@@ -55,7 +55,7 @@
 
     <!-- Header with Stats -->
     <div class="flex flex-col gap-4">
-      <div class="flex items-center gap-3">
+      <div v-if="!hideHeader" class="flex items-center gap-3">
         <div class="p-3 rounded-xl bg-brand/10">
           <ChatBubbleLeftRightIcon class="w-6 h-6 txt-brand" />
         </div>
@@ -70,7 +70,10 @@
       </div>
 
       <!-- Stats Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div
+        class="grid grid-cols-1 gap-3"
+        :class="iamSharingEnabled ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'"
+      >
         <div class="surface-card p-4 flex items-center gap-3">
           <div class="p-2 rounded-lg bg-blue-500/10">
             <ChatBubbleLeftRightIcon class="w-5 h-5 text-blue-500" />
@@ -83,21 +86,38 @@
           </div>
         </div>
         <div class="surface-card p-4 flex items-center gap-3">
-          <div class="p-2 rounded-lg bg-purple-500/10">
-            <PuzzlePieceIcon class="w-5 h-5 text-purple-500" />
-          </div>
-          <div>
-            <div class="text-2xl font-bold txt-primary">{{ widgetChatsCount }}</div>
-            <div class="text-xs txt-secondary">Widget Chats</div>
-          </div>
-        </div>
-        <div class="surface-card p-4 flex items-center gap-3">
-          <div class="p-2 rounded-lg bg-green-500/10">
-            <UserIcon class="w-5 h-5 text-green-500" />
+          <div class="p-2 rounded-lg bg-[var(--status-success-muted)]">
+            <Icon icon="mdi:lock-outline" class="w-5 h-5 text-[var(--status-success-text)]" />
           </div>
           <div>
             <div class="text-2xl font-bold txt-primary">{{ myChatsCount }}</div>
-            <div class="text-xs txt-secondary">{{ $t('chat.browser.myChats') }}</div>
+            <div class="text-xs txt-secondary">{{ $t('iam.incoming.filter.private') }}</div>
+          </div>
+        </div>
+        <div
+          v-if="iamSharingEnabled"
+          class="surface-card p-4 flex items-center gap-3"
+          data-testid="card-incoming-count"
+        >
+          <div class="p-2 rounded-lg bg-[var(--brand-alpha-light)] relative">
+            <Icon icon="mdi:account-group-outline" class="w-5 h-5 text-[var(--brand)]" />
+            <span
+              v-if="incomingStore.hasNew"
+              class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-card)]"
+            />
+          </div>
+          <div>
+            <div class="text-2xl font-bold txt-primary">{{ incomingChatsCount }}</div>
+            <div class="text-xs txt-secondary">{{ $t('iam.incoming.filter.group') }}</div>
+          </div>
+        </div>
+        <div class="surface-card p-4 flex items-center gap-3">
+          <div class="p-2 rounded-lg bg-[var(--status-neutral-muted)]">
+            <PuzzlePieceIcon class="w-5 h-5 text-[var(--status-neutral-text)]" />
+          </div>
+          <div>
+            <div class="text-2xl font-bold txt-primary">{{ widgetChatsCount }}</div>
+            <div class="text-xs txt-secondary">{{ $t('iam.incoming.filter.widget') }}</div>
           </div>
         </div>
       </div>
@@ -126,25 +146,22 @@
         </button>
       </div>
 
+      <!-- Type filter buttons: Private (mine) / Group (incoming) / Widget -->
+      <div>
+        <span class="flex items-center gap-2 text-xs font-medium txt-secondary mb-2">
+          <FunnelIcon class="w-3.5 h-3.5" />
+          {{ $t('chat.browser.filterByType') }}
+        </span>
+        <ChatKindFilter
+          v-model="selectedType"
+          show-widget
+          :counts="chatKindCounts"
+          :new-count="iamSharingEnabled ? incomingStore.unseenCount : 0"
+        />
+      </div>
+
       <!-- Filter Row -->
       <div class="flex flex-col sm:flex-row gap-3">
-        <!-- Type Filter -->
-        <div class="flex-1">
-          <label class="flex items-center gap-2 text-xs font-medium txt-secondary mb-2">
-            <FunnelIcon class="w-3.5 h-3.5" />
-            {{ $t('chat.browser.filterByType') }}
-          </label>
-          <select
-            v-model="selectedType"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
-            data-testid="select-type-filter"
-          >
-            <option value="all">{{ $t('chat.browser.allTypes') }}</option>
-            <option value="widget">{{ $t('chat.browser.widgetChats') }}</option>
-            <option value="my">{{ $t('chat.browser.myChats') }}</option>
-          </select>
-        </div>
-
         <!-- Date Filter -->
         <div class="flex-1">
           <label class="flex items-center gap-2 text-xs font-medium txt-secondary mb-2">
@@ -192,13 +209,11 @@
         <button
           v-if="selectedType !== 'all'"
           class="pill txt-secondary text-xs flex items-center gap-1.5 hover:bg-red-500/10 hover:text-red-500 transition-colors"
+          data-testid="btn-clear-type-filter"
           @click="selectedType = 'all'"
         >
-          <PuzzlePieceIcon v-if="selectedType === 'widget'" class="w-3 h-3" />
-          <UserIcon v-else class="w-3 h-3" />
-          {{
-            selectedType === 'widget' ? $t('chat.browser.widgetChats') : $t('chat.browser.myChats')
-          }}
+          <FunnelIcon class="w-3 h-3" />
+          {{ $t(`iam.incoming.filter.${selectedType}`) }}
           <XMarkIcon class="w-3 h-3" />
         </button>
         <button
@@ -275,21 +290,19 @@
           <!-- Main Content (clickable to open chat) -->
           <div class="flex-1 min-w-0 cursor-pointer" @click="openChat(chat.id)">
             <!-- Title and Type Badge -->
-            <div class="flex items-center gap-2 mb-2">
-              <div
-                v-if="chat.type === 'widget'"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400"
+            <div class="flex items-center gap-2 mb-2 flex-wrap">
+              <ChatKindPill
+                size="sm"
+                :kind="chat.kind"
+                :label="chat.kindLabel"
+                :is-new="chat.isNew"
+              />
+              <span
+                v-if="chat.type === 'shared' && chat.access"
+                class="text-xs txt-secondary"
+                data-testid="text-shared-chat-access"
+                >{{ $t(`iam.permission.${chat.access}`) }}</span
               >
-                <PuzzlePieceIcon class="w-3.5 h-3.5" />
-                <span class="text-xs font-medium">Widget</span>
-              </div>
-              <div
-                v-else
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/10 text-green-600 dark:text-green-400"
-              >
-                <UserIcon class="w-3.5 h-3.5" />
-                <span class="text-xs font-medium">{{ $t('chat.browser.myChats') }}</span>
-              </div>
               <!-- Share status badge -->
               <div
                 v-if="getShareStatus(chat.id)"
@@ -297,6 +310,18 @@
               >
                 <GlobeAltIcon class="w-3 h-3" />
                 <span class="text-xs font-medium">{{ $t('chat.browser.public') }}</span>
+              </div>
+              <!--
+                A turn keeps generating after the tab that started it navigated
+                away, so mark the chats that are still worth returning to.
+              -->
+              <div
+                v-if="chatsStore.activeRunChatIds.has(chat.id)"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--brand)] bg-brand/10"
+                data-testid="indicator-chat-active-run"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
+                <span class="text-xs font-medium">{{ $t('chat.stillGenerating') }}</span>
               </div>
             </div>
 
@@ -328,8 +353,10 @@
           >
             <!-- Share Button -->
             <button
-              class="p-1.5 md:p-2 rounded-lg txt-secondary hover:txt-brand hover:bg-brand/10 transition-all"
+              v-if="chat.type !== 'shared'"
+              class="icon-ghost"
               :title="$t('chat.browser.share')"
+              :aria-label="$t('chat.browser.share')"
               data-testid="btn-chat-share"
               @click.stop="openShareModal(chat)"
             >
@@ -337,6 +364,7 @@
             </button>
             <!-- Delete Button -->
             <button
+              v-if="chat.type !== 'shared'"
               class="p-1.5 md:p-2 rounded-lg txt-secondary hover:text-red-500 hover:bg-red-500/10 transition-all"
               :title="$t('common.delete')"
               data-testid="btn-chat-delete"
@@ -425,17 +453,33 @@
 
     <!-- Empty State -->
     <div
-      v-else-if="filteredChats.length === 0"
+      v-else-if="
+        listSettled && !chatsStore.loading && !chatsStore.error && filteredChats.length === 0
+      "
       class="surface-card p-12 text-center"
-      data-testid="no-results"
+      :data-testid="isAllChatsEmpty ? 'chats-empty' : 'no-results'"
     >
       <ChatBubbleLeftRightIcon class="w-16 h-16 mx-auto mb-4 txt-secondary opacity-50" />
-      <h3 class="text-lg font-medium txt-primary mb-2">
-        {{ $t('chat.browser.noResults') }}
-      </h3>
-      <p class="txt-secondary">
-        {{ $t('chat.browser.noResultsDesc') }}
-      </p>
+      <template v-if="isAllChatsEmpty">
+        <h3 class="text-lg font-medium txt-primary mb-2">{{ $t('chats.empty') }}</h3>
+        <button
+          type="button"
+          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="btn-chats-empty-new"
+          :disabled="creatingChat"
+          @click="goToNewChat"
+        >
+          {{ $t('chats.emptyAction') }}
+        </button>
+      </template>
+      <template v-else>
+        <h3 class="text-lg font-medium txt-primary mb-2">
+          {{ $t('chat.browser.noResults') }}
+        </h3>
+        <p class="txt-secondary">
+          {{ $t('chat.browser.noResultsDesc') }}
+        </p>
+      </template>
     </div>
 
     <!-- Share Modal -->
@@ -446,6 +490,14 @@
       @close="shareModalOpen = false"
       @shared="chatsStore.loadChats()"
       @unshared="chatsStore.loadChats()"
+    />
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="conversation"
+      :resource-id="iamShareResourceId"
+      :resource-name="shareModalChatTitle"
+      @close="iamShareOpen = false"
+      @public-link="openPublicLinkFromIam"
     />
   </div>
 </template>
@@ -458,7 +510,6 @@ import {
   ChatBubbleLeftRightIcon,
   ChatBubbleLeftIcon,
   PuzzlePieceIcon,
-  UserIcon,
   ChevronRightIcon,
   ChevronLeftIcon,
   XMarkIcon,
@@ -472,12 +523,26 @@ import {
   Squares2X2Icon,
   GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
+import { Icon } from '@iconify/vue'
 import ChatShareModal from './ChatShareModal.vue'
+import ShareDialog from './iam/ShareDialog.vue'
+import ChatKindPill from './iam/ChatKindPill.vue'
+import ChatKindFilter from './iam/ChatKindFilter.vue'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { useIncomingStore } from '@/stores/incoming'
+import {
+  kindOfSharedItem,
+  matchesChatFilter,
+  type ChatKind,
+  type ChatListFilter,
+} from '@/utils/chatKind'
 import { useChatsStore } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+
+const { hideHeader = false } = defineProps<{ hideHeader?: boolean }>()
 
 const chatsStore = useChatsStore()
 const router = useRouter()
@@ -488,7 +553,9 @@ const { formatRelativeTime } = useDateFormat()
 
 // Filter states
 const searchQuery = ref('')
-const selectedType = ref<'all' | 'widget' | 'my'>('all')
+const selectedType = ref<ChatListFilter>('all')
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const incomingStore = useIncomingStore()
 const selectedDateRange = ref<'all' | 'today' | 'yesterday' | 'lastWeek' | 'lastMonth' | 'older'>(
   'all'
 )
@@ -509,6 +576,8 @@ const isAllSelected = computed(() => {
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref<string>('')
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
 
 // Selection methods
 const toggleChatSelection = (chatId: number) => {
@@ -546,9 +615,19 @@ const getShareStatus = (chatId: number): boolean => {
 }
 
 // Share modal
+const openPublicLinkFromIam = () => {
+  iamShareOpen.value = false
+  shareModalOpen.value = true
+}
+
 const openShareModal = (chat: ChatItem) => {
   shareModalChatId.value = chat.id
   shareModalChatTitle.value = chat.title
+  if (isIamSharingEnabled()) {
+    iamShareResourceId.value = String(chat.id)
+    iamShareOpen.value = true
+    return
+  }
   shareModalOpen.value = true
 }
 
@@ -632,9 +711,14 @@ const isInDateRange = (timestamp: number | string | undefined): boolean => {
 interface ChatItem {
   id: number
   title: string
-  type: 'widget' | 'my'
+  type: 'widget' | 'my' | 'shared'
   messageCount: number
   lastMessage: number | string | undefined
+  access?: string
+  /** Pill shown in the row: private (mine), group / everyone / direct (incoming), widget. */
+  kind: ChatKind
+  kindLabel: string | null
+  isNew: boolean
 }
 
 // Generate default widget title from session info
@@ -660,9 +744,28 @@ const isAutoGeneratedTitle = (
   return false
 }
 
+// Incoming (shared-with-me) conversations, pilled by the group / person they came through
+const sharedChats = computed((): ChatItem[] => {
+  if (!iamSharingEnabled.value) return []
+  return incomingStore.chats.map((item) => {
+    const { kind, label } = kindOfSharedItem(item)
+    return {
+      id: Number(item.id),
+      title: item.name,
+      type: 'shared' as const,
+      messageCount: Number(item.meta?.messageCount ?? 0),
+      lastMessage: item.sharedAt || undefined,
+      access: item.permission,
+      kind,
+      kindLabel: label,
+      isNew: item.isNew === true,
+    }
+  })
+})
+
 // Compute all chats from store
 const allChats = computed((): ChatItem[] => {
-  return chatsStore.chats.map((c) => {
+  const owned = chatsStore.chats.map((c): ChatItem => {
     if (c.widgetSession) {
       const session = c.widgetSession
       const defaultTitle = getDefaultWidgetTitle(session.widgetName, session.sessionId)
@@ -680,6 +783,9 @@ const allChats = computed((): ChatItem[] => {
         type: 'widget' as const,
         messageCount: session.messageCount,
         lastMessage: lastTimestamp,
+        kind: 'widget',
+        kindLabel: null,
+        isNew: false,
       }
     } else {
       return {
@@ -688,18 +794,23 @@ const allChats = computed((): ChatItem[] => {
         type: 'my' as const,
         messageCount: c.messageCount ?? 0,
         lastMessage: Math.floor(new Date(c.updatedAt).getTime() / 1000),
+        kind: 'private',
+        kindLabel: null,
+        isNew: false,
       }
     }
   })
+  const ownedIds = new Set(owned.map((chat) => chat.id))
+  return [...owned, ...sharedChats.value.filter((chat) => !ownedIds.has(chat.id))]
 })
 
 // Filter and sort chats
 const filteredChats = computed((): ChatItem[] => {
   let result = allChats.value
 
-  // Filter by type
+  // Filter by type (Private = mine, Group = incoming, Widget = visitor sessions)
   if (selectedType.value !== 'all') {
-    result = result.filter((c) => c.type === selectedType.value)
+    result = result.filter((c) => matchesChatFilter(c.kind, selectedType.value))
   }
 
   // Filter by search query
@@ -752,6 +863,14 @@ const widgetChatsCount = computed(() => allChats.value.filter((c) => c.type === 
 
 const myChatsCount = computed(() => allChats.value.filter((c) => c.type === 'my').length)
 
+const incomingChatsCount = computed(() => allChats.value.filter((c) => c.type === 'shared').length)
+
+const chatKindCounts = computed<Partial<Record<ChatListFilter, number>>>(() => ({
+  private: myChatsCount.value,
+  group: incomingChatsCount.value,
+  widget: widgetChatsCount.value,
+}))
+
 const hasActiveFilters = computed(() => {
   return (
     selectedType.value !== 'all' ||
@@ -759,6 +878,17 @@ const hasActiveFilters = computed(() => {
     searchQuery.value.trim() !== ''
   )
 })
+
+const listSettled = ref(false)
+const creatingChat = ref(false)
+const isAllChatsEmpty = computed(
+  () =>
+    listSettled.value &&
+    !chatsStore.loading &&
+    !chatsStore.error &&
+    !hasActiveFilters.value &&
+    totalChatsCount.value === 0
+)
 
 const clearAllFilters = () => {
   selectedType.value = 'all'
@@ -812,7 +942,22 @@ const openChat = (id: number) => {
   router.push('/')
 }
 
+const goToNewChat = async () => {
+  if (creatingChat.value || !listSettled.value || chatsStore.loading) return
+  creatingChat.value = true
+  try {
+    const chat = await chatsStore.findOrCreateEmptyChat()
+    if (!chat) return
+    if (router.currentRoute.value.path !== '/') {
+      await router.push('/')
+    }
+  } finally {
+    creatingChat.value = false
+  }
+}
+
 onMounted(async () => {
-  await chatsStore.loadChats()
+  await Promise.all([chatsStore.loadChats(), incomingStore.load()])
+  listSettled.value = true
 })
 </script>

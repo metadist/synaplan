@@ -1,0 +1,284 @@
+name: Umbrel Store Sync
+
+# Carries deploy/umbrel/synaplan/ into the Umbrel App Store, so the store
+# package follows a release without anyone copying files by hand.
+#
+# Two different jobs hide behind that one sentence, and which one applies is
+# decided by the store itself:
+#
+#   * Synaplan is not in the store yet. The submission is still an open pull
+#     request, and keeping it current means updating the branch it is built from.
+#     Umbrel's linter requires `releaseNotes` and `gallery` to stay EMPTY for a
+#     new submission — Umbrel produces the final store assets — so nothing here
+#     fills them.
+#   * Synaplan is in the store. Then a release is a version bump, which is a new
+#     pull request of its own, and Umbrel expects user-facing `releaseNotes`.
+#
+# Runs on the default branch after the version pins land there, which is what
+# release-rollout.yml does in its maintenance window. The merge itself cannot be
+# automated: getumbrel/umbrel-apps belongs to Umbrel.
+
+on:
+  push:
+    branches: [main]
+    paths: ['deploy/umbrel/synaplan/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The fork branch is rewritten in place, so two runs must never overlap.
+concurrency:
+  group: umbrel-store-sync
+  cancel-in-progress: false
+
+env:
+  FORK: metadist/umbrel-apps
+  UPSTREAM: getumbrel/umbrel-apps
+  APP_ID: synaplan
+  SUBMISSION_BRANCH: synaplan
+
+jobs:
+  sync:
+    name: Update the Umbrel App Store package
+    runs-on: ubuntu-latest
+
+    steps:
+      # The token belongs to the fork, not to this repository, so it cannot be
+      # derived from anything available here. Skipped rather than failed while it
+      # is unset: the store package is still correct in this repository.
+      - name: Check the fork credentials
+        id: config
+        env:
+          TOKEN: ${{ secrets.UMBREL_FORK_TOKEN }}
+        run: |
+          if test -n "${TOKEN:-}"; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No \`UMBREL_FORK_TOKEN\`; the Umbrel App Store sync is skipped." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: synaplan
+          persist-credentials: false
+
+      - name: Read the packaged version
+        id: package
+        if: steps.config.outputs.configured == 'true'
+        working-directory: synaplan
+        run: |
+          set -euo pipefail
+          version="$(node scripts/read-release-version.mjs | jq -r .version)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Packaging Synaplan ${version} for the Umbrel App Store." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clone the fork
+        if: steps.config.outputs.configured == 'true'
+        env:
+          TOKEN: ${{ secrets.UMBREL_FORK_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Credentials in a helper rather than the remote URL, so no later `git
+          # remote -v` in a log can expose the token.
+          git clone --quiet --no-tags "https://github.com/${FORK}.git" fork
+          cd fork
+          git config credential.helper '!f() { echo "username=x-access-token"; echo "password=${TOKEN}"; }; f'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add upstream "https://github.com/${UPSTREAM}.git"
+          git fetch --quiet --no-tags upstream master
+
+      # Whether the store already carries the app decides everything below: the
+      # branch to build, the pull request to open, and whether release notes are
+      # required or forbidden.
+      - name: Decide submission or version bump
+        id: mode
+        if: steps.config.outputs.configured == 'true'
+        working-directory: fork
+        run: |
+          set -euo pipefail
+
+          if git cat-file -e "upstream/master:${APP_ID}/umbrel-app.yml" 2>/dev/null; then
+            echo "mode=bump" >> "$GITHUB_OUTPUT"
+            echo "The store already carries \`${APP_ID}\`; this release is a version bump." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "mode=submission" >> "$GITHUB_OUTPUT"
+            echo "\`${APP_ID}\` is not in the store yet; the open submission is updated instead." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Guards the one thing a forced update could destroy. The automation owns
+      # `<app>/` on the submission branch, but anything a maintainer added
+      # outside it — tooling, another app, a fix to the store itself — would be
+      # lost, and losing someone else's work silently is not acceptable.
+      - name: Check the submission branch for foreign changes
+        if: steps.config.outputs.configured == 'true' && steps.mode.outputs.mode == 'submission'
+        working-directory: fork
+        run: |
+          set -euo pipefail
+
+          git rev-parse --verify --quiet "origin/${SUBMISSION_BRANCH}" >/dev/null || exit 0
+
+          foreign="$(
+            git diff --name-only "upstream/master...origin/${SUBMISSION_BRANCH}" \
+              | grep -v "^${APP_ID}/" || true
+          )"
+          if [ -n "$foreign" ]; then
+            echo "::error::\`${FORK}:${SUBMISSION_BRANCH}\` changes files outside \`${APP_ID}/\`, which this sync would discard: $(echo "$foreign" | tr '\n' ' ')"
+            exit 1
+          fi
+
+      - name: Build the store package
+        id: build
+        if: steps.config.outputs.configured == 'true'
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          VERSION: ${{ steps.package.outputs.version }}
+          # Reads this repository's own release, so the run's own token is enough
+          # — the fork credentials have no business here.
+          GH_TOKEN: ${{ github.token }}
+        working-directory: fork
+        run: |
+          set -euo pipefail
+
+          if [ "$MODE" = submission ]; then
+            branch="$SUBMISSION_BRANCH"
+          else
+            branch="${APP_ID}-${VERSION}"
+          fi
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+
+          # Rebuilt from upstream rather than rebased onto it: the branch carries
+          # exactly one directory, so recreating it can never conflict, and the
+          # result stays mergeable for as long as upstream leaves that directory
+          # alone.
+          git checkout --quiet -B "$branch" upstream/master
+
+          # Mirrored, not merged: a file dropped from the package here has to
+          # disappear from the store package too.
+          rsync --archive --delete "../synaplan/deploy/umbrel/${APP_ID}/" "${APP_ID}/"
+
+          if [ "$MODE" = bump ]; then
+            # Umbrel shows these in the update dialog and its linter asks for them
+            # on a version bump. Absent for a new submission, where the same
+            # linter rejects them.
+            body="$(gh release view "v${VERSION}" --repo "$GITHUB_REPOSITORY" --json body --jq .body 2>/dev/null || true)"
+            node ../synaplan/scripts/set-umbrel-release-notes.mjs \
+              --manifest "${APP_ID}/umbrel-app.yml" \
+              --body "$body" \
+              --url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}" \
+              > /dev/null
+          fi
+
+          # --porcelain rather than `git diff`: the submission path starts from an
+          # upstream that has no such directory at all, so every file is untracked
+          # and a diff would report no change at all.
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "The store package already matches this repository; nothing to push." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git add --all "${APP_ID}"
+          if [ "$MODE" = submission ]; then
+            git commit --quiet -m "${APP_ID}: add Synaplan ${VERSION}"
+          else
+            git commit --quiet -m "${APP_ID}: update to ${VERSION}"
+          fi
+
+      # Umbrel's own rules, run before Umbrel has to look at it: manifest fields,
+      # port conflicts, and with --check-images that every pinned digest really
+      # exists. --changed is what tells the linter whether this is a new
+      # submission or an update, so its release-notes rule matches reality.
+      - name: Lint the package with Umbrel's linter
+        if: steps.build.outputs.changed == 'true'
+        working-directory: fork
+        run: |
+          set -euo pipefail
+
+          if ! jq -e '.scripts["lint:apps"]' package.json >/dev/null 2>&1; then
+            echo "::warning::${UPSTREAM} no longer provides \`lint:apps\`; the store package is pushed unlinted."
+            exit 0
+          fi
+
+          npm ci --no-audit --no-fund
+          npm run lint:apps -- --changed "upstream/master...HEAD" --check-images --format github
+
+      - name: Push and propose
+        if: steps.build.outputs.changed == 'true'
+        env:
+          # TOKEN feeds the credential helper the clone step installed, GH_TOKEN
+          # the API calls. Same secret, two consumers that read it differently.
+          TOKEN: ${{ secrets.UMBREL_FORK_TOKEN }}
+          GH_TOKEN: ${{ secrets.UMBREL_FORK_TOKEN }}
+          MODE: ${{ steps.mode.outputs.mode }}
+          VERSION: ${{ steps.package.outputs.version }}
+          BRANCH: ${{ steps.build.outputs.branch }}
+        working-directory: fork
+        run: |
+          set -euo pipefail
+
+          # Force, because the branch was rebuilt on upstream/master. For the
+          # submission branch this updates the pull request that is already open;
+          # the step above proved it carries nothing but this app.
+          git push --quiet --force origin "HEAD:refs/heads/${BRANCH}"
+
+          existing="$(
+            gh pr list --repo "$UPSTREAM" --state open \
+              --head "$BRANCH" --json number,url --jq '.[0].url // ""' || true
+          )"
+
+          if [ -n "$existing" ]; then
+            {
+              echo "### Umbrel App Store"
+              echo ""
+              echo "Updated ${existing} to Synaplan \`${VERSION}\`. Umbrel merges its own store pull requests."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Only a version bump opens a new one. A missing submission pull request
+          # is not something to guess at: reopening it silently could duplicate a
+          # submission Umbrel already closed for a reason.
+          if [ "$MODE" = submission ]; then
+            {
+              echo "### Umbrel App Store"
+              echo ""
+              echo "Pushed Synaplan \`${VERSION}\` to \`${FORK}:${BRANCH}\`, but no open submission pull request was found."
+              echo ""
+              echo "Open one against [${UPSTREAM}](${GITHUB_SERVER_URL}/${UPSTREAM}/compare) from that branch if the submission should be revived."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::No open submission pull request for ${BRANCH}; the branch was updated but nothing was proposed."
+            exit 0
+          fi
+
+          body_file="$(mktemp)"
+          cat > "$body_file" <<EOF
+          Updates Synaplan to \`${VERSION}\`.
+
+          Release notes: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}
+
+          The package is generated from \`deploy/umbrel/${APP_ID}/\` in
+          ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY} and pins the image by digest.
+          Opened automatically after the release was published and verified.
+          EOF
+
+          url="$(
+            gh pr create --repo "$UPSTREAM" \
+              --base master \
+              --head "${FORK%%/*}:${BRANCH}" \
+              --title "${APP_ID}: update to ${VERSION}" \
+              --body-file "$body_file"
+          )"
+
+          {
+            echo "### Umbrel App Store"
+            echo ""
+            echo "Opened ${url} for Synaplan \`${VERSION}\`. Umbrel merges its own store pull requests."
+          } >> "$GITHUB_STEP_SUMMARY"

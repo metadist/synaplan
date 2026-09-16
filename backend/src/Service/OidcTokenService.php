@@ -273,6 +273,113 @@ final class OidcTokenService
     }
 
     /**
+     * Resolve the claims a fresh login may trust, picking the mechanism by
+     * token type so login and refresh agree on what a valid token is.
+     *
+     * A JWT access token is validated locally — signature via JWKS plus iss,
+     * exp and aud — which is exactly the check the refresh path applies. Doing
+     * it here means a misconfigured audience is rejected by the very first
+     * login, with the reason in the log, instead of passing login and then
+     * killing every session on the first refresh five minutes later (#1520).
+     *
+     * An opaque access token carries nothing we can inspect, so the IdP has to
+     * resolve it: those fall back to the userinfo endpoint.
+     *
+     * @return array<string, mixed>|null Claims to provision the user from, null when the token is not acceptable
+     */
+    public function resolveLoginClaims(string $accessToken, string $provider = 'keycloak'): ?array
+    {
+        if (!self::looksLikeJwt($accessToken)) {
+            $this->logger->debug('OIDC login: opaque access token, resolving via userinfo', [
+                'provider' => $provider,
+            ]);
+
+            return $this->fetchUserInfo($accessToken, $provider);
+        }
+
+        $claims = $this->validateBearerToken($accessToken, $provider);
+
+        if (null === $claims) {
+            $this->logger->error('OIDC login rejected: the access token failed local JWT validation', [
+                'provider' => $provider,
+                'hint' => 'Preceding JWT log entries name the failing check (signature, iss, exp or aud).',
+            ]);
+
+            return null;
+        }
+
+        // Which profile claims reach the access token depends on the client's
+        // protocol mappers, and provisioning needs at least one identifier
+        // besides sub. Top those up from userinfo rather than creating a user
+        // with a synthetic address. The validated claims stay authoritative.
+        if (!isset($claims['email']) && !isset($claims['preferred_username'])) {
+            $userInfo = $this->fetchUserInfo($accessToken, $provider) ?? [];
+            $claims = array_merge($userInfo, $claims);
+        }
+
+        return $claims;
+    }
+
+    /**
+     * A JWT is three base64url segments; anything else is an opaque token that
+     * only the issuer can resolve. Structural check only — the signature and
+     * claims are verified by the caller.
+     */
+    private static function looksLikeJwt(string $token): bool
+    {
+        $parts = explode('.', $token);
+
+        if (3 !== count($parts)) {
+            return false;
+        }
+
+        foreach ($parts as $part) {
+            if ('' === $part || 1 !== preg_match('/^[A-Za-z0-9_-]+$/', $part)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Ask the IdP who a token belongs to. Required for opaque tokens and used
+     * to complete missing profile claims for JWTs.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function fetchUserInfo(string $accessToken, string $provider): ?array
+    {
+        try {
+            $discovery = $this->getDiscoveryConfig($provider);
+
+            $endpoint = $discovery['userinfo_endpoint'] ?? null;
+            if (!is_string($endpoint) || '' === $endpoint) {
+                $this->logger->error('OIDC provider advertises no userinfo_endpoint', [
+                    'provider' => $provider,
+                ]);
+
+                return null;
+            }
+
+            $response = $this->httpClient->request('GET', $endpoint, [
+                'headers' => ['Authorization' => 'Bearer '.$accessToken],
+            ]);
+
+            $claims = $response->toArray();
+
+            return $claims ?: null;
+        } catch (\Exception $e) {
+            $this->logger->error('OIDC userinfo request failed', [
+                'error' => $e->getMessage(),
+                'provider' => $provider,
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * Get user from OIDC token (validates and returns user).
      */
     public function getUserFromOidcToken(string $accessToken, string $provider = 'keycloak'): ?User

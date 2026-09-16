@@ -6,10 +6,12 @@
     >
       <div class="max-w-4xl mx-auto space-y-6">
         <!-- Header -->
-        <div class="surface-card p-6" data-testid="section-header">
-          <h1 class="text-2xl font-semibold txt-primary mb-1">⚙️ {{ $t('settings.title') }}</h1>
-          <p class="txt-secondary text-sm">{{ $t('settings.subtitle') }}</p>
-        </div>
+        <PageHeader
+          :title="$t('settings.title')"
+          :subtitle="$t('settings.subtitle')"
+          icon="heroicons:cog-6-tooth"
+          data-testid="section-header"
+        />
 
         <!-- General Settings Content -->
         <div class="space-y-6" data-testid="section-general-settings">
@@ -22,7 +24,10 @@
               {{ $t('settings.language.description') }}
             </p>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="grid-language-options">
+            <div
+              class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+              data-testid="grid-language-options"
+            >
               <button
                 v-for="lang in languages"
                 :key="lang.value"
@@ -98,8 +103,15 @@
             </div>
           </div>
 
-          <!-- Account Info -->
-          <div class="surface-card p-6" data-testid="section-account-info">
+          <WebSearchProviderSetting v-if="authStore.isAuthenticated" />
+          <ExportImportPanel v-if="authStore.isAuthenticated" />
+
+          <!-- Account Info (signed-in users only — a guest has nothing to show here) -->
+          <div
+            v-if="authStore.isAuthenticated"
+            class="surface-card p-6"
+            data-testid="section-account-info"
+          >
             <h2 class="text-lg font-semibold txt-primary mb-4">
               {{ $t('settings.account.title') }}
             </h2>
@@ -108,7 +120,9 @@
                 <label class="block text-sm font-medium txt-secondary mb-1">{{
                   $t('settings.account.email')
                 }}</label>
-                <div class="txt-primary">{{ authStore.user?.email || 'Not logged in' }}</div>
+                <div class="txt-primary">
+                  {{ authStore.user?.email || $t('settings.notLoggedIn') }}
+                </div>
               </div>
               <div data-testid="text-account-level">
                 <label class="block text-sm font-medium txt-secondary mb-1">{{
@@ -130,10 +144,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { languageOptions } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import NativeServerControl from '@/components/NativeServerControl.vue'
+import WebSearchProviderSetting from '@/components/settings/WebSearchProviderSetting.vue'
+import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
 import { isNativeServerControlAvailable } from '@/services/api/nativeServer'
 import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/vue/24/outline'
 
@@ -141,12 +159,7 @@ const authStore = useAuthStore()
 const { theme, setTheme } = useTheme()
 const { locale } = useI18n()
 
-const languages = [
-  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { value: 'en', label: 'English', flag: '🇬🇧' },
-  { value: 'es', label: 'Español', flag: '🇪🇸' },
-  { value: 'tr', label: 'Türkçe', flag: '🇹🇷' },
-]
+const languages = languageOptions
 
 const selectedLanguage = computed({
   get: () => locale.value,

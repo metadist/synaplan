@@ -1,0 +1,18 @@
+{
+  "protocol": 1,
+  "jobs": [
+    {
+      "jobId": 1,
+      "type": "skill.run",
+      "input": {
+        "skill": "hello-files",
+        "prompt": "List the files in my Documents folder",
+        "fileIds": []
+      },
+      "leaseToken": "lt_0000000000000000000000000000000000000000000000000000",
+      "leaseExpires": 1788126300,
+      "attempt": 1
+    }
+  ],
+  "next_call_at": 1788126030
+}

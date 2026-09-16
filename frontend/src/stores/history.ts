@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgainData } from '@/types/ai-models'
-import type { ApiInProgressTurn, ApiLoadedMessageRow } from '@/utils/messageMapper'
+import type { ApiActiveRun, ApiInProgressTurn, ApiLoadedMessageRow } from '@/utils/messageMapper'
 import {
   IN_PROGRESS_TURN_ID,
   mapApiMessageRow,
@@ -9,9 +9,12 @@ import {
   parseContentWithThinking,
   reconcileLocalMessage,
 } from '@/utils/messageMapper'
+import { finalizeSettledInProgressTurn } from '@/utils/chatErrorDisplay'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
+import { isSessionTerminating } from '@/services/sessionTeardown'
 import type { MessageUsage } from '@/stores/usageTaximeter'
+import type { TimelineModel, TimelineStep } from '@/utils/processingTimeline'
 
 // Re-export so existing consumers keep importing from the store module.
 // The implementation moved to utils/messageMapper.ts (issue #1070) so the
@@ -21,6 +24,10 @@ export { parseContentWithThinking }
 // Helper function to check authentication and redirect if needed
 // Uses authService which holds user info in memory (not localStorage)
 function checkAuthOrRedirect(): boolean {
+  // A logout in progress owns the next navigation: redirecting here would
+  // cancel it (see sessionTeardown). Bail out silently instead.
+  if (isSessionTerminating()) return false
+
   if (!authService.isAuthenticated()) {
     console.warn('🔒 Not authenticated - redirecting to login')
     // Only genuine expired sessions (prior login on this browser) get the
@@ -38,6 +45,7 @@ export type PartType =
   | 'video'
   | 'audio'
   | 'code'
+  | 'json'
   | 'links'
   | 'docs'
   | 'screenshot'
@@ -46,6 +54,7 @@ export type PartType =
   | 'commandList'
   | 'thinking'
   | 'tts_loading'
+  | 'pastedText'
 
 export interface Part {
   /**
@@ -125,9 +134,23 @@ export interface Message {
   quotedText?: string | null
   /** Backend id of the message the quote was taken from. */
   quotedMessageId?: number | null
+  /** Assistant this turn was pinned to (`AGENTID` meta). */
+  agentId?: number | null
   files?: MessageFile[] // Attached files
+  documentChanges?: Array<{
+    labelKey: string
+    labelParams?: Record<string, unknown>
+    ok: boolean
+  }>
+  documentVersion?: number
+  documentFidelityLossy?: boolean
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
+  errorReason?: string | null
+  /** Localized, non-leaky sentence from the SSE error payload. */
+  errorMessage?: string | null
+  canRetryModel?: boolean
+  errorDebug?: string | null
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {
     limitType?: string
@@ -170,6 +193,8 @@ export interface Message {
     enabled?: boolean
     query?: string
     resultsCount?: number
+    // Result pages whose full text was read for the answer (deep research).
+    pagesRead?: number
   } | null // Web search metadata
   tool?: {
     command?: string
@@ -178,8 +203,16 @@ export interface Message {
   } | null // Tool metadata (e.g., web search, file generation)
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
+  /** Platform docs cited in this answer (`docs_loaded` / complete.docs). */
+  docs?: { slug: string; title: string; url: string }[]
   processingStatus?: string
   processingMetadata?: Record<string, unknown> | null
+  /**
+   * Snapshot of the turn's progress timeline. Kept on the finished message
+   * so the folded step summary stays visible after the stream ends.
+   */
+  processingSteps?: TimelineStep[] | null
+  processingModel?: TimelineModel | null
   // Multitask routing: live task-card state while a multi-node plan streams.
   // Only set when a `plan` SSE event arrives (multi-node turns). On reload the
   // turn is flattened (text + media parts), so this is a streaming-time affordance.
@@ -208,6 +241,8 @@ export const TASK_CARD_KINDS = [
   'search',
   'extract',
   'email',
+  'folder',
+  'compute',
 ] as const
 export type TaskCardKind = (typeof TASK_CARD_KINDS)[number]
 
@@ -218,6 +253,7 @@ export const TASK_CARD_STATES = [
   'failed',
   'skipped',
   'cancelled',
+  'waiting_approval',
 ] as const
 export type TaskCardState = (typeof TASK_CARD_STATES)[number]
 
@@ -235,6 +271,8 @@ export interface TaskCard {
   capability: string
   kind: TaskCardKind
   state: TaskCardState
+  /** Upstream step ids this step waited on (empty/undefined for roots). */
+  dependsOn?: string[]
   text?: string
   url?: string
   mediaType?: string
@@ -255,6 +293,8 @@ export interface TaskCard {
   elapsedSeconds?: number
   /** Async media job key when the node detached to a background worker. */
   jobId?: string
+  /** True when this run mounted the user's persistent file-work folder. */
+  usedWorkspace?: boolean
   /**
    * #1229 smart collapse: the card's prose is already contained in the final
    * answer body, so the card collapses to its header (set by ResultAssembler
@@ -386,6 +426,16 @@ export const useHistoryStore = defineStore('history', () => {
   const currentOffset = ref(0)
   const inProgressPollIntervalMs = 2000
 
+  /**
+   * A turn of the loaded chat that is STILL generating on the server.
+   *
+   * The backend keeps a turn alive across a client disconnect and buffers its
+   * events, so a reload or a trip to another view can pick it back up. The
+   * store only reports it; ChatView owns the re-attach because rendering the
+   * events needs its stream handler.
+   */
+  const activeRun = ref<ApiActiveRun | null>(null)
+
   // Monotonic generation counter: incremented each time loadMessages is called
   // for a fresh chat (offset === 0). Responses from older generations are
   // discarded so a slow response for a previous chat never overwrites the
@@ -434,7 +484,12 @@ export const useHistoryStore = defineStore('history', () => {
     againData?: AgainData,
     backendMessageId?: number,
     originalMessageId?: number,
-    webSearch?: { enabled?: boolean; query?: string; resultsCount?: number } | null,
+    webSearch?: {
+      enabled?: boolean
+      query?: string
+      resultsCount?: number
+      pagesRead?: number
+    } | null,
     tool?: { command: string; label: string; icon: string } | null,
     quotedText?: string | null,
     quotedMessageId?: number | null
@@ -505,20 +560,36 @@ export const useHistoryStore = defineStore('history', () => {
         }
       }
 
-      // #1058: convert live wall-clock start → thinkingTime seconds, then clear
-      // the ephemeral startedAt so history payloads stay lean.
-      const now = Date.now()
-      for (const part of message.parts) {
-        if (part.type !== 'thinking') continue
-        if (part.isStreaming) {
-          delete part.isStreaming
-        }
-        if (typeof part.thinkingStartedAt === 'number' && !part.thinkingTime) {
-          part.thinkingTime = Math.max(1, Math.round((now - part.thinkingStartedAt) / 1000))
-        }
-        delete part.thinkingStartedAt
-      }
+      closeThinkingParts(message.parts)
     }
+  }
+
+  // #1058: convert live wall-clock start → thinkingTime seconds, then clear
+  // the ephemeral startedAt so history payloads stay lean.
+  const closeThinkingParts = (parts: Part[]) => {
+    const now = Date.now()
+    for (const part of parts) {
+      if (part.type !== 'thinking') continue
+      if (part.isStreaming) {
+        delete part.isStreaming
+      }
+      if (typeof part.thinkingStartedAt === 'number' && !part.thinkingTime) {
+        part.thinkingTime = Math.max(1, Math.round((now - part.thinkingStartedAt) / 1000))
+      }
+      delete part.thinkingStartedAt
+    }
+  }
+
+  /**
+   * The answer started: the live reasoning block is finished even though the
+   * message keeps streaming. Lets the thinking panel fold away on the first
+   * answer token instead of staying open until `complete`.
+   */
+  const finishLiveThinking = (id: string) => {
+    const message = messages.value.find((m) => m.id === id)
+    if (!message) return
+    if (!message.parts.some((part) => part.type === 'thinking' && part.isStreaming)) return
+    closeThinkingParts(message.parts)
   }
 
   const removeMessage = (id: string) => {
@@ -560,6 +631,7 @@ export const useHistoryStore = defineStore('history', () => {
     messages.value = []
     currentOffset.value = 0
     hasMoreMessages.value = false
+    activeRun.value = null
   }
 
   const loadMessages = async (chatId: number, offset = 0, limit = 50, silent = false) => {
@@ -592,6 +664,7 @@ export const useHistoryStore = defineStore('history', () => {
         messages?: ApiLoadedMessageRow[]
         pagination?: { hasMore?: boolean }
         inProgressTurn?: ApiInProgressTurn | null
+        activeRun?: ApiActiveRun | null
       }
 
       if (myGeneration !== loadGeneration) return
@@ -599,12 +672,26 @@ export const useHistoryStore = defineStore('history', () => {
       if (response.success && response.messages) {
         const loadedMessages: Message[] = response.messages.map(mapApiMessageRow)
 
+        // Only the first page carries it, and only while the turn runs.
+        if (offset === 0) {
+          activeRun.value = response.activeRun ?? null
+        }
+
         // Issue #1142: append a provisional assistant bubble for a still-running
         // multi-task turn (only sent on the first page) so returning mid-stream
         // shows the running/completed task cards, not just the user prompt.
         if (offset === 0 && response.inProgressTurn) {
-          loadedMessages.push(mapInProgressTurn(response.inProgressTurn))
-          scheduleInProgressPoll(chatId)
+          const mapped = mapInProgressTurn(response.inProgressTurn)
+          const { message: inProgress, stalled } = finalizeSettledInProgressTurn(
+            mapped,
+            response.activeRun != null
+          )
+          loadedMessages.push(inProgress)
+          if (stalled) {
+            stopInProgressPolling()
+          } else {
+            scheduleInProgressPoll(chatId)
+          }
         } else if (offset === 0 && inProgressPollChatId === chatId) {
           stopInProgressPolling()
         }
@@ -751,10 +838,12 @@ export const useHistoryStore = defineStore('history', () => {
     messages,
     isLoadingMessages,
     hasMoreMessages,
+    activeRun,
     addMessage,
     addStreamingMessage,
     updateStreamingMessage,
     finishStreamingMessage,
+    finishLiveThinking,
     markSuperseded,
     removeMessage,
     setMessageStatus,

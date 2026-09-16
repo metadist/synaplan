@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getProviderIcon, getProviderFlag } from '@/utils/providerIcons'
+import { getProviderIcon, getProviderFlag, isLocalSelfHostedProvider } from '@/utils/providerIcons'
 
 describe('Provider Icons Utility', () => {
   it('should return OpenAI icon for openai service', () => {
@@ -33,6 +33,10 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('ollama')).toBe('simple-icons:ollama')
   })
 
+  it('should return a microphone icon for local Whisper', () => {
+    expect(getProviderIcon('Whisper')).toBe('mdi:microphone')
+  })
+
   it('should return Stability AI icon for stability service', () => {
     expect(getProviderIcon('stability')).toBe('simple-icons:stabilityai')
   })
@@ -57,6 +61,12 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('trusted tokens')).toBe('mdi:shield-check')
   })
 
+  it('should return a gateway icon for A2Agent', () => {
+    expect(getProviderIcon('A2Agent')).toBe('mdi:transit-connection-variant')
+    expect(getProviderIcon('a2agent')).toBe('mdi:transit-connection-variant')
+    expect(getProviderIcon('a2-agent')).toBe('mdi:transit-connection-variant')
+  })
+
   it('should return default robot icon for unknown service', () => {
     expect(getProviderIcon('unknown')).toBe('mdi:robot')
     expect(getProviderIcon('')).toBe('mdi:robot')
@@ -73,18 +83,35 @@ describe('Provider Flag Utility', () => {
     expect(getProviderFlag('openai')).toBe('circle-flags:us')
   })
 
-  it('should return a neutral world badge (not the US flag) for OpenAI-compatible', () => {
-    expect(getProviderFlag('OpenAICompatible')).toBe('circle-flags:un')
-    expect(getProviderFlag('openaicompatible')).toBe('circle-flags:un')
-  })
-
-  it('should return the German flag for self-hosted Ollama', () => {
-    expect(getProviderFlag('ollama')).toBe('circle-flags:de')
+  it('should return a local pin (not a country flag) for self-hosted engines', () => {
+    // These run on the operator's machine. A German flag implied Synaplan-DE
+    // hosting and looked wrong on every local Ollama install.
+    expect(getProviderFlag('ollama')).toBe('mdi:map-marker')
+    expect(getProviderFlag('Ollama')).toBe('mdi:map-marker')
+    expect(getProviderFlag('piper')).toBe('mdi:map-marker')
+    expect(getProviderFlag('triton')).toBe('mdi:map-marker')
+    expect(getProviderFlag('OpenAICompatible')).toBe('mdi:map-marker')
+    expect(getProviderFlag('openaicompatible')).toBe('mdi:map-marker')
   })
 
   it('should return the German flag for TrustedTokens', () => {
     expect(getProviderFlag('TrustedTokens')).toBe('circle-flags:de')
     expect(getProviderFlag('trustedtokens')).toBe('circle-flags:de')
     expect(getProviderFlag('trusted-tokens')).toBe('circle-flags:de')
+  })
+
+  it('should return the Chinese flag for A2Agent', () => {
+    expect(getProviderFlag('A2Agent')).toBe('circle-flags:cn')
+    expect(getProviderFlag('a2agent')).toBe('circle-flags:cn')
+    expect(getProviderFlag('a2-agent')).toBe('circle-flags:cn')
+  })
+
+  it('should classify only self-hosted engines as local', () => {
+    expect(isLocalSelfHostedProvider('ollama')).toBe(true)
+    expect(isLocalSelfHostedProvider('whisper')).toBe(true)
+    expect(isLocalSelfHostedProvider('triton')).toBe(true)
+    expect(isLocalSelfHostedProvider('TrustedTokens')).toBe(false)
+    expect(isLocalSelfHostedProvider('A2Agent')).toBe(false)
+    expect(isLocalSelfHostedProvider('openai')).toBe(false)
   })
 })

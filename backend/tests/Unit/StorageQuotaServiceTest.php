@@ -7,19 +7,22 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
 use App\Service\BillingService;
+use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class StorageQuotaServiceTest extends TestCase
 {
-    private FileRepository $fileRepository;
-    private ConfigRepository $configRepository;
+    private FileRepository&MockObject $fileRepository;
+    private ConfigRepository&MockObject $configRepository;
     private EntityManagerInterface $em;
     private LoggerInterface $logger;
+    private RateLimitService&MockObject $rateLimitService;
     private StorageQuotaService $service;
 
     protected function setUp(): void
@@ -28,6 +31,10 @@ class StorageQuotaServiceTest extends TestCase
         $this->configRepository = $this->createMock(ConfigRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->rateLimitService->method('resolveRateLimitLevel')->willReturnCallback(
+            static fn (User $user): string => $user->getRateLimitLevel()
+        );
 
         $billingService = new BillingService('sk_test_valid_key', 'price_1RealProId');
 
@@ -36,7 +43,8 @@ class StorageQuotaServiceTest extends TestCase
             $this->configRepository,
             $this->em,
             $this->logger,
-            $billingService
+            $billingService,
+            $this->rateLimitService,
         );
     }
 
@@ -92,6 +100,37 @@ class StorageQuotaServiceTest extends TestCase
         $this->assertEquals(100 * 1024 * 1024, $limit);
     }
 
+    public function testGetStorageLimitUsesGroupRateLimitTier(): void
+    {
+        $user = $this->createUser('NEW');
+        $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->rateLimitService->method('resolveRateLimitLevel')->willReturn('BUSINESS');
+
+        $this->service = new StorageQuotaService(
+            $this->fileRepository,
+            $this->configRepository,
+            $this->em,
+            $this->logger,
+            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            $this->rateLimitService,
+        );
+
+        $config = $this->createMock(Config::class);
+        $config->method('getValue')->willReturn('100');
+
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => 0,
+                'group' => 'RATELIMITS_BUSINESS',
+                'setting' => 'STORAGE_GB',
+            ])
+            ->willReturn($config);
+
+        $this->assertSame(100 * 1024 * 1024 * 1024, $this->service->getStorageLimit($user));
+    }
+
     public function testGetStorageLimitReturnsDefaultWhenNoConfig(): void
     {
         $user = $this->createUser('NEW');
@@ -104,6 +143,51 @@ class StorageQuotaServiceTest extends TestCase
 
         // Default: 100 MB
         $this->assertEquals(100 * 1024 * 1024, $limit);
+    }
+
+    public function testGetStorageLimitIsUnlimitedForAdmin(): void
+    {
+        $user = $this->createUser('ADMIN');
+
+        $this->configRepository->expects($this->never())->method('findOneBy');
+
+        $this->assertTrue($this->service->isUnlimited($user));
+        $this->assertSame(StorageQuotaService::UNLIMITED_BYTES, $this->service->getStorageLimit($user));
+    }
+
+    public function testCheckStorageLimitDoesNotThrowForAdmin(): void
+    {
+        $user = $this->createUser('ADMIN');
+
+        $this->fileRepository->expects($this->never())->method('createQueryBuilder');
+
+        $this->service->checkStorageLimit($user, 200 * 1024 * 1024);
+    }
+
+    public function testGetStorageStatsMarksAdminAsUnlimited(): void
+    {
+        $user = $this->createUser('ADMIN');
+
+        $qb = $this->createMock(QueryBuilder::class);
+        $qb->method('select')->willReturnSelf();
+        $qb->method('where')->willReturnSelf();
+        $qb->method('setParameter')->willReturnSelf();
+
+        $query = $this->createMock(Query::class);
+        $query->method('getSingleScalarResult')->willReturn(150 * 1024 * 1024);
+
+        $qb->method('getQuery')->willReturn($query);
+
+        $this->fileRepository
+            ->method('createQueryBuilder')
+            ->willReturn($qb);
+
+        $stats = $this->service->getStorageStats($user);
+
+        $this->assertTrue($stats['unlimited']);
+        $this->assertSame(0.0, $stats['percentage']);
+        $this->assertSame(StorageQuotaService::UNLIMITED_BYTES, $stats['limit']);
+        $this->assertSame(150 * 1024 * 1024, $stats['usage']);
     }
 
     public function testGetStorageUsageReturnsZeroWhenNoFiles(): void

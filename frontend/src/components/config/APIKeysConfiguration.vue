@@ -1,5 +1,12 @@
 <template>
   <div class="space-y-6" data-testid="page-config-api-keys">
+    <PageHeader
+      :title="$t('config.apiKeys.title')"
+      :subtitle="$t('config.apiKeys.description')"
+      icon="heroicons:key"
+      data-testid="section-header"
+    />
+
     <!-- Error Alert -->
     <div
       v-if="error"
@@ -46,13 +53,6 @@
     </div>
 
     <div class="surface-card p-6" data-testid="section-create-key">
-      <h2 class="text-2xl font-semibold txt-primary mb-3">
-        {{ $t('config.apiKeys.title') }}
-      </h2>
-      <p class="txt-secondary text-sm mb-6">
-        {{ $t('config.apiKeys.description') }}
-      </p>
-
       <div class="flex flex-col sm:flex-row gap-3">
         <input
           v-model="newKeyName"
@@ -62,6 +62,36 @@
           data-testid="input-key-name"
           @keypress.enter="createAPIKey"
         />
+        <div class="flex flex-col gap-2 sm:w-auto">
+          <p class="text-xs txt-secondary">{{ $t('config.apiKeys.scopes.hint') }}</p>
+          <label class="flex items-center gap-2 text-sm txt-primary">
+            <input
+              v-model="includeIamRead"
+              type="checkbox"
+              class="rounded border-light-border/30 dark:border-dark-border/20"
+              data-testid="checkbox-scope-iam-read"
+            />
+            {{ $t('config.apiKeys.scopes.iamRead') }}
+          </label>
+          <label class="flex items-center gap-2 text-sm txt-primary">
+            <input
+              v-model="includeIamManage"
+              type="checkbox"
+              class="rounded border-light-border/30 dark:border-dark-border/20"
+              data-testid="checkbox-scope-iam-manage"
+            />
+            {{ $t('config.apiKeys.scopes.iamManage') }}
+          </label>
+          <label v-if="computeEnabled" class="flex items-center gap-2 text-sm txt-primary">
+            <input
+              v-model="includeComputeRun"
+              type="checkbox"
+              class="rounded border-light-border/30 dark:border-dark-border/20"
+              data-testid="checkbox-scope-compute-run"
+            />
+            {{ $t('config.apiKeys.scopes.computeRun') }}
+          </label>
+        </div>
         <button
           :disabled="!newKeyName.trim() || loading"
           class="w-full sm:w-auto btn-primary px-5 py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -194,6 +224,13 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center gap-2">
                   <span class="text-sm font-medium txt-primary">{{ apiKey.name }}</span>
+                  <span
+                    v-if="apiKey.linkedPlatform"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand/10 txt-brand"
+                    data-testid="badge-linked-platform"
+                  >
+                    {{ $t('config.apiKeys.linkedPlatform') }}
+                  </span>
                   <span class="text-xs txt-secondary">
                     ({{ apiKey.usageCount }} {{ $t('config.apiKeys.usageCount') }})
                   </span>
@@ -378,7 +415,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted, onActivated, watch } from 'vue'
+import { ref, onMounted, onActivated, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   PlusIcon,
@@ -387,6 +424,7 @@ import {
   CheckIcon,
   CommandLineIcon,
 } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import {
   listApiKeys,
   createApiKey,
@@ -397,6 +435,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { getConfigSync } from '@/services/api/httpClient'
 
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
@@ -414,10 +453,15 @@ interface UIApiKey {
   lastUsed: number | null
   usageCount: number
   scopes: string[]
+  linkedPlatform: { client: string; host: string } | null
 }
 
 const apiKeys = ref<UIApiKey[]>([])
 const newKeyName = ref('')
+const includeIamRead = ref(false)
+const includeIamManage = ref(false)
+const includeComputeRun = ref(false)
+const computeEnabled = computed(() => getConfigSync().features?.computeEnabled === true)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showKeyModal = ref(false)
@@ -443,6 +487,7 @@ const loadAPIKeys = async () => {
       lastUsed: key.last_used || null,
       usageCount: 0, // Backend doesn't track this yet
       scopes: key.scopes,
+      linkedPlatform: key.linked_platform ?? null,
     }))
   } catch (err: unknown) {
     console.error('Failed to load API keys:', err)
@@ -459,9 +504,23 @@ const createAPIKey = async () => {
     loading.value = true
     error.value = null
 
+    const scopes: string[] = []
+    if (includeIamRead.value) {
+      scopes.push('iam:read')
+    }
+    if (includeIamManage.value) {
+      scopes.push('iam:manage')
+    }
+    if (includeComputeRun.value && computeEnabled.value) {
+      scopes.push('compute:run', 'desktop:messages', 'desktop:files')
+    }
+    if (scopes.length === 0) {
+      scopes.push('webhooks:*')
+    }
+
     const response = await createApiKey({
       name: newKeyName.value,
-      scopes: ['webhooks:*'], // Default scopes
+      scopes,
     })
 
     // Add to list with full key
@@ -477,10 +536,14 @@ const createAPIKey = async () => {
       lastUsed: null,
       usageCount: 0,
       scopes: response.api_key.scopes,
+      linkedPlatform: null,
     }
 
     apiKeys.value.unshift(newKey)
     newKeyName.value = ''
+    includeIamRead.value = false
+    includeIamManage.value = false
+    includeComputeRun.value = false
 
     // Show modal with the full key
     newlyCreatedKey.value = response.api_key.key

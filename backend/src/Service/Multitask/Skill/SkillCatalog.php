@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Skill;
 
+use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
+use App\Service\Runtime\RuntimeProfile;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
@@ -53,6 +55,17 @@ final class SkillCatalog
     }
 
     /**
+     * Every registered skill, including flag-gated ones. The tool registry
+     * lists them; planner rendering still omits disabled capabilities.
+     *
+     * @return list<SkillDescriptor>
+     */
+    public function descriptors(): array
+    {
+        return array_values($this->byCapability);
+    }
+
+    /**
      * Render the `[CAPABILITYLIST]` block: one `- "capability": summary` line
      * per capability, plus any per-user dynamic note a descriptor contributes.
      *
@@ -64,7 +77,15 @@ final class SkillCatalog
     public function renderCapabilityList(?int $userId = null, array $context = []): string
     {
         $lines = [];
+        $allowed = $context['allowedCapabilities'] ?? null;
         foreach (Capability::cases() as $capability) {
+            if (is_array($allowed) && !in_array($capability->value, $allowed, true)) {
+                continue;
+            }
+            $profile = $context['runtime_profile'] ?? $context['assistant'] ?? null;
+            if ($profile instanceof RuntimeProfile && !AssistantSkillGate::allows($profile, $capability->value)) {
+                continue;
+            }
             $descriptor = $this->byCapability[$capability->value] ?? null;
 
             // Flag-gated blocks (url_fetch, mcp_fetch, email_search …) are
@@ -72,6 +93,12 @@ final class SkillCatalog
             // exist, so it cannot emit them (plan 09 §6 — plan-time gate; the
             // runner re-checks the flag at run time as defense in depth).
             if (null !== $descriptor && !$this->isEnabled($descriptor, $userId)) {
+                continue;
+            }
+
+            // Engine-gated blocks (document_export needs the office converter)
+            // are omitted the same way when the install lacks the engine.
+            if (null !== $descriptor && !$descriptor->isAvailable()) {
                 continue;
             }
 

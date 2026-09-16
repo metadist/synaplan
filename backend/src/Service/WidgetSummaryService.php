@@ -54,7 +54,7 @@ final readonly class WidgetSummaryService
      */
     private function getSummaryModelName(Widget $widget): ?string
     {
-        // #1320: resolve via the SUMMARIZE capability default, not a hardcoded id.
+        // Text Analytics (ANALYZE → CHAT), never a hardcoded id.
         $modelId = $this->modelConfigService->getSummaryModelConfig($widget->getOwnerId())['model_id'] ?? 0;
 
         $customTopic = self::getSummaryTopicForWidget($widget);
@@ -78,7 +78,7 @@ final readonly class WidgetSummaryService
     /**
      * Resolve AI model configuration with multi-level fallback.
      *
-     * Priority: preferredModelId → SUMMARIZE capability default → owner default CHAT → global default CHAT.
+     * Priority: preferredModelId → Text Analytics (ANALYZE) → owner default CHAT → global default CHAT.
      *
      * @return array{provider: string, model: string, model_id: int}
      *
@@ -88,8 +88,7 @@ final readonly class WidgetSummaryService
     {
         $candidates = array_filter([
             $preferredModelId,
-            // #1320: SUMMARIZE capability default (→ SORT → CHAT) instead of a
-            // hardcoded lightweight model id.
+            // Text Analytics (ANALYZE → CHAT), never a hardcoded model id.
             $this->modelConfigService->getSummaryModelConfig($ownerId)['model_id'],
             $this->modelConfigService->getDefaultModel('CHAT', $ownerId),
             $this->modelConfigService->getDefaultModel('CHAT', 0),
@@ -593,14 +592,14 @@ PROMPT;
     /**
      * Resolve summary prompt and model for a widget.
      *
-     * Fallback chain: custom per-widget -> system default -> SUMMARIZE capability default.
+     * Fallback chain: custom per-widget -> system default -> Text Analytics (ANALYZE).
      *
      * @return array{prompt: string, modelId: int}
      */
     private function resolveSummaryConfig(Widget $widget, string $conversationText, string $systemPrompt): array
     {
         $promptText = null;
-        // #1320: SUMMARIZE capability default instead of a hardcoded model id.
+        // Text Analytics (ANALYZE → CHAT), never a hardcoded model id.
         $modelId = $this->modelConfigService->getSummaryModelConfig($widget->getOwnerId())['model_id'] ?? 0;
 
         // 1. Try custom per-widget prompt

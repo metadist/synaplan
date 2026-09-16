@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\SearchResultRepository;
+use App\Service\Message\ReadPagesPolicy;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -12,16 +14,18 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
-use App\Service\Search\BraveSearchService;
+use App\Service\Research\WebResearchService;
 use Psr\Log\LoggerInterface;
 
 /**
  * `web_search` runner — reuses the existing {@see SearchQueryGenerator} (to turn
- * the request into an optimized query) + {@see BraveSearchService} (the live web
+ * the request into an optimized query) + {@see WebSearchGateway} (the live web
  * search) instead of adding new search code.
  *
  * The node output is the formatted, source-cited results block
- * ({@see BraveSearchService::formatResultsForAI()}). A downstream `chat`/
+ * ({@see WebSearchGateway::formatResultsForAI()}), deepened by
+ * {@see WebResearchService} with the condensed text of the top result pages
+ * (`params.read_pages: false` opts a node out). A downstream `chat`/
  * `summarize` node typically consumes `$nX.text` to write the final answer; when
  * web_search is the reply node, the user sees the result list directly. The raw
  * structured results also ride in metadata for any later consumer.
@@ -30,9 +34,10 @@ final readonly class WebSearchRunner implements TaskRunner
 {
     public function __construct(
         private SearchQueryGenerator $queryGenerator,
-        private BraveSearchService $braveSearch,
+        private WebSearchGateway $webSearch,
         private LoggerInterface $logger,
         private ?SearchResultRepository $searchResultRepository = null,
+        private ?WebResearchService $webResearch = null,
     ) {
     }
 
@@ -47,13 +52,13 @@ final readonly class WebSearchRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::WebSearch, 'Search the web for current information.'),
+            new SkillDescriptor(Capability::WebSearch, 'Search the web for current information. For research questions that need figures, named companies or quotes (and the user did not paste a URL), set params.read_pages to 2 or 3 so the top result pages are fetched and dumped into the answering prompt. Set params.read_pages to 0 when snippets suffice (weather, ticker, simple yes/no).'),
         ];
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult
     {
-        if (!$this->braveSearch->isEnabled()) {
+        if (!$this->webSearch->isEnabled($context->userId)) {
             return NodeResult::failed('web search is not configured');
         }
 
@@ -79,7 +84,7 @@ final readonly class WebSearchRunner implements TaskRunner
                 'query' => $preFetched['query'] ?? null,
             ]);
 
-            return NodeResult::ok($this->braveSearch->formatResultsForAI($preFetched), [], [
+            return NodeResult::ok($this->webSearch->formatResultsForAI($preFetched), [], [
                 'web_search' => true,
                 'query' => is_string($preFetched['query'] ?? null) ? $preFetched['query'] : '',
                 'search_results' => $preFetched,
@@ -98,10 +103,10 @@ final readonly class WebSearchRunner implements TaskRunner
         $query = $this->queryGenerator->generate($request, $context->userId);
 
         try {
-            $results = $this->braveSearch->search($query, [
+            $results = $this->webSearch->search($query, [
                 'search_lang' => $language,
                 'country' => $language,
-            ]);
+            ], $context->userId);
         } catch (\Throwable $e) {
             $this->logger->warning('WebSearchRunner: search failed', [
                 'error' => $e->getMessage(),
@@ -110,7 +115,8 @@ final readonly class WebSearchRunner implements TaskRunner
             return NodeResult::failed('web_search failed: '.$e->getMessage());
         }
 
-        $text = $this->braveSearch->formatResultsForAI($results);
+        $results = $this->readTopPages($results, $request, $node, $context);
+        $text = $this->webSearch->formatResultsForAI($results);
 
         // Persist the structured results to the DB so MessageApiFormatter can
         // build the Sources dropdown on reload — mirrors what MessageProcessor
@@ -130,7 +136,71 @@ final readonly class WebSearchRunner implements TaskRunner
             'web_search' => true,
             'query' => $query,
             'search_results' => $results,
+            'pages_read' => (int) ($results['pages_read'] ?? 0),
         ]);
+    }
+
+    /**
+     * Read the top result pages so the node output carries evidence, not
+     * just teasers. Best-effort: any failure keeps the snippet-only results.
+     *
+     * @param array<string, mixed> $results
+     *
+     * @return array<string, mixed>
+     */
+    private function readTopPages(array $results, string $request, TaskNode $node, NodeContext $context): array
+    {
+        if (null === $this->webResearch || !$this->webResearch->isDeepSearchEnabled() || empty($results['results'])) {
+            return $results;
+        }
+        $maxPages = $this->resolveReadPages($node, $context);
+        if ($maxPages <= 0) {
+            return $results;
+        }
+
+        try {
+            return $this->webResearch->deepen(
+                $results,
+                $request,
+                $context->userId,
+                static function (string $status, string $message, array $meta) use ($node, $context): void {
+                    $context->emitProgress($node->id, ['status' => $status, 'message' => $message] + $meta);
+                },
+                $maxPages,
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('WebSearchRunner: reading result pages failed (ignored)', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $results;
+        }
+    }
+
+    /**
+     * Planner `params.read_pages` wins when set (0 / 2 / 3 / false).
+     * Otherwise the sorter's BREADPAGES vote decides.
+     */
+    private function resolveReadPages(TaskNode $node, NodeContext $context): int
+    {
+        $flag = $node->params['read_pages'] ?? null;
+        if (false === $flag || 0 === $flag || '0' === $flag || 'false' === $flag) {
+            return 0;
+        }
+        if (is_numeric($flag) && (int) $flag > 0) {
+            return ReadPagesPolicy::clamp((int) $flag);
+        }
+        if (true === $flag || 'true' === $flag) {
+            return ReadPagesPolicy::SHORT;
+        }
+
+        $vote = $context->classification['read_pages'] ?? null;
+
+        return ReadPagesPolicy::pagesToRead(
+            is_int($vote) ? $vote : null,
+            ($context->classification['url_pages_read'] ?? 0) >= 1,
+            false,
+        );
     }
 
     private function stringInput(mixed $value): ?string

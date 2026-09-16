@@ -11,6 +11,7 @@ use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
+use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
@@ -59,7 +60,8 @@ class ChatReadinessServiceTest extends TestCase
             new ArrayAdapter(),
             $this->providerRegistry,
             $ollamaModelInventory,
-            'test',
+            $this->createMock(ModelHealthRepository::class),
+            new NullLogger(),
         );
 
         return new ChatReadinessService(
@@ -177,5 +179,21 @@ class ChatReadinessServiceTest extends TestCase
             ->willReturn([]);
 
         $this->assertFalse($this->service()->isChatReady([]));
+    }
+
+    public function testBuiltInTestProviderDoesNotCountAsReady(): void
+    {
+        $this->givenDefaultChatBindings([
+            0 => 'test',
+        ]);
+        $this->providerRegistry->expects($this->once())
+            ->method('getAvailableProviders')
+            ->with('chat', false)
+            ->willReturn([]);
+
+        $this->assertFalse(
+            $this->service()->isChatReady(['test' => true, 'anthropic' => false]),
+            'The demo TestProvider must not make the setup page claim AI is ready.'
+        );
     }
 }

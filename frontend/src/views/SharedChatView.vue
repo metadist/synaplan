@@ -43,10 +43,9 @@
                   class="appearance-none px-3 py-2 rounded-lg surface-chip txt-primary text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   @change="switchLanguage"
                 >
-                  <option value="de">DE</option>
-                  <option value="en">EN</option>
-                  <option value="es">ES</option>
-                  <option value="tr">TR</option>
+                  <option v-for="lang in supportedLanguages" :key="lang" :value="lang">
+                    {{ lang.toUpperCase() }}
+                  </option>
                 </select>
               </div>
               <a
@@ -209,13 +208,14 @@
                   {{ formatDate(message.timestamp) }}
                 </span>
               </div>
-              <!-- Message parts (text, code blocks) -->
+              <!-- Message parts (text, code blocks, JSON payloads) -->
               <template v-for="(part, partIndex) in parseMessageParts(message)" :key="partIndex">
                 <MessageCode
                   v-if="part.type === 'code'"
                   :content="part.content"
                   :language="part.language"
                 />
+                <MessageJson v-else-if="part.type === 'json'" :content="part.content" />
                 <MessageText
                   v-else-if="part.type === 'text'"
                   :content="part.content"
@@ -362,6 +362,7 @@ import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
 import MessageAudio from '../components/MessageAudio.vue'
 import MessageCode from '../components/MessageCode.vue'
+import MessageJson from '../components/MessageJson.vue'
 import MessageText from '../components/MessageText.vue'
 import BrandAttribution from '../components/BrandAttribution.vue'
 import {
@@ -654,13 +655,13 @@ const formatDate = (timestamp: number): string => {
 }
 
 interface MessagePart {
-  type: 'text' | 'code'
+  type: 'text' | 'code' | 'json'
   content: string
   language?: string
 }
 
 /**
- * Parse message text into parts (text and code blocks).
+ * Parse message text into parts (text, code blocks, JSON payloads).
  * Uses the same parser as the main chat for consistent rendering.
  */
 const parseMessageParts = (message: Message): MessagePart[] => {
@@ -674,9 +675,9 @@ const parseMessageParts = (message: Message): MessagePart[] => {
   // For assistant messages, parse into parts
   const parsed = parseAIResponse(message.text)
   return parsed.parts
-    .filter((part) => part.type === 'text' || part.type === 'code')
+    .filter((part) => part.type === 'text' || part.type === 'code' || part.type === 'json')
     .map((part) => ({
-      type: part.type as 'text' | 'code',
+      type: part.type as 'text' | 'code' | 'json',
       content: part.content,
       language: part.language,
     }))

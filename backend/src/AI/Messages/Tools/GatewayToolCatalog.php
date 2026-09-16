@@ -6,7 +6,13 @@ namespace App\AI\Messages\Tools;
 
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\Entity\User;
+use App\Service\Compute\ComputeRunGrant;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\Runtime\RuntimeProfile;
+use App\Service\Tool\SideEffect;
+use App\Service\Tool\ToolRegistry;
+use App\Service\Tool\ToolsConfig;
+use App\Service\Tool\ToolSource;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -25,6 +31,7 @@ final readonly class GatewayToolCatalog
 {
     public const KIND_MCP = 'mcp';
     public const KIND_NATIVE = 'native';
+    public const KIND_CUSTOM = 'custom';
 
     /** Synaplan executed the search itself. */
     public const WEB_SEARCH_SYNAPLAN = 'synaplan';
@@ -52,6 +59,10 @@ final readonly class GatewayToolCatalog
         private MessagesGatewayConfig $config,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
+        private ?ToolRegistry $toolRegistry = null,
+        private ?ToolsConfig $toolsConfig = null,
+        private ?CodeExecutionTool $codeExecutionTool = null,
+        private ?ComputeRunGrant $computeRunGrant = null,
     ) {
     }
 
@@ -60,13 +71,13 @@ final readonly class GatewayToolCatalog
      *
      * @return CatalogSnapshot
      */
-    public function build(User $user, string $sessionKey, array $requestBody): array
+    public function build(User $user, string $sessionKey, array $requestBody, ?RuntimeProfile $assistant = null): array
     {
-        $native = $this->nativeTools($user, $requestBody);
+        $native = $this->nativeTools($user, $requestBody, $assistant);
         $tools = [];
         $dispatch = [];
 
-        foreach ([$this->mcpTools($user, $sessionKey, $requestBody), $native] as $part) {
+        foreach ([$this->mcpTools($user, $sessionKey, $requestBody), $this->customTools($user), $native] as $part) {
             foreach ($part['tools'] as $tool) {
                 if (isset($dispatch[$tool['name']])) {
                     continue;
@@ -102,6 +113,10 @@ final readonly class GatewayToolCatalog
             $names[] = AnalyzeImageTool::NAME;
         }
 
+        if (null !== $this->codeExecutionTool && $this->codeExecutionTool->isAvailable($userId)) {
+            $names[] = CodeExecutionTool::NAME;
+        }
+
         return $names;
     }
 
@@ -116,9 +131,15 @@ final readonly class GatewayToolCatalog
      */
     public function replacedServerTools(array $snapshot): array
     {
-        return \in_array($snapshot['web_search'], [self::WEB_SEARCH_SYNAPLAN, self::WEB_SEARCH_OFF], true)
-            ? [WebSearchTool::NAME]
-            : [];
+        $replaced = [];
+        if (\in_array($snapshot['web_search'], [self::WEB_SEARCH_SYNAPLAN, self::WEB_SEARCH_OFF], true)) {
+            $replaced[] = WebSearchTool::NAME;
+        }
+        if (isset($snapshot['dispatch'][CodeExecutionTool::NAME])) {
+            $replaced[] = CodeExecutionTool::NAME;
+        }
+
+        return $replaced;
     }
 
     /**
@@ -149,7 +170,13 @@ final readonly class GatewayToolCatalog
             }
         }
 
-        $mcp = $this->mcpCatalogAdapter->toAnthropicTools($userId, includeMutating: false);
+        $includeMutating = null !== $this->toolsConfig
+            && $this->toolsConfig->isRegistryEnabled($userId)
+            && $this->toolsConfig->isApprovalsEnabled($userId);
+        $mcp = $this->mcpCatalogAdapter->toAnthropicTools($userId, includeMutating: $includeMutating);
+        if (null !== $this->toolRegistry && null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($userId)) {
+            $mcp = $this->mcpFromRegistry($userId, $includeMutating);
+        }
         $snapshot = $this->empty();
         foreach ($mcp['tools'] as $tool) {
             $snapshot['tools'][] = $tool;
@@ -176,13 +203,61 @@ final readonly class GatewayToolCatalog
      *
      * @return CatalogSnapshot
      */
-    private function nativeTools(User $user, array $requestBody): array
+    private function nativeTools(User $user, array $requestBody, ?RuntimeProfile $assistant = null): array
     {
         $snapshot = $this->empty();
         $userId = (int) $user->getId();
 
         $this->appendWebSearch($snapshot, $userId, $requestBody);
         $this->appendAnalyzeImage($snapshot, $userId, $requestBody);
+        $this->appendCodeExecution($snapshot, $user, $requestBody, $assistant);
+
+        return $snapshot;
+    }
+
+    /**
+     * Custom HTTP tools the user created under Settings. Independent of the
+     * MCP flag — they are not MCP tools (issue #1884).
+     *
+     * @return CatalogSnapshot
+     */
+    private function customTools(User $user): array
+    {
+        $snapshot = $this->empty();
+        $userId = (int) $user->getId();
+        if (
+            null === $this->toolRegistry
+            || null === $this->toolsConfig
+            || !$this->toolsConfig->isRegistryEnabled($userId)
+            || !$this->toolsConfig->isCustomHttpEnabled($userId)
+        ) {
+            return $snapshot;
+        }
+
+        foreach ($this->toolRegistry->forUser($userId) as $descriptor) {
+            if (ToolSource::Custom !== $descriptor->source) {
+                continue;
+            }
+            $name = $descriptor->callName();
+            if (isset($snapshot['dispatch'][$name])) {
+                continue;
+            }
+            $description = '' !== $descriptor->description ? $descriptor->description : $descriptor->title;
+            $snapshot['tools'][] = [
+                'name' => $name,
+                'description' => $description,
+                'input_schema' => $descriptor->inputSchema,
+            ];
+            $snapshot['dispatch'][$name] = [
+                'kind' => self::KIND_CUSTOM,
+                'serverId' => 0,
+                'tool' => $name,
+                'annotations' => [
+                    'readOnlyHint' => SideEffect::Read === $descriptor->sideEffect,
+                    'toolId' => (int) ($descriptor->meta['toolId'] ?? 0),
+                ],
+            ];
+        }
 
         return $snapshot;
     }
@@ -257,6 +332,30 @@ final readonly class GatewayToolCatalog
     }
 
     /**
+     * @param CatalogSnapshot      $snapshot
+     * @param array<string, mixed> $requestBody
+     */
+    private function appendCodeExecution(array &$snapshot, User $user, array $requestBody, ?RuntimeProfile $assistant): void
+    {
+        if (null === $this->codeExecutionTool || !$this->codeExecutionTool->isAvailable((int) $user->getId())) {
+            return;
+        }
+        if (null === $this->computeRunGrant || !$this->computeRunGrant->allows($user->getId(), $assistant)) {
+            return;
+        }
+        if ($this->hasClientToolNamed($requestBody, CodeExecutionTool::NAME)) {
+            return;
+        }
+
+        $this->addNativeTool(
+            $snapshot,
+            $this->codeExecutionTool->declaration(),
+            CodeExecutionTool::NAME,
+            ['readOnlyHint' => false],
+        );
+    }
+
+    /**
      * Synaplan answers the client's web search declaration itself: any mode that
      * does not hand the search to the upstream, plus a provider to run it.
      */
@@ -280,8 +379,9 @@ final readonly class GatewayToolCatalog
     /**
      * @param CatalogSnapshot                                                              $snapshot
      * @param array{name: string, description: string, input_schema: array<string, mixed>} $declaration
+     * @param array<string, mixed>                                                         $annotations
      */
-    private function addNativeTool(array &$snapshot, array $declaration, string $name): void
+    private function addNativeTool(array &$snapshot, array $declaration, string $name, array $annotations = ['readOnlyHint' => true]): void
     {
         if (isset($snapshot['dispatch'][$name])) {
             return;
@@ -292,7 +392,7 @@ final readonly class GatewayToolCatalog
             'kind' => self::KIND_NATIVE,
             'serverId' => 0,
             'tool' => $name,
-            'annotations' => ['readOnlyHint' => true],
+            'annotations' => $annotations,
         ];
     }
 
@@ -357,6 +457,39 @@ final readonly class GatewayToolCatalog
         }
 
         return $tools;
+    }
+
+    /**
+     * @return array{tools: list<GatewayTool>, dispatch: array<string, array{serverId: int, tool: string, annotations: array<string, mixed>}>}
+     */
+    private function mcpFromRegistry(int $userId, bool $includeMutating): array
+    {
+        $tools = [];
+        $dispatch = [];
+        foreach ($this->toolRegistry?->forUser($userId) ?? [] as $descriptor) {
+            if (ToolSource::Mcp !== $descriptor->source) {
+                continue;
+            }
+            if (!$includeMutating && SideEffect::Read !== $descriptor->sideEffect) {
+                continue;
+            }
+            $name = $descriptor->callName();
+            $serverId = (int) ($descriptor->meta['serverId'] ?? 0);
+            $tool = is_string($descriptor->meta['tool'] ?? null) ? $descriptor->meta['tool'] : $descriptor->title;
+            $annotations = is_array($descriptor->meta['annotations'] ?? null) ? $descriptor->meta['annotations'] : [];
+            $tools[] = [
+                'name' => $name,
+                'description' => $descriptor->description,
+                'input_schema' => $descriptor->inputSchema,
+            ];
+            $dispatch[$name] = [
+                'serverId' => $serverId,
+                'tool' => $tool,
+                'annotations' => $annotations,
+            ];
+        }
+
+        return ['tools' => $tools, 'dispatch' => $dispatch];
     }
 
     /**

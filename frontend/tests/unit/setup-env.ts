@@ -58,16 +58,25 @@ const localStorageMock = {
   },
 }
 
-// Set up localStorage on all possible global objects
-;(globalThis as unknown as { localStorage: typeof localStorageMock }).localStorage =
-  localStorageMock
+// Set up localStorage on all possible global objects. happy-dom declares
+// localStorage as a getter-only accessor, so a plain assignment throws as soon as
+// the test environment exposes the real window instead of a writable proxy.
+const defineLocalStorage = (target: object): void => {
+  Object.defineProperty(target, 'localStorage', {
+    value: localStorageMock,
+    writable: true,
+    configurable: true,
+  })
+}
+
+defineLocalStorage(globalThis)
 
 if (typeof window !== 'undefined') {
-  ;(window as unknown as { localStorage: typeof localStorageMock }).localStorage = localStorageMock
+  defineLocalStorage(window)
 }
 
 if (typeof global !== 'undefined') {
-  ;(global as unknown as { localStorage: typeof localStorageMock }).localStorage = localStorageMock
+  defineLocalStorage(global)
 }
 
 // Export to prevent tree-shaking

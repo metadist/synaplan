@@ -68,4 +68,15 @@ final class FileLifecycleTest extends TestCase
         $file->setVectorState(File::VECTOR_STATE_STALE);
         self::assertSame('stale', $file->getVectorState());
     }
+
+    public function testSetStatusTouchesUpdatedAt(): void
+    {
+        $file = new File();
+        $file->setUpdatedAt(1_700_000_000);
+
+        $file->setStatus('extracting');
+
+        self::assertSame('extracting', $file->getStatus());
+        self::assertGreaterThan(1_700_000_000, $file->getUpdatedAt());
+    }
 }

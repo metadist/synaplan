@@ -1,0 +1,20 @@
+{
+  "id": "resp_tools_1",
+  "object": "response",
+  "status": "completed",
+  "output": [
+    {
+      "type": "function_call",
+      "id": "fc_1",
+      "call_id": "call_weather_1",
+      "name": "get_weather",
+      "arguments": "{\"city\":\"Berlin\"}",
+      "status": "completed"
+    }
+  ],
+  "usage": {
+    "input_tokens": 20,
+    "output_tokens": 8,
+    "total_tokens": 28
+  }
+}

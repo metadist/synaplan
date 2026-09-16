@@ -6,11 +6,13 @@
 import { computed } from 'vue'
 import type { Part } from '../stores/history'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import type { PlatformDocRef } from '@/components/chat/refs/DocRefPill'
 import MessageText from './MessageText.vue'
 import MessageImage from './MessageImage.vue'
 import MessageVideo from './MessageVideo.vue'
 import MessageAudio from './MessageAudio.vue'
 import MessageCode from './MessageCode.vue'
+import MessageJson from './MessageJson.vue'
 import MessageLinks from './MessageLinks.vue'
 import MessageDocs from './MessageDocs.vue'
 import MessageScreenshot from './MessageScreenshot.vue'
@@ -19,11 +21,15 @@ import MessageLink from './MessageLink.vue'
 import MessageCommandList from './MessageCommandList.vue'
 import MessageThinking from './MessageThinking.vue'
 import MessageTtsLoading from './MessageTtsLoading.vue'
+import MessagePastedText from './MessagePastedText.vue'
 
 interface Props {
   part: Part
   isStreaming?: boolean
   memories?: UserMemory[] | null // Full memory objects (resolved from IDs)
+  docs?: PlatformDocRef[] | null
+  /** Received (shared) conversation: memory IDs belong to the owner. */
+  foreignMemory?: boolean
 }
 
 const props = defineProps<Props>()
@@ -40,6 +46,8 @@ const componentType = computed(() => {
       return MessageAudio
     case 'code':
       return MessageCode
+    case 'json':
+      return MessageJson
     case 'links':
       return MessageLinks
     case 'docs':
@@ -56,6 +64,8 @@ const componentType = computed(() => {
       return MessageThinking
     case 'tts_loading':
       return MessageTtsLoading
+    case 'pastedText':
+      return MessagePastedText
     default:
       return MessageText
   }
@@ -68,6 +78,8 @@ const componentProps = computed(() => {
         content: props.part.content || '',
         isStreaming: props.isStreaming,
         memories: props.memories,
+        docs: props.docs,
+        foreignMemory: props.foreignMemory,
       }
     case 'image':
       return { url: props.part.url || '', alt: props.part.alt }
@@ -82,6 +94,8 @@ const componentProps = computed(() => {
         filename: props.part.filename,
         isStreaming: props.isStreaming,
       }
+    case 'json':
+      return { content: props.part.content || '' }
     case 'links':
       return { items: props.part.items || [] }
     case 'docs':
@@ -107,8 +121,10 @@ const componentProps = computed(() => {
         thinkingTime: props.part.thinkingTime,
         isStreaming: props.part.isStreaming,
       }
+    case 'pastedText':
+      return { content: props.part.content || '' }
     default:
-      return { content: props.part.content || '', memories: props.memories }
+      return { content: props.part.content || '', memories: props.memories, docs: props.docs }
   }
 })
 </script>

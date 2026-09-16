@@ -280,4 +280,122 @@ class GoogleProviderAsyncVideoTest extends TestCase
             $this->assertSame('google', $e->getProviderName());
         }
     }
+
+    public function testStartOmniVideoOperationUsesInteractionsApi(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('toArray')->willReturn([
+            'id' => 'v1_omni_abc',
+            'status' => 'in_progress',
+            'model' => 'gemini-omni-1.1-flash',
+        ]);
+        $response->method('getStatusCode')->willReturn(200);
+
+        $captured = ['method' => '', 'url' => '', 'json' => []];
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->willReturnCallback(function (string $method, string $url, array $options) use (&$captured, $response): ResponseInterface {
+                $captured = ['method' => $method, 'url' => $url, 'json' => $options['json'] ?? []];
+
+                return $response;
+            });
+
+        $provider = new GoogleProvider(new NullLogger(), $httpClient, 'fake-api-key');
+        $result = $provider->startVideoOperation('A red ball on a table', [
+            'model' => 'gemini-omni-1.1-flash',
+            'duration' => 8,
+            'resolution' => '720p',
+            'modelConfig' => [
+                'allowed_resolutions' => ['720p'],
+                'default_resolution' => '720p',
+            ],
+        ]);
+
+        $this->assertSame('POST', $captured['method']);
+        $this->assertStringEndsWith('/interactions', (string) $captured['url']);
+        $this->assertSame('gemini-omni-1.1-flash', $captured['json']['model'] ?? null);
+        $this->assertTrue($captured['json']['background'] ?? false);
+        $this->assertSame('8s', $captured['json']['response_format']['duration'] ?? null);
+        $this->assertSame('interactions/v1_omni_abc', $result['operationName']);
+        $this->assertSame('gemini-omni-1.1-flash', $result['model']);
+        $this->assertSame(8, $result['duration']);
+        $this->assertSame('720p', $result['resolution']);
+    }
+
+    public function testPollOmniVideoOperationOnceCompletedWithInlineData(): void
+    {
+        $data = [
+            'id' => 'v1_omni_abc',
+            'status' => 'completed',
+            'model' => 'gemini-omni-1.1-flash',
+            'steps' => [
+                ['type' => 'user_input', 'content' => [['type' => 'text', 'text' => 'hi']]],
+                ['type' => 'thought', 'content' => []],
+                [
+                    'type' => 'model_output',
+                    'content' => [[
+                        'type' => 'video',
+                        'mime_type' => 'video/mp4',
+                        'data' => base64_encode('mp4-bytes'),
+                    ]],
+                ],
+            ],
+        ];
+        $provider = $this->createProviderWithMockResponse($data);
+
+        $result = $provider->pollVideoOperationOnce('interactions/v1_omni_abc');
+
+        $this->assertTrue($result['done']);
+        $this->assertSame('data:video/mp4;base64,'.base64_encode('mp4-bytes'), $result['videoUri']);
+        $this->assertNull($result['error']);
+    }
+
+    public function testPollOmniVideoOperationOnceInProgress(): void
+    {
+        $provider = $this->createProviderWithMockResponse([
+            'id' => 'v1_omni_abc',
+            'status' => 'in_progress',
+        ]);
+
+        $result = $provider->pollVideoOperationOnce('interactions/v1_omni_abc');
+
+        $this->assertFalse($result['done']);
+        $this->assertNull($result['videoUri']);
+    }
+
+    public function testDownloadOmniInlineDataUriDoesNotHitHttp(): void
+    {
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient->expects($this->never())->method('request');
+
+        $provider = new GoogleProvider(new NullLogger(), $httpClient, 'fake-api-key');
+        $raw = $provider->downloadVideoRaw('data:video/mp4;base64,'.base64_encode('clip'));
+
+        $this->assertSame('clip', $raw);
+    }
+
+    public function testCancelOmniVideoOperationUsesDelete(): void
+    {
+        $captured = ['method' => '', 'url' => ''];
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->willReturnCallback(function (string $method, string $url) use (&$captured, $response): ResponseInterface {
+                $captured = ['method' => $method, 'url' => $url];
+
+                return $response;
+            });
+
+        $provider = new GoogleProvider(new NullLogger(), $httpClient, 'fake-api-key');
+        $provider->cancelVideoOperation('interactions/v1_omni_abc');
+
+        $this->assertSame('DELETE', $captured['method']);
+        $this->assertStringEndsWith('/interactions/v1_omni_abc', $captured['url']);
+    }
 }

@@ -1,5 +1,5 @@
 /**
- * Messages Gateway API (Channels → AI Agents)
+ * Messages Gateway API (Channels → Coding clients)
  *
  * Backend endpoints under /api/v1/messages-gateway.
  */

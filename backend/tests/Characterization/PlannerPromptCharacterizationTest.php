@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Characterization;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Prompt\PromptCatalog;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
@@ -26,7 +27,7 @@ use Symfony\Component\Clock\MockClock;
  * Golden snapshot of the FULLY RENDERED planner system prompt.
  *
  * The planner prompt is the routing contract of the multitask engine: every
- * `[CAPABILITYLIST]` / `[DYNAMICLIST]` / `[KEYLIST]` substitution, every
+ * `[CAPABILITYLIST]` / `[CHANNELLIST]` / `[DYNAMICLIST]` / `[KEYLIST]` substitution, every
  * routing rule and every canonical example influences which DAGs the model
  * emits. This snapshot makes any change to that surface an EXPLICIT, reviewed
  * diff instead of an invisible side effect — and it is the equivalence proof
@@ -45,6 +46,7 @@ final class PlannerPromptCharacterizationTest extends TestCase
     /** Fixed topic fixture standing in for the BPROMPTS routing pool. */
     private const TOPIC_FIXTURE = [
         ['topic' => 'general', 'description' => 'Catch-all topic for everyday questions.'],
+        ['topic' => 'synaplan', 'description' => 'Questions about Synaplan itself: what it can and cannot do, how to use a feature, what is new, plans and pricing.'],
         ['topic' => 'mediamaker', 'description' => 'Media-generation topic for images, videos and audio.'],
         ['topic' => 'officemaker', 'description' => 'Generate a single Office document.'],
         ['topic' => 'docsummary', 'description' => 'Summarize a document or attached file text.'],
@@ -120,6 +122,7 @@ final class PlannerPromptCharacterizationTest extends TestCase
                 new NullLogger(),
             ),
             $this->createMock(RateLimitService::class),
+            $this->createMock(StructuredOutputConfig::class),
         );
     }
 

@@ -1,0 +1,66 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-09-09T00:00:00Z",
+  "sourceInstance": "sha256:hello-world-plugin",
+  "sourceVersion": "1.0.0",
+  "scope": "user",
+  "sections": [
+    {
+      "kind": "prompts",
+      "version": 1,
+      "items": [
+        {
+          "key": "hello-world",
+          "topic": "agent:hello-world",
+          "text": "You are a friendly hello-world assistant. Greet the person and offer to help.",
+          "description": "Hello World"
+        }
+      ]
+    },
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "hello-world",
+          "name": "Hello World",
+          "prompt": "hello-world",
+          "icon": "",
+          "description": "A starter assistant from the Hello World plugin.",
+          "instruction": "You are a friendly hello-world assistant. Greet the person and offer to help.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": { "chat": null, "vision": null, "vectorize": null },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": true,
+              "files": true,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": { "allow": [], "deny": [] },
+            "parameters": {
+              "temperature": 0.7,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "Hello — I am the Hello World assistant.",
+              "starterPrompts": ["Say hello"],
+              "memory": "user"
+            },
+            "triggers": { "events": [], "schedules": [] }
+          }
+        }
+      ]
+    }
+  ]
+}

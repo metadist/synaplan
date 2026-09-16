@@ -17,6 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 final class McpControllerTest extends WebTestCase
 {
     private const API_KEY = 'sk_test_mcp_endpoint_key_1234567890abcdef';
+    private const ADMIN_API_KEY = 'sk_test_mcp_admin_key_1234567890abcdef01';
     private const PROTOCOL_VERSION = '2025-11-25';
 
     private KernelBrowser $client;
@@ -29,6 +30,7 @@ final class McpControllerTest extends WebTestCase
         $this->em = static::getContainer()->get('doctrine')->getManager();
 
         $this->createUserWithApiKey();
+        $this->createAdminUserWithApiKey();
     }
 
     public function testRejectsUnauthenticatedRequests(): void
@@ -125,6 +127,29 @@ final class McpControllerTest extends WebTestCase
         self::assertContains('list_chats', $toolNames);
         self::assertContains('get_messages', $toolNames);
         self::assertContains('list_prompts', $toolNames);
+        // Admin-only tool must never appear for a regular account.
+        self::assertNotContains('recent_errors', $toolNames);
+    }
+
+    public function testRecentErrorsToolIsVisibleToAdminOnly(): void
+    {
+        $this->client->disableReboot();
+
+        $sessionId = $this->initialize(self::ADMIN_API_KEY);
+
+        $result = $this->jsonRpc(
+            [
+                'jsonrpc' => '2.0',
+                'id' => 2,
+                'method' => 'tools/list',
+                'params' => new \stdClass(),
+            ],
+            $sessionId,
+            self::ADMIN_API_KEY,
+        );
+
+        $toolNames = array_map(static fn (array $t): string => $t['name'], $result['result']['tools']);
+        self::assertContains('recent_errors', $toolNames, json_encode($result));
     }
 
     public function testResourceTemplatesAreListed(): void
@@ -309,9 +334,9 @@ final class McpControllerTest extends WebTestCase
     /**
      * Runs the initialize handshake and returns the negotiated session id.
      */
-    private function initialize(): string
+    private function initialize(?string $apiKey = null): string
     {
-        $result = $this->jsonRpc($this->initializePayload(), null);
+        $result = $this->jsonRpc($this->initializePayload(), null, $apiKey);
 
         self::assertArrayHasKey('result', $result, json_encode($result));
         self::assertArrayHasKey('serverInfo', $result['result']);
@@ -325,12 +350,12 @@ final class McpControllerTest extends WebTestCase
      *
      * @return array<string, mixed>
      */
-    private function jsonRpc(array $payload, ?string $sessionId): array
+    private function jsonRpc(array $payload, ?string $sessionId, ?string $apiKey = null): array
     {
         $server = [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_ACCEPT' => 'application/json, text/event-stream',
-            'HTTP_X_API_KEY' => self::API_KEY,
+            'HTTP_X_API_KEY' => $apiKey ?? self::API_KEY,
             'HTTP_MCP_PROTOCOL_VERSION' => self::PROTOCOL_VERSION,
         ];
         if (null !== $sessionId) {
@@ -386,6 +411,36 @@ final class McpControllerTest extends WebTestCase
             $apiKey->setKey(self::API_KEY);
             $apiKey->setStatus('active');
             $apiKey->setName('MCP Endpoint Test');
+            $apiKey->setScopes([]);
+            $this->em->persist($apiKey);
+            $this->em->flush();
+        }
+    }
+
+    private function createAdminUserWithApiKey(): void
+    {
+        $userRepo = $this->em->getRepository(User::class);
+        $user = $userRepo->findOneBy(['mail' => 'mcp-admin-test@synaplan.internal']);
+
+        if (null === $user) {
+            $user = new User();
+            $user->setMail('mcp-admin-test@synaplan.internal');
+            $user->setCreated(date('YmdHis'));
+            $user->setType('WEB');
+            $user->setProviderId('mcp-admin-endpoint-test');
+            $user->setUserLevel('ADMIN');
+            $user->setEmailVerified(true);
+            $this->em->persist($user);
+            $this->em->flush();
+        }
+
+        $apiKeyRepo = $this->em->getRepository(ApiKey::class);
+        if (null === $apiKeyRepo->findOneBy(['key' => self::ADMIN_API_KEY])) {
+            $apiKey = new ApiKey();
+            $apiKey->setOwner($user);
+            $apiKey->setKey(self::ADMIN_API_KEY);
+            $apiKey->setStatus('active');
+            $apiKey->setName('MCP Admin Endpoint Test');
             $apiKey->setScopes([]);
             $this->em->persist($apiKey);
             $this->em->flush();

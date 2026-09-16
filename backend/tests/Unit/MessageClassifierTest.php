@@ -2,13 +2,25 @@
 
 namespace App\Tests\Unit;
 
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\Agent\AgentPinResolver;
+use App\Service\File\Office\OfficeConverterClient;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
+use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterMatch;
+use App\Service\Message\Routing\EmbeddingRouterService;
+use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\SelfAware\SelfAwareConfig;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -45,7 +57,13 @@ class MessageClassifierTest extends TestCase
             $this->modelConfigService,
             $this->configRepository,
             $this->em,
-            $this->logger
+            $this->logger,
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($this->configRepository),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
     }
 
@@ -94,6 +112,24 @@ class MessageClassifierTest extends TestCase
 
         $this->assertEquals('tools:pic', $result['topic']);
         $this->assertEquals('tool_command', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    public function testHelpCommandRoutesToSynaplan(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(21);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('/help');
+        $message->method('getLanguage')->willReturn('en');
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('synaplan', $result['topic']);
+        $this->assertSame('chat', $result['intent']);
+        $this->assertSame('tool_command', $result['source']);
         $this->assertTrue($result['skip_sorting']);
     }
 
@@ -153,7 +189,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
         $message->method('getFileType')->willReturn('');
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
 
@@ -312,9 +348,9 @@ class MessageClassifierTest extends TestCase
         $message->method('getFile')->willReturn(0);
 
         // Mock that the message has files (images)
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileMime')->willReturn('image/png');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -338,10 +374,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Summarize this');
         $message->method('getLanguage')->willReturn('en');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('pdf');
         $file->method('getFileName')->willReturn('report.pdf');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -356,6 +392,119 @@ class MessageClassifierTest extends TestCase
         $this->assertTrue($result['skip_sorting']);
     }
 
+    public function testMergeAttachmentsIntoPdfRoutesToDocumentCombine(): void
+    {
+        $message = $this->attachmentMessage(483, 'führe beide dateien in eine pdf zusammen', ['xlsx', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        // BTOPIC stays a real prompt topic; the capability comes from the intent.
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('document_combine', $result['intent']);
+        $this->assertSame('attachment_document_combine', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    public function testExportSingleAttachmentAsPdfRoutesToDocumentExport(): void
+    {
+        $message = $this->attachmentMessage(481, 'hieraus eine pdf', ['xlsx']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('document_export', $result['intent']);
+        $this->assertSame('attachment_document_export', $result['source']);
+    }
+
+    /**
+     * "Save these PDFs to folder X" is a save_to_folder request. The old
+     * `speichern.{0,40}pdf` pattern read it as an export and merged the
+     * attachments instead.
+     */
+    public function testSavingAttachedPdfsToAFolderIsNotAMerge(): void
+    {
+        $message = $this->attachmentMessage(484, 'Speichere die PDFs im Ordner Projekte', ['pdf', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    /**
+     * Converting two files "to PDF" plausibly means two PDFs. Without an
+     * explicit merge verb or a single-file target the planner decides.
+     */
+    public function testConvertingTwoAttachmentsToPdfIsNotAMerge(): void
+    {
+        $message = $this->attachmentMessage(485, 'convert both files to PDF', ['xlsx', 'docx']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    public function testExportPhrasingWithAnExplicitSingleTargetStillMerges(): void
+    {
+        $message = $this->attachmentMessage(486, 'convert both files into one pdf', ['xlsx', 'docx']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('document_combine', $result['intent']);
+    }
+
+    /**
+     * The deterministic route skips the planner, so a second intent in the same
+     * turn would be lost (#1192). Compound requests stay with the planner.
+     */
+    public function testMergeCombinedWithAnotherIntentGoesToThePlanner(): void
+    {
+        $message = $this->attachmentMessage(487, 'führe beide dateien in eine pdf zusammen und lies es vor', ['xlsx', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('attachment_document_or_audio', $result['source']);
+    }
+
+    public function testMergeIsNotRoutedWithoutTheOfficeEngine(): void
+    {
+        $message = $this->attachmentMessage(488, 'führe beide dateien in eine pdf zusammen', ['xlsx', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting(officeEngineOn: false)->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    /**
+     * Two PDFs need no converter, so an install without the office engine can
+     * still merge them.
+     */
+    public function testMergingTwoPdfsNeedsNoOfficeEngine(): void
+    {
+        $message = $this->attachmentMessage(489, 'merge these two files', ['pdf', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting(officeEngineOn: false)->classify($message);
+
+        $this->assertSame('document_combine', $result['intent']);
+    }
+
+    /**
+     * Without the multi-task engine no runner can produce the PDF and the
+     * legacy router would answer with a chat turn that only claims it did.
+     */
+    public function testMergeIsNotRoutedWhenMultitaskRoutingIsDisabled(): void
+    {
+        $message = $this->attachmentMessage(490, 'führe beide dateien in eine pdf zusammen', ['xlsx', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting(multitaskOn: false)->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
+
     public function testAudioAttachmentForcesAnalyzefileRoute(): void
     {
         $message = $this->createMock(Message::class);
@@ -364,10 +513,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Transcribe');
         $message->method('getLanguage')->willReturn('de');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('mp3');
         $file->method('getFileName')->willReturn('voice.mp3');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -393,10 +542,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('What is in this clip?');
         $message->method('getLanguage')->willReturn('en');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('mp4');
         $file->method('getFileName')->willReturn('clip.mp4');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -425,10 +574,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('fasse zusammen');
         $message->method('getLanguage')->willReturn('de');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('audio'); // generic kind, not 'mp3'
         $file->method('getFileName')->willReturn('tts_123.mp3');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -455,10 +604,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('was steht drin');
         $message->method('getLanguage')->willReturn('de');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('document');
         $file->method('getFileName')->willReturn('generated-doc'); // no extension
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -503,6 +652,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -511,7 +666,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Hello, how are you today?');
         $message->method('getLanguage')->willReturn('en');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $result = $classifier->classify($message);
 
@@ -545,6 +700,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -553,7 +714,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Please draw a sunset over a mountain.');
         $message->method('getLanguage')->willReturn('en');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20250116120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -582,7 +743,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getTopic')->willReturn('');
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
 
@@ -615,7 +776,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getTopic')->willReturn('');
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
 
@@ -711,6 +872,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -719,7 +886,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -779,6 +946,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -787,7 +960,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn($lang);
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -850,6 +1023,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -858,7 +1037,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn($lang);
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -893,6 +1072,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -901,7 +1086,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -957,6 +1142,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -965,7 +1156,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1006,6 +1197,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $previousFileMessage = $this->createMock(Message::class);
@@ -1018,7 +1215,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Kannst du den Titel bitte fett machen');
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1057,6 +1254,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $previousReply = $this->createMock(Message::class);
@@ -1069,7 +1272,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Thanks, that helps a lot!');
         $message->method('getLanguage')->willReturn('en');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $result = $classifier->classify($message, [$previousReply]);
 
@@ -1103,6 +1306,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $fileTurn = $this->createMock(Message::class);
@@ -1119,7 +1328,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Kannst du den Titel in der Datei jetzt zentrieren');
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1159,6 +1368,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $fileTurn = $this->createMock(Message::class);
@@ -1175,12 +1390,788 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Super, danke dir vielmals');
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $result = $classifier->classify($message, [$fileTurn, $interleavedReply]);
 
         $this->assertSame('general', $result['topic']);
         $this->assertSame('fast_path_heuristic', $result['source']);
         $this->assertTrue($result['skip_sorting']);
+    }
+
+    /**
+     * Session files, image half: "mach es blau" right after an image was
+     * generated names no format and hits none of the media trigger substrings,
+     * so the fast-path used to shortcut it to `general` — where the chat model
+     * can only talk about the picture instead of editing it. Generated media
+     * carries no `__FILE_GENERATED__:` marker, so it needs its own guard.
+     */
+    public function testFastPathDefersWhenPreviousTurnGeneratedAnImage(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image', 'input_mode' => 'reference_images']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+
+        $imageTurn = $this->createMock(Message::class);
+        $imageTurn->method('getDirection')->willReturn('OUT');
+        $imageTurn->method('getText')->willReturn('Here is your image');
+        $imageTurn->method('getFilePath')->willReturn('ai/car-sunset.png');
+
+        $result = $classifier->classify($this->plainMessage(301, 'mach es blau'), [$imageTurn]);
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertSame('reference_images', $result['input_mode']);
+    }
+
+    /**
+     * Multi-turn editing: normal chat is interleaved after the picture was
+     * generated, and a later message references it by a visual property.
+     */
+    public function testFastPathDefersForLaterImageEditAfterInterleavedChat(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+
+        $imageTurn = $this->createMock(Message::class);
+        $imageTurn->method('getDirection')->willReturn('OUT');
+        $imageTurn->method('getText')->willReturn('Here is your image');
+        $imageTurn->method('getFilePath')->willReturn('ai/car-sunset.png');
+
+        $interleavedReply = $this->createMock(Message::class);
+        $interleavedReply->method('getDirection')->willReturn('OUT');
+        $interleavedReply->method('getText')->willReturn('Gerne, hier ist die Erklaerung.');
+        $interleavedReply->method('getFilePath')->willReturn('');
+
+        $result = $classifier->classify(
+            $this->plainMessage(302, 'kannst du die Farbe noch anpassen'),
+            [$imageTurn, $interleavedReply],
+        );
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * Counterpart: no over-deferral. Plain chat after an interleaved reply still
+     * takes the fast path even though the thread contains a generated picture.
+     */
+    public function testFastPathTakenForUnrelatedChatAfterEarlierImage(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+
+        $imageTurn = $this->createMock(Message::class);
+        $imageTurn->method('getDirection')->willReturn('OUT');
+        $imageTurn->method('getText')->willReturn('Here is your image');
+        $imageTurn->method('getFilePath')->willReturn('ai/car-sunset.png');
+
+        $interleavedReply = $this->createMock(Message::class);
+        $interleavedReply->method('getDirection')->willReturn('OUT');
+        $interleavedReply->method('getText')->willReturn('Gerne, hier ist die Erklaerung.');
+        $interleavedReply->method('getFilePath')->willReturn('');
+
+        $result = $classifier->classify(
+            $this->plainMessage(303, 'Super, danke dir vielmals'),
+            [$imageTurn, $interleavedReply],
+        );
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+    }
+
+    /**
+     * A generated DOCUMENT must not trip the media guard — documents have their
+     * own (already shipped) deferral and the media probe is extension-based.
+     */
+    public function testGeneratedDocumentDoesNotTripTheMediaGuard(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+
+        $documentTurn = $this->createMock(Message::class);
+        $documentTurn->method('getDirection')->willReturn('OUT');
+        $documentTurn->method('getText')->willReturn('Done.');
+        $documentTurn->method('getFilePath')->willReturn('ai/report.docx');
+
+        $result = $classifier->classify($this->plainMessage(304, 'Super, danke dir vielmals'), [$documentTurn]);
+
+        $this->assertSame('fast_path_heuristic', $result['source']);
+    }
+
+    /**
+     * BINPUTMODE was parsed by the sorter and then dropped here, so the media
+     * handler never learned that a request edits an existing picture.
+     */
+    public function testInputModeFromTheSorterReachesTheClassification(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'language' => 'en',
+            'media_type' => 'image',
+            'input_mode' => 'reference_images',
+        ]);
+
+        $result = $this->service->classify($this->plainMessage(305, 'make the car blue'));
+
+        $this->assertSame('reference_images', $result['input_mode']);
+    }
+
+    public function testClassificationHasNoInputModeWhenTheSorterOmitsIt(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+        ]);
+
+        $this->assertArrayNotHasKey('input_mode', $this->service->classify($this->plainMessage(306, 'hello there')));
+    }
+
+    // ──────────────────────────────────────────────
+    //  Phase 8: embedding-router cascade layer
+    // ──────────────────────────────────────────────
+
+    public function testEmbeddingRouterDisabledByDefaultNeverConsultsTheRouter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: false);
+
+        $result = $classifier->classify($this->plainMessage(400, 'Hello, how are you?'));
+
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    public function testConfidentEmbeddingMatchSkipsTheAiSorter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('mediamaker', 0.95, [['topic' => 'general', 'score' => 0.4]]));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true, threshold: 0.88);
+
+        // Deliberately gibberish text: no local-language heuristic anchor
+        // fires for any of the five supported languages, so
+        // resolveConfidentLanguage() falls back to the 'de' already pinned
+        // on the message by plainMessage() rather than guessing.
+        $result = $classifier->classify($this->plainMessage(401, 'zzzqx foobar wibble 12345'));
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('de', $result['language']);
+        $this->assertSame('embedding_router', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+        $this->assertSame('image_generation', $result['intent']);
+        $this->assertNull($result['web_search']);
+        $this->assertSame(0.95, $result['routing_confidence']);
+        // RoutingDecision::$discardedAlternatives is list<string> (see its
+        // docblock) — EmbeddingRouterMatch's structured {topic,score} pairs
+        // are formatted down to that shape here, matching every other layer.
+        $this->assertSame(['general (0.400)'], $result['routing_discarded_alternatives']);
+    }
+
+    public function testSubThresholdEmbeddingMatchEscalatesToTheAiSorter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        // Below the configured 0.88 threshold.
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('mediamaker', 0.5));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true, threshold: 0.88);
+
+        $result = $classifier->classify($this->plainMessage(402, 'Something ambiguous'));
+
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    public function testNoEmbeddingMatchEscalatesToTheAiSorter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(null);
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(403, 'Something with no anchors'));
+
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * A confident topic match with an undetectable language must still defer
+     * to the AI sorter rather than guess — same guard as the fast-path (a
+     * German "wer bist du?" was once answered in English because an
+     * undetectable language silently defaulted to 'en').
+     */
+    public function testConfidentEmbeddingMatchWithoutConfidentLanguageEscalatesToTheAiSorter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('general', 0.99));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(404);
+        $message->method('getUserId')->willReturn(10);
+        // No German/English/etc. anchor words, and 'NN' (unknown) on the message.
+        $message->method('getText')->willReturn('xyzzy plugh');
+        $message->method('getLanguage')->willReturn('NN');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * With both new layers on, Phase 8's refusal must reach the AI sorter and
+     * not be intercepted by Phase 9. The refusal is specifically a request for
+     * BLANG resolution, and Phase 9 answers `language: 'en'` — i.e. exactly
+     * the guess Phase 8 declined to make.
+     */
+    public function testAnEmbeddingMatchDeclinedForLanguageReachesTheSorterEvenWithPhase9On(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('general', 0.99));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'de']);
+
+        $classifier = $this->classifierWithBothNewLayers($embeddingRouter, $sorter);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(405);
+        $message->method('getUserId')->willReturn(10);
+        // No language anchor words, and 'NN' (unknown) on the message.
+        $message->method('getText')->willReturn('xyzzy plugh');
+        $message->method('getLanguage')->willReturn('NN');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertArrayNotHasKey('defer_routing_to_chat', $result);
+        $this->assertSame('de', $result['language']);
+    }
+
+    /**
+     * The complement of the test above: when Phase 8 finds NO match at all it
+     * has expressed no opinion, so Phase 9 is free to take the turn.
+     */
+    public function testPhase9StillTakesTheTurnWhenTheEmbeddingRouterFoundNothing(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(null);
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithBothNewLayers($embeddingRouter, $sorter);
+
+        $result = $classifier->classify($this->plainMessage(406, 'What is the capital of France?'));
+
+        $this->assertTrue($result['defer_routing_to_chat']);
+    }
+
+    public function testNativeToolRoutingDefersTheDecisionToTheAnsweringCall(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(900, 'What is the capital of France?'));
+
+        // The acceptance criterion of Phase 9: a simple chat turn costs no
+        // sorter call at all.
+        self::assertSame('general', $result['topic']);
+        self::assertSame('chat', $result['intent']);
+        self::assertSame('native_tool_calling', $result['source']);
+        self::assertTrue($result['skip_sorting']);
+        self::assertTrue($result['defer_routing_to_chat']);
+        // No sorter means no BWEBSEARCH vote, exactly as on the fast-path.
+        self::assertNull($result['web_search']);
+    }
+
+    public function testDisabledNativeToolRoutingKeepsTheSorterCall(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: false);
+
+        $result = $classifier->classify($this->plainMessage(901, 'What is the capital of France?'));
+
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * The pre-gate: on an account whose chat provider has no native tool
+     * calling, deferring would buy a guaranteed re-route on every single
+     * message.
+     */
+    public function testNoDeferralWhenTheAccountChatProviderCannotDoToolCalling(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true, chatProvider: 'ollama');
+
+        $result = $classifier->classify($this->plainMessage(902, 'What is the capital of France?'));
+
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * The second pass after an unhonourable deferral: without this the turn
+     * would defer, come back, and defer again forever.
+     */
+    public function testASecondPassWithDeferralDisallowedGoesToTheSorter(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify(
+            $this->plainMessage(903, 'What is the capital of France?'),
+            [],
+            null,
+            allowRoutingDeferral: false,
+        );
+
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * Deferring means "let the answering model decide", but an attachment
+     * rule has already decided — the deferral must sit BELOW every
+     * deterministic layer, not above them.
+     */
+    public function testDeterministicLayersStillWinOverTheDeferral(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(904, '/pic a cat on a bike'));
+
+        self::assertSame('tool_command', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * Self-awareness answers by routing to the `synaplan` topic, which only
+     * the AI sorter can pick — the hand-off toolset covers the four system
+     * capabilities and nothing else. Deferring such a question would answer it
+     * from a plain chat turn that knows nothing about the product.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testTheDeferralStepsAsideForSelfAwareMetaQuestions(string $text): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(905, $text));
+
+        self::assertSame('synaplan', $result['topic']);
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * Same rule for the Phase 8 layer: a confident anchor match can only ever
+     * be one of the four system topics, so `synaplan` would be unreachable.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testTheEmbeddingRouterStepsAsideForSelfAwareMetaQuestions(string $text): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(906, $text));
+
+        self::assertSame('synaplan', $result['topic']);
+        self::assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * @param string $chatProvider the account's default chat provider, which decides
+     *                             whether the classifier's cheap pre-gate lets the
+     *                             deferral through at all
+     */
+    private function classifierWithNativeToolRouting(
+        MessageSorter $sorter,
+        bool $enabled,
+        string $chatProvider = 'anthropic',
+    ): MessageClassifier {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'NATIVE_TOOL_ROUTING' === $group && 'ENABLED' === $setting
+                ? ($enabled ? '1' : '0')
+                : null
+        );
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultProvider')->willReturn($chatProvider);
+
+        return new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $modelConfig,
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            new NativeToolRoutingConfig($configRepo),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
+            new SelfAwareConfig($configRepo),
+        );
+    }
+
+    /**
+     * Both new cascade layers on at once — the configuration in which the
+     * layers can shadow each other.
+     */
+    private function classifierWithBothNewLayers(
+        EmbeddingRouterService $embeddingRouter,
+        MessageSorter $sorter,
+        float $threshold = 0.88,
+    ): MessageClassifier {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static function (int $owner, string $group, string $setting) use ($threshold): ?string {
+                if ('EMBEDDING_ROUTER' === $group && 'ENABLED' === $setting) {
+                    return '1';
+                }
+                if ('EMBEDDING_ROUTER' === $group && 'CONFIDENCE_THRESHOLD' === $setting) {
+                    return (string) $threshold;
+                }
+                if ('NATIVE_TOOL_ROUTING' === $group && 'ENABLED' === $setting) {
+                    return '1';
+                }
+
+                return null;
+            }
+        );
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultProvider')->willReturn('anthropic');
+
+        return new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $modelConfig,
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $embeddingRouter,
+            new EmbeddingRouterConfig($configRepo),
+            new NativeToolRoutingConfig($configRepo),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
+            new SelfAwareConfig($configRepo),
+        );
+    }
+
+    /**
+     * The Phase 9 deferral switched off, which is the default everywhere and
+     * therefore the right baseline for every test that is not about it.
+     */
+    private function disabledNativeToolRouting(): NativeToolRoutingConfig
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn(null);
+
+        return new NativeToolRoutingConfig($configRepo);
+    }
+
+    private function classifierWithEmbeddingRouter(
+        EmbeddingRouterService $embeddingRouter,
+        MessageSorter $sorter,
+        bool $enabled,
+        float $threshold = 0.88,
+    ): MessageClassifier {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting) use ($enabled, $threshold): ?string {
+            if ('EMBEDDING_ROUTER' === $group && 'ENABLED' === $setting) {
+                return $enabled ? '1' : '0';
+            }
+            if ('EMBEDDING_ROUTER' === $group && 'CONFIDENCE_THRESHOLD' === $setting) {
+                return (string) $threshold;
+            }
+
+            return null;
+        });
+
+        return new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $embeddingRouter,
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
+            new SelfAwareConfig($configRepo),
+        );
+    }
+
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function selfAwareGuardUtterances(): array
+    {
+        return [
+            ['can you make PDFs?'],
+            ['was kannst du?'],
+            ['¿puedes buscar en internet?'],
+            ['peux-tu lire mes e-mails ?'],
+            ['video yapabilir misin?'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testFastPathDefersSelfAwareMetaQuestions(string $text): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+        $result = $classifier->classify($this->plainMessage(410, $text));
+
+        $this->assertSame('synaplan', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    public function testFastPathKeepsPdfRequestsOnGeneralWhenEngineOff(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter, false);
+        $result = $classifier->classify($this->plainMessage(412, 'gib es mir als pdf'));
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+    }
+
+    public function testFastPathDefersPdfRequestsWhenEngineOn(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter, true);
+        $result = $classifier->classify($this->plainMessage(413, 'gib es mir als pdf'));
+
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    public function testFastPathStillClassifiesOrdinaryChat(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+        $result = $classifier->classify($this->plainMessage(411, 'write me a poem'));
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+    }
+
+    private function classifierWithFastPathEnabled(MessageSorter $sorter, bool $officeEngineOn = false): MessageClassifier
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
+        });
+
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn($officeEngineOn);
+
+        return new MessageClassifier(
+            $sorter,
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
+            new SelfAwareConfig($configRepo),
+            $converter,
+        );
+    }
+
+    /**
+     * Classifier wired for the attachment merge/export layer: it only routes
+     * when the multi-task engine can execute the node and — for office sources
+     * — the converter is up.
+     */
+    private function classifierForAttachmentRouting(bool $officeEngineOn = true, bool $multitaskOn = true): MessageClassifier
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): string => MultitaskRoutingConfig::CONFIG_GROUP === $group
+                && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $setting
+                    ? ($multitaskOn ? '1' : '0')
+                    : '0'
+        );
+
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn($officeEngineOn);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        return new MessageClassifier(
+            $this->messageSorter,
+            $this->messageMetaRepository,
+            $this->modelConfigService,
+            $configRepo,
+            $this->em,
+            $this->logger,
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
+            officeConverter: $converter,
+            multitaskConfig: new MultitaskRoutingConfig($configRepo),
+        );
+    }
+
+    /**
+     * @param list<string> $extensions
+     */
+    private function attachmentMessage(int $id, string $text, array $extensions): Message&MockObject
+    {
+        $files = [];
+        foreach ($extensions as $index => $extension) {
+            $file = $this->createMock(File::class);
+            $file->method('getFileType')->willReturn($extension);
+            $file->method('getFileName')->willReturn('Finanzmodell_'.$index.'.'.$extension);
+            $files[] = $file;
+        }
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn($id);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection($files));
+
+        return $message;
+    }
+
+    private function plainMessage(int $id, string $text): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn($id);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        return $message;
     }
 }

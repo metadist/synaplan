@@ -105,16 +105,25 @@ framework:
             # stored summary after the chat turn is persisted, so the hot path
             # never waits on the summarizer.
             'App\Message\RefreshConversationSummaryCommand': async_ai_high
+            # After-turn digest of other chats — quiet applies only to the live chat.
+            'App\Message\DigestOtherChatsCommand': async_ai_high
             # API-session summary — folds gateway request excerpts into a
             # rolling per-session summary chat, off the SSE hot path.
             'App\Message\SummarizeApiSessionCommand': async_ai_high
             'App\Message\ProvisionDefaultUserPluginsMessage': async_index
             'App\Message\CrawlWidgetUrlMessage': async_index
             'App\Message\ReVectorizeMessage': async_index
+            'App\Message\SyncPlatformDocsMessage': async_index
             # Async media jobs (Release 4.0): each message advances one render by
             # a single non-blocking step then re-dispatches itself (DelayStamp)
             # for the next poll. Short hops, never a worker pinned for minutes.
             'App\Message\AdvanceMediaJobCommand': async_index
+            'App\Message\GenerateDocumentThumbnailMessage': async_index
+            'App\Message\ResumeApprovalCommand': async_ai_high
+            'App\Message\ResumeSavedTaskRunCommand': async_ai_high
+            # Public webhook → Saved Task run. Accepted on the request path,
+            # executed here so proxy timeouts never trigger duplicate runs.
+            'App\Message\RunSavedTaskCommand': async_ai_high
 
 when@test:
     framework:

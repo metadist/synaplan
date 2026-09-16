@@ -35,6 +35,7 @@ final readonly class CapabilityService
         'audio' => ['mp3', 'wav', 'ogg', 'm4a'],
         'video' => ['mp4', 'webm', 'mov', 'avi', 'mkv'],
         'calendar' => ['ics'],
+        'archives' => ['jar'],
     ];
 
     /**

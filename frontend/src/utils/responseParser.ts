@@ -1,4 +1,5 @@
 import { extractBTextPayload } from './jsonResponse'
+import { looksLikeJsonDocument } from './jsonResult'
 
 export interface ParsedResponsePart {
   type: 'text' | 'code' | 'json' | 'link' | 'links' | 'thinking'
@@ -106,6 +107,15 @@ export function parseAIResponse(content: string): ParsedResponse {
 }
 
 function parseTextContent(text: string, parts: ParsedResponsePart[]) {
+  if (looksLikeJsonDocument(text)) {
+    parts.push({
+      type: 'json',
+      content: text.trim(),
+      language: 'json',
+    })
+    return
+  }
+
   // Extract all links (both markdown and plain URLs)
   const links: Array<{ url: string; title: string; position: number }> = []
 

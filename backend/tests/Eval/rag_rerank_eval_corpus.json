@@ -1,0 +1,25 @@
+{
+  "corpusId": "golden-extraction-s1",
+  "questions": [
+    {"id": "Q01", "question": "What format is the golden corpus written in?", "expected": {"file": "sample.md", "mustContain": "markdown"}},
+    {"id": "Q02", "question": "Which extractor is the golden corpus for?", "expected": {"file": "sample.md", "mustContain": "native extractor"}},
+    {"id": "Q03", "question": "Where is the golden corpus described?", "expected": {"file": "sample.md", "mustContain": "Golden corpus"}},
+    {"id": "Q04", "question": "Is the sample note written as plain markdown?", "expected": {"file": "sample.md", "mustContain": "Plain markdown"}},
+    {"id": "Q05", "question": "What does the markdown sample say about the native path?", "expected": {"file": "sample.md", "mustContain": "native"}},
+    {"id": "Q06", "question": "Who is listed as an engineer in the staff table?", "expected": {"file": "sample.csv", "mustContain": "Ada"}},
+    {"id": "Q07", "question": "What role does Ada have?", "expected": {"file": "sample.csv", "mustContain": "Engineer"}},
+    {"id": "Q08", "question": "Which columns does the staff table use?", "expected": {"file": "sample.csv", "mustContain": "role"}},
+    {"id": "Q09", "question": "What is Ada's job title?", "expected": {"file": "sample.csv", "mustContain": "Engineer"}},
+    {"id": "Q10", "question": "Name the person in the role table.", "expected": {"file": "sample.csv", "mustContain": "Ada"}},
+    {"id": "Q11", "question": "What greeting is in the HTML sample?", "expected": {"file": "sample.html", "mustContain": "Hello from HTML"}},
+    {"id": "Q12", "question": "Does the HTML sample contain a paragraph?", "expected": {"file": "sample.html", "mustContain": "Hello"}},
+    {"id": "Q13", "question": "What does the HTML body say?", "expected": {"file": "sample.html", "mustContain": "HTML"}},
+    {"id": "Q14", "question": "Find the hello message in the web page sample.", "expected": {"file": "sample.html", "mustContain": "Hello from HTML"}},
+    {"id": "Q15", "question": "Is there a short HTML page in the golden set?", "expected": {"file": "sample.html", "mustContain": "Hello"}},
+    {"id": "Q16", "question": "Which sample is meant for the native extractor?", "expected": {"file": "sample.md", "mustContain": "native extractor"}},
+    {"id": "Q17", "question": "What heading does the markdown sample use?", "expected": {"file": "sample.md", "mustContain": "Golden corpus"}},
+    {"id": "Q18", "question": "Who appears in the name column of the table?", "expected": {"file": "sample.csv", "mustContain": "Ada"}},
+    {"id": "Q19", "question": "What text sits inside the HTML paragraph?", "expected": {"file": "sample.html", "mustContain": "Hello from HTML"}},
+    {"id": "Q20", "question": "Which sample mentions an engineer?", "expected": {"file": "sample.csv", "mustContain": "Engineer"}}
+  ]
+}

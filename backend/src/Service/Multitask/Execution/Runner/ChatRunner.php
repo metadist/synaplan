@@ -6,6 +6,8 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
+use App\Entity\Prompt;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
@@ -14,27 +16,34 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\Runtime\RuntimeProfile;
+use App\Service\SelfAware\Docs\PlatformDocsRetriever;
+use App\Service\SelfAware\SelfAwareConfig;
+use App\Service\SelfAware\SelfAwarePromptDecorator;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Text-capability runner for `chat`, `summarize`, `translate`, `rag_query`.
  *
- * Resolves the model via the existing capability→DEFAULTMODEL chain (SUMMARIZE
- * for summarize, CHAT otherwise) keyed by the effective user id — the migration
- * principle: the planner picks the task, the model resolution stays here. It
- * runs the transform through AiFacade::chat on the upstream text input.
+ * Resolves the model via the existing capability→DEFAULTMODEL chain (ANALYZE
+ * for summarize — Text Analytics — CHAT otherwise) keyed by the effective user
+ * id. The leftover SUMMARIZE slot is never consulted. The planner picks the
+ * task; model resolution stays here. It runs the transform through
+ * AiFacade::chat on the upstream text input.
+ *
+ * `chat` nodes honour `params.topic_id` the same way ChatHandler binds a
+ * Task Prompt: the topic's system text is used, and PromptMeta.aiModel pins
+ * the model when the user did not pick one for the turn. Missing or unknown
+ * topics fall back to the generic assistant prompt — they never fail the node.
  *
  * `rag_query` nodes additionally retrieve knowledge-base context through the
  * same {@see VectorSearchService} the legacy ChatHandler uses (user-selected
  * `rag_group_key` scope when present, whole knowledge base otherwise) and
  * inject it into the system prompt. Retrieval failure degrades to a plain
  * answer — never fails the node.
- *
- * NOTE (Sprint 3b): a multi-node `chat` node uses a generic system prompt. Full
- * custom-topic (params.topic_id → PromptMeta) binding for INTERMEDIATE nodes is
- * a later refinement; single-node custom topics already work via the Sprint 2
- * path.
  */
 final readonly class ChatRunner implements TaskRunner
 {
@@ -43,7 +52,12 @@ final readonly class ChatRunner implements TaskRunner
         private ModelConfigService $modelConfigService,
         private VectorSearchService $vectorSearchService,
         private KnowledgeContextFormatter $knowledgeContextFormatter,
+        private PromptService $promptService,
         private LoggerInterface $logger,
+        #[Autowire(lazy: true)]
+        private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
+        #[Autowire(lazy: true)]
+        private ?PlatformDocsRetriever $platformDocsRetriever = null,
     ) {
     }
 
@@ -75,17 +89,20 @@ final readonly class ChatRunner implements TaskRunner
         }
 
         $language = is_string($context->classification['language'] ?? null) ? $context->classification['language'] : ($context->message->getLanguage() ?: 'en');
-        $capabilityTag = Capability::Summarize === $node->capability ? 'SUMMARIZE' : 'CHAT';
-        $modelId = $this->resolveModelId($capabilityTag, $context);
+        $topicBinding = $this->resolveTopicBinding($node, $context, $language);
+        $capabilityTag = Capability::Summarize === $node->capability ? 'ANALYZE' : 'CHAT';
+        $modelId = $this->resolveModelId($capabilityTag, $context, $topicBinding['modelId']);
         $provider = $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null;
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
-        $systemPrompt = $this->systemPrompt($node, $language, $context);
+        $systemPrompt = $this->systemPrompt($node, $language, $context, $topicBinding['systemPrompt']);
+        $systemPrompt = $this->decorateSelfAwareTopic($systemPrompt, $node, $context, $text);
         $ragChunks = 0;
         if (Capability::RagQuery === $node->capability) {
             $ragContext = $this->ragContext($text, $context, $ragChunks);
             $systemPrompt .= $ragContext;
         }
+        $systemPrompt .= $this->linkedPagesContext($context);
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -115,6 +132,11 @@ final readonly class ChatRunner implements TaskRunner
                     'temperature' => 0.3,
                 ], static fn ($v) => null !== $v),
             );
+        } catch (StreamCancelledException $e) {
+            // Not a model failure: the user pressed Stop. Reporting it as a
+            // failed node would drop the `cancelled` marker and make the turn
+            // persist a second, untranslated cancellation card (#1501).
+            throw $e;
         } catch (\Throwable $e) {
             $this->logger->warning('ChatRunner: model call failed', [
                 'capability' => $node->capability->value,
@@ -156,7 +178,7 @@ final readonly class ChatRunner implements TaskRunner
      * default instead of surfacing an error. Mirror the legacy chain here so the
      * behaviour is identical regardless of which path the classifier picks.
      */
-    private function resolveModelId(string $capabilityTag, NodeContext $context): ?int
+    private function resolveModelId(string $capabilityTag, NodeContext $context, ?int $topicModelId = null): ?int
     {
         $selected = $context->classification['model_id'] ?? null;
         if (is_numeric($selected) && (int) $selected > 0) {
@@ -168,8 +190,53 @@ final readonly class ChatRunner implements TaskRunner
             return (int) $override;
         }
 
+        if (null !== $topicModelId && $topicModelId > 0) {
+            return $topicModelId;
+        }
+
         return $this->modelConfigService->getDefaultModel($capabilityTag, $context->userId)
             ?? $this->modelConfigService->getDefaultModel('CHAT', $context->userId);
+    }
+
+    /**
+     * @return array{systemPrompt: ?string, modelId: ?int}
+     */
+    private function resolveTopicBinding(TaskNode $node, NodeContext $context, string $language): array
+    {
+        if (Capability::Chat !== $node->capability) {
+            return ['systemPrompt' => null, 'modelId' => null];
+        }
+
+        $topicId = $node->params['topic_id'] ?? null;
+        if (!is_string($topicId) || '' === trim($topicId)) {
+            return ['systemPrompt' => null, 'modelId' => null];
+        }
+
+        $userId = $context->userId ?? 0;
+        try {
+            $promptData = $this->promptService->getPromptWithMetadata(trim($topicId), $userId, $language);
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatRunner: topic binding failed, using generic prompt', [
+                'topic_id' => $topicId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['systemPrompt' => null, 'modelId' => null];
+        }
+
+        if (null === $promptData) {
+            return ['systemPrompt' => null, 'modelId' => null];
+        }
+
+        $prompt = $promptData['prompt'] ?? null;
+        $text = $prompt instanceof Prompt ? trim($prompt->getPrompt()) : '';
+        $metadata = is_array($promptData['metadata'] ?? null) ? $promptData['metadata'] : [];
+        $pinned = isset($metadata['aiModel']) && is_numeric($metadata['aiModel']) ? (int) $metadata['aiModel'] : null;
+
+        return [
+            'systemPrompt' => '' !== $text ? $text : null,
+            'modelId' => (null !== $pinned && $pinned > 0) ? $pinned : null,
+        ];
     }
 
     /**
@@ -186,10 +253,21 @@ final readonly class ChatRunner implements TaskRunner
         $groupKey = $context->classification['rag_group_key']
             ?? $context->options['rag_group_key']
             ?? null;
-        $groupKey = is_string($groupKey) && '' !== $groupKey ? $groupKey : null;
+        $limit = $context->options['rag_limit'] ?? null;
+        $minScore = $context->options['rag_min_score'] ?? null;
 
-        $limit = isset($context->options['rag_limit']) ? max(1, min(50, (int) $context->options['rag_limit'])) : 20;
-        $minScore = isset($context->options['rag_min_score']) ? max(0.0, min(1.0, (float) $context->options['rag_min_score'])) : 0.2;
+        // A pinned assistant carries its scope in the RuntimeProfile, never
+        // as scalar copies (see ChatHandler::ragSettings).
+        $profile = $context->options['runtime_profile'] ?? null;
+        if ($profile instanceof RuntimeProfile) {
+            $groupKey ??= $profile->primaryRagGroupKey();
+            $limit ??= $profile->ragLimit;
+            $minScore ??= $profile->ragMinScore;
+        }
+
+        $groupKey = is_string($groupKey) && '' !== $groupKey ? $groupKey : null;
+        $limit = null !== $limit ? max(1, min(50, (int) $limit)) : 20;
+        $minScore = null !== $minScore ? max(0.0, min(1.0, (float) $minScore)) : 0.2;
 
         try {
             $results = $this->vectorSearchService->semanticSearch(
@@ -217,8 +295,71 @@ final readonly class ChatRunner implements TaskRunner
         return $this->knowledgeContextFormatter->formatRagContext($results);
     }
 
-    private function systemPrompt(TaskNode $node, string $language, NodeContext $context): string
+    /**
+     * Pages the processor already read for the links in this message. When
+     * the planner placed a `url_fetch` node, that node carries the content
+     * into the chat input and nothing is appended here; otherwise a pasted
+     * link would be fetched and then dropped before the model answers.
+     */
+    private function linkedPagesContext(NodeContext $context): string
     {
+        $urlContent = $context->classification['url_content'] ?? null;
+        if (!is_string($urlContent) || '' === trim($urlContent)) {
+            return '';
+        }
+        if (in_array(Capability::UrlFetch->value, $context->planCapabilities, true)) {
+            return '';
+        }
+
+        return "\n\n".$urlContent;
+    }
+
+    private function decorateSelfAwareTopic(string $systemPrompt, TaskNode $node, NodeContext $context, string $query): string
+    {
+        if (null === $this->selfAwarePromptDecorator) {
+            return $systemPrompt;
+        }
+
+        $topicId = $node->params['topic_id'] ?? null;
+        $topic = is_string($topicId) ? trim($topicId) : '';
+        $isWidget = SelfAwarePromptDecorator::isWidgetConversation(
+            $context->classification,
+            $context->options,
+        );
+        $docsHits = null;
+        if (SelfAwareConfig::ROUTABLE_TOPIC === $topic && null !== $this->platformDocsRetriever && !$isWidget) {
+            $retrievalQuery = trim($query);
+            if ('' === $retrievalQuery || 1 === preg_match('/^\/help\b/i', $retrievalQuery)) {
+                $retrievalQuery = 'What can you do here?';
+            }
+            try {
+                $docsHits = $this->platformDocsRetriever->retrieve(
+                    $retrievalQuery,
+                    $context->userId ?? $context->message->getUserId(),
+                );
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatRunner: Platform docs retrieval failed, continuing without', [
+                    'error' => $e->getMessage(),
+                ]);
+                $docsHits = null;
+            }
+        }
+
+        return $this->selfAwarePromptDecorator->apply(
+            $systemPrompt,
+            '' !== $topic ? $topic : 'general',
+            $context->userId ?? $context->message->getUserId(),
+            $isWidget,
+            $docsHits,
+        );
+    }
+
+    private function systemPrompt(TaskNode $node, string $language, NodeContext $context, ?string $topicPrompt = null): string
+    {
+        if (null !== $topicPrompt && '' !== $topicPrompt) {
+            return $topicPrompt.$this->pipelineDirective($context);
+        }
+
         $base = match ($node->capability) {
             Capability::Summarize => sprintf(
                 'You are a precise summarizer. Summarize the user text concisely%s in language "%s". Return ONLY the summary, no preamble.',

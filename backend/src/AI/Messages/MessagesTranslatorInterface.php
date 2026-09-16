@@ -24,6 +24,10 @@ interface MessagesTranslatorInterface
      * @param array{
      *     api_key: string,
      *     upstream_url: string,
+     *     provider?: string,
+     *     provider_model_id?: string,
+     *     openai_upstream_url?: string,
+     *     openai_completions_url?: string,
      *     anthropic_version?: string|null,
      *     anthropic_beta?: string|null,
      *     x_fixture?: string|null,
@@ -45,6 +49,10 @@ interface MessagesTranslatorInterface
      * @param array{
      *     api_key: string,
      *     upstream_url: string,
+     *     provider?: string,
+     *     provider_model_id?: string,
+     *     openai_upstream_url?: string,
+     *     openai_completions_url?: string,
      *     anthropic_version?: string|null,
      *     anthropic_beta?: string|null,
      *     x_fixture?: string|null,

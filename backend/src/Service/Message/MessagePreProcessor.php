@@ -32,7 +32,15 @@ final readonly class MessagePreProcessor
     // entries the chat preprocessor silently skipped the file, leaving
     // BFILETEXT empty and FileAnalysisHandler reporting "unsupported file
     // type" for legitimately uploaded documents.
-    public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv'];
+    //
+    // Issue #1907: the same gap for OpenDocument, RTF, Apple iWork, and
+    // iCalendar — they are in ALLOWED_EXTENSIONS but were never extracted on
+    // the chat path, so FileTypeResolver returned '' and the turn never
+    // force-routed to file_analysis.
+    public const DOCUMENT_EXTENSIONS = [
+        'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
+        'odt', 'ods', 'odp', 'odg', 'odf', 'rtf', 'pages', 'numbers', 'key', 'ics',
+    ];
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
@@ -52,6 +60,16 @@ final readonly class MessagePreProcessor
         'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'ppt' => 'application/vnd.ms-powerpoint',
         'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'rtf' => 'application/rtf',
+        'odt' => 'application/vnd.oasis.opendocument.text',
+        'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+        'odp' => 'application/vnd.oasis.opendocument.presentation',
+        'odg' => 'application/vnd.oasis.opendocument.graphics',
+        'odf' => 'application/vnd.oasis.opendocument.formula',
+        'ics' => 'text/calendar',
+        'pages' => 'application/vnd.apple.pages',
+        'numbers' => 'application/vnd.apple.numbers',
+        'key' => 'application/vnd.apple.keynote',
     ];
 
     public function __construct(
@@ -165,9 +183,9 @@ final readonly class MessagePreProcessor
             return;
         }
 
-        // Skip extraction if text already exists (e.g., from FileProcessor in upload endpoint)
-        // This prevents overwriting robust extraction with simple Tika-only extraction
-        if (!empty($messageFile->getFileText())) {
+        // Skip if upload already ran FileProcessor. Empty OCR on a photo is a
+        // real result (status=extracted, fileText='') — do not Vision twice.
+        if (!empty($messageFile->getFileText()) || 'extracted' === $messageFile->getStatus()) {
             $this->logger->info('PreProcessor: File text already extracted, skipping re-extraction', [
                 'file_id' => $messageFile->getId(),
                 'type' => $fileType,
@@ -257,10 +275,14 @@ final readonly class MessagePreProcessor
             $useExternal = $this->aiFacade->hasConfiguredSttProvider($userId);
 
             if (!$useExternal && !$this->whisperService->isAvailable()) {
+                // Issue #1908: a missing STT backend is a failure, not success.
+                // Downstream treats `processed` as "extraction finished", so an
+                // empty BFILETEXT would look like a silent skip (UX contract U8).
                 $this->logger->warning('PreProcessor: Whisper not available and no external STT configured, skipping', [
                     'file' => basename($fullPath),
+                    'file_id' => $messageFile->getId(),
                 ]);
-                $messageFile->setStatus('processed');
+                $messageFile->setStatus('error');
 
                 return;
             }
@@ -270,8 +292,8 @@ final readonly class MessagePreProcessor
                     ? $this->aiFacade->transcribe($fullPath, $userId)
                     : $this->transcribeWithWhisper($fullPath, null);
                 $this->persistTranscriptionUsage($message, $result);
-                if ($result && !empty($result['text'])) {
-                    $transcribedText = $result['text'];
+                $transcribedText = $this->transcribedText($result);
+                if ('' !== $transcribedText) {
                     $messageFile->setFileText($transcribedText);
                     $messageFile->setStatus('processed');
 
@@ -289,6 +311,11 @@ final readonly class MessagePreProcessor
                     ]);
 
                     $this->billFileAnalysis($messageFile, $message, 'audio');
+                } else {
+                    $messageFile->setStatus('error');
+                    $this->logger->warning('PreProcessor: Audio transcription produced empty text', [
+                        'file_id' => $messageFile->getId(),
+                    ]);
                 }
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Audio transcription failed', [
@@ -299,17 +326,21 @@ final readonly class MessagePreProcessor
             }
         }
 
-        // Image mit Vision AI
+        // Image: same FileProcessor chain as chat upload (issue #1792 / #1793).
         elseif (in_array($fileType, self::IMAGE_EXTENSIONS)) {
             try {
-                // Use file owner as context for Vision AI
                 $userId = $messageFile->getUserId() ?? 0;
-                $text = $this->processImageWithVision($messageFile->getFilePath(), $userId);
-                $messageFile->setFileText($text ?? '');
+                [$text, $extractMeta] = $this->fileProcessor->extractText(
+                    $messageFile->getFilePath(),
+                    $fileType,
+                    $userId,
+                );
+                $messageFile->setFileText($text);
                 $messageFile->setStatus('processed');
                 $this->logger->info('PreProcessor: Image processed with Vision AI', [
                     'file_id' => $messageFile->getId(),
-                    'text_length' => strlen($text ?? ''),
+                    'text_length' => strlen($text),
+                    'strategy' => $extractMeta['strategy'] ?? 'unknown',
                 ]);
 
                 $this->billFileAnalysis($messageFile, $message, 'image');
@@ -436,8 +467,8 @@ final readonly class MessagePreProcessor
                     ? $this->aiFacade->transcribe($fullPath, $userId)
                     : $this->transcribeWithWhisper($fullPath, $message->getLanguage());
                 $this->persistTranscriptionUsage($message, $result);
-                if ($result && !empty($result['text'])) {
-                    $transcribedText = $result['text'];
+                $transcribedText = $this->transcribedText($result);
+                if ('' !== $transcribedText) {
                     $message->setFileText($transcribedText);
 
                     // Update message text for better classification
@@ -506,7 +537,7 @@ final readonly class MessagePreProcessor
             }
         }
 
-        // Image mit Vision AI (wenn Tika nichts extrahiert hat)
+        // Image: FileProcessor so the configured image chain runs (issue #1792).
         if (in_array($fileType, self::IMAGE_EXTENSIONS)) {
             $this->logger->info('PreProcessor: Processing image with Vision AI', [
                 'file' => basename($fullPath),
@@ -514,10 +545,14 @@ final readonly class MessagePreProcessor
             ]);
 
             try {
-                $text = $this->processImageWithVision($message->getFilePath(), $message->getUserId());
-                $message->setFileText($text ?? '');
+                [$text] = $this->fileProcessor->extractText(
+                    $filePath,
+                    $fileType,
+                    $message->getUserId(),
+                );
+                $message->setFileText($text);
                 $this->logger->info('PreProcessor: Image processed successfully', [
-                    'text_length' => strlen($text ?? ''),
+                    'text_length' => strlen($text),
                 ]);
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Vision AI failed', [
@@ -561,6 +596,21 @@ final readonly class MessagePreProcessor
     }
 
     /**
+     * `!empty()` treats whitespace-only strings as present; routeFiles() later
+     * trims and reports a failure. Trim here so every empty transcript is error.
+     *
+     * @param array<string, mixed>|null $result
+     */
+    private function transcribedText(?array $result): string
+    {
+        if (null === $result || !isset($result['text']) || !is_string($result['text'])) {
+            return '';
+        }
+
+        return trim($result['text']);
+    }
+
+    /**
      * Transcribe audio file with Whisper.
      */
     private function transcribeWithWhisper(string $filePath, ?string $languageHint = null): ?array
@@ -572,9 +622,6 @@ final readonly class MessagePreProcessor
             if ($languageHint && 2 === strlen($languageHint)) {
                 $options['language'] = $languageHint;
             }
-
-            // Use base model by default (good balance of speed/accuracy)
-            $options['model'] = 'base';
 
             return $this->whisperService->transcribe($filePath, $options);
         } catch (\Exception $e) {
@@ -601,35 +648,6 @@ final readonly class MessagePreProcessor
         }
 
         $message->setMeta('ai_transcription_usage', (string) json_encode($usage));
-    }
-
-    /**
-     * Process image with Vision AI.
-     */
-    private function processImageWithVision(string $relativePath, int $userId): ?string
-    {
-        try {
-            $prompt = 'Extract all text visible in this image. '
-                .'Return only the text exactly as it appears, preserving line breaks. '
-                .'Do not add descriptions or commentary. '
-                .'If no text is visible, return an empty string.';
-
-            $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
-            $text = trim($result['content'] ?? '');
-            if ('' !== $text && str_starts_with(strtolower($text), 'test image description:')) {
-                $text = preg_replace('/^test image description:\s*/i', '', $text);
-                $text = trim($text);
-            }
-
-            return '' !== $text ? $text : null;
-        } catch (\Exception $e) {
-            $this->logger->error("Vision AI analysis failed: {$e->getMessage()}", [
-                'file' => basename($relativePath),
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
     }
 
     private function notify(?callable $callback, string $status, string $message): void

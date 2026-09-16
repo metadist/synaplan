@@ -121,6 +121,21 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
         $this->assertSame(['enabled' => true], $this->decode($response)['updated']);
     }
 
+    public function testEmptyFlagUpdateEmitsAnObjectNotAnArray(): void
+    {
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $response = $this->controller->putFlags($this->request([]), $this->makeUser());
+
+        $raw = (string) $response->getContent();
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertStringContainsString('"updated":{}', $raw);
+        $decoded = json_decode($raw, false, 512, \JSON_THROW_ON_ERROR);
+        $this->assertIsObject($decoded);
+        $this->assertTrue($decoded->success);
+        $this->assertIsObject($decoded->updated);
+    }
+
     /**
      * @return iterable<string, array{array<string, mixed>, string}>
      */

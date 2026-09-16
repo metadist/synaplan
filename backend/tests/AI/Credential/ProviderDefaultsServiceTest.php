@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\AI\Credential;
 
 use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -45,10 +47,46 @@ final class ProviderDefaultsServiceTest extends TestCase
      * on catalog drift (renamed/removed models) at test time instead of at
      * apply time in an operator's install.
      */
+    /**
+     * Media and speech providers share the key store (Models & keys is the one
+     * editor) but serve no chat model, so they have no recommended defaults.
+     * Anything else in the store must have some.
+     */
+    private const NO_CHAT_PROVIDERS = ['thehive', 'higgsfield', 'elevenlabs'];
+
+    /**
+     * @return list<string>
+     */
+    private static function chatProviders(): array
+    {
+        $chat = array_values(array_filter(ProviderKeyStore::SUPPORTED_PROVIDERS, ProviderKeyCatalog::servesChat(...)));
+        $chat[] = 'ollama';
+
+        return $chat;
+    }
+
+    /**
+     * The catalog flag is what the API and the first-run wizard read; the
+     * defaults service must agree with it in both directions.
+     */
+    public function testMediaAndSpeechProvidersHaveNoDefaultsAndSayWhy(): void
+    {
+        foreach (self::NO_CHAT_PROVIDERS as $provider) {
+            self::assertFalse(ProviderKeyCatalog::servesChat($provider), $provider.' is a media/speech provider');
+            self::assertFalse(ProviderDefaultsService::supports($provider), $provider.' serves no chat model and must not offer "apply defaults"');
+        }
+        foreach (ProviderKeyStore::SUPPORTED_PROVIDERS as $provider) {
+            self::assertSame(
+                ProviderKeyCatalog::servesChat($provider),
+                ProviderDefaultsService::supports($provider),
+                $provider.': catalog chat flag and recommended defaults disagree'
+            );
+        }
+    }
+
     public function testEveryRecommendedDefaultResolvesInTheModelCatalog(): void
     {
-        $providers = [...ProviderKeyStore::SUPPORTED_PROVIDERS, 'ollama'];
-        foreach ($providers as $provider) {
+        foreach (self::chatProviders() as $provider) {
             self::assertTrue(ProviderDefaultsService::supports($provider), sprintf('No recommended defaults defined for supported provider "%s"', $provider));
 
             $defaults = $this->service->getRecommendedDefaults($provider);
@@ -59,6 +97,47 @@ final class ProviderDefaultsServiceTest extends TestCase
                 self::assertGreaterThan(0, $bid, sprintf('%s/%s resolved to an invalid BID', $provider, $capability));
             }
         }
+    }
+
+    /**
+     * Resolving is not enough. "Use this provider" writes these bindings
+     * unattended — the first-run wizard, the admin button and
+     * `app:provider:apply-defaults --auto` on container start all go through
+     * here — so a recommendation pointing at a model that has since been
+     * retired or deactivated would silently bind the install to something that
+     * cannot serve a request. That is not hypothetical: the xAI SOUND2TEXT
+     * recommendation outlived `grok-stt` and had to be removed by hand in
+     * #1514, and nothing would have caught it.
+     */
+    public function testNoRecommendedDefaultPointsAtARetiredOrInactiveModel(): void
+    {
+        $byBid = [];
+        foreach (ModelCatalog::all() as $model) {
+            $byBid[(int) $model['id']] = $model;
+        }
+
+        $problems = [];
+        foreach (self::chatProviders() as $provider) {
+            foreach ($this->service->getRecommendedDefaults($provider) as $capability => $bid) {
+                $reasons = [];
+                if (ModelCatalog::isRetired($bid)) {
+                    $reasons[] = 'retired';
+                }
+                if (0 === (int) ($byBid[$bid]['active'] ?? 0)) {
+                    $reasons[] = 'inactive';
+                }
+                if ([] !== $reasons) {
+                    $problems[] = sprintf('%s/%s → BID %d (%s)', $provider, $capability, $bid, implode(' + ', $reasons));
+                }
+            }
+        }
+
+        self::assertSame([], $problems, sprintf(
+            "Recommended default(s) point at a model that can no longer serve a request:\n  %s\n"
+            ."Repoint them at a live model, or drop the capability from PROVIDER_DEFAULTS so it keeps\n"
+            .'whatever the install had instead of being rebound to a dead model.',
+            implode("\n  ", $problems),
+        ));
     }
 
     public function testAutoApplyNoopsWhenCurrentDefaultIsAvailable(): void

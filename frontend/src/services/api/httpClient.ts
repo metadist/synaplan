@@ -147,6 +147,10 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         features: {
           help: false,
           memoryService: false,
+          officeConvertEnabled: false,
+          documentToolsEnabled: false,
+          computeEnabled: false,
+          computeWorkspacesEnabled: false,
         },
         googleTag: {
           enabled: false,
@@ -163,7 +167,8 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
           ip: 'dev',
         },
       }
-      runtimeConfigRef.value = defaultConfig
+      // Do not cache the fallback. A failed load after `app:setup:reset` (backend
+      // briefly unreachable) must not permanently hide `setup.wizardRequired`.
       return defaultConfig
     } finally {
       configPromise = null
@@ -211,6 +216,10 @@ export function getConfigSync(): RuntimeConfig {
       },
       features: {
         help: false,
+        officeConvertEnabled: false,
+        documentToolsEnabled: false,
+        computeEnabled: false,
+        computeWorkspacesEnabled: false,
       },
       googleTag: {
         enabled: false,
@@ -238,6 +247,88 @@ interface HttpClientOptions<S extends z.Schema | undefined = undefined> extends 
 let isRefreshing = false
 let refreshPromise: Promise<RefreshResult> | null = null
 
+// --- Auth-mutation lock -----------------------------------------------------
+// A deliberate cookie rewrite (login, admin impersonation start/stop) must be
+// the last writer of the session cookies. While it runs, the automatic 401 ->
+// refresh path must NOT fire its own /auth/refresh: a refresh that still
+// carries the PRE-swap cookies either mints a token for the old principal
+// (impersonation banner never mounts) or 401s and tears down a login that
+// just succeeded. The lock is inert outside those windows.
+let authMutationPromise: Promise<void> | null = null
+let authMutationResolve: (() => void) | null = null
+let authMutationTimer: ReturnType<typeof setTimeout> | null = null
+let authMutationDepth = 0
+
+/**
+ * Safety net: never let a swap that forgot to release (unexpected throw before
+ * `endAuthMutation`, navigation mid-swap) suspend the refresh path forever.
+ */
+const AUTH_MUTATION_MAX_MS = 15000
+
+/**
+ * Open the auth-mutation critical section. While open, `refreshAccessToken`
+ * waits for it to close instead of issuing a competing refresh. Reentrant:
+ * balanced with `endAuthMutation`.
+ */
+function beginAuthMutation(): void {
+  authMutationDepth++
+  if (authMutationPromise) return
+  authMutationPromise = new Promise<void>((resolve) => {
+    authMutationResolve = resolve
+  })
+  authMutationTimer = setTimeout(() => {
+    console.warn('Auth-mutation lock auto-released after timeout')
+    forceReleaseAuthMutation()
+  }, AUTH_MUTATION_MAX_MS)
+}
+
+/** Close the auth-mutation critical section (balanced with `beginAuthMutation`). */
+function endAuthMutation(): void {
+  if (authMutationDepth === 0) return
+  authMutationDepth--
+  if (authMutationDepth > 0) return
+  forceReleaseAuthMutation()
+}
+
+function forceReleaseAuthMutation(): void {
+  authMutationDepth = 0
+  if (authMutationTimer) {
+    clearTimeout(authMutationTimer)
+    authMutationTimer = null
+  }
+  const resolve = authMutationResolve
+  authMutationPromise = null
+  authMutationResolve = null
+  resolve?.()
+}
+
+/**
+ * The refresh currently in flight, if any. Callers starting a principal swap
+ * await this so an already-running refresh settles BEFORE the swap request is
+ * sent, guaranteeing the swap response is the last writer of the session cookie.
+ */
+function getInFlightRefresh(): Promise<RefreshResult> | null {
+  return refreshPromise
+}
+
+/** True while login / impersonation holds the cookie-swap lock. */
+function isAuthMutationInProgress(): boolean {
+  return null !== authMutationPromise
+}
+
+/**
+ * Await the open auth-mutation critical section, if any. Independent
+ * `/auth/refresh` pools (chatApi's SSE warmer, authService, legacy apiService)
+ * call this before their raw refresh so they don't fire with pre-swap cookies
+ * during an impersonation swap and clobber the new session. Resolves
+ * immediately when no swap is in progress.
+ */
+async function awaitAuthMutation(): Promise<void> {
+  if (authMutationPromise) {
+    await authMutationPromise
+  }
+}
+
 // Track auth failures to prevent redirect loops
 let authFailureCount = 0
 let lastAuthFailureTime = 0
@@ -250,6 +341,24 @@ const MAX_AUTH_FAILURES_IN_WINDOW = 2
 interface RefreshResult {
   success: boolean
   oidcSessionExpired?: boolean
+  /** True when /auth/refresh failed for a reason that is not "cookie is dead". */
+  transient?: boolean
+}
+
+/**
+ * Statuses from `/auth/refresh` that mean the session is actually dead.
+ * 5xx / 429 / 408 (and network failures) are a restart or blip — keep the
+ * hint. Other 4xx (400/404/422/…) are a definitive broken request, not a
+ * rolling deploy, so they must clear the hint instead of retrying forever.
+ */
+export function isDefinitiveAuthRejection(status: number): boolean {
+  if (status === 401 || status === 403) {
+    return true
+  }
+  if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
+    return true
+  }
+  return false
 }
 
 /**
@@ -293,7 +402,26 @@ function recordAuthFailure(): void {
  * "session expired" noise into the console for users who never had a
  * session in the first place.
  */
-async function refreshAccessToken(): Promise<RefreshResult> {
+async function refreshAccessToken(
+  options: { bypassMutationLock?: boolean } = {}
+): Promise<RefreshResult> {
+  // A principal swap (impersonation start/stop) is rewriting the session
+  // cookies out-of-band. An automatic refresh triggered by a request still
+  // carrying the PRE-swap cookies would clobber the freshly installed cookie,
+  // so wait for the swap to finish — then fall through to a REAL refresh
+  // against the now-stable cookies.
+  //
+  // We must NOT short-circuit with a synthetic success here: if the swap
+  // failed and this 401 was a genuinely expired token, the caller's retry
+  // would 401 again and hit handleAuthFailure(), logging the admin out. A real
+  // refresh against the stable post-swap cookies recovers cleanly instead.
+  //
+  // `bypassMutationLock` lets the swap itself mint a fresh pre-swap token while
+  // it holds the lock, without deadlocking by waiting on its own promise.
+  if (authMutationPromise && !options.bypassMutationLock) {
+    await authMutationPromise
+  }
+
   // Native gates on a stored refresh token (no cookie); web on the UX hint.
   const native = isNativeApp()
   if (native ? !hasNativeTokens() : !hasSessionHint()) {
@@ -334,11 +462,23 @@ async function refreshAccessToken(): Promise<RefreshResult> {
         return { success: true }
       }
 
+      // A restarting backend answers 502/503/504 (or 429). That is not a
+      // dead session — keep the hint and let the caller retry. authService
+      // already treated those as transient; this path is what most API
+      // calls actually use, so a deploy used to log every active user out.
+      if (!isDefinitiveAuthRejection(response.status)) {
+        return { success: false, transient: true }
+      }
+
       // Refresh definitively failed - the stored cookie is dead. Clear the
       // hint so future visits don't keep retrying against a closed session.
-      clearSessionHint()
-      if (native) {
-        clearNativeTokens()
+      // Skip during login / impersonation: those flows are about to write
+      // (or just wrote) a new hint, and wiping it makes /auth/me look empty.
+      if (!isAuthMutationInProgress()) {
+        clearSessionHint()
+        if (native) {
+          clearNativeTokens()
+        }
       }
 
       // Check if this was an OIDC session expiry (user logged out from Keycloak)
@@ -354,7 +494,7 @@ async function refreshAccessToken(): Promise<RefreshResult> {
       return { success: false }
     } catch (error) {
       console.error('Token refresh error:', error)
-      return { success: false }
+      return { success: false, transient: true }
     } finally {
       isRefreshing = false
       refreshPromise = null
@@ -379,14 +519,6 @@ async function handleAuthFailure(): Promise<never> {
     throw new Error('Authentication failed (loop detected)')
   }
 
-  const { useAuthStore } = await import('@/stores/auth')
-  const authStore = useAuthStore()
-
-  // Logout handles all user-scoped state cleanup (SSE tokens, chats,
-  // memories, feedback, realtime) plus the server-side session teardown.
-  // Using silent=true avoids a network call — the session is already dead.
-  await authStore.logout(true)
-
   // Use Vue Router instead of window.location.href to avoid full page reload loops
   // Support subfolder deployments via BASE_URL (from vite.config base option)
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
@@ -397,10 +529,37 @@ async function handleAuthFailure(): Promise<never> {
     `${basePath}/forgot-password`,
     `${basePath}/reset-password`,
     `${basePath}/logged-out`,
+    `${basePath}/setup`,
   ]
   const isOnPublicAuthPage = publicAuthPaths.some((p) => window.location.pathname.startsWith(p))
 
-  if (!isOnPublicAuthPage) {
+  // A 401 that started before login / impersonation took the cookie-swap
+  // lock must not call logout(): that clears the session hint and the user,
+  // so the session the swap just wrote looks logged out. The request that
+  // failed simply loses; the swap's own /auth/me settles the real state.
+  if (isAuthMutationInProgress()) {
+    throw new Error('Authentication required')
+  }
+
+  const { useAuthStore } = await import('@/stores/auth')
+  const authStore = useAuthStore()
+
+  // Logout handles all user-scoped state cleanup (SSE tokens, chats,
+  // memories, feedback, realtime) plus the server-side session teardown.
+  // Using silent=true avoids a network call — the session is already dead.
+  await authStore.logout(true)
+
+  let sendToSetup = true === getConfigSync().setup?.wizardRequired
+  try {
+    const { ensureWizardRequired } = await import('@/router/setupGate')
+    sendToSetup = await ensureWizardRequired({ fresh: true, probe: true })
+  } catch {
+    // Keep the runtime-config answer when the dedicated probe cannot run.
+  }
+
+  if (sendToSetup) {
+    await redirectToSetupWizard()
+  } else if (!isOnPublicAuthPage) {
     try {
       const { default: router } = await import('@/router')
       router.push({ name: 'login', query: { reason: 'session_expired' } })
@@ -411,6 +570,43 @@ async function handleAuthFailure(): Promise<never> {
 
   // Throw error to stop the request chain
   throw new Error('Authentication required')
+}
+
+/**
+ * A 503 SETUP_REQUIRED means the backend has closed the whole API because this
+ * installation has never had an administrator. Every call except the wizard's own
+ * endpoints answers that way, so the only useful reaction is to go to the wizard.
+ *
+ * Not treated as an auth failure on purpose: there is no session to tear down,
+ * and running the logout path would clear the native token store of an app that
+ * is merely pointed at a fresh server.
+ *
+ * Exported because not every call site goes through this client: the guest store
+ * talks to the API with a raw `fetch` and would otherwise turn SETUP_REQUIRED
+ * into its own "trial unavailable" card — a dead end on the one installation
+ * where reaching the wizard matters most.
+ */
+export async function redirectToSetupWizard(): Promise<void> {
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
+
+  if (window.location.pathname.startsWith(`${basePath}/setup`)) {
+    return
+  }
+
+  try {
+    const { default: router } = await import('@/router')
+    await router.push({ name: 'setup' })
+  } catch {
+    window.location.href = `${basePath}/setup`
+  }
+}
+
+/** True when a successful response has no body that JSON.parse can consume. */
+function isEmptySuccessBody(response: Response): boolean {
+  if (response.status === 204 || response.status === 205) {
+    return true
+  }
+  return response.headers?.get('content-length') === '0'
 }
 
 // Overload: with schema
@@ -496,6 +692,10 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
         return httpClient(endpoint, { ...options, _isRetry: true })
       }
 
+      if (refreshResult.transient) {
+        throw new ApiError(503, 'Authentication temporarily unavailable', 'AUTH_TRANSIENT')
+      }
+
       // Refresh failed - logout
       return handleAuthFailure()
     }
@@ -521,6 +721,11 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
       if (typeof errorData.error === 'string') {
         errorCode = errorData.error
       }
+      // Machine-readable `code` wins when the backend sends both, so callers can
+      // switch on SETUP_REQUIRED instead of matching prose.
+      if (typeof errorData.code === 'string') {
+        errorCode = errorData.code
+      }
       if (errorData && typeof errorData === 'object') {
         errorDetails = errorData as Record<string, unknown>
       }
@@ -529,9 +734,21 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     } catch {
       // Use default error message
     }
+    if (response.status === 503 && errorCode === 'SETUP_REQUIRED') {
+      await redirectToSetupWizard()
+    }
+
     // Include debug info in error message if present
     const fullMessage = debugInfo ? `${errorMessage}\n[Debug] ${debugInfo}` : errorMessage
     throw new ApiError(response.status, fullMessage, errorCode, errorDetails, debugInfo)
+  }
+
+  // 204/205 and Content-Length: 0 have no body. response.json() throws
+  // SyntaxError on the empty payload, which turned DELETE /agents/{id} (the
+  // only 204 endpoint) into a false "Could not delete" toast. Keep blob/text
+  // parsers on the native empty representation instead of returning undefined.
+  if (isEmptySuccessBody(response) && responseType === 'json') {
+    return undefined as T
   }
 
   // Parse response based on requested type
@@ -580,4 +797,13 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
   return data as T
 }
 
-export { httpClient, getApiBaseUrl, refreshAccessToken }
+export {
+  httpClient,
+  getApiBaseUrl,
+  refreshAccessToken,
+  beginAuthMutation,
+  endAuthMutation,
+  getInFlightRefresh,
+  isAuthMutationInProgress,
+  awaitAuthMutation,
+}

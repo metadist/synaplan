@@ -82,16 +82,49 @@ final readonly class SsrfGuard
         return false;
     }
 
-    /** True when the IP is private, loopback, link-local or otherwise reserved. */
+    /**
+     * Public A/AAAA (or the literal IP) after the same private/reserved filter
+     * as {@see isBlockedHost}. Empty when the name does not resolve or every
+     * answer is blocked. Callers that already passed {@see isBlockedHost} get
+     * the pin list compute may connect to.
+     *
+     * @return list<string>
+     */
+    public function pinnedIps(string $host): array
+    {
+        $host = strtolower(trim($host, "[] \t"));
+        if ('' === $host) {
+            return [];
+        }
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return $this->isBlockedIp($host) ? [] : [$host];
+        }
+        $ips = [];
+        foreach ($this->resolveIps($host) as $ip) {
+            if (!$this->isBlockedIp($ip)) {
+                $ips[] = $ip;
+            }
+        }
+
+        return array_values(array_unique($ips));
+    }
+
+    /**
+     * True when the IP is private, loopback, link-local, reserved or otherwise
+     * not globally routable.
+     */
     public function isBlockedIp(string $ip): bool
     {
-        // filter_var flags: NO_PRIV_RANGE blocks RFC1918 + IPv6 ULA,
-        // NO_RES_RANGE blocks loopback, link-local, 0.0.0.0/8, benchmarking
-        // and other reserved ranges (v4 + v6).
+        // NO_PRIV_RANGE: RFC 1918 + IPv6 ULA. NO_RES_RANGE: loopback,
+        // link-local, 0.0.0.0/8, 240/4 and friends. GLOBAL_RANGE (PHP ≥ 8.2)
+        // additionally rejects everything IANA lists as not globally
+        // reachable — shared address space 100.64/10 (CGNAT, overlay VPNs),
+        // 192.0.0/24, benchmarking 198.18/15, documentation prefixes and
+        // 6to4 2002::/16, which the two older flags let through.
         return false === filter_var(
             $ip,
             \FILTER_VALIDATE_IP,
-            \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE,
+            \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE | \FILTER_FLAG_GLOBAL_RANGE,
         );
     }
 

@@ -30,11 +30,12 @@ final readonly class TaskPlan
      * and throws {@see InvalidTaskPlanException} when the payload is not sound.
      *
      * @param array<string, mixed> $payload
+     * @param list<string>|null    $allowedCapabilities
      */
-    public static function fromArray(array $payload, ?TaskPlanValidator $validator = null): self
+    public static function fromArray(array $payload, ?TaskPlanValidator $validator = null, ?array $allowedCapabilities = null): self
     {
         $validator ??= new TaskPlanValidator();
-        $errors = $validator->validate($payload);
+        $errors = $validator->validate($payload, $allowedCapabilities);
         if ([] !== $errors) {
             throw new InvalidTaskPlanException($errors);
         }

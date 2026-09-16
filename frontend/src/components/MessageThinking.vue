@@ -1,6 +1,7 @@
 <template>
   <div
-    class="surface-card mb-2 overflow-hidden opacity-50 hover:opacity-70 transition-opacity"
+    class="surface-card mb-2 overflow-hidden transition-opacity"
+    :class="isStreaming ? 'opacity-90' : 'opacity-50 hover:opacity-70'"
     data-testid="section-message-thinking"
   >
     <button
@@ -8,10 +9,17 @@
       type="button"
       :aria-expanded="isExpanded"
       data-testid="btn-thinking-toggle"
-      @click="isExpanded = !isExpanded"
+      @click="toggle"
     >
-      <span class="text-sm font-medium txt-secondary">
-        {{ headerLabel }}
+      <span class="flex items-center gap-2 min-w-0">
+        <span
+          v-if="isStreaming"
+          class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse flex-shrink-0"
+          aria-hidden="true"
+        />
+        <span class="text-sm font-medium txt-secondary truncate">
+          {{ headerLabel }}
+        </span>
       </span>
       <svg
         class="w-4 h-4 txt-tertiary transition-transform flex-shrink-0"
@@ -60,8 +68,15 @@
             />
           </svg>
         </div>
+        <!--
+          While streaming the box is capped and follows the newest line, like a
+          console — the point is to show the model working, not to read every
+          word. Finished thinking is shown in full.
+        -->
         <div
+          ref="contentEl"
           class="flex-1 text-[13px] leading-relaxed txt-secondary whitespace-pre-wrap break-words"
+          :class="{ 'max-h-40 overflow-y-auto': isStreaming }"
         >
           {{ content }}
         </div>
@@ -71,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 interface Props {
@@ -83,7 +98,38 @@ interface Props {
 const props = defineProps<Props>()
 const { t } = useI18n()
 
-const isExpanded = ref(false)
+// Open while the model thinks so the user sees it working; folds away on its
+// own when the answer starts. A manual toggle wins over both automatics.
+const isExpanded = ref(!!props.isStreaming)
+const userToggled = ref(false)
+const contentEl = ref<HTMLElement | null>(null)
+
+const toggle = () => {
+  userToggled.value = true
+  isExpanded.value = !isExpanded.value
+}
+
+watch(
+  () => props.isStreaming,
+  (streaming, wasStreaming) => {
+    if (userToggled.value) return
+    if (streaming) {
+      isExpanded.value = true
+    } else if (wasStreaming) {
+      isExpanded.value = false
+    }
+  }
+)
+
+watch(
+  () => props.content,
+  async () => {
+    if (!props.isStreaming || !isExpanded.value) return
+    await nextTick()
+    const el = contentEl.value
+    if (el) el.scrollTop = el.scrollHeight
+  }
+)
 
 // #1058: never invent a fake "8 seconds". While streaming show a live label;
 // when finished, show the measured duration if we have one.

@@ -13,8 +13,9 @@ use Symfony\Component\HttpFoundation\Request;
  * Mirrors the semantics enforced on the widget chat endpoints
  * (WidgetPublicController::ensureDomainAllowed):
  *
- *   - an EMPTY allowlist blocks — a widget without configured domains is
- *     not embeddable, so no anonymous request on its behalf is legitimate;
+ *   - an EMPTY allowlist allows every domain — restricting embedding is
+ *     opt-in, matching the legacy widget.js loader and the UI copy
+ *     ("Leave empty to allow all domains");
  *   - the requesting host is taken from `X-Widget-Host` (set by the embed
  *     script), falling back to the `Origin` / `Referer` headers;
  *   - allowlist entries support `*.example.com` wildcards and optional
@@ -33,7 +34,7 @@ final readonly class WidgetOriginValidator
     public function isRequestAllowed(Request $request, array $allowedDomains): bool
     {
         if ([] === $allowedDomains) {
-            return false;
+            return true;
         }
 
         $host = $this->extractHostFromRequest($request);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\File;
 
+use App\Service\File\Office\DocxStyleSheet;
 use App\Service\File\Presentation\PptxRenderer;
 use App\Service\File\Presentation\SlideMarkdownParser;
 use PhpOffice\PhpPresentation\IOFactory as PresentationIOFactory;
@@ -32,6 +33,16 @@ final readonly class DocumentGeneratorService
     private const BINARY_FORMATS = ['docx', 'xlsx', 'pptx'];
 
     private const IMAGE_MARKER_PATTERN = '/\{\{IMAGE:[a-z]+:\d+}}/';
+
+    /**
+     * Content directive marking where the Word table of contents belongs
+     * (own line, usually right after the document title). DOCX renders a
+     * real, updatable TOC field there; every other format strips the marker.
+     */
+    private const TOC_MARKER_PATTERN = '/^[ \t]*\{\{TOC}}[ \t]*$/mi';
+
+    /** Headings deeper than this are kept in the document but not listed in the TOC. */
+    private const TOC_MAX_DEPTH = 3;
 
     public function __construct(
         private LoggerInterface $logger,
@@ -68,7 +79,7 @@ final readonly class DocumentGeneratorService
                 $this->writeXlsx($this->stripMarkers($content), $absolutePath);
                 break;
             case 'pptx':
-                $this->writePptx($content, $absolutePath, $images);
+                $this->writePptx($this->stripTocMarker($content), $absolutePath, $images);
                 break;
             default:
                 // Only DOCX and PPTX can embed images — every other format would
@@ -100,6 +111,15 @@ final readonly class DocumentGeneratorService
         $images = $normalized['images'];
         $temporaryImages = $normalized['temporary'];
 
+        // A TOC needs at least one heading to list — a bare marker in a
+        // heading-less document is dropped (an empty TOC field would be
+        // malformed OOXML).
+        $withToc = 1 === preg_match(self::TOC_MARKER_PATTERN, $content)
+            && 1 === preg_match('/^#{1,6}[ \t]+\S/m', $content);
+        if (!$withToc) {
+            $content = $this->stripTocMarker($content);
+        }
+
         try {
             // Ensure special characters (like '&', '<', '>') are escaped in the XML to prevent document corruption.
             WordSettings::setOutputEscapingEnabled(true);
@@ -107,8 +127,10 @@ final readonly class DocumentGeneratorService
             $usedFallback = false;
             try {
                 $phpWord = new PhpWord();
-                $section = $phpWord->addSection();
-                $this->addDocxContent($section, $content, $images);
+                DocxStyleSheet::apply($phpWord);
+                $section = $phpWord->addSection(DocxStyleSheet::sectionSettings());
+                DocxStyleSheet::decorateSection($section);
+                $this->addDocxContent($section, $content, $images, $withToc);
             } catch (\Throwable $e) {
                 $this->logger->warning('DocumentGeneratorService: DOCX HTML parsing failed, using plain text fallback', [
                     'error' => $e->getMessage(),
@@ -218,10 +240,16 @@ final readonly class DocumentGeneratorService
     /**
      * Add markdown and image markers to a Word section in source order.
      *
+     * In TOC mode markdown headings are added as PhpWord Title elements (real
+     * `Heading{N}` styles with outline levels) instead of going through the
+     * HTML converter — the TOC field can only collect Titles.
+     *
      * @param array<string, string> $images
      */
-    private function addDocxContent(\PhpOffice\PhpWord\Element\Section $section, string $content, array $images): void
+    private function addDocxContent(\PhpOffice\PhpWord\Element\Section $section, string $content, array $images, bool $withToc = false): void
     {
+        $tocPending = $withToc;
+
         foreach ($this->splitImageMarkers($content) as $part) {
             if ($part['image']) {
                 $path = $images[$part['value']] ?? null;
@@ -237,11 +265,63 @@ final readonly class DocumentGeneratorService
                 continue;
             }
 
-            $html = (new \Parsedown())->text($part['value']);
+            if ($withToc) {
+                $this->addMarkdownWithTitles($section, $part['value'], $tocPending);
+                continue;
+            }
 
-            // PhpWord parses HTML as XHTML. Self-close void tags that models
-            // commonly leave open so table and paragraph content survives.
-            WordHtml::addHtml($section, $this->normalizeVoidTags($html), false, false);
+            $this->addMarkdownAsHtml($section, $part['value']);
+        }
+    }
+
+    private function addMarkdownAsHtml(\PhpOffice\PhpWord\Element\Section $section, string $markdown): void
+    {
+        $html = (new \Parsedown())->text($markdown);
+
+        // PhpWord parses HTML as XHTML. Self-close void tags that models
+        // commonly leave open so table and paragraph content survives.
+        WordHtml::addHtml($section, $this->normalizeVoidTags($html), false, false);
+    }
+
+    /**
+     * TOC-mode rendering: heading lines become Title elements, the `{{TOC}}`
+     * marker becomes the TOC field (first occurrence only), everything in
+     * between keeps the normal markdown→HTML path.
+     */
+    private function addMarkdownWithTitles(\PhpOffice\PhpWord\Element\Section $section, string $markdown, bool &$tocPending): void
+    {
+        $segments = preg_split(
+            '/^([ \t]*\{\{TOC}}[ \t]*|#{1,6}[ \t]+.+)$/mi',
+            $markdown,
+            -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY,
+        );
+        if (false === $segments) {
+            $this->addMarkdownAsHtml($section, $this->stripTocMarker($markdown));
+
+            return;
+        }
+
+        foreach ($segments as $segment) {
+            $trimmed = trim($segment);
+            if ('' === $trimmed) {
+                continue;
+            }
+
+            if (1 === preg_match('/^\{\{TOC}}$/i', $trimmed)) {
+                if ($tocPending) {
+                    $section->addTOC(['size' => 11], null, 1, self::TOC_MAX_DEPTH);
+                    $tocPending = false;
+                }
+                continue;
+            }
+
+            if (1 === preg_match('/^(#{1,6})[ \t]+(.+)$/', $trimmed, $m)) {
+                $section->addTitle($this->stripMarkdown($m[2]), strlen($m[1]));
+                continue;
+            }
+
+            $this->addMarkdownAsHtml($section, $segment);
         }
     }
 
@@ -254,8 +334,12 @@ final readonly class DocumentGeneratorService
      */
     private function buildPlainTextDocx(string $content, array $images = []): PhpWord
     {
+        $content = $this->stripTocMarker($content);
+
         $phpWord = new PhpWord();
-        $section = $phpWord->addSection();
+        DocxStyleSheet::apply($phpWord);
+        $section = $phpWord->addSection(DocxStyleSheet::sectionSettings());
+        DocxStyleSheet::decorateSection($section);
 
         foreach ($this->splitImageMarkers($content) as $part) {
             if ($part['image']) {
@@ -302,10 +386,23 @@ final readonly class DocumentGeneratorService
         }
 
         return $this->closeMarkerGaps(preg_replace(
-            [SlideMarkdownParser::DIRECTIVE_PATTERN, self::IMAGE_MARKER_PATTERN],
+            [SlideMarkdownParser::DIRECTIVE_PATTERN, self::IMAGE_MARKER_PATTERN, self::TOC_MARKER_PATTERN],
             '',
             $content,
         ) ?? $content);
+    }
+
+    /**
+     * Remove the `{{TOC}}` directive from content whose format cannot render a
+     * table of contents (everything except the DOCX title path).
+     */
+    private function stripTocMarker(string $content): string
+    {
+        if (!str_contains($content, '{{')) {
+            return $content;
+        }
+
+        return $this->closeMarkerGaps(preg_replace(self::TOC_MARKER_PATTERN, '', $content) ?? $content);
     }
 
     /**

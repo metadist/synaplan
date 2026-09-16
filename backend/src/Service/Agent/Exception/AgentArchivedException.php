@@ -1,0 +1,13 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service\Agent\Exception;
+
+final class AgentArchivedException extends \RuntimeException
+{
+    public static function forId(int $agentId): self
+    {
+        return new self(sprintf('Assistant %d is archived', $agentId));
+    }
+}

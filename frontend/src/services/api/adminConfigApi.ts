@@ -17,6 +17,14 @@ const ConfigFieldSchemaZ = z.object({
   default: z.string(),
   source: z.enum(['env', 'database']).optional(),
   options: z.array(z.string()).optional(),
+  /** Example value shown inside the input; the description stays above it as help text. */
+  placeholder: z.string().optional(),
+  /**
+   * Set when another surface is the one editor for this field (instance
+   * provider keys → AI infrastructure › Models & keys). The value is still
+   * reported read-only; PUT /values answers 422 for it.
+   */
+  managedBy: z.enum(['ai-infrastructure']).optional(),
 })
 
 const ConfigSectionZ = z.object({
@@ -40,6 +48,12 @@ const ConfigValueZ = z.object({
   isMasked: z.boolean(),
   effectiveForMe: z.string().optional(),
   hasPersonalOverride: z.boolean().optional(),
+  // Set when an explicit environment variable pins the setting, so the stored
+  // value is inert until the operator removes it.
+  envOverride: z.boolean().optional(),
+  effectiveValue: z.string().optional(),
+  /** For managed provider keys: where the key in force comes from. */
+  keySource: z.enum(['db', 'env', 'none']).optional(),
 })
 
 const ConfigBackupZ = z.object({

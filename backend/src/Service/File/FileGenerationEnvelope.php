@@ -29,7 +29,7 @@ final class FileGenerationEnvelope
     }
 
     /**
-     * @return array{filename: string, content: string, extension: string}|null
+     * @return array{filename: string, content: string, extension: string, export?: string}|null
      */
     public static function extract(string $content): ?array
     {
@@ -136,7 +136,7 @@ final class FileGenerationEnvelope
     }
 
     /**
-     * @return array{filename: string, content: string, extension: string}|null
+     * @return array{filename: string, content: string, extension: string, export?: string}|null
      */
     private static function decode(string $candidate): ?array
     {
@@ -161,10 +161,19 @@ final class FileGenerationEnvelope
             return null;
         }
 
-        return [
+        $decoded = [
             'filename' => $filename,
             'content' => $fileContent,
             'extension' => strtolower(pathinfo($filename, PATHINFO_EXTENSION)),
         ];
+
+        if (isset($data['BEXPORT']) && is_string($data['BEXPORT'])) {
+            $export = strtolower(trim($data['BEXPORT']));
+            if ('pdf' === $export) {
+                $decoded['export'] = 'pdf';
+            }
+        }
+
+        return $decoded;
     }
 }

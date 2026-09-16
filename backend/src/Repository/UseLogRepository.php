@@ -72,6 +72,74 @@ class UseLogRepository extends ServiceEntityRepository
     }
 
     /**
+     * Totals per published version and per day. Never includes user ids,
+     * message ids or content — distinctUsers is a count.
+     *
+     * @return array{
+     *   byVersion: list<array{agentVersionId: int|null, version: int|null, messages: int, tokens: int, cost: string, distinctUsers: int}>,
+     *   byDay: list<array{day: string, messages: int, tokens: int, cost: string}>
+     * }
+     */
+    public function aggregateForAgent(int $agentId, int $from, int $to): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+        $versionRows = $conn->fetchAllAssociative(
+            'SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(l.BMETADATA, \'$.agentVersionId\')) AS UNSIGNED) AS agent_version_id,
+                    v.BVERSION AS version,
+                    COUNT(*) AS messages,
+                    COALESCE(SUM(l.BTOKENS), 0) AS tokens,
+                    COALESCE(SUM(l.BCOST), 0) AS cost,
+                    COUNT(DISTINCT l.BUSERID) AS distinct_users
+             FROM BUSELOG l
+             LEFT JOIN BAGENTVERSIONS v ON v.BID = CAST(JSON_UNQUOTE(JSON_EXTRACT(l.BMETADATA, \'$.agentVersionId\')) AS UNSIGNED)
+             WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(l.BMETADATA, \'$.agentId\')) AS UNSIGNED) = :agentId
+               AND l.BUNIXTIMES >= :fromTs
+               AND l.BUNIXTIMES <= :toTs
+             GROUP BY agent_version_id, v.BVERSION
+             ORDER BY v.BVERSION ASC',
+            ['agentId' => $agentId, 'fromTs' => $from, 'toTs' => $to],
+        );
+        $dayRows = $conn->fetchAllAssociative(
+            'SELECT FROM_UNIXTIME(l.BUNIXTIMES, \'%Y-%m-%d\') AS day,
+                    COUNT(*) AS messages,
+                    COALESCE(SUM(l.BTOKENS), 0) AS tokens,
+                    COALESCE(SUM(l.BCOST), 0) AS cost
+             FROM BUSELOG l
+             WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(l.BMETADATA, \'$.agentId\')) AS UNSIGNED) = :agentId
+               AND l.BUNIXTIMES >= :fromTs
+               AND l.BUNIXTIMES <= :toTs
+             GROUP BY day
+             ORDER BY day ASC',
+            ['agentId' => $agentId, 'fromTs' => $from, 'toTs' => $to],
+        );
+
+        $byVersion = [];
+        foreach ($versionRows as $row) {
+            $versionId = isset($row['agent_version_id']) ? (int) $row['agent_version_id'] : 0;
+            $byVersion[] = [
+                'agentVersionId' => $versionId > 0 ? $versionId : null,
+                'version' => isset($row['version']) && '' !== (string) $row['version'] ? (int) $row['version'] : null,
+                'messages' => (int) $row['messages'],
+                'tokens' => (int) $row['tokens'],
+                'cost' => (string) $row['cost'],
+                'distinctUsers' => (int) $row['distinct_users'],
+            ];
+        }
+
+        $byDay = [];
+        foreach ($dayRows as $row) {
+            $byDay[] = [
+                'day' => (string) $row['day'],
+                'messages' => (int) $row['messages'],
+                'tokens' => (int) $row['tokens'],
+                'cost' => (string) $row['cost'],
+            ];
+        }
+
+        return ['byVersion' => $byVersion, 'byDay' => $byDay];
+    }
+
+    /**
      * Speichert einen UseLog.
      */
     public function save(UseLog $useLog, bool $flush = true): void

@@ -41,9 +41,10 @@
         ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >
-        <!-- E2E: visible when streaming finished so tests can wait for message-done -->
+        <!-- E2E: success terminal. Hidden on error so waitForAnswer races
+             exactly one of message-done | chat-error-notice (U8). -->
         <span
-          v-if="role === 'assistant' && !isStreaming"
+          v-if="role === 'assistant' && !isStreaming && !errorReason"
           data-testid="message-done"
           class="sr-only"
           aria-hidden="true"
@@ -93,7 +94,11 @@
         -->
         <div
           v-if="
-            isStreaming && !processingStatus && role === 'assistant' && contentParts.length === 0
+            isStreaming &&
+            !processingStatus &&
+            role === 'assistant' &&
+            !hasAnswerContent &&
+            !errorReason
           "
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-initial-indicator"
@@ -116,7 +121,7 @@
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
         >
-          <!-- Trennlinie für Memory-Processing (nach dem Haupt-Content) -->
+          <!-- Divider for memory processing (after the main content) -->
           <div
             v-if="
               processingStatus.startsWith('analyzing_memories') ||
@@ -126,221 +131,23 @@
             class="border-t border-gray-200 dark:border-gray-700 mb-3 -mx-4"
           ></div>
 
-          <div class="flex items-center gap-3">
-            <!-- Icon: Brain for memory-related, otherwise spinner -->
-            <svg
-              v-if="processingStatus.includes('memories')"
-              class="w-5 h-5 txt-brand flex-shrink-0"
-              :class="{
-                'animate-pulse':
-                  processingStatus === 'analyzing_memories' ||
-                  processingStatus === 'checking_memories',
-              }"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-              />
-            </svg>
-            <svg
-              v-else
-              class="w-5 h-5 animate-spin txt-brand flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              />
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            <div class="flex-1 min-w-0">
-              <template v-if="processingStatus === 'started'">
-                <div class="font-medium">{{ $t('processing.startedTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">{{ $t('processing.startedDesc') }}</div>
-              </template>
-              <template v-else-if="processingStatus === 'preprocessing'">
-                <div class="font-medium">{{ $t('processing.preprocessingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.preprocessingDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'classifying'">
-                <div class="font-medium animate-pulse">{{ $t('processing.classifyingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.classifyingDesc') }}
-                  <span
-                    v-if="processingMetadata?.model_name || processingMetadata?.provider"
-                    class="txt-brand"
-                  >
-                    · {{ processingMetadata.model_name || processingMetadata.provider }}
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'classified'">
-                <div class="font-medium">{{ $t('processing.classifiedTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5 flex items-center gap-1.5 flex-wrap">
-                  <span>{{ $t('processing.topic') }}:</span>
-                  <span class="txt-brand font-medium">{{
-                    processingMetadata?.topic || 'general'
-                  }}</span>
-                  <span v-if="processingMetadata?.language" class="opacity-50">·</span>
-                  <span v-if="processingMetadata?.language">
-                    {{ $t('processing.language') }}:
-                    <span class="font-medium">{{ processingMetadata.language.toUpperCase() }}</span>
-                  </span>
-                  <span v-if="processingMetadata?.model_name" class="opacity-50">·</span>
-                  <span v-if="processingMetadata?.model_name" class="txt-tertiary text-xs">
-                    via {{ processingMetadata.model_name }}
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'searching'">
-                <div class="font-medium animate-pulse">{{ $t('processing.searchingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.searchingDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'search_complete'">
-                <div class="font-medium">{{ $t('processing.searchCompleteTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.searchCompleteDesc') }}
-                  <span v-if="processingMetadata?.results_count" class="txt-brand font-medium">
-                    · {{ processingMetadata.results_count }} {{ $t('processing.results') }}
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'analyzing'">
-                <div class="font-medium animate-pulse">{{ $t('processing.analyzingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.analyzingDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'analyzing_prompt'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.analyzingPromptTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.analyzingPromptDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'planning'">
-                <div class="font-medium animate-pulse">{{ $t('processing.planningTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.planningDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'searching_files'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.searchingFilesTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.searchingFilesDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'checking_memories'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.checkingMemoriesTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.checkingMemoriesDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'processing'">
-                <div class="font-medium">{{ $t('processing.routingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.routingDesc') }}
-                  <span v-if="processingMetadata?.handler" class="txt-brand font-medium">
-                    {{ processingMetadata.handler }}
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'generating'">
-                <div class="font-medium animate-pulse">{{ $t('processing.generatingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  <template v-if="processingMetadata?.customMessage">
-                    {{ processingMetadata.customMessage }}
-                  </template>
-                  <template v-else>
-                    {{ $t('processing.generatingDesc') }}
-                    <span
-                      v-if="processingMetadata?.model_name || processingMetadata?.provider"
-                      class="txt-brand"
-                    >
-                      · {{ processingMetadata.model_name || processingMetadata.provider }}
-                    </span>
-                  </template>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'generating_file'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.generatingFileTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  <template v-if="processingMetadata?.stage === 'writing'">
-                    {{
-                      processingMetadata?.filename
-                        ? $t('processing.generatingFileWritingNamed', {
-                            filename: processingMetadata.filename,
-                          })
-                        : $t('processing.generatingFileWriting')
-                    }}
-                  </template>
-                  <template v-else-if="processingMetadata?.stage === 'converting'">
-                    {{
-                      $t('processing.generatingFileConverting', {
-                        filename: processingMetadata?.filename ?? '',
-                      })
-                    }}
-                  </template>
-                  <template v-else>
-                    {{ processingMetadata?.customMessage || $t('processing.generatingFileDesc') }}
-                  </template>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'thinking'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.thinkingTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.thinkingDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'analyzing_memories'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.analyzingMemoriesTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.analyzingMemoriesDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'saving_memories'">
-                <div class="font-medium">{{ $t('processing.savingMemoriesTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.savingMemoriesDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'memories_complete'">
-                <div class="font-medium">{{ $t('processing.memoriesCompleteTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.memoriesCompleteDesc') }}
-                </div>
-              </template>
-            </div>
-          </div>
+          <ProcessingTimeline :steps="visibleTimelineSteps" :model="timelineModel">
+            <template #active-extra="{ step }">
+              <ul
+                v-if="step.key === 'file' && documentStepList.length > 0"
+                class="mt-2 space-y-1"
+                data-testid="document-step-list"
+              >
+                <li
+                  v-for="(docStep, idx) in documentStepList"
+                  :key="idx"
+                  class="text-xs txt-tertiary surface-chip rounded-md px-2 py-1"
+                >
+                  {{ stepLabel(docStep) }}
+                </li>
+              </ul>
+            </template>
+          </ProcessingTimeline>
           <Transition name="long-running">
             <div
               v-if="longRunning"
@@ -362,6 +169,25 @@
               {{ $t('processing.longRunningHint') }}
             </div>
           </Transition>
+        </div>
+
+        <!--
+          Once the answer streams, the steps that led to it fold into one
+          muted line (expandable) so the work stays visible without pushing
+          the text down. The snapshot stays on the finished message for
+          the rest of the session.
+        -->
+        <div
+          v-if="
+            role === 'assistant' &&
+            hasAnswerContent &&
+            collapsedTimelineSteps.length > 0 &&
+            !(isStreaming && processingStatus)
+          "
+          class="px-4 pt-3"
+          data-testid="processing-timeline-summary"
+        >
+          <ProcessingTimeline :steps="collapsedTimelineSteps" :model="timelineModel" collapsed />
         </div>
 
         <!-- Bubble content (only non-thinking parts) -->
@@ -406,6 +232,15 @@
                     class="text-xs opacity-60 flex-shrink-0 whitespace-nowrap"
                     >{{ formatFileSize(file.fileSize) }}</span
                   >
+                  <FileOfficeActions
+                    v-if="file.id && showOfficeActions(file)"
+                    :file-id="file.id"
+                    :filename="file.filename"
+                    :guest-session-id="guestSessionId"
+                    :sibling-file-ids="officeSiblingIds"
+                    @click.stop
+                    @preview="openPreview(file)"
+                  />
                 </div>
               </template>
 
@@ -436,6 +271,20 @@
                 <span v-if="webSearch.resultsCount" class="text-xs opacity-80 font-semibold">
                   · {{ webSearch.resultsCount }}
                 </span>
+                <span
+                  v-if="webSearch.pagesRead"
+                  class="text-xs opacity-80"
+                  :title="
+                    $t(
+                      'processing.pagesReadDesc',
+                      { count: webSearch.pagesRead },
+                      webSearch.pagesRead
+                    )
+                  "
+                  data-testid="badge-web-search-pages-read"
+                >
+                  · {{ $t('processing.pagesReadBadge', { count: webSearch.pagesRead }) }}
+                </span>
               </div>
 
               <!-- Show More/Less Button -->
@@ -454,6 +303,19 @@
                 />
               </button>
             </div>
+            <div
+              v-if="documentChanges && documentChanges.length > 0"
+              class="text-xs txt-tertiary space-y-1"
+              data-testid="document-changes"
+            >
+              <div class="font-medium txt-secondary">{{ $t('message.documentChangesTitle') }}</div>
+              <ul class="space-y-0.5">
+                <li v-for="(step, idx) in documentChanges" :key="idx">{{ stepLabel(step) }}</li>
+              </ul>
+              <p v-if="documentFidelityLossy" class="txt-tertiary">
+                {{ $t('files.fidelityNotice') }}
+              </p>
+            </div>
           </div>
 
           <!-- Message Content -->
@@ -471,8 +333,12 @@
           <TaskPlanBubble
             v-if="displayTaskPlan && displayTaskPlan.cards.length > 0"
             :plan="displayTaskPlan"
+            :schedule-source="scheduleSource"
+            :source-message-id="backendMessageId"
+            :guest="isGuestMode"
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
+            @followup-task="emit('followupTask', $event)"
           />
 
           <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
@@ -487,11 +353,27 @@
           </div>
 
           <MessagePart
-            v-for="(part, index) in contentParts"
+            v-for="(part, index) in visibleContentParts"
             :key="part.partId ?? `${part.type}-${index}`"
             :part="part"
             :is-streaming="isStreaming"
             :memories="memories"
+            :docs="docs"
+            :foreign-memory="foreignMemory"
+          />
+
+          <ChatErrorNotice
+            v-if="role === 'assistant' && errorReason"
+            class="m-3"
+            :error-reason="errorReason"
+            :error-message="errorMessage"
+            :has-partial-answer="hasPartialAnswer"
+            :can-retry-model="canRetryModel"
+            :error-debug="errorDebug"
+            :recommended-model-id="selectedModel?.id ?? null"
+            :failed-model-id="failedModelId"
+            :model-options="errorRetryOptions"
+            @retry="handleErrorRetry"
           />
 
           <!-- Continue Button (truncated response) -->
@@ -623,6 +505,13 @@
 
                       <!-- Source Name -->
                       <span class="text-xs txt-muted truncate flex-1">{{ result.source }}</span>
+                      <span
+                        v-if="result.shared && result.ownerName"
+                        class="text-[10px] txt-secondary shrink-0"
+                        data-testid="chip-shared-owner"
+                      >
+                        {{ $t('iam.owner') }}: {{ result.ownerName }}
+                      </span>
 
                       <!-- Open Link Icon (visible when highlighted) -->
                       <span
@@ -1056,10 +945,16 @@
   </div>
 
   <ExternalLinkWarning :url="pendingUrl" :is-open="warningOpen" @close="closeWarning" />
+  <DocumentPreviewModal
+    :open="previewFile !== null"
+    :file="previewFile"
+    :guest-session-id="guestSessionId"
+    @close="previewFile = null"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -1076,11 +971,16 @@ import ToolBadge from '@/components/ToolBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
+import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
+import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
+import { kindFromExtension, extensionOf } from '@/services/filePreview'
+import { useGuestStore } from '@/stores/guest'
 import { isChannelSource } from '@/utils/channelSource'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
@@ -1093,14 +993,50 @@ import { aggregateTurnUsage, type MessageUsage } from '@/stores/usageTaximeter'
 import { formatCostDisplay, formatTokens } from '@/utils/usageFormat'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import MediaJobStatus from '@/components/MediaJobStatus.vue'
+import ProcessingTimeline from '@/components/chat/ProcessingTimeline.vue'
+import {
+  timelineFromStatus,
+  type TimelineModel,
+  type TimelineStep,
+} from '@/utils/processingTimeline'
+import { progressNarrationSwitches } from '@/utils/progressNarrationConfig'
+import type { StreamEventMetadata } from '@/types/chatStream'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import { chatErrorReasonKey } from '@/utils/chatErrorDisplay'
 
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
+const guestStore = useGuestStore()
+const guestSessionId = computed(() => guestStore.sessionId)
+const previewFile = ref<{ id: number; filename: string } | null>(null)
+const DocumentPreviewModal = defineAsyncComponent(
+  () => import('@/components/files/DocumentPreviewModal.vue')
+)
+
+const showOfficeActions = (file: MessageFile): boolean => {
+  if (!file.id) return false
+  const kind = kindFromExtension(extensionOf(file.filename) || file.fileType)
+  if ('pdf' === kind) return true
+  return isOfficeConvertEnabled() && 'document' === kind
+}
+
+const openPreview = (file: MessageFile) => {
+  previewFile.value = { id: file.id, filename: file.filename }
+}
+
+const officeSiblingIds = computed(() =>
+  (props.files ?? [])
+    .filter((file) => {
+      if (!file.id) return false
+      const kind = kindFromExtension(extensionOf(file.filename) || file.fileType)
+      return 'document' === kind || 'pdf' === kind
+    })
+    .map((file) => file.id)
+)
 
 // No purchase path on a custom server in the native app (store IAP only).
 const purchaseAllowed = isPurchaseAllowed()
@@ -1134,12 +1070,38 @@ interface Props {
     language?: string
     customMessage?: string
     results_count?: number
+    /** Deep research progress (status === 'reading_pages' / 'pages_read'). */
+    pages_total?: number
+    pages_read?: number
+    /** Linked pages the user pasted (status === 'fetching_urls' / 'urls_fetched'). */
+    urls_total?: number
+    urls_read?: number
     handler?: string
     /** Document generation progress (status === 'generating_file'). */
     stage?: string
     filename?: string
+    documentSteps?: Array<{
+      labelKey: string
+      labelParams?: Record<string, unknown>
+      ok?: boolean
+    }>
+    /** Picture of the conversation this turn edits (status === 'editing'). */
+    edit_source_name?: string
   } | null
+  /**
+   * Ordered pipeline steps of the running turn (see `utils/processingTimeline`).
+   * When absent, a one-step timeline is derived from `processingStatus`.
+   */
+  processingSteps?: TimelineStep[] | null
+  /** Model the running turn is generated with, once the backend named it. */
+  processingModel?: TimelineModel | null
   files?: MessageFile[] // Attached files
+  documentChanges?: Array<{
+    labelKey: string
+    labelParams?: Record<string, unknown>
+    ok?: boolean
+  }>
+  documentFidelityLossy?: boolean
   searchResults?: Array<{
     title: string
     url: string
@@ -1147,6 +1109,8 @@ interface Props {
     published?: string
     source?: string
     thumbnail?: string
+    shared?: boolean
+    ownerName?: string
   }> | null // Web search results
   aiModels?: {
     chat?: {
@@ -1172,6 +1136,7 @@ interface Props {
     enabled?: boolean
     query?: string
     resultsCount?: number
+    pagesRead?: number
   } | null // Web search metadata
   tool?: {
     command?: string
@@ -1180,6 +1145,7 @@ interface Props {
   } | null // Tool metadata (e.g., web search, file generation)
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
+  docs?: { slug: string; title: string; url: string }[] | null
   truncated?: boolean
   // Multitask routing: live task-card state while a multi-node plan streams.
   taskPlan?: TaskPlanState | null
@@ -1197,7 +1163,18 @@ interface Props {
   usageTaximeterActive?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
+  /**
+   * Received (shared) conversation: `[Memory:ID]` belongs to the chat owner.
+   * MessageText renders a terminal badge and never looks the id up.
+   */
+  foreignMemory?: boolean
+  /** User text that produced this plan — used to save it as a scheduled task. */
+  scheduleSource?: string
   status?: 'sent' | 'failed' | 'rate_limited'
+  errorReason?: string | null
+  errorMessage?: string | null
+  canRetryModel?: boolean
+  errorDebug?: string | null
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {
     limitType?: string
@@ -1211,6 +1188,18 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+type DocumentStep = { labelKey: string; labelParams?: Record<string, unknown>; ok?: boolean }
+
+const documentStepList = computed<DocumentStep[]>(() => {
+  const live = props.processingMetadata?.documentSteps
+  if (Array.isArray(live) && live.length > 0) return live
+  return props.documentChanges ?? []
+})
+
+const stepLabel = (step: DocumentStep): string => {
+  return t(step.labelKey, (step.labelParams ?? {}) as Record<string, unknown>)
+}
 
 /**
  * Usage taximeter hover badge: "<tokens> · <cost>" for the complete assistant
@@ -1407,6 +1396,49 @@ const contentParts = computed(() => {
   })
 })
 
+// Timeline source: the parent's accumulated steps when it feeds the reducer,
+// otherwise a single step built from the bare status (keeps callers that only
+// know the current status — and the existing tests — working unchanged).
+const fallbackTimeline = computed(() => {
+  if (props.processingSteps || !props.processingStatus) return null
+  return timelineFromStatus(
+    props.processingStatus,
+    (props.processingMetadata ?? undefined) as StreamEventMetadata | undefined
+  )
+})
+
+const allTimelineSteps = computed<TimelineStep[]>(
+  () => props.processingSteps ?? fallbackTimeline.value?.steps ?? []
+)
+
+const timelineModel = computed<TimelineModel>(
+  () => props.processingModel ?? fallbackTimeline.value?.model ?? {}
+)
+
+// A streaming message is born with an EMPTY text part, so "parts exist" says
+// nothing about whether the answer started. Only real content counts.
+const hasAnswerContent = computed(() =>
+  contentParts.value.some((part) => part.type !== 'text' || (part.content?.trim() ?? '') !== '')
+)
+
+// Before the first token every step so far is shown; once the answer is on
+// screen only the post-answer pass (memory extraction) belongs in this slot —
+// the pre-answer steps move to the collapsed summary line.
+const visibleTimelineSteps = computed<TimelineStep[]>(() => {
+  const postAnswer = allTimelineSteps.value.filter((step) => step.afterAnswer)
+  const steps =
+    postAnswer.length > 0 ? postAnswer : hasAnswerContent.value ? [] : allTimelineSteps.value
+  if (progressNarrationSwitches().steps) return steps
+  // Admin switched the history off: only the phase that is running right now.
+  return steps.filter((step) => step.state === 'active')
+})
+
+const collapsedTimelineSteps = computed<TimelineStep[]>(() =>
+  progressNarrationSwitches().steps
+    ? allTimelineSteps.value.filter((step) => !step.afterAnswer && step.state === 'done')
+    : []
+)
+
 // Multitask routing, #1229 smart collapse: mark a task card's prose redundant
 // when that text is already part of the final answer in the message body —
 // the card then collapses to its header instead of repeating the wall of
@@ -1530,6 +1562,7 @@ const isProcessing = computed(() => {
     'classifying',
     'analyzing',
     'analyzing_memories',
+    'editing',
     'saving_memories',
     'generating',
   ]
@@ -1570,6 +1603,7 @@ const emit = defineEmits<{
   /** Bubbled from a failed task card: re-run that step with another model. */
   retryTask: [payload: { prompt: string; modelId: number }]
   cancelTask: [nodeId: string]
+  followupTask: [prompt: string]
   falsePositive: [text: string, messageId?: number]
   report: [messageId: number]
   'click-memory': [memory: UserMemory]
@@ -1619,11 +1653,24 @@ const shortenModel = (name: string): string => {
 // that pre-date the structured metadata. Without this preference the round-robin
 // recommendation cannot identify the current model and always returns the
 // second-highest-rated model. See issue #922.
-const againDataComputed = computed(() => props.againData)
+const againDataComputed = computed(() => {
+  const existing = props.againData
+  const failedId = props.aiModels?.chat?.model_id
+  if (typeof failedId !== 'number' || failedId <= 0) {
+    return existing
+  }
+
+  return {
+    eligible: existing?.eligible ?? [],
+    predictedNext: existing?.predictedNext ?? null,
+    tag: existing?.tag ?? 'CHAT',
+    currentModelId: existing?.currentModelId ?? existing?.current_model_id ?? failedId,
+  }
+})
 const filesComputed = computed(() => props.files)
 const currentProviderComputed = computed(() => props.aiModels?.chat?.provider ?? props.provider)
 const currentModelNameComputed = computed(() => props.aiModels?.chat?.model ?? props.modelLabel)
-const { modelOptions, predictedModel, hasModels } = useModelSelection(
+const { modelOptions, predictedModel, hasModels, currentModelId } = useModelSelection(
   againDataComputed,
   filesComputed,
   currentProviderComputed,
@@ -1633,6 +1680,39 @@ const { modelOptions, predictedModel, hasModels } = useModelSelection(
 
 // Selected model: use predicted or first available
 const selectedModel = computed(() => predictedModel.value)
+
+const failedModelId = computed(() => currentModelId.value ?? props.aiModels?.chat?.model_id ?? null)
+
+const errorRetryOptions = computed(() =>
+  modelOptions.value.map((option) => ({
+    id: option.id,
+    label: option.label || option.model,
+  }))
+)
+
+const hasPartialAnswer = computed(() => {
+  if (!hasAnswerContent.value) {
+    return false
+  }
+  const body = copyableText.value.trim()
+  const explanation = (props.errorMessage ?? '').trim()
+  if (explanation !== '' && body === explanation) {
+    return false
+  }
+  const catalogKey = chatErrorReasonKey(props.errorReason)
+  const catalog = te(catalogKey) ? t(catalogKey) : ''
+  if (catalog !== '' && body === catalog) {
+    return false
+  }
+  return true
+})
+
+const visibleContentParts = computed(() => {
+  if (!props.errorReason || hasPartialAnswer.value) {
+    return contentParts.value
+  }
+  return contentParts.value.filter((part) => part.type !== 'text')
+})
 
 const aiConfigStoreForCost = useAiConfigStore()
 const peerModelsForCost = computed((): AIModel[] => {
@@ -1726,6 +1806,10 @@ const handleSimpleAgain = () => {
   if (props.backendMessageId) {
     emit('again', props.backendMessageId)
   }
+}
+
+const handleErrorRetry = (modelId?: number) => {
+  emit('again', props.backendMessageId ?? 0, modelId)
 }
 
 const selectModel = (model: ModelOption) => {

@@ -7,6 +7,8 @@ namespace App\Tests\Unit\Service;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
+use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\IamConfig;
 use App\Service\ImpersonationService;
 use App\Service\TokenService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -37,24 +39,71 @@ final class ImpersonationServiceTest extends TestCase
 {
     private TokenService&MockObject $tokenService;
     private UserRepository&MockObject $userRepository;
+    private AuditLogWriter&MockObject $auditLogWriter;
+    private IamConfig&MockObject $iamConfig;
     private ImpersonationService $service;
 
     protected function setUp(): void
     {
         $this->tokenService = $this->createMock(TokenService::class);
         $this->userRepository = $this->createMock(UserRepository::class);
+        $this->auditLogWriter = $this->createMock(AuditLogWriter::class);
+        $this->iamConfig = $this->createMock(IamConfig::class);
+        $this->iamConfig->method('isImpersonationDisabled')->willReturn(false);
 
         $this->service = new ImpersonationService(
             $this->tokenService,
             $this->userRepository,
             new NullLogger(),
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            $this->auditLogWriter,
+            $this->iamConfig,
         );
     }
 
     // ---------------------------------------------------------------------
     // start() — security invariants
     // ---------------------------------------------------------------------
+
+    public function testStartWritesAuditRow(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $target = $this->makeUser(id: 7, level: 'PRO');
+        $request = $this->requestWithAppTokens([
+            TokenService::REFRESH_COOKIE => 'admin-refresh',
+        ]);
+        $this->tokenService->method('generateAccessToken')->willReturn('target-access');
+        $this->tokenService->method('createAccessCookie')
+            ->willReturn(Cookie::create(TokenService::ACCESS_COOKIE)->withValue('target-access'));
+        $this->tokenService->method('createClearRefreshCookie')
+            ->willReturn(Cookie::create(TokenService::REFRESH_COOKIE)->withValue(''));
+        $this->auditLogWriter->expects(self::once())
+            ->method('record')
+            ->with(1, 'impersonation.start', 'user', '7', ['targetUserId' => 7], self::isString());
+
+        $this->service->startImpersonation($admin, $target, $request, new Response());
+    }
+
+    public function testDisabledReturns403Shape(): void
+    {
+        $this->iamConfig = $this->createMock(IamConfig::class);
+        $this->iamConfig->method('isImpersonationDisabled')->willReturn(true);
+        $this->service = new ImpersonationService(
+            $this->tokenService,
+            $this->userRepository,
+            new NullLogger(),
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            $this->auditLogWriter,
+            $this->iamConfig,
+        );
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $target = $this->makeUser(id: 7, level: 'PRO');
+        $this->expectException(AccessDeniedException::class);
+        $this->expectExceptionMessage('iam.impersonationDisabled');
+        $this->tokenService->expects(self::never())->method('generateAccessToken');
+
+        $this->service->startImpersonation($admin, $target, new Request(), new Response());
+    }
 
     public function testStartImpersonationRefusesNonAdmin(): void
     {
@@ -269,6 +318,34 @@ final class ImpersonationServiceTest extends TestCase
             $cookies[ImpersonationService::ADMIN_REFRESH_STASH_COOKIE]->getValue(),
             'stash cookie must be cleared on exit'
         );
+    }
+
+    public function testStopWritesAuditRowForImpersonatedUser(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-admin-refresh',
+            TokenService::ACCESS_COOKIE => 'target-access',
+        ]);
+
+        $refreshTokenEntity = $this->createMock(\App\Entity\Token::class);
+        $refreshTokenEntity->method('getUser')->willReturn($admin);
+        $this->tokenService->method('validateRefreshToken')->willReturn($refreshTokenEntity);
+        $this->tokenService->method('generateAccessToken')->willReturn('fresh-admin-access');
+        $this->tokenService->method('createAccessCookie')
+            ->willReturn(Cookie::create(TokenService::ACCESS_COOKIE)->withValue('fresh-admin-access'));
+        $this->tokenService->method('createRefreshCookie')
+            ->willReturn(Cookie::create(TokenService::REFRESH_COOKIE)->withValue('stashed-admin-refresh'));
+        $this->tokenService->method('decodeAccessTokenIgnoringExpiry')->willReturn([
+            'user_id' => 7,
+            'impersonator_id' => 1,
+            'type' => 'access',
+        ]);
+        $this->auditLogWriter->expects(self::once())
+            ->method('record')
+            ->with(1, 'impersonation.stop', 'user', '7', ['targetUserId' => 7], self::isString());
+
+        $this->service->stopImpersonation($request, new Response());
     }
 
     public function testStopImpersonationFailsWhenNoStash(): void
@@ -515,6 +592,156 @@ final class ImpersonationServiceTest extends TestCase
         self::assertSame($adminTarget, $result['user']);
     }
 
+    public function testRefreshReturnsNullWhenAdminIsSuspended(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN', active: false);
+        $target = $this->makeUser(id: 7, level: 'PRO');
+
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-refresh',
+            TokenService::ACCESS_COOKIE => 'target-access',
+        ]);
+
+        $refreshTokenEntity = $this->createMock(\App\Entity\Token::class);
+        $refreshTokenEntity->method('getUser')->willReturn($admin);
+
+        $this->tokenService
+            ->method('validateRefreshToken')
+            ->willReturn($refreshTokenEntity);
+
+        $this->userRepository->method('find')->willReturn($target);
+        $this->tokenService->expects(self::never())->method('generateAccessToken');
+
+        self::assertNull($this->service->issueRefreshedImpersonationAccessToken($request));
+    }
+
+    public function testRefreshReturnsNullWhenTargetIsSuspended(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $target = $this->makeUser(id: 7, level: 'PRO', active: false);
+
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-refresh',
+            TokenService::ACCESS_COOKIE => 'target-access',
+        ]);
+
+        $refreshTokenEntity = $this->createMock(\App\Entity\Token::class);
+        $refreshTokenEntity->method('getUser')->willReturn($admin);
+
+        $this->tokenService
+            ->method('validateRefreshToken')
+            ->willReturn($refreshTokenEntity);
+
+        $this->tokenService
+            ->method('decodeAccessTokenIgnoringExpiry')
+            ->willReturn([
+                'user_id' => 7,
+                'impersonator_id' => 1,
+                'type' => 'access',
+            ]);
+
+        $this->userRepository->method('find')->willReturn($target);
+        $this->tokenService->expects(self::never())->method('generateAccessToken');
+
+        self::assertNull($this->service->issueRefreshedImpersonationAccessToken($request));
+    }
+
+    // ---------------------------------------------------------------------
+    // recoverAdminSessionFromStash()
+    // ---------------------------------------------------------------------
+
+    public function testRecoverAdminSessionMintsAdminAccessWhenAccessTokenLacksImpersonatorClaim(): void
+    {
+        // Plain admin access token (no impersonator_id) next to a valid stash:
+        // recovery must mint a fresh admin token so the admin is not logged out.
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-admin-refresh',
+            TokenService::ACCESS_COOKIE => 'plain-admin-access',
+        ]);
+
+        $refreshTokenEntity = $this->createMock(\App\Entity\Token::class);
+        $refreshTokenEntity->method('getUser')->willReturn($admin);
+
+        $this->tokenService
+            ->method('validateRefreshToken')
+            ->with('stashed-admin-refresh')
+            ->willReturn($refreshTokenEntity);
+
+        $this->tokenService
+            ->expects(self::once())
+            ->method('decodeAccessTokenIgnoringExpiry')
+            ->with('plain-admin-access')
+            ->willReturn([
+                'user_id' => 1,
+                'type' => 'access',
+            ]);
+
+        $this->tokenService
+            ->expects(self::once())
+            ->method('generateAccessToken')
+            ->with($admin)
+            ->willReturn('fresh-admin-access');
+
+        $result = $this->service->recoverAdminSessionFromStash($request);
+
+        self::assertNotNull($result);
+        self::assertSame('fresh-admin-access', $result['access_token']);
+        self::assertSame($admin, $result['user']);
+    }
+
+    public function testRecoverAdminSessionReturnsNullWhenAccessTokenIsStillImpersonation(): void
+    {
+        // A genuine impersonation access token must be handled by the normal
+        // impersonation-refresh path, never silently downgraded to admin.
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-admin-refresh',
+            TokenService::ACCESS_COOKIE => 'impersonation-access',
+        ]);
+
+        $refreshTokenEntity = $this->createMock(\App\Entity\Token::class);
+        $refreshTokenEntity->method('getUser')->willReturn($admin);
+
+        $this->tokenService
+            ->method('validateRefreshToken')
+            ->willReturn($refreshTokenEntity);
+
+        $this->tokenService
+            ->method('decodeAccessTokenIgnoringExpiry')
+            ->willReturn([
+                'user_id' => 7,
+                'impersonator_id' => 1,
+                'type' => 'access',
+            ]);
+
+        $this->tokenService
+            ->expects(self::never())
+            ->method('generateAccessToken');
+
+        self::assertNull($this->service->recoverAdminSessionFromStash($request));
+    }
+
+    public function testRecoverAdminSessionReturnsNullWhenNoStash(): void
+    {
+        self::assertNull($this->service->recoverAdminSessionFromStash(new Request()));
+    }
+
+    public function testRecoverAdminSessionReturnsNullWhenStashInvalid(): void
+    {
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'revoked-stash',
+        ]);
+
+        $this->tokenService
+            ->method('validateRefreshToken')
+            ->willReturn(null);
+
+        self::assertNull($this->service->recoverAdminSessionFromStash($request));
+    }
+
     // ---------------------------------------------------------------------
     // resolveImpersonatorFromActiveSession()
     // ---------------------------------------------------------------------
@@ -646,13 +873,14 @@ final class ImpersonationServiceTest extends TestCase
         );
     }
 
-    private function makeUser(int $id, string $level): User
+    private function makeUser(int $id, string $level, bool $active = true): User
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn($id);
         $user->method('getMail')->willReturn(sprintf('user-%d@example.com', $id));
         $user->method('getUserLevel')->willReturn($level);
         $user->method('isAdmin')->willReturn('ADMIN' === $level);
+        $user->method('isActive')->willReturn($active);
 
         return $user;
     }

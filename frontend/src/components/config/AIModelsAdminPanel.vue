@@ -233,12 +233,48 @@
               </template>
 
               <template v-else>
-                <td class="py-2 px-2 txt-primary text-xs">{{ m.service }}</td>
-                <td class="py-2 px-2 txt-primary text-xs">{{ m.tag }}</td>
-                <td class="py-2 px-2 txt-primary text-xs max-w-56 truncate" :title="m.providerId">
+                <td
+                  :class="['py-2 px-2 txt-primary text-xs', !m.providerAvailable && 'opacity-50']"
+                >
+                  {{ m.service }}
+                </td>
+                <td
+                  :class="['py-2 px-2 txt-primary text-xs', !m.providerAvailable && 'opacity-50']"
+                >
+                  {{ m.tag }}
+                </td>
+                <td
+                  :class="[
+                    'py-2 px-2 txt-primary text-xs max-w-56 truncate',
+                    !m.providerAvailable && 'opacity-50',
+                  ]"
+                  :title="m.providerId"
+                >
                   {{ m.providerId }}
                 </td>
-                <td class="py-2 px-2 txt-primary text-xs font-medium">{{ m.name }}</td>
+                <td class="py-2 px-2 text-xs font-medium">
+                  <div class="flex items-center gap-1.5">
+                    <span :class="['txt-primary', !m.providerAvailable && 'opacity-50']">
+                      {{ m.name }}
+                    </span>
+                    <span
+                      v-if="hasToolUse(m.json)"
+                      class="pill text-[10px] whitespace-nowrap"
+                      :title="t('config.aiModels.toolUseTooltip')"
+                      data-testid="badge-model-tool-use"
+                    >
+                      {{ t('config.aiModels.toolUseBadge') }}
+                    </span>
+                    <span
+                      v-if="!m.providerAvailable"
+                      class="pill text-[10px] whitespace-nowrap"
+                      :title="availabilityTooltip(m)"
+                      data-testid="badge-model-unavailable"
+                    >
+                      {{ availabilityBadge(m) }}
+                    </span>
+                  </div>
+                </td>
                 <td class="py-2 px-2 text-center">
                   <span
                     class="inline-block w-2 h-2 rounded-full"
@@ -559,6 +595,28 @@ const paginatedAdminModels = computed(() => {
 watch(adminSearch, () => {
   adminPage.value = 1
 })
+
+function hasToolUse(json: Record<string, unknown>): boolean {
+  const features = json.features
+  return Array.isArray(features) && features.includes('tool_use')
+}
+
+/**
+ * Unavailable rows stay in the catalog (never deleted) but are greyed and
+ * badged so the admin sees WHY users don't get them: missing provider
+ * credentials, or an Ollama model that is not pulled yet.
+ */
+function availabilityBadge(m: AdminModel): string {
+  return m.unavailableReason === 'not_pulled'
+    ? t('config.aiModels.admin.availability.notPulled')
+    : t('config.aiModels.admin.availability.providerUnavailable')
+}
+
+function availabilityTooltip(m: AdminModel): string {
+  return m.unavailableReason === 'not_pulled'
+    ? t('config.aiModels.admin.availability.notPulledTooltip')
+    : t('config.aiModels.admin.availability.providerUnavailableTooltip')
+}
 
 function startEdit(m: AdminModel) {
   editingId.value = m.id

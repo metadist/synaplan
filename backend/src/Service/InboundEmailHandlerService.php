@@ -6,7 +6,11 @@ use App\AI\Service\AiFacade;
 use App\Entity\InboundEmailHandler;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\PromptRepository;
+use App\Repository\SavedTaskRepository;
 use App\Repository\UserRepository;
+use App\Service\SavedTask\InboundEmailFilter;
+use App\Service\SavedTask\SavedTaskConfig;
+use App\Service\SavedTask\SavedTaskRunner;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Email;
@@ -32,6 +36,9 @@ final readonly class InboundEmailHandlerService
         private EncryptionService $encryptionService,
         private MailHandlerLogService $activityLog,
         private LoggerInterface $logger,
+        private ?SavedTaskRepository $savedTasks = null,
+        private ?SavedTaskRunner $savedTaskRunner = null,
+        private ?SavedTaskConfig $savedTaskConfig = null,
     ) {
     }
 
@@ -724,6 +731,7 @@ final readonly class InboundEmailHandlerService
                     $rawSubject = (string) ($header->subject ?? '');
                     $subject = '' === $rawSubject ? '(no subject)' : $this->decodeMimeHeader($rawSubject);
                     $from = $header->from[0]->mailbox.'@'.$header->from[0]->host;
+                    $this->runMatchingSavedTasks($handler, $from, $subject, $body);
 
                     // Route email to department
                     $routedEmail = $this->routeEmailToDepartment($handler, $subject, $body);
@@ -743,6 +751,7 @@ final readonly class InboundEmailHandlerService
                             ['from' => $from, 'subject' => $subject],
                         );
                     } else {
+                        $departmentAgentId = $this->departmentAgentId($handler, $routedEmail);
                         $forwardResult = $this->forwardEmail($handler, $from, $routedEmail, $subject, $body);
 
                         if ('forwarded' === $forwardResult) {
@@ -751,6 +760,7 @@ final readonly class InboundEmailHandlerService
                                 'from' => $from,
                                 'subject' => $subject,
                                 'routed_to' => $routedEmail,
+                                'agent_id' => $departmentAgentId,
                             ]);
                             $this->activityLog->log(
                                 $userId,
@@ -758,7 +768,7 @@ final readonly class InboundEmailHandlerService
                                 MailHandlerLogService::EVENT_FORWARDED,
                                 MailHandlerLogService::STATUS_SUCCESS,
                                 null,
-                                ['from' => $from, 'subject' => $subject, 'routed_to' => $routedEmail],
+                                ['from' => $from, 'subject' => $subject, 'routed_to' => $routedEmail, 'agentId' => $departmentAgentId],
                             );
                         } else {
                             // "No SMTP configured" is a configuration gap, not a
@@ -981,5 +991,44 @@ final readonly class InboundEmailHandlerService
         }
 
         return $results;
+    }
+
+    public function departmentAgentId(InboundEmailHandler $handler, string $routedEmail): ?int
+    {
+        foreach ($handler->getDepartments() as $dept) {
+            if (!is_array($dept)) {
+                continue;
+            }
+            $email = (string) ($dept['email'] ?? '');
+            if ($email === $routedEmail && isset($dept['agentId']) && (int) $dept['agentId'] > 0) {
+                return (int) $dept['agentId'];
+            }
+        }
+
+        return null;
+    }
+
+    private function runMatchingSavedTasks(InboundEmailHandler $handler, string $from, string $subject, string $body): void
+    {
+        if (null === $this->savedTasks || null === $this->savedTaskRunner || null === $this->savedTaskConfig) {
+            return;
+        }
+        $ownerId = $handler->getUserId();
+        $accountId = (int) $handler->getId();
+        if ($accountId < 1 || !$this->savedTaskConfig->isEnabled($ownerId)) {
+            return;
+        }
+        $text = trim($subject."\n\n".$body);
+        foreach ($this->savedTasks->findEnabledInboundEmailTasks($ownerId, $accountId) as $task) {
+            $id = $task->getId();
+            if (null === $id) {
+                continue;
+            }
+            $filter = $task->getTriggerConfig()['filter'] ?? null;
+            if (!InboundEmailFilter::matches(is_array($filter) ? $filter : null, $from, $subject, $body)) {
+                continue;
+            }
+            $this->savedTaskRunner->run($ownerId, $id, $text, 'inbound_email');
+        }
     }
 }

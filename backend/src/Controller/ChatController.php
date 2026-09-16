@@ -6,9 +6,19 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
+use App\Repository\UserRepository;
+use App\Service\Chat\ChatDeletionService;
+use App\Service\Chat\Run\ChatRunService;
 use App\Service\File\OgImageService;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\ConversationCopyService;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\ConversationKind;
+use App\Service\Iam\ShareService;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
+use App\Service\PastedContentText;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -26,12 +36,19 @@ class ChatController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private ChatRepository $chatRepository,
+        private ChatDeletionService $chatDeletionService,
         private MessageRepository $messageRepository,
         private WidgetSessionService $widgetSessionService,
         private OgImageService $ogImageService,
         private MessageApiFormatter $messageApiFormatter,
         private InProgressTurnResolver $inProgressTurnResolver,
+        private ChatRunService $chatRunService,
         private LoggerInterface $logger,
+        private AccessGate $accessGate,
+        private IamConfig $iamConfig,
+        private ConversationCopyService $conversationCopyService,
+        private ShareService $shareService,
+        private UserRepository $userRepository,
     ) {
     }
 
@@ -88,6 +105,13 @@ class ChatController extends AbstractController
                         new OA\Property(property: 'offset', type: 'integer', example: 0),
                         new OA\Property(property: 'limit', type: 'integer', example: 20),
                         new OA\Property(property: 'hasMore', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'activeRunChatIds',
+                            description: 'Chats with a turn generating right now. A turn keeps running after the client that started it disconnects, so this marks where an answer is still being written after the user moved on. Not limited to the current page.',
+                            type: 'array',
+                            items: new OA\Items(type: 'integer'),
+                            example: [7]
+                        ),
                     ]
                 )
             ),
@@ -128,7 +152,9 @@ class ChatController extends AbstractController
                     // Tool commands (/pic, /vid, …) are kept in the stored message
                     // text for backend routing, but the raw prefix must never leak
                     // into the chat list preview — only the user's actual query.
-                    $content = $this->stripToolCommandPrefix($message->getText() ?? '');
+                    $content = PastedContentText::strip(
+                        $this->stripToolCommandPrefix($message->getText() ?? ''),
+                    );
                     $firstMessagePreview = mb_strlen($content) > 30
                         ? mb_substr($content, 0, 30).'…'
                         : $content;
@@ -156,6 +182,12 @@ class ChatController extends AbstractController
             'offset' => $paginate ? $offset : 0,
             'limit' => $paginate ? $limit : count($result),
             'hasMore' => $paginate ? ($offset + count($result)) < $total : false,
+            // Turns keep generating after their client disconnects, so a user
+            // who left a chat mid-answer gets a visible "still working" marker
+            // instead of having to guess whether anything is happening.
+            'activeRunChatIds' => $this->chatRunService->activeChatIds(
+                ChatRunService::ownerKeyForUser((int) $user->getId()),
+            ),
         ]);
     }
 
@@ -168,7 +200,7 @@ class ChatController extends AbstractController
      */
     private function stripToolCommandPrefix(string $text): string
     {
-        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search)\s*/i', '', $text) ?? $text;
+        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search|help)\s*/i', '', $text) ?? $text;
     }
 
     #[Route('', name: 'create', methods: ['POST'])]
@@ -267,14 +299,37 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'title', type: 'string'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
-                                new OA\Property(property: 'isShared', type: 'boolean'),
-                                new OA\Property(property: 'shareToken', type: 'string', nullable: true),
+                                new OA\Property(property: 'isShared', type: 'boolean', description: 'Public link enabled'),
+                                new OA\Property(property: 'shareToken', type: 'string', nullable: true, description: 'Public link token; only returned to the owner'),
+                                new OA\Property(property: 'widgetSession', type: 'object', nullable: true),
+                                new OA\Property(property: 'access', type: 'string', enum: ['owner', 'read', 'use'], example: 'owner'),
+                                new OA\Property(
+                                    property: 'owner',
+                                    type: 'object',
+                                    required: ['id', 'name'],
+                                    properties: [
+                                        new OA\Property(property: 'id', type: 'integer'),
+                                        new OA\Property(property: 'name', type: 'string'),
+                                    ]
+                                ),
+                                new OA\Property(
+                                    property: 'sharedVia',
+                                    type: 'object',
+                                    nullable: true,
+                                    description: 'How this chat reached the viewer. Null when they own it.',
+                                    required: ['type', 'name'],
+                                    properties: [
+                                        new OA\Property(property: 'type', type: 'string', enum: ['user', 'group', 'everyone'], example: 'group'),
+                                        new OA\Property(property: 'name', type: 'string', example: 'Sales', description: 'Group name, or empty for "everyone" / a direct share'),
+                                    ]
+                                ),
                             ]
                         ),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Shared chat does not reach this user'),
             new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
@@ -287,12 +342,16 @@ class ChatController extends AbstractController
         }
 
         $chat = $this->chatRepository->find($id);
-
-        if (!$chat || $chat->getUserId() !== $user->getId()) {
-            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        $denied = $this->denyConversation($user, $chat);
+        if (null !== $denied) {
+            return $denied;
         }
+        \assert($chat instanceof Chat);
+        $access = $this->conversationAccess($user, $chat);
+        \assert(null !== $access);
 
         $sessionInfo = $this->widgetSessionService->getSessionMapForChats([$chat->getId()]);
+        $isOwner = 'owner' === $access;
 
         return $this->json([
             'success' => true,
@@ -302,8 +361,17 @@ class ChatController extends AbstractController
                 'createdAt' => $chat->getCreatedAt()->format('c'),
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
                 'isShared' => $chat->isPublic(),
-                'shareToken' => $chat->getShareToken(),
-                'widgetSession' => $sessionInfo[$chat->getId()] ?? null,
+                // The public link is the owner's to hand out; a group share must
+                // not turn into a redistributable token.
+                'shareToken' => $isOwner ? $chat->getShareToken() : null,
+                'widgetSession' => $isOwner ? ($sessionInfo[$chat->getId()] ?? null) : null,
+                'access' => $access,
+                'owner' => $this->conversationOwner($chat),
+                'sharedVia' => $isOwner ? null : $this->shareService->sharedViaFor(
+                    (int) $user->getId(),
+                    ConversationKind::KEY,
+                    (string) $chat->getId(),
+                ),
             ],
         ]);
     }
@@ -391,8 +459,7 @@ class ChatController extends AbstractController
             return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $this->em->remove($chat);
-        $this->em->flush();
+        $this->chatDeletionService->deleteOwnedChat($user->getId(), $chat);
 
         $this->logger->info('Chat deleted', [
             'chat_id' => $id,
@@ -498,7 +565,18 @@ class ChatController extends AbstractController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'messages', type: 'array', items: new OA\Items()),
+                        new OA\Property(
+                            property: 'messages',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
+                                    new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
+                                    new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
+                                ]
+                            )
+                        ),
                         new OA\Property(
                             property: 'pagination',
                             type: 'object',
@@ -536,6 +614,18 @@ class ChatController extends AbstractController
                                 ),
                             ]
                         ),
+                        new OA\Property(
+                            property: 'activeRun',
+                            description: 'Present only on the first page (offset 0) when a turn in this chat is still generating. The turn survives a client disconnect and mirrors its Server-Sent Events into a replayable log, so a client that reloaded can paint `partialText` immediately and then re-attach to the live stream via GET /api/v1/messages/stream/attach. Absent in incognito mode, which is never buffered server-side.',
+                            type: 'object',
+                            nullable: true,
+                            properties: [
+                                new OA\Property(property: 'runId', type: 'string', format: 'uuid', example: '0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0'),
+                                new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
+                                new OA\Property(property: 'lastSeq', type: 'integer', description: 'Sequence number of the newest buffered event.', example: 42),
+                                new OA\Property(property: 'partialText', type: 'string', description: 'Assistant text produced so far, for an instant repaint before the re-attach delivers the rest.', example: 'The answer so far'),
+                            ]
+                        ),
                     ]
                 )
             ),
@@ -553,10 +643,11 @@ class ChatController extends AbstractController
         }
 
         $chat = $this->chatRepository->find($id);
-
-        if (!$chat || $chat->getUserId() !== $user->getId()) {
-            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        $denied = $this->denyConversation($user, $chat);
+        if (null !== $denied) {
+            return $denied;
         }
+        \assert($chat instanceof Chat);
 
         $limit = (int) $request->query->get('limit', 50);
         $offset = (int) $request->query->get('offset', 0);
@@ -608,6 +699,18 @@ class ChatController extends AbstractController
             if (null !== $inProgress) {
                 $payload['inProgressTurn'] = $inProgress;
             }
+
+            // A turn that is still generating right now: hand the client the
+            // text produced so far plus the run id, so returning to the chat
+            // re-attaches to the live stream instead of waiting for the
+            // finished answer to land in BMESSAGES.
+            $activeRun = $this->chatRunService->describeActiveForChat(
+                (int) $chat->getId(),
+                ChatRunService::ownerKeyForUser((int) $user->getId()),
+            );
+            if (null !== $activeRun) {
+                $payload['activeRun'] = $activeRun;
+            }
         }
 
         return $this->json($payload);
@@ -637,7 +740,18 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                             ]
                         ),
-                        new OA\Property(property: 'messages', type: 'array', items: new OA\Items()),
+                        new OA\Property(
+                            property: 'messages',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
+                                    new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
+                                    new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
+                                ]
+                            )
+                        ),
                     ]
                 )
             ),
@@ -676,5 +790,131 @@ class ChatController extends AbstractController
             ],
             'messages' => $messageData,
         ]);
+    }
+
+    #[Route('/{id}/continue', name: 'continue', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/chats/{id}/continue',
+        operationId: 'continueSharedChat',
+        summary: 'Continue a shared conversation as my copy',
+        tags: ['Chats', 'IAM Sharing'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Copy created',
+                content: new OA\JsonContent(
+                    required: ['success', 'chat'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'chat',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer'),
+                                new OA\Property(property: 'title', type: 'string'),
+                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'access', type: 'string', example: 'owner'),
+                                new OA\Property(
+                                    property: 'owner',
+                                    type: 'object',
+                                    required: ['id', 'name'],
+                                    properties: [
+                                        new OA\Property(property: 'id', type: 'integer'),
+                                        new OA\Property(property: 'name', type: 'string'),
+                                    ]
+                                ),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Need Can use'),
+            new OA\Response(response: 404, description: 'Chat not found'),
+        ]
+    )]
+    public function continueAsCopy(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $chat = $this->chatRepository->find($id);
+        $denied = $this->denyConversation($user, $chat, Permission::Use);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($chat instanceof Chat);
+
+        $copy = $this->conversationCopyService->copyForUser($chat, $user);
+
+        return $this->json([
+            'success' => true,
+            'chat' => [
+                'id' => $copy->getId(),
+                'title' => $copy->getTitle() ?? 'New Chat',
+                'createdAt' => $copy->getCreatedAt()->format('c'),
+                'updatedAt' => $copy->getUpdatedAt()->format('c'),
+                'access' => 'owner',
+                'owner' => $this->conversationOwner($copy),
+            ],
+        ], Response::HTTP_CREATED);
+    }
+
+    private function denyConversation(?User $user, ?Chat $chat, Permission $needed = Permission::Read): ?JsonResponse
+    {
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        if (!$chat instanceof Chat) {
+            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($chat->getUserId() === (int) $user->getId()) {
+            return null;
+        }
+        if (!$this->iamConfig->isSharingEnabled((int) $user->getId())) {
+            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (!$this->accessGate->decide($user, ConversationKind::KEY, (string) $chat->getId(), $needed)) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        return null;
+    }
+
+    private function conversationAccess(User $user, Chat $chat): ?string
+    {
+        if ($chat->getUserId() === (int) $user->getId()) {
+            return 'owner';
+        }
+        $granted = $this->accessGate->highestGranted($user, ConversationKind::KEY, (string) $chat->getId());
+        if (null === $granted || !$granted->implies(Permission::Read)) {
+            return null;
+        }
+
+        return $granted->implies(Permission::Use) ? 'use' : 'read';
+    }
+
+    /**
+     * @return array{id: int, name: string}
+     */
+    private function conversationOwner(Chat $chat): array
+    {
+        $owner = $this->userRepository->find($chat->getUserId());
+        $name = $owner instanceof User ? (string) $owner->getMail() : '';
+        if ($owner instanceof User) {
+            $details = $owner->getUserDetails();
+            foreach (['full_name', 'first_name'] as $key) {
+                $value = $details[$key] ?? null;
+                if (is_string($value) && '' !== trim($value)) {
+                    $name = trim($value);
+                    break;
+                }
+            }
+        }
+
+        return ['id' => $chat->getUserId(), 'name' => $name];
     }
 }

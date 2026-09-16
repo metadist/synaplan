@@ -1,0 +1,24 @@
+{
+    "searchParameters": { "q": "synaplan ai platform", "gl": "us", "hl": "en", "type": "search" },
+    "organic": [
+        {
+            "title": "Synaplan — AI knowledge platform",
+            "link": "https://synaplan.com/",
+            "snippet": "Synaplan is an AI knowledge management platform with RAG and chat widgets.",
+            "date": "2026-08-01",
+            "position": 1
+        },
+        {
+            "title": "Synaplan on GitHub",
+            "link": "https://github.com/metadist/synaplan",
+            "snippet": "Full-stack AI platform: PHP/Symfony backend, Vue frontend.",
+            "position": 2
+        },
+        {
+            "title": "No link entry is skipped",
+            "snippet": "This row has no link and must not become a result.",
+            "position": 3
+        }
+    ],
+    "knowledgeGraph": { "title": "Synaplan" }
+}

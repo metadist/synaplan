@@ -5,12 +5,23 @@ declare(strict_types=1);
 namespace App\Mcp;
 
 use App\Entity\Chat;
+use App\Entity\DesktopDevice;
+use App\Entity\DesktopJob;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Observability\EventRingStore;
 use App\Repository\ChatRepository;
+use App\Repository\DesktopDeviceRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptRepository;
+use App\Service\Agent\AssistantAliasResolver;
+use App\Service\ConversationSummaryRefreshDispatcher;
+use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Desktop\DesktopJobContract;
+use App\Service\Desktop\DesktopJobResultNotifier;
+use App\Service\Desktop\DesktopJobStore;
+use App\Service\Desktop\Exception\ResultTooLargeException;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\File\FileHelper;
 use App\Service\File\FileStorageService;
@@ -74,14 +85,28 @@ final class McpServerFactory
         private readonly RateLimitService $rateLimit,
         private readonly EntityManagerInterface $em,
         private readonly CacheItemPoolInterface $cache,
+        private readonly ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
+        private readonly DesktopAgentConfig $desktopAgentConfig,
+        private readonly DesktopJobStore $desktopJobStore,
+        private readonly DesktopDeviceRepository $desktopDeviceRepository,
+        private readonly DesktopJobResultNotifier $desktopJobResultNotifier,
         private readonly LoggerInterface $logger,
+        private readonly EventRingStore $eventRing,
+        private readonly ?AssistantAliasResolver $assistantAliases = null,
     ) {
     }
 
     /**
      * Build a server instance with all tools bound to the given user.
+     *
+     * When the request is authenticated by a scoped key bound to a paired
+     * computer ($device is non-null) AND the Desktop feature is enabled, two
+     * extra tools are exposed — `agent_checkin` (lease work) and
+     * `agent_report_result` (return a result). They are the ONLY way a device
+     * pulls jobs; there is no push and no server-supplied shell command.
+     * A normal MCP client (Claude/Cursor, or a non-desktop key) never sees them.
      */
-    public function build(User $user): Server
+    public function build(User $user, ?DesktopDevice $device = null): Server
     {
         $builder = Server::builder()
             ->setServerInfo(
@@ -94,14 +119,14 @@ final class McpServerFactory
                 .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
                 .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
                 .'store long-term memories; file_ingest to add documents to the knowledge base; and '
-                .'list_chats / get_messages / list_prompts to browse conversations and task prompts. '
+                .'list_chats / get_messages / list_prompts / list_assistants to browse conversations, task prompts and assistants. '
                 .'Documents and memories are also available as resources, and task prompts as MCP '
                 .'prompts. Everything is scoped to the authenticated Synaplan account.',
             )
             ->setLogger($this->logger)
             ->setSession($this->sessionStore())
             ->addTool(
-                $this->chatHandler($user),
+                $this->chatHandler($user, $device),
                 'synaplan_chat',
                 'Synaplan chat',
                 'Send a message through Synaplan\'s full AI pipeline — intent classification, '
@@ -181,7 +206,21 @@ final class McpServerFactory
                 'List the user\'s available Synaplan task prompts (internal `tools:*` prompts excluded).',
                 new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
                 self::listPromptsSchema(),
-            )
+            );
+
+        if (null !== $this->assistantAliases) {
+            $builder->addTool(
+                $this->listAssistantsHandler($user, $device),
+                'list_assistants',
+                'List assistants',
+                'List assistants the authenticated user may use from a connected app. '
+                .'Each row includes slug, name, description, version and origin.',
+                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
+                self::listAssistantsSchema(),
+            );
+        }
+
+        $builder
             ->addResourceTemplate(
                 $this->fileResourceHandler($user),
                 'synaplan://file/{id}',
@@ -199,9 +238,224 @@ final class McpServerFactory
                 'application/json',
             );
 
+        // Admin-only troubleshooting tool. The `mcp` firewall authenticates any
+        // valid API key (ROLE_USER), so the admin gate lives here: the tool is
+        // invisible to non-admins in tools/list and refuses in the handler.
+        if (self::hasAdminRole($user)) {
+            $builder->addTool(
+                $this->recentErrorsHandler($user),
+                'recent_errors',
+                'Recent production errors',
+                'Query the redacted operational event ring for recent production errors and '
+                .'notable events (admin only). mode=summary returns counts by level/event/route '
+                .'for a time window; mode=recent returns the newest events with optional '
+                .'level/query/request_id filters. Every field is allow-listed and free text is '
+                .'scrubbed — no chat content, user emails, document text or secrets are returned.',
+                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
+                self::recentErrorsSchema(),
+            );
+        }
+
+        if ($device instanceof DesktopDevice && $this->desktopAgentConfig->isEnabled((int) $user->getId())) {
+            $this->registerDesktopAgentTools($builder, $device);
+        }
+
         $this->registerPrompts($builder, $user);
 
         return $builder->build();
+    }
+
+    /**
+     * Register the Synaplan Desktop check-in tools for a paired device.
+     *
+     * These are gated twice: the device must be present (scoped key → device
+     * row) and the global flag must be ON. A revoked device's key is already
+     * inactive, so it never authenticates this far.
+     */
+    private function registerDesktopAgentTools(Builder $builder, DesktopDevice $device): void
+    {
+        $builder
+            ->addTool(
+                $this->agentCheckinHandler($device),
+                'agent_checkin',
+                'Desktop agent check-in',
+                'Synaplan Desktop calls this to lease the next queued job for THIS computer. '
+                .'Returns at most one job as {jobId, type, input:{skill,prompt,fileIds}, leaseToken, '
+                .'leaseExpires}, plus next_call_at (when to poll again). The input never contains a '
+                .'shell command — only a named skill the device already has installed.',
+                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
+                self::agentCheckinSchema(),
+            )
+            ->addTool(
+                $this->agentReportResultHandler($device),
+                'agent_report_result',
+                'Desktop agent report result',
+                'Synaplan Desktop calls this to report the outcome of a leased job, identified by its '
+                .'leaseToken. status is "succeeded" or "failed"; a refusal (unknown/disabled skill) is '
+                .'a normal "failed" with an errorCode, not an error.',
+                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
+                self::agentReportResultSchema(),
+            );
+    }
+
+    /**
+     * @return \Closure(int, list<mixed>, list<mixed>, string, string): array<string, mixed>
+     */
+    private function agentCheckinHandler(DesktopDevice $device): \Closure
+    {
+        return function (int $protocol = DesktopJobContract::PROTOCOL_VERSION, array $capabilities = [], array $enabledSkills = [], string $agentKind = 'synaplan-desktop', string $status = 'idle') use ($device): array {
+            $now = time();
+
+            $device->touchLastSeen();
+            if ([] !== $capabilities) {
+                $device->setCapabilities(array_values(array_filter(
+                    $capabilities,
+                    static fn ($c): bool => \is_string($c),
+                )));
+            }
+            $this->desktopDeviceRepository->save($device);
+
+            // Never guess for a client speaking a protocol we don't know — hand
+            // back no work and a far next check-in (contract invariant C9).
+            if (DesktopJobContract::PROTOCOL_VERSION !== $protocol) {
+                return [
+                    'protocol' => DesktopJobContract::PROTOCOL_VERSION,
+                    'jobs' => [],
+                    'next_call_at' => $now + DesktopJobContract::NEXT_CALL_UNKNOWN_PROTOCOL_SECONDS,
+                ];
+            }
+
+            if (!$device->isActive()) {
+                return [
+                    'protocol' => DesktopJobContract::PROTOCOL_VERSION,
+                    'jobs' => [],
+                    'next_call_at' => $now + DesktopJobContract::NEXT_CALL_IDLE_SECONDS,
+                ];
+            }
+
+            $job = $this->desktopJobStore->leaseForDevice($device);
+            $jobs = $job instanceof DesktopJob ? [DesktopJobContract::buildDevicePayload($job)] : [];
+
+            return [
+                'protocol' => DesktopJobContract::PROTOCOL_VERSION,
+                'jobs' => $jobs,
+                'next_call_at' => $now + ([] === $jobs
+                    ? DesktopJobContract::NEXT_CALL_IDLE_SECONDS
+                    : DesktopJobContract::NEXT_CALL_ACTIVE_SECONDS),
+            ];
+        };
+    }
+
+    /**
+     * @return \Closure(string, string, ?array<string, mixed>, ?string): array<string, mixed>
+     */
+    private function agentReportResultHandler(DesktopDevice $device): \Closure
+    {
+        return function (string $leaseToken, string $status, ?array $result = null, ?string $errorCode = null) use ($device): array {
+            if ('' === trim($leaseToken)) {
+                throw new ToolCallException('leaseToken is required.');
+            }
+
+            if (null !== $errorCode && !DesktopJobContract::isValidErrorCode($errorCode)) {
+                throw new ToolCallException('Unknown errorCode.');
+            }
+
+            try {
+                $job = $this->desktopJobStore->reportResult($device, $leaseToken, $status, $result, $errorCode);
+            } catch (ResultTooLargeException $e) {
+                throw new ToolCallException($e->getMessage());
+            }
+
+            // Unknown / stale / foreign lease token → a clean tool error, not a 500.
+            if (!$job instanceof DesktopJob) {
+                throw new ToolCallException('Unknown or stale lease token, or invalid status.');
+            }
+
+            // Post the "done" note into the originating chat (if any). The
+            // result text is untrusted device content, stamped as such.
+            $this->desktopJobResultNotifier->notify($job);
+
+            return [
+                'success' => true,
+                'jobId' => $job->getId(),
+                'status' => $job->getStatus(),
+            ];
+        };
+    }
+
+    /**
+     * The frozen `agent_checkin` argument schema (protocol 1, DS18). Public so
+     * the contract-fixture test can assert the committed fixtures against the
+     * live schema (invariant C9).
+     *
+     * @return array<string, mixed>
+     */
+    public static function agentCheckinSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'protocol' => [
+                    'type' => 'integer',
+                    'default' => DesktopJobContract::PROTOCOL_VERSION,
+                    'description' => 'The desktop job protocol version the client speaks. Currently 1.',
+                ],
+                'capabilities' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Job kinds this computer supports (v1: ["skill.run"]).',
+                ],
+                'enabledSkills' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Names of skills currently installed/enabled on the device. A hint so the server can skip jobs the device would refuse — an optimization, not a security boundary.',
+                ],
+                'agentKind' => [
+                    'type' => 'string',
+                    'description' => 'Client identifier. Always "synaplan-desktop" for the official client.',
+                ],
+                'status' => [
+                    'type' => 'string',
+                    'description' => 'Free-form device status hint (e.g. "idle", "busy").',
+                ],
+            ],
+            'additionalProperties' => false,
+        ];
+    }
+
+    /**
+     * The frozen `agent_report_result` argument schema (protocol 1, DS18).
+     * Public for the contract-fixture test (invariant C9).
+     *
+     * @return array<string, mixed>
+     */
+    public static function agentReportResultSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'leaseToken' => [
+                    'type' => 'string',
+                    'description' => 'The leaseToken from the job returned by agent_checkin.',
+                ],
+                'status' => [
+                    'type' => 'string',
+                    'enum' => [DesktopJob::STATUS_SUCCEEDED, DesktopJob::STATUS_FAILED],
+                    'description' => 'Outcome of the job. A refused skill is a normal "failed".',
+                ],
+                'result' => [
+                    'type' => ['object', 'null'],
+                    'description' => 'Structured result payload (e.g. {fileIds:[...], summary:"..."}). Size-capped.',
+                ],
+                'errorCode' => [
+                    'type' => ['string', 'null'],
+                    'enum' => [...DesktopJobContract::ERROR_CODES, null],
+                    'description' => 'Machine-readable failure reason when status is "failed".',
+                ],
+            ],
+            'required' => ['leaseToken', 'status'],
+            'additionalProperties' => false,
+        ];
     }
 
     /**
@@ -247,6 +501,61 @@ final class McpServerFactory
                 : $instruction;
 
             return [['role' => 'user', 'content' => $content]];
+        };
+    }
+
+    /**
+     * Mirrors the `ROLE_ADMIN` check the HTTP admin endpoints use. Deliberately
+     * not `User::isAdmin()`, which only looks at the internal user level and so
+     * would lock out an admin whose role comes from the OIDC role mapping.
+     */
+    private static function hasAdminRole(User $user): bool
+    {
+        return \in_array('ROLE_ADMIN', $user->getRoles(), true);
+    }
+
+    /**
+     * @return \Closure(string, ?string, int, ?string, ?string, int): array<string, mixed>
+     */
+    private function recentErrorsHandler(User $user): \Closure
+    {
+        return function (
+            string $mode = 'summary',
+            ?string $level = null,
+            int $since_minutes = 60,
+            ?string $query = null,
+            ?string $request_id = null,
+            int $limit = 50,
+        ) use ($user): array {
+            // Defence in depth: the tool is only registered for admins, but a
+            // handler must never assume its own visibility gate held.
+            if (!self::hasAdminRole($user)) {
+                throw new ToolCallException('recent_errors requires an admin account.');
+            }
+
+            $sinceMinutes = max(1, min(10080, $since_minutes)); // cap at 7 days
+            $sinceTs = time() - $sinceMinutes * 60;
+
+            if ('recent' === $mode) {
+                $level = null !== $level && \in_array($level, EventRingStore::LEVELS, true) ? $level : null;
+                $query = null !== $query && '' !== trim($query) ? $query : null;
+                $requestId = null !== $request_id && '' !== trim($request_id) ? $request_id : null;
+
+                $events = $this->eventRing->recent($level, $sinceTs, $query, $requestId, max(1, min(200, $limit)));
+
+                return [
+                    'mode' => 'recent',
+                    'window_minutes' => $sinceMinutes,
+                    'total' => \count($events),
+                    'events' => $events,
+                ];
+            }
+
+            return [
+                'mode' => 'summary',
+                'window_minutes' => $sinceMinutes,
+                'summary' => $this->eventRing->summary($sinceTs),
+            ];
         };
     }
 
@@ -357,6 +666,37 @@ final class McpServerFactory
     }
 
     /**
+     * @return \Closure(): array<string, mixed>
+     */
+    private function listAssistantsHandler(User $user, ?DesktopDevice $device): \Closure
+    {
+        return function () use ($user, $device): array {
+            if (null === $this->assistantAliases) {
+                return ['total' => 0, 'assistants' => []];
+            }
+            $assistants = $this->assistantAliases->listAssistants($user, self::assistantEventKinds($device));
+
+            return ['total' => \count($assistants), 'assistants' => $assistants];
+        };
+    }
+
+    /**
+     * Event kinds an MCP session may address: `mcp` always, `desktop` only
+     * when the session belongs to a paired Synaplan Desktop device.
+     *
+     * @return list<string>
+     */
+    private static function assistantEventKinds(?DesktopDevice $device): array
+    {
+        $kinds = [AssistantAliasResolver::EVENT_MCP];
+        if ($device instanceof DesktopDevice) {
+            $kinds[] = AssistantAliasResolver::EVENT_DESKTOP;
+        }
+
+        return $kinds;
+    }
+
+    /**
      * Resource template handler for `synaplan://file/{id}` — returns the document's text.
      *
      * @return \Closure(string, string): string
@@ -399,13 +739,24 @@ final class McpServerFactory
     }
 
     /**
-     * @return \Closure(string, ?int): array<string, mixed>
+     * @return \Closure(string, ?int, string|int|null): array<string, mixed>
      */
-    private function chatHandler(User $user): \Closure
+    private function chatHandler(User $user, ?DesktopDevice $device): \Closure
     {
-        return function (string $message, ?int $chat_id = null) use ($user): array {
+        return function (string $message, ?int $chat_id = null, string|int|null $agentId = null) use ($user, $device): array {
             if (!($this->rateLimit->checkLimit($user, 'MESSAGES')['allowed'] ?? false)) {
                 throw new ToolCallException('Rate limit exceeded for chat messages.');
+            }
+
+            // Resolve the pin before anything is persisted so an unusable
+            // assistant yields a clear error instead of a stray chat turn.
+            $options = [];
+            if (null !== $agentId && '' !== (string) $agentId) {
+                $agent = $this->assistantAliases?->resolveUsable($user, $agentId, self::assistantEventKinds($device));
+                if (null === $agent?->getId()) {
+                    throw new ToolCallException(sprintf('Assistant "%s" is not available: it must be published, allow connected apps and be usable by you.', (string) $agentId));
+                }
+                $options['agentId'] = $agent->getId();
             }
 
             $userId = (int) $user->getId();
@@ -432,7 +783,7 @@ final class McpServerFactory
             $this->em->persist($incoming);
             $this->em->flush();
 
-            $result = $this->messageProcessor->process($incoming);
+            $result = $this->messageProcessor->process($incoming, $options);
 
             if (!($result['success'] ?? false)) {
                 throw new ToolCallException($result['error'] ?? 'Message processing failed.');
@@ -463,6 +814,12 @@ final class McpServerFactory
             $this->em->persist($outgoing);
             $chat->updateTimestamp();
             $this->em->flush();
+
+            // Rolling-summary refresh after the OUT persist (channel parity):
+            // MCP conversations thread through Chats like every other channel.
+            if (null !== $chat->getId()) {
+                $this->summaryRefreshDispatcher->dispatch((int) $chat->getId(), $userId);
+            }
 
             $this->recordChatUsage($user, $message, $answer, $meta);
 
@@ -638,6 +995,11 @@ final class McpServerFactory
             $file->setStatus('vectorized');
             $this->em->flush();
 
+            $this->rateLimit->recordFileAnalysisOnce($user, (int) $file->getId(), [
+                'source' => 'MCP',
+                'filename' => $title,
+            ]);
+
             return [
                 'success' => true,
                 'file_id' => $file->getId(),
@@ -710,6 +1072,51 @@ final class McpServerFactory
                 'memories' => $memories,
             ];
         };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function recentErrorsSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'mode' => [
+                    'type' => 'string',
+                    'enum' => ['summary', 'recent'],
+                    'default' => 'summary',
+                    'description' => 'summary = aggregate counts by level/event/route; recent = the newest individual events.',
+                ],
+                'level' => [
+                    'type' => ['string', 'null'],
+                    'description' => 'Filter recent events by exact level (debug, info, notice, warning, error, critical, alert, emergency).',
+                ],
+                'since_minutes' => [
+                    'type' => 'integer',
+                    'minimum' => 1,
+                    'maximum' => 10080,
+                    'default' => 60,
+                    'description' => 'Look back this many minutes (max 7 days).',
+                ],
+                'query' => [
+                    'type' => ['string', 'null'],
+                    'description' => 'Case-insensitive substring match across event/message/exception/route/provider/model (recent mode).',
+                ],
+                'request_id' => [
+                    'type' => ['string', 'null'],
+                    'description' => 'Filter recent events by correlation id (the X-Request-Id a user may report).',
+                ],
+                'limit' => [
+                    'type' => 'integer',
+                    'minimum' => 1,
+                    'maximum' => 200,
+                    'default' => 50,
+                    'description' => 'Maximum number of events to return in recent mode (1-200).',
+                ],
+            ],
+            'additionalProperties' => false,
+        ];
     }
 
     /**
@@ -814,8 +1221,26 @@ final class McpServerFactory
                     'description' => 'Optional existing chat id (from list_chats) to continue a '
                         .'conversation. Omit to start a new chat.',
                 ],
+                'agentId' => [
+                    'type' => ['string', 'integer', 'null'],
+                    'description' => 'Optional assistant id or slug (see list_assistants). Pins the reply '
+                        .'to that assistant; fails when it is not published, not usable by you, '
+                        .'or does not allow connected apps.',
+                ],
             ],
             'required' => ['message'],
+            'additionalProperties' => false,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function listAssistantsSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => new \stdClass(),
             'additionalProperties' => false,
         ];
     }

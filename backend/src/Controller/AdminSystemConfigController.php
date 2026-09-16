@@ -56,7 +56,26 @@ final class AdminSystemConfigController extends AbstractController
                     required: ['tabs', 'fields'],
                     properties: [
                         new OA\Property(property: 'tabs', type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'object')),
-                        new OA\Property(property: 'fields', type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'object')),
+                        new OA\Property(
+                            property: 'fields',
+                            type: 'object',
+                            description: 'Field key => definition. A definition may carry "managedBy" (enum: ai-infrastructure): the field then has another editor (AI infrastructure › Models & keys), is reported read-only here and PUT /values answers 422 for it.',
+                            additionalProperties: new OA\AdditionalProperties(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'tab', type: 'string', example: 'ai'),
+                                    new OA\Property(property: 'section', type: 'string', example: 'cloud'),
+                                    new OA\Property(property: 'type', type: 'string', enum: ['text', 'password', 'url', 'email', 'number', 'boolean', 'select'], example: 'password'),
+                                    new OA\Property(property: 'sensitive', type: 'boolean', example: true),
+                                    new OA\Property(property: 'description', type: 'string'),
+                                    new OA\Property(property: 'default', type: 'string'),
+                                    new OA\Property(property: 'source', type: 'string', enum: ['env', 'database'], nullable: true),
+                                    new OA\Property(property: 'options', type: 'array', items: new OA\Items(type: 'string'), nullable: true),
+                                    new OA\Property(property: 'placeholder', type: 'string', nullable: true),
+                                    new OA\Property(property: 'managedBy', type: 'string', enum: ['ai-infrastructure'], nullable: true, description: 'Set for instance provider keys: edit them under AI infrastructure › Models & keys'),
+                                ],
+                            ),
+                        ),
                     ]
                 ),
             ]
@@ -112,6 +131,25 @@ final class AdminSystemConfigController extends AbstractController
                                 nullable: true,
                                 description: 'True when the acting admin has a per-user BCONFIG override'
                             ),
+                            new OA\Property(
+                                property: 'envOverride',
+                                type: 'boolean',
+                                nullable: true,
+                                description: 'True when an explicit environment variable pins this setting, so the stored value has no effect until the operator removes it (REGISTRATION_ENABLED, GUEST_CHAT_ENABLED)'
+                            ),
+                            new OA\Property(
+                                property: 'effectiveValue',
+                                type: 'string',
+                                nullable: true,
+                                description: 'The value actually in force when envOverride is true'
+                            ),
+                            new OA\Property(
+                                property: 'keySource',
+                                type: 'string',
+                                enum: ['db', 'env', 'none'],
+                                nullable: true,
+                                description: 'For managedBy provider keys: where the key in force comes from (db = saved under Models & keys, env = environment / Helm, none = not set)'
+                            ),
                         ]
                     )
                 ),
@@ -163,7 +201,18 @@ final class AdminSystemConfigController extends AbstractController
     #[OA\Response(response: 400, description: 'Invalid request')]
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 422, description: 'Validation error')]
+    #[OA\Response(
+        response: 422,
+        description: 'Validation error, or the field is managed elsewhere (managedBy names the editor: AI infrastructure › Models & keys)',
+        content: new OA\JsonContent(
+            required: ['success', 'error'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: false),
+                new OA\Property(property: 'error', type: 'string', example: 'OPENAI_API_KEY is managed under AI infrastructure › Models & keys (/admin/setup). Save, test or remove the key there.'),
+                new OA\Property(property: 'managedBy', type: 'string', enum: ['ai-infrastructure'], nullable: true),
+            ]
+        )
+    )]
     public function updateValue(
         #[MapRequestPayload] AdminConfigUpdateRequest $dto,
         #[CurrentUser] ?User $user,
@@ -171,6 +220,14 @@ final class AdminSystemConfigController extends AbstractController
         $result = $this->configService->setValue($dto->key, $dto->value, $user?->getId());
 
         if (!$result['success']) {
+            if (isset($result['managedBy'])) {
+                return $this->json([
+                    'success' => false,
+                    'error' => $result['message'] ?? 'This field is managed elsewhere',
+                    'managedBy' => $result['managedBy'],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             return $this->json([
                 'success' => false,
                 'error' => $result['message'] ?? 'Failed to update value',
@@ -196,10 +253,10 @@ final class AdminSystemConfigController extends AbstractController
     )]
     #[OA\Parameter(
         name: 'service',
-        description: 'Service to test (ollama, tika, qdrant, mailer)',
+        description: 'Service to test (ollama, tika, docling, qdrant, mailer)',
         in: 'path',
         required: true,
-        schema: new OA\Schema(type: 'string', enum: ['ollama', 'tika', 'qdrant', 'mailer'])
+        schema: new OA\Schema(type: 'string', enum: ['ollama', 'tika', 'docling', 'qdrant', 'mailer'])
     )]
     #[OA\Response(
         response: 200,

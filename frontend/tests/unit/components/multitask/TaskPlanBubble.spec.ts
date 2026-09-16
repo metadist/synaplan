@@ -6,6 +6,37 @@ import type { TaskPlanState } from '@/stores/history'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 
+const { mockSavedTasksEnabled, mockDialogPrompt, mockCreatePrompt } = vi.hoisted(() => ({
+  mockSavedTasksEnabled: vi.fn(() => false),
+  mockDialogPrompt: vi.fn(),
+  mockCreatePrompt: vi.fn(),
+}))
+
+vi.mock('@/composables/useSavedTasksFeature', () => ({
+  isSavedTasksEnabled: () => mockSavedTasksEnabled(),
+}))
+
+vi.mock('@/composables/useDialog', () => ({
+  useDialog: () => ({ prompt: mockDialogPrompt }),
+}))
+
+vi.mock('@/services/api/promptsApi', () => ({
+  promptsApi: { createPrompt: (...args: unknown[]) => mockCreatePrompt(...args) },
+}))
+
+const mockCreateSavedTask = vi.fn().mockResolvedValue({ id: 1 })
+vi.mock('@/services/api/savedTasksApi', () => ({
+  savedTasksApi: { create: (...args: unknown[]) => mockCreateSavedTask(...args) },
+}))
+
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+}))
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}))
+
 // `MessageText` is stubbed because the real component pulls in Pinia stores
 // and the markdown pipeline; both are tested elsewhere. The stub preserves
 // the visible text so the existing `text()` assertions still pass after
@@ -53,6 +84,9 @@ describe('TaskPlanBubble', () => {
   // cards) — give every mount a fresh Pinia so specs stay isolated.
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockSavedTasksEnabled.mockReturnValue(false)
+    mockDialogPrompt.mockReset()
+    mockCreatePrompt.mockReset()
   })
   it('renders one card per task node', () => {
     const wrapper = mount(TaskPlanBubble, {
@@ -434,6 +468,20 @@ describe('TaskPlanBubble', () => {
     expect(wrapper.emitted('cancelTask')).toEqual([['n2']])
   })
 
+  it('does not offer a Stop button on a running compute card', () => {
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([{ nodeId: 'n1', capability: 'code_run', kind: 'compute', state: 'running' }]),
+      },
+      global: {
+        ...mountOptions.global,
+        stubs: { ...mountOptions.global.stubs, ComputeRunCard: true },
+      },
+    })
+
+    expect(wrapper.find('[data-testid="task-card-stop"]').exists()).toBe(false)
+  })
+
   it('does not offer a Stop button on a running text card', () => {
     const wrapper = mount(TaskPlanBubble, {
       props: {
@@ -502,5 +550,92 @@ describe('TaskPlanBubble', () => {
     const card = wrapper.find('[data-testid="task-card-n5"]')
     expect(card.exists()).toBe(true)
     expect(card.text()).toContain('Sent to a***@example.com')
+  })
+
+  it('shows the clock after a finished plan when Saved Tasks are on', () => {
+    mockSavedTasksEnabled.mockReturnValue(true)
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: {
+          active: false,
+          replyNode: 'n1',
+          cards: [{ nodeId: 'n1', capability: 'image_generation', kind: 'image', state: 'done' }],
+        },
+      },
+      ...mountOptions,
+    })
+
+    expect(wrapper.find('[data-testid="btn-schedule-plan"]').exists()).toBe(true)
+  })
+
+  it('enables URL prefetch when the saved instruction contains a markdown link', async () => {
+    mockSavedTasksEnabled.mockReturnValue(true)
+    mockDialogPrompt.mockResolvedValue('Daily brief')
+    mockCreatePrompt.mockResolvedValue({ id: 9 })
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: {
+          active: false,
+          replyNode: 'n1',
+          cards: [{ nodeId: 'n1', capability: 'url_fetch', kind: 'search', state: 'done' }],
+        },
+        scheduleSource: 'Check and summarize [the page](https://example.com/news)',
+      },
+      ...mountOptions,
+    })
+
+    await wrapper.find('[data-testid="btn-schedule-plan"]').trigger('click')
+    await vi.waitFor(() => expect(mockCreatePrompt).toHaveBeenCalled())
+
+    expect(mockCreatePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'Check and summarize [the page](https://example.com/news)',
+        metadata: expect.objectContaining({ tool_url_screenshot: true }),
+      })
+    )
+  })
+
+  it('pins the executed plan by sending the assistant message id when saving', async () => {
+    mockSavedTasksEnabled.mockReturnValue(true)
+    mockDialogPrompt.mockResolvedValue('RioTinto')
+    mockCreatePrompt.mockResolvedValue({ id: 9 })
+    mockCreateSavedTask.mockClear()
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: {
+          active: false,
+          replyNode: 'n2',
+          cards: [
+            { nodeId: 'n1', capability: 'url_fetch', kind: 'search', state: 'done' },
+            { nodeId: 'n2', capability: 'chat', kind: 'text', state: 'done' },
+            { nodeId: 'n3', capability: 'email_me', kind: 'text', state: 'done' },
+          ],
+        },
+        scheduleSource: 'Look up the price on https://example.com/stock and mail it to me',
+        sourceMessageId: 4711,
+      },
+      ...mountOptions,
+    })
+
+    await wrapper.find('[data-testid="btn-schedule-plan"]').trigger('click')
+    await vi.waitFor(() => expect(mockCreateSavedTask).toHaveBeenCalled())
+
+    // Without the source message the backend cannot copy the executed steps
+    // into the task graph and a rerun degrades to a re-planned chat answer.
+    expect(mockCreateSavedTask).toHaveBeenCalledWith(9, 'RioTinto', 4711)
+  })
+
+  it('hides the clock while the plan is still running', () => {
+    mockSavedTasksEnabled.mockReturnValue(true)
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          { nodeId: 'n1', capability: 'image_generation', kind: 'image', state: 'done' },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    expect(wrapper.find('[data-testid="btn-schedule-plan"]').exists()).toBe(false)
   })
 })

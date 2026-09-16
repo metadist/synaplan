@@ -116,6 +116,7 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
             groupKey: $query->groupKey,
             limit: $query->limit * 2,
             minScore: $query->minScore,
+            query: $query,
         );
 
         // Resolve the expected model per-user: the query vector was embedded
@@ -135,17 +136,25 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         $hits = array_slice($filtered['fresh'], 0, $query->limit);
 
         return array_map(
-            fn (array $result) => new SearchResult(
-                chunkId: $result['id'],
-                fileId: (int) $result['payload']['file_id'],
-                groupKey: $result['payload']['group_key'],
-                text: $result['payload']['text'],
-                score: (float) $result['score'],
-                startLine: (int) $result['payload']['start_line'],
-                endLine: (int) $result['payload']['end_line'],
-                fileName: $result['payload']['file_name'] ?? null,
-                mimeType: $result['payload']['mime_type'] ?? null,
-            ),
+            function (array $result) use ($query): SearchResult {
+                $ownerId = isset($result['payload']['user_id'])
+                    ? (int) $result['payload']['user_id']
+                    : $query->userId;
+
+                return new SearchResult(
+                    chunkId: $result['id'],
+                    fileId: (int) $result['payload']['file_id'],
+                    groupKey: $result['payload']['group_key'],
+                    text: $result['payload']['text'],
+                    score: (float) $result['score'],
+                    startLine: (int) $result['payload']['start_line'],
+                    endLine: (int) $result['payload']['end_line'],
+                    fileName: $result['payload']['file_name'] ?? null,
+                    mimeType: $result['payload']['mime_type'] ?? null,
+                    ownerId: $ownerId,
+                    shared: $ownerId !== $query->userId,
+                );
+            },
             $hits
         );
     }

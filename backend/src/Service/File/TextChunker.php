@@ -99,6 +99,254 @@ final readonly class TextChunker
     }
 
     /**
+     * Split markdown into heading-aware chunks. Same return shape as chunkify().
+     * Headings `#`–`###` start a new section; each chunk is prefixed with a
+     * breadcrumb (`Report › Q3`). Tables stay together unless larger than
+     * maxChunkSize, in which case they split by row with the header repeated.
+     *
+     * @return list<array{content: string, start_line: int, end_line: int}>
+     */
+    public function chunkifyMarkdown(string $markdown): array
+    {
+        if ('' === $markdown) {
+            return [];
+        }
+
+        $normalized = str_replace(["\r\n", "\r"], "\n", $markdown);
+        $lines = explode("\n", $normalized);
+        $blocks = $this->parseMarkdownBlocks($lines);
+
+        $headingByLevel = [];
+        $chunks = [];
+        $currentBody = '';
+        $chunkStartLine = 0;
+        $chunkEndLine = 0;
+        $currentPrefix = '';
+
+        foreach ($blocks as $block) {
+            if ('heading' === $block['type']) {
+                $this->flushMarkdownChunk($chunks, $currentPrefix, $currentBody, $chunkStartLine, $chunkEndLine);
+                $currentBody = '';
+                $level = $block['level'];
+                foreach (array_keys($headingByLevel) as $lvl) {
+                    if ($lvl >= $level) {
+                        unset($headingByLevel[$lvl]);
+                    }
+                }
+                $headingByLevel[$level] = $block['title'];
+                ksort($headingByLevel);
+                $currentPrefix = implode(' › ', array_values($headingByLevel));
+                $chunkStartLine = $block['start'];
+                $chunkEndLine = $block['end'];
+                continue;
+            }
+
+            if ('table' === $block['type']) {
+                $this->flushMarkdownChunk($chunks, $currentPrefix, $currentBody, $chunkStartLine, $chunkEndLine);
+                $currentBody = '';
+                foreach ($this->chunkMarkdownTable($block, $currentPrefix) as $piece) {
+                    $chunks[] = $piece;
+                }
+                continue;
+            }
+
+            foreach ($block['lines'] as $i => $line) {
+                $lineNum = $block['start'] + $i;
+                $candidate = '' === $currentBody ? $line : $currentBody."\n".$line;
+                $prefixed = '' !== $currentPrefix ? $currentPrefix."\n\n".$candidate : $candidate;
+                if (strlen($prefixed) > $this->maxChunkSize && '' !== $currentBody) {
+                    $this->flushMarkdownChunk($chunks, $currentPrefix, $currentBody, $chunkStartLine, $chunkEndLine);
+                    $currentBody = $line;
+                    $chunkStartLine = $lineNum;
+                } else {
+                    if ('' === $currentBody) {
+                        $chunkStartLine = $lineNum;
+                    }
+                    $currentBody = $candidate;
+                }
+                $chunkEndLine = $lineNum;
+            }
+        }
+
+        $this->flushMarkdownChunk($chunks, $currentPrefix, $currentBody, $chunkStartLine, $chunkEndLine);
+
+        return $chunks;
+    }
+
+    /**
+     * @param list<array{content: string, start_line: int, end_line: int}> $chunks
+     */
+    private function flushMarkdownChunk(
+        array &$chunks,
+        string $prefix,
+        string $body,
+        int $startLine,
+        int $endLine,
+    ): void {
+        $trimmed = trim($body);
+        if ('' === $trimmed) {
+            return;
+        }
+        $content = '' !== $prefix ? $prefix."\n\n".$trimmed : $trimmed;
+        if (strlen($content) < $this->minChunkSize && [] !== $chunks) {
+            $last = count($chunks) - 1;
+            $merged = $chunks[$last]['content']."\n\n".$content;
+            if (strlen($merged) <= $this->maxChunkSize) {
+                $chunks[$last]['content'] = $merged;
+                $chunks[$last]['end_line'] = $endLine;
+
+                return;
+            }
+        }
+        $chunks[] = [
+            'content' => $content,
+            'start_line' => $startLine,
+            'end_line' => $endLine,
+        ];
+    }
+
+    /**
+     * @param list<string> $lines
+     *
+     * @return list<array{type: string, lines: list<string>, start: int, end: int, level?: int, title?: string}>
+     */
+    private function parseMarkdownBlocks(array $lines): array
+    {
+        $blocks = [];
+        $i = 0;
+        $n = count($lines);
+        while ($i < $n) {
+            $heading = $this->matchMarkdownHeading($lines[$i]);
+            if (null !== $heading) {
+                $blocks[] = [
+                    'type' => 'heading',
+                    'level' => $heading['level'],
+                    'title' => $heading['title'],
+                    'lines' => [$lines[$i]],
+                    'start' => $i,
+                    'end' => $i,
+                ];
+                ++$i;
+                continue;
+            }
+            if ($this->isMarkdownTableRow($lines[$i])) {
+                $start = $i;
+                $tableLines = [];
+                while ($i < $n && $this->isMarkdownTableRow($lines[$i])) {
+                    $tableLines[] = $lines[$i];
+                    ++$i;
+                }
+                $blocks[] = [
+                    'type' => 'table',
+                    'lines' => $tableLines,
+                    'start' => $start,
+                    'end' => $i - 1,
+                ];
+                continue;
+            }
+            $start = $i;
+            $para = [];
+            while ($i < $n && null === $this->matchMarkdownHeading($lines[$i]) && !$this->isMarkdownTableRow($lines[$i])) {
+                $para[] = $lines[$i];
+                ++$i;
+            }
+            $blocks[] = [
+                'type' => 'text',
+                'lines' => $para,
+                'start' => $start,
+                'end' => max($start, $i - 1),
+            ];
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * @return array{level: int, title: string}|null
+     */
+    private function matchMarkdownHeading(string $line): ?array
+    {
+        if (1 === preg_match('/^(#{1,3})\s+(.+)$/', trim($line), $matches)) {
+            return ['level' => strlen($matches[1]), 'title' => trim($matches[2])];
+        }
+
+        return null;
+    }
+
+    private function isMarkdownTableRow(string $line): bool
+    {
+        return str_starts_with(ltrim($line), '|');
+    }
+
+    private function isMarkdownTableSeparator(string $line): bool
+    {
+        return 1 === preg_match('/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/', trim($line));
+    }
+
+    /**
+     * @param array{type: string, lines: list<string>, start: int, end: int} $block
+     *
+     * @return list<array{content: string, start_line: int, end_line: int}>
+     */
+    private function chunkMarkdownTable(array $block, string $prefix): array
+    {
+        $lines = $block['lines'];
+        if ([] === $lines) {
+            return [];
+        }
+        $full = implode("\n", $lines);
+        $content = '' !== $prefix ? $prefix."\n\n".$full : $full;
+        if (strlen($content) <= $this->maxChunkSize) {
+            return [[
+                'content' => $content,
+                'start_line' => $block['start'],
+                'end_line' => $block['end'],
+            ]];
+        }
+
+        $hasSep = isset($lines[1]) && $this->isMarkdownTableSeparator($lines[1]);
+        $header = $lines[0];
+        $separator = $hasSep ? $lines[1] : '';
+        $headerBlock = $hasSep ? $header."\n".$separator : $header;
+        $dataStart = $hasSep ? 2 : 1;
+
+        $out = [];
+        $currentRows = [];
+        $rowStart = $block['start'] + $dataStart;
+        $rowEnd = $rowStart;
+
+        $emit = function (array $rows, int $start, int $end) use (&$out, $prefix, $headerBlock): void {
+            if ([] === $rows) {
+                return;
+            }
+            $body = $headerBlock."\n".implode("\n", $rows);
+            $text = '' !== $prefix ? $prefix."\n\n".$body : $body;
+            $out[] = ['content' => $text, 'start_line' => $start, 'end_line' => $end];
+        };
+
+        $n = count($lines);
+        for ($i = $dataStart; $i < $n; ++$i) {
+            $row = $lines[$i];
+            $trial = [] === $currentRows ? [$row] : array_merge($currentRows, [$row]);
+            $trialText = ('' !== $prefix ? $prefix."\n\n" : '').$headerBlock."\n".implode("\n", $trial);
+            if (strlen($trialText) > $this->maxChunkSize && [] !== $currentRows) {
+                $emit($currentRows, $rowStart, $rowEnd);
+                $currentRows = [$row];
+                $rowStart = $block['start'] + $i;
+            } else {
+                if ([] === $currentRows) {
+                    $rowStart = $block['start'] + $i;
+                }
+                $currentRows[] = $row;
+            }
+            $rowEnd = $block['start'] + $i;
+        }
+        $emit($currentRows, $rowStart, $rowEnd);
+
+        return $out;
+    }
+
+    /**
      * Get overlap text from the end of current chunk.
      */
     private function getOverlapText(string $text): string

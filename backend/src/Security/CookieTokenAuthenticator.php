@@ -23,9 +23,30 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  * Validates access tokens from HttpOnly cookies.
  * Supports both app tokens and OIDC tokens (Keycloak).
  * Falls back to Authorization header for API compatibility.
+ *
+ * Credential-exchange routes under `/api/v1/auth/` (login, refresh, OAuth
+ * callbacks, …) are never claimed. Those endpoints prove identity with a
+ * password, a DB-backed refresh token, or an IdP code. A stale 5-minute
+ * access cookie — expired during a deploy, or signed with a previous
+ * `APP_SECRET` — must not 401 them, or every user is locked out across a
+ * container restart even though `BTOKENS` still holds a valid 30-day
+ * refresh row.
  */
 class CookieTokenAuthenticator extends AbstractAuthenticator
 {
+    /**
+     * `/api/v1/auth/*` routes that authenticate via the access cookie.
+     * Every other path under that prefix is a credential exchange.
+     *
+     * @var list<string>
+     */
+    private const ACCESS_COOKIE_AUTH_PATHS = [
+        '/api/v1/auth/me',
+        '/api/v1/auth/logout',
+        '/api/v1/auth/revoke-all',
+        '/api/v1/auth/token',
+    ];
+
     public function __construct(
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
@@ -36,6 +57,10 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
+        if ($this->isCredentialExchangePath($request)) {
+            return false;
+        }
+
         // Defer to ApiKeyAuthenticator when non-empty API key signals are present
         $apiKeyHeader = $request->headers->get('X-API-Key');
         if (is_string($apiKeyHeader) && '' !== trim($apiKeyHeader)) {
@@ -173,5 +198,19 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
         }
 
         return null;
+    }
+
+    /**
+     * Login, refresh and the other public `/api/v1/auth/*` exchanges must run
+     * even when the browser still sends an expired or unsigned access cookie.
+     */
+    private function isCredentialExchangePath(Request $request): bool
+    {
+        $path = $request->getPathInfo();
+        if (!str_starts_with($path, '/api/v1/auth/')) {
+            return false;
+        }
+
+        return !\in_array($path, self::ACCESS_COOKIE_AUTH_PATHS, true);
     }
 }

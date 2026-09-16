@@ -407,7 +407,7 @@ final class RealtimeTokenControllerTest extends TestCase
         $this->assertSame(403, $controller->issueWidgetToken($evilOrigin, 'wdg_abc', 'sid_xyz')->getStatusCode());
     }
 
-    public function testWidgetTokenRefusedWhenWidgetHasNoAllowedDomains(): void
+    public function testWidgetTokenIssuedWhenWidgetHasNoAllowedDomains(): void
     {
         $widgetRepo = $this->createMock(WidgetRepository::class);
         $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget(allowedDomains: []));
@@ -420,8 +420,9 @@ final class RealtimeTokenControllerTest extends TestCase
             sessionRepo: $sessionRepo,
         );
 
-        // Same fail-closed rule as the chat endpoints: no allowlist, no embed.
-        $this->assertSame(403, $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_abc', 'sid_xyz')->getStatusCode());
+        // Same open-by-default rule as the chat endpoints: an empty allowlist
+        // means the widget is embeddable from any domain.
+        $this->assertSame(200, $controller->issueWidgetToken(new Request(server: ['HTTP_ORIGIN' => 'https://anywhere.test']), 'wdg_abc', 'sid_xyz')->getStatusCode());
     }
 
     public function testWidgetTokenEndpointIsRateLimitedPerIp(): void

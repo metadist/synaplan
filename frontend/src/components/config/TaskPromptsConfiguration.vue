@@ -1,68 +1,61 @@
 <template>
   <div class="space-y-6" data-testid="page-config-task-prompts">
-    <!-- Header / overview card -->
-    <div class="surface-card p-6" data-testid="section-task-prompts-overview">
-      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div class="flex items-start gap-3 flex-1 min-w-0">
-          <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
-            <Icon icon="heroicons:document-text" class="w-6 h-6 text-[var(--brand)]" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <h2 class="text-2xl font-semibold txt-primary">{{ $t('config.taskPrompts.title') }}</h2>
-            <p class="txt-secondary text-sm mt-1">{{ $t('config.taskPrompts.subtitle') }}</p>
-            <div class="flex items-center gap-2 mt-3 text-xs flex-wrap">
-              <span
-                class="px-2 py-1 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] flex items-center gap-1.5"
-                data-testid="badge-language"
-              >
-                <Icon icon="heroicons:language" class="w-3.5 h-3.5" />
-                {{ $t('config.taskPrompts.workingLanguage', { language: currentLanguageLabel }) }}
-              </span>
-              <span class="txt-secondary">{{ $t('config.taskPrompts.workingLanguageHint') }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col sm:flex-row sm:items-center gap-3 lg:flex-shrink-0">
-          <!-- Stat pills -->
-          <div class="flex flex-wrap items-center gap-2" data-testid="section-task-prompts-stats">
-            <div
-              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
-              data-testid="stat-total"
-            >
-              <Icon icon="heroicons:rectangle-stack" class="w-4 h-4 text-[var(--brand)]" />
-              <span class="text-sm font-semibold txt-primary">{{ prompts.length }}</span>
-              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statTotal') }}</span>
-            </div>
-            <div
-              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
-              data-testid="stat-system"
-            >
-              <Icon icon="heroicons:shield-check" class="w-4 h-4 text-blue-500" />
-              <span class="text-sm font-semibold txt-primary">{{ systemPromptCount }}</span>
-              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statSystem') }}</span>
-            </div>
-            <div
-              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
-              data-testid="stat-custom"
-            >
-              <Icon icon="heroicons:user" class="w-4 h-4 text-purple-500" />
-              <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
-              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
-            </div>
-          </div>
-
-          <button
-            class="px-4 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
-            data-testid="btn-create-prompt"
-            @click="showCreateModal = true"
+    <PageHeader
+      :title="$t('config.taskPrompts.title')"
+      :subtitle="$t('config.taskPrompts.subtitle')"
+      icon="heroicons:document-text"
+      data-testid="section-task-prompts-overview"
+    >
+      <template #actions>
+        <!-- Stat pills -->
+        <div class="flex flex-wrap items-center gap-2" data-testid="section-task-prompts-stats">
+          <div
+            class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+            data-testid="stat-total"
           >
-            <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
-            {{ $t('config.taskPrompts.createNew') }}
-          </button>
+            <Icon icon="heroicons:rectangle-stack" class="w-4 h-4 text-[var(--brand)]" />
+            <span class="text-sm font-semibold txt-primary">{{ prompts.length }}</span>
+            <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statTotal') }}</span>
+          </div>
+          <div
+            class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+            data-testid="stat-system"
+          >
+            <Icon icon="heroicons:shield-check" class="w-4 h-4 text-blue-500" />
+            <span class="text-sm font-semibold txt-primary">{{ systemPromptCount }}</span>
+            <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statSystem') }}</span>
+          </div>
+          <div
+            class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+            data-testid="stat-custom"
+          >
+            <Icon icon="heroicons:user" class="w-4 h-4 text-purple-500" />
+            <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
+            <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
+          </div>
         </div>
+
+        <button
+          class="px-4 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
+          data-testid="btn-create-prompt"
+          @click="showCreateModal = true"
+        >
+          <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
+          {{ $t('config.taskPrompts.createNew') }}
+        </button>
+      </template>
+
+      <div class="flex items-center gap-2 text-xs flex-wrap">
+        <span
+          class="px-2 py-1 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] flex items-center gap-1.5"
+          data-testid="badge-language"
+        >
+          <Icon icon="heroicons:language" class="w-3.5 h-3.5" />
+          {{ $t('config.taskPrompts.workingLanguage', { language: currentLanguageLabel }) }}
+        </span>
+        <span class="txt-secondary">{{ $t('config.taskPrompts.workingLanguageHint') }}</span>
       </div>
-    </div>
+    </PageHeader>
 
     <!-- Two-pane layout: list + editor -->
     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-6">
@@ -244,6 +237,13 @@
                         >
                           {{ $t('config.taskPrompts.badgeOverride') }}
                         </span>
+                        <span
+                          v-if="prompt.shared"
+                          class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-[var(--brand)]/10 text-[var(--brand)] leading-none flex-shrink-0"
+                          data-testid="badge-shared-assistant"
+                        >
+                          {{ $t('iam.sharedWithMe') }}
+                        </span>
                       </div>
                       <p
                         v-if="viewDensity === 'detailed' && prompt.shortDescription"
@@ -329,6 +329,16 @@
                   {{ $t('config.taskPrompts.badgeSystem') }}
                 </span>
                 <span
+                  v-else-if="currentPrompt.shared"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-[var(--brand)]/10 text-[var(--brand)] leading-none"
+                >
+                  {{
+                    currentPrompt.owner?.name
+                      ? $t('iam.sharedBy', { name: currentPrompt.owner.name })
+                      : $t('iam.sharedWithMe')
+                  }}
+                </span>
+                <span
                   v-else-if="!currentPrompt.isDefault"
                   class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 leading-none"
                 >
@@ -337,7 +347,36 @@
               </div>
               <p class="text-xs txt-secondary font-mono truncate">{{ currentPrompt.topic }}</p>
             </div>
+            <button
+              v-if="canSharePrompt"
+              type="button"
+              class="btn-secondary inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+              data-testid="btn-share-assistant"
+              @click="openAssistantShare"
+            >
+              {{ $t('iam.share') }}
+            </button>
+            <button
+              v-if="showSaveAsTask"
+              type="button"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+              data-testid="btn-save-as-task"
+              @click="onSaveAsTask"
+            >
+              {{ $t('config.savedTasks.saveAsTask') }}
+            </button>
           </div>
+
+          <SharedResourceBanner
+            v-if="currentPrompt.shared"
+            class="mb-4"
+            kind="assistant"
+            :owner-name="currentPrompt.owner?.name ?? null"
+            :shared-via="sharedAssistantMeta(currentPrompt.id)?.sharedVia"
+            :permission="
+              currentPrompt.access && currentPrompt.access !== 'owner' ? currentPrompt.access : null
+            "
+          />
 
           <!-- System prompt info banner -->
           <div
@@ -376,6 +415,21 @@
               </p>
             </div>
           </div>
+
+          <p
+            v-if="showSaveAsTask && !currentSavedTask"
+            class="text-xs txt-secondary mb-4"
+            data-testid="saved-task-empty-hint"
+          >
+            {{ $t('config.savedTasks.emptyHint') }}
+          </p>
+          <SavedTaskCard
+            v-if="currentSavedTask"
+            class="mb-4"
+            :task="currentSavedTask"
+            @updated="onSavedTaskUpdated"
+            @deleted="onSavedTaskDeleted"
+          />
 
           <!-- Tab nav -->
           <div class="tab-nav !mb-4" role="tablist" data-testid="section-prompt-tabs">
@@ -1157,6 +1211,13 @@
       @save="handleSave"
       @discard="handleDiscard"
     />
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="assistant"
+      :resource-id="iamShareResourceId"
+      :resource-name="iamShareName"
+      @close="iamShareOpen = false"
+    />
   </div>
 </template>
 
@@ -1176,7 +1237,7 @@ import {
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
-import { findModelIdByString } from '@/utils/aiModelDefaults'
+import { resolveModelIdForSave } from '@/utils/aiModelDefaults'
 import {
   type InternetSearchMode,
   internetModeFromMetadata,
@@ -1186,9 +1247,17 @@ import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
 import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useAuthStore } from '@/stores/auth'
+import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
+import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
+import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { ApiError } from '@/services/api/httpClient'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
+import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { iamApi, type IamSharedItem } from '@/services/api/iamApi'
 
 const SELECTION_RULES_TEMPLATE =
   'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
@@ -1230,11 +1299,58 @@ const { t, locale } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
+const savedTasks = ref<SavedTask[]>([])
+
+const currentSavedTask = computed(
+  () => savedTasks.value.find((task) => task.promptId === currentPrompt.value?.id) ?? null
+)
+
+const showSaveAsTask = computed(
+  () =>
+    isSavedTasksEnabled() &&
+    currentPrompt.value !== null &&
+    currentSavedTask.value === null &&
+    (!currentPrompt.value.isDefault || currentPrompt.value.isUserOverride === true)
+)
+
+const loadSavedTasks = async () => {
+  if (!isSavedTasksEnabled()) {
+    savedTasks.value = []
+    return
+  }
+  try {
+    savedTasks.value = await savedTasksApi.list()
+  } catch {
+    savedTasks.value = []
+  }
+}
+
+const onSavedTaskUpdated = (task: SavedTask) => {
+  savedTasks.value = savedTasks.value.map((row) => (row.id === task.id ? task : row))
+}
+
+const onSavedTaskDeleted = (id: number) => {
+  savedTasks.value = savedTasks.value.filter((row) => row.id !== id)
+}
+
+const onSaveAsTask = async () => {
+  if (!currentPrompt.value) {
+    return
+  }
+  try {
+    const task = await savedTasksApi.create(currentPrompt.value.id, currentPrompt.value.name)
+    savedTasks.value = [...savedTasks.value.filter((row) => row.id !== task.id), task]
+    success(t('config.savedTasks.created'))
+  } catch {
+    showError(t('config.savedTasks.createFailed'))
+  }
+}
 
 const PROMPT_LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'de', label: 'Deutsch' },
   { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
   { value: 'tr', label: 'Türkçe' },
 ]
 
@@ -1259,7 +1375,25 @@ const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
 const promptListSearch = ref('')
-const promptListFilter = ref<'all' | 'system' | 'custom'>('all')
+const promptListFilter = ref<'all' | 'system' | 'custom' | 'shared'>('all')
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
+const iamShareName = ref('')
+const sharedAssistantItems = ref<IamSharedItem[]>([])
+const sharedAssistantMeta = (id: number) =>
+  sharedAssistantItems.value.find((item) => item.id === String(id))
+const canSharePrompt = computed(() => {
+  const prompt = currentPrompt.value
+  if (!iamSharingEnabled.value || !prompt || prompt.shared) return false
+  return !prompt.isDefault || prompt.isUserOverride === true
+})
+const openAssistantShare = () => {
+  if (!currentPrompt.value) return
+  iamShareResourceId.value = String(currentPrompt.value.id)
+  iamShareName.value = currentPrompt.value.name
+  iamShareOpen.value = true
+}
 const activeTab = ref<EditorTabId>('routing')
 const viewDensity = ref<'compact' | 'detailed'>('compact')
 const collapsedGroups = ref<Set<string>>(new Set())
@@ -1272,24 +1406,36 @@ const systemPromptCount = computed(
   () => prompts.value.filter((p) => p.isDefault && !p.isUserOverride).length
 )
 const customPromptCount = computed(() => prompts.value.filter((p) => !p.isDefault).length)
+const sharedPromptCount = computed(() => prompts.value.filter((p) => p.shared === true).length)
 
-const promptListFilters = computed(() => [
-  {
-    value: 'all' as const,
-    label: t('config.taskPrompts.filterAll'),
-    count: prompts.value.length,
-  },
-  {
-    value: 'system' as const,
-    label: t('config.taskPrompts.filterSystem'),
-    count: systemPromptCount.value,
-  },
-  {
-    value: 'custom' as const,
-    label: t('config.taskPrompts.filterCustom'),
-    count: customPromptCount.value,
-  },
-])
+const promptListFilters = computed(() => {
+  const filters: { value: 'all' | 'system' | 'custom' | 'shared'; label: string; count: number }[] =
+    [
+      {
+        value: 'all',
+        label: t('config.taskPrompts.filterAll'),
+        count: prompts.value.length,
+      },
+      {
+        value: 'system',
+        label: t('config.taskPrompts.filterSystem'),
+        count: systemPromptCount.value,
+      },
+      {
+        value: 'custom',
+        label: t('config.taskPrompts.filterCustom'),
+        count: customPromptCount.value,
+      },
+    ]
+  if (iamSharingEnabled.value) {
+    filters.push({
+      value: 'shared',
+      label: t('iam.sharedWithMe'),
+      count: sharedPromptCount.value,
+    })
+  }
+  return filters
+})
 
 const contentLength = computed(() => (formData.value.content || '').length)
 const contentWordCount = computed(() => {
@@ -1305,6 +1451,9 @@ const filteredPrompts = computed(() => {
       return false
     }
     if (promptListFilter.value === 'custom' && p.isDefault && !p.isUserOverride) {
+      return false
+    }
+    if (promptListFilter.value === 'shared' && p.shared !== true) {
       return false
     }
     if (search === '') return true
@@ -1651,6 +1800,15 @@ const loadPrompts = async () => {
   try {
     const data = await promptsApi.getPrompts(locale.value || 'en')
     const nonWidgetPrompts = data.filter((p) => !p.topic.startsWith('w_'))
+    if (isIamSharingEnabled()) {
+      try {
+        sharedAssistantItems.value = await iamApi.listSharedWithMe('assistant')
+      } catch {
+        sharedAssistantItems.value = []
+      }
+    } else {
+      sharedAssistantItems.value = []
+    }
     prompts.value = nonWidgetPrompts.map((p) => {
       const metadata = p.metadata || {}
 
@@ -1795,10 +1953,19 @@ const handleSave = saveChanges(async () => {
   try {
     const metadata: PromptMetadata = {}
 
+    // A pinned model whose provider is unavailable is missing from the picker
+    // list, so it loads as "default". Only an explicit change clears the pin —
+    // otherwise merely opening and saving a prompt would drop it.
+    const pinnedModelId = currentPrompt.value.metadata?.aiModel
     if (formData.value.aiModel === 'default' || !formData.value.aiModel) {
-      metadata.aiModel = 0
+      metadata.aiModel =
+        originalData.value.aiModel === formData.value.aiModel ? (pinnedModelId ?? 0) : 0
     } else {
-      metadata.aiModel = findModelIdByString(allModels.value, formData.value.aiModel)
+      metadata.aiModel = resolveModelIdForSave(
+        allModels.value,
+        formData.value.aiModel,
+        pinnedModelId
+      )
     }
 
     metadata.tool_files = (formData.value.availableTools || []).includes('files-search')
@@ -2178,7 +2345,7 @@ watch(locale, () => {
 
 onMounted(() => {
   cleanupGuard = setupNavigationGuard()
-  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles()]).then(() => {
+  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles(), loadSavedTasks()]).then(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const topicParam = urlParams.get('topic')
     if (topicParam) {

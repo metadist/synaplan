@@ -1,0 +1,7 @@
+{
+  "schema": "agent.v1",
+  "tools": {
+    "internet": true,
+    "foo": true
+  }
+}

@@ -4,11 +4,16 @@ namespace App\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\StructuredOutputViolationException;
+use App\AI\Health\ModelHealthRecorder;
+use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\SupportsInlineReferenceImage;
 use App\AI\Provider\GoogleProvider;
+use App\AI\StructuredOutput\StructuredOutputRecovery;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Service\CircuitBreaker;
 use App\Service\DiscordNotificationService;
 use App\Service\Exception\StreamCancelledException;
@@ -16,6 +21,7 @@ use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use App\Service\TtsTextSanitizer;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -56,8 +62,10 @@ class AiFacade
         private CacheItemPoolInterface $cachePool,
         private HiggsfieldCredentialResolver $higgsfieldCredentials,
         private TranscriptionUsageRecorder $transcriptionUsageRecorder,
+        private ModelHealthRecorder $health,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private string $embeddingFallbackProvider = '',
+        private StructuredOutputRecovery $structuredOutputRecovery = new StructuredOutputRecovery(),
     ) {
     }
 
@@ -169,11 +177,21 @@ class AiFacade
 
         // Execute with Circuit Breaker protection
         try {
-            $response = $this->circuitBreaker->execute(
+            $response = $this->executeWithHealth(
                 callback: fn () => $provider->chat($messages, $options),
                 serviceName: 'ai_provider_'.$provider->getName(),
+                capability: 'chat',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
+        } catch (StructuredOutputViolationException $e) {
+            // The provider answered — it just rejected the model's own JSON
+            // against the schema we asked for. Heal in-process before anyone
+            // sees an error: salvage the rejected output, else retry once
+            // with a corrective turn. Anything else still bubbles up typed.
+            $response = $this->recoverStructuredOutput($e, $provider, $messages, $options, $userId);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -183,12 +201,137 @@ class AiFacade
             throw new ProviderException('AI provider failed', 'unknown', null, 0, $e);
         }
 
-        return [
+        $out = [
             'content' => $response['content'] ?? '',
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'usage' => $response['usage'] ?? [],
             'response_id' => $response['response_id'] ?? null,
+            // Native tool calls, normalised to list<ToolCall> by the provider
+            // ({@see \App\AI\ToolCalling\ToolCallParser}). Always present so a
+            // caller that declared tools can read the key unconditionally;
+            // empty for every provider and every call that declared none.
+            'tool_calls' => $response['tool_calls'] ?? [],
+        ];
+        if (isset($response[StructuredOutputRecovery::RESPONSE_KEY]) && is_string($response[StructuredOutputRecovery::RESPONSE_KEY])) {
+            // Tells the caller its answer came from the healing loop so it can
+            // log/score it; absent on a first-try success.
+            $out[StructuredOutputRecovery::RESPONSE_KEY] = $response[StructuredOutputRecovery::RESPONSE_KEY];
+        }
+        if (isset($response['tool_calls']) && is_array($response['tool_calls'])) {
+            $out['tool_calls'] = $response['tool_calls'];
+        }
+        if (isset($response['finish_reason']) && is_string($response['finish_reason']) && '' !== $response['finish_reason']) {
+            $out['finish_reason'] = $response['finish_reason'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Self-healing loop for a schema-rejected generation — cheapest step first,
+     * bounded to a single extra provider call:
+     *
+     *   1. salvage the rejected output locally (drop forbidden keys, re-validate);
+     *   2. otherwise retry ONCE with the rejection fed back as a correction;
+     *   3. if that is rejected too, salvage that one, else give up typed so the
+     *      call site can apply its own safe default.
+     *
+     * Every step is logged with the schema name so a recurring violation shows
+     * up as a prompt/schema problem to fix, not as silent retries.
+     *
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed> provider-shaped response (`content`, `usage`, …)
+     *                              plus {@see StructuredOutputRecovery::RESPONSE_KEY}
+     */
+    private function recoverStructuredOutput(
+        StructuredOutputViolationException $violation,
+        ChatProviderInterface $provider,
+        array $messages,
+        array $options,
+        ?int $userId,
+    ): array {
+        $schema = $options['structured_output'] ?? null;
+        if (!$schema instanceof StructuredOutputSchema) {
+            // A violation without a schema on OUR side is not something we
+            // can validate against — nothing to heal with.
+            throw $violation;
+        }
+
+        $logContext = [
+            'provider' => $provider->getName(),
+            'model' => $options['model'] ?? null,
+            'schema' => $schema->name,
+            'user_id' => $userId,
+            'validation_error' => $violation->getValidationError(),
+        ];
+
+        $salvaged = $this->structuredOutputRecovery->salvage($violation->getFailedGeneration(), $schema);
+        if (null !== $salvaged) {
+            $this->logger->warning('AI chat: salvaged a schema-rejected generation without a retry', $logContext);
+
+            return $this->salvagedResponse($salvaged);
+        }
+
+        $this->logger->warning('AI chat: schema-rejected generation not salvageable, retrying once with a corrective turn', $logContext + [
+            'failed_generation' => mb_substr((string) $violation->getFailedGeneration(), 0, 500),
+        ]);
+
+        $repairMessages = $this->structuredOutputRecovery->repairMessages($messages, $violation, $schema);
+
+        try {
+            $response = $this->executeWithHealth(
+                callback: fn () => $provider->chat($repairMessages, $options),
+                serviceName: 'ai_provider_'.$provider->getName(),
+                capability: 'chat',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
+                fallback: null,
+            );
+        } catch (StructuredOutputViolationException $retryViolation) {
+            $salvaged = $this->structuredOutputRecovery->salvage($retryViolation->getFailedGeneration(), $schema);
+            if (null !== $salvaged) {
+                $this->logger->warning('AI chat: salvaged the corrective retry\'s schema-rejected generation', $logContext);
+
+                return $this->salvagedResponse($salvaged);
+            }
+
+            $this->logger->error('AI chat: structured output unrecoverable after salvage and one corrective retry', $logContext + [
+                'retry_validation_error' => $retryViolation->getValidationError(),
+                'retry_failed_generation' => mb_substr((string) $retryViolation->getFailedGeneration(), 0, 500),
+            ]);
+
+            throw $retryViolation;
+        }
+
+        $this->logger->warning('AI chat: corrective retry repaired the structured output', $logContext);
+        $response[StructuredOutputRecovery::RESPONSE_KEY] = StructuredOutputRecovery::RECOVERY_REPAIRED;
+
+        return $response;
+    }
+
+    /**
+     * A salvaged answer never reached the usage counters: the provider's 400
+     * carries no `usage` block, so the tokens it burned are reported as zero
+     * rather than guessed.
+     *
+     * @return array<string, mixed>
+     */
+    private function salvagedResponse(string $content): array
+    {
+        return [
+            'content' => $content,
+            'usage' => [
+                'prompt_tokens' => 0,
+                'completion_tokens' => 0,
+                'total_tokens' => 0,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ],
+            StructuredOutputRecovery::RESPONSE_KEY => StructuredOutputRecovery::RECOVERY_SALVAGED,
         ];
     }
 
@@ -231,7 +374,7 @@ class AiFacade
         // Execute streaming with Circuit Breaker protection
         $streamResult = null;
         try {
-            $this->circuitBreaker->execute(
+            $this->executeWithHealth(
                 callback: function () use ($provider, $messages, $streamCallback, $options, &$streamResult) {
                     $this->logger->info('🟢 AiFacade: Calling provider chatStream');
                     $streamResult = $provider->chatStream($messages, $streamCallback, $options);
@@ -240,6 +383,9 @@ class AiFacade
                     return null;
                 },
                 serviceName: 'ai_provider_'.$provider->getName(),
+                capability: 'chat',
+                provider: $provider,
+                options: $options,
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
         } catch (ProviderException|StreamCancelledException $e) {
@@ -260,6 +406,11 @@ class AiFacade
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'usage' => $streamResult['usage'] ?? [],
             'response_id' => $streamResult['response_id'] ?? null,
+            // See chat(): tool calls reassembled from the stream fragments by
+            // {@see \App\AI\ToolCalling\StreamingToolCallAccumulator}. A tool
+            // call is NOT emitted to the stream callback — the client must
+            // never see a routing hand-off as if it were answer text.
+            'tool_calls' => $streamResult['tool_calls'] ?? [],
         ];
     }
 
@@ -320,7 +471,13 @@ class AiFacade
                         'text_length' => strlen($text),
                     ]);
 
-                    return $provider->embed($text, $options);
+                    return $this->observing(
+                        'embedding',
+                        $provider->getName(),
+                        $resolvedModel,
+                        $userId,
+                        fn () => $provider->embed($text, $options),
+                    );
                 }
             );
         } catch (ProviderException $primaryError) {
@@ -505,7 +662,13 @@ class AiFacade
         $missingIndexes = array_keys($missingByIndex);
 
         try {
-            $batch = $provider->embedBatch($missingTexts, $options);
+            $batch = $this->observing(
+                'embedding',
+                $provider->getName(),
+                $resolvedModel,
+                $userId,
+                fn () => $provider->embedBatch($missingTexts, $options),
+            );
         } catch (\Throwable $primaryError) {
             // The fallback covers the FULL original text list (not just the
             // misses). Mixing cached primary vectors with fallback vectors
@@ -802,9 +965,13 @@ class AiFacade
             ]);
 
             try {
-                $response = $this->circuitBreaker->execute(
+                $response = $this->executeWithHealth(
                     callback: fn () => $provider->explainImage($imagePath, $prompt, $candidateOptions),
                     serviceName: 'ai_provider_vision_'.$provider->getName(),
+                    capability: 'vision',
+                    provider: $provider,
+                    options: $candidateOptions,
+                    userId: $userId,
                     fallback: null // NO FALLBACK
                 );
 
@@ -876,9 +1043,13 @@ class AiFacade
         ]);
 
         try {
-            $images = $this->circuitBreaker->execute(
+            $images = $this->executeWithHealth(
                 callback: fn () => $provider->generateImage($prompt, $options),
                 serviceName: 'ai_provider_image_'.$provider->getName(),
+                capability: 'image_generation',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK
             );
         } catch (ProviderException $e) {
@@ -926,9 +1097,13 @@ class AiFacade
         ]);
 
         try {
-            $videos = $this->circuitBreaker->execute(
+            $videos = $this->executeWithHealth(
                 callback: fn () => $provider->generateVideo($prompt, $options),
                 serviceName: 'ai_provider_video_'.$provider->getName(),
+                capability: 'video_generation',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK
             );
         } catch (ProviderException $e) {
@@ -1152,11 +1327,63 @@ class AiFacade
         return 'unknown';
     }
 
+    /**
+     * Run a provider call through the circuit breaker and tell the health
+     * monitor how it ended.
+     *
+     * This is the single choke point for passive detection: every capability
+     * already goes through the circuit breaker, so wrapping it here observes
+     * real traffic without adding a single extra provider request. Recording
+     * never throws — {@see ModelHealthRecorder} swallows its own errors — so a
+     * broken counter cannot take down the call it is watching.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function executeWithHealth(
+        callable $callback,
+        string $serviceName,
+        string $capability,
+        ProviderMetadataInterface $provider,
+        array $options,
+        ?int $userId = null,
+        ?callable $fallback = null,
+    ): mixed {
+        return $this->observing(
+            $capability,
+            $provider->getName(),
+            $this->reportedModel($provider, $options, $capability),
+            $userId,
+            fn () => $this->circuitBreaker->execute($callback, $serviceName, $fallback),
+        );
+    }
+
+    /**
+     * Report how a provider call ended to the health monitor and pass the
+     * result (or the exception) straight through.
+     *
+     * Used directly by the embedding path, which caches and falls back instead
+     * of going through the circuit breaker.
+     */
+    private function observing(string $capability, string $providerName, ?string $model, ?int $userId, callable $callback): mixed
+    {
+        try {
+            $result = $callback();
+        } catch (\Throwable $e) {
+            $this->health->recordFailure($capability, $providerName, $model, $e, $userId);
+            throw $e;
+        }
+
+        $this->health->recordSuccess($capability, $providerName, $model);
+
+        return $result;
+    }
+
     public function transcribe(string $audioPath, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
         $callerSuppliedModel = array_key_exists('model', $options);
-        $sttModelId = null;
+        $sttModelId = $this->positiveIntOrNull($options['model_id'] ?? null);
+        unset($options['model_id']);
 
         // The settings UI persists the user's transcription pick to
         // BCONFIG.DEFAULTMODEL.SOUND2TEXT. Honour that configured row before
@@ -1168,7 +1395,7 @@ class AiFacade
         if (!$providerName && null !== $userId && $userId > 0) {
             $sttDefault = $this->modelConfig->resolveSttDefault($userId);
             $providerName = $sttDefault['provider'];
-            $sttModelId = $sttDefault['model_id'];
+            $sttModelId ??= $sttDefault['model_id'];
 
             // Only forward the SOUND2TEXT model name when it actually resolved
             // to a BMODELS row — otherwise the provider would receive a stale
@@ -1190,9 +1417,13 @@ class AiFacade
         ]);
 
         try {
-            $result = $this->circuitBreaker->execute(
+            $result = $this->executeWithHealth(
                 callback: fn () => $provider->transcribe($audioPath, $options),
                 serviceName: 'ai_provider_stt_'.$provider->getName(),
+                capability: 'speech_to_text',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK
             );
         } catch (ProviderException $e) {
@@ -1284,6 +1515,9 @@ class AiFacade
 
         $provider = $this->registry->getTextToSpeechProvider($providerName);
 
+        // Last-line defence for callers that skip TtsTextSanitizer (#1665).
+        $text = TtsTextSanitizer::truncateForSynthesis($text);
+
         $this->logger->info('AI TTS request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
@@ -1291,9 +1525,13 @@ class AiFacade
         ]);
 
         try {
-            $filename = $this->circuitBreaker->execute(
+            $filename = $this->executeWithHealth(
                 callback: fn () => $provider->synthesize($text, $options),
                 serviceName: 'ai_provider_tts_'.$provider->getName(),
+                capability: 'text_to_speech',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
                 fallback: null // NO FALLBACK
             );
         } catch (ProviderException $e) {
@@ -1349,6 +1587,8 @@ class AiFacade
         }
 
         $provider = $this->registry->getTextToSpeechProvider($providerName);
+
+        $text = TtsTextSanitizer::truncateForSynthesis($text);
 
         $this->logger->info('AI TTS stream request', [
             'provider' => $provider->getName(),
@@ -1427,5 +1667,17 @@ class AiFacade
         ]);
 
         return $relativePath;
+    }
+
+    private function positiveIntOrNull(mixed $value): ?int
+    {
+        if (is_int($value) && $value > 0) {
+            return $value;
+        }
+        if (is_string($value) && ctype_digit($value) && (int) $value > 0) {
+            return (int) $value;
+        }
+
+        return null;
     }
 }

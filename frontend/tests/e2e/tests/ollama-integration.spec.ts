@@ -45,7 +45,13 @@ async function restoreDefaults(
   })
 }
 
-test.describe('@ci @smoke Ollama Integration', () => {
+// @ollama routes this file into the `chromium-ollama` project, which CI runs as
+// its own job on its own test stack. That is a hard requirement, not tidiness:
+// switchToOllamaChat below changes the CHAT default for the entire
+// installation, so every chat test running at the same time would talk to the
+// stub instead of its own model. Do not drop the tag to "just run it with the
+// rest" — see playwright.config.ts.
+test.describe('@ci @smoke @ollama Ollama Integration', () => {
   test.describe.configure({ mode: 'serial' })
 
   let apiCtx: Awaited<ReturnType<typeof playwrightRequest.newContext>>

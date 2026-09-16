@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Admin;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Admin\BootstrapAdminService;
+use App\Service\Setup\SetupStateService;
 use App\Service\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -32,6 +33,7 @@ final class BootstrapAdminServiceTest extends TestCase
     private UserPasswordHasherInterface&MockObject $passwordHasher;
     private LockFactory&MockObject $lockFactory;
     private SharedLockInterface&MockObject $lock;
+    private SetupStateService&MockObject $setupState;
     private LoggerInterface&MockObject $logger;
     private BootstrapAdminService $service;
     private bool $lockAcquired = true;
@@ -44,6 +46,7 @@ final class BootstrapAdminServiceTest extends TestCase
         $this->passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
         $this->lockFactory = $this->createMock(LockFactory::class);
         $this->lock = $this->createMock(SharedLockInterface::class);
+        $this->setupState = $this->createMock(SetupStateService::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->lockFactory->method('createLock')->willReturn($this->lock);
@@ -55,6 +58,7 @@ final class BootstrapAdminServiceTest extends TestCase
             $this->entityManager,
             $this->passwordHasher,
             $this->lockFactory,
+            $this->setupState,
             $this->logger,
         );
     }
@@ -238,6 +242,39 @@ final class BootstrapAdminServiceTest extends TestCase
         $result = $this->service->bootstrap('admin@example.com', 'SecurePass123!');
 
         $this->assertSame(BootstrapAdminService::RESULT_CREATED, $result);
+    }
+
+    /**
+     * The headless path must leave no first-run setup window open behind it —
+     * otherwise a deployment that ships BOOTSTRAP_ADMIN_* would still send its
+     * operator through the browser wizard on first visit.
+     */
+    public function testClosesTheSetupWindowAfterCreatingTheAdmin(): void
+    {
+        $this->userRepository->method('hasAdmin')->willReturn(false);
+        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->userLifecycleService->method('createUser')->willReturn(new User());
+        $this->setupState->expects($this->once())->method('markCompleted');
+
+        $this->service->bootstrap('admin@example.com', 'SecurePass123!');
+    }
+
+    public function testClosesTheSetupWindowAfterPromotingAnExistingUser(): void
+    {
+        $this->userRepository->method('hasAdmin')->willReturn(false);
+        $this->userRepository->method('findByEmail')->willReturn((new User())->setPw('old-hash'));
+        $this->passwordHasher->method('hashPassword')->willReturn('new-hash');
+        $this->setupState->expects($this->once())->method('markCompleted');
+
+        $this->service->bootstrap('admin@example.com', 'SecurePass123!');
+    }
+
+    public function testLeavesTheSetupWindowUntouchedWhenAnAdminAlreadyExists(): void
+    {
+        $this->userRepository->method('hasAdmin')->willReturn(true);
+        $this->setupState->expects($this->never())->method('markCompleted');
+
+        $this->service->bootstrap('admin@example.com', 'SecurePass123!');
     }
 
     public function testCreatedAdminKeepsItsPasswordWhenNoChangeIsForced(): void

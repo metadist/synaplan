@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
 import { useHistoryStore } from '@/stores/history'
+import { endSessionTeardown, isSessionTerminating } from '@/services/sessionTeardown'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
@@ -11,6 +12,11 @@ vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
   refreshAccessToken: vi.fn().mockResolvedValue(true),
   getConfigSync: () => ({ realtime: { enabled: false, wsUrl: '' } }),
+  beginAuthMutation: vi.fn(),
+  endAuthMutation: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
+  isAuthMutationInProgress: vi.fn().mockReturnValue(false),
+  awaitAuthMutation: vi.fn().mockResolvedValue(undefined),
 }))
 
 // auth.logout() dynamically imports the realtime store so it can disconnect
@@ -73,9 +79,10 @@ vi.mock('@/services/authService', async () => {
   }
 })
 
+const configReloadMock = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({
-    reload: vi.fn().mockResolvedValue(undefined),
+    reload: (...args: unknown[]) => configReloadMock(...args),
     billing: { enabled: false },
   }),
 }))
@@ -104,6 +111,8 @@ vi.mock('@/stores/userFeedback', () => ({
 describe('useAuthStore — impersonation', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // Module-scoped and deliberately not cleared by logout itself.
+    endSessionTeardown()
     refreshUserMock.mockClear()
     startApiMock.mockReset()
     stopApiMock.mockReset()
@@ -112,6 +121,8 @@ describe('useAuthStore — impersonation', () => {
     realtimeDisconnectMock.mockClear()
     mediaJobsSubscribeMock.mockClear()
     mediaJobsUnsubscribeMock.mockClear()
+    configReloadMock.mockReset()
+    configReloadMock.mockResolvedValue(undefined)
     localStorage.clear()
   })
 
@@ -150,6 +161,37 @@ describe('useAuthStore — impersonation', () => {
     expect(store.isImpersonating).toBe(true)
     // /auth/me must have been called as part of the post-swap refresh.
     expect(refreshUserMock).toHaveBeenCalled()
+  })
+
+  it('startImpersonation mints a fresh token (bypassing the lock) as the last writer before the swap', async () => {
+    const httpClient = await import('@/services/api/httpClient')
+    const authServiceModule = (await import('@/services/authService')) as unknown as {
+      __setUser: (u: unknown) => void
+      __setImpersonator: (i: unknown) => void
+    }
+
+    vi.mocked(httpClient.beginAuthMutation).mockClear()
+    vi.mocked(httpClient.endAuthMutation).mockClear()
+    vi.mocked(httpClient.refreshAccessToken).mockClear()
+
+    startApiMock.mockResolvedValueOnce({ success: true })
+    authServiceModule.__setUser({ id: 99, email: 'target@example.com', level: 'PRO' })
+    authServiceModule.__setImpersonator({ id: 1, email: 'admin@example.com', level: 'ADMIN' })
+
+    const store = useAuthStore()
+    await store.startImpersonation(99)
+
+    // The whole swap is wrapped in the auth-mutation lock…
+    expect(httpClient.beginAuthMutation).toHaveBeenCalledTimes(1)
+    expect(httpClient.endAuthMutation).toHaveBeenCalledTimes(1)
+    // …and a bypass refresh is issued so the impersonate call never goes out
+    // with an expired cookie.
+    expect(httpClient.refreshAccessToken).toHaveBeenCalledWith({ bypassMutationLock: true })
+
+    // Ordering: the pre-swap refresh must run BEFORE the impersonate request.
+    const refreshOrder = vi.mocked(httpClient.refreshAccessToken).mock.invocationCallOrder[0]
+    const startOrder = startApiMock.mock.invocationCallOrder[0]
+    expect(refreshOrder).toBeLessThan(startOrder)
   })
 
   it('startImpersonation surfaces a server error verbatim and leaves state untouched', async () => {
@@ -298,6 +340,36 @@ describe('useAuthStore — impersonation', () => {
     expect(historyStore.messages).toEqual([])
   })
 
+  it('stopImpersonation returns without waiting for config reload or realtime resubscribe', async () => {
+    const authServiceModule = (await import('@/services/authService')) as unknown as {
+      __setUser: (u: unknown) => void
+      __setImpersonator: (i: unknown) => void
+    }
+
+    authServiceModule.__setUser({ id: 99, email: 'target@example.com', level: 'PRO' })
+    authServiceModule.__setImpersonator({ id: 1, email: 'admin@example.com', level: 'ADMIN' })
+    const store = useAuthStore()
+    await store.refreshUser()
+
+    stopApiMock.mockResolvedValueOnce({ success: true })
+    authServiceModule.__setUser({
+      id: 1,
+      email: 'admin@example.com',
+      level: 'ADMIN',
+      isAdmin: true,
+    })
+    authServiceModule.__setImpersonator(null)
+
+    // Hang config reload. If stop awaited it, this test would time out.
+    configReloadMock.mockReturnValueOnce(new Promise(() => {}))
+
+    const result = await store.stopImpersonation()
+
+    expect(result.success).toBe(true)
+    expect(store.isImpersonating).toBe(false)
+    expect(configReloadMock).toHaveBeenCalledTimes(1)
+  })
+
   it('logout wipes both user and impersonator state', async () => {
     const authServiceModule = (await import('@/services/authService')) as unknown as {
       __setUser: (u: unknown) => void
@@ -310,6 +382,8 @@ describe('useAuthStore — impersonation', () => {
     const store = useAuthStore()
     await store.refreshUser()
     expect(store.isImpersonating).toBe(true)
+    // Signing in clears any teardown left over from an earlier session.
+    expect(isSessionTerminating()).toBe(false)
 
     await store.logout()
 
@@ -319,5 +393,8 @@ describe('useAuthStore — impersonation', () => {
     // The realtime client must be torn down before the auth cookie is
     // cleared so it cannot keep retrying with stale credentials.
     expect(realtimeDisconnectMock).toHaveBeenCalledOnce()
+    // Logout owns the next navigation from here on; the stores must not
+    // redirect or keep calling protected endpoints (see sessionTeardown).
+    expect(isSessionTerminating()).toBe(true)
   })
 })

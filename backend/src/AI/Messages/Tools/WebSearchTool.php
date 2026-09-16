@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Messages\Tools;
 
-use App\Service\Search\BraveSearchService;
+use App\Plug\WebSearch\WebSearchGateway;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -35,14 +35,14 @@ final readonly class WebSearchTool
     private const FRESHNESS_VALUES = ['pd', 'pw', 'pm', 'py'];
 
     public function __construct(
-        private BraveSearchService $braveSearch,
+        private WebSearchGateway $webSearch,
         private LoggerInterface $logger,
     ) {
     }
 
     public function isAvailable(): bool
     {
-        return $this->braveSearch->isEnabled();
+        return $this->webSearch->isEnabled();
     }
 
     /**
@@ -108,7 +108,7 @@ final readonly class WebSearchTool
         }
 
         try {
-            $results = $this->braveSearch->search($query, $this->searchOptions($input));
+            $results = $this->webSearch->search($query, $this->searchOptions($input));
         } catch (\Throwable $e) {
             $this->logger->warning('WebSearchTool: search failed', [
                 'query' => $query,
@@ -125,7 +125,7 @@ final readonly class WebSearchTool
         ]);
 
         return [
-            'text' => $this->braveSearch->formatResultsForAI($results),
+            'text' => $this->webSearch->formatResultsForAI($results),
             'isError' => false,
             'query' => $query,
             'resultCount' => $count,

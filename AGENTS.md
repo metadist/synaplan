@@ -7,7 +7,7 @@ description: AI-powered knowledge management system with RAG, chat widgets, and 
 
 Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, embeddable chat widgets, WhatsApp/Email integration, multiple AI providers (Ollama, OpenAI, Anthropic, Groq, Gemini, xAI).
 
-**Stack:** PHP 8.3/Symfony 7, Vue 3/TypeScript/Vite, Docker Compose, frankenphp/caddy.
+**Stack:** PHP 8.4/Symfony 8.1, Vue 3/TypeScript/Vite, Docker Compose, frankenphp/caddy.
 
 ## Repository Architecture
 
@@ -28,6 +28,48 @@ Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, e
 - **Code, comments, commit messages: ALWAYS English.** Never write German (or any other language) in code or comments.
 - Chat responses: in the language the user chooses.
 
+### Perfect UX & Stability — the product bar (MANDATORY)
+
+Without usability and stability the software is bad, whatever the API does.
+Every plan, sprint file and PR that touches anything a person sees or waits
+for is measured against this bar. It is the merge gate, not a polish pass.
+The binding contract is `_devextras/planning/202609_ux_user_flows.md`
+(rules **U1–U12**); the use-case list that applies it is
+`_devextras/planning/20260913-use-case-research/README.md` §1.
+
+A user-visible change is **done** only when all seven hold:
+
+1. **First run without help.** A new user reaches the result from an empty
+   install guided only by the screen. Every empty state is one sentence plus
+   one primary action (U5). Flag off ⇒ the surface is absent, never a teaser
+   or a dead control (U11).
+2. **Ten-second findability.** Whatever was produced or granted — file,
+   mail, calendar entry, pending approval, run, shared item — the person
+   finds it in ten seconds from where they normally work: badge, sibling
+   inbox (Incoming chats / Approvals pattern), or list filter. Name that path
+   in the plan **before** the first `.vue` (U1, U2, U6).
+3. **Five questions on the open surface.** Who owns this? Who else? What will
+   it touch / what can they do? How do I stop it? Where did it come from?
+   Answered on the resource itself, not only inside a dialog (U7).
+4. **Honest outcome copy.** Every run, job and stream reaches a terminal
+   state with one sentence a non-technical user understands — no HTTP code,
+   no stack trace, a named recovery. When a write was involved, say what did
+   **and did not** happen (U8). Never "Nothing was sent" when something was.
+5. **Undo is a click.** Turn off, revoke, reject, disconnect — from the same
+   row, with the consequence stated in one kind-specific sentence (U3).
+6. **Stability is UX.** No stuck "running", no silent skip, no `setTimeout`
+   race fix, no feature that works only while the tab is open. The full
+   pre-commit gate **and** the named journey walked end to end in the browser
+   (click, type, find, undo — U10) are the proof; a screenshot is not.
+7. **Every theme, every size, every locale.** Light, dark, V2, 320 px, WCAG
+   AA, all five locales in the same PR (U9).
+
+Planning rule (sprint files opened after 2026-09-13): a sprint file with
+an `ota-candidate` step names its journey (§5 of the UX contract) and
+lists the five exit bullets from its §6 before implementation starts.
+Existing files add those bullets when next edited; they are not a
+retroactive merge block. "A listed screen is not a user-flow."
+
 ### Docker Environment
 
 All backend/frontend tooling runs inside containers:
@@ -39,11 +81,18 @@ docker compose exec -T frontend npm run check:types
 
 Prefer the `make` targets (they wrap `docker compose exec` correctly).
 
+The database is **MariaDB, not MySQL** — the `db` container has no `mysql` binary. Use the `mariadb` client with the app credentials from `docker-compose.yml`:
+
+```bash
+docker compose exec -T db mariadb -usynaplan_user -psynaplan_password synaplan -e "SELECT ..."
+```
+
 ### Git — allowed, but NEVER on main
 
 - Git operations (branch, add, commit, push) are allowed.
 - **NEVER** commit or push directly to `main`; never force-push `main` or `master`. All changes go through feature branches + PRs.
 - Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:` — e.g. `feat(frontend): add runtime config API support`.
+- **The commit type is not just style — it drives the release version.** `Cut Release Tag` (`.github/workflows/release-tag.yml`) defaults to `bump: auto`, which reads every commit since the last release tag: any commit whose subject **starts with `feat`** raises the minor version, everything else raises the patch version. Only the start of the subject is matched and the casing is ignored, so `feat:`, `feat(chat):`, `feat!:` and the `Feat/desktop client` shape a squash-merged PR title takes all count alike. A major version is never automatic — it requires explicitly selecting `bump: major`. Getting the type wrong on a feature commit silently ships it as a patch release.
 - **NEVER** add attribution ("Generated with Claude Code", "Co-Authored-By: …", or similar).
 
 ### Merge Conflicts — NEVER Accept One Side Blindly
@@ -53,9 +102,11 @@ Prefer the `make` targets (they wrap `docker compose exec` correctly).
 3. **Preserve ALL functionality** from both branches unless explicitly instructed.
 4. **If unsure, ASK** — throwing away code is worse than asking.
 
-### MANDATORY Pre-Commit Gate — Run Tests BEFORE Every Commit
+### MANDATORY Local CI Gate — Run Tests BEFORE Every Commit / Push
 
-This is the ENFORCED local mirror of the GitHub `CI` workflow — each step maps 1:1 to a CI job, and the `All Checks Passed` gate goes red if you skip one. If any step fails, fix it before committing. No exceptions.
+Do **not** push and wait for GitHub. The `CI` workflow is ~10–15 minutes; a miss costs another full cycle. Run the same jobs locally first. If any step fails, fix it before committing. No exceptions.
+
+#### 1. Unit / static — required before every commit
 
 | Local step | CI job it mirrors |
 | ---------- | ----------------- |
@@ -66,19 +117,44 @@ This is the ENFORCED local mirror of the GitHub `CI` workflow — each step maps
 | `docker compose exec -T frontend npm run check:types` | Frontend (Vue/TypeScript) — vue-tsc |
 | `make -C frontend test` | Frontend (Vue/TypeScript) — Vitest |
 
-**One-shot (this IS the gate — green here ⇒ green CI):**
+```bash
+make ci-local
+# same as:
+# make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
+```
+
+`make ci-local` is **not** full CI. Green here only means the unit/static jobs will pass. Playwright is a separate required job (below).
+
+#### 2. E2E — required before every push / PR
+
+GitHub `All Checks Passed` also requires the Playwright matrix. Run it locally against the running dev stack (`docker compose up -d`, Vite on `:5173`):
+
+| Local step | CI job it mirrors |
+| ---------- | ----------------- |
+| `make test-e2e` | E2E Tests (chromium [1/3] [2/3] [3/3]) — `@ci` suite |
+| `make -C frontend test-e2e-layout` | E2E Tests (chromium Mobile) — when layout / nav / viewport changed |
+| `cd frontend && npm run test:e2e:firefox` | E2E Tests (firefox) — when `@crossbrowser` flows changed |
+| `cd frontend && npm run test:e2e:oidc` / `test:e2e:oidc-redirect` | OIDC jobs — when auth / OIDC changed |
+| `cd frontend && npm run test:e2e:ollama` | E2E Tests (chromium Ollama) — when chat-model / Ollama path changed |
+| `make test-e2e-full` | Same `@ci` suite on the production test image (`:8001`) — when Docker / compose / the shipped `dist/` changed |
+
+**Minimum before every push** that touches frontend, routes, OpenAPI consumed by the UI, Saved Tasks, chat, or auth:
 
 ```bash
-make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
+make ci-local && make test-e2e
 ```
+
+Backend-only PHP with no HTTP/UI contract change may skip Playwright. A selector, i18n, or route miss will **not** show up in Vitest — only in E2E.
+
+Host Playwright once: `make -C frontend deps-host` then `npx playwright install --with-deps`. See `docs/E2E_TESTING.md`.
 
 **Rules:**
 
-- A green FILTERED run (`phpunit --filter ...`, `phpstan analyse <path>`, `vitest <file>`) is NOT the gate — always finish with the unfiltered `make` targets.
+- A green FILTERED run (`phpunit --filter ...`, `phpstan analyse <path>`, `vitest <file>`, `npx playwright test tests/foo.spec.ts`) is NOT the gate — always finish with the unfiltered `make` targets (and `make test-e2e` before push).
 - `make -C backend phpstan` analyses `src/` **and** `tests/` — never scope it to a single path.
-- If you only changed backend PHP, you may skip frontend checks (and vice versa).
+- If you only changed backend PHP, you may skip frontend unit checks (and vice versa). You may **not** skip E2E when the change is user-visible or OpenAPI-facing.
 - If you changed backend OpenAPI annotations: `make -C frontend generate-schemas`, then re-run `vue-tsc`.
-- **NEVER** commit with failing tests.
+- **NEVER** commit with failing tests. **NEVER** use GitHub as the first E2E run.
 
 ### Common pre-commit traps
 
@@ -101,6 +177,10 @@ Real failure modes that have caused red CI more than once:
   ```
 
 - **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults a code path OFF, new logic there passes tests and is still a no-op in prod. Check the `BCONFIG` default and confirm the path is reachable before claiming a fix.
+- **`make ci-local` ≠ green CI.** It does not run Playwright. A page that unit-tests green can still fail `saved-task-roundtrip` or layout. Run `make test-e2e` before push.
+- **GitHub E2E died before any test ran.** If every E2E job fails at `Unable to download artifact` (the `docker-image` tarball), that is Actions infra — re-run the workflow. Do not “fix” product code.
+- **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.62.1-noble` image with `--network host`.
+- **Playwright is headless by default** (`frontend/tests/e2e/playwright.config.ts`). Never set `HEADED=1` or pass `--headed` unless the user explicitly asks to watch the browser. Headed + 4 workers opens a window per worker.
 
 ### Mobile App Compatibility
 
@@ -128,7 +208,10 @@ mobile support a narrow, reviewable compatibility layer:
   `tests/mobile-impact.test.mjs`, and verify with
   `node scripts/mobile-impact.mjs --base <base> --head <head>`.
 - The app release chain starts only when a GitHub release is **published**
-  (`mobile-release-artifacts.yml`); tags alone feed the platform release jobs.
+  (`mobile-release-artifacts.yml`); tags alone feed the platform release jobs. Publishing is no
+  longer a manual click: `release-publish.yml` publishes the draft that `Cut Release Tag` left
+  behind as soon as the CI run for that tag is green, so cutting a tag is in practice the decision
+  to start the chain.
 - Treat these as mobile-risk paths: auth/OAuth and Bearer handling, subscription/IAP and
   entitlement logic, native guards/bootstrap, forced updates, and Capacitor-facing services.
 - Run the complete backend/frontend gate for every affected area. For OpenAPI changes, regenerate
@@ -140,8 +223,9 @@ mobile support a narrow, reviewable compatibility layer:
 
 ```bash
 docker compose up -d / down            # Start/stop services
-make lint && make -C backend phpstan && make test   # Quality gate
-make build                              # Frontend app + widget
+make ci-local                          # Unit/static gate (lint, phpstan, tests, vue-tsc)
+make test-e2e                          # Playwright @ci — required before push
+make build                             # Frontend app + widget
 make help / make -C backend help / make -C frontend help
 
 # Dev URLs
@@ -179,6 +263,44 @@ const config = await httpClient('/api/v1/config/runtime', {
 - The V2 glass design (`frontend/src/style-v2.css`, active via the `.design-v2` class) overrides many tokens/utilities — a surface can look fine in V1 and be broken in V2.
 - See `docs/FRONTEND_CONVENTIONS.md` for the token/utility reference.
 
+### Buttons (MANDATORY)
+
+`.btn-primary` / `.btn-secondary` / `.btn-danger` only set the **color**. They do
+**not** add padding, radius, or type size. A bare `<button class="btn-primary">`
+renders as a rectangular browser button and is unfinished work.
+
+Every clickable button must use a house utility **and** the standard shape:
+
+```html
+<button type="button" class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium">
+```
+
+- Primary action: `btn-primary px-4 py-2.5 rounded-lg` (add `inline-flex items-center gap-2` when there is an icon).
+- Secondary / cancel: `btn-secondary` with the same padding and radius.
+- Destructive: `btn-danger` with the same padding and radius.
+- **Never** a raw `<button>` or `<input type="submit">` without those classes.
+- Match nearby buttons on the same surface — do not invent a one-off size.
+
+### Form controls (MANDATORY)
+
+There is **no global baseline for `input` / `textarea` / `select`** in `style.css`.
+Tailwind v4 preflight strips border, padding and background from form elements, so a
+field carrying only layout classes (`class="mt-1 w-full"`) renders as an invisible,
+borderless, zero-padding box. Exactly like a bare `btn-primary` button, that is
+unfinished work — and it already shipped once across the whole assistants builder.
+
+Every text field, textarea and select must carry the full house chain:
+
+```html
+<input class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" />
+```
+
+- Full-width form field: the chain above (drop `mt-1` when the field is not under a label, use `flex-1 min-w-0` instead of `w-full` inside a row).
+- `px-4 py-2` without `text-sm` is the larger variant used on standalone forms — match the nearby fields, don't invent a size.
+- Add `disabled:opacity-50 disabled:cursor-not-allowed` whenever the control binds `:disabled`.
+- **Do not rely on `style-v2.css` §17b.** It force-feeds a border and background to bare fields in the V2 design only — it supplies no padding or radius, and V1 gets nothing at all. A field that "looks fine" in the default V2 design can be invisible in V1.
+- Only use a token that actually exists. `var(--danger)` is **not defined** — inline error text is `text-sm text-red-600 dark:text-red-400`.
+
 ### Color contrast & theme consistency (MANDATORY)
 
 Every UI surface must be readable in **both light and dark theme** (and in the V2 design variant). Poor contrast is a bug, not a style preference.
@@ -208,17 +330,19 @@ Every UI surface must be readable in **both light and dark theme** (and in the V
 ### i18n
 
 - All UI text through `vue-i18n` — never hardcode user-facing strings.
-- **Always update ALL four locales**: `en.json`, `de.json`, `es.json`, `tr.json` (`frontend/src/i18n/`, registered as `supportedLanguages = ['de', 'en', 'es', 'tr']`). A missing key silently falls back to English.
+- **Always update ALL five locales**: `en.json`, `de.json`, `es.json`, `fr.json`, `tr.json` (`frontend/src/i18n/`, registered as `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`). A missing key silently falls back to English.
+- **This is enforced.** `tests/unit/i18n/localeParity.spec.ts` gates full-file key parity against `localeParityBaseline.json`, a frozen ledger of the drift that predates the gate (`es`/`tr` ~78% translated, `de` ~93%, `fr` 100%). An English-only key added to a namespace fails the suite. The ledger is compared exactly, so it can only shrink: translate a listed key ⇒ delete its ledger entry in the same change. Only add to the ledger for a genuine exception, never to silence the gate.
+- Placeholder names (`{count}`, `{folder}`) must match English in every locale — a dropped one renders as literal text. Plural **branch counts** may differ legitimately (Turkish uses one form after a numeral), so only the placeholder names are compared.
 
 ### UI copy & wording (UX clarity)
 
 User-facing text must be **clean, consistent, and crystal clear for a non-technical user**. Chaotic or contradictory wording is a bug.
 
 - **Write for the average user, not the developer.** No implementation jargon ("interview", "prompt topic", "node") in primary copy.
-- **ONE canonical term per concept**, applied in all four locales:
-  - **chat widget** (short: **widget**) — the embeddable product. (de: *Chat-Widget*, es: *widget de chat*, tr: *sohbet widget'ı*)
-  - **AI assistant** — the AI that answers inside a widget. (de: *KI-Assistent*, es: *asistente de IA*, tr: *AI asistanı*)
-  - **AI Setup Assistant** — the guided chat that configures a widget. (de: *KI-Setup-Assistent*, es: *Asistente de Configuración IA*, tr: *AI Kurulum Asistanı*)
+- **ONE canonical term per concept**, applied in all five locales:
+  - **chat widget** (short: **widget**) — the embeddable product. (de: *Chat-Widget*, es: *widget de chat*, fr: *widget de chat*, tr: *sohbet widget'ı*)
+  - **AI assistant** — the AI that answers inside a widget. (de: *KI-Assistent*, es: *asistente de IA*, fr: *assistant IA*, tr: *AI asistanı*)
+  - **AI Setup Assistant** — the guided chat that configures a widget. (de: *KI-Setup-Assistent*, es: *Asistente de Configuración IA*, fr: *Assistant de configuration IA*, tr: *AI Kurulum Asistanı*)
 - **Copy must be CORRECT.** When renaming a tab/button/route, grep for every string referencing the old name (breadcrumbs, "the 'X' tab") and update them in the same change.
 
 ### Widget Development
@@ -280,6 +404,7 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 
 ### Project-Specific Patterns
 
+- **Optional features are `FeatureModule`s** — never add a bare `isEnabled()` + status block again. Declare the module in `backend/src/Module/`, list its decisive env in `backend/.env.minimal` and `docker-compose.minimal.yml`, and let the registry drive feature status, runtime config, and the gate 404.
 - **Internal prompts** (not selectable by AI classification) MUST use the `tools:` prefix in `topic` (e.g. `tools:memory_extraction`). `MessageSorter` excludes them via `excludeTools: true`. A user-facing prompt without the prefix WILL be selected by the AI.
 - **Memory badges**: AI responses reference memories as `[Memory:ID]`. Only use IDs from the current memory list in the system prompt — never copy from earlier chat messages, never invent IDs. `MessageText.vue` renders the badges.
 - **Feedback categories** `feedback_negative` / `feedback_positive` / `feedback_false_positive` are hidden from the user memory list, used internally.
@@ -301,12 +426,19 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 - Business logic or EntityManager work in a controller
 - Hardcoded user-facing strings (use `$t()`) or hardcoded AI model names (use `ModelRepository`)
 - Tailwind colors / custom CSS instead of `style.css` tokens
+- A raw or `btn-primary`-only button (missing `px-4 py-2.5 rounded-lg`)
+- An `input` / `textarea` / `select` with layout classes only (missing `px-3 py-2 rounded-lg surface-card border … txt-primary`)
+- An interactive utility (`.pill`, `.btn-*`, `.icon-ghost`) used for a static, non-clickable badge
 - `setTimeout()` to "fix" race conditions
 - German (or non-English) code comments
 - Committing to `main`, or committing with AI attribution
 - `doctrine:schema:update --force` on a shared DB (generate a migration instead)
 - Internal prompt without `tools:` prefix; invented Memory IDs
 - Hardcoded API URL in the widget (use `detectApiUrl()`)
+- A user-visible feature whose result the other person cannot find in ten seconds; an empty state without a next action; a "coming soon" control behind a flag
+- "Request failed" / a raw API error shown to a user; a write action whose copy does not say what did and did not happen
+- A run or stream that can end in a non-terminal state ("running" forever, silently skipped step)
+- A UI PR without the named journey walked in the browser (screenshot ≠ walk)
 - `console.log` debugging left in; `any` types
 
 ## Boundaries

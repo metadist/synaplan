@@ -84,6 +84,28 @@ class FileGenerationEnvelopeTest extends TestCase
         $this->assertTrue(FileGenerationEnvelope::hasSignature($reply));
     }
 
+    public function testExtractsOptionalPdfExportKey(): void
+    {
+        $data = FileGenerationEnvelope::extract(
+            '{"BFILEPATH":"report.docx","BFILETEXT":"# Title","BEXPORT":"pdf"}'
+        );
+
+        $this->assertNotNull($data);
+        $this->assertSame('report.docx', $data['filename']);
+        $this->assertSame('docx', $data['extension']);
+        $this->assertSame('pdf', $data['export']);
+    }
+
+    public function testIgnoresUnknownExportTarget(): void
+    {
+        $data = FileGenerationEnvelope::extract(
+            '{"BFILEPATH":"report.docx","BFILETEXT":"# Title","BEXPORT":"html"}'
+        );
+
+        $this->assertNotNull($data);
+        $this->assertArrayNotHasKey('export', $data);
+    }
+
     public function testSignatureRequiresBothFileEnvelopeKeys(): void
     {
         $this->assertFalse(FileGenerationEnvelope::hasSignature('Plain prose'));

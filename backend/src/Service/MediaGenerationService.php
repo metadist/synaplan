@@ -13,6 +13,7 @@ use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -39,9 +40,13 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
      * /api/v1/media/generate and /api/v1/media/video/start. Used as the
      * fallback validation set when a model does not declare its own
      * `allowed_resolutions`, so we never forward arbitrary caller input
-     * (e.g. "8K") to a provider.
+     * (e.g. "8K") to a provider. Sourced from the mediamaker capability's
+     * parameter schema ({@see SystemCapabilityRegistry}) — the single place
+     * this enum is declared — so it cannot drift from
+     * {@see Message\MessageSorter::SUPPORTED_VIDEO_RESOLUTIONS}
+     * or {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema}.
      */
-    private const SUPPORTED_VIDEO_RESOLUTIONS = ['720p', '1080p', '4K'];
+    private const SUPPORTED_VIDEO_RESOLUTIONS = SystemCapabilityRegistry::MEDIAMAKER_VIDEO_RESOLUTIONS;
     private const VIDEO_JOB_TTL_SECONDS = 1200;
 
     public function __construct(

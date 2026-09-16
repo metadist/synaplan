@@ -39,6 +39,10 @@ final readonly class SkillDescriptor
      *                                                                                  dynamic note expands to something — a dynamic block with
      *                                                                                  nothing to offer (no connected servers, topic not
      *                                                                                  entitled) stays invisible to the planner entirely
+     * @param (\Closure(): bool)|null                              $available           install-level precondition of the block (an external
+     *                                                                                  engine that must be configured); when it returns false
+     *                                                                                  the capability is OMITTED like a disabled flag, so the
+     *                                                                                  planner never plans work the install cannot run
      */
     public function __construct(
         public Capability $capability,
@@ -47,6 +51,12 @@ final readonly class SkillDescriptor
         public ?string $enabledFlag = null,
         public bool $enabledDefault = false,
         public bool $requiresDynamicNote = false,
+        public ?\Closure $available = null,
     ) {
+    }
+
+    public function isAvailable(): bool
+    {
+        return null === $this->available || true === ($this->available)();
     }
 }

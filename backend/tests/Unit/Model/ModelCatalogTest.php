@@ -7,17 +7,18 @@ namespace App\Tests\Unit\Model;
 use App\Model\ModelCatalog;
 use App\Service\CostCalculationService;
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class ModelCatalogTest extends TestCase
 {
     public function testFindByServiceAndProviderId(): void
     {
-        $results = ModelCatalog::find('groq:llama-3.3-70b-versatile');
+        $results = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat');
 
         $this->assertNotEmpty($results);
         $this->assertSame('Groq', $results[0]['service']);
-        $this->assertSame('llama-3.3-70b-versatile', $results[0]['providerId']);
+        $this->assertSame('qwen/qwen3.6-27b', $results[0]['providerId']);
     }
 
     /**
@@ -33,11 +34,25 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('huggingface', ModelCatalog::normalizeProvider('huggingface'));
     }
 
+    public function testCollapseCountsByProviderMergesAliasSpellings(): void
+    {
+        $merged = ModelCatalog::collapseCountsByProvider([
+            'huggingface' => ['active' => 2, 'total' => 4],
+            'hugging face' => ['active' => 1, 'total' => 1],
+            'openai' => ['active' => 3, 'total' => 3],
+        ]);
+
+        $this->assertSame([
+            'huggingface' => ['active' => 3, 'total' => 5],
+            'openai' => ['active' => 3, 'total' => 3],
+        ], $merged);
+    }
+
     public function testFindIsCaseInsensitive(): void
     {
-        $lower = ModelCatalog::find('groq:llama-3.3-70b-versatile');
-        $upper = ModelCatalog::find('GROQ:LLAMA-3.3-70B-VERSATILE');
-        $mixed = ModelCatalog::find('Groq:Llama-3.3-70b-Versatile');
+        $lower = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat');
+        $upper = ModelCatalog::find('GROQ:QWEN/QWEN3.6-27B:CHAT');
+        $mixed = ModelCatalog::find('Groq:Qwen/Qwen3.6-27b:Chat');
 
         $this->assertSame($lower, $upper);
         $this->assertSame($lower, $mixed);
@@ -108,10 +123,157 @@ class ModelCatalogTest extends TestCase
         $this->assertCount(count(array_unique($ids)), $ids);
     }
 
+    public function testRerankRowsAreSeededUnselectableWithoutADefaultBinding(): void
+    {
+        $this->assertSame('rerank', ModelCatalog::CAPABILITY_TAGS['RERANK']);
+        $this->assertSame(344, ModelCatalog::findBidByKey('openaicompatible:baai/bge-reranker-v2-m3:rerank'));
+        $this->assertSame(345, ModelCatalog::findBidByKey('jina:jina-reranker-v2-base-multilingual:rerank'));
+        $this->assertSame(346, ModelCatalog::findBidByKey('cohere:rerank-v3.5:rerank'));
+        $this->assertSame(347, ModelCatalog::findBidByKey('voyage:rerank-2:rerank'));
+        foreach (ModelCatalog::all() as $row) {
+            if ('rerank' !== $row['tag']) {
+                continue;
+            }
+            $this->assertSame(0, $row['selectable']);
+            $this->assertSame(1, $row['active']);
+        }
+    }
+
+    public function testJinaRerankerCarriesJinasCurrentRate(): void
+    {
+        // $0.05/1M input tokens since Jina's May 2025 increase (api.jina.ai/v1/models,
+        // read 2026-09-10). The old $0.02 sat in the catalog for months because the
+        // drift check compared against LiteLLM, which lists yet another value.
+        $row = ModelCatalog::find('jina:jina-reranker-v2-base-multilingual:rerank')[0];
+
+        $this->assertSame(0.05, $row['priceIn']);
+        $this->assertSame('per1M', $row['inUnit']);
+        $this->assertSame(0, $row['priceOut']);
+        $this->assertSame('-', $row['outUnit']);
+    }
+
+    /**
+     * LITELLM_DEVIATIONS silences a verified LiteLLM error in the daily drift
+     * check. An entry is only meaningful while (a) the row it names exists and
+     * (b) the pinned LiteLLM value actually differs from the catalog — an entry
+     * that equals the catalog would silence nothing and hide a real drift later.
+     */
+    public function testLitellmDeviationsPointAtLiveRowsAndDifferFromTheCatalog(): void
+    {
+        $deviations = ModelCatalog::litellmDeviations();
+
+        // An empty registry is the healthy state: LiteLLM agrees with every
+        // catalog price, so there is nothing to silence. This keeps the key
+        // format guarded for whatever the registry records next.
+        $this->assertSame(
+            array_keys($deviations),
+            array_values(array_filter(
+                array_keys($deviations),
+                static fn (string $key): bool => str_contains($key, ':'),
+            )),
+            'every LITELLM_DEVIATIONS key must read "<normalized service>:<providerId>"',
+        );
+
+        foreach ($deviations as $key => $entry) {
+            [$service, $providerId] = explode(':', $key, 2);
+
+            $rows = array_values(array_filter(
+                ModelCatalog::all(),
+                static fn (array $row): bool => ModelCatalog::normalizeProvider($row['service']) === $service
+                    && $row['providerId'] === $providerId
+                    && 1 === $row['active'],
+            ));
+            $this->assertNotEmpty($rows, "LITELLM_DEVIATIONS[$key] names no active catalog row");
+            $this->assertSame($key, ModelCatalog::litellmDeviationKey($rows[0]['service'], $rows[0]['providerId']));
+
+            foreach (['litellm_in', 'litellm_out', 'source', 'verifiedOn', 'reason'] as $field) {
+                $this->assertArrayHasKey($field, $entry, "LITELLM_DEVIATIONS[$key] lacks '$field'");
+            }
+            $this->assertStringStartsWith('https://', $entry['source'], "LITELLM_DEVIATIONS[$key]: source must be a URL the next person can open");
+            $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $entry['verifiedOn'], "LITELLM_DEVIATIONS[$key]: verifiedOn must be YYYY-MM-DD");
+            $this->assertNotSame('', trim($entry['reason']), "LITELLM_DEVIATIONS[$key]: reason must say what LiteLLM got wrong");
+
+            foreach ($rows as $row) {
+                $pricingMode = $row['json']['pricing_mode'] ?? 'per_token';
+                $this->assertArrayNotHasKey(
+                    'resolution_prices',
+                    $row['json'],
+                    "LITELLM_DEVIATIONS[$key]: tiered rows are compared per tier and cannot be pinned",
+                );
+
+                [$catalogIn, $catalogOut] = 'per_token' === $pricingMode
+                    ? [(float) $row['priceIn'], (float) $row['priceOut']]
+                    : [
+                        CostCalculationService::normaliseToPerUnit((float) $row['priceIn'], $row['inUnit']),
+                        CostCalculationService::normaliseToPerUnit((float) $row['priceOut'], $row['outUnit']),
+                    ];
+
+                $this->assertTrue(
+                    abs($catalogIn - $entry['litellm_in']) > 1e-9 || abs($catalogOut - $entry['litellm_out']) > 1e-9,
+                    "LITELLM_DEVIATIONS[$key] pins the catalog's own price — the entry silences nothing; delete it",
+                );
+            }
+        }
+    }
+
+    /**
+     * On a row with `resolution_prices` billing charges from the tier table and
+     * `priceOut` is only its fallback. The drift check therefore compares the
+     * tiers and skips the headline — which is safe only while the headline IS one
+     * of the tiers (LiteLLM's base = cheapest tier, ours = default render; both
+     * conventions are fine, an invented number is not).
+     */
+    public function testResolutionTieredRowsUseOneOfTheirOwnTiersAsHeadline(): void
+    {
+        $seen = 0;
+
+        foreach (ModelCatalog::all() as $row) {
+            $tiers = $row['json']['resolution_prices'] ?? null;
+            if (!is_array($tiers)) {
+                continue;
+            }
+            ++$seen;
+
+            $matches = array_filter($tiers, static fn ($price): bool => abs((float) $price - (float) $row['priceOut']) < 1e-9);
+            $this->assertNotEmpty(
+                $matches,
+                sprintf('BID %d: priceOut %s is none of its resolution_prices (%s)', $row['id'], $row['priceOut'], json_encode($tiers)),
+            );
+        }
+
+        $this->assertGreaterThan(0, $seen, 'expected at least one resolution-tiered row');
+    }
+
+    public function testUpsertDoesNotOverwriteSelectableOnExistingRerankRow(): void
+    {
+        $model = null;
+        foreach (ModelCatalog::all() as $row) {
+            if ('rerank' === $row['tag']) {
+                $model = $row;
+                break;
+            }
+        }
+        $this->assertNotNull($model);
+
+        $connection = $this->createMock(Connection::class);
+        // @phpstan-ignore-next-line
+        $connection
+            ->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                $this->logicalAnd(
+                    $this->stringContains('INSERT INTO BMODELS'),
+                    $this->logicalNot($this->stringContains('BSELECTABLE = VALUES(BSELECTABLE)'))
+                )
+            );
+
+        ModelCatalog::upsert($connection, $model);
+    }
+
     public function testUpsertCallsExecuteStatement(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         // @phpstan-ignore-next-line
         $connection
@@ -125,24 +287,124 @@ class ModelCatalogTest extends TestCase
         ModelCatalog::upsert($connection, $model);
     }
 
-    public function testRemoveCallsDeleteById(): void
+    public function testEnableInsertsMissingModel(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $connection->method('fetchOne')->willReturn(false);
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         // @phpstan-ignore-next-line
         $connection
             ->expects($this->once())
             ->method('executeStatement')
-            ->with('DELETE FROM BMODELS WHERE BID = ?', [$model['id']]);
+            ->with($this->stringContains('INSERT INTO BMODELS'));
 
-        ModelCatalog::remove($connection, $model);
+        ModelCatalog::enable($connection, $model);
+    }
+
+    public function testEnableExistingModelRestoresVisibilityFlagsToCatalogValues(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn('42');
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
+
+        // Only the operator-owned visibility flags are written — an admin's
+        // price or name edits must survive an enable like they survive a re-seed.
+        // @phpstan-ignore-next-line
+        $connection
+            ->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                'UPDATE BMODELS SET BACTIVE = ?, BSELECTABLE = ? WHERE BID = ?',
+                [$model['active'], $model['selectable'], $model['id']]
+            );
+
+        ModelCatalog::enable($connection, $model);
+    }
+
+    /**
+     * Disabling must never DELETE: BMESSAGES references the BID, and
+     * ModelSeeder re-inserts any absent catalog row on the next container
+     * start — which is exactly how the old DELETE-based disable silently
+     * reverted itself.
+     */
+    public function testDisableDeactivatesExistingRowWithoutDeleting(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn('42');
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
+
+        // @phpstan-ignore-next-line
+        $connection
+            ->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                'UPDATE BMODELS SET BACTIVE = 0, BSELECTABLE = 0 WHERE BID = ?',
+                [$model['id']]
+            );
+
+        ModelCatalog::disable($connection, $model);
+    }
+
+    public function testDisableInsertsMissingRowSoTheDeactivationSurvivesReseed(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn(false);
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
+
+        $statements = [];
+        $connection->method('executeStatement')
+            ->willReturnCallback(static function (string $sql) use (&$statements): int {
+                $statements[] = $sql;
+
+                return 1;
+            });
+
+        ModelCatalog::disable($connection, $model);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString('INSERT INTO BMODELS', $statements[0]);
+        $this->assertStringContainsString('UPDATE BMODELS SET BACTIVE = 0, BSELECTABLE = 0', $statements[1]);
+        foreach ($statements as $sql) {
+            $this->assertStringNotContainsString('DELETE', $sql);
+        }
+    }
+
+    public function testFindByServiceMatchesCaseInsensitivelyAndCollapsesAliases(): void
+    {
+        $lower = ModelCatalog::findByService('groq');
+        $upper = ModelCatalog::findByService('  GROQ ');
+
+        $this->assertNotEmpty($lower);
+        $this->assertSame($lower, $upper);
+        $this->assertSame(['Groq'], array_unique(array_column($lower, 'service')));
+
+        // The 'Hugging Face' alias must resolve like the canonical name (#1313).
+        $this->assertSame(
+            ModelCatalog::findByService('huggingface'),
+            ModelCatalog::findByService('Hugging Face')
+        );
+
+        $this->assertSame([], ModelCatalog::findByService('skynet'));
+    }
+
+    public function testServiceNamesAreKeyedByNormalizedName(): void
+    {
+        $names = ModelCatalog::serviceNames();
+
+        $this->assertSame('Groq', $names['groq']);
+        $this->assertSame('OpenAI', $names['openai']);
+        $this->assertSame('Ollama', $names['ollama']);
+
+        foreach (array_keys($names) as $key) {
+            $this->assertSame(ModelCatalog::normalizeProvider($key), $key);
+        }
     }
 
     public function testUpsertSqlDoesNotOverwriteOperatorOwnedFields(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         // @phpstan-ignore-next-line
         $connection
@@ -194,6 +456,197 @@ class ModelCatalogTest extends TestCase
         $this->assertNull(ModelCatalog::findBidByKey('nonexistent:provider:chat'));
     }
 
+    /**
+     * GPT-6 Astra — OpenAI flagship added 2026-09-04. Chat + vision share the
+     * same upstream id, official $10/$50 per-1M pricing, $1/1M cached input,
+     * and the >272k long-context 2x/1.5x tier via CONTEXT_PRICING.
+     */
+    public function testGpt6AstraModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $astra = ModelCatalog::find('openai:gpt-6-astra');
+
+        $this->assertCount(2, $astra, 'Expected gpt-6-astra chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($astra, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6-astra:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6-astra:pic2text'));
+        $this->assertNull(ModelCatalog::findBidByKey('openai:gpt-6-astra'));
+
+        foreach ($astra as $variant) {
+            $this->assertSame('OpenAI', $variant['service']);
+            $this->assertSame('gpt-6-astra', $variant['providerId']);
+            $this->assertSame('gpt-6-astra', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(50.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(1.0, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('responses', $variant['json']['meta']['api'] ?? null);
+            $this->assertSame('1050000', $variant['json']['meta']['context_window'] ?? null);
+            $this->assertContains('reasoning', $variant['json']['features'] ?? []);
+        }
+
+        $chat = ModelCatalog::find('openai:gpt-6-astra:chat')[0];
+        $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+        $this->assertSame('medium', $chat['json']['meta']['reasoning_effort_default'] ?? null);
+
+        $tier = ModelCatalog::contextPricing('gpt-6-astra');
+        $this->assertNotNull($tier);
+        $this->assertSame(272000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(20.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(75.0, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(2.0, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * Official cached-input rates per 1M tokens, verified against
+     * https://developers.openai.com/api/docs/pricing and
+     * https://ai.google.dev/gemini-api/docs/pricing on 2026-09-04.
+     *
+     * Every one of these reads at 0.1x the input rate. CostCalculationService
+     * falls back to 50% when a row authors nothing, which over-billed cached
+     * tokens 5x across the whole GPT-5+ and Gemini Pro lineup — so an explicit
+     * price on each row is what keeps billing correct, not a nice-to-have.
+     *
+     * @return array<string, array{0: string, 1: float}>
+     */
+    public static function cachedInputRateProvider(): array
+    {
+        return [
+            'gpt-6-astra' => ['openai:gpt-6-astra', 1.00],
+            'gpt-5.6-sol' => ['openai:gpt-5.6-sol', 0.40],
+            'gpt-5.6-terra' => ['openai:gpt-5.6-terra', 0.20],
+            'gpt-5.6-luna' => ['openai:gpt-5.6-luna', 0.02],
+            'gpt-5.5' => ['openai:gpt-5.5', 0.50],
+            'gpt-5.4' => ['openai:gpt-5.4', 0.25],
+            'gpt-5.4-mini' => ['openai:gpt-5.4-mini', 0.075],
+            'gpt-5.4-nano' => ['openai:gpt-5.4-nano', 0.02],
+            'gemini-2.5-pro' => ['google:gemini-2.5-pro', 0.125],
+            'gemini-3.1-pro' => ['google:gemini-3.1-pro-preview', 0.20],
+            'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
+            'gemini-3.7-flash' => ['google:gemini-3.7-flash', 0.075],
+            'gemini-3.6-flash' => ['google:gemini-3.6-flash', 0.075],
+            'gemini-3.5-flash-lite' => ['google:gemini-3.5-flash-lite', 0.03],
+        ];
+    }
+
+    #[DataProvider('cachedInputRateProvider')]
+    public function testCachedInputRateIsAuthoredOnEveryVariant(string $key, float $expected): void
+    {
+        $variants = ModelCatalog::find($key);
+        $this->assertNotEmpty($variants, "No catalog rows for {$key}");
+
+        foreach ($variants as $variant) {
+            $authored = $variant['json']['cache_read_price_per_1M'] ?? null;
+            $this->assertNotNull(
+                $authored,
+                sprintf('%s (%s) authors no cache_read_price_per_1M and would fall back to 50%%', $key, $variant['tag']),
+            );
+            $this->assertEqualsWithDelta($expected, (float) $authored, 1e-9);
+        }
+    }
+
+    /**
+     * Every provider that raises input and output above a context threshold
+     * raises the cached-input rate with it, always to exactly 2x the short-context
+     * rate.
+     *
+     * Both halves are required. A tiered row that authors no base cache rate
+     * silently falls back to the 50% default discount, and a tier that omits
+     * `cache_price_in_above` keeps charging the short-context cache rate on a
+     * long-context request. Models without a cached-input discount (gpt-5.5-pro)
+     * satisfy this by stating their plain input rate on both sides.
+     */
+    public function testLongContextTiersDoubleTheCachedInputRate(): void
+    {
+        $providerIds = array_unique(array_column(ModelCatalog::all(), 'providerId'));
+
+        $checked = 0;
+        foreach ($providerIds as $providerId) {
+            $tier = ModelCatalog::contextPricing($providerId);
+            if (null === $tier) {
+                continue;
+            }
+
+            $rows = array_values(array_filter(
+                ModelCatalog::all(),
+                static fn (array $row): bool => $row['providerId'] === $providerId,
+            ));
+            $baseCache = $rows[0]['json']['cache_read_price_per_1M'] ?? null;
+
+            $this->assertNotNull(
+                $baseCache,
+                sprintf('%s has a long-context tier but authors no cache-read rate', $providerId),
+            );
+            $this->assertArrayHasKey(
+                'cache_price_in_above',
+                $tier,
+                sprintf('%s caches reads but its long-context tier does not raise the cache rate', $providerId),
+            );
+            $this->assertEqualsWithDelta(
+                2 * (float) $baseCache,
+                $tier['cache_price_in_above'],
+                1e-9,
+                sprintf('%s long-context cache rate should be 2x the short-context rate', $providerId),
+            );
+            ++$checked;
+        }
+
+        $this->assertGreaterThan(0, $checked, 'Expected at least one tiered model with a cache rate');
+    }
+
+    /**
+     * gpt-5.5-pro is the one catalog model OpenAI ships without a cached-input
+     * discount. "No discount" is expressed as the FULL input rate on every row
+     * and at the long-context tier, never as a missing key: an absent rate hands
+     * billing to CostCalculationService's 50% fallback, which would halve the
+     * bill on any payload that reports cached tokens.
+     */
+    public function testGpt55ProAuthorsCachedInputAtTheFullRate(): void
+    {
+        $rows = ModelCatalog::find('openai:gpt-5.5-pro');
+        $this->assertCount(2, $rows, 'Expected gpt-5.5-pro chat + vision variants');
+
+        foreach ($rows as $row) {
+            $this->assertEqualsWithDelta(
+                (float) $row['priceIn'],
+                (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0),
+                1e-9,
+                sprintf('gpt-5.5-pro (%s) must bill cached tokens at the plain input rate', $row['tag']),
+            );
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-5.5-pro');
+        $this->assertNotNull($tier);
+        $this->assertEqualsWithDelta($tier['price_in_above'], $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * The 1.25x cache-write charge starts with GPT-5.6; GPT-5.5 and earlier incur
+     * "no additional cache-write charge". Authoring the multiplier on the wrong
+     * row silently over-bills, so pin which rows carry it.
+     */
+    public function testCacheWriteMultiplierIsAuthoredOnlyForChargingFamilies(): void
+    {
+        $charging = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
+
+        foreach (ModelCatalog::all() as $row) {
+            $authored = $row['json']['cache_write_multiplier'] ?? null;
+
+            if (in_array($row['providerId'], $charging, true)) {
+                $this->assertEqualsWithDelta(1.25, (float) $authored, 1e-9, sprintf(
+                    '%s (%s) must bill cache writes at 1.25x',
+                    $row['providerId'],
+                    $row['tag'],
+                ));
+                continue;
+            }
+
+            $this->assertNull($authored, sprintf(
+                '%s (%s) authors a cache-write multiplier but is not billed for cache writes',
+                $row['providerId'],
+                $row['tag'],
+            ));
+        }
+    }
+
     public function testGpt55ModelsAreAvailableWithExpectedApiIds(): void
     {
         $gpt55 = ModelCatalog::find('openai:gpt-5.5');
@@ -232,6 +685,33 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Claude Fable 5.1 — successor to Fable 5 at the same input/output price.
+     * Cache reads are priced at a quarter of Fable 5's implicit rate
+     * (0.25 vs the 1.0 = 10 * 0.1 the Anthropic-wide discount would otherwise
+     * apply), so the catalog carries an explicit `cache_read_price_per_1M`
+     * override that CostCalculationService::getPriceSnapshot() picks up
+     * ahead of the per-provider discount.
+     */
+    public function testClaudeFable51ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $fable51 = ModelCatalog::find('anthropic:claude-fable-5-1');
+
+        $this->assertCount(2, $fable51, 'Expected claude-fable-5-1 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($fable51, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-fable-5-1:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-fable-5-1:pic2text'));
+
+        foreach ($fable51 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-fable-5-1', $variant['providerId']);
+            $this->assertSame('claude-fable-5-1', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(50.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.25, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+    }
+
+    /**
      * Sonnet 5 also backs the MEM-tagged memory-extraction row (BID 222), so the
      * bare `service:providerId` key resolves to three variants — capability
      * bindings must therefore always use the tag-qualified key.
@@ -257,36 +737,153 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * TrustedTokens (TNG, Germany) — three chat models + one Qwen vision row.
-     * Prices are USD/1M from https://trustedtokens.eu/api/billing/models
-     * (snapshot 2026-07-27). Provider ids keep the upstream org/name form.
+     * TrustedTokens (TNG, Germany) — chat + vision rows from
+     * https://trustedtokens.eu/api/billing/models (re-verified 2026-09-08;
+     * prices unchanged from the 2026-08-29 snapshot except BID 335 retired).
+     * Provider ids keep the upstream org/name form. Prices are USD/1M.
      */
     public function testTrustedTokensModelsAreAvailableWithExpectedApiIds(): void
     {
         $glm = ModelCatalog::find('trustedtokens:zai-org/glm-5.2:chat');
+        $glm53 = ModelCatalog::find('trustedtokens:zai-org/glm-5.3:chat');
+        $glm53Flash = ModelCatalog::find('trustedtokens:zai-org/glm-5.3-flash:chat');
+        $glm53FlashVision = ModelCatalog::find('trustedtokens:zai-org/glm-5.3-flash:pic2text');
+        $chimera = ModelCatalog::find('trustedtokens:tngtech/deepseek-tng-r1t2-chimera:chat');
+        $v4Flash = ModelCatalog::find('trustedtokens:deepseek-ai/deepseek-v4-flash:chat');
+        $v4Flash0731 = ModelCatalog::find('trustedtokens:deepseek-ai/deepseek-v4-flash-0731:chat');
+        $v4Pro = ModelCatalog::find('trustedtokens:deepseek-ai/deepseek-v4-pro-0813:chat');
         $qwenChat = ModelCatalog::find('trustedtokens:qwen/qwen3.6-35b-a3b-fp8:chat');
         $qwenVision = ModelCatalog::find('trustedtokens:qwen/qwen3.6-35b-a3b-fp8:pic2text');
         $gptOss = ModelCatalog::find('trustedtokens:openai/gpt-oss-120b:chat');
 
         $this->assertCount(1, $glm);
+        $this->assertCount(1, $glm53);
+        $this->assertCount(1, $glm53Flash);
+        $this->assertCount(1, $glm53FlashVision);
+        $this->assertCount(1, $chimera);
+        $this->assertCount(1, $v4Flash);
+        $this->assertCount(1, $v4Flash0731);
+        $this->assertCount(1, $v4Pro);
         $this->assertCount(1, $qwenChat);
         $this->assertCount(1, $qwenVision);
         $this->assertCount(1, $gptOss);
 
+        $this->assertSame(331, $glm53[0]['id']);
         $this->assertSame('zai-org/GLM-5.2', $glm[0]['providerId']);
+        $this->assertSame('zai-org/GLM-5.3', $glm53[0]['providerId']);
+        $this->assertSame('zai-org/GLM-5.3-Flash', $glm53Flash[0]['providerId']);
+        $this->assertSame('zai-org/GLM-5.3-Flash', $glm53FlashVision[0]['providerId']);
+        $this->assertSame('tngtech/DeepSeek-TNG-R1T2-Chimera', $chimera[0]['providerId']);
+        $this->assertSame('deepseek-ai/DeepSeek-V4-Flash', $v4Flash[0]['providerId']);
+        $this->assertSame(335, $v4Flash[0]['id']);
+        $this->assertSame(0, $v4Flash[0]['active']);
+        $this->assertSame(0, $v4Flash[0]['selectable']);
+        $this->assertTrue(ModelCatalog::isRetired(335));
+        $this->assertSame(336, ModelCatalog::successorBid(335));
+        $this->assertSame('deepseek-ai/DeepSeek-V4-Flash-0731', $v4Flash0731[0]['providerId']);
+        $this->assertSame(1, $v4Flash0731[0]['active']);
+        $this->assertSame(1, $v4Flash0731[0]['selectable']);
+        $this->assertSame('deepseek-ai/DeepSeek-V4-Pro-0813', $v4Pro[0]['providerId']);
         $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $qwenChat[0]['providerId']);
         $this->assertSame('openai/gpt-oss-120b', $gptOss[0]['providerId']);
 
         $this->assertEqualsWithDelta(1.50, (float) $glm[0]['priceIn'], 1e-9);
         $this->assertEqualsWithDelta(4.50, (float) $glm[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(1.50, (float) $glm53[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(4.50, (float) $glm53[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $glm53Flash[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $glm53Flash[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $glm53FlashVision[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $glm53FlashVision[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(1.00, (float) $chimera[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(3.00, (float) $chimera[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $v4Flash[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $v4Flash[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $v4Flash0731[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $v4Flash0731[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(2.25, (float) $v4Pro[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(6.75, (float) $v4Pro[0]['priceOut'], 1e-9);
         $this->assertEqualsWithDelta(0.25, (float) $qwenChat[0]['priceIn'], 1e-9);
         $this->assertEqualsWithDelta(1.50, (float) $qwenChat[0]['priceOut'], 1e-9);
         $this->assertEqualsWithDelta(0.15, (float) $gptOss[0]['priceIn'], 1e-9);
         $this->assertEqualsWithDelta(0.60, (float) $gptOss[0]['priceOut'], 1e-9);
 
-        foreach ([$glm[0], $qwenChat[0], $qwenVision[0], $gptOss[0]] as $row) {
+        // Cache-read pricing for EVERY new row — a drift in any of them would
+        // silently mischarge cached tokens (Chimera's 0.20 is the only
+        // distinct value and the most drift-prone).
+        $this->assertEqualsWithDelta(0.30, (float) ($glm53[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.03, (float) ($glm53Flash[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.03, (float) ($glm53FlashVision[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.20, (float) ($chimera[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.03, (float) ($v4Flash[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.03, (float) ($v4Flash0731[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.45, (float) ($v4Pro[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+
+        $rows = [
+            $glm[0], $glm53[0], $glm53Flash[0], $glm53FlashVision[0],
+            $chimera[0], $v4Flash[0], $v4Flash0731[0], $v4Pro[0],
+            $qwenChat[0], $qwenVision[0], $gptOss[0],
+        ];
+        foreach ($rows as $row) {
             $this->assertSame('TrustedTokens', $row['service']);
             $this->assertSame('DE', $row['json']['meta']['jurisdiction'] ?? null);
+        }
+    }
+
+    /**
+     * A2Agent — Chinese frontier models via the a2agent.me gateway (BIDs 361–366).
+     * Model ids are case-sensitive; MiniMax is the mixed-case exception
+     * (`MiniMax-M3`). Prices are USD/1M public group rates from the 2026-09-11
+     * snapshot. Jurisdiction is CN.
+     */
+    public function testA2AgentModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $qwenMax = ModelCatalog::find('a2agent:qwen3.8-max:chat');
+        $v4Pro = ModelCatalog::find('a2agent:deepseek-v4-pro:chat');
+        $v4Flash = ModelCatalog::find('a2agent:deepseek-v4-flash:chat');
+        $minimax = ModelCatalog::find('a2agent:minimax-m3:chat'); // catalog id is MiniMax-M3; lookup is case-insensitive
+        $qwenFlash = ModelCatalog::find('a2agent:qwen3.8-flash:chat');
+        $qwenVision = ModelCatalog::find('a2agent:qwen3.8-flash:pic2text');
+
+        $this->assertCount(1, $qwenMax);
+        $this->assertCount(1, $v4Pro);
+        $this->assertCount(1, $v4Flash);
+        $this->assertCount(1, $minimax);
+        $this->assertCount(1, $qwenFlash);
+        $this->assertCount(1, $qwenVision);
+
+        $this->assertSame(361, $qwenMax[0]['id']);
+        $this->assertSame(362, $v4Pro[0]['id']);
+        $this->assertSame(363, $v4Flash[0]['id']);
+        $this->assertSame(364, $minimax[0]['id']);
+        $this->assertSame(365, $qwenFlash[0]['id']);
+        $this->assertSame(366, $qwenVision[0]['id']);
+
+        $this->assertSame('qwen3.8-max', $qwenMax[0]['providerId']);
+        $this->assertSame('deepseek-v4-pro', $v4Pro[0]['providerId']);
+        $this->assertSame('deepseek-v4-flash', $v4Flash[0]['providerId']);
+        $this->assertSame('MiniMax-M3', $minimax[0]['providerId']);
+        $this->assertSame('qwen3.8-flash', $qwenFlash[0]['providerId']);
+        $this->assertSame('qwen3.8-flash', $qwenVision[0]['providerId']);
+
+        $this->assertEqualsWithDelta(2.00, (float) $qwenMax[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(6.00, (float) $qwenMax[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.435, (float) $v4Pro[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.87, (float) $v4Pro[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.14, (float) $v4Flash[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.28, (float) $v4Flash[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $minimax[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(1.20, (float) $minimax[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $qwenFlash[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.47, (float) $qwenFlash[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $qwenVision[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.47, (float) $qwenVision[0]['priceOut'], 1e-9);
+
+        $rows = [$qwenMax[0], $v4Pro[0], $v4Flash[0], $minimax[0], $qwenFlash[0], $qwenVision[0]];
+        foreach ($rows as $row) {
+            $this->assertSame('A2Agent', $row['service']);
+            $this->assertSame('CN', $row['json']['meta']['jurisdiction'] ?? null);
+            $this->assertSame('a2agent.me', $row['json']['meta']['host'] ?? null);
         }
     }
 
@@ -303,6 +900,62 @@ class ModelCatalogTest extends TestCase
             $this->assertSame('claude-opus-5', $variant['json']['params']['model'] ?? null);
             $this->assertEqualsWithDelta(5.0, (float) $variant['priceIn'], 1e-9);
             $this->assertEqualsWithDelta(25.0, (float) $variant['priceOut'], 1e-9);
+        }
+    }
+
+    /**
+     * xAI Grok 4.6 — flagship chat + vision rows added 2026-08-20. Both talk to
+     * the same upstream model id, carry the official $2/$6 per-1M pricing with a
+     * $0.50/1M cache-read rate, and share the >200k long-context 2x tier via
+     * CONTEXT_PRICING (keyed by providerId, so one entry covers both rows).
+     */
+    public function testGrok46ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $grok46 = ModelCatalog::find('xai:grok-4.6');
+
+        $this->assertCount(2, $grok46, 'Expected grok-4.6 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($grok46, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('xai:grok-4.6:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('xai:grok-4.6:pic2text'));
+
+        foreach ($grok46 as $variant) {
+            $this->assertSame('xAI', $variant['service']);
+            $this->assertSame('grok-4.6', $variant['providerId']);
+            $this->assertSame('grok-4.6', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(6.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.50, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+
+        $tier = ModelCatalog::contextPricing('grok-4.6');
+        $this->assertNotNull($tier);
+        $this->assertSame(200000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(12.0, $tier['price_out_above'], 1e-9);
+    }
+
+    /**
+     * Kimi K3 via the HF router — like every Kimi row, pinned to DeepInfra
+     * (`:deepinfra` suffix) so the billed price is deterministic and matches
+     * the catalog rate (DeepInfra snapshot 2026-08-20). K3 outputs text only,
+     * so exactly chat + pic2text variants exist — no text2pic.
+     */
+    public function testKimiK3ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $k3 = ModelCatalog::find('huggingface:moonshotai/Kimi-K3-deepinfra');
+
+        $this->assertCount(2, $k3, 'Expected Kimi K3 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($k3, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('huggingface:moonshotai/Kimi-K3-deepinfra:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('huggingface:moonshotai/Kimi-K3-deepinfra:pic2text'));
+
+        foreach ($k3 as $variant) {
+            $this->assertSame('HuggingFace', $variant['service']);
+            $this->assertSame('moonshotai/Kimi-K3:deepinfra', $variant['providerId']);
+            $this->assertSame('moonshotai/Kimi-K3:deepinfra', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.85, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(14.25, (float) $variant['priceOut'], 1e-9);
+            $this->assertTrue($variant['json']['meta']['forced_thinking'] ?? false, 'K3 always thinks — the provider relies on this flag');
         }
     }
 
@@ -350,6 +1003,52 @@ class ModelCatalogTest extends TestCase
         $ids = array_column(ModelCatalog::all(), 'id');
         $this->assertNotContains(30, $ids);
         $this->assertNotContains(49, $ids);
+    }
+
+    /**
+     * Groq shut down llama-3.3-70b-versatile, llama-3.1-8b-instant (08/16/26),
+     * llama-4-scout and qwen3-32b (07/17/26); Version20260819080000 deactivates
+     * them in existing installs. Re-adding one — under its old BID or its
+     * upstream model id — would resurrect a model whose API requests now fail.
+     */
+    public function testShutDownGroqModelsAreAbsentFromCatalog(): void
+    {
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $ids = array_column(ModelCatalog::all(), 'id');
+
+        $retired = [
+            9 => 'llama-3.3-70b-versatile',
+            17 => 'meta-llama/llama-4-scout-17b-16e-instruct',
+            53 => 'qwen/qwen3-32b',
+            236 => 'llama-3.1-8b-instant',
+        ];
+        foreach ($retired as $retiredBid => $retiredProviderId) {
+            $this->assertNotContains($retiredProviderId, $providerIds, sprintf('%s was shut down by Groq and must not be re-added.', $retiredProviderId));
+            $this->assertNotContains($retiredBid, $ids, sprintf('BID %d belongs to a retired model and must not be reused.', $retiredBid));
+        }
+    }
+
+    /**
+     * Groq Qwen 3.6 27B — the replacement for the retired Llama 3.3 70B /
+     * Qwen3 32B (chat) and Llama 4 Scout (vision) rows. Both variants must talk
+     * to the same upstream model id and carry the official Groq pricing.
+     */
+    public function testGroqQwen36ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $qwen = ModelCatalog::find('groq:qwen/qwen3.6-27b');
+
+        $this->assertCount(2, $qwen, 'Expected Qwen 3.6 27B chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($qwen, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('groq:qwen/qwen3.6-27b:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('groq:qwen/qwen3.6-27b:pic2text'));
+
+        foreach ($qwen as $variant) {
+            $this->assertSame('Groq', $variant['service']);
+            $this->assertSame('qwen/qwen3.6-27b', $variant['providerId']);
+            $this->assertSame('qwen/qwen3.6-27b', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(0.60, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(3.00, (float) $variant['priceOut'], 1e-9);
+        }
     }
 
     /**
@@ -425,14 +1124,14 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintIsDeterministic(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         $this->assertSame(ModelCatalog::fingerprint($model), ModelCatalog::fingerprint($model));
     }
 
     public function testFingerprintIgnoresOperatorOwnedFields(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $expected = ModelCatalog::fingerprint($model);
 
         $toggled = array_merge($model, [
@@ -446,7 +1145,7 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintIgnoresEmbeddedFingerprintKey(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $expected = ModelCatalog::fingerprint($model);
 
         $stamped = $model;
@@ -457,7 +1156,7 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintChangesWhenCatalogValueChanges(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $original = ModelCatalog::fingerprint($model);
 
         $model['priceIn'] = 0.99;
@@ -480,6 +1179,28 @@ class ModelCatalogTest extends TestCase
      * upstream billing is actually token-based — which would re-introduce
      * the catastrophic-overbill class of bug Copilot flagged on PR #932.
      */
+    public function testGptImage25RowsShareCalculatorPrices(): void
+    {
+        $expectedTiers = [
+            'low' => ['1024x1024' => 0.00588, '1024x1536' => 0.00474, '1536x1024' => 0.00474],
+            'medium' => ['1024x1024' => 0.01317, '1024x1536' => 0.01029, '1536x1024' => 0.01029],
+            'high' => ['1024x1024' => 0.05268, '1024x1536' => 0.04116, '1536x1024' => 0.04116],
+            'xhigh' => ['1024x1024' => 0.09366, '1024x1536' => 0.07377, '1536x1024' => 0.07377],
+            'max' => ['1024x1024' => 0.21072, '1024x1536' => 0.16464, '1536x1024' => 0.16464],
+        ];
+
+        foreach (['gpt-image-2.5-flare' => 348, 'gpt-image-2.5-sunburst' => 349] as $providerId => $bid) {
+            $rows = ModelCatalog::find('openai:'.$providerId.':text2pic');
+            $this->assertCount(1, $rows, sprintf('Catalog must contain exactly one %s text2pic row.', $providerId));
+            $this->assertSame($bid, $rows[0]['id']);
+            $this->assertSame('per_image', $rows[0]['json']['pricing_mode'] ?? null);
+            $this->assertSame('perImage', $rows[0]['outUnit'] ?? null);
+            $this->assertEqualsWithDelta(0.01317, (float) ($rows[0]['priceOut'] ?? 0.0), 1e-9);
+            $this->assertSame($expectedTiers, $rows[0]['json']['quality_prices'] ?? null);
+            $this->assertContains('pic2pic', $rows[0]['json']['features'] ?? []);
+        }
+    }
+
     public function testImagenFourHasPerImagePricingMode(): void
     {
         $imagen = array_values(array_filter(
@@ -537,7 +1258,7 @@ class ModelCatalogTest extends TestCase
         // Doctrine DBAL hands floats back as native floats; the identity should
         // survive a string round-trip equivalent to what (float) $row['BPRICEIN']
         // produces after JSON encode/decode in the actual seed flow.
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $original = ModelCatalog::fingerprint($model);
 
         $roundTripped = $model;
@@ -552,7 +1273,7 @@ class ModelCatalogTest extends TestCase
     public function testUpsertEmbedsFingerprintInJsonPayload(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $expectedFingerprint = ModelCatalog::fingerprint($model);
 
         // @phpstan-ignore-next-line
@@ -575,5 +1296,83 @@ class ModelCatalogTest extends TestCase
             );
 
         ModelCatalog::upsert($connection, $model);
+    }
+
+    /**
+     * #1778: a per1K catalog price on the implicit per_token mode is read by
+     * convertToPerToken as $price/1000 per token. Cohere's $2.00/1K searches
+     * would then bill ~1000×. Any per1K/per1000 row must author pricing_mode.
+     */
+    public function testPer1kRowsAuthorAnExplicitPricingMode(): void
+    {
+        foreach (ModelCatalog::all() as $row) {
+            $unit = strtolower((string) ($row['inUnit'] ?? ''));
+            if (!\in_array($unit, ['per1k', 'per1000'], true)) {
+                continue;
+            }
+
+            $this->assertArrayHasKey(
+                'pricing_mode',
+                $row['json'] ?? [],
+                sprintf(
+                    'BID %d (%s/%s) authors inUnit=%s and must set json.pricing_mode so it is not billed per token',
+                    $row['id'] ?? 0,
+                    $row['service'] ?? '',
+                    $row['providerId'] ?? '',
+                    $row['inUnit'] ?? '',
+                ),
+            );
+        }
+
+        $cohere = array_values(array_filter(
+            ModelCatalog::all(),
+            static fn (array $m): bool => 346 === ($m['id'] ?? null),
+        ));
+        $this->assertCount(1, $cohere);
+        $this->assertSame('per_request', $cohere[0]['json']['pricing_mode'] ?? null);
+        $this->assertSame('per1K', $cohere[0]['inUnit'] ?? null);
+        $this->assertEqualsWithDelta(2.0, (float) ($cohere[0]['priceIn'] ?? 0.0), 1e-9);
+    }
+
+    /**
+     * Live-probed Google lineup from 2026-09-11. Chat ids returned matching
+     * modelVersion from generateContent; Omni only accepts Interactions API;
+     * Transcribe and Nano Banana 2 Lite answered GET /models/{id}.
+     */
+    public function testGemini38FamilyOmniAndTranscribeAreCatalogued(): void
+    {
+        foreach (['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'] as $id) {
+            $chat = ModelCatalog::find('google:'.$id.':chat');
+            $vision = ModelCatalog::find('google:'.$id.':pic2text');
+            $this->assertCount(1, $chat, $id.' chat');
+            $this->assertCount(1, $vision, $id.' vision');
+            $this->assertEqualsWithDelta(0.75, (float) $chat[0]['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(3.75, (float) $chat[0]['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.075, (float) ($chat[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+            $this->assertContains('tool_use', $chat[0]['json']['features'] ?? []);
+        }
+
+        $lite = ModelCatalog::find('google:gemini-3.5-flash-lite:chat');
+        $this->assertCount(1, $lite);
+        $this->assertSame(356, $lite[0]['id']);
+        $this->assertEqualsWithDelta(0.30, (float) $lite[0]['priceIn'], 1e-9);
+
+        $bananaLite = ModelCatalog::find('google:gemini-3.1-flash-lite-image:text2pic');
+        $this->assertCount(1, $bananaLite);
+        $this->assertSame('per_image', $bananaLite[0]['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.0336, (float) $bananaLite[0]['priceOut'], 1e-9);
+
+        $omni = ModelCatalog::find('google:gemini-omni-1.1-flash:text2vid');
+        $this->assertCount(1, $omni);
+        $this->assertSame(359, $omni[0]['id']);
+        $this->assertSame('per_second', $omni[0]['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.10, (float) $omni[0]['priceOut'], 1e-9);
+        $this->assertSame(['720p'], $omni[0]['json']['allowed_resolutions'] ?? null);
+
+        $stt = ModelCatalog::find('google:gemini-3.5-transcribe:sound2text');
+        $this->assertCount(1, $stt);
+        $this->assertSame(360, $stt[0]['id']);
+        $this->assertSame('per_second', $stt[0]['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.003, (float) $stt[0]['priceIn'], 1e-9);
     }
 }

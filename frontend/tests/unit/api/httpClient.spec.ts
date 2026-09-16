@@ -20,6 +20,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ApiError, httpClient } from '@/services/api/httpClient'
+import { hasSessionHint, setSessionHint } from '@/services/sessionHint'
 
 type MockResponseInit = {
   ok: boolean
@@ -44,6 +45,7 @@ describe('httpClient ApiError shape (issue #883)', () => {
 
   beforeEach(() => {
     originalFetch = globalThis.fetch
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -153,5 +155,91 @@ describe('httpClient ApiError shape (issue #883)', () => {
       expect(apiError.code).toBeUndefined()
       return true
     })
+  })
+
+  it('does not treat a 502 refresh during restart as a logout', async () => {
+    setSessionHint()
+
+    globalThis.fetch = vi.fn().mockImplementation((url: RequestInfo | URL) => {
+      if (String(url).includes('/api/v1/auth/refresh')) {
+        return Promise.resolve(
+          mockResponse({
+            ok: false,
+            status: 502,
+            statusText: 'Bad Gateway',
+            body: 'Bad Gateway',
+          })
+        )
+      }
+
+      return Promise.resolve(
+        mockResponse({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          body: { error: 'expired' },
+        })
+      )
+    })
+
+    await expect(httpClient('/api/v1/auth/me')).rejects.toSatisfy((err: unknown) => {
+      expect(err).toBeInstanceOf(ApiError)
+      const apiError = err as ApiError
+      expect(apiError.status).toBe(503)
+      expect(apiError.code).toBe('AUTH_TRANSIENT')
+      return true
+    })
+
+    expect(hasSessionHint()).toBe(true)
+  })
+
+  it('resolves a 204 No Content body as undefined instead of throwing', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: 'No Content',
+      headers: { get: () => null },
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input')
+      },
+    } as unknown as Response)
+
+    await expect(httpClient('/api/v1/agents/12', { method: 'DELETE' })).resolves.toBeUndefined()
+  })
+
+  it('resolves Content-Length 0 as undefined instead of parsing JSON', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-length' ? '0' : null),
+      },
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input')
+      },
+    } as unknown as Response)
+
+    await expect(httpClient('/api/v1/noop')).resolves.toBeUndefined()
+  })
+
+  it('still returns an empty Blob when Content-Length is 0 and responseType is blob', async () => {
+    const empty = new Blob([])
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-length' ? '0' : null),
+      },
+      blob: async () => empty,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input')
+      },
+    } as unknown as Response)
+
+    await expect(httpClient('/api/v1/files/12/download', { responseType: 'blob' })).resolves.toBe(
+      empty
+    )
   })
 })

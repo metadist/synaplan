@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\FeedbackPreviewSchema;
+use App\AI\StructuredOutput\Schema\SourceSummariesSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\DTO\UserMemoryDTO;
 use App\Entity\User;
+use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\PromptRepository;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\RAG\VectorSearchService;
-use App\Service\Search\BraveSearchService;
 use Psr\Log\LoggerInterface;
 
 final readonly class FeedbackExampleService
@@ -26,10 +29,11 @@ final readonly class FeedbackExampleService
         private RateLimitService $rateLimitService,
         private UserMemoryService $memoryService,
         private VectorSearchService $vectorSearchService,
-        private BraveSearchService $braveSearchService,
+        private WebSearchGateway $webSearch,
         private PromptRepository $promptRepository,
         private LoggerInterface $logger,
         private FeedbackConfigService $feedbackConfig,
+        private StructuredOutputConfig $structuredOutputConfig,
     ) {
     }
 
@@ -230,7 +234,7 @@ final readonly class FeedbackExampleService
         // Truncate input to save tokens
         $text = mb_substr(trim($text), 0, self::MAX_INPUT_LENGTH);
 
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -294,17 +298,23 @@ Generate summary and correction options.
 PROMPT;
 
         try {
+            $aiOptions = array_filter([
+                'provider' => $provider,
+                'model' => $modelName,
+                'temperature' => 0.3,
+            ]);
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = FeedbackPreviewSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 null, // No user-specific model - use tools model
-                array_filter([
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.3,
-                ])
+                $aiOptions
             );
 
             $content = trim((string) ($response['content'] ?? ''));
@@ -445,7 +455,7 @@ PROMPT;
      */
     public function regenerateCorrection(User $user, string $falseClaim, string $oldCorrection): string
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -505,7 +515,7 @@ PROMPT;
 
     private function summarizeFalsePositive(User $user, string $text, ?string $userMessage = null): string
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -567,7 +577,7 @@ PROMPT;
 
     private function suggestCorrection(User $user, string $text, ?string $userMessage = null): string
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -908,7 +918,7 @@ PROMPT;
      */
     private function summarizeSourcesWithAi(User $user, string $claimText, array $rawSources): array
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -948,17 +958,23 @@ Summarize what each source says about this topic.
 PROMPT;
 
         try {
+            $aiOptions = array_filter([
+                'provider' => $provider,
+                'model' => $modelName,
+                'temperature' => 0.2,
+            ]);
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = SourceSummariesSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 null,
-                array_filter([
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.2,
-                ])
+                $aiOptions
             );
 
             $content = trim((string) ($response['content'] ?? ''));
@@ -1045,7 +1061,7 @@ PROMPT;
      */
     public function webResearchSources(User $user, string $claimText): array
     {
-        if (!$this->braveSearchService->isEnabled()) {
+        if (!$this->webSearch->isEnabled($user->getId())) {
             $this->logger->info('FeedbackExampleService: Brave Search not enabled');
 
             return ['sources' => []];
@@ -1056,9 +1072,9 @@ PROMPT;
         ]);
 
         try {
-            $searchResults = $this->braveSearchService->search($claimText, [
+            $searchResults = $this->webSearch->search($claimText, [
                 'count' => self::MAX_WEB_RESULTS,
-            ]);
+            ], $user->getId());
         } catch (\Throwable $e) {
             $this->logger->warning('FeedbackExampleService: Brave Search failed', [
                 'error' => $e->getMessage(),
@@ -1110,7 +1126,7 @@ PROMPT;
      */
     private function summarizeWebSourcesWithAi(User $user, string $claimText, array $rawSources): array
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -1143,17 +1159,23 @@ Summarize what each source says about this claim.
 PROMPT;
 
         try {
+            $aiOptions = array_filter([
+                'provider' => $provider,
+                'model' => $modelName,
+                'temperature' => 0.2,
+            ]);
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = SourceSummariesSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 null,
-                array_filter([
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.2,
-                ])
+                $aiOptions
             );
 
             $content = trim((string) ($response['content'] ?? ''));

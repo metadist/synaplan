@@ -99,17 +99,49 @@ platform generates for you on a redeploy and shows in its dashboard — is ignor
 so the account keeps the password from the very first start. Always sign in with
 the credentials of that first deployment.
 
-If they are lost, there are two ways back in:
+If they are lost, there are three ways back in.
 
-1. **Password reset by email.** Use *Forgot password?* on the sign-in page. This
-   only works when the deployment can send mail: `MAILER_DSN` must point at your
-   SMTP server. The production default is `null://null`, which silently discards
-   every message, so configure SMTP first (see [EMAIL.md](EMAIL.md)).
-2. **Through the database.** Sign up in the app with an address you control, then
-   make that account the administrator with the SQL in
-   [User Management](#user-management), which also shows how to open the database
-   prompt. Without working SMTP the sign-up confirmation mail never arrives, so
-   mark the account as verified in the same step — otherwise it cannot sign in.
+**1. On the server (recommended).** Anyone with shell access on the host can set
+a new password directly. This needs no mailer and no SQL:
+
+```bash
+docker compose exec -T backend php bin/console app:admin:reset-password \
+  admin@example.com --generate
+```
+
+The generated password is printed once and has to be replaced at the next
+sign-in; that rule is enforced server-side, so an API key is no way around it.
+Pass `--password='Str0ngPass'` instead to set a password you chose yourself. It
+follows the same rules as `BOOTSTRAP_ADMIN_PASSWORD`: 8 to 64 characters, and
+below 16 characters it must also contain at least one uppercase letter, one
+lowercase letter, and one number.
+
+If every administrator is gone — deleted, or demoted, so nobody can reach
+**Admin → Users** anymore — add `--promote`. It makes the named account an
+administrator and marks its address verified in the same step:
+
+```bash
+docker compose exec -T backend php bin/console app:admin:reset-password \
+  someone@example.com --generate --promote
+```
+
+The setup wizard deliberately does *not* reopen in that situation: a wizard that
+reappears on a running instance would let the next visitor claim it. Shell access
+is the intended proof of ownership instead.
+
+Accounts managed by an enterprise identity provider are refused — their password
+lives in that provider, not here.
+
+**2. Password reset by email.** Use *Forgot password?* on the sign-in page. This
+only works when the deployment can send mail: `MAILER_DSN` must point at your
+SMTP server. The production default is `null://null`, which silently discards
+every message, so configure SMTP first (see [EMAIL.md](EMAIL.md)).
+
+**3. Through the database.** Sign up in the app with an address you control, then
+make that account the administrator with the SQL in
+[User Management](#user-management), which also shows how to open the database
+prompt. Without working SMTP the sign-up confirmation mail never arrives, so mark
+the account as verified in the same step — otherwise it cannot sign in.
 
 There is no other recovery path: passwords are stored as hashes and cannot be
 read back out of the database.
@@ -131,6 +163,12 @@ curl -i -H "X-API-Key: sk_your-health-monitor-api-key" https://your-domain.com/a
 ```
 
 See [Health Monitoring](HEALTH_MONITORING.md) for full setup: monitor user creation, API-Key generation, Uptime Robot configuration.
+
+### Recent Errors
+
+`GET /api/v1/admin/logs` returns a redacted feed of recent `warning`-and-above events (`mode=summary` for counts by level/route, `mode=recent` for individual events). Every field is allow-listed and free text is scrubbed, so it never carries chat content, user emails, document text or secrets.
+
+The same feed is available to the in-chat AI through the admin-only `recent_errors` MCP tool. See [Observability](OBSERVABILITY.md) for the field list, retention and the `X-Request-Id` correlation flow.
 
 ### Recommended Uptime Robot Settings
 
@@ -248,22 +286,60 @@ Rotate `APP_SECRET`:
 
 1. Generate new secret: `openssl rand -hex 16`
 2. Update ENV var, restart backend
-3. Existing JWT tokens are invalidated — users must re-login
+3. Signed-in users stay signed in: only the 5-minute `access_token` cookies
+   stop verifying, and the browser silently obtains new ones through
+   `/auth/refresh` because the refresh tokens in `BTOKENS` do not depend on
+   `APP_SECRET`. To force everyone out, clear `BTOKENS` as described under
+   *Sessions survive restarts*. Provider API keys encrypted with the old
+   secret become unreadable and must be re-entered.
 
 ### CORS
 
 `CORS_ALLOW_ORIGIN` must match your frontend domain exactly. Never use `*` in production.
 
-### JWT Keys
+### Sessions survive restarts
 
-Auto-generated on first start at `backend/config/jwt/`. To regenerate:
+There is no JWT keypair to generate. Sign-in uses two HttpOnly cookies minted
+by `App\Service\TokenService`:
 
-```bash
-docker compose --env-file deploy/.env -f deploy/compose.yaml \
-  exec backend php bin/console lexik:jwt:generate-keypair --overwrite
-```
+| Cookie | Lifetime | Where it lives | What a restart does |
+| ------ | -------- | -------------- | ------------------- |
+| `access_token` | 5 minutes | HMAC-signed with `APP_SECRET`, not stored | Nothing — the signature still verifies |
+| `refresh_token` | 30 days, sliding on every refresh | `BTOKENS` in MariaDB | Nothing — the row is still there |
 
-All active sessions are invalidated on key rotation.
+Restarting or redeploying the backend, worker, Redis or the whole compose
+stack therefore keeps every browser and mobile-app session. Login is not a
+Redis or PHP session — the API firewall is stateless. The browser keeps the
+refresh cookie; MariaDB keeps the matching `BTOKENS` row; `/auth/refresh`
+mints a new 5-minute access cookie and slides the refresh expiry forward
+another 30 days. The web app retries `/auth/refresh` through a 5xx/network
+blip instead of treating it as a sign-out, and only a definitive `401`/`403`
+ends the session.
+
+`CookieTokenAuthenticator` must not claim `/auth/refresh` (or login). If it
+does, a stale access cookie — expired during downtime, or signed with a
+previous `APP_SECRET` — returns `401 AUTH_FAILED` before the controller can
+read `BTOKENS`, and every user looks logged out after a restart.
+
+Because refresh is public, the firewall `AccountStatusChecker` does not run
+on that request. `TokenService::refreshTokens()` and the OIDC refresh branch
+still refuse suspended or banned accounts and do not slide `BTOKENS`, so a
+leftover 30-day refresh row cannot keep a blocked user signed in.
+
+Two things must stay stable for that to hold:
+
+- **`APP_SECRET`** — the self-hosted stack persists it in
+  `deploy/data/secrets.env` (see `deploy/README.md`); Helm and other
+  automated deployments must inject the same value on every rollout. A new
+  secret invalidates every access cookie at once (sessions recover through
+  `/auth/refresh`, see *Token Rotation*) and makes the provider API keys
+  stored in the database unreadable.
+- **The MariaDB volume** — `BTOKENS` holds the refresh tokens. Wiping the
+  database signs everyone out.
+
+To sign every user out deliberately, delete their rows from `BTOKENS`
+(`DELETE FROM BTOKENS WHERE BTYPE = 'refresh'`). Rotating `APP_SECRET` alone
+does **not** do that — the refresh tokens are plain database rows.
 
 ### HTTPS
 
@@ -331,6 +407,261 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 
 ---
 
+## People and groups
+
+Groups, the People page under Operate, and the group API are gated by
+`IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The flag is **on by
+default** (seeded `1`; a migration turns it on for existing installs). Operators
+switch it in **Operate → System configuration → Features → People & sharing**
+(`/admin/config?tab=features`, field `FEATURE_IAM_GROUPS_ENABLED`) or pin it
+for automated deployments with the environment variable
+`FEATURE_IAM_GROUPS_ENABLED=false`. See [Feature flags](FEATURE_FLAGS.md) for
+the full list.
+
+When the flag is off:
+
+- Operate **People** (`/admin/people`) is still the user list. The tab bar
+  is hidden only when Users is the sole enabled section (Groups, Policies,
+  Platform instances and Audit stay flag-gated). `/admin?tab=users` redirects
+  there.
+- `/groups` is not routable and shows the not-found page.
+- `/api/v1/admin/groups` and `/api/v1/groups/mine` return 404.
+
+When the flag is on:
+
+- Operate **People** (`/admin/people`) shows **Users**, **Groups**, and
+  **Audit**. **Policies** appears only when group policies are also on.
+- An admin can create a manual group, add people by email, and set the role
+  to member or manager.
+- Groups that come from company login (`kind=directory`) can still receive
+  extra people by hand; memberships that came from login update at the next
+  sign-in.
+- Sharing a folder or conversation with a group is gated separately by
+  `IAM.SHARING_ENABLED` (effective only when groups are also on).
+
+## Sharing
+
+Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
+(both are on by default; **Features → People & sharing** or
+`FEATURE_IAM_SHARING_ENABLED`). When they are on:
+
+- An owner can share a knowledge folder, a conversation, an **AI assistant**,
+  a **saved task**, or a **chat widget** with a person, a group, or everyone
+  on the instance.
+- Conversation permissions are **Can view** and **Can use**. **Can use** lets
+  a member continue the chat as their own copy (file binaries stay with the
+  owner).
+- RAG only includes another person's files when a share grants **Can use**
+  or higher. A query never runs without an owner scope.
+- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only`) is on the same Sharing
+  page. With `admins_only`, the share dialog does not offer
+  "Everyone on this instance" to non-admins.
+- **Can manage** on a folder lets that person re-share it; only the owner can
+  delete it. Sharing an item with yourself is rejected.
+- A copy made with "continue as copy" keeps the conversation text, but the
+  owner's files are readable and searchable only while the share exists.
+  Revoking the share closes them again on the next request.
+- The public link token of a conversation is only returned to its owner; a
+  group share never exposes it.
+- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `1`) puts people into groups from the
+  company login (OIDC groups claim) at sign-in. Role mapping is unchanged.
+  Directory groups show **From your login** on People; you can still add extra
+  people by hand. Login-managed memberships update at the next sign-in.
+
+### Directory groups
+
+**Directory groups** is on by default; switch it under **Operate → System
+configuration → Features → People & sharing**
+(`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`). The claim settings stay under
+**Access → Sharing**. Optional settings:
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path (same resolver as OIDC roles) |
+| `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |
+
+Acceptance script: `_devextras/testing/iam/directory-demo.sh`. OpenCloud
+token-exchange check: `_devextras/testing/iam/opencloud-regression.md`.
+
+### Audit
+
+People → **Audit** lists who shared what, group changes, login-group updates,
+impersonation, and when an admin opened another user's resource list. Rows
+never include content. `app:iam:reap-audit` deletes rows older than
+`IAM.AUDIT_RETENTION_DAYS` (default 365; `0` keeps them forever).
+
+### Admin privacy and impersonation
+
+Administrators can share, unshare and delete (manage) but they cannot read
+another person's chats, files or assistants unless those items are shared with
+them. **Operate → People → Users** has **View as user** for audited
+impersonation (`IAM.ADMIN_IMPERSONATION` = `audited`). Set it to `disabled`
+to hide that action.
+
+### Group policies and locked defaults
+
+**Group policies** is switched under **Operate → System configuration →
+Features → People & sharing** (`FEATURE_IAM_GROUP_POLICIES_ENABLED`). People &
+groups must also be on. The seeder inserts the flag as `1`. Off means every
+resolver reads only `[user, global]` and never touches `BGROUPCONFIG`.
+
+When the flag is on, People shows a **Policies** tab. Pick one group at a
+time and set:
+
+| Setting | What it does | Several groups |
+| ------- | ------------ | -------------- |
+| Default models (`DEFAULTMODEL.*`) | Suggested model per capability | First group by id |
+| Allowed models (`MODELS.ALLOWED`) | Empty = every model; a list hides the rest | Union |
+| Features (saved tasks, desktop agent, document tools, multi-step) | Inherit (no group row) uses the instance default. **On for this group** turns it on. **Off for this group** stores `0`, which sits ahead of the instance default, so members lose the feature even when the instance is on. Across a person's groups, any **on** wins | OR among group rows; merged group value precedes the instance default |
+| Rate-limit tier (`RATELIMITS.TIER`) | Which limit table `checkLimit()` uses | Highest of NEW / PRO / TEAM / BUSINESS |
+
+A personal setting still wins unless you lock the **instance** default.
+Locked defaults live in **People → Policies** in the **Locked instance
+defaults** panel (always visible; not tied to the selected group). They flip
+`BCONFIG.BLOCKED` on the global row, so the lock applies to every group and
+every user. While a lock is on, the group value configured on the same page is
+stored but not read. Unlock to use the group value again. Locked defaults show
+**Set by your administrator** on the user's model settings; a group default
+(when not locked) shows **Default from your group**. Changing a locked setting
+on the user model page returns **409** `iam.settingLocked`.
+
+Locking a key that has no global `BCONFIG` row is rejected (**422**
+`iam.noInstanceDefault`); set the instance value first. The lock endpoint never
+creates an empty global row.
+
+Search embeddings (`VECTORIZE`) stay instance-wide: you can store a group
+default, but the indexer and the user's Search dropdown still use the global
+row.
+
+Acceptance script: `_devextras/testing/iam/policy-demo.sh`.
+
+The People, sharing, and policy switches live under
+**Operate → System configuration → Features → People & sharing**. The page
+reloads the runtime config so People, Share, and Policies appear without a
+restart. For automated deployments pin a flag with its `FEATURE_*` environment
+variable (the toggle then shows as locked); SQL remains available too:
+
+```sql
+INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+VALUES (0, 'IAM', 'SHARING_ENABLED', '1')
+ON DUPLICATE KEY UPDATE BVALUE = '1';
+```
+
+### Publishing an assistant to a group
+
+1. Turn groups and sharing on (both flags above).
+2. Create a custom assistant under **AI → Assistants** (**AI → Instructions**
+   while `FEATURE_AGENTS_ENABLED` is off). System assistants with owner `0`
+   cannot be shared — everyone can already use them.
+3. Open **Share** and grant **Can use** to the group (for example Sales).
+4. Members of that group see the assistant in their list and the classifier
+   may pick it. Its knowledge folder `TASKPROMPT:{topic}` rides with the
+   share. People outside the group get **403** on `GET /api/v1/prompts/{id}`.
+5. A shared **saved task** is run as the member's own copy
+   (`POST /api/v1/saved-tasks/{id}/copy`) — trigger resets to manual. The
+   assistant on that task must also be usable (owned, system, or shared
+   `use`), otherwise the copy returns **409** `iam.assistantNotShared`.
+6. A shared **widget** can be opened read-only (`read`) or co-edited (`edit`).
+   Embed code, visitor sessions, and transcripts stay with the owner.
+
+Acceptance script (HTTP only): `_devextras/testing/iam/publish-demo.sh`.
+
+### Plugin-declared kinds
+
+A plugin `manifest.json` may declare shareable rows in `plugin_data`:
+
+```json
+{
+  "provides": {
+    "resourceKinds": [
+      {
+        "key": "synaform:form",
+        "dataType": "form",
+        "labelKey": "synaform.kind.form",
+        "permissions": ["read", "use", "edit"]
+      }
+    ]
+  }
+}
+```
+
+`key` must be `{pluginId}:{name}`. Permissions are a subset of
+`read`, `use`, `edit`, `manage`. An invalid field fails plugin load and names
+the field. Shared rows are loaded with
+`PluginDataRepository::findSharedWith($userId, $pluginId, $dataType)`.
+
+Public token links are unchanged. Admins do not see other people's chats,
+files, assistants, tasks, or widget transcripts unless those items are shared
+with them.
+
+**People & groups** is on by default (`FEATURE_IAM_GROUPS_ENABLED` on the
+Features tab). Members see **Account → My groups**. Rollback is the same toggle
+(or SQL with `'0'`, or `FEATURE_IAM_GROUPS_ENABLED=false`). Group rows stay in
+the database.
+
+API keys: empty or legacy webhook-only scopes keep full access. A key that
+opts into `iam:read` or `iam:manage` is limited to those People routes.
+
+---
+
+## Self-awareness (`SELF_AWARE`)
+
+The assistant can answer "what can you do here?" from a live capability
+inventory, and "how do I …?" from a system-owned copy of
+[docs.synaplan.com](https://docs.synaplan.com/). Both are gated by the
+`SELF_AWARE` BCONFIG group (owner 0). Rows are insert-if-missing on
+`app:seed` and are never overwritten.
+
+### Flags
+
+| Group / Key | Default | Effect when off |
+|-------------|---------|-----------------|
+| `SELF_AWARE / ENABLED` | `true` | No inventory block, `/help` falls through to ordinary chat, the `synaplan` topic is hidden from routing. Byte-identical to a pre-feature install. |
+| `SELF_AWARE / INVENTORY_IN_GENERAL` | `true` | Inventory is injected only into the `synaplan` topic, not into everyday `general` chat. |
+| `SELF_AWARE / DOCS_RAG_ENABLED` | `true` | No documentation retrieval and no `docs_loaded` citations. The corpus sync still runs. |
+| `SELF_AWARE / DOCS_MANIFEST_URL` | `https://docs.synaplan.com/docs-manifest.json` | Empty string disables sync (air-gapped). Point at a mirror that serves the same three endpoints (`/docs-manifest.json`, `/raw/{slug}.md`, `/llms.txt`). |
+
+Resolution for the boolean flags is per-user → owner 0 → built-in default.
+`DOCS_MANIFEST_URL` is operator-only (owner 0).
+
+### Commands
+
+```bash
+# Live capability block for a user (default user id 2)
+docker compose exec -T backend php bin/console app:selfaware:inventory --user 2
+
+# Refresh the SYSTEM:synaplan documentation corpus
+docker compose exec -T backend php bin/console app:selfaware:sync-docs
+docker compose exec -T backend php bin/console app:selfaware:sync-docs --dry-run
+docker compose exec -T backend php bin/console app:selfaware:sync-docs --force
+
+# Release spot-check (needs a live chat model; not part of `make test`)
+docker compose exec -T backend php bin/console app:selfaware:eval --install=no_engine
+```
+
+`app:selfaware:sync-docs` also runs in the daily scheduler slot (after
+`app:updates:check`) and is queued when a new published version is
+recorded. It never runs at container boot. The corpus is owner 0 /
+`SYSTEM:synaplan` and does not appear in any user's file list.
+
+An unreachable manifest leaves the previous corpus in place. An empty
+`DOCS_MANIFEST_URL` prints `skipped` and exits 0.
+
+### Release checklist: `KNOWN_ABSENT`
+
+There is no `docs/RELEASE.md`. Before every release that ships a capability,
+review `PlatformCapabilityInventory::KNOWN_ABSENT`:
+
+1. **Remove** any entry a shipped feature now provides.
+2. **Add** an `alternative` (and an `adminHint` when an operator can enable
+   the missing piece) for anything newly and deliberately unsupported.
+
+This is the only hand-maintained list in the feature. Leaving a stale
+entry makes the assistant deny something the install can do; missing an
+entry makes it invent a capability.
+
+---
+
 ## Integrations
 
 | Channel | Guide |
@@ -340,6 +671,109 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 | Widget / Embed | [WIDGET.md](WIDGET.md) |
 | OpenAI-compatible API | [OPENAI_COMPATIBLE_API.md](OPENAI_COMPATIBLE_API.md) |
 | Anthropic-compatible API (Claude Code) | [ANTHROPIC_COMPATIBLE_API.md](ANTHROPIC_COMPATIBLE_API.md) |
+
+### Linked platforms
+
+A **linked platform** is a Nextcloud, ownCloud or OpenCloud server whose users
+sign in to Synaplan with the account they already have, instead of the partner
+app minting a fresh Synaplan account per user. The partner instance registers
+once; each of its users then links once, in the browser, while signed in to
+Synaplan. The result is a scoped API key (`chat`, `files`, `rag`, optionally
+`memories`) that the partner app stores and that the user can revoke at any
+time. The Outlook add-in (Synamail) uses the same bridge page and is always on.
+
+Everything under `/api/v1/platform-links/*` and `/api/v1/me/platform-links*`
+is gated by `PLATFORM_LINKS.ENABLED` (on by default — **Features → Platforms
+& desktop**, `FEATURE_PLATFORM_LINKS_ENABLED`); with the flag off those routes
+answer **404** and nothing in the UI changes.
+
+```sql
+INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+VALUES (0, 'PLATFORM_LINKS', 'ENABLED', '1')
+ON DUPLICATE KEY UPDATE BVALUE = '1';
+```
+
+Rollback is the same statement with `'0'`. Rows in `BPLATFORMINSTANCES` and
+`BEXTERNALIDENTITIES` stay; issued keys keep working until revoked.
+
+**Approving instances.** A partner instance registered by a signed-in
+administrator is `active` immediately. One registered anonymously or by a
+regular user is `pending` and cannot issue link codes until an administrator
+approves it under **Operate → People → Linked platforms** (host, client,
+status, last seen; *Approve* / *Revoke*). Anonymous registration is limited to
+10 per hour per address. Revoking an instance also revokes every key it
+issued.
+
+**What a user sees.** **Channels & integrations → Linked platforms** lists the
+user's own links (platform, host, external id, key name) with *Disconnect*,
+which revokes that key. API keys minted this way carry a *linked platform*
+badge on the API-keys page. Link codes live five minutes, are single-use, and
+a user may issue at most 20 per hour.
+
+**Security model.** Redirect targets are prefix-matched against the URIs the
+instance registered (HTTPS only outside dev, same host, same port, no
+wildcard hosts). A rejected redirect is audited as
+`platform_link.redirect_rejected`; every register, approve, revoke, link and
+disconnect writes a People → Audit row. Re-linking an external id that already
+belonged to another Synaplan account revokes the old key and moves the link to
+the new account (`platform_link.reassigned`, audited under both) — one external
+user is never two Synaplan accounts at once.
+
+Acceptance script: `_devextras/testing/platform-links/fake-instance.sh`
+(`--flag-off` proves the 404 contract). Endpoint reference:
+[Swagger UI](http://localhost:8000/api/doc) → tag *Platform Links*.
+
+### AI plugs (S1–S5)
+
+Extraction, web search and rerank go through `App\Plug\` registries.
+FileProcessor still runs today's built-in strategies (native → Tika →
+vision → STT). Extra adapters whose keys are not built-in (today:
+`docling`) run first when an admin adds them to a family chain, and fall
+through if they fail, so a down sidecar never blocks an upload.
+
+Web search defaults to Brave (`WEB_SEARCH.PROVIDER=brave`). An admin
+picks Brave, SearXNG, Tavily, Exa, Firecrawl or Perplexity on
+**Operate → AI infrastructure → Web search**, plus an optional
+fallback. The next chat search uses the new provider with no restart.
+**Test query** shows up to five titles. Per-user override is
+**Settings → Use my own search**, only when
+`WEB_SEARCH.USER_OVERRIDE_ALLOWED=1`.
+
+Rerank stays **off** by default (`RERANK.ENABLED=0`) until a live eval
+shows recall@5 up and p95 latency inside the budget. An admin turns it
+on under **Operate → AI infrastructure → Reranking**: pick a catalog
+rerank model (TEI / Jina / Cohere / Voyage), set how many extra
+snippets to fetch and the millisecond budget, optionally allow the
+summary model as a costly fallback, and run **Test order** on sample
+snippets. Chat search is unchanged while rerank is off.
+
+Importing models saves typing each row by hand. On **Models & keys**,
+an OpenAI-compatible endpoint card has **Import models** and the local
+AI card has **Import pulled models**. The preview lists what the
+endpoint offers with a guessed capability tag you can edit, and an
+**already added** badge for rows the catalog has. **Import** creates
+only the new rows; running it again says nothing changed, and it never
+touches a model you switched off or made a default. The optional
+**Check what each model can do** box sends two tiny requests per model
+(one chat, one embeddings) and refines the guess — it uses a little
+credit, so it is off by default. The scheduled model health check also
+re-lists each import source: a model the endpoint no longer offers is
+marked **not offered by endpoint** and (only when auto-disable is on)
+switched off; it recovers by itself when the endpoint lists it again.
+An **unreachable** endpoint marks nothing, so a brief outage never
+retires a model. Native Ollama is not capability-probed this way.
+
+The Operate page is **AI infrastructure** (`/admin/setup`). The
+**Extraction** tab shows adapter health, lets an admin reorder a family
+chain, and offers **Test with a file**. Tika and Docling have the same
+sidecar controls: a connection test on that tab, and URL / timeout
+(plus Docling max file size) under **System configuration →
+Processing**. Models & keys is the previous provider-key UI and now
+includes Perplexity as an optional chat provider. The **Web search**
+tab is the provider picker. The **Reranking** tab is the rerank
+settings and test.
+
+Settings table: [CONFIGURATION.md — AI plugs](CONFIGURATION.md#ai-plugs-plugs).
 
 ---
 

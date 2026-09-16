@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
+import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
+import ManagedKeysStatusCard from '@/components/admin/ManagedKeysStatusCard.vue'
+import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
+import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import { useUpdatesStore } from '@/stores/updates'
 import { useNotification } from '@/composables/useNotification'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
@@ -21,8 +27,10 @@ import {
 } from '@/services/api/adminConfigApi'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 const updatesStore = useUpdatesStore()
 const { success, error: showError } = useNotification()
 const { isDark } = useTheme()
@@ -51,12 +59,19 @@ const testingService = ref<string | null>(null)
 
 // Tab icons
 const tabIcons: Record<string, string> = {
+  features: 'mdi:toggle-switch-outline',
   ai: 'mdi:robot',
   email: 'mdi:email-outline',
   auth: 'mdi:shield-key',
   channels: 'mdi:message-text',
   processing: 'mdi:file-document-outline',
   vectordb: 'mdi:database-search',
+  sharing: 'mdi:account-group',
+  routing: 'mdi:routes',
+  branding: 'mdi:palette',
+  interface: 'mdi:monitor-dashboard',
+  guest_landing: 'mdi:newspaper-variant-outline',
+  mobile: 'mdi:cellphone',
 }
 
 // Computed
@@ -77,19 +92,19 @@ const groupDefs = [
     id: 'ai-data',
     icon: 'mdi:robot',
     labelKey: 'admin.config.tabGroups.aiData',
-    tabIds: ['ai', 'vectordb', 'processing'],
+    tabIds: ['ai', 'vectordb', 'processing', 'routing'],
   },
   {
     id: 'communication',
     icon: 'mdi:message-text',
     labelKey: 'admin.config.tabGroups.communication',
-    tabIds: ['email', 'channels'],
+    tabIds: ['email', 'channels', 'branding', 'guest_landing', 'interface', 'mobile'],
   },
   {
     id: 'security',
     icon: 'mdi:shield-key',
     labelKey: 'admin.config.tabGroups.security',
-    tabIds: ['auth'],
+    tabIds: ['features', 'auth', 'sharing'],
   },
 ]
 
@@ -113,9 +128,45 @@ function toggleGroup(groupId: string) {
   openGroup.value = openGroup.value === groupId ? null : groupId
 }
 
+/** Section a deep link pointed at, ringed until the admin moves to another tab. */
+const highlightedSection = ref<string | null>(null)
+
 function selectTab(tabId: string) {
   activeTab.value = tabId
   openGroup.value = null
+  syncTabToUrl(tabId)
+}
+
+/**
+ * Keep the tab in the URL so a setting can be linked to directly — the tabs
+ * live inside two dropdowns, and "open Settings and look for it" is not a
+ * usable instruction.
+ */
+function syncTabToUrl(tabId: string) {
+  highlightedSection.value = null
+  if (route.query.tab === tabId) {
+    return
+  }
+  void router.replace({ query: { ...route.query, tab: tabId, section: undefined } })
+}
+
+async function applyDeepLink() {
+  const wantedTab = route.query.tab
+  if (typeof wantedTab === 'string' && schema.value?.tabs[wantedTab]) {
+    activeTab.value = wantedTab
+  }
+
+  const wantedSection = route.query.section
+  if (typeof wantedSection !== 'string' || '' === wantedSection) {
+    return
+  }
+  await nextTick()
+  const target = document.getElementById(`config-section-${wantedSection}`)
+  if (!target) {
+    return
+  }
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  highlightedSection.value = wantedSection
 }
 
 // Mobile tab dropdown: a single dropdown replaces the 3-group bar (same
@@ -138,6 +189,7 @@ function closeMobileTabMenu() {
 function selectMobileTab(tabId: string) {
   closeMobileTabMenu()
   activeTab.value = tabId
+  syncTabToUrl(tabId)
 }
 
 function handleTabBarOutsideClick(event: MouseEvent) {
@@ -172,20 +224,32 @@ const currentSections = computed(() => {
       activeTab.value === 'branding'
         ? section.fields.filter((fieldKey) => !hiddenModeFields.includes(fieldKey))
         : section.fields
-    const fields = visibleFieldKeys.map((fieldKey) => ({
+    const allFields = visibleFieldKeys.map((fieldKey) => ({
       key: fieldKey,
       schema: schema.value!.fields[fieldKey],
       value: values.value[fieldKey] || { value: '', isSet: false, isMasked: false },
     }))
-    const isLive = fields.some((f) => f.schema?.source === 'database')
-    return { id, label: section.label, fields, isLive }
+    // D2: fields Models & keys owns are never rendered as inputs here. All
+    // managed ⇒ one status card replaces the section body; some managed ⇒
+    // the inputs stay and the same card sits below them.
+    const managedFields = allFields.filter((f) => f.schema?.managedBy === 'ai-infrastructure')
+    const fields = allFields.filter((f) => f.schema?.managedBy !== 'ai-infrastructure')
+    const isLive = allFields.some((f) => f.schema?.source === 'database')
+    return {
+      id,
+      label: section.label,
+      fields,
+      managedFields,
+      allManaged: managedFields.length > 0 && fields.length === 0,
+      isLive,
+    }
   })
 })
 
 // Service test mapping (multiple services per tab are tested sequentially)
 const testableServices: Record<string, string[]> = {
   ai: ['ollama', 'piper'],
-  processing: ['tika'],
+  processing: ['tika', 'docling'],
   vectordb: ['qdrant'],
   email: ['mailer'],
 }
@@ -224,6 +288,11 @@ async function handleUpdate(key: string, value: string) {
       // Show restart banner only for env-based fields
       if (result.requiresRestart) {
         showRestartBanner.value = true
+      }
+      // Feature flags feed the runtime config (navigation, share buttons,
+      // Steps editor, …) — reload it so the change is visible at once.
+      if (schema.value?.fields[key]?.tab === 'features') {
+        await configStore.reload()
       }
     }
   } catch (err) {
@@ -291,6 +360,7 @@ onMounted(async () => {
     return
   }
   await loadConfig()
+  await applyDeepLink()
 })
 
 onBeforeUnmount(() => {
@@ -359,16 +429,148 @@ onBeforeUnmount(() => {
         </Transition>
 
         <!-- Header -->
-        <div class="mb-8">
-          <div class="flex items-center gap-3 mb-2">
-            <Icon icon="mdi:cog" class="w-8 h-8 text-[var(--brand)]" />
-            <h1 class="text-3xl font-bold txt-primary">{{ $t('admin.config.title') }}</h1>
-          </div>
-          <p class="txt-secondary">{{ $t('admin.config.description') }}</p>
-        </div>
+        <PageHeader
+          :title="$t('admin.config.title')"
+          :subtitle="$t('admin.config.description')"
+          icon="mdi:cog"
+        >
+          <template v-if="!loading && schema" #default>
+            <!-- Tab group dropdowns (desktop/tablet, max 3, mirrors AdvancedWidgetConfig).
+                 On phones this is replaced by the single dropdown below (same
+                 pattern as FilesTabs.vue). -->
+            <div
+              ref="tabBarRef"
+              class="hidden md:block border-b border-light-border/30 dark:border-dark-border/20"
+            >
+              <div class="flex gap-1 sm:gap-2 py-2">
+                <div
+                  v-for="group in tabGroups"
+                  :key="group.id"
+                  class="relative flex-1 sm:flex-none"
+                >
+                  <button
+                    type="button"
+                    :class="[
+                      'tab-nav-item w-full sm:w-auto justify-between',
+                      group.tabs.some((t) => t.id === activeTab) && 'tab-nav-item--active',
+                    ]"
+                    :data-testid="`btn-config-group-${group.id}`"
+                    @click="toggleGroup(group.id)"
+                  >
+                    <span class="flex items-center gap-1.5 min-w-0">
+                      <Icon :icon="group.icon" class="w-4 h-4 flex-shrink-0" />
+                      <span class="truncate">{{ $t(group.labelKey) }}</span>
+                    </span>
+                    <Icon
+                      icon="heroicons:chevron-down"
+                      :class="[
+                        'w-4 h-4 flex-shrink-0 transition-transform',
+                        openGroup === group.id && 'rotate-180',
+                      ]"
+                    />
+                  </button>
+
+                  <!-- Dropdown menu -->
+                  <div
+                    v-if="openGroup === group.id"
+                    class="absolute left-0 top-full mt-1 z-20 min-w-[12rem] surface-card rounded-lg shadow-xl border border-light-border/30 dark:border-dark-border/20 py-1"
+                    :data-testid="`menu-config-group-${group.id}`"
+                  >
+                    <button
+                      v-for="tab in group.tabs"
+                      :key="tab.id"
+                      type="button"
+                      :class="[
+                        'w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                        activeTab === tab.id
+                          ? 'txt-brand bg-[var(--brand)]/5'
+                          : 'txt-secondary hover:txt-primary hover-surface',
+                      ]"
+                      :data-testid="`btn-config-tab-${tab.id}`"
+                      @click="selectTab(tab.id)"
+                    >
+                      <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
+                      <span class="truncate">{{ tab.label }}</span>
+                      <Icon
+                        v-if="activeTab === tab.id"
+                        icon="heroicons:check"
+                        class="w-4 h-4 ml-auto flex-shrink-0"
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab dropdown (mobile): a single dropdown replaces the 3-group bar
+                 (same pattern as FilesTabs.vue). The trigger shows the current
+                 tab; the panel keeps every group's sub-tabs under its own
+                 section header so nothing from the desktop dropdowns is lost. -->
+            <div
+              ref="mobileTabDropdownRef"
+              class="md:hidden relative border-b border-light-border/30 dark:border-dark-border/20 pb-2"
+            >
+              <button
+                type="button"
+                class="dropdown-trigger surface-card w-full justify-between border border-light-border/20 dark:border-dark-border/10"
+                :aria-expanded="mobileTabMenuOpen"
+                aria-haspopup="menu"
+                data-testid="tab-admin-config-mobile-trigger"
+                @click="toggleMobileTabMenu"
+              >
+                <span class="flex items-center gap-2 txt-primary font-medium min-w-0">
+                  <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-5 h-5 flex-shrink-0" />
+                  <span class="truncate">{{ currentTab?.label }}</span>
+                </span>
+                <Icon
+                  icon="heroicons:chevron-down"
+                  class="w-5 h-5 flex-shrink-0 transition-transform"
+                  :class="{ 'rotate-180': mobileTabMenuOpen }"
+                />
+              </button>
+
+              <div
+                v-if="mobileTabMenuOpen"
+                class="dropdown-panel absolute left-0 right-0 top-full mt-1 z-30 max-h-[70vh] overflow-y-auto scroll-thin"
+                role="menu"
+                data-testid="tab-admin-config-mobile-menu"
+              >
+                <template v-for="(group, groupIdx) in tabGroups" :key="group.id">
+                  <p
+                    class="px-3 pt-2.5 pb-1 text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
+                    :class="{
+                      'border-t border-light-border/10 dark:border-dark-border/10 mt-1':
+                        groupIdx > 0,
+                    }"
+                  >
+                    {{ $t(group.labelKey) }}
+                  </p>
+                  <button
+                    v-for="tab in group.tabs"
+                    :key="tab.id"
+                    type="button"
+                    role="menuitem"
+                    :class="['dropdown-item', activeTab === tab.id && 'dropdown-item--active']"
+                    :data-testid="`btn-config-tab-${tab.id}-mobile`"
+                    @click="selectMobileTab(tab.id)"
+                  >
+                    <Icon :icon="tab.icon" class="w-5 h-5 flex-shrink-0" />
+                    <span class="flex-1 text-left truncate">{{ tab.label }}</span>
+                    <Icon
+                      v-if="activeTab === tab.id"
+                      icon="heroicons:check"
+                      class="w-4 h-4 flex-shrink-0"
+                    />
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
+        </PageHeader>
 
         <!-- Release notice: informs and links to the guide, never updates anything -->
         <UpdatePanel v-if="updatesStore.canRead" class="mb-6" />
+        <ExportImportPanel scope="instance" class="mb-6" />
 
         <!-- Loading State -->
         <div v-if="loading" class="flex items-center justify-center py-20">
@@ -377,132 +579,6 @@ onBeforeUnmount(() => {
 
         <!-- Content -->
         <div v-else-if="schema" class="space-y-6">
-          <!-- Tab group dropdowns (desktop/tablet, max 3, mirrors AdvancedWidgetConfig).
-               On phones this is replaced by the single dropdown below (same
-               pattern as FilesTabs.vue). -->
-          <div
-            ref="tabBarRef"
-            class="hidden md:block border-b border-light-border/30 dark:border-dark-border/20"
-          >
-            <div class="flex gap-1 sm:gap-2 py-2">
-              <div v-for="group in tabGroups" :key="group.id" class="relative flex-1 sm:flex-none">
-                <button
-                  type="button"
-                  :class="[
-                    'tab-nav-item w-full sm:w-auto justify-between',
-                    group.tabs.some((t) => t.id === activeTab) && 'tab-nav-item--active',
-                  ]"
-                  :data-testid="`btn-config-group-${group.id}`"
-                  @click="toggleGroup(group.id)"
-                >
-                  <span class="flex items-center gap-1.5 min-w-0">
-                    <Icon :icon="group.icon" class="w-4 h-4 flex-shrink-0" />
-                    <span class="truncate">{{ $t(group.labelKey) }}</span>
-                  </span>
-                  <Icon
-                    icon="heroicons:chevron-down"
-                    :class="[
-                      'w-4 h-4 flex-shrink-0 transition-transform',
-                      openGroup === group.id && 'rotate-180',
-                    ]"
-                  />
-                </button>
-
-                <!-- Dropdown menu -->
-                <div
-                  v-if="openGroup === group.id"
-                  class="absolute left-0 top-full mt-1 z-20 min-w-[12rem] surface-card rounded-lg shadow-xl border border-light-border/30 dark:border-dark-border/20 py-1"
-                  :data-testid="`menu-config-group-${group.id}`"
-                >
-                  <button
-                    v-for="tab in group.tabs"
-                    :key="tab.id"
-                    type="button"
-                    :class="[
-                      'w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
-                      activeTab === tab.id
-                        ? 'txt-brand bg-[var(--brand)]/5'
-                        : 'txt-secondary hover:txt-primary hover-surface',
-                    ]"
-                    :data-testid="`btn-config-tab-${tab.id}`"
-                    @click="selectTab(tab.id)"
-                  >
-                    <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
-                    <span class="truncate">{{ tab.label }}</span>
-                    <Icon
-                      v-if="activeTab === tab.id"
-                      icon="heroicons:check"
-                      class="w-4 h-4 ml-auto flex-shrink-0"
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tab dropdown (mobile): a single dropdown replaces the 3-group bar
-               (same pattern as FilesTabs.vue). The trigger shows the current
-               tab; the panel keeps every group's sub-tabs under its own
-               section header so nothing from the desktop dropdowns is lost. -->
-          <div
-            ref="mobileTabDropdownRef"
-            class="md:hidden relative border-b border-light-border/30 dark:border-dark-border/20 pb-2"
-          >
-            <button
-              type="button"
-              class="dropdown-trigger surface-card w-full justify-between border border-light-border/20 dark:border-dark-border/10"
-              :aria-expanded="mobileTabMenuOpen"
-              aria-haspopup="menu"
-              data-testid="tab-admin-config-mobile-trigger"
-              @click="toggleMobileTabMenu"
-            >
-              <span class="flex items-center gap-2 txt-primary font-medium min-w-0">
-                <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-5 h-5 flex-shrink-0" />
-                <span class="truncate">{{ currentTab?.label }}</span>
-              </span>
-              <Icon
-                icon="heroicons:chevron-down"
-                class="w-5 h-5 flex-shrink-0 transition-transform"
-                :class="{ 'rotate-180': mobileTabMenuOpen }"
-              />
-            </button>
-
-            <div
-              v-if="mobileTabMenuOpen"
-              class="dropdown-panel absolute left-0 right-0 top-full mt-1 z-30 max-h-[70vh] overflow-y-auto scroll-thin"
-              role="menu"
-              data-testid="tab-admin-config-mobile-menu"
-            >
-              <template v-for="(group, groupIdx) in tabGroups" :key="group.id">
-                <p
-                  class="px-3 pt-2.5 pb-1 text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
-                  :class="{
-                    'border-t border-light-border/10 dark:border-dark-border/10 mt-1': groupIdx > 0,
-                  }"
-                >
-                  {{ $t(group.labelKey) }}
-                </p>
-                <button
-                  v-for="tab in group.tabs"
-                  :key="tab.id"
-                  type="button"
-                  role="menuitem"
-                  :class="['dropdown-item', activeTab === tab.id && 'dropdown-item--active']"
-                  :data-testid="`btn-config-tab-${tab.id}-mobile`"
-                  @click="selectMobileTab(tab.id)"
-                >
-                  <Icon :icon="tab.icon" class="w-5 h-5 flex-shrink-0" />
-                  <span class="flex-1 text-left truncate">{{ tab.label }}</span>
-                  <Icon
-                    v-if="activeTab === tab.id"
-                    icon="heroicons:check"
-                    class="w-4 h-4 flex-shrink-0"
-                  />
-                </button>
-              </template>
-            </div>
-          </div>
-
           <!-- Active tab title + actions -->
           <div class="flex items-center justify-between gap-2">
             <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
@@ -543,8 +619,14 @@ onBeforeUnmount(() => {
           <div class="space-y-8">
             <div
               v-for="section in currentSections"
+              :id="`config-section-${section.id}`"
               :key="section.id"
-              class="surface-card rounded-xl p-6"
+              class="surface-card rounded-xl p-6 scroll-mt-6"
+              :class="
+                highlightedSection === section.id
+                  ? 'outline outline-2 outline-offset-2 outline-[var(--brand)]'
+                  : ''
+              "
             >
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
@@ -563,7 +645,10 @@ onBeforeUnmount(() => {
               <p v-if="section.isLive" class="text-xs txt-secondary mb-4 -mt-2">
                 {{ $t('admin.config.liveHint') }}
               </p>
-              <div class="space-y-4">
+              <M365SetupGuide v-if="section.id === 'm365'" />
+              <DropboxSetupGuide v-if="section.id === 'dropbox'" />
+              <ManagedKeysStatusCard v-if="section.allManaged" :fields="section.managedFields" />
+              <div v-else class="space-y-4">
                 <ConfigField
                   v-for="field in section.fields"
                   :key="field.key"
@@ -571,6 +656,10 @@ onBeforeUnmount(() => {
                   :schema="field.schema"
                   :value="field.value"
                   @update="handleUpdate"
+                />
+                <ManagedKeysStatusCard
+                  v-if="section.managedFields.length > 0"
+                  :fields="section.managedFields"
                 />
               </div>
             </div>

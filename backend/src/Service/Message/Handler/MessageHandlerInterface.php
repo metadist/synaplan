@@ -10,6 +10,17 @@ use App\Entity\Message;
 interface MessageHandlerInterface
 {
     /**
+     * Result metadata key under which a handler reports that it answered the
+     * turn under a DIFFERENT classification than the one it was dispatched
+     * with (e.g. a misrouted audio request answered as chat). The value is a
+     * partial classification (`topic`, `intent`, `media_type`, …); `null`
+     * entries remove the key. {@see \App\Service\Message\MessageProcessor}
+     * folds it into the classification returned to the persistence layer so
+     * the stored topic and media meta describe what was actually produced.
+     */
+    public const EFFECTIVE_CLASSIFICATION_KEY = 'effective_classification';
+
+    /**
      * Handler Name (für Routing).
      */
     public function getName(): string;

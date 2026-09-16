@@ -8,6 +8,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\File\OgImageService;
+use App\Service\PastedContentText;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -150,8 +151,8 @@ class SharedChatPageController extends AbstractController
 
                 // Get first sentence or first 60 chars
                 $firstSentence = preg_split('/[.!?]/', $text, 2)[0] ?? $text;
-                if (strlen($firstSentence) > 60) {
-                    $firstSentence = substr($firstSentence, 0, 57).'...';
+                if (mb_strlen($firstSentence) > 60) {
+                    $firstSentence = mb_substr($firstSentence, 0, 57).'...';
                 }
                 if (!empty(trim($firstSentence))) {
                     return trim($firstSentence).' | '.$this->titleBrand();
@@ -167,7 +168,7 @@ class SharedChatPageController extends AbstractController
      */
     private function cleanSlashCommands(string $text): string
     {
-        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video)\s*/i', '', $text);
+        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search|help)\s*/i', '', $text);
     }
 
     /**
@@ -178,13 +179,14 @@ class SharedChatPageController extends AbstractController
         // Use first user message as context
         foreach ($messages as $message) {
             if ('IN' === $message->getDirection()) {
-                $text = strip_tags($message->getText());
+                $text = PastedContentText::strip($message->getText());
+                $text = strip_tags($text);
 
                 // Remove slash commands from description
                 $text = $this->cleanSlashCommands($text);
 
-                if (strlen($text) > 160) {
-                    return substr($text, 0, 157).'...';
+                if (mb_strlen($text) > 160) {
+                    return mb_substr($text, 0, 157).'...';
                 }
 
                 if (!empty(trim($text))) {

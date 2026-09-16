@@ -1,40 +1,24 @@
 <template>
   <div class="space-y-6" data-testid="page-config-routing">
-    <!-- Header: what routing is + how to add custom prompts -->
-    <div class="surface-card p-6" data-testid="section-routing-overview">
-      <div class="flex items-start gap-3">
-        <div class="p-2 rounded-lg bg-[var(--brand)]/10">
-          <Icon icon="heroicons:share" class="w-6 h-6 text-[var(--brand)]" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <h2 class="text-2xl font-semibold txt-primary mb-1">
-            {{ $t('config.routing.title') }}
-          </h2>
-          <p class="txt-secondary text-sm">
-            {{ $t('config.routing.flowBody') }}
-          </p>
+    <PageHeader
+      :title="$t('config.routing.title')"
+      :subtitle="$t('config.routing.flowBody')"
+      icon="heroicons:share"
+      data-testid="section-routing-overview"
+    />
 
-          <!-- Prominent callout: custom prompts live in Task Prompts -->
-          <div
-            class="mt-4 p-4 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-start gap-3"
-            data-testid="callout-custom-prompts"
-          >
-            <Icon
-              icon="heroicons:light-bulb"
-              class="w-5 h-5 text-[var(--brand)] flex-shrink-0 mt-0.5"
-            />
-            <p class="text-sm txt-secondary leading-relaxed">
-              {{ $t('config.routing.customCalloutBody') }}
-              <router-link
-                to="/ai/instructions"
-                class="text-[var(--brand)] hover:underline font-medium"
-              >
-                {{ $t('config.routing.customCalloutLink') }}
-              </router-link>
-            </p>
-          </div>
-        </div>
-      </div>
+    <!-- Prominent callout: custom prompts live in Task Prompts -->
+    <div
+      class="p-4 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-start gap-3"
+      data-testid="callout-custom-prompts"
+    >
+      <Icon icon="heroicons:light-bulb" class="w-5 h-5 text-[var(--brand)] flex-shrink-0 mt-0.5" />
+      <p class="text-sm txt-secondary leading-relaxed">
+        {{ $t('config.routing.customCalloutBody') }}
+        <router-link to="/ai/instructions" class="text-[var(--brand)] hover:underline font-medium">
+          {{ $t('config.routing.customCalloutLink') }}
+        </router-link>
+      </p>
     </div>
 
     <!-- Master switch (admin only): turn the multi-task planner on/off -->
@@ -242,54 +226,6 @@
 
         <p v-if="plannerModelId === null" class="text-xs txt-secondary mt-2">
           {{ $t('config.routing.plannerModelFallbackHint') }}
-        </p>
-      </div>
-    </div>
-
-    <!-- Summary model (admin only): which model condenses long conversations -->
-    <div
-      v-if="isAdmin"
-      class="surface-card overflow-hidden"
-      data-testid="section-routing-summary-model"
-    >
-      <div class="p-6">
-        <div class="flex items-start gap-3 mb-4">
-          <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
-            <Icon icon="heroicons:document-text" class="w-5 h-5 text-[var(--brand)]" />
-          </div>
-          <div class="min-w-0">
-            <h3 class="text-lg font-semibold txt-primary">
-              {{ $t('config.routing.summaryModelTitle') }}
-            </h3>
-            <p class="text-sm txt-secondary mt-0.5">
-              {{ $t('config.routing.summaryModelDesc') }}
-            </p>
-          </div>
-        </div>
-
-        <label class="block text-sm font-medium txt-primary mb-2" for="summary-model-select">
-          {{ $t('config.routing.summaryModelLabel') }}
-        </label>
-        <select
-          id="summary-model-select"
-          :value="summaryModelId ?? ''"
-          :disabled="loadingSummaryModel || savingSummaryModel"
-          class="w-full max-w-md px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
-          data-testid="select-summary-model"
-          @change="onSummaryModelChange(($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">{{ $t('config.routing.summaryModelAuto') }}</option>
-          <option v-for="model in plannerModels" :key="model.id" :value="model.id">
-            {{ model.name }} ({{ model.service }})
-          </option>
-        </select>
-
-        <p class="text-xs txt-secondary mt-2">
-          {{
-            summaryModelId === null
-              ? $t('config.routing.summaryModelFallbackHint')
-              : $t('config.routing.summaryModelGlobalHint')
-          }}
         </p>
       </div>
     </div>
@@ -537,18 +473,13 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import { mockSortingPrompt } from '@/mocks/sortingPrompt'
 import type { SortingPromptData } from '@/mocks/sortingPrompt'
 import { promptsApi } from '@/services/api/promptsApi'
 import type { SortingPromptPayload } from '@/services/api/promptsApi'
 import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
-import {
-  getModels,
-  getPlannerModel,
-  savePlannerModel,
-  getSummaryModel,
-  saveSummaryModel,
-} from '@/services/api/configApi'
+import { getModels, getPlannerModel, savePlannerModel } from '@/services/api/configApi'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { useAuthStore } from '@/stores/auth'
@@ -583,15 +514,6 @@ const plannerModels = ref<AIModel[]>([])
 const plannerModelId = ref<number | null>(null)
 const loadingPlannerModel = ref(false)
 const savingPlannerModel = ref(false)
-
-// --- Summary model selection (global DEFAULTMODEL.SUMMARIZE) ----------------
-// The model that condenses the older turns of a long chat into the rolling
-// summary. Global rather than per-user: it runs inside the server-side pipeline
-// for everyone and also writes widget titles and document summaries. `null`
-// means "no selection": summarization falls back to the Sorting model.
-const summaryModelId = ref<number | null>(null)
-const loadingSummaryModel = ref(false)
-const savingSummaryModel = ref(false)
 
 // --- Legacy fallback disclosure (collapsed by default) ----------------------
 const legacyOpen = ref(false)
@@ -929,38 +851,6 @@ const onPlannerModelChange = async (rawValue: string) => {
   }
 }
 
-// --- Summary model load / save ----------------------------------------------
-// Reuses the model pool already fetched for the planner dropdown.
-const loadSummaryModel = async () => {
-  loadingSummaryModel.value = true
-  try {
-    const res = await getSummaryModel()
-    summaryModelId.value = res.modelId
-  } catch (err) {
-    const message = err instanceof Error ? err.message : t('config.routing.summaryModelLoadFailed')
-    showError(message)
-  } finally {
-    loadingSummaryModel.value = false
-  }
-}
-
-const onSummaryModelChange = async (rawValue: string) => {
-  const nextId = rawValue === '' ? null : Number(rawValue)
-  const previous = summaryModelId.value
-  summaryModelId.value = nextId
-  savingSummaryModel.value = true
-  try {
-    await saveSummaryModel(nextId)
-    success(t('config.routing.summaryModelSaved'))
-  } catch (err) {
-    summaryModelId.value = previous
-    const message = err instanceof Error ? err.message : t('config.routing.summaryModelSaveFailed')
-    showError(message)
-  } finally {
-    savingSummaryModel.value = false
-  }
-}
-
 watch(locale, () => {
   loadSortingPrompt()
 })
@@ -971,7 +861,6 @@ onMounted(() => {
   if (isAdmin.value) {
     loadRoutingToggles()
     loadPlannerPrompt()
-    loadSummaryModel()
   }
 })
 </script>

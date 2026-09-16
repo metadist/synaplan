@@ -6,6 +6,7 @@ namespace App\Service\Media;
 
 use App\Entity\File;
 use App\Repository\FileRepository;
+use App\Service\File\Office\DocumentThumbnailDispatcher;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -20,6 +21,7 @@ final readonly class GeneratedFileRegistrar
         private FileRepository $files,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
     ) {
     }
 
@@ -65,11 +67,25 @@ final readonly class GeneratedFileRegistrar
             // inline + async media paths both reaching the same file).
             $existing = $this->files->findOneBy(['userId' => $userId, 'filePath' => $relativePath]);
             if ($existing instanceof File) {
+                $dirty = false;
+
                 // Backfill source text on an existing row that was registered
                 // before #1251 (empty BFILETEXT) so "Add to knowledge base"
                 // / describe can use the script without Whisper.
                 if (null !== $fileText && '' !== trim($fileText) && '' === trim($existing->getFileText())) {
                     $existing->setFileText($fileText);
+                    $dirty = true;
+                }
+
+                // Backfill the originating message on a row the generator
+                // created itself (e.g. ChatHandler documents) — it powers the
+                // Generated gallery's "Open in chat" jump.
+                if (null !== $messageId && null === $existing->getMessageId()) {
+                    $existing->setMessageId($messageId);
+                    $dirty = true;
+                }
+
+                if ($dirty) {
                     $this->files->save($existing);
                 }
 
@@ -107,6 +123,7 @@ final readonly class GeneratedFileRegistrar
             }
 
             $this->files->save($file);
+            $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
             return $file;
         } catch (\Throwable $e) {

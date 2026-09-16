@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { nextTick } from 'vue'
 import MessageAudio from '@/components/MessageAudio.vue'
 
 /**
@@ -95,9 +94,10 @@ describe('MessageAudio', () => {
     const audio = wrapper.find('[data-testid="media-audio-player"]')
     await audio.trigger('error')
 
-    // First retry waits 1s before reloading.
+    // First retry waits 1s, then mints a fresh credential before reloading —
+    // a rejected token is indistinguishable from a missing file here.
     vi.advanceTimersByTime(1000)
-    await nextTick()
+    await flushPromises()
 
     const retried = wrapper.find('[data-testid="media-audio-player"]')
     expect(retried.attributes('src')).toMatch(/_retry=\d+/)
@@ -114,16 +114,40 @@ describe('MessageAudio', () => {
     for (let i = 0; i < 3; i++) {
       await wrapper.find('[data-testid="media-audio-player"]').trigger('error')
       vi.advanceTimersByTime(5000)
-      await nextTick()
+      await flushPromises()
     }
 
     // Fourth failure exhausts the retry budget and surfaces the error state.
     await wrapper.find('[data-testid="media-audio-player"]').trigger('error')
-    await nextTick()
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="audio-load-error"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="media-audio-player"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-audio-download-fallback"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-audio-retry"]').exists()).toBe(true)
+  })
+
+  it('brings the player back when the user retries from the error state', async () => {
+    const wrapper = mount(MessageAudio, {
+      props: {
+        url: '/api/v1/files/uploads/13/voice.ogg',
+      },
+    })
+
+    for (let i = 0; i < 4; i++) {
+      await wrapper.find('[data-testid="media-audio-player"]').trigger('error')
+      vi.advanceTimersByTime(5000)
+      await flushPromises()
+    }
+    expect(wrapper.find('[data-testid="audio-load-error"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="btn-audio-retry"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="audio-load-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="media-audio-player"]').attributes('src')).toMatch(
+      /_retry=\d+/
+    )
   })
 
   it('does not let a play() rejection escape as an unhandled promise rejection', async () => {

@@ -8,16 +8,20 @@ use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Repository\FileRepository;
 use App\Service\BillingService;
+use App\Service\Chat\ChatTitleService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\ChatErrorNotifier;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -28,6 +32,7 @@ use App\Service\UsageStatsService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
+use App\Tests\Support\ChatRunServiceFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -54,6 +59,7 @@ class StreamControllerCancelledResultTest extends TestCase
             $this->createMock(WidgetService::class),
             $this->createMock(WidgetSessionService::class),
             $this->createMock(GuestSessionService::class),
+            $this->createStub(GuestChatConfig::class),
             $this->createMock(RateLimitService::class),
             '/tmp/upload',
             $this->createMock(UserUploadPathBuilder::class),
@@ -61,6 +67,7 @@ class StreamControllerCancelledResultTest extends TestCase
             $this->createMock(MessageForwardingService::class),
             $this->createMock(MemoryExtractionDispatcher::class),
             $this->createMock(ConversationSummaryRefreshDispatcher::class),
+            $this->createStub(ChatTitleService::class),
             $this->createMock(DocumentGeneratorService::class),
             $this->createMock(DocumentImageReferenceResolver::class),
             $this->createMock(MediaCancellationStore::class),
@@ -70,6 +77,12 @@ class StreamControllerCancelledResultTest extends TestCase
             $this->createMock(UsageStatsService::class),
             $this->createMock(UsageTaximeterConfig::class),
             new PremiumFeatureGate(new BillingService('', '')),
+            ChatRunServiceFactory::withoutRedis(),
+            $this->createMock(ChatErrorPresenter::class),
+            $this->createMock(ChatErrorNotifier::class),
+            $this->createMock(\App\Service\Agent\AgentConfig::class),
+            $this->createMock(\App\Service\Agent\AgentService::class),
+            $this->createMock(\App\Service\Agent\AgentRuntimeResolver::class),
         );
     }
 
@@ -93,6 +106,28 @@ class StreamControllerCancelledResultTest extends TestCase
     public function testSuccessfulTurnIsNeverACancellation(): void
     {
         $this->assertFalse($this->isCancelledResult(['success' => true, 'cancelled' => true]));
+    }
+
+    /**
+     * The DAG path used to report a cancel as an ordinary node failure, whose
+     * message was then persisted as a second, raw-English card (#1501). The
+     * marker is fixed at the source; this is the net that keeps a regression
+     * from reaching the chat.
+     */
+    public function testDagFailureThatIsReallyACancellationIsRecognised(): void
+    {
+        $this->assertTrue($this->isCancelledResult([
+            'success' => false,
+            'error' => 'chat failed: Stream cancelled by user',
+        ]));
+    }
+
+    public function testUnrelatedFailureMentioningTheUserIsStillAnError(): void
+    {
+        $this->assertFalse($this->isCancelledResult([
+            'success' => false,
+            'error' => 'chat failed: no input text for user prompt',
+        ]));
     }
 
     /**

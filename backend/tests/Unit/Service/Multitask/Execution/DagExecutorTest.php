@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask\Execution;
 
 use App\Entity\Message;
+use App\Service\Exception\StreamCancelledException;
 use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -20,6 +21,7 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Plan\TaskPlan;
 use Doctrine\Common\Collections\ArrayCollection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -77,10 +79,12 @@ final class DagExecutorTest extends TestCase
         };
     }
 
-    private function config(bool $parallel, int $cap = 3, int $timeout = 120): MultitaskRoutingConfig
+    private function config(bool $parallel, int $cap = 3, int $timeout = 120, ?int $expectedUserId = 1): MultitaskRoutingConfig
     {
         $config = $this->createMock(MultitaskRoutingConfig::class);
-        $config->method('isParallelEnabled')->willReturn($parallel);
+        $config->method('isParallelEnabled')
+            ->with($expectedUserId)
+            ->willReturn($parallel);
         $config->method('maxParallel')->willReturn($cap);
         $config->method('nodeTimeoutSeconds')->willReturn($timeout);
 
@@ -145,6 +149,48 @@ final class DagExecutorTest extends TestCase
             ['n1' => 'done', 'n2' => 'done', 'n3' => 'done', 'n4' => 'done'],
             $result['node_statuses'],
         );
+    }
+
+    /**
+     * A write-class step pauses the plan; resume() must mark that node as
+     * approved so the runner skips the gate (otherwise a second approval would
+     * be opened and the run would pause forever), merge the approved arguments,
+     * and continue with the dependents.
+     */
+    public function testResumeMarksNodeApprovedMergesArgsAndContinues(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_action', 'params' => ['server_id' => 3, 'tool' => 'create']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $gateConsultations = 0;
+        $runner = $this->runner(function (TaskNode $node, NodeContext $ctx) use (&$gateConsultations): NodeResult {
+            if (Capability::McpAction === $node->capability) {
+                if (!$ctx->isApproved($node->id)) {
+                    ++$gateConsultations;
+
+                    return NodeResult::waitingApproval(42, ['title' => 'draft']);
+                }
+
+                return NodeResult::ok('created '.$node->params['title']);
+            }
+
+            return NodeResult::ok((string) $ctx->resolveInputs($node)['text']);
+        });
+        $executor = $this->executor($runner);
+        $context = $this->context();
+
+        $paused = $executor->execute($plan, $context);
+        self::assertSame('waiting_approval', $paused['node_statuses']['n1']);
+        self::assertSame(1, $gateConsultations);
+
+        $resumed = $executor->resume($plan, $context, 'n1', ['title' => 'final']);
+        self::assertSame(1, $gateConsultations, 'the gate must not be consulted again after approval');
+        self::assertSame(['n1' => 'done', 'n2' => 'done'], $resumed['node_statuses']);
+        self::assertSame('created final', $resumed['content']);
     }
 
     /**
@@ -213,6 +259,44 @@ final class DagExecutorTest extends TestCase
         self::assertFalse($inline, 'terminal media node must keep the async detach');
     }
 
+    /**
+     * Issue #1873: parallel mode is resolved for the context user, not globally.
+     * A lookup that dropped the id (or passed a different one) would still pass
+     * a stub that ignores arguments.
+     */
+    public function testParallelLookupUsesTheContextUserIdAndNotAnotherIdentity(): void
+    {
+        $config = $this->createMock(MultitaskRoutingConfig::class);
+        $config->expects(self::once())
+            ->method('isParallelEnabled')
+            ->with(42)
+            ->willReturn(false);
+        $config->method('maxParallel')->willReturn(3);
+        $config->method('nodeTimeoutSeconds')->willReturn(120);
+
+        $executor = new DagExecutor(
+            new RunnerRegistry([$this->runner(fn (): NodeResult => NodeResult::ok('hi'))]),
+            new ResultAssembler(),
+            $this->dispatcher(),
+            $config,
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getText')->willReturn('hi');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $result = $executor->execute(
+            TaskPlan::singleChatPlan('en'),
+            new NodeContext($message, [], 42, ['language' => 'en']),
+        );
+
+        self::assertSame('hi', $result['content']);
+    }
+
     public function testFailureIsolationSkipsDependentsButRunsIndependentBranch(): void
     {
         // n1 fails -> n2 (depends n1) skipped; n3 (independent) still runs; reply = n3.
@@ -271,6 +355,34 @@ final class DagExecutorTest extends TestCase
         self::assertSame('failed', $result['node_statuses']['n1']);
         // Best-effort content rather than a crash.
         self::assertNotSame('', $result['content']);
+    }
+
+    /**
+     * A user cancel is the ONE throw that must not be isolated: ending the turn
+     * is the point. Swallowing it into a failed node dropped the `cancelled`
+     * marker, and the caller's failure path then wrote a second assistant card
+     * with raw English text for a single Stop click (#1501).
+     */
+    #[DataProvider('executionModes')]
+    public function testUserCancellationEndsTheWholeTurnInsteadOfFailingOneNode(bool $parallel): void
+    {
+        $runner = $this->runner(function (): NodeResult {
+            throw new StreamCancelledException('Stream cancelled by user');
+        });
+
+        $this->expectException(StreamCancelledException::class);
+
+        $this->executor($runner, parallel: $parallel)
+            ->execute(TaskPlan::singleChatPlan('en'), $this->context());
+    }
+
+    /**
+     * @return iterable<string, array{bool}>
+     */
+    public static function executionModes(): iterable
+    {
+        yield 'sequential' => [false];
+        yield 'parallel' => [true];
     }
 
     public function testProgressCallbackEmitsPerNodeStateUpdates(): void

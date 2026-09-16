@@ -8,14 +8,20 @@ import { useNotification } from '@/composables/useNotification'
 import type { AIModel, Capability } from '@/types/ai-models'
 import MessageText from '@/components/MessageText.vue'
 import TaskCardMedia from '@/components/multitask/TaskCardMedia.vue'
+import ComputeRunCard from '@/components/multitask/ComputeRunCard.vue'
 
-const props = defineProps<{ card: TaskCard }>()
+const props = defineProps<{
+  card: TaskCard
+  /** Shared/guest views only — logged-in chat must keep memory hover popups. */
+  isReadonly?: boolean
+}>()
 
 const emit = defineEmits<{
   /** Retry a failed media step with another model (new turn via the Again path). */
   retry: [payload: { prompt: string; modelId: number }]
   /** Stop a running media step (per-card Stop button). */
   cancel: [nodeId: string]
+  followup: [prompt: string]
 }>()
 
 const aiConfigStore = useAiConfigStore()
@@ -36,6 +42,10 @@ const iconForKind = computed(() => {
       return 'mdi:text-box-search-outline'
     case 'email':
       return 'mdi:email-outline'
+    case 'folder':
+      return 'mdi:folder-outline'
+    case 'compute':
+      return 'mdi:file-chart-outline'
     default:
       return 'mdi:text-box-outline'
   }
@@ -54,8 +64,10 @@ const showSkeleton = computed(
     props.card.state !== 'cancelled'
 )
 
-// Only media steps run long enough to be worth stopping; the button shows while
-// such a step is in flight.
+// Stop is wired only for media (MediaCancellationStore). Compute cancellation
+// goes through ComputeClient::cancel() on the PHP wait timeout, not this button.
+const isComputeKind = computed(() => props.card.kind === 'compute')
+
 const canCancel = computed(() => isMediaKind.value && props.card.state === 'running')
 
 // Live render progress (e.g. Higgsfield video) — a moving bar instead of a
@@ -169,7 +181,7 @@ const handleRetry = () => {
 
 <template>
   <div
-    class="task-card rounded-xl border p-3 transition-colors"
+    class="task-card rounded-xl border p-3 transition-colors overflow-visible"
     :class="{
       'task-card--pending': card.state === 'pending',
       'task-card--running': card.state === 'running',
@@ -249,6 +261,11 @@ const handleRetry = () => {
           class="w-4 h-4 txt-muted"
         />
         <Icon
+          v-else-if="card.state === 'waiting_approval'"
+          icon="mdi:hand-back-right-outline"
+          class="w-4 h-4 text-[var(--brand)]"
+        />
+        <Icon
           v-else-if="card.state === 'cancelled'"
           icon="mdi:stop-circle-outline"
           class="w-4 h-4 txt-muted"
@@ -270,7 +287,14 @@ const handleRetry = () => {
     </div>
 
     <!-- Body -->
-    <div v-if="card.state === 'failed'" class="space-y-2">
+    <ComputeRunCard
+      v-if="isComputeKind"
+      :card="card"
+      :is-readonly="isReadonly"
+      @followup="emit('followup', $event)"
+    />
+
+    <div v-else-if="card.state === 'failed'" class="space-y-2">
       <!-- Specific backend error when available, generic copy otherwise -->
       <p class="text-sm txt-muted break-words" data-testid="task-card-error">
         {{ card.error || $t('taskPlan.failedBody') }}
@@ -332,7 +356,7 @@ const handleRetry = () => {
           v-if="isProseKind"
           :content="card.text"
           :is-streaming="card.state === 'running'"
-          readonly
+          :readonly="isReadonly"
         />
         <p v-else class="whitespace-pre-wrap">{{ card.text }}</p>
         <span v-if="card.state === 'running'" class="task-card__cursor" aria-hidden="true">▍</span>
@@ -361,8 +385,15 @@ const handleRetry = () => {
 
 <style scoped>
 .task-card {
+  position: relative;
+  z-index: 0;
+  overflow: visible;
   background: var(--surface-card, rgba(127, 127, 127, 0.04));
   border-color: var(--border-color, rgba(127, 127, 127, 0.2));
+}
+.task-card:hover,
+.task-card:focus-within {
+  z-index: 20;
 }
 .task-card--running {
   border-color: var(--brand);

@@ -7,14 +7,38 @@ namespace App\Service\Admin;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\SecretValueGuard;
+use App\Bundle\BundleConfig;
+use App\Module\Gate\ModuleGateConfig;
+use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
+use App\Seed\ModuleGateSeeder;
+use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
+use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\MobileVersionService;
+use App\Service\Compute\ComputeClient;
+use App\Service\Compute\ComputeConfig;
+use App\Service\Config\LayeredConfigResolver;
+use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Digest\MessageDigestConfig;
+use App\Service\Document\DocumentToolsConfig;
+use App\Service\Dropbox\DropboxOAuthConfig;
+use App\Service\EncryptionService;
+use App\Service\Feature\FeatureFlagEnv;
 use App\Service\FeedbackConstants;
+use App\Service\GuestChatConfig;
+use App\Service\Iam\IamConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
+use App\Service\Mcp\McpClientConfig;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Message\ConversationSummaryConstants;
+use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\PlatformLink\PlatformLinksConfig;
+use App\Service\RegistrationConfig;
+use App\Service\SavedTask\SavedTaskConfig;
+use App\Service\SavedTask\WorkflowsConfig;
+use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
 
@@ -31,7 +55,7 @@ final readonly class SystemConfigService
     private const DB_GROUP = 'QDRANT_SEARCH';
     private const DB_OWNER_ID = 0;
 
-    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}> */
+    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}> */
     private array $schema;
 
     public function __construct(
@@ -40,14 +64,132 @@ final readonly class SystemConfigService
         private readonly ConfigRepository $configRepository,
         private readonly string $defaultTtsUrl,
         private readonly ProviderKeyStore $providerKeyStore,
+        private readonly EncryptionService $encryption,
+        private readonly RegistrationConfig $registrationConfig,
+        private readonly GuestChatConfig $guestChatConfig,
+        private readonly FeatureFlagEnv $featureFlagEnv = new FeatureFlagEnv(),
+        private readonly ?ModuleRegistry $modules = null,
+        private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
+        private readonly ?ComputeClient $computeClient = null,
     ) {
-        $this->schema = $this->buildSchema();
+        $this->schema = $this->markManagedFields($this->buildSchema());
+    }
+
+    /**
+     * Instance provider keys have exactly one editor: AI infrastructure ›
+     * Models & keys ({@see ProviderKeyStore}). Every field whose key is an env
+     * var the {@see ProviderKeyCatalog} manages stays readable here — so the
+     * response shape of /api/v1/admin/system-config does not change — but is
+     * flagged `managedBy` so the UI renders a pointer instead of an input and
+     * {@see self::setValue()} refuses the write.
+     *
+     * @param array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}> $schema
+     *
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}>
+     */
+    private function markManagedFields(array $schema): array
+    {
+        foreach (ProviderKeyCatalog::managedEnvVars() as $envVar) {
+            if (!isset($schema[$envVar])) {
+                continue;
+            }
+            $schema[$envVar]['managedBy'] = ProviderKeyCatalog::MANAGED_BY;
+            // Stored encrypted in BCONFIG by the store and applied per call.
+            $schema[$envVar]['source'] = 'database';
+        }
+
+        return $schema;
+    }
+
+    /**
+     * The Features tab: every wave feature flag in one place, grouped by what
+     * the user sees. Field keys double as the environment variable that pins
+     * the flag for automated deployments ({@see FeatureFlagEnv::envVarFor}).
+     *
+     * @return array<string, array{label: string, fields: array<string>}>
+     */
+    private function featureSections(): array
+    {
+        $sections = [
+            'people' => ['label' => 'People & sharing', 'fields' => [
+                'FEATURE_IAM_GROUPS_ENABLED',
+                'FEATURE_IAM_SHARING_ENABLED',
+                'FEATURE_IAM_GROUP_POLICIES_ENABLED',
+                'FEATURE_IAM_DIRECTORY_SYNC_ENABLED',
+            ]],
+            'assistants' => ['label' => 'AI assistants', 'fields' => [
+                'FEATURE_AGENTS_ENABLED',
+                'FEATURE_AGENTS_ROUTABLE_ENABLED',
+                'FEATURE_BUNDLE_ENABLED',
+            ]],
+            'tasks' => ['label' => 'Saved tasks & watched pages', 'fields' => [
+                'FEATURE_WORKFLOWS_BUILDER_ENABLED',
+                'FEATURE_MULTITASK_URL_FETCH_ENABLED',
+            ]],
+            'tools' => ['label' => 'Tools & approvals', 'fields' => [
+                'FEATURE_TOOLS_REGISTRY_ENABLED',
+                'FEATURE_TOOLS_APPROVALS_ENABLED',
+                'FEATURE_TOOLS_CUSTOM_HTTP_ENABLED',
+            ]],
+            'documents' => ['label' => 'Office documents', 'fields' => [
+                'FEATURE_DOCUMENT_TOOLS_ENABLED',
+            ]],
+            'platforms' => ['label' => 'Desktop & partner platforms', 'fields' => [
+                'FEATURE_DESKTOP_AGENT_ENABLED',
+                'FEATURE_PLATFORM_LINKS_ENABLED',
+            ]],
+        ];
+
+        $gateKeys = array_keys($this->moduleGateFields());
+        if ([] !== $gateKeys) {
+            $sections['modules'] = ['label' => 'Optional modules — hide what is not configured', 'fields' => $gateKeys];
+        }
+
+        return $sections;
+    }
+
+    /**
+     * One boolean per declared feature module: `MODULES.GATE_<ID>`.
+     * New-install defaults come from {@see ModuleGateSeeder::defaultValue()}.
+     * ON answers 404 on the module's routes and hides its cards while the
+     * module is not configured.
+     *
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source: string, dbGroup: string, dbKey: string}>
+     */
+    private function moduleGateFields(): array
+    {
+        if (null === $this->modules) {
+            return [];
+        }
+
+        $fields = [];
+        foreach ($this->modules->ids() as $id) {
+            $setting = ModuleGateConfig::settingFor($id);
+            $onByDefault = '1' === ModuleGateSeeder::defaultValue($id);
+            $fields[FeatureFlagEnv::envVarFor(ModuleGateConfig::GROUP, $setting)] = [
+                'tab' => 'features', 'section' => 'modules', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => sprintf(
+                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. %s Configure the module first — see Operate → Feature status.',
+                    $id,
+                    $onByDefault
+                        ? 'On is the shipped default for new installs.'
+                        : 'Off (the shipped default) keeps the module visible with a "needs setup" state.',
+                ),
+                'default' => $onByDefault ? 'true' : 'false',
+                'source' => 'database',
+                'dbGroup' => ModuleGateConfig::GROUP,
+                'dbKey' => $setting,
+            ];
+        }
+
+        return $fields;
     }
 
     /**
      * Get the configuration schema with field definitions.
      *
-     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}>}
+     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}>}
      */
     public function getSchema(): array
     {
@@ -56,7 +198,7 @@ final readonly class SystemConfigService
                 'label' => 'AI Services',
                 'sections' => [
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
-                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
+                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
                     'media' => ['label' => 'Image & Video Generation', 'fields' => ['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET']],
                     'embeddings' => ['label' => 'Embeddings (Cloudflare Workers AI)', 'fields' => ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'EMBEDDING_FALLBACK_PROVIDER']],
@@ -90,6 +232,7 @@ final readonly class SystemConfigService
             'auth' => [
                 'label' => 'Authentication',
                 'sections' => [
+                    'access' => ['label' => 'Who can use this instance', 'fields' => ['REGISTRATION_ENABLED', 'GUEST_CHAT_ENABLED']],
                     'recaptcha' => ['label' => 'reCAPTCHA v3', 'fields' => ['RECAPTCHA_ENABLED', 'RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY', 'RECAPTCHA_MIN_SCORE']],
                     'google' => ['label' => 'Google OAuth 2.0', 'fields' => ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CLOUD_PROJECT_ID']],
                     'github' => ['label' => 'GitHub OAuth 2.0', 'fields' => ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']],
@@ -102,22 +245,65 @@ final readonly class SystemConfigService
                 'sections' => [
                     'whatsapp' => ['label' => 'WhatsApp Business API', 'fields' => ['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN']],
                     'gmail' => ['label' => 'Smart Mail (Gmail IMAP)', 'fields' => ['GMAIL_USERNAME', 'GMAIL_PASSWORD']],
+                    'm365' => ['label' => 'Microsoft 365 (Graph)', 'fields' => [
+                        'M365_ENABLED', 'M365_CLIENT_ID', 'M365_CLIENT_SECRET', 'M365_TENANT', 'M365_REDIRECT_URI',
+                    ]],
+                    'dropbox' => ['label' => 'Dropbox', 'fields' => [
+                        'DROPBOX_ENABLED', 'DROPBOX_APP_KEY', 'DROPBOX_APP_SECRET', 'DROPBOX_REDIRECT_URI',
+                    ]],
+                    'mcp' => ['label' => 'MCP servers', 'fields' => ['MCP_CLIENT_ENABLED', 'MCP_OAUTH_CONNECTORS_ENABLED']],
                 ],
             ],
             'processing' => [
                 'label' => 'Processing',
                 'sections' => [
                     'tika' => ['label' => 'Apache Tika', 'fields' => ['TIKA_BASE_URL', 'TIKA_TIMEOUT_MS', 'TIKA_RETRIES', 'TIKA_HTTP_USER', 'TIKA_HTTP_PASS']],
+                    'docling' => ['label' => 'Docling', 'fields' => ['DOCLING_BASE_URL', 'DOCLING_TIMEOUT_MS', 'DOCLING_MAX_BYTES']],
                     'rasterize' => ['label' => 'PDF Rasterizer', 'fields' => ['RASTERIZE_DPI', 'RASTERIZE_PAGE_CAP', 'RASTERIZE_TIMEOUT_MS']],
                     'whisper' => ['label' => 'Whisper (Audio)', 'fields' => ['WHISPER_ENABLED', 'WHISPER_DEFAULT_MODEL']],
                     'brave' => ['label' => 'Web Search (Brave)', 'fields' => ['BRAVE_SEARCH_ENABLED', 'BRAVE_SEARCH_API_KEY', 'BRAVE_SEARCH_COUNT']],
                     'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
+                    'compute' => ['label' => 'File work', 'fields' => [
+                        'COMPUTE_ENABLED',
+                        'COMPUTE_WORKSPACES_ENABLED',
+                        'COMPUTE_EGRESS_ENABLED',
+                        'COMPUTE_EGRESS_REQUIRES_APPROVAL',
+                        'COMPUTE_EGRESS_MAX_HOSTS',
+                        'COMPUTE_DEFAULT_TIMEOUT_SEC',
+                        'COMPUTE_DEFAULT_MEMORY_MB',
+                        'COMPUTE_DEFAULT_CPU',
+                        'COMPUTE_DEFAULT_PIDS',
+                        'COMPUTE_DEFAULT_OUTPUT_MB',
+                        'COMPUTE_MAX_TIMEOUT_SEC',
+                        'COMPUTE_POLICY_INTERACTIVE',
+                        'COMPUTE_POLICY_UNATTENDED',
+                        'COMPUTE_WORKSPACE_TTL_DAYS',
+                    ]],
+                ],
+            ],
+            'features' => [
+                'label' => 'Features',
+                'sections' => $this->featureSections(),
+            ],
+            'sharing' => [
+                'label' => 'Sharing',
+                'sections' => [
+                    'everyone' => ['label' => 'Everyone', 'fields' => ['IAM_EVERYONE_SHARES']],
+                    'directory' => ['label' => 'Directory groups', 'fields' => ['IAM_DIRECTORY_GROUPS_CLAIM', 'IAM_DIRECTORY_GROUP_NAMES']],
+                    'audit' => ['label' => 'People & audit', 'fields' => ['IAM_ADMIN_IMPERSONATION', 'IAM_AUDIT_RETENTION_DAYS']],
                 ],
             ],
             'routing' => [
                 'label' => 'Routing',
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
+                    'saved_tasks' => ['label' => 'Saved Tasks', 'fields' => ['SAVEDTASKS_ENABLED']],
+                    'tools' => ['label' => 'Tool policies', 'fields' => [
+                        'TOOLS_POLICY_READ',
+                        'TOOLS_POLICY_WRITE',
+                        'TOOLS_POLICY_DESTRUCTIVE',
+                        'TOOLS_APPROVAL_EXPIRY_HOURS',
+                    ]],
                     'conversation_summary' => ['label' => 'Rolling conversation summary', 'fields' => [
                         'CONVERSATION_SUMMARY_ENABLED',
                         'CONVERSATION_SUMMARY_TARGET_WINDOW_CHARS',
@@ -127,12 +313,30 @@ final readonly class SystemConfigService
                         'CONVERSATION_SUMMARY_TIERS',
                         'CONVERSATION_SUMMARY_CACHE_TTL',
                     ]],
+                    'deep_memory' => ['label' => 'Deep memory (message digests)', 'fields' => [
+                        'DIGEST_ENABLED',
+                        'DIGEST_TOP_K',
+                        'DIGEST_MIN_SCORE',
+                        'DIGEST_RECENCY_HALF_LIFE_DAYS',
+                        'DIGEST_PULL_TOP_N',
+                        'DIGEST_PULL_MIN_SCORE',
+                        'DIGEST_BLOCK_MAX_CHARS',
+                        'DIGEST_BATCH_SIZE',
+                        'DIGEST_MAX_BATCHES_PER_USER',
+                        'DIGEST_QUIET_SECONDS',
+                        'DIGEST_MAX_PER_USER',
+                    ]],
                 ],
             ],
             'interface' => [
                 'label' => 'Interface',
                 'sections' => [
                     'usage_display' => ['label' => 'Usage display', 'fields' => ['USAGE_TAXIMETER_ENABLED']],
+                    'progress_narration' => ['label' => 'Chat progress narration', 'fields' => [
+                        'PROGRESS_SHOW_STEPS',
+                        'PROGRESS_SHOW_MODELS',
+                        'PROGRESS_SHOW_TIMINGS',
+                    ]],
                 ],
             ],
             'guest_landing' => [
@@ -168,7 +372,7 @@ final readonly class SystemConfigService
     /**
      * Get current configuration values with sensitive fields masked.
      *
-     * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool}>
+     * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool, envOverride?: bool, effectiveValue?: string, locked?: bool, keySource?: string}>
      */
     public function getValues(?int $actingUserId = null): array
     {
@@ -177,31 +381,58 @@ final readonly class SystemConfigService
         foreach ($this->schema as $key => $field) {
             $source = $field['source'] ?? 'env';
 
-            // Cloud provider API keys live in the encrypted ProviderKeyStore
+            // Instance provider keys live in the encrypted ProviderKeyStore
             // (BCONFIG), not in .env — report their status from there so this
-            // legacy surface and the provider-key wizard agree.
+            // legacy surface and Models & keys agree. The secret half of a
+            // key + secret pair reports its own presence.
             $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
             if (null !== $storeProvider) {
                 $status = $this->providerKeyStore->getStatus($storeProvider);
+                // Each half of a pair reports its own presence so a missing
+                // secret is visible. An env-imported DB row is still "from
+                // the environment / Helm", not a UI override.
+                $isSet = ProviderKeyCatalog::isSecretEnvVar($key)
+                    ? $status['hasSecret']
+                    : '' !== $status['maskedKey'];
+                $keySource = 'db' === $status['source'] && ProviderKeyStore::ORIGIN_ENV === $status['origin']
+                    ? 'env'
+                    : $status['source'];
                 $values[$key] = [
-                    'value' => $status['configured'] ? self::MASK : $field['default'],
-                    'isSet' => $status['configured'],
-                    'isMasked' => $status['configured'],
+                    'value' => $isSet ? self::MASK : $field['default'],
+                    'isSet' => $isSet,
+                    'isMasked' => $isSet,
+                    'keySource' => $keySource,
                 ];
                 continue;
             }
 
             if ('database' === $source) {
-                $rawValue = $this->configRepository->getValue(
-                    self::DB_OWNER_ID,
-                    $field['dbGroup'] ?? self::DB_GROUP,
-                    $field['dbKey'] ?? $key,
-                );
+                $dbGroup = $field['dbGroup'] ?? self::DB_GROUP;
+                $dbKey = $field['dbKey'] ?? $key;
+                $rawValue = $this->configRepository->getValue(self::DB_OWNER_ID, $dbGroup, $dbKey);
                 $isSet = null !== $rawValue && '' !== $rawValue;
+                $locked = $this->configRepository
+                    ->findByOwnerGroupAndSetting(self::DB_OWNER_ID, $dbGroup, $dbKey)
+                    ?->isBlocked() ?? false;
+
+                // A database-backed secret (e.g. an OAuth client secret) is
+                // stored encrypted and must be masked here for the same reason
+                // an env secret is: this response reaches the admin UI.
+                if ($field['sensitive']) {
+                    $values[$key] = [
+                        'value' => $isSet ? self::MASK : $field['default'],
+                        'isSet' => $isSet,
+                        'isMasked' => $isSet,
+                        'locked' => $locked,
+                    ];
+                    continue;
+                }
+
                 $values[$key] = [
-                    'value' => $rawValue ?? $field['default'],
+                    'value' => $this->normalizeStoredValue($field, $rawValue) ?? $field['default'],
                     'isSet' => $isSet,
                     'isMasked' => false,
+                    'locked' => $locked,
                 ];
             } else {
                 $rawValue = $this->getEnvValue($key);
@@ -221,6 +452,37 @@ final readonly class SystemConfigService
                     ];
                 }
             }
+        }
+
+        // The access-surface flags are stored in BCONFIG but an explicit
+        // environment variable still wins. Report that, otherwise the page shows
+        // a toggle the operator can move while nothing changes — the exact kind
+        // of silent no-op that costs an afternoon of debugging.
+        foreach ([
+            'REGISTRATION_ENABLED' => $this->registrationConfig->envOverride(),
+            'GUEST_CHAT_ENABLED' => $this->guestChatConfig->envOverride(),
+        ] as $key => $envOverride) {
+            if (!isset($values[$key]) || null === $envOverride) {
+                continue;
+            }
+
+            $values[$key]['envOverride'] = true;
+            $values[$key]['effectiveValue'] = $envOverride ? 'true' : 'false';
+        }
+
+        // Same rule for every wave feature flag on the Features tab: an
+        // automated deployment pins it with FEATURE_<GROUP>_<SETTING>, and the
+        // toggle must show that instead of pretending to be movable.
+        foreach ($this->schema as $key => $field) {
+            if ('features' !== $field['tab'] || 'boolean' !== $field['type'] || !isset($values[$key], $field['dbGroup'], $field['dbKey'])) {
+                continue;
+            }
+            $pinned = $this->featureFlagEnv->forced($field['dbGroup'], $field['dbKey']);
+            if (null === $pinned) {
+                continue;
+            }
+            $values[$key]['envOverride'] = true;
+            $values[$key]['effectiveValue'] = $pinned ? 'true' : 'false';
         }
 
         // #1079: surface effective multitask routing for the acting admin so the
@@ -249,7 +511,10 @@ final readonly class SystemConfigService
     /**
      * Update a single configuration value.
      *
-     * @return array{success: bool, requiresRestart: bool, message?: string}
+     * `managedBy` in a failed result means the field has another editor
+     * (Models & keys); the controller answers 422 and the message names it.
+     *
+     * @return array{success: bool, requiresRestart: bool, message?: string, managedBy?: string}
      */
     public function setValue(string $key, string $value, ?int $actingUserId = null): array
     {
@@ -259,6 +524,18 @@ final readonly class SystemConfigService
 
         $field = $this->schema[$key];
         $source = $field['source'] ?? 'env';
+
+        // One editor per key: instance provider keys are saved, tested and
+        // removed under AI infrastructure › Models & keys. Writing them here
+        // would bypass the live check and the key + secret pairing rule.
+        if (isset($field['managedBy'])) {
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'managedBy' => $field['managedBy'],
+                'message' => sprintf('%s is managed under AI infrastructure › Models & keys (/admin/setup). Save, test or remove the key there.', $key),
+            ];
+        }
 
         // Reading a sensitive field returns self::MASK, so a client that submits
         // the form unchanged (or retries it) sends the mask back. Storing that
@@ -272,38 +549,14 @@ final readonly class SystemConfigService
             ];
         }
 
-        // Cloud provider API keys are stored encrypted in the ProviderKeyStore
-        // and apply without a restart (providers resolve keys per call). An empty
-        // value removes the stored key (an env fallback, if set, then applies
-        // again) — the admin UI clears keys on the setup page instead, so this
-        // branch serves API clients that PUT an empty string.
-        $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
-        if (null !== $storeProvider) {
-            try {
-                if ('' === trim($value)) {
-                    $this->providerKeyStore->deleteKey($storeProvider);
-                } else {
-                    $this->providerKeyStore->saveKey($storeProvider, $value, ProviderKeyStore::ORIGIN_UI);
-                }
-                $this->logChange($key, $value);
-
-                return ['success' => true, 'requiresRestart' => false];
-            } catch (\InvalidArgumentException $e) {
-                // Rejected value (placeholder, mask) — the message names the
-                // problem and is safe to show: it never contains a real key.
-                return ['success' => false, 'requiresRestart' => false, 'message' => $e->getMessage()];
-            } catch (\Throwable $e) {
-                $this->logger->error('Failed to save provider key via system config', [
-                    'key' => $key,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to save the API key'];
-            }
-        }
-
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
+            $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value)
+                ?? $this->refuseComputeFeatureSidecarLacks($key, $value);
+            if (null !== $capRefuse) {
+                return $capRefuse;
+            }
+
             return $this->setDatabaseValue($key, $value, $field, $actingUserId);
         }
 
@@ -356,7 +609,7 @@ final readonly class SystemConfigService
     /**
      * Save a database-backed configuration value with validation.
      *
-     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string} $field
+     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string, encrypted?: bool} $field
      *
      * @return array{success: bool, requiresRestart: bool, message?: string}
      */
@@ -391,16 +644,43 @@ final readonly class SystemConfigService
             ) {
                 return ['success' => false, 'requiresRestart' => false, 'message' => 'Value must be a positive whole number'];
             }
+
+            // Deep-memory knobs: scores are 0.0–1.0 floats; PULL_TOP_N may be
+            // 0 (disables verbatim pulling); everything else is a positive
+            // whole number. MessageDigestConfig clamps out-of-range values,
+            // so a row that would be silently corrected is rejected here.
+            if (MessageDigestConfig::CONFIG_GROUP === ($field['dbGroup'] ?? null)) {
+                if (str_contains($key, 'MIN_SCORE')) {
+                    if ($numericValue < 0.0 || $numericValue > 1.0) {
+                        return ['success' => false, 'requiresRestart' => false, 'message' => 'Score must be between 0.0 and 1.0'];
+                    }
+                } elseif (floor($numericValue) !== $numericValue
+                    || $numericValue < ('DIGEST_PULL_TOP_N' === $key ? 0 : 1)
+                ) {
+                    return ['success' => false, 'requiresRestart' => false, 'message' => 'DIGEST_PULL_TOP_N' === $key
+                        ? 'Value must be a whole number (0 disables pulling)'
+                        : 'Value must be a positive whole number'];
+                }
+            }
         }
 
         $group = $field['dbGroup'] ?? self::DB_GROUP;
         $setting = $field['dbKey'] ?? $key;
 
+        // Encrypted fields hold a real credential; clearing one means storing
+        // an empty row, not an empty ciphertext nobody can distinguish.
+        $stored = ($field['encrypted'] ?? false) && '' !== $value
+            ? $this->encryption->encrypt($value)
+            : $value;
+
         try {
-            $this->configRepository->setValue(self::DB_OWNER_ID, $group, $setting, $value);
+            $this->configRepository->setValue(self::DB_OWNER_ID, $group, $setting, $stored);
             $this->logChange($key, $value);
 
             $this->applyConfigSideEffects($group, $setting, $value, $actingUserId);
+            // Resolvers memoize per request; the admin's own follow-up reads in
+            // this request (and the next worker-mode request) must see the write.
+            $this->layeredConfigResolver?->reset();
 
             return ['success' => true, 'requiresRestart' => false];
         } catch (\Throwable $e) {
@@ -408,6 +688,85 @@ final readonly class SystemConfigService
 
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Database write failed'];
         }
+    }
+
+    /**
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeAboveSidecarCap(string $key, string $value): ?array
+    {
+        $map = [
+            'COMPUTE_DEFAULT_TIMEOUT_SEC' => ['timeoutSec', 'seconds'],
+            'COMPUTE_MAX_TIMEOUT_SEC' => ['timeoutSec', 'seconds'],
+            'COMPUTE_DEFAULT_MEMORY_MB' => ['memoryMb', 'MB of memory'],
+            'COMPUTE_DEFAULT_CPU' => ['cpu', 'CPU'],
+            'COMPUTE_DEFAULT_PIDS' => ['pids', 'processes'],
+            'COMPUTE_DEFAULT_OUTPUT_MB' => ['outputMb', 'MB of result files'],
+        ];
+        if (!isset($map[$key]) || null === $this->computeClient || !is_numeric($value)) {
+            return null;
+        }
+        try {
+            $caps = $this->computeClient->health()->caps;
+        } catch (\Throwable) {
+            return null;
+        }
+        [$capKey, $unit] = $map[$key];
+        $cap = $caps[$capKey];
+        if ((float) $value <= (float) $cap) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => sprintf(
+                'This installation\'s file-work limit is %s %s. Enter a value at or below that.',
+                $cap,
+                $unit,
+            ),
+        ];
+    }
+
+    /**
+     * A compute child flag may only be switched on when the connected sidecar
+     * reports the feature in `GET /v1/health`. Otherwise the UI would show a
+     * Workspace tab or promise website access that every run then refuses
+     * (U11: a flag must never be a teaser). Switching off is always allowed.
+     *
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeFeatureSidecarLacks(string $key, string $value): ?array
+    {
+        $map = [
+            'COMPUTE_WORKSPACES_ENABLED' => ['workspaces', 'Persistent file-work folders are'],
+            'COMPUTE_EGRESS_ENABLED' => ['egress', 'Website access for file work is'],
+        ];
+        if (!isset($map[$key]) || null === $this->computeClient) {
+            return null;
+        }
+        if (!in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true)) {
+            return null;
+        }
+        try {
+            $features = $this->computeClient->health()->features;
+        } catch (\Throwable) {
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'message' => 'File work is not reachable right now. The switch stays off.',
+            ];
+        }
+        [$featureKey, $subject] = $map[$key];
+        if ($features[$featureKey]) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => $subject.' not offered by this installation\'s compute sidecar yet. The switch stays off.',
+        ];
     }
 
     /**
@@ -420,59 +779,54 @@ final readonly class SystemConfigService
      */
     private function applyConfigSideEffects(string $group, string $key, string $value, ?int $actingUserId = null): void
     {
-        // Multi-task routing master switch: a per-user row overrides this global
-        // flag (the Version20260607000000 grandfather rows are gone since
-        // Version20260706130000, but hand-set overrides can still exist). Drop
-        // the acting admin's own override so the value they just set actually
-        // applies to their own account immediately.
-        if (MultitaskRoutingConfig::CONFIG_GROUP === $group
-            && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    MultitaskRoutingConfig::CONFIG_GROUP,
-                    MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user multitask routing override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user multitask override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
+        // Every flag below resolves the per-user row before the global one, so an
+        // admin still carrying an own override would not see the value they just
+        // set. Some of those rows come from a migration (async media,
+        // Version20260629120000; multi-task grandfathering from
+        // Version20260607000000, dropped again in Version20260706130000), others
+        // were set by hand.
+        /** @var list<array{string, string, string}> $perUserOverrides */
+        $perUserOverrides = [
+            [SavedTaskConfig::CONFIG_GROUP, SavedTaskConfig::KEY_ENABLED, 'saved-tasks'],
+            [WorkflowsConfig::CONFIG_GROUP, WorkflowsConfig::KEY_BUILDER_ENABLED, 'workflow builder'],
+            [AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ENABLED, 'assistants'],
+            [AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ROUTABLE_ENABLED, 'routable assistants'],
+            [BundleConfig::CONFIG_GROUP, BundleConfig::KEY_ENABLED, 'bundle export'],
+            [McpClientConfig::CONFIG_GROUP, McpClientConfig::KEY_CLIENT_ENABLED, 'MCP client'],
+            [MultitaskRoutingConfig::CONFIG_GROUP, MultitaskRoutingConfig::KEY_ROUTING_ENABLED, 'multitask routing'],
+            [MediaJobConfig::CONFIG_GROUP, MediaJobConfig::KEY_ASYNC_JOBS_ENABLED, 'async media'],
+        ];
+
+        foreach ($perUserOverrides as [$overrideGroup, $overrideKey, $label]) {
+            if ($group === $overrideGroup && $key === $overrideKey) {
+                $this->clearActingUserOverride($overrideGroup, $overrideKey, $label, $value, $actingUserId);
+
+                return;
             }
         }
+    }
 
-        // Async media master switch: existing users were grandfathered to an
-        // explicit per-user OFF row (migration Version20260629120000), which
-        // overrides this global flag. Drop the acting admin's own override so the
-        // value they just set actually applies to their own account immediately.
-        if (MediaJobConfig::CONFIG_GROUP === $group
-            && MediaJobConfig::KEY_ASYNC_JOBS_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    MediaJobConfig::CONFIG_GROUP,
-                    MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user async media override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user async media override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
-            }
+    /**
+     * Drop the acting admin's own row for a flag that was just set globally.
+     */
+    private function clearActingUserOverride(string $group, string $key, string $label, string $globalValue, ?int $actingUserId): void
+    {
+        if (null === $actingUserId || $actingUserId <= 0) {
+            return;
+        }
+
+        try {
+            $removed = $this->configRepository->deleteValue($actingUserId, $group, $key);
+            $this->logger->info('SystemConfigService: cleared admin per-user '.$label.' override', [
+                'userId' => $actingUserId,
+                'removed' => $removed,
+                'globalValue' => $globalValue,
+            ]);
+        } catch (\Throwable $sideEffect) {
+            $this->logger->error('SystemConfigService: failed clearing per-user '.$label.' override', [
+                'userId' => $actingUserId,
+                'error' => $sideEffect->getMessage(),
+            ]);
         }
     }
 
@@ -486,6 +840,7 @@ final readonly class SystemConfigService
         return match ($service) {
             'ollama' => $this->testOllama(),
             'tika' => $this->testTika(),
+            'docling' => $this->testDocling(),
             'qdrant' => $this->testQdrant(),
             'mailer' => $this->testMailer(),
             'piper' => $this->testPiperTts(),
@@ -717,6 +1072,37 @@ final readonly class SystemConfigService
     /**
      * @return array{success: bool, message: string, details?: array<string, mixed>}
      */
+    private function testDocling(): array
+    {
+        $url = $this->getEnvValue('DOCLING_BASE_URL');
+        if (!$url || 'disabled' === strtolower($url)) {
+            return ['success' => false, 'message' => 'DOCLING_BASE_URL not configured'];
+        }
+
+        try {
+            $ch = curl_init(rtrim($url, '/').'/health');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 3,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if (200 === $httpCode) {
+                return ['success' => true, 'message' => 'Connected to Docling'];
+            }
+
+            return ['success' => false, 'message' => 'Docling returned HTTP '.$httpCode];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Connection failed: '.$e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{success: bool, message: string, details?: array<string, mixed>}
+     */
     private function testQdrant(): array
     {
         $url = $this->getEnvValue('QDRANT_URL');
@@ -806,11 +1192,223 @@ final readonly class SystemConfigService
     /**
      * Build the configuration schema.
      *
-     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}>
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}>
      */
     private function buildSchema(): array
     {
         return [
+            // === Access surface (database-backed, no restart required) ===
+            // Written by the first-run setup wizard and editable here. An
+            // explicit REGISTRATION_ENABLED / GUEST_CHAT_ENABLED environment
+            // variable still wins over the stored row — getValues() reports that
+            // as `envOverride` so this page never shows a toggle that silently
+            // does nothing.
+            'REGISTRATION_ENABLED' => [
+                'tab' => 'auth', 'section' => 'access', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Allow visitors to create their own account with email and password. Turn this off for an invite-only instance (an administrator then creates every account) or for SSO-only deployments. The sign-up page and the API both refuse when off.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => RegistrationConfig::CONFIG_GROUP,
+                'dbKey' => RegistrationConfig::KEY_ENABLED,
+            ],
+            'GUEST_CHAT_ENABLED' => [
+                'tab' => 'auth', 'section' => 'access', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let visitors try the chat without signing in. Turn this off so everyone has to sign in first — unauthenticated visitors are sent to the login page and every guest endpoint is refused.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => GuestChatConfig::CONFIG_GROUP,
+                'dbKey' => GuestChatConfig::KEY_ENABLED,
+            ],
+
+            // === Features (database-backed, no restart required) ===
+            // Every wave feature flag (docs/FEATURE_FLAGS.md). Seeded ON since
+            // 4.8; the field key is also the environment variable that pins the
+            // flag for automated deployments (FEATURE_<GROUP>_<SETTING>=false),
+            // which getValues() reports as `envOverride`.
+            'FEATURE_IAM_GROUPS_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'People & groups: show People under Operate and let administrators create groups. Members see their groups under Account. Sharing and group policies need this to be on.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_GROUPS_ENABLED,
+            ],
+            'FEATURE_IAM_SHARING_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Sharing: let owners share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Adds Share buttons and "Shared with me" filters. Requires People & groups.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_SHARING_ENABLED,
+            ],
+            'FEATURE_IAM_GROUP_POLICIES_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Group policies: let administrators set default models, allowed models, feature flags and a rate-limit tier per group (People → Policies). Locked global defaults cannot be overridden. Requires People & groups.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_GROUP_POLICIES_ENABLED,
+            ],
+            'FEATURE_IAM_DIRECTORY_SYNC_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Directory groups: at sign-in, put people into groups from the company login (OIDC groups claim). Does nothing without OIDC. The claim path and display names live under Sharing → Directory groups.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_DIRECTORY_SYNC_ENABLED,
+            ],
+            'FEATURE_AGENTS_ENABLED' => [
+                'tab' => 'features', 'section' => 'assistants', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'AI assistants: the assistant builder (instructions, knowledge folders, tools, publish as chat widget) and the /api/v1/agents API. When off, every assistant route answers 404 and the builder is hidden.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => AgentConfig::CONFIG_GROUP,
+                'dbKey' => AgentConfig::KEY_ENABLED,
+            ],
+            'FEATURE_AGENTS_ROUTABLE_ENABLED' => [
+                'tab' => 'features', 'section' => 'assistants', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Assistants in routing: let the message sorter pick an assistant that was marked "reachable from chat" as the answer for a matching request. Off keeps assistants reachable only by explicit selection.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => AgentConfig::CONFIG_GROUP,
+                'dbKey' => AgentConfig::KEY_ROUTABLE_ENABLED,
+            ],
+            'FEATURE_BUNDLE_ENABLED' => [
+                'tab' => 'features', 'section' => 'assistants', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Export and import: move assistants, instructions and saved tasks between installs as a synaplan-bundle file (/api/v1/bundles). The instance scope is admin-only.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => BundleConfig::CONFIG_GROUP,
+                'dbKey' => BundleConfig::KEY_ENABLED,
+            ],
+            'FEATURE_WORKFLOWS_BUILDER_ENABLED' => [
+                'tab' => 'features', 'section' => 'tasks', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Steps editor and webhook trigger for Saved Tasks: pin the exact steps a task runs, ask before a tool step, and start a task from an incoming webhook. When off, saved tasks keep Run now and the schedule only.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => WorkflowsConfig::CONFIG_GROUP,
+                'dbKey' => WorkflowsConfig::KEY_BUILDER_ENABLED,
+            ],
+            'FEATURE_MULTITASK_URL_FETCH_ENABLED' => [
+                'tab' => 'features', 'section' => 'tasks', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Watched pages: fetch a web address, keep one saved copy per address, and let a scheduled Saved Task compare it and mail the differences. Also powers "get this URL" in chat. When off, the Watched pages tab is hidden.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
+                'dbKey' => MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED,
+            ],
+            'FEATURE_TOOLS_REGISTRY_ENABLED' => [
+                'tab' => 'features', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Tool registry: list every callable (MCP, custom HTTP, built-in) in one registry the assistant and Saved Tasks pick from. Off restores the previous per-loop catalogs — a kill switch, not a feature to leave off.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_REGISTRY_ENABLED,
+            ],
+            'FEATURE_TOOLS_APPROVALS_ENABLED' => [
+                'tab' => 'features', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Approvals: ask before a tool that changes or deletes something runs — in chat and in unattended Saved Tasks, which pause under Approvals until you decide. Defaults per tool class live under Routing → Tool policies.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_APPROVALS_ENABLED,
+            ],
+            'FEATURE_TOOLS_CUSTOM_HTTP_ENABLED' => [
+                'tab' => 'features', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Custom tools: let users declare their own HTTP / OpenAPI tools under Connections and use them from chat and Saved Tasks.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_CUSTOM_HTTP_ENABLED,
+            ],
+            'FEATURE_DOCUMENT_TOOLS_ENABLED' => [
+                'tab' => 'features', 'section' => 'documents', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Office document tools: let the assistant build and revise Word, Excel and PowerPoint files step by step (with revisions) instead of the one-shot generator. Editing files a user uploaded stays a separate, off-by-default setting.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => DocumentToolsConfig::CONFIG_GROUP,
+                'dbKey' => DocumentToolsConfig::KEY_ENABLED,
+            ],
+            'FEATURE_DESKTOP_AGENT_ENABLED' => [
+                'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Synaplan Desktop: show the Desktop page, pairing codes, connected computers and the job queue the desktop client (public beta on GitHub) works from. When off, every desktop route answers 404.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => DesktopAgentConfig::CONFIG_GROUP,
+                'dbKey' => DesktopAgentConfig::KEY_ENABLED,
+            ],
+            'FEATURE_PLATFORM_LINKS_ENABLED' => [
+                'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → Linked platforms, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => PlatformLinksConfig::CONFIG_GROUP,
+                'dbKey' => PlatformLinksConfig::KEY_ENABLED,
+            ],
+            'IAM_EVERYONE_SHARES' => [
+                'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Who may share a folder or chat with everyone on this instance. "any_owner" lets every owner do it; "admins_only" restricts it to administrators.',
+                'default' => IamConfig::EVERYONE_SHARES_ANY_OWNER,
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_EVERYONE_SHARES,
+                'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY],
+            ],
+            'IAM_DIRECTORY_GROUPS_CLAIM' => [
+                'tab' => 'sharing', 'section' => 'directory', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Dotted claim path for directory groups (default: groups). Same resolver as OIDC roles; comma-separated paths are allowed.',
+                'default' => IamConfig::DEFAULT_DIRECTORY_GROUPS_CLAIM,
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_DIRECTORY_GROUPS_CLAIM,
+            ],
+            'IAM_DIRECTORY_GROUP_NAMES' => [
+                'tab' => 'sharing', 'section' => 'directory', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Optional JSON map of claim value to display name, e.g. {"sales":"Sales"}. Empty object keeps the claim value as the group name.',
+                'default' => '{}',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_DIRECTORY_GROUP_NAMES,
+            ],
+            'IAM_ADMIN_IMPERSONATION' => [
+                'tab' => 'sharing', 'section' => 'audit', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Whether administrators may view the application as another user. "audited" writes an audit row (default). "disabled" blocks the action.',
+                'default' => IamConfig::IMPERSONATION_AUDITED,
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_ADMIN_IMPERSONATION,
+                'options' => [IamConfig::IMPERSONATION_AUDITED, IamConfig::IMPERSONATION_DISABLED],
+            ],
+            'IAM_AUDIT_RETENTION_DAYS' => [
+                'tab' => 'sharing', 'section' => 'audit', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Days to keep People audit rows. Default 365. 0 keeps them forever. Run app:iam:reap-audit on a schedule to apply this.',
+                'default' => (string) IamConfig::DEFAULT_AUDIT_RETENTION_DAYS,
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_AUDIT_RETENTION_DAYS,
+            ],
             // === Routing (database-backed, no restart required) ===
             // Stored in BCONFIG group MULTITASK / setting ROUTING_ENABLED (the row
             // MultitaskRoutingConfig reads), not the default QDRANT_SEARCH group.
@@ -822,6 +1420,176 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            ],
+            // Outbound MCP client master switch (BCONFIG group MCP / CLIENT_ENABLED).
+            // Also toggled from Channels → MCP Servers. Seeded ON for new installs;
+            // an explicit 0 row is the operator kill switch.
+            'MCP_CLIENT_ENABLED' => [
+                'tab' => 'channels', 'section' => 'mcp', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Allow the assistant to call connected MCP servers (Jira, Confluence, CRM, and any other MCP endpoint). When off, saved connections stay in place but no calls are made. You can also turn this on from Channels → MCP Servers.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => McpClientConfig::CONFIG_GROUP,
+                'dbKey' => McpClientConfig::KEY_CLIENT_ENABLED,
+            ],
+            'MCP_OAUTH_CONNECTORS_ENABLED' => [
+                'tab' => 'channels', 'section' => 'mcp', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let users connect remote MCP servers that sign in with OAuth (Notion, Higgsfield, and any other standard remote MCP). When off, users can still add servers that use an access token. Seeded off — turn this on after you have reviewed the connections page.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => McpClientConfig::CONFIG_GROUP,
+                'dbKey' => McpClientConfig::KEY_OAUTH_CONNECTORS_ENABLED,
+            ],
+            // === Microsoft 365 app registration (database-backed) ===
+            // BCONFIG group M365 (ownerId=0), read by MicrosoftOAuthConfig.
+            // Operator-owned and install-wide: Synaplan Cloud runs a
+            // multi-tenant registration, self-hosters register their own
+            // (connector plan 07 §S3). Users never see these values — they only
+            // click "Connect Microsoft 365" and consent.
+            'M365_ENABLED' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Offer Microsoft 365 as a connection. Requires a client ID and client secret from an Azure app registration; the "Connect Microsoft 365" action stays hidden until all three are set.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_ENABLED,
+            ],
+            'M365_CLIENT_ID' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Application (client) ID of the Azure app registration. Azure portal → App registrations → your app → Overview.',
+                'default' => '',
+                'placeholder' => '11111111-2222-3333-4444-555555555555',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_CLIENT_ID,
+            ],
+            'M365_CLIENT_SECRET' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'password',
+                'sensitive' => true,
+                'encrypted' => true,
+                'description' => 'Client secret from Azure portal → your app → Certificates & secrets → New client secret. Copy the "Value" column, NOT the "Secret ID". Stored encrypted and never shown again; leave the field untouched to keep the current one.',
+                'default' => '',
+                'placeholder' => 'Example: 8Qm~aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_CLIENT_SECRET,
+            ],
+            'M365_TENANT' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Which accounts may sign in: "common" (work, school and personal accounts), "organizations" (work and school only), or a single tenant GUID to allow only your own organisation. Self-hosters normally use their own tenant GUID (Azure portal → your app → Overview → Directory (tenant) ID).',
+                'default' => MicrosoftOAuthConfig::DEFAULT_TENANT,
+                'placeholder' => 'common — or 11111111-2222-3333-4444-555555555555',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_TENANT,
+            ],
+            'M365_REDIRECT_URI' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Only needed when a proxy changes the public URL. Leave empty to use APP_URL + '.MicrosoftOAuthConfig::CALLBACK_PATH.'. Whatever is used here must be registered in Azure character for character.',
+                'default' => '',
+                'placeholder' => 'https://your-synaplan-host'.MicrosoftOAuthConfig::CALLBACK_PATH,
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_REDIRECT_URI,
+            ],
+            // === Dropbox app (database-backed) ===
+            // BCONFIG group DROPBOX (ownerId=0), read by DropboxOAuthConfig.
+            // Operator-owned and install-wide, exactly like the M365 block
+            // above (connector plan 07 C13). Users never see these values —
+            // they only click "Connect Dropbox" and consent.
+            'DROPBOX_ENABLED' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Offer Dropbox as a connection. Requires an app key and app secret from a Dropbox app; the "Connect Dropbox" action stays hidden until all three are set.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_ENABLED,
+            ],
+            'DROPBOX_APP_KEY' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'App key of the Dropbox app. Dropbox App Console (dropbox.com/developers/apps) → your app → Settings.',
+                'default' => '',
+                'placeholder' => 'a1b2c3d4e5f6g7h',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_APP_KEY,
+            ],
+            'DROPBOX_APP_SECRET' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'password',
+                'sensitive' => true,
+                'encrypted' => true,
+                'description' => 'App secret from the Dropbox App Console → your app → Settings → App secret (click "Show"). Stored encrypted and never shown again; leave the field untouched to keep the current one.',
+                'default' => '',
+                'placeholder' => 'Example: z9y8x7w6v5u4t3s',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_APP_SECRET,
+            ],
+            'DROPBOX_REDIRECT_URI' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Only needed when a proxy changes the public URL. Leave empty to use APP_URL + '.DropboxOAuthConfig::CALLBACK_PATH.'. Whatever is used here must be registered in the Dropbox App Console character for character.',
+                'default' => '',
+                'placeholder' => 'https://your-synaplan-host'.DropboxOAuthConfig::CALLBACK_PATH,
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_REDIRECT_URI,
+            ],
+            'SAVEDTASKS_ENABLED' => [
+                'tab' => 'routing', 'section' => 'saved_tasks', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Allow users to pin a Task Prompt as a Saved Task and run it on demand or on a schedule. When OFF, AI Instructions stay unchanged and no Saved Task APIs or UI are exposed. Per-user BCONFIG row overrides the global row; code default is OFF when no row exists.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => SavedTaskConfig::CONFIG_GROUP,
+                'dbKey' => SavedTaskConfig::KEY_ENABLED,
+            ],
+            'TOOLS_POLICY_READ' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Default for tools that only read data: auto, approve or block.',
+                'default' => 'auto',
+                'options' => ['auto', 'approve', 'block'],
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_POLICY_READ,
+            ],
+            'TOOLS_POLICY_WRITE' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Default for tools that change something: auto, approve or block.',
+                'default' => 'approve',
+                'options' => ['auto', 'approve', 'block'],
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_POLICY_WRITE,
+            ],
+            'TOOLS_POLICY_DESTRUCTIVE' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Default for tools that delete something: auto, approve or block.',
+                'default' => 'block',
+                'options' => ['auto', 'approve', 'block'],
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_POLICY_DESTRUCTIVE,
+            ],
+            'TOOLS_APPROVAL_EXPIRY_HOURS' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Hours a pending approval waits before it expires (1–720). Default 72.',
+                'default' => '72',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_APPROVAL_EXPIRY_HOURS,
             ],
             // === Routing — rolling conversation summary (database-backed) ===
             // BCONFIG group CONVERSATION_SUMMARY (ownerId=0), the rows
@@ -891,6 +1659,111 @@ final readonly class SystemConfigService
                 'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
                 'dbKey' => ConversationSummaryConstants::KEY_CACHE_TTL,
             ],
+            // === Routing — deep memory / message digests (database-backed) ===
+            // BCONFIG group DIGEST (ownerId=0), the rows MessageDigestConfig
+            // reads. No row means "use the MessageDigestConfig default", so
+            // the defaults below must stay in sync with that class. The
+            // per-user scan cursor lives in the same group under the user's
+            // own id and is never exposed here.
+            'DIGEST_ENABLED' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Deep memory master switch. A daily job condenses each user\'s KEY messages (documents, decisions, important facts) into one-line digests indexed in the vector DB; a chat prompt months later can then find and quote the original message ("the office rent letter from May"). Controls both the daily indexing job and the retrieval during chat. When OFF, older conversations are only reachable through extracted memories.',
+                'default' => var_export(MessageDigestConfig::DEFAULT_ENABLED, true),
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_ENABLED,
+            ],
+            'DIGEST_TOP_K' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Maximum digest hits considered per chat turn (after re-ranking by similarity and recency). 1–20.',
+                'default' => (string) MessageDigestConfig::DEFAULT_TOP_K,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_TOP_K,
+            ],
+            'DIGEST_MIN_SCORE' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Vector similarity floor (0.0–1.0) a digest must clear to be considered at all. Raise it to cut noise, lower it to increase recall. Tuned with app:digest:eval.',
+                'default' => (string) MessageDigestConfig::DEFAULT_MIN_SCORE,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_MIN_SCORE,
+            ],
+            'DIGEST_RECENCY_HALF_LIFE_DAYS' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Half-life of the recency decay in days: at this age a digest\'s effective score is halved. Deliberately slow, so an old but highly relevant message still beats a recent vague one.',
+                'default' => (string) MessageDigestConfig::DEFAULT_RECENCY_HALF_LIFE_DAYS,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_RECENCY_HALF_LIFE_DAYS,
+            ],
+            'DIGEST_PULL_TOP_N' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'How many of the best hits get their ORIGINAL message pulled verbatim into the prompt (so the model can quote amounts and dates, not just know the message exists). 0 disables pulling; the digest lines still appear.',
+                'default' => (string) MessageDigestConfig::DEFAULT_PULL_TOP_N,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_PULL_TOP_N,
+            ],
+            'DIGEST_PULL_MIN_SCORE' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Raw similarity (0.0–1.0) a hit must clear before its source message is pulled verbatim. Higher than the search floor: pulling costs prompt space.',
+                'default' => (string) MessageDigestConfig::DEFAULT_PULL_MIN_SCORE,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_PULL_MIN_SCORE,
+            ],
+            'DIGEST_BLOCK_MAX_CHARS' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Hard character cap for the whole "Older conversations" block injected into the system prompt (digest lines plus pulled excerpts).',
+                'default' => (string) MessageDigestConfig::DEFAULT_BLOCK_MAX_CHARS,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_BLOCK_MAX_CHARS,
+            ],
+            'DIGEST_BATCH_SIZE' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Messages handed to the digest model per call during the daily indexing job. 5–100.',
+                'default' => (string) MessageDigestConfig::DEFAULT_BATCH_SIZE,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_BATCH_SIZE,
+            ],
+            'DIGEST_MAX_BATCHES_PER_USER' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Cost cap: maximum digest-model calls per user per daily run. Unprocessed history is picked up by the next run (the per-user cursor never loses its place).',
+                'default' => (string) MessageDigestConfig::DEFAULT_MAX_BATCHES_PER_USER,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_MAX_BATCHES_PER_USER,
+            ],
+            'DIGEST_QUIET_SECONDS' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Messages younger than this many seconds are left for a later run — the rolling summary covers the live conversation; the digest is the long-term index and must not race a chat still in progress.',
+                'default' => (string) MessageDigestConfig::DEFAULT_QUIET_SECONDS,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_QUIET_SECONDS,
+            ],
+            'DIGEST_MAX_PER_USER' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Per-user cap on active digest entries (the deep-memory sibling of the 500-memory limit). On overflow the oldest entries are deactivated first. Minimum 100.',
+                'default' => (string) MessageDigestConfig::DEFAULT_MAX_PER_USER,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_MAX_PER_USER,
+            ],
             // Stored in BCONFIG group MEDIA / setting ASYNC_JOBS_ENABLED (the row
             // MediaJobConfig reads). Master switch for detaching media renders to
             // background jobs vs running them inline.
@@ -903,6 +1776,134 @@ final readonly class SystemConfigService
                 'dbGroup' => MediaJobConfig::CONFIG_GROUP,
                 'dbKey' => MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
             ],
+            'COMPUTE_ENABLED' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let the assistant do short file work (Python or Node) on copies of files you chose. Also needs COMPUTE_URL and COMPUTE_TOKEN pointing at the compute sidecar. Off by default — nothing is offered until both the sidecar and this switch are on.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_ENABLED,
+            ],
+            'COMPUTE_WORKSPACES_ENABLED' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Keep a folder between file-work runs so the assistant can continue yesterday\'s work. Off by default. Files → Workspace shows what is in it. Also needs file work itself to be on.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_WORKSPACES_ENABLED,
+            ],
+            'COMPUTE_EGRESS_ENABLED' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let a file-work run fetch from a short list of public websites the assistant named. Off by default — runs stay offline. Private or local addresses are always refused. Can only be switched on when the connected compute sidecar offers website access (features.egress in its health report).',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_EGRESS_ENABLED,
+            ],
+            'COMPUTE_EGRESS_REQUIRES_APPROVAL' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'When a run will fetch from the web, ask the owner first even if everyday file work would run automatically. On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_EGRESS_REQUIRES_APPROVAL,
+            ],
+            'COMPUTE_EGRESS_MAX_HOSTS' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'How many websites one file-work run may list. Default 8.',
+                'default' => (string) ComputeConfig::DEFAULT_EGRESS_MAX_HOSTS,
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_EGRESS_MAX_HOSTS,
+            ],
+            'COMPUTE_WORKSPACE_TTL_DAYS' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'How many days a file-work folder may sit unused before cleanup can remove it. Default 90.',
+                'default' => (string) ComputeConfig::DEFAULT_WORKSPACE_TTL_DAYS,
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_WORKSPACE_TTL_DAYS,
+            ],
+            'COMPUTE_DEFAULT_TIMEOUT_SEC' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default seconds a file-work run may take.',
+                'default' => '60',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_TIMEOUT_SEC,
+            ],
+            'COMPUTE_DEFAULT_MEMORY_MB' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default memory cap in megabytes for a file-work run.',
+                'default' => '512',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_MEMORY_MB,
+            ],
+            'COMPUTE_DEFAULT_CPU' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default CPU share for a file-work run.',
+                'default' => '1.0',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_CPU,
+            ],
+            'COMPUTE_DEFAULT_PIDS' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default process cap for a file-work run.',
+                'default' => '128',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_PIDS,
+            ],
+            'COMPUTE_DEFAULT_OUTPUT_MB' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default size cap in megabytes for files the run may create.',
+                'default' => '50',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_OUTPUT_MB,
+            ],
+            'COMPUTE_MAX_TIMEOUT_SEC' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Hard ceiling in seconds for a file-work run.',
+                'default' => '300',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_MAX_TIMEOUT_SEC,
+            ],
+            'COMPUTE_POLICY_INTERACTIVE' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An assistant cannot loosen this.',
+                'default' => 'auto',
+                'options' => ['auto', 'approve', 'block'],
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_POLICY_INTERACTIVE,
+            ],
+            'COMPUTE_POLICY_UNATTENDED' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An assistant cannot loosen this.',
+                'default' => 'approve',
+                'options' => ['auto', 'approve', 'block'],
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_POLICY_UNATTENDED,
+            ],
             // === Interface — in-chat usage taximeter (database-backed, no restart) ===
             // Master switch (BCONFIG group USAGE_TAXIMETER, ownerId=0) for the in-chat
             // consumption bar/ring + per-message token-cost badge. Default ON.
@@ -914,6 +1915,36 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => UsageTaximeterConfig::CONFIG_GROUP,
                 'dbKey' => UsageTaximeterConfig::KEY_ENABLED,
+            ],
+            // === Interface — chat progress narration (database-backed, no restart) ===
+            // Three switches (BCONFIG group PROGRESS_NARRATION, ownerId=0) for how much
+            // the chat tells the user while a turn runs. All default ON.
+            'PROGRESS_SHOW_STEPS' => [
+                'tab' => 'interface', 'section' => 'progress_narration', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the step-by-step progress of an answer while it is being prepared: understanding the request, web search, pages read, request sent to the model, model thinking, memory check. Finished steps stay listed until the answer streams, then fold into a one-line summary that remains on the finished message. When OFF, only the current phase is shown (one line, no history). On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ProgressNarrationConfig::CONFIG_GROUP,
+                'dbKey' => ProgressNarrationConfig::KEY_STEPS,
+            ],
+            'PROGRESS_SHOW_MODELS' => [
+                'tab' => 'interface', 'section' => 'progress_narration', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Name the model and provider doing the work in the progress lines ("Sending your request to Claude Opus 4.8 by Anthropic…", "Creating your audio with tts-1 by OpenAI…"). Turn OFF for white-label deployments that must not reveal which vendors are used; the lines then read generically ("Sending your request…"). On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ProgressNarrationConfig::CONFIG_GROUP,
+                'dbKey' => ProgressNarrationConfig::KEY_MODELS,
+            ],
+            'PROGRESS_SHOW_TIMINGS' => [
+                'tab' => 'interface', 'section' => 'progress_narration', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show how long each finished step took and a live elapsed counter on the running step. When OFF, steps are listed without durations. On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ProgressNarrationConfig::CONFIG_GROUP,
+                'dbKey' => ProgressNarrationConfig::KEY_TIMINGS,
             ],
             // === Branding (database-backed, no restart required) ===
             // Stored in BCONFIG group BRANDING (ownerId=0) — the rows BrandingService
@@ -1146,9 +2177,9 @@ final readonly class SystemConfigService
             ],
             // Every field below whose env var is known to ProviderKeyCatalog is
             // stored encrypted in BCONFIG by ProviderKeyStore and applies without
-            // a restart — hence 'source' => 'database'. getValues()/setValue()
-            // route them through the store before the source check ever runs; the
-            // marker only tells the UI to label them "saved live".
+            // a restart. markManagedFields() flags them `managedBy` (and forces
+            // 'source' => 'database'): getValues() reads their status from the
+            // store, setValue() refuses the write and points at Models & keys.
             'OPENAI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'OpenAI API key',
@@ -1183,12 +2214,18 @@ final readonly class SystemConfigService
             'TRUSTEDTOKENS_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true,
-                'description' => 'TrustedTokens API key — sovereign inference on German GPUs (GLM, Qwen, GPT OSS)',
+                'description' => 'TrustedTokens API key — sovereign inference on German GPUs (GLM, DeepSeek, Qwen, GPT OSS)',
+                'default' => '', 'source' => 'database',
+            ],
+            'A2AGENT_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'A2Agent API key — Qwen, DeepSeek and MiniMax via the A2Agent gateway (Chinese model vendors)',
                 'default' => '', 'source' => 'database',
             ],
             'HUGGINGFACE_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi K2 models through HF Inference',
+                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi models through HF Inference',
                 'default' => '', 'source' => 'database',
             ],
             'GOOGLE_VERTEX_ACCESS_TOKEN' => [
@@ -1406,6 +2443,22 @@ final readonly class SystemConfigService
                 'sensitive' => true, 'description' => 'HTTP auth password',
                 'default' => '',
             ],
+            'DOCLING_BASE_URL' => [
+                'tab' => 'processing', 'section' => 'docling', 'type' => 'url',
+                'sensitive' => false, 'description' => 'Docling serve URL (empty = off)',
+                'default' => '',
+                'placeholder' => 'http://docling:5001',
+            ],
+            'DOCLING_TIMEOUT_MS' => [
+                'tab' => 'processing', 'section' => 'docling', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Request timeout (ms)',
+                'default' => '120000',
+            ],
+            'DOCLING_MAX_BYTES' => [
+                'tab' => 'processing', 'section' => 'docling', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Max file size (bytes)',
+                'default' => '52428800',
+            ],
             'RASTERIZE_DPI' => [
                 'tab' => 'processing', 'section' => 'rasterize', 'type' => 'number',
                 'sensitive' => false, 'description' => 'PDF rasterization DPI',
@@ -1503,6 +2556,26 @@ final readonly class SystemConfigService
                 'default' => '5',
                 'source' => 'database',
             ],
-        ];
+        ] + $this->moduleGateFields();
+    }
+
+    /**
+     * The admin toggle only treats the strings "true" / "false" as on/off.
+     * Seeders and SQL often store "1" / "0"; map those so the switch matches
+     * what IamConfig (and the rest of the app) actually do.
+     *
+     * @param array{type?: string} $field
+     */
+    private function normalizeStoredValue(array $field, ?string $rawValue): ?string
+    {
+        if (null === $rawValue || '' === $rawValue) {
+            return $rawValue;
+        }
+        if ('boolean' !== ($field['type'] ?? '')) {
+            return $rawValue;
+        }
+        $asBool = filter_var($rawValue, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+
+        return null === $asBool ? $rawValue : ($asBool ? 'true' : 'false');
     }
 }

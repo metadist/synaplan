@@ -79,4 +79,39 @@ Let me know if you need more.`
       expect(result.parts.some((p) => p.type === 'links')).toBe(false)
     })
   })
+
+  describe('standalone JSON payloads', () => {
+    it('treats a chat list JSON body as a json part', () => {
+      const content = JSON.stringify({
+        total: 2,
+        chats: [
+          { id: 1, title: 'Knowledge Base One', source: 'web', message_count: 4 },
+          { id: 2, title: 'Project notes', source: 'file', message_count: 1 },
+        ],
+      })
+
+      const result = parseAIResponse(content)
+
+      expect(result.parts).toHaveLength(1)
+      expect(result.parts[0]?.type).toBe('json')
+      expect(result.parts[0]?.content).toContain('Knowledge Base One')
+    })
+
+    it('keeps prose that only mentions JSON as text', () => {
+      const content = 'Here is a sample object: {"hello":"world"} and some explanation.'
+
+      const result = parseAIResponse(content)
+
+      expect(result.parts.some((p) => p.type === 'json')).toBe(false)
+      expect(result.parts[0]?.type).toBe('text')
+    })
+
+    it('does not treat a file-generation envelope as a json result', () => {
+      const content = '{"BFILEPATH":"report.docx","BFILETEXT":"content"}'
+
+      const result = parseAIResponse(content)
+
+      expect(result.parts.some((p) => p.type === 'json')).toBe(false)
+    })
+  })
 })

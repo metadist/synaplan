@@ -91,6 +91,7 @@ class McpServerConfigControllerTest extends WebTestCase
         ]);
         self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
         self::assertTrue($data['success']);
+        self::assertFalse($data['server']['allow_write'], 'writes are opt-in — a new server is read-only');
         $serverId = (int) $data['server']['id'];
         $this->createdIds[] = $serverId;
 
@@ -113,10 +114,12 @@ class McpServerConfigControllerTest extends WebTestCase
         $updated = $this->request('PATCH', "/api/v1/mcp-servers/{$serverId}", [
             'name' => 'CRM renamed',
             'enabled' => false,
+            'allow_write' => true,
         ]);
         self::assertTrue($updated['success']);
         self::assertSame('CRM renamed', $updated['server']['name']);
         self::assertFalse($updated['server']['enabled']);
+        self::assertTrue($updated['server']['allow_write'], 'the write opt-in round-trips through PATCH');
         // Auth token untouched when the key is absent from the payload.
         self::assertTrue($updated['server']['has_auth_token']);
 
@@ -189,6 +192,48 @@ class McpServerConfigControllerTest extends WebTestCase
         $tools = $this->request('GET', "/api/v1/mcp-servers/{$serverId}/tools");
         self::assertFalse($tools['success']);
         self::assertSame([], $tools['tools']);
+    }
+
+    public function testOauthCreateAndStartAreBlockedWhileFlagIsOff(): void
+    {
+        $created = $this->request('POST', '/api/v1/mcp-servers', [
+            'name' => 'Notion',
+            'url' => 'https://mcp.notion.com/mcp',
+            'auth_mode' => 'oauth',
+        ]);
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertFalse($created['success']);
+        self::assertStringContainsString('disabled by an administrator', (string) $created['error']);
+
+        $bearer = $this->request('POST', '/api/v1/mcp-servers', [
+            'name' => 'CRM oauth-gate',
+            'url' => 'https://crm.example.com/mcp',
+        ]);
+        $serverId = (int) $bearer['server']['id'];
+        $this->createdIds[] = $serverId;
+
+        $start = $this->request('POST', "/api/v1/mcp-servers/{$serverId}/oauth/start");
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('disabled by an administrator', (string) $start['error']);
+    }
+
+    public function testOauthCallbackWithBadStateRedirectsWithError(): void
+    {
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/mcp-servers/oauth/callback?code=x&state=not-a-valid-state');
+
+        $response = $this->client->getResponse();
+        self::assertTrue($response->isRedirection());
+        // Flag ships off, so the public callback refuses the exchange first.
+        self::assertStringContainsString('oauth_error=disabled', (string) $response->headers->get('Location'));
+    }
+
+    public function testListReportsOauthConnectorsFlag(): void
+    {
+        $list = $this->request('GET', '/api/v1/mcp-servers');
+        self::assertTrue($list['success']);
+        self::assertArrayHasKey('oauth_connectors_enabled', $list);
+        self::assertFalse($list['oauth_connectors_enabled']);
     }
 
     public function testUnauthenticatedRequestsAreRejected(): void

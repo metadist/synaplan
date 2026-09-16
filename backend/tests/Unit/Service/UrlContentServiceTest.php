@@ -1,0 +1,201 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Service;
+
+use App\Service\Security\SsrfGuard;
+use App\Service\UrlContentService;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+
+/**
+ * HTML extraction: prefer landmarks, fall back to the full body when a
+ * targeted region is empty or too short (Kubio / page-builder pages).
+ */
+final class UrlContentServiceTest extends TestCase
+{
+    public function testPrefersArticleOverSurroundingChrome(): void
+    {
+        $html = <<<'HTML'
+<html><head><title>Article Title</title></head><body>
+<nav>Home About Pricing Contact lots of navigation chrome that is not the article</nav>
+<article><p>The actual article body with enough characters to pass the useful-text threshold on its own without falling back.</p></article>
+<footer>Copyright 2026 ignore this</footer>
+</body></html>
+HTML;
+
+        $result = $this->service([
+            new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
+        ])->fetch('https://example.com/article');
+
+        self::assertTrue($result->success);
+        self::assertSame('Article Title', $result->title);
+        self::assertStringContainsString('actual article body', $result->extractedText);
+        self::assertStringNotContainsString('navigation chrome', $result->extractedText);
+    }
+
+    public function testFallsBackToBodyWhenPageBuilderContentClassIsAFalseMatch(): void
+    {
+        $html = <<<'HTML'
+<html><head><title>Startseite - FPS Energy</title></head><body>
+<div class="h-column__content">info@fps.energy</div>
+<div class="hero">
+  <h1>Für die Energiewende</h1>
+  <p>Fuel &amp; Power Supply delivers hydrogen, EV charging and biofuels to industry and fleets that want to act today.</p>
+</div>
+</body></html>
+HTML;
+
+        $result = $this->service([
+            new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
+        ])->fetch('https://fps.energy/');
+
+        self::assertTrue($result->success);
+        self::assertStringContainsString('Energiewende', $result->extractedText);
+        self::assertStringContainsString('hydrogen', $result->extractedText);
+        self::assertGreaterThan(80, mb_strlen($result->extractedText));
+
+        $crawl = $this->service([
+            new MockResponse("User-agent: *\nDisallow:\n", ['http_code' => 200]),
+            new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
+        ])->fetchForCrawling('https://fps.energy/');
+
+        self::assertTrue($crawl->success);
+        self::assertStringContainsString('Energiewende', $crawl->extractedText);
+        self::assertGreaterThan(80, mb_strlen($crawl->extractedText));
+    }
+
+    public function testKeepsArticleHeaderWhenLandmarkIsAlreadyTargeted(): void
+    {
+        $html = <<<'HTML'
+<html><body>
+<nav>Home About Pricing Contact lots of navigation chrome that is not the article</nav>
+<article>
+  <header><h1>Reliable hydrogen supply for city bus fleets</h1></header>
+  <p>The article body has enough characters on its own so the extractor stays inside the landmark and still keeps the heading.</p>
+</article>
+</body></html>
+HTML;
+
+        $result = $this->service([
+            new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
+        ])->fetch('https://example.com/buses');
+
+        self::assertTrue($result->success);
+        self::assertStringContainsString('Reliable hydrogen supply', $result->extractedText);
+        self::assertStringContainsString('article body', $result->extractedText);
+        self::assertStringNotContainsString('navigation chrome', $result->extractedText);
+    }
+
+    public function testUsesEntryContentLandmarkWhenItHasEnoughText(): void
+    {
+        $html = <<<'HTML'
+<html><body>
+<div class="sidebar">Seasonal offer banner that should lose to the landmark.</div>
+<div class="entry-content">
+<p>This WordPress entry has enough characters in the landmark so the extractor keeps it instead of dumping the whole page.</p>
+</div>
+</body></html>
+HTML;
+
+        $result = $this->service([
+            new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
+        ])->fetch('https://example.com/post');
+
+        self::assertTrue($result->success);
+        self::assertStringContainsString('WordPress entry', $result->extractedText);
+        self::assertStringNotContainsString('Seasonal offer banner', $result->extractedText);
+    }
+
+    public function testFallsBackToUnstrippedBodyWhenChromeRemovalLeavesNothing(): void
+    {
+        $html = <<<'HTML'
+<html><head><title>Short</title></head><body>
+<header>
+  <h1>Hydrogen for fleets that need a reliable supply today</h1>
+  <p>We deliver tank infrastructure, redundancy and safe H2 supply even when the grid is tight.</p>
+</header>
+</body></html>
+HTML;
+
+        $result = $this->service([
+            new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
+        ])->fetch('https://example.com/hero');
+
+        self::assertTrue($result->success);
+        self::assertStringContainsString('Hydrogen for fleets', $result->extractedText);
+        self::assertStringContainsString('tank infrastructure', $result->extractedText);
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    #[DataProvider('markdownUrlProvider')]
+    public function testExtractUrlsReadsMarkdownAndBareForms(string $message, array $expected): void
+    {
+        self::assertSame($expected, $this->service([])->extractUrls($message));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: list<string>}>
+     */
+    public static function markdownUrlProvider(): iterable
+    {
+        yield 'bare url' => [
+            'summarize https://example.com/article and keep it short',
+            ['https://example.com/article'],
+        ];
+        yield 'markdown link' => [
+            'Check and read [this page](https://example.com/news) then summarize',
+            ['https://example.com/news'],
+        ];
+        yield 'markdown link with wikipedia parens' => [
+            'Read [Foo](https://en.wikipedia.org/wiki/Foo_(bar)) please',
+            ['https://en.wikipedia.org/wiki/Foo_(bar)'],
+        ];
+        yield 'bare wikipedia parens' => [
+            'https://en.wikipedia.org/wiki/Foo_(bar)',
+            ['https://en.wikipedia.org/wiki/Foo_(bar)'],
+        ];
+        yield 'gfm autolink' => [
+            'Load <https://example.com/doc> and summarize',
+            ['https://example.com/doc'],
+        ];
+        yield 'bold-wrapped url from prompt toolbar' => [
+            'Please read **https://example.com/a** now',
+            ['https://example.com/a'],
+        ];
+        yield 'html href after formatter round-trip' => [
+            'See <a href="https://example.com/href">the article</a>',
+            ['https://example.com/href'],
+        ];
+        yield 'html entity encoded slashes' => [
+            'summarize https:&#x2F;&#x2F;example.com/encoded',
+            ['https://example.com/encoded'],
+        ];
+        yield 'trailing sentence punctuation' => [
+            'See https://example.com/end.',
+            ['https://example.com/end'],
+        ];
+        yield 'no url' => [
+            'just summarize my notes',
+            [],
+        ];
+    }
+
+    /**
+     * @param list<MockResponse> $responses
+     */
+    private function service(array $responses): UrlContentService
+    {
+        return new UrlContentService(
+            new MockHttpClient($responses),
+            new SsrfGuard(),
+            new NullLogger(),
+        );
+    }
+}

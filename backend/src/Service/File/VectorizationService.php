@@ -21,6 +21,9 @@ final readonly class VectorizationService
 {
     private const VECTOR_DIMENSION = 1024;
 
+    /** Desktop project knowledge folders. Index must use the same VECTORIZE default as search. */
+    public const DESKTOP_GROUP_PREFIX = 'DESKTOP:';
+
     public function __construct(
         private AiFacade $aiFacade,
         private TextChunker $textChunker,
@@ -35,11 +38,13 @@ final readonly class VectorizationService
     /**
      * Vectorize file content and store in RAG database.
      *
-     * @param string $fileText  Extracted text from file
-     * @param int    $userId    User ID
-     * @param int    $messageId Message ID
-     * @param string $groupKey  Custom grouping key (e.g., 'PRODUCTHELP', 'DOWNLOADS')
-     * @param int    $fileType  File type (0=text, 1=image, 2=audio/video, 3=pdf, 4=doc, etc.)
+     * @param string      $fileText         Extracted text from file
+     * @param int         $userId           User ID
+     * @param int         $messageId        Message ID
+     * @param string      $groupKey         Custom grouping key (e.g., 'PRODUCTHELP', 'DOWNLOADS')
+     * @param int         $fileType         File type (0=text, 1=image, 2=audio/video, 3=pdf, 4=doc, etc.)
+     * @param string|null $markdown         When set, chunks with {@see TextChunker::chunkifyMarkdown()}
+     * @param int|null    $embeddingModelId Catalog-resolved BID; null uses account VECTORIZE. Ignored for DESKTOP: folders.
      *
      * @return array ['success' => bool, 'chunks_created' => int, 'error' => string|null, 'provider' => string]
      */
@@ -49,6 +54,8 @@ final readonly class VectorizationService
         int $messageId,
         string $groupKey = 'DEFAULT',
         int $fileType = 0,
+        ?string $markdown = null,
+        ?int $embeddingModelId = null,
     ): array {
         if (empty($fileText)) {
             $this->logger->warning('VectorizationService: Empty text, skipping', [
@@ -65,8 +72,7 @@ final readonly class VectorizationService
         }
 
         try {
-            // Get user's preferred embedding model (or system default)
-            $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
+            $embeddingModelId = $this->resolveEmbeddingModelId($embeddingModelId, $groupKey, $userId);
 
             if (!$embeddingModelId) {
                 $this->logger->error('VectorizationService: No embedding model configured');
@@ -106,8 +112,14 @@ final readonly class VectorizationService
                 'storage_provider' => $this->vectorStorage->getProviderName(),
             ]);
 
-            // Chunk the text
-            $chunks = $this->textChunker->chunkify($fileText);
+            // Chunk the text (markdown path when an extractor returned md)
+            $chunks = [];
+            if (null !== $markdown && '' !== trim($markdown)) {
+                $chunks = $this->textChunker->chunkifyMarkdown($markdown);
+            }
+            if ([] === $chunks) {
+                $chunks = $this->textChunker->chunkify($fileText);
+            }
 
             if (empty($chunks)) {
                 $this->logger->warning('VectorizationService: No chunks created');
@@ -365,5 +377,28 @@ final readonly class VectorizationService
         }
 
         return false;
+    }
+
+    /**
+     * Desktop folders always use DEFAULTMODEL.VECTORIZE — the same model
+     * {@see \App\Service\UserMemoryService::embedUserQuery} uses for search.
+     * A project EMBED hint must not open a second vector space.
+     */
+    private function resolveEmbeddingModelId(?int $requested, string $groupKey, int $userId): ?int
+    {
+        $desktopFolder = str_starts_with($groupKey, self::DESKTOP_GROUP_PREFIX);
+        if ($desktopFolder) {
+            if (null !== $requested) {
+                $this->logger->info('VectorizationService: ignoring vectorize_model for desktop folder; using VECTORIZE (same as search)', [
+                    'user_id' => $userId,
+                    'group_key' => $groupKey,
+                    'ignored_model_id' => $requested,
+                ]);
+            }
+
+            return $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
+        }
+
+        return $requested ?? $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
     }
 }

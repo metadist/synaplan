@@ -174,4 +174,35 @@ final class GeneratedFileRegistrarTest extends TestCase
         self::assertSame($existing, $file);
         self::assertSame('spoken script', $existing->getFileText());
     }
+
+    public function testBackfillsMessageIdOnExistingRowWithoutOne(): void
+    {
+        // A generator (e.g. ChatHandler documents) created the row itself
+        // without a message link; a later registration from the reply
+        // persistence knows the OUT message and must attach it so the
+        // Generated gallery's "Open in chat" works.
+        $existing = new File();
+        $existing->setFileText('already extracted');
+        $this->files->expects(self::once())->method('findOneBy')->willReturn($existing);
+        $this->files->expects(self::once())->method('save')->with($existing);
+
+        $file = $this->registrar()->register(9, '41/report.docx', 'document', 555);
+
+        self::assertSame($existing, $file);
+        self::assertSame(555, $existing->getMessageId());
+    }
+
+    public function testDoesNotOverwriteExistingMessageId(): void
+    {
+        $existing = new File();
+        $existing->setFileText('already extracted');
+        $existing->setMessageId(111);
+        $this->files->expects(self::once())->method('findOneBy')->willReturn($existing);
+        $this->files->expects(self::never())->method('save');
+
+        $file = $this->registrar()->register(9, '41/report.docx', 'document', 555);
+
+        self::assertSame($existing, $file);
+        self::assertSame(111, $existing->getMessageId());
+    }
 }

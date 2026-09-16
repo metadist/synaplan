@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Prompt\PromptCatalog;
@@ -17,6 +18,7 @@ use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -90,10 +92,11 @@ final class FeedbackPromptSubjectIsolationTest extends TestCase
             $this->createMock(RateLimitService::class),
             $memoryService,
             $this->createMock(VectorSearchService::class),
-            $this->createMock(BraveSearchService::class),
+            WebSearchGatewayFactory::fromBrave($this->createMock(BraveSearchService::class)),
             $this->createMock(PromptRepository::class),
             $this->createMock(LoggerInterface::class),
             $feedbackConfig,
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $user = $this->createMock(User::class);
@@ -195,6 +198,7 @@ final class FeedbackPromptSubjectIsolationTest extends TestCase
             $promptRepository,
             $this->createMock(LoggerInterface::class),
             $feedbackConfig,
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $user = $this->createMock(User::class);
@@ -243,5 +247,13 @@ final class FeedbackPromptSubjectIsolationTest extends TestCase
         }
 
         self::fail('feedback_contradiction_check prompt missing from PromptCatalog::all()');
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 }

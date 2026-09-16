@@ -2,8 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useGuestStore } from '@/stores/guest'
 
+const redirectToSetupWizard = vi.fn()
+
 vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
+  redirectToSetupWizard: () => redirectToSetupWizard(),
 }))
 
 describe('Guest Store', () => {
@@ -11,6 +14,7 @@ describe('Guest Store', () => {
     setActivePinia(createPinia())
     localStorage.clear()
     vi.restoreAllMocks()
+    redirectToSetupWizard.mockClear()
   })
 
   it('should initialize with default values', () => {
@@ -22,6 +26,7 @@ describe('Guest Store', () => {
     expect(store.maxMessages).toBe(5)
     expect(store.limitReached).toBe(false)
     expect(store.initialized).toBe(false)
+    expect(store.guestChatDisabled).toBe(false)
     expect(store.bannerDismissed).toBe(false)
   })
 
@@ -101,6 +106,7 @@ describe('Guest Store', () => {
     store.maxMessages = 10
     store.limitReached = true
     store.initialized = true
+    store.guestChatDisabled = true
     store.bannerDismissed = true
 
     store.$reset()
@@ -111,6 +117,7 @@ describe('Guest Store', () => {
     expect(store.maxMessages).toBe(5)
     expect(store.limitReached).toBe(false)
     expect(store.initialized).toBe(false)
+    expect(store.guestChatDisabled).toBe(false)
     expect(store.bannerDismissed).toBe(false)
   })
 
@@ -214,6 +221,78 @@ describe('Guest Store', () => {
       expect(store.initialized).toBe(true)
       expect(store.initFailed).toBe(true)
       expect(store.sessionId).toBeNull()
+    })
+
+    it('should clear storage and flag disabled on 403 GUEST_CHAT_DISABLED', async () => {
+      localStorage.setItem('synaplan_guest_session', 'stale-id')
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({
+          error: 'Guest chat is disabled on this instance.',
+          code: 'GUEST_CHAT_DISABLED',
+        }),
+      })
+
+      const store = useGuestStore()
+      await store.initSession()
+
+      expect(store.initialized).toBe(true)
+      expect(store.initFailed).toBe(true)
+      expect(store.guestChatDisabled).toBe(true)
+      expect(store.sessionId).toBeNull()
+      expect(store.isGuestMode).toBe(false)
+      expect(localStorage.getItem('synaplan_guest_session')).toBeNull()
+    })
+
+    it('should treat a 403 without the disabled code as a generic failure', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: 'nope' }),
+      })
+
+      const store = useGuestStore()
+      await store.initSession()
+
+      expect(store.initFailed).toBe(true)
+      expect(store.guestChatDisabled).toBe(false)
+    })
+
+    /**
+     * This store bypasses httpClient, so its own 503 handling is the only thing
+     * standing between a visitor and a dead end on an installation that has
+     * never had an administrator: the "trial unavailable" card offers nothing
+     * that works while the whole API is shut.
+     */
+    it('should send a visitor to the wizard on 503 SETUP_REQUIRED', async () => {
+      localStorage.setItem('synaplan_guest_session', 'stale-id')
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: 'Setup required', code: 'SETUP_REQUIRED' }),
+      })
+
+      const store = useGuestStore()
+      await store.initSession()
+
+      expect(redirectToSetupWizard).toHaveBeenCalled()
+      expect(store.initFailed).toBe(false)
+      expect(localStorage.getItem('synaplan_guest_session')).toBeNull()
+    })
+
+    it('should treat a 503 without the setup code as a generic failure', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: 'upstream down' }),
+      })
+
+      const store = useGuestStore()
+      await store.initSession()
+
+      expect(redirectToSetupWizard).not.toHaveBeenCalled()
+      expect(store.initFailed).toBe(true)
     })
 
     it('should set rateLimited on 429 response', async () => {

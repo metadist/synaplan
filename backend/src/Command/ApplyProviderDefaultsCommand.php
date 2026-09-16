@@ -43,7 +43,7 @@ final class ApplyProviderDefaultsCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('provider', InputArgument::OPTIONAL, 'Provider name (e.g. groq, openai, anthropic, google, mistral, trustedtokens, huggingface, xai)');
+        $this->addArgument('provider', InputArgument::OPTIONAL, 'Provider name (e.g. groq, openai, anthropic, google, mistral, trustedtokens, a2agent, huggingface, xai)');
         $this->addOption('auto', null, InputOption::VALUE_NONE, 'Pick the best available provider automatically, but only when the current default chat provider is a cloud provider without a usable key');
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Apply the named provider even though it has no usable key yet');
     }

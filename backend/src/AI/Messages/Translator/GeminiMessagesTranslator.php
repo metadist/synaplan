@@ -7,6 +7,7 @@ namespace App\AI\Messages\Translator;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
+use App\AI\Tool\OpenAiToolShapes;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -25,7 +26,6 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
     private const DEFAULT_UPSTREAM = 'https://generativelanguage.googleapis.com';
     private const API_VERSION = 'v1beta';
     private const DEFAULT_TIMEOUT = 600;
-    private const MAX_SCHEMA_DEPTH = 32;
 
     private const STRIP_KEYS = [
         'thinking',
@@ -160,7 +160,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         }
 
         if (isset($requestBody['tools']) && \is_array($requestBody['tools']) && [] !== $requestBody['tools']) {
-            $declarations = [];
+            $clientTools = [];
             foreach ($requestBody['tools'] as $tool) {
                 if (!\is_array($tool) || AnthropicServerTools::isServerToolDeclaration($tool)) {
                     // Server tools (`web_search_*`, `code_execution_*`, …) are
@@ -169,18 +169,9 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                     // hand the model a tool nobody can answer.
                     continue;
                 }
-                $name = $this->sanitizeName((string) ($tool['name'] ?? 'tool'));
-                $schema = $tool['input_schema'] ?? ['type' => 'object', 'properties' => []];
-                if (!\is_array($schema)) {
-                    $schema = ['type' => 'object', 'properties' => []];
-                }
-                $schema = $this->clampSchemaDepth($schema, 0);
-                $declarations[] = [
-                    'name' => $name,
-                    'description' => (string) ($tool['description'] ?? ''),
-                    'parametersJsonSchema' => $schema,
-                ];
+                $clientTools[] = $tool;
             }
+            $declarations = OpenAiToolShapes::toGeminiDeclarations($clientTools);
             if ([] !== $declarations) {
                 $payload['tools'] = [['functionDeclarations' => $declarations]];
             }
@@ -386,48 +377,6 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         }
 
         return implode("\n", $parts);
-    }
-
-    private function sanitizeName(string $name): string
-    {
-        $sanitized = preg_replace('/[^a-zA-Z0-9_]/', '_', $name) ?? 'tool';
-        if (strlen($sanitized) > 64) {
-            $sanitized = substr($sanitized, 0, 64);
-        }
-
-        return '' !== $sanitized ? $sanitized : 'tool';
-    }
-
-    /**
-     * @param array<string, mixed> $schema
-     *
-     * @return array<string, mixed>
-     */
-    private function clampSchemaDepth(array $schema, int $depth): array
-    {
-        if ($depth >= self::MAX_SCHEMA_DEPTH) {
-            return ['type' => 'object'];
-        }
-
-        foreach (['properties', '$defs', 'definitions'] as $key) {
-            if (!isset($schema[$key]) || !\is_array($schema[$key])) {
-                continue;
-            }
-            $out = [];
-            foreach ($schema[$key] as $propName => $propSchema) {
-                $safeName = $this->sanitizeName((string) $propName);
-                $out[$safeName] = \is_array($propSchema)
-                    ? $this->clampSchemaDepth($propSchema, $depth + 1)
-                    : $propSchema;
-            }
-            $schema[$key] = $out;
-        }
-
-        if (isset($schema['items']) && \is_array($schema['items'])) {
-            $schema['items'] = $this->clampSchemaDepth($schema['items'], $depth + 1);
-        }
-
-        return $schema;
     }
 
     /**

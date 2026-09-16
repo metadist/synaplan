@@ -1,0 +1,8 @@
+{
+  "leaseToken": "lt_0000000000000000000000000000000000000000000000000000",
+  "status": "succeeded",
+  "result": {
+    "summary": "Listed 12 files in Documents.",
+    "fileIds": [42]
+  }
+}

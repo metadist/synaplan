@@ -21,20 +21,20 @@ units must run the portable scripts.
 | ---- | ---------- |
 | `packer/synaplan.pkr.hcl` | Builds the AMI from Amazon Linux 2023. |
 | `scripts/provision.sh` | Packer provisioner: runtime, Caddy, application tree, pre-pulled images, systemd units. |
+| `scripts/pull-images.sh` | Bakes one release's container images into the image cache. |
 | `scripts/harden.sh` | Last provisioner: the Marketplace scanner's rules, applied and verified. |
 | `scripts/firstboot.sh` | Per-instance setup on the first boot of a data volume. |
+| `scripts/configure-tls.sh` | Picks the certificate strategy; also published as `synaplan-tls`. |
+| `scripts/update.sh` | Published as `synaplan-update`. |
 | `scripts/snapshot.sh` | Published as `synaplan-snapshot`. |
+| `scripts/snapshot-hook.sh` | The instance side of the SSM snapshot document. |
+| `scripts/stop.sh` | `ExecStop` for the service unit. |
 | `systemd/` | `synaplan-firstboot.service` and `synaplan.service`. |
+| `caddy/` | Caddyfile for a real certificate, and for the self-signed fallback. |
 | `cloudformation/` | The two delivery templates, the required architecture diagram, and the seller-account IAM roles. |
 | `ssm/` | The snapshot document, for registering it outside CloudFormation. |
 | `scripts/tests/test-firstboot.sh` | Runs `firstboot.sh` for real, with AWS stubbed. |
 | `.taskcat.yml` | Multi-region launch test of both templates, run by hand before a public listing. |
-
-Everything that is a property of the *host* rather than of AWS lives one level
-up in [`deploy/host/`](../host) and is shared with the Azure adapter: the
-Caddyfiles, `configure-tls.sh`, `update.sh`, `stop.sh`, `pull-images.sh` and
-`snapshot-hook.sh` — the last one is invoked by the SSM document here and by the
-Azure Backup script framework there, with the same two stage names.
 
 ## What the AMI contains, and what it does not
 
@@ -167,9 +167,15 @@ by the variable validation here, and by `validate-release.sh` at boot: with
 restart install a different application.
 
 The Marketplace ingests from **us-east-1**, and the source AMI must be
-unencrypted, EBS-backed and HVM — the build produces exactly that. Other regions
-are produced by copying the AMI. Build both architectures: the container images
-are multi-arch, so `-var architecture=arm64` yields the Graviton image.
+unencrypted, EBS-backed and HVM. The workflow rejects account-level EBS
+encryption before the build, verifies every resulting snapshot, and shares the
+AMI with Marketplace ingestion account `679593333241`. Marketplace encrypts its
+copy, and the CloudFormation templates independently encrypt every buyer volume.
+Other regions are produced by copying the AMI. The container images are
+multi-arch, so `-var architecture=arm64` yields a Graviton image for testing —
+AWS Marketplace ties one AMI product to one CPU architecture, so only x86_64 is
+ever offered to the listing; see
+[Why x86_64 only](../../docs/AWS_MARKETPLACE_LISTING.md#why-x86_64-only).
 
 ## Testing it without AWS
 
@@ -206,7 +212,8 @@ pipeline below.
 | Runs | Where | What it does |
 | ---- | ----- | ------------ |
 | Every push | `deployment-templates` job in [`ci.yml`](../../.github/workflows/ci.yml) | `cfn-lint` on both templates, `packer fmt -check` and `packer validate`. No AWS account, no cost. |
-| Every release tag | [`aws-ami.yml`](../../.github/workflows/aws-ami.yml) | Waits for the release's container images, builds both AMIs with Packer, then launches the x86_64 one through `synaplan-new-vpc.yaml` and runs `synaplan-smoke-test` on it over Session Manager. Deletes the stack and the snapshot it leaves behind, whatever the outcome. |
+| After a green release-tag CI run | [`aws-ami.yml`](../../.github/workflows/aws-ami.yml) | Starts from CI's `workflow_run` once the tag's images are published (or by hand). Builds an unencrypted x86_64 source AMI with Packer (arm64 is available by hand, for testing a Graviton image outside Marketplace — AWS ties a Marketplace AMI product to one CPU architecture), verifies and shares it with the AWS Marketplace ingestion account, then launches it through `synaplan-new-vpc.yaml` and runs `synaplan-smoke-test` on it over Session Manager. Marks it as `SmokeTested`, which is what [`marketplace-versions.yml`](../../.github/workflows/marketplace-versions.yml) offers to the Marketplace listing. Deletes the verification stack and the snapshot it leaves behind, whatever the outcome. |
+| Nightly | [`aws-cleanup.yml`](../../.github/workflows/aws-cleanup.yml) | Deregisters expired AMIs and deletes their snapshots, and terminates Packer builders a cancelled run abandoned. Never touches an image a published listing version launches from, the two newest releases, or anything this pipeline did not tag. Dispatch it with **Only report what would be deleted** to see its reasoning first. |
 | Before a public listing | `taskcat` with [`.taskcat.yml`](.taskcat.yml) | Launches both templates in two or three regions. By hand, per release. |
 
 `aws-ami.yml` skips itself with a notice while the secret
@@ -215,10 +222,13 @@ account exists.
 
 That secret is the ARN of a role in the seller account that trusts GitHub's OIDC
 provider — **not** an access key, of which this repository holds none. Its trust
-policy must be narrowed to this repository, and it needs the permissions Packer
-uses to build an AMI (EC2 instance, key pair, security group, snapshot, image),
-plus CloudFormation, IAM, SSM and EC2 for the verification stack. The AWS
-managed policy `AWSMarketplaceAmiIngestion` goes on a separate role, the one the
+policy is narrowed to this repository's `ami-build` environment, which the
+workflow's jobs declare — so the workflow can also be dispatched by hand from a
+pull request branch to build and verify a deployment fix *before* it is merged,
+while forks stay excluded. The role needs the permissions Packer uses to build
+an AMI (EC2 instance, key pair, security group, snapshot, image), plus
+CloudFormation, IAM, SSM and EC2 for the verification stack. The AWS managed
+policy `AWSMarketplaceAmiIngestion` goes on a separate role, the one the
 Marketplace assumes to read the finished AMI.
 
 The AMI bakes the version pinned in `packer/synaplan.pkr.hcl`, which

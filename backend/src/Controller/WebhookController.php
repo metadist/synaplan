@@ -6,12 +6,14 @@ use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\DiscordNotificationService;
 use App\Service\Email\RawMimeEmailParser;
 use App\Service\EmailChatService;
 use App\Service\EmailWebhookIdempotencyService;
 use App\Service\InternalEmailService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -47,6 +49,8 @@ class WebhookController extends AbstractController
         private ModelConfigService $modelConfigService,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private RawMimeEmailParser $rawMimeEmailParser,
+        private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
+        private ChatErrorPresenter $chatErrorPresenter,
     ) {
     }
 
@@ -377,22 +381,51 @@ class WebhookController extends AbstractController
             $processingTime = microtime(true) - $startTime;
 
             if (!$result['success']) {
+                $errorView = $this->chatErrorPresenter->presentFromResult(
+                    $result,
+                    $message->getLanguage() ?: 'en',
+                    false,
+                );
+                $userError = $errorView->userText;
+                $rawError = $errorView->rawMessage;
+
                 if ($debugDiscord) {
                     $this->discordNotificationService->notifyEmailError(
                         'processing',
                         $fromEmail,
                         $toEmail,
                         $subject,
-                        $result['error'] ?? 'Unknown error',
+                        $rawError,
                         ['user_message' => $body],
                     );
                 }
 
+                try {
+                    $this->internalEmailService->sendAiResponseEmail(
+                        $fromEmail,
+                        $subject,
+                        $userError,
+                        $messageId,
+                        $result['provider'] ?? null,
+                        null,
+                        $processingTime,
+                        null,
+                        $toEmail,
+                    );
+                } catch (\Exception $e) {
+                    $this->logger->error('Failed to send email error response', [
+                        'to' => $fromEmail,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                // The sender already has our reply, so a webhook redelivery would
+                // only reprocess a turn we finished. Report the outcome without
+                // asking the provider to retry.
                 return $this->json([
                     'success' => false,
                     'error' => 'Message processing failed',
-                    'details' => $result['error'] ?? 'Unknown error',
-                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                ]);
             }
 
             $aiResponse = $result['response'];
@@ -545,6 +578,13 @@ class WebhookController extends AbstractController
 
             $chat->updateTimestamp();
             $this->em->flush();
+
+            // Rolling-summary refresh after the OUT persist (channel parity
+            // with the web chat) — email threads are exactly the slow channel
+            // the durable summary store exists for.
+            if (null !== $chat->getId()) {
+                $this->summaryRefreshDispatcher->dispatch((int) $chat->getId(), (int) $user->getId());
+            }
 
             // Send email response back to user
             try {
@@ -846,9 +886,15 @@ class WebhookController extends AbstractController
             $result = $this->messageProcessor->process($message);
 
             if (!$result['success']) {
+                $errorView = $this->chatErrorPresenter->presentFromResult(
+                    $result,
+                    $message->getLanguage() ?: 'en',
+                    false,
+                );
+
                 return $this->json([
                     'success' => false,
-                    'error' => $result['error'] ?? 'Processing failed',
+                    'error' => $errorView->userText,
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 

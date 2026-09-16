@@ -3,7 +3,10 @@
 namespace App\Service;
 
 use App\Entity\User;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Service\Auth\OidcClaimResolver;
+use App\Service\Iam\DirectoryGroupSync;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
@@ -27,12 +30,16 @@ class OidcUserService
         private EntityManagerInterface $em,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
+        private ExternalIdentityRepository $externalIdentityRepository,
+        private OidcClaimResolver $claimResolver,
+        private DirectoryGroupSync $directoryGroupSync,
         string $oidcAdminRoles,
         string $oidcRoleClaims,
         string $oidcClientId,
+        private string $oidcDiscoveryUrl = '',
     ) {
         $this->adminRoleNames = array_map('strtolower', array_map('trim', explode(',', $oidcAdminRoles)));
-        $this->roleClaimPaths = $this->parseRoleClaims($oidcRoleClaims, $oidcClientId);
+        $this->roleClaimPaths = $this->claimResolver->paths($oidcRoleClaims, $oidcClientId);
     }
 
     /**
@@ -51,7 +58,7 @@ class OidcUserService
             throw new \RuntimeException('OIDC claims missing subject (sub)');
         }
 
-        $user = $this->findBySub($sub) ?? $this->findByEmail($email);
+        $user = $this->findBySub($claims) ?? $this->findByEmail($email);
         $isNewUser = false;
 
         if ($user) {
@@ -92,6 +99,20 @@ class OidcUserService
 
         $this->em->persist($user);
         $this->em->flush();
+        $lastSeen = $this->lastSeenForClaims($user, $claims);
+        $this->upsertExternalIdentity($user, $claims);
+        if ($this->directoryGroupSync->shouldRun($user, $refreshToken, $lastSeen)) {
+            // Group reconciliation is best-effort: a malformed claim or a
+            // transient write failure must not turn a valid login into an error.
+            try {
+                $this->directoryGroupSync->sync($user, $claims);
+            } catch (\Throwable $e) {
+                $this->logger->error('Directory group sync failed; login continues without group changes', [
+                    'user_id' => $user->getId(),
+                    'exception' => $e,
+                ]);
+            }
+        }
 
         if ($isNewUser) {
             $this->modelConfigService->initializeNewUserDefaults($user->getId());
@@ -104,7 +125,7 @@ class OidcUserService
     {
         $oidcRoles = [];
         foreach ($this->roleClaimPaths as $segments) {
-            $value = $this->resolveClaimPath($claims, $segments);
+            $value = $this->claimResolver->resolve($claims, $segments);
             if (is_array($value)) {
                 $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $value)));
             }
@@ -135,51 +156,79 @@ class OidcUserService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string>        $segments
+     * Resolve by the configured issuer first so a colliding `sub` from another
+     * IdP cannot log into the wrong local account. Legacy JSON `oidc_sub` is
+     * the fallback for rows written before BEXTERNALIDENTITIES existed.
+     *
+     * @param array<string, mixed> $claims
      */
-    private function resolveClaimPath(array $data, array $segments): mixed
+    private function findBySub(array $claims): ?User
     {
-        $current = $data;
-        foreach ($segments as $segment) {
-            if (!is_array($current) || !array_key_exists($segment, $current)) {
-                return null;
-            }
-            $current = $current[$segment];
+        $sub = $claims['sub'] ?? null;
+        if (!is_string($sub) || '' === $sub) {
+            return null;
         }
 
-        return $current;
-    }
-
-    /**
-     * @return array<array<string>>
-     */
-    private function parseRoleClaims(string $oidcRoleClaims, string $clientId): array
-    {
-        $raw = array_map('trim', explode(',', $oidcRoleClaims));
-
-        $paths = [];
-        foreach ($raw as $path) {
-            if ('' === $path) {
-                continue;
+        $identity = $this->externalIdentityRepository->findOneByTriple(
+            $this->oidcSource($claims),
+            '',
+            $sub,
+        );
+        if (null !== $identity) {
+            $user = $this->userRepository->find($identity->getUserId());
+            if ($user instanceof User) {
+                return $user;
             }
-            $path = str_replace('{client_id}', $clientId, $path);
-            $segments = preg_split('/(?<!\\\\)\./', $path);
-            $segments = array_map(static fn (string $s) => str_replace('\\.', '.', $s), $segments);
-            $paths[] = $segments;
         }
 
-        return $paths;
-    }
-
-    private function findBySub(string $sub): ?User
-    {
         $qb = $this->userRepository->createQueryBuilder('u');
         $qb->where('u.userDetails LIKE :pattern')
             ->setParameter('pattern', '%"oidc_sub":"'.addcslashes($sub, '"\\').'"%')
             ->setMaxResults(1);
 
         return $qb->getQuery()->getOneOrNullResult();
+    }
+
+    /**
+     * @param array<string, mixed> $claims
+     */
+    private function upsertExternalIdentity(User $user, array $claims): void
+    {
+        $userId = $user->getId();
+        $sub = $claims['sub'] ?? null;
+        if (null === $userId || !is_string($sub) || '' === $sub) {
+            return;
+        }
+
+        $this->externalIdentityRepository->upsert(
+            (int) $userId,
+            $this->oidcSource($claims),
+            $sub,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $claims
+     */
+    private function lastSeenForClaims(User $user, array $claims): int
+    {
+        $sub = $claims['sub'] ?? null;
+        $userId = $user->getId();
+        if (null === $userId || !is_string($sub) || '' === $sub) {
+            return 0;
+        }
+        $identity = $this->externalIdentityRepository->findOneByTriple(
+            $this->oidcSource($claims),
+            '',
+            $sub,
+        );
+
+        return $identity?->getLastSeen() ?? 0;
+    }
+
+    private function oidcSource(array $claims): string
+    {
+        return 'oidc:'.$this->claimResolver->issuer($claims, $this->oidcDiscoveryUrl);
     }
 
     private function findByEmail(?string $email): ?User

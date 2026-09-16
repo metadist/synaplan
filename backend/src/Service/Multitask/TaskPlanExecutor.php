@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\Entity\Message;
+use App\Entity\SavedTask;
+use App\Repository\PromptRepository;
+use App\Repository\SavedTaskRepository;
+use App\Service\Agent\Policy\AssistantSkillGate;
+use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\DagExecutor;
@@ -12,6 +17,9 @@ use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\PerfTimer;
+use App\Service\Runtime\RuntimeProfile;
+use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
+use App\Service\SavedTask\SavedTaskConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -45,11 +53,34 @@ use Psr\Log\LoggerInterface;
 final readonly class TaskPlanExecutor
 {
     /**
-     * Capabilities that have NO legacy InferenceRouter equivalent and therefore
-     * must run through the DAG even as a lone single node (see
-     * {@see shouldUseLegacyRouter()}).
+     * Handler-result metadata key carrying the executed plan definition
+     * ({@see TaskPlan::toArray()}). Channels persist it as message meta
+     * {@see self::PLAN_DEFINITION_META} on the OUT message.
      */
-    private const DAG_ONLY_CAPABILITIES = [Capability::CalendarEvent, Capability::UrlFetch, Capability::McpFetch, Capability::EmailSearch];
+    public const PLAN_DEFINITION_KEY = 'task_plan_definition';
+    public const PLAN_DEFINITION_META = 'task_plan_definition';
+
+    /**
+     * Capabilities whose single-node form has a proven InferenceRouter handler.
+     * A missing entry falls through to the DAG so an authored Saved Task step
+     * cannot silently become a chat answer (issue #1882). The previous
+     * deny-list had to be extended for every new capability and failed closed
+     * to the legacy router — which is how a lone `tool_call` / `email_me`
+     * node reported `completed` without doing the work.
+     */
+    private const LEGACY_ROUTER_CAPABILITIES = [
+        Capability::Chat,
+        Capability::Summarize,
+        Capability::Translate,
+        Capability::RagQuery,
+        Capability::FileAnalysis,
+        Capability::ImageGeneration,
+        Capability::VideoGeneration,
+        Capability::Text2Sound,
+        Capability::DocumentGeneration,
+        Capability::WebSearch,
+        // ExtractText has no InferenceRouter mapping — it is ExtractTextRunner only.
+    ];
 
     /**
      * Single-shot media generators that the legacy router already delivers
@@ -74,6 +105,10 @@ final readonly class TaskPlanExecutor
         private ModelConfigService $modelConfigService,
         private MultitaskRoutingConfig $multitaskConfig,
         private LoggerInterface $logger,
+        private ?SavedTaskConfig $savedTaskConfig = null,
+        private ?SavedTaskRepository $savedTasks = null,
+        private ?PromptRepository $prompts = null,
+        private ?SavedTaskPlanFactory $savedTaskPlanFactory = null,
     ) {
     }
 
@@ -103,7 +138,7 @@ final readonly class TaskPlanExecutor
                 $classification,
             );
         }
-        if ($this->shouldUseLegacyRouter($plan->plan)) {
+        if ($this->shouldUseLegacyRouter($plan)) {
             return $this->withPlanningUsage(
                 $this->runSingleNode(
                     fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
@@ -117,6 +152,15 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
+            if ($plan->authored) {
+                $this->logger->info('TaskPlanExecutor: authored DAG produced no successful node, not falling back to chat', [
+                    'message_id' => $message->getId(),
+                ]);
+                $streamCallback($assembled['content']);
+
+                return $this->toHandlerResult($assembled);
+            }
+
             $this->logger->info('TaskPlanExecutor: DAG produced no successful node, falling back to legacy router', [
                 'message_id' => $message->getId(),
             ]);
@@ -126,11 +170,13 @@ final readonly class TaskPlanExecutor
             // "step failed" box sitting above a correct reply.
             $this->discardPlan($progressCallback);
 
+            $fallbackClassification = $this->legacyFallbackClassification($classification);
+
             return $this->withPlanningUsage(
                 $this->runSingleNode(
-                    fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
+                    fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($fallbackClassification), $streamCallback, $progressCallback, $options),
                     $message,
-                    $classification,
+                    $fallbackClassification,
                 ),
                 $plan,
             );
@@ -168,7 +214,7 @@ final readonly class TaskPlanExecutor
                 $classification,
             );
         }
-        if ($this->shouldUseLegacyRouter($plan->plan)) {
+        if ($this->shouldUseLegacyRouter($plan)) {
             return $this->withPlanningUsage(
                 $this->runSingleNode(
                     fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
@@ -182,13 +228,23 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
+            if ($plan->authored) {
+                $this->logger->info('TaskPlanExecutor: authored DAG produced no successful node, not falling back to chat', [
+                    'message_id' => $message->getId(),
+                ]);
+
+                return $this->toHandlerResult($assembled);
+            }
+
             $this->discardPlan($progressCallback);
+
+            $fallbackClassification = $this->legacyFallbackClassification($classification);
 
             return $this->withPlanningUsage(
                 $this->runSingleNode(
-                    fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
+                    fn () => $this->router->route($message, $thread, $this->effectiveClassification($fallbackClassification), $progressCallback, $options),
                     $message,
-                    $classification,
+                    $fallbackClassification,
                 ),
                 $plan,
             );
@@ -201,21 +257,69 @@ final readonly class TaskPlanExecutor
      * Whether a planned single-node plan should delegate to the legacy
      * InferenceRouter (the behaviour-identical Sprint-2 degenerate path).
      *
-     * Multi-node plans always run the DAG. A single-node plan also runs the DAG
-     * when its capability has NO legacy router equivalent — otherwise the legacy
-     * router, fed the original (calendar-unaware) classification, silently
-     * degrades a lone `calendar_event` into a plain chat answer that merely
-     * *describes* adding the event (e.g. emitting a literal "{{date:tomorrow}}")
-     * instead of producing the .ics. Chat/media/file capabilities keep the
-     * legacy path (the legacy classifier already handles them).
+     * Multi-node plans always run the DAG. A single-node plan uses the DAG
+     * unless its capability is on {@see LEGACY_ROUTER_CAPABILITIES} — otherwise
+     * the legacy router, fed the original classification, silently degrades a
+     * lone `tool_call` / `email_me` / `calendar_event` into a plain chat answer
+     * that merely *describes* the step and still reports `completed`.
+     * Authored Saved Task graphs always run the DAG: the classification for a
+     * fixed run is `intent = chat`, so the legacy router would skip the node's
+     * params and answer as chat (issue #1882, Copilot review on PR #1952).
      */
-    private function shouldUseLegacyRouter(TaskPlan $plan): bool
+    private function shouldUseLegacyRouter(TaskPlanResult $result): bool
     {
+        if ($result->authored) {
+            return false;
+        }
+
+        $plan = $result->plan;
         if (!$plan->isSingleNode()) {
             return false;
         }
 
-        return !in_array($plan->nodes[0]->capability, self::DAG_ONLY_CAPABILITIES, true);
+        return in_array($plan->nodes[0]->capability, self::LEGACY_ROUTER_CAPABILITIES, true);
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     */
+    private function isDeterministicDocumentFileIntent(array $classification): bool
+    {
+        $intent = $classification['intent'] ?? null;
+        $source = $classification['source'] ?? null;
+
+        return in_array($intent, ['document_combine', 'document_export'], true)
+            && is_string($source)
+            && str_starts_with($source, 'attachment_');
+    }
+
+    /**
+     * Classification the legacy router should run on after a DAG produced
+     * nothing.
+     *
+     * The deterministic merge/export intents (#1694 / #1691) have no legacy
+     * handler — `InferenceRouter::getHandler()` falls through to `chat`, which
+     * would answer a failed merge (no office engine, missing `pdfunite`, a file
+     * that vanished) with a chat turn that happily CLAIMS the PDF exists: the
+     * exact symptom #1694 was about. Hand the router the attachment
+     * classification these turns had before the merge route existed, so the
+     * user gets a real answer about the attached files instead.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function legacyFallbackClassification(array $classification): array
+    {
+        if (!$this->isDeterministicDocumentFileIntent($classification)) {
+            return $classification;
+        }
+
+        return array_merge($classification, [
+            'topic' => 'analyzefile',
+            'intent' => 'file_analysis',
+            'source' => 'attachment_document_or_audio',
+        ]);
     }
 
     /**
@@ -240,8 +344,17 @@ final readonly class TaskPlanExecutor
         //     to the legacy router with the original analyzefile classification,
         //     i.e. identical behaviour. Only genuinely multi-intent messages run
         //     the DAG (issue #1192).
+        //   - `saved_task`: Saved Task runs (manual "Run now" and the scheduler
+        //     tick). They pin their prompt and skip the sorter, but the stored
+        //     instruction is a full user turn ("make an image of a cat and save
+        //     it to Nextcloud", "create a calendar entry", …) — without planning
+        //     every rerun degraded to a single chat answer that only TALKED
+        //     about the steps. A single-intent instruction still collapses to a
+        //     one-node plan → legacy path, identical to a normal chat turn.
         $source = $classification['source'] ?? null;
-        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio'], true)) {
+        $deterministicFileIntent = $this->isDeterministicDocumentFileIntent($classification);
+        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio', 'saved_task'], true)
+            && !$deterministicFileIntent) {
             return null;
         }
 
@@ -252,6 +365,18 @@ final readonly class TaskPlanExecutor
         // (planning-doc §3.4 invariant).
         if (!empty($classification['is_widget_mode'])) {
             return null;
+        }
+
+        // Attachment merge/export (#1694 / #1691): the classifier already
+        // decided. Do not send these to the planner or the analyzefile legacy
+        // router — neither produces a real PDF.
+        if ($deterministicFileIntent) {
+            return new TaskPlanResult($this->mapper->toSingleNodePlan($classification, $this->allowedCapabilities($classification)), fallback: false);
+        }
+
+        $authored = $this->authoredSavedTaskPlan($message, $classification);
+        if (null !== $authored) {
+            return $authored;
         }
 
         if ($this->sorterVotedSingleStep($message, $classification)) {
@@ -325,6 +450,101 @@ final readonly class TaskPlanExecutor
     }
 
     /**
+     * Flag-gated short-circuit: an enabled Saved Task with an authored graph
+     * replaces the planner. No graph ⇒ identical to today (invariant C3).
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function authoredSavedTaskPlan(Message $message, array $classification): ?TaskPlanResult
+    {
+        if (null === $this->savedTaskConfig || null === $this->savedTasks || null === $this->prompts || null === $this->savedTaskPlanFactory) {
+            return null;
+        }
+
+        try {
+            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        // Anonymous channels (e.g. WhatsApp senders without an account) have no
+        // per-user Saved Tasks; without this bail-out the null user id fatals in
+        // findByTopicAndUser() and 500s the whole webhook.
+        if (null === $userId) {
+            return null;
+        }
+
+        if (!$this->savedTaskConfig->isEnabled($userId)) {
+            return null;
+        }
+
+        $task = $this->savedTaskForClassification($classification, $userId);
+        if (null === $task || null === $task->getGraph()) {
+            return null;
+        }
+
+        try {
+            $plan = $this->savedTaskPlanFactory->fromTask($task, is_string($classification['language'] ?? null) ? $classification['language'] : 'en');
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanExecutor: authored Saved Task graph rejected', [
+                'message_id' => $message->getId(),
+                'task_id' => $task->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $this->logger->info('TaskPlanExecutor: using authored Saved Task steps', [
+            'message_id' => $message->getId(),
+            'task_id' => $task->getId(),
+            'task_name' => $task->getName(),
+        ]);
+
+        return new TaskPlanResult($plan, fallback: false, authored: true);
+    }
+
+    /**
+     * The Saved Task whose pinned steps this turn should replay, if any.
+     *
+     * A Saved Task RUN (manual "Run now", scheduler tick, inbound email) names
+     * its task directly via `saved_task_id` — the run goes through the AI
+     * sorter like a typed turn, so the classified topic (e.g. `general`) says
+     * nothing about the task. Legacy fixed-prompt runs (source=saved_task)
+     * and ordinary chat turns resolve through the prompt topic: a run picks
+     * the task's graph regardless of trigger type, a chat turn only pins the
+     * steps of a chat-trigger task (typing the matching instruction re-runs
+     * them).
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function savedTaskForClassification(array $classification, int $userId): ?SavedTask
+    {
+        \assert(null !== $this->savedTasks && null !== $this->prompts);
+
+        $taskId = $classification['saved_task_id'] ?? null;
+        if (is_int($taskId) && $taskId > 0) {
+            $task = $this->savedTasks->findByIdAndOwner($taskId, $userId);
+
+            return null !== $task && $task->isEnabled() ? $task : null;
+        }
+
+        $topic = $classification['topic'] ?? null;
+        if (!is_string($topic) || '' === $topic) {
+            return null;
+        }
+
+        $prompt = $this->prompts->findByTopicAndUser($topic, $userId);
+        if (null === $prompt || null === $prompt->getId()) {
+            return null;
+        }
+
+        return 'saved_task' === ($classification['source'] ?? null)
+            ? $this->savedTasks->findEnabledGraphTaskForPrompt($prompt->getId(), $userId)
+            : $this->savedTasks->findEnabledChatTaskForPrompt($prompt->getId(), $userId);
+    }
+
+    /**
      * Whether the AI sorter already told us this turn is a single step, so the
      * planner round-trip can be skipped.
      *
@@ -334,10 +554,10 @@ final readonly class TaskPlanExecutor
      * that {@see shouldUseLegacyRouter()} hands straight back to the legacy
      * router — identical output, one blocking LLM call later.
      *
-     * The sorter prompt counts the DAG-only capabilities (calendar entry, URL
-     * fetch, connected-system lookup, mailbox search, "mail it to me") as
-     * multi-step even though they produce one deliverable: they have no legacy
-     * router equivalent, so skipping the planner would silently degrade them
+     * The sorter prompt counts capabilities without a legacy router equivalent
+     * (calendar entry, URL fetch, connected-system lookup, mailbox search,
+     * "mail it to me", a custom tool call) as multi-step even though they
+     * produce one deliverable: skipping the planner would silently degrade them
      * into a chat answer that only talks about the action.
      *
      * Deliberately strict: only an explicit `false` skips planning. A missing
@@ -460,7 +680,11 @@ final readonly class TaskPlanExecutor
         TaskPlanResult $plan,
         ?callable $progressCallback,
     ): array {
-        $userId = $plan->modelId ? $this->modelConfigService->getEffectiveUserIdForMessage($message) : $message->getUserId();
+        // Always the effective identity: an unverified WhatsApp owner must not
+        // unlock allow-listed group flags (PARALLEL_ENABLED) that routing would
+        // keep global-only. Deterministic plans have no modelId; they still
+        // share this context with every other DAG path.
+        $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
         // Sibling awareness: give every runner the full set of capabilities in
         // this plan so a content node (chat/summarize) knows that media/file
@@ -518,6 +742,11 @@ final readonly class TaskPlanExecutor
         if (null !== $plan->planningUsage) {
             $assembled['metadata']['planning_usage'] = $plan->planningUsage;
         }
+        // The full node definitions (inputs/params, not just the render cards)
+        // ride along so the channel can persist them on the OUT message. That
+        // is what "Schedule this" copies into a Saved Task graph — a rerun then
+        // replays exactly these steps instead of asking the planner again.
+        $assembled['metadata'][self::PLAN_DEFINITION_KEY] = $plan->plan->toArray();
 
         if (null !== $messageId) {
             try {
@@ -801,7 +1030,7 @@ final readonly class TaskPlanExecutor
     private function effectiveClassification(array $classification): array
     {
         try {
-            $plan = $this->mapper->toSingleNodePlan($classification);
+            $plan = $this->mapper->toSingleNodePlan($classification, $this->allowedCapabilities($classification));
             $node = $plan->nodes[0] ?? null;
             $recovered = $node ? $this->mapper->classificationFromNode($node) : null;
 
@@ -825,7 +1054,7 @@ final readonly class TaskPlanExecutor
             if (null === $messageId) {
                 return;
             }
-            $plan = $this->mapper->toSingleNodePlan($classification);
+            $plan = $this->mapper->toSingleNodePlan($classification, $this->allowedCapabilities($classification));
             $this->store->persist($messageId, $plan, null, $status);
         } catch (\Throwable $e) {
             $this->logger->warning('TaskPlanExecutor: failed to persist executed plan (ignored)', [
@@ -833,5 +1062,20 @@ final readonly class TaskPlanExecutor
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     *
+     * @return list<string>|null
+     */
+    private function allowedCapabilities(array $classification): ?array
+    {
+        $profile = $classification['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            return null;
+        }
+
+        return AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile);
     }
 }

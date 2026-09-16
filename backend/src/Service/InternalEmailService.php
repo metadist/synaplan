@@ -2,7 +2,8 @@
 
 namespace App\Service;
 
-use Parsedown;
+use App\AI\Health\ModelHealthAlert;
+use App\Service\Email\MarkdownEmailFormatter;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
@@ -197,10 +198,8 @@ final readonly class InternalEmailService
 
         $hasInlineImage = false;
 
-        // Convert markdown to HTML using Parsedown
-        $parsedown = new \Parsedown();
-        $parsedown->setSafeMode(true); // Prevent XSS
-        $htmlBody = $parsedown->text($bodyText);
+        $formatter = new MarkdownEmailFormatter();
+        $htmlBody = $formatter->toFragment($bodyText);
 
         // Embed images inline via CID for broad email client compatibility (Outlook, Gmail, etc.)
         if ('image' === $mediaType && $attachmentPath && file_exists($attachmentPath)) {
@@ -255,7 +254,7 @@ final readonly class InternalEmailService
             ->to($to)
             ->subject('Re: '.$subject)
             ->text($textBody)
-            ->html($htmlBody);
+            ->html($formatter->wrapDocument($htmlBody));
 
         // Add In-Reply-To header for email threading
         if ($inReplyTo) {
@@ -315,9 +314,8 @@ final readonly class InternalEmailService
         $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
 
-        $parsedown = new \Parsedown();
-        $parsedown->setSafeMode(true); // Prevent XSS
-        $htmlBody = $parsedown->text($markdown);
+        $formatter = new MarkdownEmailFormatter();
+        $htmlBody = $formatter->toFragment($markdown);
 
         // Split attachments: first image becomes the inline (CID) hero image.
         $inlineImagePath = null;
@@ -346,7 +344,7 @@ final readonly class InternalEmailService
             ->to($to)
             ->subject($subject)
             ->text($markdown)
-            ->html($htmlBody);
+            ->html($formatter->wrapDocument($htmlBody));
 
         if (null !== $inlineImagePath) {
             $email->embedFromPath($inlineImagePath, 'generated-image');
@@ -369,6 +367,32 @@ final readonly class InternalEmailService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Inbox link only — never include the tool arguments.
+     */
+    public function sendApprovalRequestEmail(string $to, string $preview, string $inboxUrl): void
+    {
+        $this->sendTaskResultEmail(
+            $to,
+            'Waiting for your approval',
+            $preview."\n\nNothing has been sent yet. Open Approvals to Approve or Reject:\n".$inboxUrl,
+        );
+    }
+
+    /**
+     * @param list<string> $previews
+     */
+    public function sendApprovalDigestEmail(string $to, array $previews, int $count): void
+    {
+        $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
+        $lines = array_map(static fn (string $preview): string => '- '.$preview, array_slice($previews, 0, 20));
+        $this->sendTaskResultEmail(
+            $to,
+            sprintf('%d actions waiting for your approval', $count),
+            "These actions are still waiting:\n\n".implode("\n", $lines)."\n\nOpen Approvals:\n".$frontendUrl.'/channels/approvals',
+        );
     }
 
     /**
@@ -465,6 +489,91 @@ final readonly class InternalEmailService
             $this->logger->info('Embedding fallback warning email sent', ['to' => $adminEmail]);
         } catch (\Exception $e) {
             $this->logger->warning('Failed to send embedding fallback warning email', [
+                'to' => $adminEmail,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Report AI models that stopped working, or that started working again.
+     *
+     * One email per provider, never one per model: a revoked key takes out
+     * every model behind it at once, and forty separate emails about the same
+     * key is how an alert channel gets muted. Throttling lives in
+     * {@see \App\AI\Health\ModelHealthAlerter}, alongside the Discord path.
+     */
+    public function sendModelHealthAlert(ModelHealthAlert $alert, bool $resolved = false): void
+    {
+        $adminEmail = $this->operatorInbox();
+        if (null === $adminEmail) {
+            $this->logger->debug('No admin email configured, skipping model health alert');
+
+            return;
+        }
+
+        $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
+        $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
+        $timestamp = (new \DateTimeImmutable())->format('Y-m-d H:i:s T');
+
+        $provider = htmlspecialchars($alert->name(), ENT_QUOTES);
+        $models = htmlspecialchars($alert->previewNames(), ENT_QUOTES);
+        $reason = htmlspecialchars($alert->reason, ENT_QUOTES);
+        $count = $alert->modelCount();
+
+        if ($resolved) {
+            $banner = '#2e7d32';
+            $title = '✅ RESOLVED — AI models available again';
+            $lead = "<p><strong>{$count}</strong> model(s) from <strong>{$provider}</strong> are working again. No action needed.</p>";
+            $action = '';
+            $subject = '[RESOLVED][Synaplan] '.$alert->name().' models available again';
+        } else {
+            $banner = '#c62828';
+            $title = '🚨 INCIDENT — AI models unavailable';
+            $lead = "<p><strong>{$count}</strong> model(s) from <strong>{$provider}</strong> are currently not usable.</p>";
+            $action = '<p><strong>Action required:</strong> '.htmlspecialchars($alert->actionRequired(), ENT_QUOTES).'</p>';
+            $subject = '[INCIDENT][Synaplan] '.$alert->headline();
+        }
+
+        $html = <<<HTML
+            <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: {$banner}; color: #fff; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px;">
+                    <strong style="font-size: 18px;">{$title}</strong>
+                </div>
+                {$lead}
+                {$action}
+                <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Provider</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$provider}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Models</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$models}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reason</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">{$reason}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Time</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$timestamp}</td></tr>
+                </table>
+                <p style="color: #666; font-size: 13px;">Full status per model: Admin → Model status.</p>
+            </div>
+            HTML;
+
+        try {
+            $email = (new Email())
+                ->from(sprintf('%s <%s>', $fromName, $fromEmail))
+                ->to($adminEmail)
+                // Prefix stays machine-matchable so inbox rules and pagers can
+                // route on it without parsing the body.
+                ->subject($subject)
+                ->priority($resolved ? Email::PRIORITY_NORMAL : Email::PRIORITY_HIGH)
+                ->html($html);
+
+            $this->sendWithRetry($email);
+            $this->logger->info('Model health alert email sent', [
+                'to' => $adminEmail,
+                'provider' => $alert->provider,
+                'resolved' => $resolved,
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->warning('Failed to send model health alert email', [
                 'to' => $adminEmail,
                 'error' => $e->getMessage(),
             ]);

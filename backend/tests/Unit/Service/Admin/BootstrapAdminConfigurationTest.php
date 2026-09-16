@@ -21,6 +21,26 @@ final class BootstrapAdminConfigurationTest extends TestCase
         $this->assertNull(BootstrapAdminConfiguration::fromConfiguration('', ''));
     }
 
+    /**
+     * The deployment contract test mounts this ONE file into a bare PHP image as
+     * the autoload path (assert_bootstrap_contract in
+     * deploy/scripts/tests/test-lifecycle.sh), so importing a sibling class turns
+     * every case there into a fatal error the exit status reports as "the
+     * authority could not decide". Catch that here, where the message says why,
+     * instead of three minutes into a Docker-backed CI job.
+     */
+    public function testTheAuthorityStaysLoadableFromItsFileAlone(): void
+    {
+        $source = file_get_contents((string) (new \ReflectionClass(BootstrapAdminConfiguration::class))->getFileName());
+
+        $this->assertIsString($source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/^use\s+App\\\\/m',
+            $source,
+            'the bootstrap authority must not import another App class: the deployment contract test loads this file on its own'
+        );
+    }
+
     public function testWhitespaceOnlyEmailWithoutPasswordMeansNotConfigured(): void
     {
         $this->assertNull(BootstrapAdminConfiguration::fromConfiguration("  \t ", ''));

@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ConfigRepository;
@@ -12,12 +16,15 @@ use App\Repository\FileRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\FeedbackConfigService;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\Prompt\TimeContextBuilder;
@@ -79,12 +86,51 @@ class ChatHandlerDocumentImageContextTest extends TestCase
     }
 
     /**
+     * Cross-turn image edits: told nothing, the mediamaker prompt turns "make
+     * the car blue" into a full scene description and the image model redraws
+     * the picture instead of editing it.
+     */
+    public function testMediamakerPromptNamesTheImageBeingEdited(): void
+    {
+        $context = $this->buildMediaEditContext('mediamaker', ['media_edit_source_name' => 'car-sunset.png']);
+
+        $this->assertStringContainsString('You are editing an existing image', $context);
+        $this->assertStringContainsString('car-sunset.png', $context);
+        $this->assertStringContainsString('keep everything else unchanged', $context);
+    }
+
+    public function testMediamakerPromptIsUnchangedForAFreshGeneration(): void
+    {
+        $this->assertSame('', $this->buildMediaEditContext('mediamaker', []));
+        $this->assertSame('', $this->buildMediaEditContext('mediamaker', ['media_edit_source_name' => '  ']));
+    }
+
+    public function testMediaEditContextIsScopedToTheMediamakerTopic(): void
+    {
+        $this->assertSame('', $this->buildMediaEditContext('general', ['media_edit_source_name' => 'car-sunset.png']));
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function buildMediaEditContext(string $topic, array $options): string
+    {
+        $method = new \ReflectionMethod(ChatHandler::class, 'buildMediaEditContext');
+
+        return (string) $method->invoke(
+            (new \ReflectionClass(ChatHandler::class))->newInstanceWithoutConstructor(),
+            $topic,
+            $options,
+        );
+    }
+
+    /**
      * @param list<File> $conversationImages
      */
     private function buildContext(array $conversationImages, string $topic): string
     {
         $repository = $this->createMock(FileRepository::class);
-        $repository->method('findImagesByMessageIds')->willReturn($conversationImages);
+        $repository->method('findFilesByMessageIds')->willReturn($conversationImages);
 
         $threadMessage = (new Message())->setUserId(7);
         (new \ReflectionProperty(Message::class, 'id'))->setValue($threadMessage, 500);
@@ -92,7 +138,7 @@ class ChatHandlerDocumentImageContextTest extends TestCase
         $method = new \ReflectionMethod(ChatHandler::class, 'buildDocumentImageContext');
 
         return (string) $method->invoke(
-            $this->handler(new DocumentImageCatalog($repository, $this->uploadDir)),
+            $this->handler(new DocumentImageCatalog(new ConversationFileCatalog($repository, $this->uploadDir))),
             (new Message())->setUserId(7),
             [$threadMessage],
             $topic,
@@ -124,6 +170,14 @@ class ChatHandlerDocumentImageContextTest extends TestCase
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->createMock(\App\Service\Digest\DigestSearchService::class),
+            $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
+            $this->createMock(ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(StructuredOutputConfig::class),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
         );
     }
 

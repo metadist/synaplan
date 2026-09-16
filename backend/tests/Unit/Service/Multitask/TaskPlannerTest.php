@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\PromptMetaRepository;
@@ -66,7 +68,16 @@ final class TaskPlannerTest extends TestCase
                 new NullLogger(),
             ),
             $this->createMock(RateLimitService::class),
+            $this->alwaysOnStructuredOutputConfig(),
         );
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     private function message(string $text = 'hello', string $lang = 'en'): Message&MockObject
@@ -103,6 +114,46 @@ final class TaskPlannerTest extends TestCase
         self::assertSame(Capability::ExtractText, $result->plan->nodeById('n1')?->capability);
         self::assertSame('n4', $result->plan->replyNode);
         self::assertSame(76, $result->modelId);
+    }
+
+    public function testLargeAttachmentReachesThePlannerAsADigestNotAsFullText(): void
+    {
+        $rows = [];
+        for ($i = 1; $i <= 6000; ++$i) {
+            $rows[] = sprintf('| %d | 2025-%02d-01 | Region-%d | %d.00 |', $i, $i % 12 + 1, $i % 7, $i * 91);
+        }
+        $fileText = "## Sheet: Sales\n\n| ID | Date | Region | Revenue |\n| --- | --- | --- | --- |\n".implode("\n", $rows);
+        self::assertGreaterThan(200000, strlen($fileText));
+
+        $message = $this->createMock(Message::class);
+        $message->method('getText')->willReturn('Analyse revenue per region');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn($fileText);
+        $message->method('getFileType')->willReturn('xlsx');
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getFile')->willReturn(1);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $sentMessages = null;
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages) use (&$sentMessages): array {
+            $sentMessages = $messages;
+
+            return ['content' => json_encode([
+                'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+                'tasks' => [['id' => 'n1', 'capability' => 'file_analysis', 'inputs' => ['files' => '$message.files']]],
+            ])];
+        });
+
+        $result = $this->planner->plan($message, [], 1);
+
+        self::assertFalse($result->fallback);
+        $current = json_decode((string) end($sentMessages)['content'], true);
+        self::assertIsArray($current);
+        self::assertLessThan(3000, strlen($current['BFILETEXT']), 'planner receives a digest, not 200 kB of table');
+        self::assertStringContainsString('Attachment digest for routing', $current['BFILETEXT']);
+        self::assertStringContainsString('spreadsheet', $current['BFILETEXT']);
+        self::assertStringContainsString('ID, Date, Region, Revenue', $current['BFILETEXT']);
+        self::assertSame('xlsx', $current['BATTACHED_FILES']);
     }
 
     public function testMarkdownFencedJsonIsParsed(): void
@@ -178,5 +229,61 @@ final class TaskPlannerTest extends TestCase
         $this->planner->plan($this->message(), [], 1);
 
         self::assertGreaterThanOrEqual(3000, $options['max_tokens'] ?? 0);
+    }
+
+    public function testPlanForwardsTheTaskPlanSchemaToTheAiFacade(): void
+    {
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"version":1,"language":"en","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+            }
+        );
+
+        $this->planner->plan($this->message(), [], 1);
+
+        self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
+        self::assertSame('task_plan', $options['structured_output']->name);
+        self::assertFalse($options['structured_output']->strict);
+    }
+
+    public function testPlanOmitsTheTaskPlanSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"version":1,"language":"en","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+            }
+        );
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $planner = new TaskPlanner(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->modelConfigService,
+            new TaskPlanValidator(),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(UserRepository::class),
+            new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
+            $this->createMock(RateLimitService::class),
+            $structuredOutputConfig,
+        );
+
+        $planner->plan($this->message(), [], 1);
+
+        self::assertArrayNotHasKey('structured_output', $options ?? []);
     }
 }

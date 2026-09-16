@@ -22,6 +22,7 @@
     </ErrorBoundary>
     <NotificationContainer />
     <Dialog />
+    <AnnouncementModal />
     <CookieConsent @consent="handleCookieConsent" />
     <BiometricLockScreen />
     <ForceUpdateScreen />
@@ -30,7 +31,7 @@
 
 <script setup lang="ts">
 import { watch, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
@@ -39,6 +40,7 @@ import { brandName } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import AnnouncementModal from '@/components/AnnouncementModal.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 import OfflineBanner from '@/components/OfflineBanner.vue'
 import BiometricLockScreen from '@/components/BiometricLockScreen.vue'
@@ -53,6 +55,7 @@ import { initNativeStatusBar } from '@/services/nativeStatusBar'
 import { initNativeBackButton } from '@/services/nativeBackButton'
 import { initKeyboardScrollAssist } from '@/services/keyboardScrollAssist'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { initNativeShortcuts } from '@/services/api/nativeShortcuts'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
@@ -129,6 +132,16 @@ void initNativeBackButton()
 // the WebView does not shrink, so ordinary form/dialog fields would otherwise
 // stay hidden behind it). No-op on web.
 initKeyboardScrollAssist()
+
+// MOBILE-APP SEAM: iOS Shortcuts that need the composer (dictate / photo)
+// navigate to chat. The pending action itself is consumed in ChatView once
+// the input is mounted. No-op on web / when the bridge is absent.
+const router = useRouter()
+initNativeShortcuts(() => {
+  if ('chat' !== String(router.currentRoute.value.name ?? '')) {
+    void router.push({ name: 'chat' })
+  }
+})
 
 // Update page title when language changes
 const route = useRoute()

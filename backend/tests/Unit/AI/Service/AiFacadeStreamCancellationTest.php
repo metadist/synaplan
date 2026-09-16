@@ -6,6 +6,8 @@ namespace App\Tests\Unit\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
+use App\AI\Health\FailureKind;
+use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
@@ -43,6 +45,11 @@ class AiFacadeStreamCancellationTest extends TestCase
         $circuitBreaker = $this->createMock(CircuitBreaker::class);
         $circuitBreaker->method('execute')->willReturnCallback(static fn (callable $callback) => $callback());
 
+        // recordFailure() returns an enum, which PHPUnit cannot invent a
+        // default for, so the stub has to name one explicitly.
+        $health = $this->createMock(ModelHealthRecorder::class);
+        $health->method('recordFailure')->willReturn(FailureKind::Cancelled);
+
         $facade = new AiFacade(
             $registry,
             $this->createMock(ModelConfigService::class),
@@ -55,6 +62,7 @@ class AiFacadeStreamCancellationTest extends TestCase
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(HiggsfieldCredentialResolver::class),
             $this->createMock(TranscriptionUsageRecorder::class),
+            $health,
             '/tmp'
         );
 

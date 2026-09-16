@@ -1,0 +1,16 @@
+{
+    "id": "fixture_search",
+    "name": "fixture_search",
+    "namespace": "Plugin\\FixtureSearch",
+    "version": "1.0.0",
+    "description": "Test fixture: a declared web_search plug adapter.",
+    "provides": {
+        "plugs": [
+            {
+                "port": "web_search",
+                "class": "Plugin\\FixtureSearch\\Plug\\FixtureSearchAdapter",
+                "key": "fixture_search"
+            }
+        ]
+    }
+}

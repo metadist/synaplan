@@ -4,8 +4,18 @@ namespace App\AI\Provider;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Messages\MessagesUsage;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Tool\CatalogToolUse;
+use App\AI\Tool\OpenAiToolShapes;
+use App\AI\Tool\ToolCallAccumulator;
+use App\AI\ToolCalling\ToolCallingCapability;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -19,12 +29,30 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * - Extended Thinking (reasoning)
  * - System messages
  *
- * Tool use / function calling is NOT implemented here. Claude Code and other
- * Anthropic-protocol clients that need tools should use the Messages gateway
- * at POST /v1/messages (AnthropicPassthroughTranslator), which forwards the
- * request body verbatim — including tools — to the upstream Anthropic API.
+ * Tool use / function calling is implemented for the ChatProvider contract
+ * (tools / tool_choice / tool_calls). Claude Code and other Anthropic-protocol
+ * clients that need a verbatim Anthropic body should still use the Messages
+ * gateway at POST /v1/messages (AnthropicPassthroughTranslator).
+ *
+ * Anthropic has no native JSON-schema response mode, so structured output is
+ * expressed as a FORCED single tool call ({@see StructuredOutputTranslator}).
+ * That shares the `tools` / `tool_choice` slot with a caller's own tool
+ * declarations, so the two cannot travel together: when a schema is merged,
+ * declared tools are dropped
+ * ({@see ToolCallingCapability::conflictsWithStructuredOutput()}).
+ *
+ * Note on Claude Fable 5.1 / Claude Mythos 5.1: those models reject forced
+ * tool_choice ({"type": "any"} or {"type": "tool", "name": ...}) with a 400
+ * invalid_request_error — only "auto" (default) and "none" are accepted.
+ * That rules out the structured-output dialect for them, so
+ * {@see StructuredOutputCapability} reports it as unsupported and callers
+ * fall back to the prose-instruction path. Ordinary tool declarations are
+ * unaffected: they send tool_choice `auto`. For `required` / named tools
+ * this provider maps the caller's choice through and lets Anthropic's own
+ * 400 surface the mismatch, exactly as a direct API call would. The Messages
+ * gateway passthrough forwards the client's tool_choice verbatim.
  */
-class AnthropicProvider implements ChatProviderInterface, VisionProviderInterface
+class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface
 {
     private const API_VERSION = '2023-06-01';
     private const BASE_URL = 'https://api.anthropic.com/v1';
@@ -49,6 +77,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-sonnet-5',
         'claude-haiku-4-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
@@ -60,6 +89,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-5',
         'claude-sonnet-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /**
@@ -75,6 +105,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-5',
         'claude-sonnet-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /**
@@ -89,7 +120,42 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         private int $timeout = 120,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?ProviderKeyStore $keyStore = null,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
+        private ToolCallingCapability $toolCallingCapability = new ToolCallingCapability(),
     ) {
+    }
+
+    /**
+     * Structured output on Anthropic IS a forced tool call, so a caller's own
+     * declarations would overwrite the schema's `tools` / `tool_choice`. The
+     * schema wins: it is the caller's output contract and something
+     * downstream parses against it, whereas "no tool call" is already a valid
+     * outcome of every toolset we declare.
+     *
+     * Keyed off the schema actually being MERGED, not merely requested:
+     * models that reject a forced tool_choice get no schema, and a dropped
+     * schema has nothing left to conflict with.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $translatedSchema
+     *
+     * @return array<string, mixed>
+     */
+    private function dropToolsConflictingWithSchema(array $options, array $translatedSchema, ?string $model): array
+    {
+        if ([] === $translatedSchema
+            || !$this->toolCallingCapability->conflictsWithStructuredOutput($this->getName())
+            || !is_array($options['tools'] ?? null) || [] === $options['tools']
+        ) {
+            return $options;
+        }
+
+        $this->logger->warning('Anthropic: tool declaration dropped, cannot combine tools with structured output', [
+            'model' => $model,
+        ]);
+        unset($options['tools'], $options['tool_choice'], $options['parallel_tool_calls']);
+
+        return $options;
     }
 
     private function resolveApiKey(): ?string
@@ -104,6 +170,15 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function getName(): string
     {
         return 'anthropic';
+    }
+
+    public function supportsToolCalling(string $model): bool
+    {
+        if (CatalogToolUse::hasChatRow($this->getName(), $model)) {
+            return CatalogToolUse::supports($this->getName(), $model);
+        }
+
+        return true;
     }
 
     public function getDisplayName(): string
@@ -208,6 +283,21 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 ]);
             }
 
+            $schema = $options['structured_output'] ?? null;
+            $translatedSchema = [];
+            if ($schema instanceof StructuredOutputSchema) {
+                $translatedSchema = $this->structuredOutputTranslator->translate($this->getName(), $model, false, $schema);
+                $requestBody = array_merge($requestBody, $translatedSchema);
+            }
+
+            // Models that reject a forced tool_choice get no schema and answer
+            // in prose instead, so any `tool_use` block coming back from them
+            // really is a tool call.
+            $schemaForcedToolUse = [] !== $translatedSchema;
+
+            $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
+            $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
+
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
                 'message_count' => count($conversationMessages),
@@ -226,12 +316,27 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             // Extract content blocks
             $textContent = '';
             $thinkingContent = '';
+            $toolCalls = $this->extractAnthropicToolCalls($data['content'] ?? []);
 
             foreach ($data['content'] ?? [] as $block) {
                 $type = $block['type'] ?? '';
 
                 if ('text' === $type) {
                     $textContent .= $block['text'] ?? '';
+                } elseif ('tool_use' === $type && $schemaForcedToolUse) {
+                    // Structured-output request (see StructuredOutputDialect::ANTHROPIC_TOOL_FORCING):
+                    // Claude has no native JSON-schema response mode, so the schema was
+                    // sent as a forced single tool call. Its `input` IS the desired JSON
+                    // result — re-encode it into `content` so callers can treat this
+                    // response exactly like a schema-following text response from any
+                    // other provider.
+                    //
+                    // Guarded on the schema having been SENT, not merely
+                    // requested: with native tool calling a `tool_use` block is
+                    // a REAL tool call whose arguments are routing plumbing,
+                    // and re-encoding those into the answer text would show the
+                    // user a raw JSON blob instead of an answer.
+                    $textContent .= json_encode($block['input'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 } elseif ('thinking' === $type) {
                     $thinkingContent .= $block['thinking'] ?? '';
                 }
@@ -240,6 +345,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $inputTokens = $data['usage']['input_tokens'] ?? 0;
             $outputTokens = $data['usage']['output_tokens'] ?? 0;
             $cacheCreationTokens = $data['usage']['cache_creation_input_tokens'] ?? 0;
+            $cacheCreation1hTokens = MessagesUsage::extractCacheCreation1hTokens($data['usage'] ?? []);
             $cacheReadTokens = $data['usage']['cache_read_input_tokens'] ?? 0;
 
             $usage = [
@@ -248,6 +354,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
                 'cached_tokens' => $cacheReadTokens,
                 'cache_creation_tokens' => $cacheCreationTokens,
+                'cache_creation_1h_tokens' => $cacheCreation1hTokens,
             ];
 
             $this->logger->info('Anthropic: Chat completed', [
@@ -256,13 +363,29 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'has_thinking' => !empty($thinkingContent),
             ]);
 
-            return [
+            $result = [
                 'content' => $textContent,
                 'usage' => $usage,
             ];
+
+            // Only real tool calls are reported: with a structured-output
+            // schema the single forced `tool_use` block was already folded
+            // into `content` above, and calling this turn a tool turn would
+            // make the caller wait for a tool result that never comes.
+            if (!$schemaForcedToolUse) {
+                if ([] !== $toolCalls) {
+                    $result['tool_calls'] = $toolCalls;
+                    $result['finish_reason'] = 'tool_calls';
+                } elseif ('tool_use' === ($data['stop_reason'] ?? null)) {
+                    $result['finish_reason'] = 'tool_calls';
+                }
+            }
+
+            return $result;
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
             $upstreamStatus = 0;
+            $errorBody = null;
 
             if (method_exists($e, 'getResponse')) {
                 try {
@@ -287,7 +410,12 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'status_code' => $upstreamStatus,
             ]);
 
-            throw new ProviderException($errorMessage, 'anthropic', null, $upstreamStatus, $e);
+            $errorType = null;
+            if (isset($errorBody['error']['type']) && is_string($errorBody['error']['type'])) {
+                $errorType = $errorBody['error']['type'];
+            }
+
+            throw (new ProviderFailureFactory())->fromParsed($errorMessage, 'anthropic', 'chat', $upstreamStatus, $errorType, previous: $e);
         }
     }
 
@@ -337,6 +465,24 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 ]);
             }
 
+            $schema = $options['structured_output'] ?? null;
+            $translatedSchema = [];
+            if ($schema instanceof StructuredOutputSchema) {
+                $translatedSchema = $this->structuredOutputTranslator->translate($this->getName(), $model, true, $schema);
+                $requestBody = array_merge($requestBody, $translatedSchema);
+            }
+
+            $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
+            $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
+
+            // Only accumulate when the request really declares tools. A forced
+            // schema tool also streams its `input` as `input_json_delta`, but
+            // those fragments are the ANSWER and must reach the user as
+            // content instead of being folded into a tool call.
+            $toolCalls = isset($requestBody['tools']) && [] === $translatedSchema
+                ? new ToolCallAccumulator()
+                : null;
+
             $this->logger->info('Anthropic: Starting streaming chat', [
                 'model' => $model,
                 'message_count' => count($conversationMessages),
@@ -366,11 +512,21 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             }
 
             // Parse SSE stream and collect usage
-            $usage = $this->parseSSEStream($response, $callback);
+            $usage = $this->parseSSEStream($response, $callback, $toolCalls);
 
-            $this->logger->info('🔵 Anthropic: Streaming completed', ['usage' => $usage]);
+            $completedToolCalls = null !== $toolCalls && !$toolCalls->isEmpty() ? $toolCalls->complete() : [];
 
-            return ['usage' => $usage];
+            $this->logger->info('🔵 Anthropic: Streaming completed', [
+                'usage' => $usage,
+                'tool_calls' => count($completedToolCalls),
+            ]);
+
+            $result = ['usage' => $usage];
+            if ([] !== $completedToolCalls) {
+                $result['tool_calls'] = $completedToolCalls;
+            }
+
+            return $result;
         } catch (ProviderException $e) {
             // Already carries a formatted, user-safe message (e.g. the up-front
             // HTTP error detection above) — surface it as-is without re-wrapping.
@@ -423,7 +579,11 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'status_code' => $upstreamStatus,
             ]);
 
-            throw new ProviderException($errorMessage, 'anthropic', null, $upstreamStatus, $e);
+            $errorType = is_array($errorBody['error'] ?? null) && isset($errorBody['error']['type']) && is_string($errorBody['error']['type'])
+                ? $errorBody['error']['type']
+                : null;
+
+            throw (new ProviderFailureFactory())->fromParsed($errorMessage, 'anthropic', 'chat_stream', $upstreamStatus, $errorType, previous: $e);
         }
     }
 
@@ -792,9 +952,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $last = &$merged[count($merged) - 1];
 
             if ($messages[$i]['role'] === $last['role']) {
-                $prevContent = is_string($last['content']) ? $last['content'] : json_encode($last['content']);
-                $curContent = is_string($messages[$i]['content']) ? $messages[$i]['content'] : json_encode($messages[$i]['content']);
-                $last['content'] = $prevContent."\n\n".$curContent;
+                $last['content'] = $this->concatAnthropicContent($last['content'], $messages[$i]['content']);
             } else {
                 $merged[] = $messages[$i];
             }
@@ -849,14 +1007,21 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
      * - message_stop: Stream complete
      * - ping: Keep-alive
      * - error: Error occurred
+     *
+     * `$toolCalls` is non-null only when the request declared native tools
+     * and no schema was forced. It flips the meaning of `input_json_delta`:
+     * those fragments then belong to a real tool call and are folded into it
+     * instead of being streamed to the user as answer text (with a schema
+     * they still ARE the answer — see chat()).
      */
-    private function parseSSEStream(ResponseInterface $response, callable $callback): array
+    private function parseSSEStream(ResponseInterface $response, callable $callback, ?ToolCallAccumulator $toolCalls = null): array
     {
         $buffer = '';
         $currentBlockType = null;
         $inputTokens = 0;
         $outputTokens = 0;
         $cacheCreationTokens = 0;
+        $cacheCreation1hTokens = 0;
         $cacheReadTokens = 0;
         $finishReason = null;
 
@@ -885,6 +1050,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                         $msgUsage = $event['data']['message']['usage'] ?? [];
                         $inputTokens = $msgUsage['input_tokens'] ?? 0;
                         $cacheCreationTokens = $msgUsage['cache_creation_input_tokens'] ?? 0;
+                        $cacheCreation1hTokens = MessagesUsage::extractCacheCreation1hTokens($msgUsage);
                         $cacheReadTokens = $msgUsage['cache_read_input_tokens'] ?? 0;
                         break;
 
@@ -893,6 +1059,17 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
                         if ('thinking' === $currentBlockType) {
                             $this->logger->info('🧠 Anthropic: Thinking block started');
+                        } elseif ('tool_use' === $currentBlockType) {
+                            $block = is_array($event['data']['content_block'] ?? null) ? $event['data']['content_block'] : [];
+                            $chunk = [
+                                'type' => 'tool_call_delta',
+                                'index' => (int) ($event['data']['index'] ?? 0),
+                                'id' => isset($block['id']) && is_string($block['id']) && '' !== $block['id'] ? $block['id'] : null,
+                                'name' => isset($block['name']) && is_string($block['name']) && '' !== $block['name'] ? $block['name'] : null,
+                                'arguments' => '',
+                            ];
+                            $toolCalls?->addDelta($chunk);
+                            $callback($chunk);
                         }
                         break;
 
@@ -909,6 +1086,30 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                             $callback([
                                 'type' => 'reasoning',
                                 'content' => $delta['thinking'] ?? '',
+                            ]);
+                        } elseif ('input_json_delta' === $deltaType && null !== $toolCalls) {
+                            // Native tool calling (see chatStream()): these
+                            // fragments are the arguments of a REAL tool call.
+                            // Folded here for this method's caller and passed
+                            // on for stream consumers that fold themselves.
+                            $chunk = [
+                                'type' => 'tool_call_delta',
+                                'index' => (int) ($event['data']['index'] ?? 0),
+                                'id' => null,
+                                'name' => null,
+                                'arguments' => is_string($delta['partial_json'] ?? null) ? $delta['partial_json'] : '',
+                            ];
+                            $toolCalls->addDelta($chunk);
+                            $callback($chunk);
+                        } elseif ('input_json_delta' === $deltaType) {
+                            // Structured-output tool-forcing (see chat()): the tool's
+                            // `input` streams as incremental JSON fragments here instead
+                            // of `text_delta`. Forward them as ordinary content chunks so
+                            // they concatenate into the same complete JSON string the
+                            // non-streaming path returns in `content`.
+                            $callback([
+                                'type' => 'content',
+                                'content' => $delta['partial_json'] ?? '',
                             ]);
                         }
                         // signature_delta carries integrity data only — no forwarding needed
@@ -931,6 +1132,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                             $finishReason = match ($stopReason) {
                                 'max_tokens' => 'length',
                                 'end_turn' => 'stop',
+                                'tool_use' => 'tool_calls',
                                 default => $stopReason,
                             };
                         }
@@ -958,6 +1160,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
             'cached_tokens' => $cacheReadTokens,
             'cache_creation_tokens' => $cacheCreationTokens,
+            'cache_creation_1h_tokens' => $cacheCreation1hTokens,
         ];
     }
 
@@ -1004,7 +1207,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
      * Convert OpenAI-style messages to Anthropic format.
      *
      * Handles multimodal content (images) by converting from OpenAI's image_url format
-     * to Anthropic's image source format.
+     * to Anthropic's image source format, and maps assistant `tool_calls` / `role: tool`
+     * onto `tool_use` / `tool_result` blocks.
      *
      * @param array $messages OpenAI-style messages with potential image_url content
      *
@@ -1024,6 +1228,43 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 continue;
             }
 
+            if ('tool' === $role) {
+                $result = is_string($content) ? $content : (json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
+                $converted[] = [
+                    'role' => 'user',
+                    'content' => [[
+                        'type' => 'tool_result',
+                        'tool_use_id' => (string) ($message['tool_call_id'] ?? ''),
+                        'content' => $result,
+                    ]],
+                ];
+                continue;
+            }
+
+            $toolCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+            if ('assistant' === $role && [] !== $toolCalls) {
+                $blocks = $this->anthropicContentBlocks($content);
+                foreach ($toolCalls as $call) {
+                    if (!is_array($call)) {
+                        continue;
+                    }
+                    $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
+                    $args = $fn['arguments'] ?? '{}';
+                    $decoded = is_string($args) ? json_decode($args, true) : $args;
+                    $blocks[] = [
+                        'type' => 'tool_use',
+                        'id' => (string) ($call['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                        'name' => (string) ($fn['name'] ?? 'tool'),
+                        'input' => is_array($decoded) ? $decoded : [],
+                    ];
+                }
+                $converted[] = [
+                    'role' => 'assistant',
+                    'content' => $blocks,
+                ];
+                continue;
+            }
+
             // If content is a string, keep as-is
             if (is_string($content)) {
                 $converted[] = $message;
@@ -1032,55 +1273,151 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
             // If content is an array (multimodal), convert to Anthropic format
             if (is_array($content)) {
-                $anthropicContent = [];
-
-                foreach ($content as $part) {
-                    $type = $part['type'] ?? '';
-
-                    if ('text' === $type) {
-                        $anthropicContent[] = [
-                            'type' => 'text',
-                            'text' => $part['text'] ?? '',
-                        ];
-                    } elseif ('image_url' === $type) {
-                        // Convert OpenAI image_url to Anthropic image source
-                        $imageUrl = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
-
-                        if (str_starts_with($imageUrl, 'data:')) {
-                            // Parse data URL: data:image/jpeg;base64,/9j/4AAQ...
-                            if (preg_match('/^data:([^;]+);base64,(.+)$/', $imageUrl, $matches)) {
-                                $mimeType = $matches[1];
-                                $base64Data = $matches[2];
-
-                                $anthropicContent[] = [
-                                    'type' => 'image',
-                                    'source' => [
-                                        'type' => 'base64',
-                                        'media_type' => $mimeType,
-                                        'data' => $base64Data,
-                                    ],
-                                ];
-                            }
-                        } elseif (str_starts_with($imageUrl, 'http')) {
-                            // URL-based images (Anthropic supports these too)
-                            $anthropicContent[] = [
-                                'type' => 'image',
-                                'source' => [
-                                    'type' => 'url',
-                                    'url' => $imageUrl,
-                                ],
-                            ];
-                        }
-                    }
-                }
-
                 $converted[] = [
                     'role' => $role,
-                    'content' => $anthropicContent,
+                    'content' => $this->anthropicContentBlocks($content),
                 ];
             }
         }
 
         return $converted;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function anthropicContentBlocks(mixed $content): array
+    {
+        if (is_string($content)) {
+            return '' === $content ? [] : [['type' => 'text', 'text' => $content]];
+        }
+        if (!is_array($content)) {
+            return [];
+        }
+
+        $anthropicContent = [];
+        foreach ($content as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+            $type = $part['type'] ?? '';
+
+            if ('text' === $type) {
+                $anthropicContent[] = [
+                    'type' => 'text',
+                    'text' => $part['text'] ?? '',
+                ];
+            } elseif ('image_url' === $type) {
+                $imageUrl = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
+
+                if (is_string($imageUrl) && str_starts_with($imageUrl, 'data:')) {
+                    if (preg_match('/^data:([^;]+);base64,(.+)$/', $imageUrl, $matches)) {
+                        $anthropicContent[] = [
+                            'type' => 'image',
+                            'source' => [
+                                'type' => 'base64',
+                                'media_type' => $matches[1],
+                                'data' => $matches[2],
+                            ],
+                        ];
+                    }
+                } elseif (is_string($imageUrl) && str_starts_with($imageUrl, 'http')) {
+                    $anthropicContent[] = [
+                        'type' => 'image',
+                        'source' => [
+                            'type' => 'url',
+                            'url' => $imageUrl,
+                        ],
+                    ];
+                }
+            }
+        }
+
+        return $anthropicContent;
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function applyAnthropicToolOptions(array $requestBody, array $options): array
+    {
+        if (isset($options['tools']) && is_array($options['tools']) && [] !== $options['tools']) {
+            $requestBody['tools'] = OpenAiToolShapes::toAnthropicTools($options['tools']);
+        }
+        if (array_key_exists('tool_choice', $options)) {
+            $mapped = OpenAiToolShapes::toAnthropicToolChoice($options['tool_choice']);
+            if (null !== $mapped) {
+                $requestBody['tool_choice'] = $mapped;
+            }
+        }
+
+        return $requestBody;
+    }
+
+    /**
+     * @return list<array{id: string, type: 'function', function: array{name: string, arguments: string}}>
+     */
+    private function extractAnthropicToolCalls(mixed $content): array
+    {
+        if (!is_array($content)) {
+            return [];
+        }
+
+        $calls = [];
+        foreach ($content as $block) {
+            if (!is_array($block) || 'tool_use' !== ($block['type'] ?? '')) {
+                continue;
+            }
+            $input = $block['input'] ?? [];
+            $calls[] = [
+                'id' => (string) ($block['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                'type' => 'function',
+                'function' => [
+                    'name' => (string) ($block['name'] ?? 'tool'),
+                    'arguments' => is_string($input)
+                        ? ('' !== $input ? $input : '{}')
+                        : (json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}'),
+                ],
+            ];
+        }
+
+        return $calls;
+    }
+
+    /**
+     * Concatenate two Anthropic content payloads when consecutive same-role
+     * turns are merged. String+string keeps the historical "\\n\\n" join so
+     * existing text-only threads stay byte-identical; any array side is
+     * flattened to blocks so a `tool_result` is not JSON-stringified.
+     */
+    private function concatAnthropicContent(mixed $left, mixed $right): array|string
+    {
+        if (is_string($left) && is_string($right)) {
+            return $left."\n\n".$right;
+        }
+
+        return array_merge($this->anthropicContentAsBlocks($left), $this->anthropicContentAsBlocks($right));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function anthropicContentAsBlocks(mixed $content): array
+    {
+        if (is_string($content)) {
+            return '' === $content ? [] : [['type' => 'text', 'text' => $content]];
+        }
+        if (!is_array($content)) {
+            return [];
+        }
+        if ([] === $content || array_is_list($content)) {
+            /* @var list<array<string, mixed>> $content */
+            return $content;
+        }
+
+        return [$content];
     }
 }

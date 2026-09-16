@@ -306,6 +306,37 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.084000', $result->totalCost);
     }
 
+    public function testCalculateMediaCostImageXhighAndMaxTiers(): void
+    {
+        // GPT Image 2.5 adds xhigh / max. Billing must pass those through
+        // rather than collapsing them to 'high' (which would under-bill).
+        $json = $this->gptImageJson();
+        $json['quality_prices']['xhigh'] = ['1024x1024' => 0.09366];
+        $json['quality_prices']['max'] = ['1024x1024' => 0.21072];
+        $model = $this->createModelMock(17, 'OpenAI', 0.0, 0.01317, 'perImage', 'perImage', $json);
+        $this->modelRepository->expects(self::any())->method('find')->with(17)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $xhigh = $this->service->calculateMediaCost(17, 0, 1.0, null, null, 'xhigh', '1024x1024');
+        $this->assertSame('0.093660', $xhigh->totalCost);
+
+        $max = $this->service->calculateMediaCost(17, 0, 1.0, null, null, 'max', '1024x1024');
+        $this->assertSame('0.210720', $max->totalCost);
+    }
+
+    public function testCalculateMediaCostImageXhighOnLegacyTiersBillsHigh(): void
+    {
+        // gpt-image-1 has no xhigh row. The provider clamps xhigh → high
+        // before calling OpenAI; billing must follow (not fall back to medium).
+        $model = $this->createModelMock(18, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
+        $this->modelRepository->expects(self::any())->method('find')->with(18)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(18, 0, 1.0, null, null, 'xhigh', '1024x1024');
+
+        $this->assertSame('0.167000', $result->totalCost);
+    }
+
     public function testCalculateMediaCostImageUnknownQualityBillsHigh(): void
     {
         // OpenAIProvider defaults unknown quality values to 'high' before

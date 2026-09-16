@@ -1,6 +1,7 @@
 import type { AIModel } from '@/stores/models'
 import {
   getApiBaseUrl,
+  isDefinitiveAuthRejection,
   refreshAccessToken as refreshTokenViaHttpClient,
 } from '@/services/api/httpClient'
 import { isNativeApp } from '@/services/api/nativeRuntime'
@@ -102,8 +103,9 @@ async function refreshAccessToken(): Promise<boolean> {
       })
 
       if (!refreshResponse.ok) {
-        // Stored cookie is dead - drop the hint so the next call short-circuits.
-        clearSessionHint()
+        if (isDefinitiveAuthRejection(refreshResponse.status)) {
+          clearSessionHint()
+        }
       }
       return refreshResponse.ok
     } catch (error) {
@@ -241,10 +243,12 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
           clearTimeout(retryTimeoutId)
           throw error
         }
-      } else {
+      } else if (!hasSessionHint()) {
         // Refresh failed - redirect to login
         redirectToSessionExpired()
         throw new Error('Session expired')
+      } else {
+        throw new Error('Authentication temporarily unavailable')
       }
     }
 

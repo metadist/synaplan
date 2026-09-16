@@ -8,6 +8,7 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Service\AiResponseSanitizer;
+use App\Service\Digest\MessageReferenceResolver;
 use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,6 +27,7 @@ final readonly class MessageForwardingService
         private WhatsAppService $whatsAppService,
         private MessageRepository $messageRepository,
         private UserMemoryService $memoryService,
+        private MessageReferenceResolver $messageReferenceResolver,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -56,6 +58,7 @@ final readonly class MessageForwardingService
         }
 
         $text = $this->resolveMemoryTagsForChat($chat, $text);
+        $text = $this->resolveMessageTagsForChat($chat, $text);
 
         $this->forwardToWhatsApp($chat, $text);
     }
@@ -122,6 +125,24 @@ final readonly class MessageForwardingService
     private static function stripMemoryTags(string $text): string
     {
         return (string) preg_replace('/\[Memory\s*:\s*\d+\.{0,3}\]/i', '', $text);
+    }
+
+    /**
+     * Replace [Message:ID] digest-reference tags with a readable inline form
+     * (the digest title) so external channel users don't see raw markers.
+     */
+    private function resolveMessageTagsForChat(Chat $chat, string $text): string
+    {
+        if (false === stripos($text, '[message')) {
+            return $text;
+        }
+
+        $user = $this->em->getRepository(User::class)->find($chat->getUserId());
+        if (!$user) {
+            return (string) preg_replace('/\[Message\s*:\s*\d+\.{0,3}\]/i', '', $text);
+        }
+
+        return $this->messageReferenceResolver->resolveMessageTags($text, $user);
     }
 
     private function forwardToWhatsApp(Chat $chat, string $text): void

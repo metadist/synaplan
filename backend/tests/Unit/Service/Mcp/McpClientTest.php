@@ -6,13 +6,18 @@ namespace App\Tests\Unit\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\ConfigRepository;
+use App\Repository\McpServerConfigRepository;
 use App\Service\EncryptionService;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
+use App\Service\Mcp\McpOAuthState;
+use App\Service\Mcp\McpOAuthTokenProvider;
+use App\Service\OAuth\OAuthClient;
 use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -28,31 +33,6 @@ final class McpClientTest extends TestCase
     protected function setUp(): void
     {
         $this->encryption = new EncryptionService('test-secret', new NullLogger());
-    }
-
-    /**
-     * @param list<MockResponse>                                                      $responses
-     * @param list<array{method: string, url: string, options: array<string, mixed>}> $captured
-     */
-    private function client(array $responses, array &$captured = []): McpClient
-    {
-        $factory = function (string $method, string $url, array $options) use (&$captured, &$responses): MockResponse {
-            $captured[] = ['method' => $method, 'url' => $url, 'options' => $options];
-            $next = array_shift($responses);
-
-            return $next ?? new MockResponse('', ['http_code' => 202]);
-        };
-
-        $configRepo = $this->createMock(ConfigRepository::class);
-        $configRepo->method('getValue')->willReturn(null);
-
-        return new McpClient(
-            new MockHttpClient($factory),
-            new SsrfGuard(),
-            $this->encryption,
-            new McpClientConfig($configRepo),
-            new NullLogger(),
-        );
     }
 
     private function server(string $url = 'https://8.8.8.8/mcp', string $authHeader = '', string $token = ''): McpServerConfig
@@ -191,5 +171,129 @@ final class McpClientTest extends TestCase
         $this->expectExceptionMessageMatches('/HTTP 503/');
 
         $client->listTools($this->server());
+    }
+
+    public function testHttpErrorIncludesTheResponseBodyExcerpt(): void
+    {
+        $client = $this->client([
+            new MockResponse(
+                (string) json_encode(['error' => 'invalid_request_url', 'error_description' => 'Invalid request URL.']),
+                ['http_code' => 400],
+            ),
+        ]);
+
+        $this->expectException(McpClientException::class);
+        $this->expectExceptionMessageMatches('/HTTP 400 \(invalid_request_url: Invalid request URL\.\)/');
+
+        $client->listTools($this->server());
+    }
+
+    public function testOauthModeSendsTheBearerAccessToken(): void
+    {
+        $captured = [];
+        $encryption = $this->encryption;
+        $server = $this->oauthServer($encryption, time() + 3600);
+        $client = $this->client([
+            self::rpc([]),
+            new MockResponse('', ['http_code' => 202]),
+            self::rpc(['tools' => []]),
+        ], $captured, $this->tokenProvider($encryption, $server));
+
+        $client->listTools($server);
+
+        $initHeaders = implode("\n", $captured[0]['options']['headers'] ?? []);
+        self::assertStringContainsString('Authorization: Bearer fresh-at', $initHeaders);
+    }
+
+    public function testOauth401RefreshesOnceAndRetries(): void
+    {
+        $captured = [];
+        $encryption = $this->encryption;
+        $server = $this->oauthServer($encryption, time() + 3600);
+        $provider = $this->tokenProvider($encryption, $server, [
+            new MockResponse((string) json_encode([
+                'access_token' => 'rotated-at',
+                'refresh_token' => 'rt',
+                'expires_in' => 3600,
+            ]), ['http_code' => 200]),
+        ]);
+
+        $client = $this->client([
+            new MockResponse('{"error":"invalid_token"}', ['http_code' => 401]),
+            self::rpc([]),
+            new MockResponse('', ['http_code' => 202]),
+            self::rpc(['tools' => [['name' => 'search', 'description' => '', 'inputSchema' => []]]]),
+        ], $captured, $provider);
+
+        $tools = $client->listTools($server);
+
+        self::assertSame('search', $tools[0]['name']);
+        self::assertSame('rotated-at', $server->getDecryptedOAuthState($encryption)->accessToken);
+    }
+
+    /**
+     * @param list<MockResponse>                                                      $responses
+     * @param list<array{method: string, url: string, options: array<string, mixed>}> $captured
+     */
+    private function client(array $responses, array &$captured = [], ?McpOAuthTokenProvider $tokens = null): McpClient
+    {
+        $factory = function (string $method, string $url, array $options) use (&$captured, &$responses): MockResponse {
+            $captured[] = ['method' => $method, 'url' => $url, 'options' => $options];
+            $next = array_shift($responses);
+
+            return $next ?? new MockResponse('', ['http_code' => 202]);
+        };
+
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn(null);
+
+        return new McpClient(
+            new MockHttpClient($factory),
+            new SsrfGuard(),
+            $this->encryption,
+            new McpClientConfig($configRepo),
+            new NullLogger(),
+            $tokens,
+        );
+    }
+
+    /**
+     * @param list<MockResponse> $refreshResponses
+     */
+    private function tokenProvider(EncryptionService $encryption, McpServerConfig $server, array $refreshResponses = []): McpOAuthTokenProvider
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn('1');
+        $repo = $this->createMock(McpServerConfigRepository::class);
+
+        return new McpOAuthTokenProvider(
+            new McpClientConfig($configRepo),
+            new OAuthClient(new MockHttpClient($refreshResponses), new NullLogger()),
+            $encryption,
+            $repo,
+            new ArrayAdapter(),
+            new NullLogger(),
+            'https://web.synaplan.com',
+        );
+    }
+
+    private function oauthServer(EncryptionService $encryption, int $expiresAt): McpServerConfig
+    {
+        $server = new McpServerConfig();
+        $server->setUserId(7)->setName('Notion')->setUrl('https://8.8.8.8/mcp');
+        $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+        $server->setDecryptedOAuthState(new McpOAuthState(
+            authorizationEndpoint: 'https://mcp.notion.com/authorize',
+            tokenEndpoint: 'https://mcp.notion.com/token',
+            clientId: 'cid',
+            accessToken: 'fresh-at',
+            refreshToken: 'rt',
+            expiresAt: $expiresAt,
+            status: McpOAuthState::STATUS_CONNECTED,
+        ), $encryption);
+        $ref = new \ReflectionProperty(McpServerConfig::class, 'id');
+        $ref->setValue($server, 3);
+
+        return $server;
     }
 }

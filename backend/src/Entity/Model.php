@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'BMODELS')]
 #[ORM\Index(columns: ['BTAG'], name: 'idx_tag')]
 #[ORM\Index(columns: ['BSERVICE'], name: 'idx_service')]
+#[ORM\Index(columns: ['BRETIREDON'], name: 'IDX_BMODELS_RETIREDON')]
 class Model
 {
     #[ORM\Id]
@@ -61,6 +62,27 @@ class Model
 
     #[ORM\Column(name: 'BDESCRIPTION', type: 'text', nullable: true)]
     private ?string $description = null;
+
+    /**
+     * Date the provider retired this model, or null when it is not retired.
+     *
+     * This is what distinguishes an inactive row that is dead upstream from one
+     * an operator switched off on purpose. Written by ModelRetirementSeeder from
+     * {@see \App\Model\ModelCatalog}::RETIREMENTS, never by hand.
+     */
+    #[ORM\Column(name: 'BRETIREDON', type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $retiredOn = null;
+
+    /**
+     * BID that replaces this retired model, or null when the provider shipped no
+     * replacement (an embedding model, or a capability that simply went away).
+     *
+     * Deliberately a plain int and not a self-referencing association:
+     * successors get retired in turn, and a foreign key would turn a future
+     * retirement into a constraint failure.
+     */
+    #[ORM\Column(name: 'BSUCCESSORID', type: 'integer', nullable: true)]
+    private ?int $successorId = null;
 
     #[ORM\Column(name: 'BJSON', type: 'json')]
     private array $json = [];
@@ -288,6 +310,35 @@ class Model
         return $this;
     }
 
+    public function getRetiredOn(): ?\DateTimeImmutable
+    {
+        return $this->retiredOn;
+    }
+
+    public function setRetiredOn(?\DateTimeImmutable $retiredOn): self
+    {
+        $this->retiredOn = $retiredOn;
+
+        return $this;
+    }
+
+    public function isRetired(): bool
+    {
+        return null !== $this->retiredOn;
+    }
+
+    public function getSuccessorId(): ?int
+    {
+        return $this->successorId;
+    }
+
+    public function setSuccessorId(?int $successorId): self
+    {
+        $this->successorId = $successorId;
+
+        return $this;
+    }
+
     /**
      * Check if this is a system model that cannot be changed by users.
      */
@@ -337,6 +388,40 @@ class Model
         $intValue = (int) $value;
 
         return $intValue > 0 ? $intValue : null;
+    }
+
+    /**
+     * Total context window (input + output tokens) from `BJSON.meta.context_window`.
+     *
+     * The catalog authors this per model (see ModelCatalog); `SyncModelPricesCommand`
+     * refreshes it from LiteLLM. Returns null when the row carries no usable value
+     * so callers can apply their own conservative fallback.
+     */
+    public function getContextWindowTokens(): ?int
+    {
+        $value = $this->json['meta']['context_window'] ?? null;
+
+        if (null === $value || !is_numeric($value)) {
+            return null;
+        }
+
+        $intValue = (int) $value;
+
+        return $intValue > 0 ? $intValue : null;
+    }
+
+    /**
+     * Provider-side output ceiling from `BJSON.meta.max_output` (falls back to
+     * `max_tokens`). Null when unknown.
+     */
+    public function getMaxOutputTokens(): ?int
+    {
+        $value = $this->json['meta']['max_output'] ?? null;
+        if (null !== $value && is_numeric($value) && (int) $value > 0) {
+            return (int) $value;
+        }
+
+        return $this->getMaxTokens();
     }
 
     /**

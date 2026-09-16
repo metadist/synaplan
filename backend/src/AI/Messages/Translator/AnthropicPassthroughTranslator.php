@@ -165,6 +165,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
         $inputTokens = 0;
         $outputTokens = 0;
         $cacheCreation = 0;
+        $cacheCreation1h = 0;
         $cacheRead = 0;
         $stopReason = null;
         $eventName = null;
@@ -211,6 +212,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
                         $usage = $decoded['message']['usage'] ?? [];
                         $inputTokens = (int) ($usage['input_tokens'] ?? $inputTokens);
                         $cacheCreation = (int) ($usage['cache_creation_input_tokens'] ?? $cacheCreation);
+                        $cacheCreation1h = \is_array($usage) ? MessagesUsage::extractCacheCreation1hTokens($usage) : $cacheCreation1h;
                         $cacheRead = (int) ($usage['cache_read_input_tokens'] ?? $cacheRead);
                     } elseif ('message_delta' === $type) {
                         $usage = $decoded['usage'] ?? [];
@@ -228,6 +230,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
             inputTokens: $inputTokens,
             outputTokens: $outputTokens,
             cacheCreationTokens: $cacheCreation,
+            cacheCreation1hTokens: $cacheCreation1h,
             cacheReadTokens: $cacheRead,
             stopReason: $stopReason,
         );
@@ -244,6 +247,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
         $inputTokens = 0;
         $outputTokens = 0;
         $cacheCreation = 0;
+        $cacheCreation1h = 0;
         $cacheRead = 0;
         $stopReason = null;
         $eventName = null;
@@ -292,6 +296,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
                         $usage = $decoded['message']['usage'] ?? [];
                         $inputTokens = (int) ($usage['input_tokens'] ?? $inputTokens);
                         $cacheCreation = (int) ($usage['cache_creation_input_tokens'] ?? $cacheCreation);
+                        $cacheCreation1h = \is_array($usage) ? MessagesUsage::extractCacheCreation1hTokens($usage) : $cacheCreation1h;
                         $cacheRead = (int) ($usage['cache_read_input_tokens'] ?? $cacheRead);
                     } elseif ('message_delta' === $type) {
                         $usage = $decoded['usage'] ?? [];
@@ -311,6 +316,7 @@ final readonly class AnthropicPassthroughTranslator implements MessagesTranslato
             inputTokens: $inputTokens,
             outputTokens: $outputTokens,
             cacheCreationTokens: $cacheCreation,
+            cacheCreation1hTokens: $cacheCreation1h,
             cacheReadTokens: $cacheRead,
             stopReason: $stopReason,
         );

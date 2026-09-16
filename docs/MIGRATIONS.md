@@ -13,6 +13,8 @@ commands** for production-essential catalog data. Demo/test data lives in DataFi
 | Rate-limit config (`BCONFIG`)    | `App\Seed\RateLimitConfigSeeder` / `app:ratelimit:seed-defaults` | dev + prod      |
 | Subscription budgets (`BSUBSCRIPTIONS`) | `App\Seed\SubscriptionPlanSeeder`                         | dev + prod      |
 | Multitask routing flags (`BCONFIG`) | `App\Seed\MultitaskConfigSeeder`                              | dev + prod      |
+| Saved Tasks flag (`BCONFIG`)     | `App\Seed\SavedTaskConfigSeeder` / `app:seed`                | dev + prod      |
+| Saved Tasks + connections (`BSAVEDTASKS`, `BSAVEDTASK_RUNS`, `BCONNECTIONS`, `BCREDENTIALS`) | Doctrine migration `Version20260815140000` | dev + prod      |
 | Demo widget config (`BCONFIG`)   | `App\Seed\DemoWidgetConfigSeeder`                                | dev + test only |
 | Demo users (`BUSER`)             | `App\DataFixtures\UserFixtures`                                  | dev + test only |
 
@@ -73,6 +75,17 @@ All seeders are idempotent and safe to re-run any number of times:
   deletes them or re-aligns the row with the catalog values exactly). Operator
   toggles (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`, `BSHOWWHENFREE`) are still
   excluded from the upsert UPDATE clause as a second layer of defence.
+
+- **Model retirements** are the one deliberate exception to that preservation
+  rule, and they run as a separate step (`ModelRetirementSeeder`, right after
+  `models`). A model the provider switched off cannot serve a request, so
+  "please keep offering this" is not a preference worth honouring: the seeder
+  forces `BACTIVE = BSELECTABLE = BISDEFAULT = 0` and stamps `BRETIREDON` /
+  `BSUCCESSORID` from `ModelCatalog::RETIREMENTS`. It is guarded on `BPROVID`
+  (a BID an operator repurposed is skipped) and writes nothing on a re-run.
+  **Retiring a model therefore needs no migration** — add the registry entry
+  and the next deploy applies it. See `docs/PRICING_MAINTENANCE.md` →
+  "Retiring a model".
 
 - **Prompts** use `INSERT … ON DUPLICATE KEY UPDATE` on catalog-owned columns
   only — operator toggles are preserved across re-seeds, but corrected

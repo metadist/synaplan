@@ -40,6 +40,7 @@ tests:
       # which this test has no use for.
       InstanceType: c7i.xlarge
       DataVolumeSize: 20
+      AllowedWebCidr: 203.0.113.1/32
       # The DataVolume carries DeletionPolicy Snapshot, so leaving this on would
       # also leave paid snapshots behind after taskcat deletes the stacks.
       EnableDailySnapshots: 'false'
@@ -51,6 +52,7 @@ tests:
       ImageId: ami-00000000000000000
       InstanceType: c7i.xlarge
       DataVolumeSize: 20
+      AllowedWebCidr: 203.0.113.1/32
       EnableDailySnapshots: 'false'
       AdminEmail: $[taskcat_genuuid]@example.com
       # This template deploys into a network it does not own, and taskcat has no

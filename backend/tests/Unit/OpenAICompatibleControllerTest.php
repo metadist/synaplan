@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit;
 
+use App\AI\OpenAI\OpenAiGatewayToolLoop;
 use App\AI\Service\AiFacade;
 use App\Controller\OpenAICompatibleController;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ModelRepository;
+use App\Service\Api\OpenAiToolCallingGate;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -31,6 +33,7 @@ class OpenAICompatibleControllerTest extends TestCase
     private MessagesGatewayConfig&MockObject $messagesGatewayConfig;
     private MessageBusInterface&MockObject $messageBus;
     private LoggerInterface&MockObject $logger;
+    private OpenAiToolCallingGate&MockObject $toolCallingGate;
     private OpenAICompatibleController $controller;
 
     protected function setUp(): void
@@ -42,6 +45,7 @@ class OpenAICompatibleControllerTest extends TestCase
         $this->messagesGatewayConfig = $this->createMock(MessagesGatewayConfig::class);
         $this->messageBus = $this->createMock(MessageBusInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->toolCallingGate = $this->createMock(OpenAiToolCallingGate::class);
 
         $this->controller = new OpenAICompatibleController(
             $this->aiFacade,
@@ -51,6 +55,8 @@ class OpenAICompatibleControllerTest extends TestCase
             $this->messagesGatewayConfig,
             $this->messageBus,
             $this->logger,
+            $this->toolCallingGate,
+            $this->createMock(OpenAiGatewayToolLoop::class),
         );
     }
 

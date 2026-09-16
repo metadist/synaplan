@@ -8,14 +8,17 @@
       @dragleave="handleDragLeave"
       @drop.prevent="handleDrop"
     >
-      <!-- Incognito toggle (desktop): there is no chat header, so the button
-           floats over the top-right of the message area. The mobile instance
-           lives in MainLayout (fixed top-right, mirroring the menu button). -->
+      <!-- Incognito toggle + collapsed speed config (desktop): there is no
+           chat header, so the buttons float over the top-right of the message
+           area. The mobile instances live in MainLayout (fixed top-right,
+           mirroring the menu button). The mix button hides itself while the
+           expanded card is showing in the empty state below. -->
       <div
-        v-if="authStore.isAuthenticated"
-        class="hidden md:block absolute top-3 right-3 z-30"
+        v-if="authStore.isAuthenticated && !needsProviderSetup"
+        class="v2-desktop-chrome items-center gap-2 absolute top-3 right-3 z-30"
         data-testid="section-incognito-toggle-desktop"
       >
+        <ModelMixControl />
         <IncognitoToggle />
       </div>
 
@@ -37,11 +40,19 @@
         </div>
       </Transition>
 
-      <!-- First-run: no usable AI provider yet — admins get a wizard CTA -->
-      <ProviderSetupBanner />
-      <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+      <!-- First-run: no usable AI provider — replace the chat, do not let
+           the user send messages that can only fail with HTTP 500. -->
+      <div
+        v-if="needsProviderSetup"
+        class="flex-1 min-h-0 flex flex-col"
+        data-testid="state-provider-setup"
+      >
+        <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+        <ProviderSetupBanner />
+      </div>
 
       <div
+        v-else
         ref="chatContainer"
         class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
         :class="{ 'flex flex-col items-center': isEmptyLanding }"
@@ -70,7 +81,7 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span class="ml-2 txt-secondary text-sm">Loading messages...</span>
+            <span class="ml-2 txt-secondary text-sm">{{ $t('common.loadingMessages') }}</span>
           </div>
 
           <div
@@ -98,34 +109,46 @@
               </div>
               <h2 class="text-xl font-semibold txt-primary mb-2">
                 {{
-                  guestStore.sessionExpired
-                    ? $t('guest.expiredTitle')
-                    : guestStore.rateLimited
-                      ? $t('guest.rateLimitedTitle')
-                      : $t('guest.errorTitle')
+                  guestStore.guestChatDisabled
+                    ? $t('guest.disabledTitle')
+                    : guestStore.sessionExpired
+                      ? $t('guest.expiredTitle')
+                      : guestStore.rateLimited
+                        ? $t('guest.rateLimitedTitle')
+                        : $t('guest.errorTitle')
                 }}
               </h2>
               <p class="txt-secondary mb-4">
                 {{
-                  guestStore.sessionExpired
-                    ? $t('guest.expiredDescription')
-                    : guestStore.rateLimited
-                      ? $t('guest.rateLimitedDescription')
-                      : $t('guest.errorDescription')
+                  guestStore.guestChatDisabled
+                    ? $t('guest.disabledDescription')
+                    : guestStore.sessionExpired
+                      ? $t('guest.expiredDescription')
+                      : guestStore.rateLimited
+                        ? $t('guest.rateLimitedDescription')
+                        : $t('guest.errorDescription')
                 }}
               </p>
               <div class="flex gap-3 justify-center">
+                <!-- Retrying a disabled trial can never succeed. -->
                 <button
+                  v-if="!guestStore.guestChatDisabled"
                   class="px-4 py-2 rounded-lg btn-brand text-sm font-medium"
                   @click="guestStore.retryInit()"
                 >
                   {{ $t('guest.retry') }}
                 </button>
+                <!-- Sign-in fallback: /register is unreachable when
+                     registration is disabled (#462 route guard). -->
                 <router-link
-                  :to="{ name: 'register' }"
+                  :to="{ name: configStore.auth.registrationEnabled ? 'register' : 'login' }"
                   class="px-4 py-2 rounded-lg border border-[var(--border)] txt-secondary text-sm font-medium hover:bg-[var(--bg-secondary)] transition-colors"
                 >
-                  {{ $t('guest.createAccount') }}
+                  {{
+                    configStore.auth.registrationEnabled
+                      ? $t('guest.createAccount')
+                      : $t('auth.signIn')
+                  }}
                 </router-link>
               </div>
             </div>
@@ -144,19 +167,32 @@
                 <Icon icon="mdi:incognito" class="w-6 h-6 txt-brand" aria-hidden="true" />
               </div>
               <h2 class="text-2xl font-semibold txt-primary mb-2">
-                {{ incognitoStore.active ? $t('incognito.emptyTitle') : welcomeGreeting }}
+                {{ emptyLandingTitle }}
               </h2>
               <p class="txt-secondary">
-                {{
-                  incognitoStore.active ? $t('incognito.emptyHint') : $t('chatInput.placeholder')
-                }}
+                {{ emptyLandingHint }}
               </p>
+              <SelfAwareEmptyHint v-if="!pinnedAgentId" @ask="handleSendMessage" />
             </div>
 
-            <ExamplePrompts
-              v-if="!authStore.isAuthenticated && !configStore.marketingNews.enabled"
+            <!-- Speed config: the expanded mix card greets the user on every
+                 fresh chat and collapses into the round top-right button on
+                 the first tap, click, or keystroke elsewhere. -->
+            <div
+              v-if="showInlineMixPanel"
+              ref="inlineMixPanelEl"
+              class="w-full max-w-sm"
+              data-testid="section-model-mix-inline"
+            >
+              <ModelMixPanel @select="dismissInlineMixPanel" />
+            </div>
+
+            <AssistantStarterPrompts
+              v-if="pinnedAgentId && pinnedStarterPrompts.length > 0"
+              :prompts="pinnedStarterPrompts"
               @pick="handleExamplePick"
             />
+            <ExamplePrompts v-else-if="showExamplePrompts" @pick="handleExamplePick" />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -179,33 +215,49 @@
               :topic="message.topic"
               :original-topic="message.originalTopic"
               :original-media-type="message.originalMediaType"
+              :error-reason="message.errorReason"
+              :error-message="message.errorMessage"
+              :can-retry-model="message.canRetryModel"
+              :error-debug="message.errorDebug"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :quoted-text="message.quotedText"
               :quoted-message-id="message.quotedMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
               :processing-metadata="message.isStreaming ? processingMetadata : undefined"
+              :processing-steps="
+                message.isStreaming ? processingTimeline.steps : message.processingSteps
+              "
+              :processing-model="
+                message.isStreaming ? processingTimeline.model : message.processingModel
+              "
               :files="message.files"
+              :document-changes="message.documentChanges"
+              :document-fidelity-lossy="message.documentFidelityLossy"
               :search-results="message.searchResults"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
               :memory-ids="message.memoryIds"
               :feedback-ids="message.feedbackIds"
+              :docs="message.docs"
               :status="message.status"
               :error-type="message.errorType"
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
+              :schedule-source="userTextBefore(message.id)"
               :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
               :usage-extra="message.usageExtra"
               :usage-taximeter-active="usageTaximeterStore.active"
               :is-guest-mode="isGuestMode"
+              :foreign-memory="sharedConversationLocked"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
+              @followup-task="handleTaskFollowup"
               @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @report="openReportModal"
@@ -222,13 +274,14 @@
       <!-- Usage taximeter: desktop rail + mobile ring. Gated by the admin
            master switch and authenticated (non-guest/widget) web usage; the
            two share one store and differ only by CSS breakpoint. -->
-      <template v-if="usageTaximeterStore.active">
+      <template v-if="usageTaximeterStore.active && !needsProviderSetup">
         <ConsumptionBar />
         <ConsumptionRing />
       </template>
 
       <!-- Contextual Promo Tips -->
       <PromoTipBanner
+        v-if="!needsProviderSetup"
         :tip="promoTips.currentTip.value"
         :expanded="promoTips.isExpanded.value"
         @toggle="promoTips.toggleExpand()"
@@ -244,15 +297,45 @@
       />
 
       <!-- Single composer, always docked at the bottom. On the empty landing
-           the messages area shows only the welcome hero + example prompts;
-           keeping the input at the bottom (instead of a centered hero composer)
-           means the "+" menu and its dropdowns always open upward with room and
-           are never clipped by the chat container's overflow (issue #1285). -->
+           the messages area shows the welcome hero (plus example prompts for
+           anonymous users); keeping the input at the bottom (instead of a
+           centered hero composer) means the "+" menu and its dropdowns always
+           open upward with room and are never clipped by the chat container's
+           overflow (issue #1285). -->
+      <SharedConversationBanner
+        v-if="sharedConversationLocked && sharedConversationAccess"
+        class="mx-4 mb-3"
+        :owner-name="sharedConversationOwnerName"
+        :shared-via="chatsStore.conversationSource?.sharedVia ?? null"
+        :access="sharedConversationAccess"
+        :can-continue="chatsStore.conversationAccess === 'use'"
+        @continue="continueSharedConversation"
+      />
+      <div
+        v-if="isApprovalsEnabled() && chatPendingApprovals.length > 0"
+        class="mx-4 mb-3 space-y-3"
+        data-testid="chat-approvals"
+      >
+        <ApprovalCard
+          v-for="row in chatPendingApprovals"
+          :key="row.id"
+          :approval="row"
+          :can-always-allow="row.canAlwaysAllow"
+          @approved="onChatApprovalApproved"
+          @rejected="onChatApprovalRejected"
+          @always-allow="onChatApprovalAlwaysAllow"
+        />
+      </div>
       <ChatInput
+        v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
-        :banner-visible="showPendingPurchaseBanner || (isGuestMode && guestStore.shouldShowBanner)"
+        :banner-visible="
+          showPendingPurchaseBanner ||
+          (isGuestMode && guestStore.shouldShowBanner) ||
+          Boolean(pinnedAgentId)
+        "
         :quote="quoting.pendingQuote.value"
         @send="handleSendMessage"
         @stop="handleUserStop"
@@ -261,22 +344,21 @@
       >
         <!-- Native onboarding: a signed-out store purchase waiting to be
              linked to an account outranks the guest quota banner. -->
-        <template v-if="showPendingPurchaseBanner" #banner>
+        <template #banner>
           <PendingPurchaseBanner
+            v-if="showPendingPurchaseBanner"
             :visible="showPendingPurchaseBanner"
             @dismiss="pendingPurchaseBannerDismissed = true"
           />
-        </template>
-        <template v-else-if="isGuestMode" #banner>
           <GuestBanner
+            v-else-if="isGuestMode"
             :visible="guestStore.shouldShowBanner"
             :remaining="guestStore.remainingMessages"
             :max-messages="guestStore.maxMessages"
             @dismiss="guestStore.dismissBanner()"
           />
-        </template>
-        <template v-else-if="incognitoStore.active" #banner>
           <div
+            v-else-if="incognitoStore.active"
             class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
             data-testid="banner-incognito"
           >
@@ -284,6 +366,16 @@
             <span>
               <strong class="txt-primary">{{ $t('incognito.bannerTitle') }}</strong>
               — {{ $t('incognito.bannerText') }}
+            </span>
+          </div>
+          <div
+            v-else-if="pinnedAgentId && pinnedAssistantName"
+            class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
+            data-testid="banner-pinned-assistant"
+          >
+            <Icon icon="mdi:robot-outline" class="w-4 h-4 txt-brand flex-shrink-0" />
+            <span class="txt-primary">
+              {{ $t('assistants.talkingTo', { name: pinnedAssistantName }) }}
             </span>
           </div>
         </template>
@@ -436,12 +528,16 @@ import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
 import ExamplePrompts from '@/components/ExamplePrompts.vue'
+import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
+import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
+import { parsePlatformDocs } from '@/components/chat/refs/DocRefPill'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
+import { useFirstRunSetup } from '@/composables/useFirstRunSetup'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
   useHistoryStore,
@@ -450,19 +546,39 @@ import {
   type Message,
   type Part,
 } from '@/stores/history'
-import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
+import { useChatsStore } from '@/stores/chats'
+import { iamApi } from '@/services/api/iamApi'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import SharedConversationBanner from '@/components/iam/SharedConversationBanner.vue'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
+import { useApprovalsStore } from '@/stores/approvals'
+import ApprovalCard from '@/components/chat/ApprovalCard.vue'
+import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
 import { useUsageTaximeterStore, type UsageTotals } from '@/stores/usageTaximeter'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
+import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
+import { shouldOpenFreshAssistantChat, usePinnedAssistant } from '@/composables/usePinnedAssistant'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
+import ModelMixControl from '@/components/chat/ModelMixControl.vue'
+import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
+import { useModelMixStore } from '@/stores/modelMix'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
+import type { StreamUpdatePayload } from '@/types/chatStream'
+import {
+  cloneTimelineModel,
+  cloneTimelineSteps,
+  createTimelineState,
+  consumeVisibleAnswer,
+  ingestTimelineEvent,
+  type TimelineState,
+} from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
@@ -474,8 +590,14 @@ import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaP
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
+import { stripPastedBlocks } from '@/utils/pastedContent'
+import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
+import {
+  chatErrorSuggestsOtherModel,
+  shouldFinishWithoutErrorOnTransportDrop,
+} from '@/utils/chatErrorDisplay'
 import { httpClient } from '@/services/api/httpClient'
 import { pluginCommands } from '@/stores/commands'
 import { i18n } from '@/i18n'
@@ -484,6 +606,8 @@ import {
   parseMediaJobPayload,
   applyMediaJobUpdateToMessage,
   mapApiMessageRow,
+  parseContentWithThinking,
+  IN_PROGRESS_TURN_ID,
 } from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
@@ -512,6 +636,13 @@ import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
 import SubscriptionPaywallModal from '@/components/subscription/SubscriptionPaywallModal.vue'
 import { paywallReasonForLimit, usePaywallPrompt } from '@/composables/usePaywallPrompt'
 import { hasPendingIapRedemption } from '@/services/nativeIap'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import {
+  consumePendingShortcut,
+  onShortcutAction,
+  type ShortcutActionName,
+} from '@/services/api/nativeShortcuts'
+import { captureNativePhoto, isNativeCameraAvailable } from '@/services/api/nativeCamera'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
 
@@ -530,6 +661,7 @@ const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
 const { isPaywallOpen, paywallReason, shouldRemind, openPaywall, closePaywall } = usePaywallPrompt()
 const { error: showErrorToast, success: showSuccessToast } = useNotification()
+const { goToProviderSetup } = useFirstRunSetup()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
@@ -550,18 +682,135 @@ const isDragging = ref(false)
 const dragCounter = ref(0)
 const historyStore = useHistoryStore()
 const chatsStore = useChatsStore()
+const sharedConversationLocked = computed(
+  () => chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
+)
+const sharedConversationAccess = computed(() =>
+  chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
+    ? chatsStore.conversationAccess
+    : null
+)
+const sharedConversationOwnerName = computed(
+  () => chatsStore.conversationSource?.owner?.name?.trim() || null
+)
+const canComposeSharedChat = computed(() => {
+  if (isGuestMode.value) {
+    return true
+  }
+  if (sharedConversationLocked.value) {
+    return false
+  }
+  if (chatsStore.conversationAccess === 'owner') {
+    return true
+  }
+  return !isIamSharingEnabled()
+})
+
+const continueSharedConversation = async () => {
+  const id = chatsStore.activeChatId
+  if (!id) return
+  try {
+    const copy = await iamApi.continueChat(id)
+    chatsStore.setActiveChat(copy.id)
+    await chatsStore.loadChats()
+    await chatsStore.loadConversationAccess(copy.id)
+  } catch {
+    showErrorToast(t('iam.continueFailed'))
+  }
+}
 const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const mediaJobsStore = useMediaJobsStore()
+const approvalsStore = useApprovalsStore()
 const guestStore = useGuestStore()
+
+const chatPendingApprovals = computed(() =>
+  approvalsStore.pending.filter(
+    (row) => row.requestedBy.kind === 'chat' && row.requestedBy.chatId === chatsStore.activeChatId
+  )
+)
+
+async function onChatApprovalApproved(id: number): Promise<void> {
+  try {
+    await approvalsStore.approve(id)
+    showSuccessToast(t('approvals.approvedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
+async function onChatApprovalRejected(id: number, reason: string): Promise<void> {
+  try {
+    await approvalsStore.reject(id, reason)
+    showSuccessToast(t('approvals.rejectedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
+async function onChatApprovalAlwaysAllow(id: number): Promise<void> {
+  try {
+    await approvalsStore.approve(id, true)
+    showSuccessToast(t('approvals.approvedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
+function ingestApprovalRequired(data: StreamUpdatePayload): void {
+  if (!isApprovalsEnabled()) {
+    return
+  }
+  if (data.status !== 'task_update' || data.metadata?.state !== 'waiting_approval') {
+    return
+  }
+  const approvalId = data.metadata.approval_id
+  if (typeof approvalId !== 'number' || approvalId < 1) {
+    return
+  }
+  const rawClass = data.metadata.side_effect
+  const sideEffect =
+    rawClass === 'read' || rawClass === 'write' || rawClass === 'destructive' ? rawClass : 'read'
+  approvalsStore.addFromStream({
+    id: approvalId,
+    tool: typeof data.metadata.tool === 'string' ? data.metadata.tool : '',
+    preview: typeof data.metadata.preview === 'string' ? data.metadata.preview : '',
+    status: 'pending',
+    expiresAt: typeof data.metadata.expires_at === 'number' ? data.metadata.expires_at : 0,
+    created: Math.floor(Date.now() / 1000),
+    requestedBy: {
+      kind: 'chat',
+      chatId: chatsStore.activeChatId,
+      messageId: data.messageId ?? null,
+    },
+    sideEffect,
+    canAlwaysAllow: sideEffect === 'write',
+  })
+  void approvalsStore.load('pending')
+}
 const configStore = useConfigStore()
 const usageTaximeterStore = useUsageTaximeterStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
+const messageDigestsStore = useMessageDigestsStore()
 const incognitoStore = useIncognitoStore()
+const {
+  agentId: pinnedAgentId,
+  queryAgentId,
+  name: pinnedAssistantName,
+  greeting: pinnedAssistantGreeting,
+  starterPrompts: pinnedStarterPrompts,
+} = usePinnedAssistant()
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
+
+function applyDocsToMessage(message: Message, raw: unknown): void {
+  const docs = parsePlatformDocs(raw)
+  if (docs) {
+    message.docs = docs
+  }
+}
 
 const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
 
@@ -582,6 +831,24 @@ const showPendingPurchaseBanner = computed(
 const welcomeGreeting = computed(() => {
   const firstName = authStore.user?.firstName?.trim()
   return firstName ? t('welcomeUser', { name: firstName }) : t('welcome')
+})
+const emptyLandingTitle = computed(() => {
+  if (incognitoStore.active) {
+    return t('incognito.emptyTitle')
+  }
+  if (pinnedAgentId.value) {
+    return pinnedAssistantGreeting.value || pinnedAssistantName.value || welcomeGreeting.value
+  }
+  return welcomeGreeting.value
+})
+const emptyLandingHint = computed(() => {
+  if (incognitoStore.active) {
+    return t('incognito.emptyHint')
+  }
+  if (pinnedAgentId.value && pinnedAssistantName.value) {
+    return t('assistants.emptyHint', { name: pinnedAssistantName.value })
+  }
+  return t('chatInput.placeholder')
 })
 const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
@@ -644,9 +911,169 @@ const isEmptyLanding = computed(
     !historyStore.isLoadingMessages
 )
 
+// Guest landing only — signed-in empty chats keep the greeting, no teaser cards.
+const showExamplePrompts = computed(
+  () => !authStore.isAuthenticated && !incognitoStore.active && !configStore.marketingNews.enabled
+)
+
+// Runtime-config first-run signal: the default chat model has no usable
+// provider. Replace the composer with a tombstone so a fresh install cannot
+// produce the cryptic HTTP 500 the old banner still allowed.
+const needsProviderSetup = computed(
+  () => authStore.isAuthenticated && configStore.setup.chatReady === false
+)
+
+// --- Speed config (model mixes) -------------------------------------------
+// The expanded card shows on every fresh, non-incognito chat until the user
+// interacts anywhere (tap, click, or typing); it then collapses into the
+// round ModelMixControl button next to the incognito toggle. The store flag
+// keeps that button hidden while the card is up, on desktop AND mobile.
+const modelMixStore = useModelMixStore()
+const mixPanelDismissed = ref(false)
+const inlineMixPanelEl = ref<HTMLElement | null>(null)
+
+const showInlineMixPanel = computed(() => false)
+
+watch(showInlineMixPanel, (visible) => {
+  modelMixStore.inlinePanelVisible = visible
+})
+
+const dismissInlineMixPanel = () => {
+  mixPanelDismissed.value = true
+}
+
+// A fresh chat gets the card back.
+watch(
+  () => chatsStore.activeChatId,
+  (chatId) => {
+    mixPanelDismissed.value = false
+    if (chatId) {
+      void chatsStore.loadConversationAccess(chatId)
+    } else {
+      chatsStore.resolveConversationAccessAsOwn()
+    }
+  },
+  { immediate: true }
+)
+
+// "Once tapped, clicked or text is entered, the popup closes": any pointer
+// press outside the card and any keystroke (the composer is focused on load,
+// so typing lands there) collapse it.
+const collapseMixPanelOnPointer = (event: PointerEvent) => {
+  if (!showInlineMixPanel.value) return
+  if (inlineMixPanelEl.value?.contains(event.target as Node)) return
+  dismissInlineMixPanel()
+}
+
+const collapseMixPanelOnKeydown = () => {
+  if (!showInlineMixPanel.value) return
+  dismissInlineMixPanel()
+}
+
+onMounted(() => {
+  modelMixStore.inlinePanelVisible = showInlineMixPanel.value
+  document.addEventListener('pointerdown', collapseMixPanelOnPointer)
+  document.addEventListener('keydown', collapseMixPanelOnKeydown)
+})
+
+onBeforeUnmount(() => {
+  modelMixStore.inlinePanelVisible = false
+  document.removeEventListener('pointerdown', collapseMixPanelOnPointer)
+  document.removeEventListener('keydown', collapseMixPanelOnKeydown)
+})
+
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key
   featureGateOpen.value = true
+}
+
+// MOBILE-APP SEAM: iOS App Shortcuts land here after the native bootstrap
+// pulls (cold start) or pushes (warm start) the pending action. `open` is a
+// no-op — the app is already visible. Photos are attached, never auto-sent.
+let stopShortcutListen: (() => void) | null = null
+const handledShortcutTokens = new Set<string>()
+// The composer is `v-if`-gated behind provider setup, so a shortcut can arrive
+// before it exists. The action is parked here and run by the watcher below
+// once the composer is mounted, instead of polling for the ref: dictation and
+// the camera are useless without an input to hand their result to, and a
+// captured photo with nowhere to go would be silently discarded.
+const queuedShortcut = ref<Exclude<ShortcutActionName, 'open'> | null>(null)
+
+async function runNativeShortcut(
+  input: InstanceType<typeof ChatInput>,
+  action: Exclude<ShortcutActionName, 'open'>
+): Promise<void> {
+  if ('dictate' === action) {
+    await input.startDictation()
+    return
+  }
+  if (isGuestMode.value) {
+    handleGuestFeatureGate('attach')
+    return
+  }
+  if (!isNativeCameraAvailable()) {
+    showErrorToast(t('chatInput.cameraUnavailable'))
+    return
+  }
+  const file = await captureNativePhoto()
+  if (file) {
+    await chatInputRef.value?.uploadFiles([file])
+  }
+}
+
+function handleNativeShortcut(action: ShortcutActionName, token: string): void {
+  if (token && handledShortcutTokens.has(token)) {
+    return
+  }
+  if (token) {
+    handledShortcutTokens.add(token)
+  }
+  if ('open' !== action) {
+    queuedShortcut.value = action
+  }
+}
+
+watch(
+  [chatInputRef, queuedShortcut],
+  ([input, action]) => {
+    if (!input || !action) {
+      return
+    }
+    queuedShortcut.value = null
+    void runNativeShortcut(input, action)
+  },
+  { flush: 'post' }
+)
+
+const isSummarizeToolQuery = (tool: unknown): boolean =>
+  tool === 'summarize' || (Array.isArray(tool) && tool.includes('summarize'))
+
+watch(
+  [chatInputRef, () => route.query.tool],
+  ([input, tool]) => {
+    if (!input || !isSummarizeToolQuery(tool)) {
+      return
+    }
+    input.armSummarize()
+    const nextQuery = { ...route.query }
+    delete nextQuery.tool
+    void router.replace({ path: route.path, query: nextQuery })
+  },
+  { flush: 'post' }
+)
+
+function initChatShortcuts(): void {
+  if (!isNativeApp()) {
+    return
+  }
+  stopShortcutListen = onShortcutAction((payload) => {
+    handleNativeShortcut(payload.action, payload.token)
+  })
+  void consumePendingShortcut().then((pending) => {
+    if (pending) {
+      handleNativeShortcut(pending.action, pending.token)
+    }
+  })
 }
 
 function handleExamplePick(prompt: string) {
@@ -662,6 +1089,12 @@ let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
 let currentStreamingChatId: number | undefined = undefined // Store chatId where stream was started
+// Run this view is already re-attached to, so a repeated history load (the 2s
+// in-progress poll, a chat switch back and forth) cannot open a second
+// connection and render the same answer twice.
+let attachedRunId: string | null = null
+// Chat currently marked as "still answering" in the sidebar by this view.
+let generatingChatId: number | null = null
 let currentAudioStreamer: AudioStreamer | null = null
 const isAudioStreaming = ref(false)
 
@@ -674,10 +1107,35 @@ type StreamingProcessingMetadata = {
   language?: string
   customMessage?: string
   results_count?: number
+  pages_total?: number
+  pages_read?: number
+  urls_total?: number
+  urls_read?: number
   handler?: string
+  stage?: string
+  filename?: string
+  documentSteps?: Array<{
+    labelKey: string
+    labelParams?: Record<string, unknown>
+    ok?: boolean
+  }>
 }
 
 const processingMetadata = ref<StreamingProcessingMetadata>({})
+
+// Ordered record of the running turn's pipeline steps. `processingStatus`
+// above keeps only the latest phase; this keeps all of them so the bubble can
+// show what is done, what is running and for how long (`ProcessingTimeline`).
+const processingTimeline = ref<TimelineState>(createTimelineState())
+
+const ingestTimeline = (data: StreamUpdatePayload) => {
+  ingestTimelineEvent(processingTimeline.value, data)
+  const message = historyStore.messages.find((m) => m.isStreaming && m.role === 'assistant')
+  if (!message) return
+  // Clone so the next turn's empty timeline cannot wipe this message's summary.
+  message.processingSteps = cloneTimelineSteps(processingTimeline.value.steps)
+  message.processingModel = cloneTimelineModel(processingTimeline.value.model)
+}
 
 // Backend pipeline steps that only need a label in the thinking indicator:
 // no metadata, no side effects. Kept in one list so the guest and the
@@ -691,6 +1149,42 @@ const PIPELINE_PROGRESS_STATUSES = [
 
 const isPipelineProgressStatus = (status: string | undefined): status is string =>
   typeof status === 'string' && PIPELINE_PROGRESS_STATUSES.includes(status)
+
+// Web research steps: the backend reads the links the user pasted
+// (`fetching_urls` → `urls_fetched`) and the top result pages of a web search
+// (`reading_pages` → `pages_read`). `pages_read` also refreshes the sources
+// with their `fetched` flag and the count shown on the Web Search badge.
+// Shared by the guest and the authenticated stream handler.
+const RESEARCH_STATUSES = ['fetching_urls', 'urls_fetched', 'reading_pages', 'pages_read']
+
+const applyResearchStatus = (messageId: string, data: StreamUpdatePayload): boolean => {
+  if (typeof data.status !== 'string' || !RESEARCH_STATUSES.includes(data.status)) {
+    return false
+  }
+  const meta = data.metadata || {}
+  processingStatus.value = data.status
+  processingMetadata.value = {
+    customMessage: data.message || undefined,
+    pages_total: meta.pages_total,
+    pages_read: meta.pages_read,
+    urls_total: meta.urls_total,
+    urls_read: meta.urls_read,
+  }
+
+  if (data.status === 'pages_read') {
+    const searchMsg = historyStore.messages.find((m) => m.id === messageId)
+    if (searchMsg) {
+      const results = meta.results
+      if (Array.isArray(results) && results.length > 0) {
+        searchMsg.searchResults = results as NonNullable<Message['searchResults']>
+      }
+      const pagesRead = typeof meta.pages_read === 'number' ? meta.pages_read : 0
+      searchMsg.webSearch = { ...(searchMsg.webSearch || {}), pagesRead }
+    }
+  }
+
+  return true
+}
 
 // Phase 3e: non-blocking pill that surfaces when backgrounded memory
 // extraction (Phase 2) completes after the assistant message has already
@@ -762,10 +1256,17 @@ const isStreaming = computed(() => {
 
 // Init on mount
 onMounted(async () => {
+  initChatShortcuts()
   // Subscribe to the per-user realtime channel so finished renders resolve
   // their banner instantly (push primary). No-op for guests / when realtime is
   // disabled; the 25s banner poll remains the fallback.
   void mediaJobsStore.subscribe(authStore.user?.id)
+  if (isApprovalsEnabled()) {
+    void approvalsStore.subscribe(authStore.user?.id)
+    if (authStore.isAuthenticated) {
+      void approvalsStore.load('pending')
+    }
+  }
   // Hydrate the global Jobs tray with any renders already running across chats.
   if (authStore.isAuthenticated) {
     void mediaJobsStore.loadActive()
@@ -787,6 +1288,10 @@ onMounted(async () => {
         await nextTick()
         scrollToBottom()
       }
+
+      // A turn that was still generating when the guest reloaded keeps writing
+      // into a fresh bubble instead of being lost.
+      void resumeActiveRunIfAny()
     }
 
     const restricted = route.query.restricted as string | undefined
@@ -804,12 +1309,21 @@ onMounted(async () => {
 
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+    window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+    window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
     maybeRemindAboutUpgrade()
     return
   }
 
-  // Load AI models config for Again functionality (await these - they're fast)
-  await Promise.all([aiConfigStore.loadModels(), aiConfigStore.loadDefaults()])
+  // The chat list needs nothing from the model catalog, so both requests go out
+  // together. Awaiting the catalog first put the list — and behind it the first
+  // chat and the composer — one extra round trip away from the user for no
+  // reason; on a slow backend that cost several seconds of staring at an empty
+  // chat.
+  const chatsLoaded = chatsStore.loadChats()
+
+  // Models config is needed for Again functionality
+  const modelsLoaded = Promise.all([aiConfigStore.loadModels(), aiConfigStore.loadDefaults()])
 
   // Start loading memories in background (don't await - non-blocking!)
   // Memories button will be disabled until loaded
@@ -822,8 +1336,19 @@ onMounted(async () => {
     console.warn('⚠️ Failed to load feedbacks in background:', err)
   })
 
-  // Load chats first
-  await chatsStore.loadChats()
+  await Promise.all([chatsLoaded, modelsLoaded])
+
+  // Deep link from Saved Tasks ("Run now" / "Show results"): /?chat=<id>
+  // opens the task's chat so the user sees the run's result. Without this
+  // the query was silently ignored and the view reopened the LAST ACTIVE
+  // chat — for a task saved from a chat turn that was the original prompt
+  // with the old output.
+  const requestedChatId = Number(route.query.chat)
+  const openedSpecificChat = Number.isInteger(requestedChatId) && requestedChatId > 0
+  if (openedSpecificChat) {
+    chatsStore.setActiveChat(requestedChatId)
+    router.replace({ query: { ...route.query, chat: undefined } })
+  }
 
   // If no active chat, create one
   if (!chatsStore.activeChatId) {
@@ -831,6 +1356,18 @@ onMounted(async () => {
   } else {
     // Load messages for active chat
     await historyStore.loadMessages(chatsStore.activeChatId)
+    // A turn that was still generating when the page was reloaded keeps
+    // writing into this bubble instead of being lost.
+    void resumeActiveRunIfAny()
+  }
+
+  // Start chat from an assistant must not reopen an unrelated last thread.
+  // A ?chat= deep link (Saved Tasks) keeps that thread even if agentId is set.
+  if (
+    !openedSpecificChat &&
+    shouldOpenFreshAssistantChat(queryAgentId.value, historyStore.messages)
+  ) {
+    await chatsStore.findOrCreateEmptyChat()
   }
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
@@ -857,6 +1394,8 @@ onMounted(async () => {
   window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   // Setup window event listener for feedback dialog (used by MessageText.vue)
   window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+  window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+  window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
 
   // Phase 1d: keep the SSE token cache warm.
   //   - Prefetch on mount so the first message of a session never waits.
@@ -932,6 +1471,23 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
   }
 }
 
+// Demo-mode CTA: sign in as the seeded admin (if needed) and open setup.
+const handleOpenFirstRunSetupEvent = () => {
+  void goToProviderSetup()
+}
+
+// Window event handler for [Message:ID] digest badges (used by MessageText.vue):
+// open the older conversation the reference points into.
+const handleOpenMessageReferenceEvent = (event: Event) => {
+  const customEvent = event as CustomEvent<{ messageId: number; chatId: number }>
+  const chatId = customEvent.detail?.chatId
+  if (!chatId || chatId <= 0) return
+  if (chatsStore.activeChatId === chatId) return
+
+  chatsStore.setActiveChat(chatId)
+  void historyStore.loadMessages(chatId)
+}
+
 // Detach (do NOT cancel) a running turn when the user navigates away or
 // switches chats (issues #1142 / #1223 / #1225). Closes the SSE connection and
 // clears local streaming state WITHOUT telling the backend to stop — the turn
@@ -939,6 +1495,95 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
 // Explicit cancellation stays in handleUserStop() (the Stop button).
 function handleNavigateAway() {
   finishStreamingTurnLocally()
+}
+
+/**
+ * Remember the resumable run the server opened for the turn this view is
+ * rendering, and mark its chat in the sidebar.
+ *
+ * The run id keeps a later history load from attaching a second time to a turn
+ * this tab already renders. The sidebar mark is what makes leaving mid-answer
+ * visible: the turn keeps generating, so the user needs to see which chat is
+ * worth returning to.
+ */
+function noteRunStarted(runId: unknown) {
+  if (typeof runId !== 'string' || runId === '') return
+
+  attachedRunId = runId
+
+  // Guests have no chat list to mark.
+  if (isGuestMode.value) return
+
+  // Tracked separately from currentStreamingChatId even though it starts from
+  // it: navigate-away clears that one while the turn deliberately keeps running,
+  // which is exactly when the marker has to stay.
+  generatingChatId = currentStreamingChatId ?? chatsStore.activeChatId ?? null
+  if (null !== generatingChatId) {
+    chatsStore.markChatGenerating(generatingChatId, true)
+  }
+}
+
+/**
+ * The turn ended on the wire. Releasing the run id lets the chat be picked up
+ * again later.
+ *
+ * A recoverable transport drop is NOT the end of the turn server-side — it keeps
+ * generating for whoever comes back — so that case deliberately keeps the
+ * sidebar marker, which is exactly what it exists to show.
+ */
+function noteRunTerminal(data: StreamUpdatePayload) {
+  attachedRunId = null
+
+  if (isRecoverableStreamError(data)) return
+
+  clearGeneratingMark()
+}
+
+function clearGeneratingMark() {
+  if (null !== generatingChatId) {
+    chatsStore.markChatGenerating(generatingChatId, false)
+    generatingChatId = null
+  }
+}
+
+/**
+ * Pick a still-generating turn back up after a reload, a chat switch, or a trip
+ * to another view.
+ *
+ * The backend keeps a turn alive across the disconnect and buffers its events,
+ * and the chat history response reports it as `activeRun`. Re-attaching replays
+ * what was missed and then follows the live tail, so the answer keeps writing
+ * itself instead of leaving the user on a bare prompt until it is persisted.
+ */
+async function resumeActiveRunIfAny() {
+  const run = isGuestMode.value ? guestStore.activeRun : historyStore.activeRun
+  if (!run) return
+
+  // Already rendering this turn — either the tab that started it never left, or
+  // a silent in-progress poll re-reported the same run. Attaching again would
+  // produce a second bubble for one answer.
+  if (attachedRunId === run.runId || isStreaming.value) return
+
+  // A multitask turn is reported BOTH as `inProgressTurn` (#1142 synthesizes a
+  // provisional card bubble) and as `activeRun`. The live re-attach renders the
+  // same turn more completely, so drop the provisional one instead of showing
+  // the answer twice. If the attach drops, finishStreamingMessage() clears the
+  // live flag and the next in-progress poll restores it.
+  historyStore.removeMessage(IN_PROGRESS_TURN_ID)
+
+  // The turn's REAL track id. Inventing a fresh one would leave Stop unable to
+  // flag the running turn — the answer would keep generating (and billing)
+  // while the UI claimed it was cancelled.
+  const runTrackId = Number.parseInt(run.trackId, 10)
+
+  attachedRunId = run.runId
+  await streamAIResponse('', {
+    attach: {
+      runId: run.runId,
+      partialText: run.partialText,
+      trackId: Number.isFinite(runTrackId) ? runTrackId : undefined,
+    },
+  })
 }
 
 // Cleanup: detach the running stream when the component unmounts (user leaves chat)
@@ -963,6 +1608,12 @@ onBeforeUnmount(() => {
   window.removeEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+  window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+  window.removeEventListener('open-message-reference', handleOpenMessageReferenceEvent)
+  if (stopShortcutListen) {
+    stopShortcutListen()
+    stopShortcutListen = null
+  }
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
@@ -1048,6 +1699,12 @@ watch(
       // Calling clear() first causes empty chat if loadMessages() fails silently.
       await historyStore.loadMessages(newChatId)
 
+      // Coming back to a chat whose turn is still generating: keep watching it
+      // live. A different chat means a different run, so the previous
+      // attachment no longer applies.
+      attachedRunId = null
+      void resumeActiveRunIfAny()
+
       // Usage taximeter: a chat switch resets the session (not the day totals)
       // and rebuilds it from the newly loaded history.
       if (usageTaximeterStore.active) {
@@ -1067,32 +1724,23 @@ watch(
   }
 )
 
-async function generateChatTitleFromFirstMessage(firstMessage: string) {
-  const chat = chatsStore.activeChat
-  if (!chat) return
-
-  if (chat.title && !isDefaultChatTitle(chat.title)) return
-
-  // Only generate for user messages from this chat
-  const userMessages = historyStore.messages.filter((m) => m.role === 'user')
-  if (userMessages.length !== 1) return
-
-  // Generate title from first message (take first 50 chars). Strip a leading
-  // tool-command prefix ("/pic ", "/vid ", "/search ") first — `firstMessage`
-  // is the raw content sent to the backend, which keeps the prefix for
-  // pic/vid routing (see handleSendMessage), so without this the sidebar
-  // title showed e.g. "/pic Haus" instead of just "Haus".
-  let title = firstMessage.trim()
-  const commandMatch = title.match(/^\/(search|pic|vid)\s+(.*)$/)
-  if (commandMatch) {
-    title = commandMatch[2].trim()
+watch(queryAgentId, async (id) => {
+  if (!id || !authStore.isAuthenticated) {
+    return
   }
-  if (title.length > 50) {
-    title = title.substring(0, 47) + '...'
+  if (shouldOpenFreshAssistantChat(id, historyStore.messages)) {
+    await chatsStore.findOrCreateEmptyChat()
   }
+})
 
-  // Update chat title
-  await chatsStore.updateChatTitle(chat.id, title)
+const userTextBefore = (messageId: string | number): string => {
+  const list = historyStore.messages
+  const idx = list.findIndex((row) => row.id === messageId)
+  for (let i = idx - 1; i >= 0; i--) {
+    if (list[i].role !== 'user') continue
+    return scheduleSourceFromParts(list[i].parts)
+  }
+  return ''
 }
 
 const groupedMessages = computed(() => {
@@ -1403,6 +2051,46 @@ function schedulePostStreamMemoryPoll(messageId: number): void {
  *     Earlier parts (e.g. a finished code block followed by more streaming
  *     prose) keep their identity instead of being re-created each tick.
  */
+function applyDocumentStep(messageId: string, data: StreamUpdatePayload): void {
+  processingStatus.value = 'generating_file'
+  const meta = (data.metadata ?? {}) as Record<string, unknown>
+  const step = {
+    labelKey:
+      typeof meta.labelKey === 'string'
+        ? meta.labelKey
+        : (data.message ?? 'processing.documentStepFailed'),
+    labelParams:
+      meta.labelParams && typeof meta.labelParams === 'object'
+        ? (meta.labelParams as Record<string, unknown>)
+        : {},
+    ok: meta.ok !== false,
+  }
+  const existing = Array.isArray(processingMetadata.value?.documentSteps)
+    ? processingMetadata.value.documentSteps
+    : []
+  processingMetadata.value = {
+    ...(processingMetadata.value ?? {}),
+    stage: 'writing',
+    documentSteps: [...existing, step],
+  }
+  const message = historyStore.messages.find((m) => m.id === messageId)
+  if (message) {
+    message.documentChanges = [...(message.documentChanges ?? []), step]
+  }
+}
+
+function applyDocumentComplete(message: Message, data: StreamUpdatePayload): void {
+  if (Array.isArray(data.documentChanges)) {
+    message.documentChanges = data.documentChanges
+  }
+  if (typeof data.documentVersion === 'number') {
+    message.documentVersion = data.documentVersion
+  }
+  if (data.documentFidelityLossy === true) {
+    message.documentFidelityLossy = true
+  }
+}
+
 function applyMediaJobToMessage(message: Message | undefined, raw: unknown): void {
   if (!message) return
   // Accept both the bare job payload ({ job_id, type, state }, as sent on the
@@ -1518,7 +2206,9 @@ function renderStreamingContent(content: string, msgId: string): void {
   parsed.parts.forEach((part) => {
     if (part.type === 'text') {
       desired.push({ type: 'text', content: part.content })
-    } else if (part.type === 'code' || part.type === 'json') {
+    } else if (part.type === 'json') {
+      desired.push({ type: 'json', content: part.content, language: part.language ?? 'json' })
+    } else if (part.type === 'code') {
       desired.push({ type: 'code', content: part.content, language: part.language })
     } else if (part.type === 'links' && part.links) {
       desired.push({
@@ -1543,7 +2233,12 @@ function renderStreamingContent(content: string, msgId: string): void {
   // / audio) are pushed by separate SSE events and not part of `desired`;
   // we keep them appended after the structural section.
   const existingStructural = message.parts.filter(
-    (p) => p.type === 'thinking' || p.type === 'text' || p.type === 'code' || p.type === 'links'
+    (p) =>
+      p.type === 'thinking' ||
+      p.type === 'text' ||
+      p.type === 'code' ||
+      p.type === 'json' ||
+      p.type === 'links'
   )
   const existingMedia = extractMediaParts(message.parts)
 
@@ -1569,6 +2264,7 @@ function renderStreamingContent(content: string, msgId: string): void {
           }
           break
         case 'code':
+        case 'json':
           if (have.content !== want.content) have.content = want.content
           if (have.language !== want.language) have.language = want.language
           if (have.filename !== want.filename) have.filename = want.filename
@@ -1604,7 +2300,7 @@ const handleContinueResponse = async (message: Message) => {
   for (const p of message.parts) {
     if (p.type === 'thinking' && p.content) {
       fullContent += `<think>${p.content}</think>\n`
-    } else if (p.type === 'text' && p.content) {
+    } else if ((p.type === 'text' || p.type === 'json') && p.content) {
       fullContent += p.content
     }
   }
@@ -1620,6 +2316,7 @@ const handleContinueResponse = async (message: Message) => {
     trackId,
     language: locale.value,
     continueMessageId: message.backendMessageId,
+    agentId: pinnedAgentId.value ?? undefined,
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
         fullContent += data.chunk
@@ -1660,6 +2357,8 @@ const handleContinueResponse = async (message: Message) => {
         if (data.truncated) {
           message.truncated = true
         }
+
+        applyDocsToMessage(message, data.docs)
 
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
@@ -1756,8 +2455,13 @@ const handleSendMessage = async (
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
+    language?: string
   }
 ) => {
+  if (needsProviderSetup.value) {
+    return
+  }
+
   // Plugin slash-commands (e.g. "/fastbill show overdue") are handled by the
   // owning plugin, not the AI pipeline. Intercept before any other processing.
   const pluginRoute = matchPluginChatCommand(content)
@@ -1838,7 +2542,7 @@ const handleSendMessage = async (
   let backendContent = backendMessage
 
   if (messageToSend.startsWith('/')) {
-    const commandMatch = messageToSend.match(/^\/(\w+)\s+(.*)$/)
+    const commandMatch = messageToSend.match(/^\/(\w+)\s+([\s\S]*)$/)
     if (commandMatch) {
       const cmd = commandMatch[1]
       const args = commandMatch[2] || ''
@@ -1871,9 +2575,10 @@ const handleSendMessage = async (
   // badge). Without this the only visible artifact of a voice upload was
   // the transcribed text — there was no way to replay the original
   // recording from the web chat.
-  const optimisticParts: import('@/stores/history').Part[] = [
-    { type: 'text', content: displayContent },
-  ]
+  const optimisticParts: import('@/stores/history').Part[] = parseContentWithThinking(
+    displayContent,
+    'user'
+  )
   if (files && files.length > 0) {
     for (const file of files) {
       if (!isAudioFileType(file.fileType, file.fileMime)) continue
@@ -1908,7 +2613,7 @@ const handleSendMessage = async (
   // Mirrors the backend preview format (30 chars + ellipsis).
   // Incognito: the turn belongs to no chat — never touch the sidebar.
   if (chatsStore.activeChatId && !incognitoStore.active) {
-    const previewSource = displayContent.trim()
+    const previewSource = stripPastedBlocks(displayContent).trim()
     const preview =
       previewSource.length > 30 ? previewSource.slice(0, 30) + '…' : previewSource || undefined
     chatsStore.bumpChatActivity(chatsStore.activeChatId, {
@@ -2036,9 +2741,20 @@ const streamAIResponse = async (
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
+    language?: string
+    /**
+     * Re-attach to a turn already generating on the server instead of starting
+     * a new one. `userMessage` is then irrelevant — nothing is sent, the client
+     * only subscribes to the turn's buffered events. `trackId` is the turn's
+     * existing id, so an explicit Stop can still cancel it server-side.
+     */
+    attach?: { runId: string; partialText: string; trackId?: number }
   }
 ) => {
   streamingAbortController = new AbortController()
+
+  const attach = options?.attach
+  processingTimeline.value = createTimelineState()
 
   const currentModel =
     aiConfigStore.models.CHAT?.find((model) => model.id === options?.modelId) ??
@@ -2048,6 +2764,28 @@ const streamAIResponse = async (
 
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
+
+  // Paint what the turn already produced right away, so returning to a running
+  // chat shows the answer-so-far instead of an empty bubble.
+  const paintedPrefix = attach?.partialText ?? ''
+  if (paintedPrefix) {
+    historyStore.updateStreamingMessage(messageId, paintedPrefix)
+  }
+
+  /**
+   * Render streamed text without ever letting the bubble shrink.
+   *
+   * The re-attach replays the turn from sequence 0 (which is what rebuilds the
+   * task cards and memory badges, so shortening the replay is not an option),
+   * meaning the first replayed chunks are far SHORTER than the answer-so-far
+   * already on screen. Rendering them verbatim would visibly rewind a long
+   * answer back to its first word and then re-type it. Holding the painted
+   * prefix until the replay grows past it keeps the text moving forward only;
+   * from there the replay is longer and takes over on its own.
+   */
+  const renderStreamingText = (text: string) => {
+    renderStreamingContent(text.length >= paintedPrefix.length ? text : paintedPrefix, messageId)
+  }
 
   let streamingRafId: number | null = null
   let streamingDirty = false
@@ -2078,22 +2816,35 @@ const streamAIResponse = async (
         return
       }
 
-      const trackId = Date.now()
+      // A re-attach adopts the running turn's id; only a NEW turn mints one.
+      const trackId = attach?.trackId ?? Date.now()
       currentTrackId = trackId
       let fullContent = ''
+      let insideThink = false
 
       processingStatus.value = 'started'
       processingMetadata.value = {}
 
-      const stopStreaming = chatApi.streamGuestMessage({
+      // The handler lives on an options object rather than inline at the call
+      // site so the re-attach transport can reuse the exact same one — a turn
+      // picked back up after a reload must render through identical logic.
+      const guestStreamOptions = {
         guestSessionId: guestStore.sessionId,
         message: userMessage,
         chatId: guestChatId,
         trackId,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        onUpdate: (data) => {
+        onUpdate: (data: StreamUpdatePayload) => {
           if (streamingAbortController?.signal.aborted) return
+
+          ingestTimeline(data)
+
+          // Recognised here rather than in each terminal branch below, which
+          // exist per error kind and would each need their own reset.
+          if (data.status === 'complete' || data.status === 'error') {
+            noteRunTerminal(data)
+          }
 
           if (data.status === 'guest_limit_reached') {
             // #1128: drop the empty assistant placeholder — same as the
@@ -2124,6 +2875,11 @@ const streamAIResponse = async (
             return
           }
 
+          if (data.status === 'run_started') {
+            noteRunStarted(data.runId)
+            return
+          }
+
           if (data.status === 'started') {
             processingStatus.value = 'started'
             processingMetadata.value = {}
@@ -2133,6 +2889,11 @@ const streamAIResponse = async (
           } else if (data.status === 'analyzing') {
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'editing') {
+            // Media edit of a picture from earlier in the conversation — name
+            // the source so the user can see WHICH image is being changed.
+            processingStatus.value = 'editing'
+            processingMetadata.value = data.metadata || {}
           } else if (isPipelineProgressStatus(data.status)) {
             processingStatus.value = data.status
             processingMetadata.value = {}
@@ -2170,6 +2931,8 @@ const streamAIResponse = async (
                 }
               }
             }
+          } else if (applyResearchStatus(messageId, data)) {
+            // handled: linked pages / result pages being read
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             processingMetadata.value = {
@@ -2190,6 +2953,13 @@ const streamAIResponse = async (
             // and `converting` while the office file is built.
             processingStatus.value = 'generating_file'
             processingMetadata.value = data.metadata || {}
+          } else if (data.status === 'document_step') {
+            applyDocumentStep(messageId, data)
+          } else if (data.status === 'thinking') {
+            // Reasoning models: same live "thinking" phase as the
+            // authenticated handler, so guests are not left on "generating".
+            processingStatus.value = 'thinking'
+            processingMetadata.value = {}
           } else if (data.status === 'processing') {
             // Processing/routing — no UI update needed
           } else if (data.status === 'plan') {
@@ -2226,6 +2996,7 @@ const streamAIResponse = async (
               message.wasMultitask = false
             }
           } else if (data.status === 'task_update') {
+            ingestApprovalRequired(data)
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             if (card && card.state === 'cancelled') {
@@ -2243,6 +3014,9 @@ const streamAIResponse = async (
               }
               if (typeof data.metadata?.results_count === 'number') {
                 card.resultsCount = data.metadata.results_count
+              }
+              if (data.metadata?.used_workspace === true) {
+                card.usedWorkspace = true
               }
             }
           } else if (data.status === 'task_chunk') {
@@ -2294,9 +3068,17 @@ const streamAIResponse = async (
             // normal single-bubble media events (they still persist on the OUT
             // message and re-render from history on reload).
           } else if (data.status === 'data' && data.chunk) {
-            if (processingStatus.value) {
-              processingStatus.value = ''
-              processingMetadata.value = {}
+            // First visible answer token: the live thinking panel folds away.
+            // A buffered `<think>` block, including one split across chunks,
+            // is not the answer.
+            const visible = consumeVisibleAnswer(data.chunk, insideThink)
+            insideThink = visible.insideThink
+            if (visible.text.trim() !== '') {
+              if (processingStatus.value) {
+                processingStatus.value = ''
+                processingMetadata.value = {}
+              }
+              historyStore.finishLiveThinking(messageId)
             }
             fullContent += data.chunk
 
@@ -2306,7 +3088,7 @@ const streamAIResponse = async (
                 streamingRafId = null
                 if (!streamingDirty) return
                 streamingDirty = false
-                renderStreamingContent(fullContent, messageId)
+                renderStreamingText(fullContent)
               })
             }
           } else if (data.status === 'reasoning' && data.chunk) {
@@ -2374,6 +3156,11 @@ const streamAIResponse = async (
                 }),
               })
             }
+          } else if (data.status === 'docs_loaded') {
+            const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
+            if (streamingMessage) {
+              applyDocsToMessage(streamingMessage, data.metadata?.docs)
+            }
           } else if (data.status === 'complete') {
             if (streamingRafId !== null) {
               cancelAnimationFrame(streamingRafId)
@@ -2386,7 +3173,7 @@ const streamAIResponse = async (
             }
 
             if (fullContent) {
-              renderStreamingContent(fullContent, messageId)
+              renderStreamingText(fullContent)
             } else if (data.mediaJob || data.media_job) {
               renderStreamingContent(
                 generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
@@ -2450,6 +3237,8 @@ const streamAIResponse = async (
                 }
               }
 
+              applyDocumentComplete(message, data)
+
               if (
                 data.searchResults &&
                 Array.isArray(data.searchResults) &&
@@ -2461,6 +3250,8 @@ const streamAIResponse = async (
                   resultsCount: data.searchResults.length,
                 }
               }
+
+              applyDocsToMessage(message, data.docs)
 
               applyAssistantChatModelFooter(
                 message,
@@ -2513,7 +3304,15 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
           }
         },
-      })
+      }
+
+      const stopStreaming = attach
+        ? chatApi.attachStream({
+            runId: attach.runId,
+            guestSessionId: guestStore.sessionId,
+            onUpdate: guestStreamOptions.onUpdate,
+          })
+        : chatApi.streamGuestMessage(guestStreamOptions)
 
       stopStreamingFn = stopStreaming
     } else {
@@ -2536,7 +3335,8 @@ const streamAIResponse = async (
         ? buildIncognitoHistorySnapshot()
         : []
 
-      const trackId = Date.now()
+      // A re-attach adopts the running turn's id; only a NEW turn mints one.
+      const trackId = attach?.trackId ?? Date.now()
       currentTrackId = trackId // Store for stop functionality
       currentStreamingChatId = chatId ?? undefined // Store chatId for stop functionality
       let fullContent = ''
@@ -2557,6 +3357,11 @@ const streamAIResponse = async (
       let spokenLength = 0
       let audioText = ''
       let insideThinkBlock = false
+      let answerThinkOpen = false
+      // Frontend language selects the Piper voice. Seed English, then adopt
+      // the backend-detected reply language (meta.language) — the request
+      // already sent locale.value. Piper maps en/de/es/tr to the four voices
+      // baked into synaplan-tts; there is no separate voice picker.
       let detectedLanguage = 'en'
 
       if (options?.voiceReply) {
@@ -2568,7 +3373,10 @@ const streamAIResponse = async (
         })
       }
 
-      const stopStreaming = chatApi.streamMessage({
+      // The handler lives on an options object rather than inline at the call
+      // site so the re-attach transport can reuse the exact same one — a turn
+      // picked back up after a reload must render through identical logic.
+      const streamOptions = {
         userId,
         message: userMessage,
         trackId,
@@ -2577,7 +3385,7 @@ const streamAIResponse = async (
         history: incognitoHistory,
         includeReasoning,
         webSearch,
-        language: locale.value,
+        language: options?.language ?? locale.value,
         modelId: finalModelId,
         fileIds,
         voiceReply: options?.voiceReply,
@@ -2585,10 +3393,24 @@ const streamAIResponse = async (
         ragGroupKey: options?.ragGroupKey,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        onUpdate: (data) => {
+        agentId: pinnedAgentId.value ?? undefined,
+        onUpdate: (data: StreamUpdatePayload) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
             return
+          }
+
+          ingestTimeline(data)
+
+          if (data.status === 'run_started') {
+            noteRunStarted(data.runId)
+            return
+          }
+
+          // Recognised here rather than in each terminal branch below, which
+          // exist per error kind and would each need their own reset.
+          if (data.status === 'complete' || data.status === 'error') {
+            noteRunTerminal(data)
           }
 
           // [i2v-debug] Opt-in multitask/media tracing: a task card stuck at
@@ -2633,6 +3455,11 @@ const streamAIResponse = async (
             // Analyzing phase (e.g., understanding media generation request)
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'editing') {
+            // Media edit of a picture from earlier in the conversation — name
+            // the source so the user can see WHICH image is being changed.
+            processingStatus.value = 'editing'
+            processingMetadata.value = data.metadata || {}
           } else if (isPipelineProgressStatus(data.status)) {
             processingStatus.value = data.status
             processingMetadata.value = {}
@@ -2680,6 +3507,8 @@ const streamAIResponse = async (
                 }
               }
             }
+          } else if (applyResearchStatus(messageId, data)) {
+            // handled: linked pages / result pages being read
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             // Use custom message from backend if available, otherwise default
@@ -2707,6 +3536,8 @@ const streamAIResponse = async (
             // and `converting` while the office file is built.
             processingStatus.value = 'generating_file'
             processingMetadata.value = data.metadata || {}
+          } else if (data.status === 'document_step') {
+            applyDocumentStep(messageId, data)
           } else if (data.status === 'processing') {
             // Processing/routing messages - improved logging
           } else if (data.status === 'thinking') {
@@ -2771,6 +3602,7 @@ const streamAIResponse = async (
               message.wasMultitask = false
             }
           } else if (data.status === 'task_update') {
+            ingestApprovalRequired(data)
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             // A user-cancelled step is terminal on the client: ignore the
@@ -2794,6 +3626,9 @@ const streamAIResponse = async (
               }
               if (typeof data.metadata?.results_count === 'number') {
                 card.resultsCount = data.metadata.results_count
+              }
+              if (data.metadata?.used_workspace === true) {
+                card.usedWorkspace = true
               }
             }
           } else if (data.status === 'task_chunk') {
@@ -2851,9 +3686,17 @@ const streamAIResponse = async (
             // OUT message files persist; history renders the flattened bubble
             // on reload.
           } else if (data.status === 'data' && data.chunk) {
-            if (processingStatus.value) {
-              processingStatus.value = ''
-              processingMetadata.value = {}
+            // First visible answer token: the live thinking panel folds away.
+            // A buffered `<think>` block, including one split across chunks,
+            // is not the answer.
+            const visible = consumeVisibleAnswer(data.chunk, answerThinkOpen)
+            answerThinkOpen = visible.insideThink
+            if (visible.text.trim() !== '') {
+              if (processingStatus.value) {
+                processingStatus.value = ''
+                processingMetadata.value = {}
+              }
+              historyStore.finishLiveThinking(messageId)
             }
 
             fullContent += data.chunk
@@ -2908,7 +3751,7 @@ const streamAIResponse = async (
                 streamingRafId = null
                 if (!streamingDirty) return
                 streamingDirty = false
-                renderStreamingContent(fullContent, messageId)
+                renderStreamingText(fullContent)
               })
             }
           } else if (data.status === 'reasoning' && data.chunk) {
@@ -3061,6 +3904,11 @@ const streamAIResponse = async (
                 streamingMessage.memoryIds = memoryIds
               }
             }
+          } else if (data.status === 'docs_loaded') {
+            const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
+            if (streamingMessage) {
+              applyDocsToMessage(streamingMessage, data.metadata?.docs)
+            }
           } else if (data.status === 'feedback_loaded') {
             // Feedback examples loaded - store in feedbackStore for badge rendering
             const feedbacks = data.metadata?.feedbacks
@@ -3090,6 +3938,22 @@ const streamAIResponse = async (
               if (streamingMessage && feedbackIds.length > 0) {
                 streamingMessage.feedbackIds = feedbackIds
               }
+            }
+          } else if (data.status === 'digests_loaded') {
+            // Deep-memory references loaded - store for [Message:ID] badge rendering
+            const digests = data.metadata?.digests
+            if (digests && Array.isArray(digests)) {
+              messageDigestsStore.addReferences(
+                digests
+                  .filter((d) => d && typeof d.message_id === 'number')
+                  .map((d) => ({
+                    messageId: d.message_id,
+                    chatId: d.chat_id ?? 0,
+                    title: d.title ?? '',
+                    channel: d.channel ?? '',
+                    sourceDate: d.source_date ?? 0,
+                  }))
+              )
             }
           } else if (data.status === 'memory_deleted') {
             // Legacy backend event - remove from local store only
@@ -3138,7 +4002,7 @@ const streamAIResponse = async (
             streamingDirty = false
 
             if (fullContent) {
-              renderStreamingContent(fullContent, messageId)
+              renderStreamingText(fullContent)
             } else if (data.mediaJob || data.media_job) {
               renderStreamingContent(
                 generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
@@ -3161,6 +4025,13 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
+
+              // Multitask: the DAG finished — freeze the task cards so the plan
+              // renders as final and the schedule clock appears immediately
+              // (canSchedule requires !plan.active), without a page reload.
+              if (message.taskPlan) {
+                message.taskPlan.active = false
+              }
 
               // Mark as truncated so the Continue button appears
               if (data.truncated) {
@@ -3234,6 +4105,8 @@ const streamAIResponse = async (
                 })
               }
 
+              applyDocumentComplete(message, data)
+
               // ✨ NEW: Parse JSON response if AI responded in JSON format
               // NOTE: againData is now generated by frontend in ChatMessage.vue
               // based on available models and message type (image/video/audio)
@@ -3261,6 +4134,8 @@ const streamAIResponse = async (
               if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
                 message.memoryIds = data.memoryIds
               }
+
+              applyDocsToMessage(message, data.docs)
 
               // Store feedback IDs if provided
               if (
@@ -3313,6 +4188,15 @@ const streamAIResponse = async (
               if (data.originalMediaType !== undefined) {
                 message.originalMediaType = data.originalMediaType
               }
+              if (typeof data.errorReason === 'string' && data.errorReason !== '') {
+                message.errorReason = data.errorReason
+                message.canRetryModel =
+                  data.canRetryModel !== false && chatErrorSuggestsOtherModel(data.errorReason)
+                message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
+                if (typeof data.error === 'string' && data.error.trim() !== '') {
+                  message.errorMessage = data.error
+                }
+              }
 
               if (data.error_hint === 'vision_model_required') {
                 const hint =
@@ -3338,8 +4222,13 @@ const streamAIResponse = async (
             // bump, no reconcile against a stored message, no memory-
             // extraction poll (extraction is skipped server-side).
             if (!incognito && chatId) {
-              // Generate chat title from first message
-              generateChatTitleFromFirstMessage(userMessage)
+              // The server names the chat after the first exchange (#1500) and
+              // sends the title on the turn that produced it. Until then the
+              // sidebar shows the first-message preview, so there is nothing to
+              // do when the field is absent.
+              if (data.chatTitle) {
+                chatsStore.applyChatTitle(chatId, data.chatTitle)
+              }
 
               // Bump chat activity so the sidebar reflects the assistant message
               // landing without waiting for a full reload.
@@ -3379,32 +4268,34 @@ const streamAIResponse = async (
             }
             streamingDirty = false
 
-            const errorMsg = String(data.error ?? data.message ?? 'Unknown error')
+            const rawError = typeof data.error === 'string' ? data.error : ''
+            const classified =
+              typeof data.errorReason === 'string' && data.errorReason.trim() !== ''
+            const errorMsg =
+              classified && rawError.trim() !== '' ? rawError : t('chatError.reason.unknown')
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
             processingMetadata.value = {}
 
-            // Issue #1265: a pure SSE transport drop is NOT a turn failure — the
-            // backend keeps the turn alive after the client disconnects (#1230)
-            // and persists the answer. Instead of leaving a phantom "Connection
-            // interrupted" bubble that disappears on refresh, reconcile with the
-            // server so the live view matches what a reload would show: the
-            // persisted answer, or (for a still-running turn) the in-progress
-            // task cards (#1142). Only genuine backend errors fall through to the
-            // error-bubble path below.
-            if (isRecoverableStreamError(data) && !incognito && chatId) {
-              historyStore.finishStreamingMessage(messageId)
-              // #1413: the drop can land before the still-running turn has
-              // persisted its answer. Re-poll the persisted turn with bounded
-              // backoff instead of reconciling exactly once, so the answer
-              // renders without a manual reload (which otherwise invites a
-              // duplicate re-send).
-              void historyStore.recoverInterruptedTurn(chatId)
-              streamingAbortController = null
-              stopStreamingFn = null
-              currentTrackId = undefined
-              currentStreamingChatId = undefined
-              return
+            // Issue #1265: a pure SSE transport drop is NOT a turn failure.
+            // Persisted chats: reconcile with the server (#1230 / #1142 / #1413).
+            // Incognito (no chat row): keep whatever already streamed. Painting
+            // "Connection interrupted" on a finished demo reply is U8-false —
+            // the in-memory draft is the only copy and it is already on screen.
+            if (isRecoverableStreamError(data)) {
+              const dropped = historyStore.messages.find((m) => m.id === messageId)
+              const canReconcile = !incognito && Boolean(chatId)
+              if (shouldFinishWithoutErrorOnTransportDrop({ canReconcile, message: dropped })) {
+                historyStore.finishStreamingMessage(messageId)
+                if (canReconcile && chatId) {
+                  void historyStore.recoverInterruptedTurn(chatId)
+                }
+                streamingAbortController = null
+                stopStreamingFn = null
+                currentTrackId = undefined
+                currentStreamingChatId = undefined
+                return
+              }
             }
 
             // Update message metadata from error event so status/provider/topic
@@ -3412,6 +4303,10 @@ const streamAIResponse = async (
             {
               const message = historyStore.messages.find((m) => m.id === messageId)
               if (message) {
+                // Multitask: stop the cards from animating on a failed turn.
+                if (message.taskPlan) {
+                  message.taskPlan.active = false
+                }
                 if (data.messageId) {
                   message.backendMessageId = data.messageId
                 }
@@ -3437,10 +4332,13 @@ const streamAIResponse = async (
               }
             }
 
-            // Handle chat not found errors with toast notification
+            // Match control-flow on the raw SSE string. Unclassified events
+            // (chat-not-found, rate-limit) have no errorReason, so errorMsg
+            // is the translated unknown copy and must not hide those branches.
+            const rawErrorLower = rawError.toLowerCase()
             if (
-              errorMsg.toLowerCase().includes('chat not found') ||
-              errorMsg.toLowerCase().includes('access denied')
+              rawErrorLower.includes('chat not found') ||
+              rawErrorLower.includes('access denied')
             ) {
               // Remove the empty assistant message
               historyStore.removeMessage(messageId)
@@ -3457,7 +4355,7 @@ const streamAIResponse = async (
             }
 
             // Handle rate limit errors with modal
-            if (errorMsg.toLowerCase().includes('rate limit')) {
+            if (rawErrorLower.includes('rate limit')) {
               // Remove the empty assistant message
               historyStore.removeMessage(messageId)
 
@@ -3558,54 +4456,35 @@ const streamAIResponse = async (
               return
             }
 
-            // Format user-friendly error message with installation instructions
-            let displayError = '## ⚠️ ' + errorMsg + '\n\n'
-
-            if (data.install_command && data.suggested_models) {
-              displayError += '### 📦 ' + t('aiProvider.error.noModelTitle') + '\n\n'
-
-              if (data.suggested_models.quick) {
-                displayError += '**' + t('aiProvider.error.quickModels') + ':**\n'
-                data.suggested_models.quick.forEach((model: string) => {
-                  displayError += `- \`${model}\`\n`
-                })
-                displayError += '\n'
-              }
-
-              if (data.suggested_models.medium) {
-                displayError += '**' + t('aiProvider.error.mediumModels') + ':**\n'
-                data.suggested_models.medium.forEach((model: string) => {
-                  displayError += `- \`${model}\`\n`
-                })
-                displayError += '\n'
-              }
-
-              if (data.suggested_models.large) {
-                displayError += '**' + t('aiProvider.error.largeModels') + ':**\n'
-                data.suggested_models.large.forEach((model: string) => {
-                  displayError += `- \`${model}\`\n`
-                })
-                displayError += '\n'
-              }
-
-              displayError += '### 💡 ' + t('aiProvider.error.exampleCommand') + '\n\n'
-              displayError += '```bash\n' + data.install_command + '\n```\n\n'
-              displayError += '*' + t('aiProvider.error.restartNote') + '*'
-            }
-
-            // Show error in the streaming message bubble
             const message = historyStore.messages.find((m) => m.id === messageId)
             const hasContent = message?.parts.some(
               (p) => p.type === 'text' && p.content && p.content.trim() !== ''
             )
-            if (message && hasContent) {
-              // Already has meaningful content (partial response streamed before error)
-              historyStore.finishStreamingMessage(messageId)
-            } else {
-              // No visible content yet — display the error message
-              historyStore.updateStreamingMessage(messageId, displayError)
-              historyStore.finishStreamingMessage(messageId)
+            if (message) {
+              message.errorReason =
+                typeof data.errorReason === 'string' && data.errorReason !== ''
+                  ? data.errorReason
+                  : 'unknown'
+              message.canRetryModel =
+                data.canRetryModel !== false && chatErrorSuggestsOtherModel(message.errorReason)
+              message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
+              // Only the backend-classified sentence is user-safe. Transport
+              // strings ("Connection failed (HTTP 500)") stay off the notice.
+              if (
+                typeof data.errorReason === 'string' &&
+                data.errorReason !== '' &&
+                typeof data.error === 'string' &&
+                data.error.trim() !== ''
+              ) {
+                message.errorMessage = data.error
+              }
             }
+            if (!hasContent) {
+              // `errorMsg` is the localized text the backend also persists as the
+              // message body, so the live bubble and the reloaded row match.
+              historyStore.updateStreamingMessage(messageId, errorMsg)
+            }
+            historyStore.finishStreamingMessage(messageId)
 
             // Clean up streaming resources after error
             streamingAbortController = null
@@ -3616,7 +4495,11 @@ const streamAIResponse = async (
             console.warn('⚠️ Unknown status:', data.status, data)
           }
         },
-      })
+      }
+
+      const stopStreaming = attach
+        ? chatApi.attachStream({ runId: attach.runId, onUpdate: streamOptions.onUpdate })
+        : chatApi.streamMessage(streamOptions)
 
       // Store EventSource cleanup function globally
       stopStreamingFn = stopStreaming
@@ -3637,7 +4520,7 @@ const streamAIResponse = async (
     }
     streamingDirty = false
 
-    historyStore.updateStreamingMessage(messageId, 'Sorry, an error occurred.')
+    historyStore.updateStreamingMessage(messageId, t('chatError.reason.unknown'))
     historyStore.finishStreamingMessage(messageId)
     streamingAbortController = null
     stopStreamingFn = null
@@ -3657,6 +4540,10 @@ const handleUserStop = async () => {
   if (streamingAbortController) {
     streamingAbortController.abort()
   }
+
+  // Unlike navigating away, an explicit Stop really does end the turn.
+  attachedRunId = null
+  clearGeneratingMark()
 
   // Close the EventSource connection IMMEDIATELY
   if (stopStreamingFn) {
@@ -3885,9 +4772,13 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  const assistantMessage = historyStore.messages.find(
-    (m) => m.backendMessageId === backendMessageId && m.role === 'assistant'
-  )
+  const assistantMessage =
+    backendMessageId > 0
+      ? historyStore.messages.find(
+          (m) => m.backendMessageId === backendMessageId && m.role === 'assistant'
+        )
+      : (historyStore.messages.find((m) => m.id === IN_PROGRESS_TURN_ID) ??
+        [...historyStore.messages].reverse().find((m) => m.role === 'assistant' && !!m.errorReason))
 
   if (!assistantMessage) {
     console.error('❌ Could not find assistant message with backendMessageId:', backendMessageId)
@@ -3920,6 +4811,10 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
 
   historyStore.markSuperseded(assistantMessage.id)
 
+  const fileIds = (userMessage.files ?? [])
+    .map((file) => file.id)
+    .filter((id) => Number.isFinite(id) && id > 0)
+
   // Stream new response directly without creating a duplicate user message.
   //
   // With a model pick: `isAgain` skips classification and routes straight to
@@ -3929,7 +4824,10 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   // backend re-classifies (`source: ai_sorting`) and the planner can build a
   // fresh DAG — `isAgain` without a model would silently degrade the turn to
   // the single-node legacy path.
-  await streamAIResponse(userText, modelId ? { modelId, isAgain: true } : {})
+  //
+  // Reattach the original file IDs so a file_analysis Again still has the
+  // attachment to analyze (issue #1910).
+  await streamAIResponse(userText, modelId ? { modelId, isAgain: true, fileIds } : { fileIds })
 }
 
 /**
@@ -3939,6 +4837,21 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
  * so only that sub-task re-runs. The result arrives as a new assistant bubble;
  * the original turn (with its successful parts) is left untouched.
  */
+const handleTaskFollowup = async (prompt: string) => {
+  if (!authStore.isAuthenticated || isGuestMode.value) return
+  if (!prompt.trim()) return
+  const planMessage =
+    historyStore.messages.find((m) => m.isStreaming && m.taskPlan) ??
+    [...historyStore.messages].reverse().find((m) => m.taskPlan)
+  const messageIndex = planMessage ? historyStore.messages.indexOf(planMessage) : -1
+  const userMessage =
+    messageIndex >= 0 ? findPrecedingUserMessage(historyStore.messages, messageIndex) : null
+  const fileIds = (userMessage?.files ?? [])
+    .map((file) => file.id)
+    .filter((id) => Number.isFinite(id) && id > 0)
+  await streamAIResponse(prompt.trim(), { fileIds })
+}
+
 const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => {
   if (!authStore.isAuthenticated || isGuestMode.value) return
   if (!payload.prompt || !payload.modelId) return
@@ -3958,12 +4871,11 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
 // and signal the backend so the provider poll aborts and stops billing.
 const handleTaskCancel = async (nodeId: string) => {
   // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
-  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …) and
-  // taskPlan.active is only cleared on local teardown (not on a normal/error
-  // completion), so finding the FIRST active plan can match a stale earlier turn and
-  // cancel the wrong card / send the wrong trackId. The streaming message is the
-  // unambiguous active turn; fall back to the active-plan lookup only if none is
-  // currently streaming.
+  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …), so
+  // finding the FIRST active plan could match a stale earlier turn and cancel the
+  // wrong card / send the wrong trackId. The streaming message is the unambiguous
+  // active turn; fall back to the active-plan lookup only if none is currently
+  // streaming.
   const message =
     historyStore.messages.find((m) => m.isStreaming && m.taskPlan?.active) ??
     historyStore.messages.find((m) => m.taskPlan?.active)

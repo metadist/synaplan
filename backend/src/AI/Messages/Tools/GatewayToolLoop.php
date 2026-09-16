@@ -8,12 +8,23 @@ use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\MessagesEventEmitter;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
+use App\Entity\ComputeRun;
+use App\Entity\CustomTool;
 use App\Entity\User;
+use App\Repository\CustomToolRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
+use App\Service\Tool\Custom\HttpToolExecutor;
+use App\Service\Tool\Custom\InvalidToolTemplateException;
+use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\ToolExecutionGate;
+use App\Service\Tool\ToolRegistry;
+use App\Service\Tool\ToolsConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -21,7 +32,8 @@ use Psr\Log\LoggerInterface;
  *
  * Injects the session-pinned catalog built by {@see GatewayToolCatalog}, calls
  * the translator, and on `stop_reason === tool_use` executes the tools Synaplan
- * owns — the user's MCP tools via {@see McpClient} and Synaplan's built-ins such
+ * owns — the user's custom HTTP tools, MCP tools via {@see McpClient}, and
+ * Synaplan's built-ins such
  * as {@see WebSearchTool} — appends `tool_result` turns, and re-prompts until
  * end_turn, client-owned tools appear, or bounds are hit.
  *
@@ -57,6 +69,12 @@ final readonly class GatewayToolLoop
         private MessagesGatewayConfig $config,
         private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
+        private ?ToolExecutionGate $executionGate = null,
+        private ?ToolRegistry $toolRegistry = null,
+        private ?ToolsConfig $toolsConfig = null,
+        private ?CodeExecutionTool $codeExecutionTool = null,
+        private ?HttpToolExecutor $httpExecutor = null,
+        private ?CustomToolRepository $customTools = null,
     ) {
     }
 
@@ -116,9 +134,13 @@ final readonly class GatewayToolLoop
         }
 
         $dropWebSearch = \in_array(WebSearchTool::NAME, $replacedServerTools, true);
+        $dropCodeExecution = \in_array(CodeExecutionTool::NAME, $replacedServerTools, true);
         $kept = [];
         foreach ($requestBody['tools'] as $tool) {
             if (\is_array($tool) && $dropWebSearch && AnthropicServerTools::isWebSearch($tool)) {
+                continue;
+            }
+            if (\is_array($tool) && $dropCodeExecution && AnthropicServerTools::isCodeExecution($tool)) {
                 continue;
             }
             $kept[] = $tool;
@@ -214,7 +236,7 @@ final readonly class GatewayToolLoop
                 break;
             }
 
-            $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user);
+            $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, null, $this->assistantFrom($translatorContext));
             $body = $this->appendToolTurn($body, $content, $toolResults);
         }
 
@@ -307,6 +329,7 @@ final readonly class GatewayToolLoop
                 ping: static function () use ($emitter): void {
                     $emitter->emitPing();
                 },
+                assistant: $this->assistantFrom($translatorContext),
             );
             $body = $this->appendToolTurn($body, $turn['content'], $toolResults);
         }
@@ -350,6 +373,7 @@ final readonly class GatewayToolLoop
         $inputTokens = 0;
         $outputTokens = 0;
         $cacheCreation = 0;
+        $cacheCreation1h = 0;
         $cacheRead = 0;
         $error = false;
 
@@ -363,6 +387,7 @@ final readonly class GatewayToolLoop
             &$inputTokens,
             &$outputTokens,
             &$cacheCreation,
+            &$cacheCreation1h,
             &$cacheRead,
             &$error,
             $emitter,
@@ -390,6 +415,7 @@ final readonly class GatewayToolLoop
                 if (\is_array($usage)) {
                     $inputTokens = (int) ($usage['input_tokens'] ?? $inputTokens);
                     $cacheCreation = (int) ($usage['cache_creation_input_tokens'] ?? $cacheCreation);
+                    $cacheCreation1h = MessagesUsage::extractCacheCreation1hTokens($usage);
                     $cacheRead = (int) ($usage['cache_read_input_tokens'] ?? $cacheRead);
                 }
                 // Emit immediately — suppressed on subsequent turns by the emitter.
@@ -503,6 +529,7 @@ final readonly class GatewayToolLoop
                 inputTokens: $inputTokens,
                 outputTokens: $outputTokens,
                 cacheCreationTokens: $cacheCreation,
+                cacheCreation1hTokens: $cacheCreation1h,
                 cacheReadTokens: $cacheRead,
                 stopReason: $stopReason,
             ),
@@ -547,7 +574,7 @@ final readonly class GatewayToolLoop
      *
      * @return list<array<string, mixed>> tool_result content blocks
      */
-    private function executeOurs(array $toolUses, array $dispatch, User $user, ?callable $ping = null): array
+    private function executeOurs(array $toolUses, array $dispatch, User $user, ?callable $ping = null, ?RuntimeProfile $assistant = null): array
     {
         if (count($toolUses) > self::MAX_TOOLS_PER_TURN) {
             $toolUses = array_slice($toolUses, 0, self::MAX_TOOLS_PER_TURN);
@@ -585,7 +612,7 @@ final readonly class GatewayToolLoop
                 $results[] = $this->toolResultBlock(
                     $toolUseId,
                     null === $parsed
-                        ? 'Unknown MCP tool.'
+                        ? 'Unknown tool.'
                         : sprintf('Tool `%s` is not in the pinned session catalog.', $name),
                     isError: true,
                 );
@@ -593,7 +620,12 @@ final readonly class GatewayToolLoop
             }
 
             if (GatewayToolCatalog::KIND_NATIVE === $entry['kind']) {
-                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user);
+                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
+                if (null !== $gated) {
+                    $results[] = $gated;
+                    continue;
+                }
+                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user, $assistant);
                 if (null !== $ping) {
                     $ping();
                     $lastPing = microtime(true);
@@ -601,13 +633,26 @@ final readonly class GatewayToolLoop
                 continue;
             }
 
-            if ($this->catalogAdapter->isMutatingTool($entry['annotations'])) {
+            if (GatewayToolCatalog::KIND_CUSTOM === $entry['kind']) {
+                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
+                if (null !== $gated) {
+                    $results[] = $gated;
+                    continue;
+                }
+                $results[] = $this->executeCustom($entry, $arguments, $toolUseId, $user);
+                if (null !== $ping) {
+                    $ping();
+                    $lastPing = microtime(true);
+                }
+                continue;
+            }
+
+            if ($this->catalogAdapter->isMutatingTool($entry['annotations']) && !$this->approvalsOn((int) $user->getId())) {
                 $results[] = $this->toolResultBlock(
                     $toolUseId,
                     sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']),
                     isError: true,
                 );
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
                 continue;
             }
 
@@ -618,28 +663,32 @@ final readonly class GatewayToolLoop
                     'MCP server is not available.',
                     isError: true,
                 );
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
                 continue;
             }
 
             try {
+                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
+                if (null !== $gated) {
+                    $results[] = $gated;
+                    continue;
+                }
                 $call = $this->mcpClient->callTool($server, $entry['tool'], $arguments);
                 $text = $this->formatToolContent($call['content']);
                 $isError = $call['isError'];
+                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], $isError);
                 $results[] = $this->toolResultBlock($toolUseId, $text, $isError);
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: $isError);
             } catch (McpClientException $e) {
                 $this->logger->warning('GatewayToolLoop: MCP tool call failed', [
                     'server_id' => $entry['serverId'],
                     'tool' => $entry['tool'],
                     'error' => $e->getMessage(),
                 ]);
+                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
                 $results[] = $this->toolResultBlock(
                     $toolUseId,
                     'Tool call failed: '.$e->getMessage(),
                     isError: true,
                 );
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
             }
 
             if (null !== $ping) {
@@ -652,13 +701,97 @@ final readonly class GatewayToolLoop
     }
 
     /**
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed>|null a tool_result block when the call must not execute
+     */
+    private function gatedToolResult(User $user, string $name, array $arguments, string $toolUseId): ?array
+    {
+        $userId = (int) $user->getId();
+        if (null !== $this->toolRegistry && null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($userId)) {
+            if (null === $this->toolRegistry->get($userId, $name)) {
+                throw new ToolNotRegisteredException($name);
+            }
+        }
+        if (null === $this->executionGate || !$this->approvalsOn($userId)) {
+            return null;
+        }
+        $decision = $this->executionGate->inspect(
+            $userId,
+            $name,
+            $arguments,
+            $user,
+            PolicyContext::Interactive,
+            'chat:0',
+        );
+        if (null !== $decision['refusal']) {
+            return $this->toolResultBlock($toolUseId, $decision['refusal'], isError: true);
+        }
+        if (null !== $decision['approval']) {
+            return $this->toolResultBlock(
+                $toolUseId,
+                sprintf('requires approval; request #%d created', (int) $decision['approval']->getId()),
+            );
+        }
+
+        return null;
+    }
+
+    private function approvalsOn(int $userId): bool
+    {
+        return null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($userId);
+    }
+
+    /**
+     * @param DispatchEntry        $entry
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed> tool_result content block
+     */
+    private function executeCustom(array $entry, array $arguments, string $toolUseId, User $user): array
+    {
+        if (null === $this->httpExecutor || null === $this->customTools) {
+            return $this->toolResultBlock($toolUseId, 'This custom tool cannot run right now.', isError: true);
+        }
+        $userId = (int) $user->getId();
+        if (
+            null !== $this->toolsConfig
+            && (!$this->toolsConfig->isRegistryEnabled($userId) || !$this->toolsConfig->isCustomHttpEnabled($userId))
+        ) {
+            return $this->toolResultBlock($toolUseId, 'This custom tool is not available.', isError: true);
+        }
+
+        $toolId = (int) ($entry['annotations']['toolId'] ?? 0);
+        $tool = $toolId > 0 ? $this->customTools->find($toolId) : null;
+        if (!$tool instanceof CustomTool || !$tool->isEnabled()) {
+            return $this->toolResultBlock($toolUseId, 'This custom tool is not available.', isError: true);
+        }
+
+        try {
+            $result = $this->httpExecutor->execute($tool, $arguments, (int) $user->getId());
+        } catch (InvalidToolTemplateException $e) {
+            $this->logger->info('GatewayToolLoop: custom tool failed', [
+                'tool' => $entry['tool'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->toolResultBlock($toolUseId, $e->getMessage(), isError: true);
+        }
+
+        $text = '' !== $result['summary'] ? $result['summary'] : 'The tool finished';
+        $failed = $result['status'] < 200 || $result['status'] >= 300;
+
+        return $this->toolResultBlock($toolUseId, $this->clampToolText($text), isError: $failed);
+    }
+
+    /**
      * Execute one of Synaplan's built-in tools.
      *
      * @param array<string, mixed> $arguments
      *
      * @return array<string, mixed> tool_result content block
      */
-    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user): array
+    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, ?RuntimeProfile $assistant = null): array
     {
         if (WebSearchTool::NAME === $tool) {
             $result = $this->webSearchTool->execute($arguments);
@@ -674,7 +807,31 @@ final readonly class GatewayToolLoop
             return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
         }
 
+        if (CodeExecutionTool::NAME === $tool && null !== $this->codeExecutionTool) {
+            $result = $this->codeExecutionTool->execute(
+                $arguments,
+                $user,
+                ComputeRun::VIA_GATEWAY_ANTHROPIC,
+                $assistant,
+                null,
+                $assistant?->promptId,
+            );
+            $this->recordNativeUsage($user, 'COMPUTE_RUNS', $tool, 'file_work', $result['isError']);
+
+            return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
+        }
+
         return $this->toolResultBlock($toolUseId, sprintf('Unknown Synaplan tool `%s`.', $tool), isError: true);
+    }
+
+    /**
+     * @param array<string, mixed> $translatorContext
+     */
+    private function assistantFrom(array $translatorContext): ?RuntimeProfile
+    {
+        $profile = $translatorContext['runtime_profile'] ?? null;
+
+        return $profile instanceof RuntimeProfile ? $profile : null;
     }
 
     /**
@@ -764,6 +921,10 @@ final readonly class GatewayToolLoop
         $this->recordToolUsage($user, $source, 'synaplan', 'tool:'.$tool, $query, $error);
     }
 
+    /**
+     * Ledger-only: tools must not consume the MESSAGES quota (issue #1878).
+     * Usage statistics still need a BUSELOG row per tool call.
+     */
     private function recordToolUsage(
         User $user,
         string $source,
@@ -773,7 +934,7 @@ final readonly class GatewayToolLoop
         bool $error,
     ): void {
         try {
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+            $this->rateLimitService->recordUsage($user, 'TOOLS', [
                 'source' => $source,
                 'provider' => $provider,
                 'model' => $model,
@@ -801,6 +962,7 @@ final readonly class GatewayToolLoop
             inputTokens: $a->inputTokens + $b->inputTokens,
             outputTokens: $a->outputTokens + $b->outputTokens,
             cacheCreationTokens: $a->cacheCreationTokens + $b->cacheCreationTokens,
+            cacheCreation1hTokens: $a->cacheCreation1hTokens + $b->cacheCreation1hTokens,
             cacheReadTokens: $a->cacheReadTokens + $b->cacheReadTokens,
             stopReason: $b->stopReason ?? $a->stopReason,
         );
@@ -819,6 +981,20 @@ final readonly class GatewayToolLoop
             'cache_creation_input_tokens' => $usage->cacheCreationTokens,
             'cache_read_input_tokens' => $usage->cacheReadTokens,
         ];
+
+        // Mirror Anthropic's TTL breakdown so a client inspecting the aggregated
+        // multi-turn usage (e.g. for its own cost estimate) sees the same shape
+        // it would from a single-turn response. Clamp defensively: summing
+        // per-turn usage (sumUsage()) should never let the 1h count exceed the
+        // total, but a negative ephemeral_5m_input_tokens would be an invalid
+        // token count and could confuse a client parsing this breakdown.
+        if ($usage->cacheCreation1hTokens > 0) {
+            $cacheCreation1h = min($usage->cacheCreation1hTokens, $usage->cacheCreationTokens);
+            $body['usage']['cache_creation'] = [
+                'ephemeral_5m_input_tokens' => $usage->cacheCreationTokens - $cacheCreation1h,
+                'ephemeral_1h_input_tokens' => $cacheCreation1h,
+            ];
+        }
 
         return $body;
     }

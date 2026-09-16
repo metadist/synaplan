@@ -4,6 +4,11 @@ namespace App\Tests\Unit;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\Prompt;
@@ -19,7 +24,10 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Routing\RoutingDirective;
+use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\Prompt\TimeContextBuilder;
@@ -48,6 +56,9 @@ class ChatHandlerTest extends TestCase
     private RateLimitService&MockObject $rateLimitService;
     private MemoryExtractionDispatcher&MockObject $memoryExtractionDispatcher;
     private PerfPipelineFlag&MockObject $perfPipelineFlag;
+    private \App\Service\Digest\DigestSearchService&MockObject $digestSearchService;
+    private \App\Service\Digest\MessageDigestConfig&MockObject $digestConfig;
+    private \App\Service\Vision\VisionModelResolver&MockObject $visionModelResolver;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -66,6 +77,16 @@ class ChatHandlerTest extends TestCase
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->memoryExtractionDispatcher = $this->createMock(MemoryExtractionDispatcher::class);
         $this->perfPipelineFlag = $this->createMock(PerfPipelineFlag::class);
+        $this->digestSearchService = $this->createMock(\App\Service\Digest\DigestSearchService::class);
+        $this->digestSearchService->method('recentOtherChatTail')->willReturn([]);
+        $this->digestConfig = $this->createMock(\App\Service\Digest\MessageDigestConfig::class);
+        $this->visionModelResolver = $this->createMock(\App\Service\Vision\VisionModelResolver::class);
+
+        // Every resolved model is revalidated before it reaches the provider.
+        // Unless a test says otherwise, the model it picked still works.
+        $this->modelConfigService
+            ->method('resolveUsableModelId')
+            ->willReturnCallback(static fn (?int $modelId): ?int => $modelId);
 
         $this->handler = new ChatHandler(
             $this->aiFacade,
@@ -88,13 +109,203 @@ class ChatHandlerTest extends TestCase
             $this->createMock(DocumentImageCatalog::class),
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
-            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->visionModelResolver,
+            $this->digestSearchService,
+            $this->digestConfig,
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
         );
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     public function testGetName(): void
     {
         $this->assertEquals('chat', $this->handler->getName());
+    }
+
+    /**
+     * A message on the Phase 9 deferral path, wired so the resolved chat
+     * model is the given provider.
+     */
+    private function deferredRoutingMessage(string $provider, string $model, string $filePath = ''): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Make an image of a cat');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn($filePath);
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(1);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->with(10)->willReturn($provider);
+        $this->modelConfigService->method('getModelName')->with(10)->willReturn($model);
+
+        return $message;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function deferredClassification(): array
+    {
+        return ['topic' => 'general', 'language' => 'en', 'defer_routing_to_chat' => true];
+    }
+
+    public function testDeferredRoutingAttachesTheHandoffToolsToTheAnsweringCall(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5');
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->with($this->anything(), 1, $this->callback(function (array $options): bool {
+                $names = array_map(
+                    static fn (array $tool): string => $tool['function']['name'],
+                    $options['tools'],
+                );
+                self::assertSame(['handoff_mediamaker', 'handoff_officemaker', 'handoff_docsummary'], $names);
+                self::assertSame('auto', $options['tool_choice']);
+
+                return true;
+            }))
+            ->willReturn(['content' => 'A cat!', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
+
+        $result = $this->handler->handle($message, [], $this->deferredClassification());
+
+        // No tool call: it really was a chat turn, and it cost exactly one
+        // model call for the whole turn.
+        self::assertSame('A cat!', $result['content']);
+        self::assertNull(RoutingDirective::fromHandlerResult($result));
+    }
+
+    public function testAHandoffToolCallReturnsADirectiveInsteadOfAnAnswer(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5');
+
+        $this->aiFacade->method('chat')->willReturn([
+            // Models often narrate before calling a tool; that preamble is
+            // not an answer and must not reach the user.
+            'content' => 'Sure, let me generate that.',
+            'provider' => 'anthropic',
+            'model' => 'claude-sonnet-5',
+            'tool_calls' => [['id' => 'toolu_1', 'type' => 'function', 'function' => ['name' => 'handoff_mediamaker', 'arguments' => '{"media_type":"image"}']]],
+        ]);
+
+        $directive = RoutingDirective::fromHandlerResult(
+            $this->handler->handle($message, [], $this->deferredClassification())
+        );
+
+        self::assertNotNull($directive);
+        self::assertSame(RoutingDirective::TYPE_HANDOFF, $directive->type);
+        self::assertSame('mediamaker', $directive->topic);
+        self::assertSame(['media_type' => 'image'], $directive->fields);
+    }
+
+    public function testAnUnknownToolNameIsIgnoredAndTheAnswerIsKept(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Paris.',
+            'provider' => 'anthropic',
+            'model' => 'claude-sonnet-5',
+            'tool_calls' => [['id' => 'toolu_1', 'type' => 'function', 'function' => ['name' => 'search_the_web', 'arguments' => '{}']]],
+        ]);
+
+        $result = $this->handler->handle($message, [], $this->deferredClassification());
+
+        self::assertSame('Paris.', $result['content']);
+        self::assertNull(RoutingDirective::fromHandlerResult($result));
+    }
+
+    /**
+     * The authoritative capability check: the classifier pre-gates on the
+     * ACCOUNT default, but a widget/prompt/"Again" binding can resolve a
+     * different model — and that one decides.
+     */
+    public function testAModelWithoutToolCallingSendsTheTurnBackToTheSorterWithoutSpendingACall(): void
+    {
+        $message = $this->deferredRoutingMessage('ollama', 'llama3');
+
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $directive = RoutingDirective::fromHandlerResult(
+            $this->handler->handle($message, [], $this->deferredClassification())
+        );
+
+        self::assertNotNull($directive);
+        self::assertSame(RoutingDirective::TYPE_RECLASSIFY, $directive->type);
+    }
+
+    /**
+     * An attached image makes the handler swap in the configured vision model,
+     * and THAT model decides whether the deferral can be honoured. Resolving
+     * the hand-off tools against the pre-swap chat model would build tools the
+     * translator then drops for the vision provider — the deferral would
+     * silently evaporate and the user would get a vision answer instead of the
+     * route they asked for.
+     */
+    public function testTheVisionModelDecidesWhetherTheDeferralCanBeHonoured(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5', 'user/1/cat.png');
+
+        $chatModel = $this->createMock(Model::class);
+        $chatModel->method('hasFeature')->willReturnCallback(
+            static fn (string $feature): bool => 'vision' !== $feature,
+        );
+        $this->modelRepository->method('find')->willReturn($chatModel);
+
+        // The account's vision model is an Ollama one, which cannot do native
+        // tool calling.
+        $visionModel = $this->createMock(Model::class);
+        $visionModel->method('getId')->willReturn(99);
+        $visionModel->method('getService')->willReturn('Ollama');
+        $visionModel->method('getProviderId')->willReturn('llama3');
+        $visionModel->method('getName')->willReturn('Llama 3 Vision');
+        $this->visionModelResolver->method('resolve')->willReturn($visionModel);
+
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $directive = RoutingDirective::fromHandlerResult(
+            $this->handler->handle($message, [], $this->deferredClassification())
+        );
+
+        self::assertNotNull($directive);
+        self::assertSame(RoutingDirective::TYPE_RECLASSIFY, $directive->type);
+    }
+
+    public function testAnOrdinaryTurnDeclaresNoTools(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5');
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->with($this->anything(), 1, $this->callback(static function (array $options): bool {
+                self::assertArrayNotHasKey('tools', $options);
+
+                return true;
+            }))
+            ->willReturn(['content' => 'Paris.', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
+
+        $this->handler->handle($message, [], ['topic' => 'general', 'language' => 'en']);
     }
 
     public function testHumanizeFileMarkersReplacesGeneratedMarker(): void
@@ -586,6 +797,85 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * Channel parity: the non-streaming `handle()` path (email, MCP, generic
+     * webhook) must fold options['conversation_summary'] into the SYSTEM
+     * prompt exactly like handleStream() — long threads on slow channels are
+     * the main beneficiary of the rolling summary.
+     */
+    public function testHandleInjectsConversationSummaryIntoSystemPrompt(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('And what about the second point?');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260827120000');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$captured): array {
+                $captured = $messages;
+
+                return ['content' => 'ok', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            null,
+            ['conversation_summary' => 'Earlier: the user argued for option A and asked to compare prices.'],
+        );
+
+        self::assertNotNull($captured);
+        self::assertSame('system', $captured[0]['role'] ?? '');
+        $systemPrompt = $captured[0]['content'] ?? '';
+        self::assertStringContainsString('Summary of earlier conversation', $systemPrompt);
+        self::assertStringContainsString('option A', $systemPrompt);
+    }
+
+    public function testHandleWithoutConversationSummaryLeavesSystemPromptClean(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Hello');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260827120000');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$captured): array {
+                $captured = $messages;
+
+                return ['content' => 'ok', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
+
+        self::assertNotNull($captured);
+        self::assertStringNotContainsString('Summary of earlier conversation', $captured[0]['content'] ?? '');
+    }
+
+    /**
      * Issue #615: the non-streaming `handle()` path serves email
      * (`smart+...@synaplan.net`) and the generic API webhook. Before the
      * fix, neither loaded user memories nor extracted new ones. This
@@ -680,6 +970,213 @@ class ChatHandlerTest extends TestCase
         self::assertSame([
             ['id' => 42, 'key' => 'city', 'value' => 'Hamburg', 'score' => 0.91],
         ], $result['metadata']['memories']);
+    }
+
+    /**
+     * Sprint 4 (deep memory): when the digest index has relevant hits for
+     * the prompt, `handle()` must inject the "Older conversations" block
+     * into the system prompt and expose the reference list in metadata —
+     * on the non-streaming path too (email/MCP channel parity).
+     */
+    public function testHandleInjectsDigestContextIntoSystemPrompt(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(9000);
+        $message->method('getChatId')->willReturn(55);
+        $message->method('getText')->willReturn('What did the realtor write about the office rent?');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(true);
+        $this->userMemoryService->method('embedUserQuery')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('embedQueryForMemorySearch')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('getMemoryEmbeddingModelId')->willReturn(10);
+        $this->userMemoryService->method('searchMemoriesByVector')->willReturn([]);
+
+        $this->digestConfig->method('isEnabled')->willReturn(true);
+        $this->digestConfig->method('getBlockMaxChars')->willReturn(4000);
+
+        $digest = [
+            'message_id' => 1234,
+            'chat_id' => 11,
+            'title' => 'office rent letter to realtor about the increase of payments',
+            'channel' => 'web',
+            'source_date' => 1_777_636_800,
+            'score' => 0.9,
+            'effective_score' => 0.85,
+            'excerpt' => 'Dear Sir, the rent will increase to 1620 EUR.',
+        ];
+        $this->digestSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->with(7, [0.1, 0.2, 0.3], excludeChatId: 55)
+            ->willReturn([$digest]);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $capturedMessages = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$capturedMessages): array {
+                $capturedMessages = $messages;
+
+                return ['content' => 'ok', 'provider' => 'openai', 'model' => 'gpt-4.1'];
+            });
+
+        $result = $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
+
+        self::assertNotNull($capturedMessages);
+        $systemPrompt = $capturedMessages[0]['content'] ?? '';
+        self::assertStringContainsString('Older conversations', $systemPrompt);
+        self::assertStringContainsString('office rent letter to realtor', $systemPrompt);
+        self::assertStringContainsString('1620 EUR', $systemPrompt, 'pulled excerpt must reach the model');
+        self::assertStringContainsString('[Message:ID]', $systemPrompt, 'reference rules must ship with the block');
+        self::assertSame([$digest], $result['metadata']['digests']);
+    }
+
+    /**
+     * Streaming parity: handleStream() must inject the same digest block AND
+     * emit the digests_loaded progress event carrying the reference list
+     * (id, chat, title — no message bodies) for the frontend badges.
+     */
+    public function testHandleStreamInjectsDigestContextAndEmitsDigestsLoaded(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(9001);
+        $message->method('getChatId')->willReturn(55);
+        $message->method('getText')->willReturn('What did the realtor write about the office rent?');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(true);
+        $this->userMemoryService->method('embedUserQuery')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('embedQueryForMemorySearch')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('getMemoryEmbeddingModelId')->willReturn(10);
+        $this->userMemoryService->method('searchMemoriesByVector')->willReturn([]);
+
+        $this->digestConfig->method('isEnabled')->willReturn(true);
+        $this->digestConfig->method('getBlockMaxChars')->willReturn(4000);
+
+        $digest = [
+            'message_id' => 1234,
+            'chat_id' => 11,
+            'title' => 'office rent letter to realtor about the increase of payments',
+            'channel' => 'web',
+            'source_date' => 1_777_636_800,
+            'score' => 0.9,
+            'effective_score' => 0.85,
+            'excerpt' => 'Dear Sir, the rent will increase to 1620 EUR.',
+        ];
+        $this->digestSearchService->method('search')->willReturn([$digest]);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(function ($messages, $cb) use (&$captured) {
+                $captured = $messages;
+                $cb('ok');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
+
+        $progressEvents = [];
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+            static function (array $event) use (&$progressEvents): void {
+                $progressEvents[] = $event;
+            },
+        );
+
+        self::assertNotNull($captured);
+        $systemPrompt = $captured[0]['content'] ?? '';
+        self::assertStringContainsString('Older conversations', $systemPrompt);
+        self::assertStringContainsString('office rent letter to realtor', $systemPrompt);
+        self::assertStringContainsString('1620 EUR', $systemPrompt);
+
+        $digestEvents = array_values(array_filter(
+            $progressEvents,
+            static fn (array $e): bool => 'digests_loaded' === ($e['status'] ?? '')
+        ));
+        self::assertCount(1, $digestEvents);
+        self::assertSame(1234, $digestEvents[0]['metadata']['digests'][0]['message_id']);
+        self::assertSame(11, $digestEvents[0]['metadata']['digests'][0]['chat_id']);
+        self::assertArrayNotHasKey(
+            'excerpt',
+            $digestEvents[0]['metadata']['digests'][0],
+            'message bodies must stay backend-only'
+        );
+    }
+
+    /**
+     * A widget/guest visitor must never see the account owner's message
+     * history — the digest search is gated by the same levers as memories.
+     */
+    public function testHandleSkipsDigestSearchForWidgetChannel(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Hello');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->digestConfig->method('isEnabled')->willReturn(true);
+        $this->digestSearchService->expects($this->never())->method('search');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'ok', 'provider' => 'test', 'model' => 'test',
+        ]);
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en', 'source' => 'widget'],
+            null,
+            ['channel' => 'WIDGET'],
+        );
+
+        self::assertSame([], $result['metadata']['digests']);
     }
 
     /**
@@ -1221,6 +1718,219 @@ class ChatHandlerTest extends TestCase
 
         self::assertSame('__FILE_GENERATION_FAILED__', $result['content']);
         self::assertStringNotContainsString('BFILETEXT', $result['content']);
+    }
+
+    /**
+     * The officemaker topic's reply IS the machine-readable
+     * {"BFILEPATH":…,"BFILETEXT":…} envelope, so `handle()` must attach
+     * {@see \App\AI\StructuredOutput\Schema\FileGenerationSchema} — replacing
+     * reliance on the prompt's "respond with PURE JSON" instruction alone.
+     */
+    public function testHandleForwardsTheFileGenerationSchemaForOfficemaker(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Create a presentation');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $capturedOptions = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return ['content' => '{"BFILEPATH":"slides.pptx","BFILETEXT":"content"}', 'provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'en', 'model_id' => 206],
+        );
+
+        self::assertIsArray($capturedOptions);
+        self::assertInstanceOf(StructuredOutputSchema::class, $capturedOptions['structured_output'] ?? null);
+        self::assertSame('office_file_generation', $capturedOptions['structured_output']->name);
+    }
+
+    /**
+     * The STRUCTURED_OUTPUT.ENABLED kill switch must suppress the
+     * officemaker schema too — there is no separate flag per call site.
+     */
+    public function testHandleOmitsTheFileGenerationSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Create a presentation');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $capturedOptions = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return ['content' => '{"BFILEPATH":"slides.pptx","BFILETEXT":"content"}', 'provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $handler = new ChatHandler(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->promptService,
+            $this->modelConfigService,
+            $this->modelRepository,
+            $this->logger,
+            $this->vectorSearchService,
+            $this->em,
+            '/tmp/uploads',
+            $this->userUploadPathBuilder,
+            $this->userMemoryService,
+            $this->feedbackConfigService,
+            $this->rateLimitService,
+            $this->memoryExtractionDispatcher,
+            $this->perfPipelineFlag,
+            $this->createMock(DocumentGeneratorService::class),
+            $this->createMock(DocumentImageReferenceResolver::class),
+            $this->createMock(DocumentImageCatalog::class),
+            new TimeContextBuilder(),
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->digestSearchService,
+            $this->digestConfig,
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $structuredOutputConfig,
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
+        );
+
+        $handler->handle(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'en', 'model_id' => 206],
+        );
+
+        self::assertIsArray($capturedOptions);
+        self::assertArrayNotHasKey('structured_output', $capturedOptions);
+    }
+
+    /**
+     * Every non-officemaker topic keeps its free-form chat completion — the
+     * schema must not leak onto normal conversations.
+     */
+    public function testHandleOmitsTheFileGenerationSchemaForNonOfficemakerTopics(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Hello there');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('general');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $capturedOptions = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return ['content' => 'Hi! How can I help?', 'provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'general', 'language' => 'en', 'model_id' => 206],
+        );
+
+        self::assertIsArray($capturedOptions);
+        self::assertArrayNotHasKey('structured_output', $capturedOptions);
+    }
+
+    /**
+     * Streaming variant: officemaker runs through `handleStream()` on the web
+     * chat channel just as much as through `handle()`.
+     */
+    public function testHandleStreamForwardsTheFileGenerationSchemaForOfficemaker(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Create a presentation');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getFeatures')->willReturn([]);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $capturedOptions = null;
+        $this->aiFacade
+            ->method('chatStream')
+            ->willReturnCallback(function (array $messages, callable $cb, ?int $userId, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+                $cb('{"BFILEPATH":"slides.pptx","BFILETEXT":"content"}');
+
+                return ['provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'de', 'model_id' => 206],
+            static function ($chunk): void {},
+        );
+
+        self::assertIsArray($capturedOptions);
+        self::assertInstanceOf(StructuredOutputSchema::class, $capturedOptions['structured_output'] ?? null);
+        self::assertSame('office_file_generation', $capturedOptions['structured_output']->name);
     }
 
     /**

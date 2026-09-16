@@ -14,7 +14,19 @@ use Psr\Log\LoggerInterface;
 final readonly class CostCalculationService
 {
     private const CACHE_READ_DISCOUNT_ANTHROPIC = 0.10;
+    // Default TTL (5 minutes) cache write, per https://platform.claude.com/docs/en/build-with-claude/prompt-caching.
     private const CACHE_WRITE_MULTIPLIER_ANTHROPIC = 1.25;
+    // Opt-in 1-hour TTL cache write (`cache_control: {"type": "ephemeral", "ttl": "1h"}`) — billed
+    // at 2x base input price, not the 1.25x default. Applies uniformly across the whole Anthropic
+    // lineup (Anthropic docs footnote: only cache *reads* vary per model, e.g. Fable 5.1's 0.025x).
+    private const CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H = 2.0;
+    // Last-resort cache-read rate for rows that author no `cache_read_price_per_1M`.
+    // It matches the GPT-4o generation (gpt-4o-mini: $0.075 on $0.15) but NOT the
+    // GPT-5+ / Gemini Pro lines, which read at 0.1x — those author an explicit
+    // price, because falling back to 50% here overcharged them 5x (#1319 follow-up).
+    // It cuts in on a MISSING rate, not on a missing discount: a model billing
+    // cached tokens at full price (gpt-5.5-pro) must author its input rate here,
+    // otherwise this default halves its bill.
     private const CACHE_READ_DISCOUNT_DEFAULT = 0.50;
 
     public function __construct(
@@ -24,6 +36,14 @@ final readonly class CostCalculationService
     ) {
     }
 
+    /**
+     * @param int $cacheCreationTokens   total tokens written to the cache (both TTLs combined) —
+     *                                   Anthropic's `cache_creation_input_tokens`
+     * @param int $cacheCreation1hTokens Subset of $cacheCreationTokens written with a 1-hour TTL —
+     *                                   Anthropic's `cache_creation.ephemeral_1h_input_tokens`. The
+     *                                   remainder is billed at the default 5-minute-TTL rate.
+     *                                   Non-Anthropic providers never populate this (always 0).
+     */
     public function calculateCost(
         int $promptTokens,
         int $completionTokens,
@@ -31,6 +51,7 @@ final readonly class CostCalculationService
         int $cacheCreationTokens,
         ?int $modelId,
         ?int $timestamp = null,
+        int $cacheCreation1hTokens = 0,
     ): CostResult {
         if (!$modelId) {
             return $this->zeroCostResult();
@@ -59,9 +80,15 @@ final readonly class CostCalculationService
             );
         }
 
+        // Per-search rows (Cohere rerank) must never go through convertToPerToken —
+        // a $2.00/1K-searches price would be read as $0.002/token (#1778).
+        if ('per_request' === ($model->getJson()['pricing_mode'] ?? 'per_token')) {
+            return $this->calculateMediaCost($modelId, 1.0, 0.0, $timestamp);
+        }
+
         // Long-context tier: several providers bill the WHOLE request at a
         // higher per-token rate once the prompt crosses a token threshold
-        // (Gemini/Claude >200k, GPT-5.x >272k). Switch both input and output to
+        // (Gemini/Claude >200k, GPT-5.x / GPT-6 >272k). Switch both input and output to
         // the above-threshold rate — matching how the provider (and LiteLLM)
         // meter it — so we don't under-bill large-context requests (#1319). The
         // tier is read from the current catalog (not the historical snapshot):
@@ -73,6 +100,14 @@ final readonly class CostCalculationService
             $priceOut = $contextTier['price_out_above'];
             $priceSnapshot['price_in'] = number_format($priceIn, 8, '.', '');
             $priceSnapshot['price_out'] = number_format($priceOut, 8, '.', '');
+
+            // The cached-input rate rises with the tier too (OpenAI bills long
+            // context at "2x input and cache rates"), so a request above the
+            // threshold must not keep paying the short-context cache price.
+            if (isset($contextTier['cache_price_in_above'])) {
+                $cachePriceIn = number_format($contextTier['cache_price_in_above'], 8, '.', '');
+                $priceSnapshot['cache_price_in'] = $cachePriceIn;
+            }
         }
 
         $pricePerInputToken = $this->convertToPerToken($priceIn, $priceSnapshot['in_unit']);
@@ -83,7 +118,8 @@ final readonly class CostCalculationService
         // ('Anthropic') never silently misses the provider-specific rate (#1313).
         $provider = ModelCatalog::normalizeProvider($model->getService());
         $cacheReadDiscount = $this->getCacheReadDiscount($provider);
-        $cacheWriteMultiplier = $this->getCacheWriteMultiplier($provider);
+        $cacheWriteMultiplier = $this->getCacheWriteMultiplier($provider, $model);
+        $cacheWriteMultiplier1h = $this->getCacheWriteMultiplier1h($provider);
 
         // Override with explicit cache price if available
         $cacheReadPricePerToken = null !== $cachePriceIn
@@ -96,9 +132,16 @@ final readonly class CostCalculationService
             $regularInputTokens = 0;
         }
 
+        // Split cache writes by TTL: the 1-hour slice is billed at the higher
+        // multiplier, the remainder at the default (5-minute) rate. Clamp
+        // defensively so a caller-supplied 1h count can never exceed the total.
+        $cacheCreation1h = min(max($cacheCreation1hTokens, 0), $cacheCreationTokens);
+        $cacheCreation5m = $cacheCreationTokens - $cacheCreation1h;
+
         $regularInputCost = $regularInputTokens * $pricePerInputToken;
         $cachedInputCost = $cachedTokens * $cacheReadPricePerToken;
-        $cacheCreationCost = $cacheCreationTokens * $pricePerInputToken * $cacheWriteMultiplier;
+        $cacheCreationCost = ($cacheCreation5m * $pricePerInputToken * $cacheWriteMultiplier)
+            + ($cacheCreation1h * $pricePerInputToken * $cacheWriteMultiplier1h);
         $outputCost = $completionTokens * $pricePerOutputToken;
 
         $totalInputCost = $regularInputCost + $cachedInputCost + $cacheCreationCost;
@@ -188,9 +231,9 @@ final readonly class CostCalculationService
      *                                    When the model defines `json.resolution_prices`, the matching
      *                                    per-second price overrides `priceOut`. Falls back to default
      *                                    pricing when omitted or unknown.
-     * @param string|null $quality        Optional image quality tier (low|medium|high, or the legacy
-     *                                    standard/hd aliases). Used with $size to pick a per-image price
-     *                                    from `json.quality_prices` (e.g. gpt-image, #1315).
+     * @param string|null $quality        Optional image quality tier (low|medium|high|xhigh|max, or the
+     *                                    legacy standard/hd aliases). Used with $size to pick a per-image
+     *                                    price from `json.quality_prices` (e.g. gpt-image, #1315).
      * @param string|null $size           Optional image size (e.g. '1024x1024', '1024x1536'). Combined
      *                                    with $quality to look up the exact per-image tier price.
      */
@@ -301,7 +344,7 @@ final readonly class CostCalculationService
             'perhour' => $price / 3_600,
             // Flat per-clip / per-call billing (#1317): the authored price is
             // already the price for one whole generation, so no scaling.
-            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond', 'per_generation', 'pergeneration' => $price,
+            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond', 'per_generation', 'pergeneration', 'perrequest', 'per_request' => $price,
             '-', '', 'free' => 0.0,
             default => $price,
         };
@@ -370,10 +413,17 @@ final readonly class CostCalculationService
         }
 
         $resolvedQuality = $this->normaliseImageQuality($quality);
-        if (null === $resolvedQuality || !isset($tiers[$resolvedQuality]) || !is_array($tiers[$resolvedQuality])) {
+        if (null === $resolvedQuality) {
+            // auto / unspecified → the model's authored default.
             $default = $json['default_quality'] ?? null;
             $resolvedQuality = is_string($default) && isset($tiers[$default])
                 ? $default
+                : (string) array_key_first($tiers);
+        } elseif (!isset($tiers[$resolvedQuality]) || !is_array($tiers[$resolvedQuality])) {
+            // A 2.5-only tier (xhigh/max) on gpt-image-1 / 1.5. The provider
+            // clamps that to high before calling OpenAI; bill the same tier.
+            $resolvedQuality = isset($tiers['high']) && is_array($tiers['high'])
+                ? 'high'
                 : (string) array_key_first($tiers);
         }
 
@@ -394,15 +444,15 @@ final readonly class CostCalculationService
     }
 
     /**
-     * Map the app-level quality value onto OpenAI's low|medium|high tiers.
+     * Map the app-level quality value onto OpenAI's image-quality tiers.
      *
      * Mirrors the mapping in OpenAIProvider::generateImageWithGptImage1() so the
      * price we bill matches the quality actually requested from the provider:
-     * standard→medium, hd→high, low/medium/high pass through, and unknown
-     * values map to 'high' because the provider defaults them to 'high' before
-     * sending — billing anything cheaper would under-bill the actual request.
-     * Only 'auto' (OpenAI picks the tier, we can't know which) and null fall
-     * back to null so the caller applies the model's `default_quality`.
+     * standard→medium, hd→high, low/medium/high/xhigh/max pass through, and
+     * unknown values map to 'high' because the provider defaults them to 'high'
+     * before sending — billing anything cheaper would under-bill the actual
+     * request. Only 'auto' (OpenAI picks the tier, we can't know which) and
+     * null fall back to null so the caller applies the model's `default_quality`.
      */
     private function normaliseImageQuality(?string $quality): ?string
     {
@@ -413,7 +463,7 @@ final readonly class CostCalculationService
         return match (strtolower($quality)) {
             'standard' => 'medium',
             'hd' => 'high',
-            'low', 'medium', 'high' => strtolower($quality),
+            'low', 'medium', 'high', 'xhigh', 'max' => strtolower($quality),
             'auto' => null,
             default => 'high',
         };
@@ -454,11 +504,33 @@ final readonly class CostCalculationService
             : self::CACHE_READ_DISCOUNT_DEFAULT;
     }
 
-    /** @param string $provider canonical provider key (see ModelCatalog::normalizeProvider) */
-    private function getCacheWriteMultiplier(string $provider): float
+    /**
+     * Multiplier applied to the input rate for tokens WRITTEN to the cache.
+     *
+     * Whether a cache write is billed at all is a per-model property, not a
+     * per-provider one: OpenAI started charging 1.25x with the GPT-5.6 family
+     * (and GPT-6), while GPT-5.5 and earlier incur "no additional cache-write
+     * charge". So the catalog value wins, and the Anthropic-wide rate stays as
+     * the fallback for rows that don't author one.
+     *
+     * @param string $provider canonical provider key (see ModelCatalog::normalizeProvider)
+     */
+    private function getCacheWriteMultiplier(string $provider, Model $model): float
     {
+        $authored = $model->getJson()['cache_write_multiplier'] ?? null;
+        if (is_numeric($authored)) {
+            return (float) $authored;
+        }
+
         return 'anthropic' === $provider
             ? self::CACHE_WRITE_MULTIPLIER_ANTHROPIC
+            : 1.0;
+    }
+
+    private function getCacheWriteMultiplier1h(string $provider): float
+    {
+        return 'anthropic' === $provider
+            ? self::CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H
             : 1.0;
     }
 

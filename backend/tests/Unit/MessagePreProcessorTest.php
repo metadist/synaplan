@@ -330,7 +330,65 @@ class MessagePreProcessorTest extends TestCase
     }
 
     /**
-     * Issue #1191 — re-attaching an already-vectorized file (BFILETEXT
+     * Issue #1793 — a textless photo is stored as status=extracted with empty
+     * BFILETEXT. The preprocessor must not run Vision a second time.
+     */
+    public function testProcessFileEntityWithExtractedEmptyImageSkipsReExtraction(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_img_'.uniqid().'.png';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(88);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('png');
+            $file->method('getFileName')->willReturn('photo.png');
+            $file->method('getFileSize')->willReturn(2048);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getStatus')->willReturn('extracted');
+            $file->method('getUserId')->willReturn(7);
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setStatus')
+                ->with('processed');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            $this->fileProcessor
+                ->expects($this->never())
+                ->method('extractText');
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * Issue #1191 — re-attaching an already-vectorized file (BFILETEXT)
      * present) must NOT downgrade its status to 'processed'. The Qdrant
      * vectors are still valid, so flipping the DB status to 'processed' would
      * make the two stores inconsistent.
@@ -459,6 +517,16 @@ class MessagePreProcessorTest extends TestCase
         yield 'markdown' => ['md'];
         yield 'csv' => ['csv'];
         yield 'powerpoint legacy' => ['ppt'];
+        yield 'icalendar' => ['ics'];
+        yield 'opendocument text' => ['odt'];
+        yield 'opendocument spreadsheet' => ['ods'];
+        yield 'opendocument presentation' => ['odp'];
+        yield 'opendocument graphics' => ['odg'];
+        yield 'opendocument formula' => ['odf'];
+        yield 'rtf' => ['rtf'];
+        yield 'apple pages' => ['pages'];
+        yield 'apple numbers' => ['numbers'];
+        yield 'apple keynote' => ['key'];
     }
 
     #[DataProvider('supportedDocumentExtensionsProvider')]
@@ -635,6 +703,227 @@ class MessagePreProcessorTest extends TestCase
                     "[Visual description]\nA cat on a sofa.\n\n[Audio transcript]\nHello world.",
                     ['strategy' => 'video_transcript_vision'],
                 ]);
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * Issue #1908 — a missing STT backend must mark the File entity `error`,
+     * not `processed`. Downstream treats `processed` as "extraction finished".
+     */
+    public function testProcessFileEntityAudioWithoutSttMarksError(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_audio_'.uniqid().'.webm';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(77);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('webm');
+            $file->method('getFileName')->willReturn('recording.webm');
+            $file->method('getFileSize')->willReturn(31000);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getUserId')->willReturn(7);
+            $file->method('getStatus')->willReturn('uploaded');
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setStatus')
+                ->with('error');
+
+            $this->aiFacade
+                ->expects($this->once())
+                ->method('hasConfiguredSttProvider')
+                ->with(7)
+                ->willReturn(false);
+
+            $this->whisperService
+                ->expects($this->once())
+                ->method('isAvailable')
+                ->willReturn(false);
+
+            $this->whisperService->expects($this->never())->method('transcribe');
+            $this->aiFacade->expects($this->never())->method('transcribe');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getId')->willReturn(123);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            $this->logger
+                ->expects($this->atLeastOnce())
+                ->method('warning')
+                ->with($this->stringContains('Whisper not available'));
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * Issue #1908: PHP `!empty("\\n")` is true, so whitespace-only STT used
+     * to mark the file processed while routeFiles() later treated it as failed.
+     */
+    public function testWhitespaceOnlyTranscriptMarksAudioFileError(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_audio_'.uniqid().'.webm';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(78);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('webm');
+            $file->method('getFileName')->willReturn('recording.webm');
+            $file->method('getFileSize')->willReturn(31000);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getUserId')->willReturn(7);
+            $file->method('getStatus')->willReturn('uploaded');
+            $file->expects($this->never())->method('setFileText');
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setStatus')
+                ->with('error');
+
+            $this->whisperService
+                ->expects($this->once())
+                ->method('isAvailable')
+                ->willReturn(true);
+
+            $this->whisperService
+                ->expects($this->once())
+                ->method('transcribe')
+                ->willReturn(['text' => "  \n\t  ", 'language' => 'en']);
+
+            $this->rateLimitService
+                ->expects($this->never())
+                ->method('recordFileAnalysisOnce');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getId')->willReturn(124);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * Issue #1908: a configured STT that returns empty text must take the same
+     * error path as a missing backend, and must not record FILE_ANALYSIS usage.
+     */
+    public function testEmptyTranscriptFromConfiguredSttMarksAudioFileError(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_audio_'.uniqid().'.webm';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(79);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('webm');
+            $file->method('getFileName')->willReturn('recording.webm');
+            $file->method('getFileSize')->willReturn(31000);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getUserId')->willReturn(7);
+            $file->method('getStatus')->willReturn('uploaded');
+            $file->expects($this->never())->method('setFileText');
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setStatus')
+                ->with('error');
+
+            $this->aiFacade
+                ->expects($this->once())
+                ->method('hasConfiguredSttProvider')
+                ->with(7)
+                ->willReturn(true);
+
+            $this->aiFacade
+                ->expects($this->once())
+                ->method('transcribe')
+                ->willReturn(['text' => '', 'language' => 'en']);
+
+            $this->whisperService->expects($this->never())->method('transcribe');
+            $this->rateLimitService
+                ->expects($this->never())
+                ->method('recordFileAnalysisOnce');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getId')->willReturn(125);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            $this->logger
+                ->expects($this->atLeastOnce())
+                ->method('warning')
+                ->with($this->stringContains('produced empty text'));
 
             $service = new MessagePreProcessor(
                 $this->messageRepository,

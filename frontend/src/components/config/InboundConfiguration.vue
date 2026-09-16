@@ -1,15 +1,20 @@
 <template>
   <div class="space-y-6" data-testid="page-config-inbound">
-    <div class="mb-8" data-testid="section-header">
-      <h1 class="text-2xl font-semibold txt-primary mb-2">
-        {{ $t('channels.title') }}
-      </h1>
-      <p class="txt-secondary">
-        {{ $t('channels.description') }}
-      </p>
-    </div>
+    <PageHeader
+      :title="$t('channels.title')"
+      :subtitle="$t('channels.description')"
+      icon="heroicons:inbox-arrow-down"
+      data-testid="section-header"
+    />
 
-    <div class="surface-card p-6" data-testid="section-whatsapp">
+    <!-- WhatsApp is a feature module: an installation without it shows the shared notice instead -->
+    <FeatureNotConfiguredNotice
+      v-if="!whatsappAvailable"
+      module="whatsapp"
+      :docs="whatsappGate?.docs ?? 'modules/whatsapp'"
+    />
+
+    <div v-if="whatsappAvailable" class="surface-card p-6" data-testid="section-whatsapp">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <DevicePhoneMobileIcon class="w-5 h-5 text-green-500" />
         {{ $t('channels.whatsappChannels') }}
@@ -29,9 +34,19 @@
           </div>
         </div>
       </div>
+      <div class="mt-4">
+        <ChannelAssistantSelect
+          :model-value="whatsappAgentId"
+          :label="$t('channels.whatsappAssistant')"
+          @update:model-value="saveWhatsappAssistant"
+          :none-label="$t('channels.whatsappAssistantNone')"
+          :hint="$t('channels.whatsappAssistantHint')"
+          test-id="select-whatsapp-assistant"
+        />
+      </div>
     </div>
 
-    <PhoneVerification />
+    <PhoneVerification v-if="whatsappAvailable" />
 
     <div class="surface-card p-6" data-testid="section-email">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
@@ -138,8 +153,17 @@ import {
   CommandLineIcon,
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
+import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
+import FeatureNotConfiguredNotice from '@/components/common/FeatureNotConfiguredNotice.vue'
+import { isModuleConfigured } from '@/composables/useModuleFeature'
+import {
+  featureNotConfigured,
+  type FeatureNotConfigured,
+} from '@/services/api/featureNotConfigured'
+import { getWhatsAppAssistant, setWhatsAppAssistant } from '@/services/api/whatsappAssistantApi'
 import {
   mockWhatsAppChannels,
   mockAPIConfig,
@@ -172,6 +196,13 @@ const originalData = ref({
 })
 
 // Computed refs for template access
+// Hidden when the runtime config reports the module absent, or when a request
+// came back as the module gate's 404 (deep link with a stale runtime config).
+const whatsappGate = ref<FeatureNotConfigured | null>(null)
+const whatsappAvailable = computed(
+  () => isModuleConfigured('whatsapp') && whatsappGate.value === null
+)
+const whatsappAgentId = ref<number | null>(null)
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed<EmailChannel[]>(() => {
   const channels: EmailChannel[] = [
@@ -220,7 +251,28 @@ const loadEmailKeyword = async () => {
 onMounted(async () => {
   cleanupGuard = setupNavigationGuard()
   await loadEmailKeyword()
+  if (!whatsappAvailable.value) return
+  try {
+    whatsappAgentId.value = await getWhatsAppAssistant()
+  } catch (err: unknown) {
+    whatsappAgentId.value = null
+    whatsappGate.value = featureNotConfigured(err)
+  }
 })
+
+// Saved on user interaction only — a watcher would also fire for the value
+// loaded on mount and greet the user with a save toast they never triggered.
+async function saveWhatsappAssistant(id: number | null): Promise<void> {
+  const previous = whatsappAgentId.value
+  whatsappAgentId.value = id
+  try {
+    await setWhatsAppAssistant(id)
+    success(t('channels.whatsappAssistantSaved'))
+  } catch {
+    whatsappAgentId.value = previous
+    error(t('channels.whatsappAssistantFailed'))
+  }
+}
 
 onUnmounted(() => {
   cleanupGuard?.()

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import config from '@/stores/config'
+import { i18n } from '@/i18n'
 
 export interface Command {
   name: string
@@ -48,6 +49,16 @@ export const commandsData: Command[] = [
   },
 ]
 
+function helpCommand(): Command {
+  return {
+    name: 'help',
+    description: String(i18n.global.t('selfAware.helpCommand.description')),
+    usage: '/help',
+    requiresArgs: false,
+    icon: 'mdi:help-circle-outline',
+  }
+}
+
 /**
  * Slash-commands contributed by installed plugins via their manifest
  * `chatCommands`, exposed through the runtime config. This is the generic seam
@@ -83,7 +94,11 @@ export function pluginCommands(): Command[] {
 }
 
 export const useCommandsStore = defineStore('commands', () => {
-  const commands = computed<Command[]>(() => [...commandsData, ...pluginCommands()])
+  const commands = computed<Command[]>(() => [
+    ...commandsData,
+    ...(config.features.selfAware ? [helpCommand()] : []),
+    ...pluginCommands(),
+  ])
 
   const recentCommands = ref<string[]>(JSON.parse(localStorage.getItem('recentCommands') || '[]'))
 

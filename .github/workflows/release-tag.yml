@@ -3,8 +3,10 @@ name: Cut Release Tag
 # Cuts a release tag for `main` on request and prepares a DRAFT GitHub release
 # with generated notes. The tag alone only feeds the platform release jobs
 # (Docker images, version pins); the mobile release chain in
-# metadist/synaplan-apps starts when the draft release is PUBLISHED, which is
-# the deliberate "release" decision (`mobile-release-artifacts.yml`).
+# metadist/synaplan-apps starts when the draft release is PUBLISHED
+# (`mobile-release-artifacts.yml`). release-publish.yml raises that signal on
+# its own, the moment this tag's CI run goes green — see that workflow for why
+# publishing is automatic rather than a manual click.
 #
 # The mobile classification is computed here purely as information for the
 # summary — it no longer gates the tag, because the authoritative
@@ -15,6 +17,17 @@ name: Cut Release Tag
 # selects an earlier commit on that branch, for when the tip carries work that
 # should not ship yet.
 #
+# The version level comes from the `bump` input. "auto" (the default) reads the
+# commit types between the previous release and this one: any commit whose
+# subject STARTS with `feat` raises the minor version, everything else raises
+# the patch version. Only the start matters and the casing does not, so `feat:`,
+# `feat(chat):` and the `Feat/desktop client` shape a squash-merged PR title
+# takes all count — see scripts/next-release-tag.mjs and its tests for the
+# exact rules. A major version is never automatic; select `bump: major`
+# deliberately when a release should be one. A `BREAKING CHANGE:` footer or
+# `feat!:` marker is called out in the step summary instead of silently
+# becoming a major bump.
+#
 # The tag is created through a GitHub App installation token on purpose. Refs
 # created with the default GITHUB_TOKEN do not start new workflow runs, so the
 # tag would never reach CI and the platform release jobs would not run.
@@ -22,6 +35,16 @@ name: Cut Release Tag
 on:
   workflow_dispatch:
     inputs:
+      bump:
+        description: >-
+          Version level. "auto" reads the commits since the last release: any
+          commit starting with "feat" raises the minor version, everything else
+          the patch version. A major version is never automatic — select it
+          here.
+        required: false
+        default: auto
+        type: choice
+        options: [auto, patch, minor, major]
       commit:
         description: Commit on the default branch to release, or empty for its tip
         required: false
@@ -51,6 +74,7 @@ jobs:
       # workflow and the classifier therefore always run from the default
       # branch, and the selected commit stays data.
       HEAD_SHA: ${{ inputs.commit || github.sha }}
+      BUMP: ${{ inputs.bump || 'auto' }}
     steps:
       - name: Check tagging credentials
         id: config
@@ -170,7 +194,23 @@ jobs:
           echo "classification=$classification" >> "$GITHUB_OUTPUT"
           echo "previous=${previous_tag:-none}" >> "$GITHUB_OUTPUT"
           echo "needs_tag=true" >> "$GITHUB_OUTPUT"
-          echo "tag=$(node scripts/next-release-tag.mjs)" >> "$GITHUB_OUTPUT"
+
+          # The version level: "auto" reads the Conventional Commits between
+          # the previous release and this one; an explicit `bump` overrides it
+          # outright. Never resolves to "major" on its own — see
+          # next-release-tag.mjs.
+          node scripts/next-release-tag.mjs \
+            --bump "$BUMP" \
+            --base "$base_ref" \
+            --head "$HEAD_SHA" \
+            --json > release-plan.json
+          echo "tag=$(jq -r '.tag' release-plan.json)" >> "$GITHUB_OUTPUT"
+          echo "level=$(jq -r '.level' release-plan.json)" >> "$GITHUB_OUTPUT"
+          echo "requested=$(jq -r '.requested' release-plan.json)" >> "$GITHUB_OUTPUT"
+          # The full classification (features/breaking/unconventional commits)
+          # for the summary step below, carried through as one compact JSON
+          # line — a step output cannot hold a multi-line value.
+          echo "plan=$(jq -c '.' release-plan.json)" >> "$GITHUB_OUTPUT"
 
       - name: Report the plan
         if: steps.classify.outputs.needs_tag == 'true'
@@ -178,9 +218,45 @@ jobs:
           RELEASE_TAG: ${{ steps.classify.outputs.tag }}
           CLASSIFICATION: ${{ steps.classify.outputs.classification }}
           PREVIOUS: ${{ steps.classify.outputs.previous }}
+          LEVEL: ${{ steps.classify.outputs.level }}
+          REQUESTED: ${{ steps.classify.outputs.requested }}
+          PLAN: ${{ steps.classify.outputs.plan }}
         run: |
+          set -euo pipefail
           {
             echo "Release \`$RELEASE_TAG\` tags \`${HEAD_SHA}\` and collects everything since \`$PREVIOUS\`."
+            echo ""
+
+            feature_count="$(printf '%s' "$PLAN" | jq '.features | length')"
+            commit_count="$(printf '%s' "$PLAN" | jq '.commits')"
+            breaking_count="$(printf '%s' "$PLAN" | jq '.breaking | length')"
+            unconventional_count="$(printf '%s' "$PLAN" | jq '.unconventional | length')"
+
+            if [ "$REQUESTED" = auto ]; then
+              if [ "$LEVEL" = minor ]; then
+                echo "Version \`$RELEASE_TAG\` raises the minor version: ${feature_count} of ${commit_count} commits since \`$PREVIOUS\` start with \`feat\`."
+              else
+                echo "Version \`$RELEASE_TAG\` raises the patch version: none of the ${commit_count} commits since \`$PREVIOUS\` start with \`feat\`."
+              fi
+            else
+              echo "Version \`$RELEASE_TAG\` raises the ${LEVEL} version because \`bump: ${REQUESTED}\` was requested."
+            fi
+
+            # A breaking-change marker never raises the version on its own —
+            # see next-release-tag.mjs — so it is surfaced here instead, with
+            # the explicit next step to raise it deliberately.
+            if [ "$breaking_count" -gt 0 ] && [ "$LEVEL" != major ]; then
+              echo ""
+              echo "**Breaking-change marker(s) found, but the major version was not raised.** Re-run with \`bump: major\` if this release should be one:"
+              printf '%s' "$PLAN" | jq -r '.breaking[] | "- `" + . + "`"'
+            fi
+
+            if [ "$unconventional_count" -gt 0 ]; then
+              echo ""
+              echo "${unconventional_count} commit(s) do not start with a known commit type and could not be classified for \`bump: auto\`:"
+              printf '%s' "$PLAN" | jq -r '.unconventional[] | "- `" + . + "`"'
+            fi
+
             echo ""
             case "$CLASSIFICATION" in
               ota-candidate) route='ships over the air once the draft release is published' ;;
@@ -218,16 +294,18 @@ jobs:
           RELEASE_TAG: ${{ steps.classify.outputs.tag }}
         run: |
           set -euo pipefail
-          # Publishing this draft is the deliberate release decision: it starts
-          # mobile-release-artifacts.yml, which classifies everything since the
-          # previously published release and routes it (OTA, store, or nothing).
+          # Publishing this draft starts mobile-release-artifacts.yml, which
+          # classifies everything since the previously published release and
+          # routes it (OTA, store, or nothing). release-publish.yml does the
+          # publishing on its own once CI for this tag is green; nobody needs
+          # to click anything for the chain to continue.
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
             --verify-tag \
             --generate-notes \
             --title "Synaplan ${RELEASE_TAG}"
-          echo "Draft release \`${RELEASE_TAG}\` created — publish it to start the mobile release chain." |
+          echo "Draft release \`${RELEASE_TAG}\` created — release-publish.yml publishes it automatically once CI for this tag is green." |
             tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Report a dry run

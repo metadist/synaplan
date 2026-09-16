@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\File;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\FileRepository;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use PHPUnit\Framework\TestCase;
@@ -120,7 +121,7 @@ class DocumentImageReferenceResolverTest extends TestCase
     {
         return new DocumentImageReferenceResolver(
             $repository,
-            new DocumentImageCatalog($repository, $this->uploadDir),
+            new DocumentImageCatalog(new ConversationFileCatalog($repository, $this->uploadDir)),
             new NullLogger(),
         );
     }

@@ -74,6 +74,16 @@ const config = {
     get registrationEnabled(): boolean {
       return getConfigSync().auth?.registrationEnabled ?? true
     },
+    /**
+     * False when the operator disabled the anonymous guest trial
+     * (GUEST_CHAT_ENABLED=false, issue #1517): guest-allowed routes then
+     * require authentication like any other route. Defaults to true so
+     * unconfigured/older backends keep the trial. The backend refuses the
+     * guest endpoints regardless.
+     */
+    get guestChatEnabled(): boolean {
+      return getConfigSync().auth?.guestChatEnabled ?? true
+    },
   },
 
   /**
@@ -98,6 +108,12 @@ const config = {
       const features = getConfigSync().features
       return features?.help === true
     },
+    get selfAware(): boolean {
+      // Current backends send features.selfAware. Older ones omit it — treat
+      // a missing flag as off so the hint and /help stay hidden.
+      const features = getConfigSync().features as { selfAware?: boolean } | undefined
+      return features?.selfAware === true
+    },
     get memoryService(): boolean {
       // Return cached async check if available, otherwise fall back to config flag
       if (memoryServiceAvailable.value !== null) {
@@ -113,10 +129,19 @@ const config = {
 
   /**
    * Speech-to-text configuration
+   * webSpeechEnabled: the browser's Web Speech API may be offered (deployment flag)
    * whisperEnabled: true when local Whisper.cpp is available (record-then-transcribe)
    * speechToTextAvailable: true when ANY transcription is available (local OR API models)
    */
   speech: {
+    /**
+     * The browser's cloud-backed Web Speech API may be used for live
+     * speech-to-text (WEB_SPEECH_ENABLED, default true; air-gapped
+     * instances turn it off)
+     */
+    get webSpeechEnabled(): boolean {
+      return getConfigSync().speech?.webSpeechEnabled ?? true
+    },
     /** Local Whisper.cpp is available for record-then-transcribe mode */
     get whisperEnabled(): boolean {
       return getConfigSync().speech?.whisperEnabled ?? false
@@ -274,9 +299,10 @@ const config = {
 
   /**
    * First-run setup status (authenticated users only).
-   * chatReady is false when the provider serving the current user's effective
-   * default chat model (per-user override, then global default) has no usable
-   * key/connection — the chat shows a "connect an AI provider" banner and
+   * chatReady is false when no real AI provider can serve the current user's
+   * effective default chat model (per-user override, then global default) —
+   * a cloud key or a pulled local Ollama model. The built-in demo responder
+   * does not count. The chat then shows a full-page setup tombstone and
    * admins are pointed at /admin/setup.
    * Defaults to true so anonymous pages and the pre-config phase never flash
    * the banner.
@@ -284,6 +310,14 @@ const config = {
   setup: {
     get chatReady(): boolean {
       return getConfigSync().setup?.chatReady ?? true
+    },
+    /**
+     * Public first-run signal: the login page may show the seeded
+     * administrator. Always false in production, and false once that
+     * password has been changed.
+     */
+    get demoLoginHint(): boolean {
+      return getConfigSync().setup?.demoLoginHint === true
     },
   },
 

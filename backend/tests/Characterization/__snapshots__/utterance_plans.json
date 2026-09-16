@@ -1,0 +1,172 @@
+{
+    "u1_outlook_calendar_write": {
+        "plan": {
+            "language": "en",
+            "reply_node": "n2",
+            "tasks": [
+                {
+                    "capability": "calendar_event",
+                    "depends_on": [],
+                    "id": "n1",
+                    "params": {
+                        "channel": "outlook",
+                        "duration_minutes": 60,
+                        "start": "2026-08-19T10:00:00",
+                        "timezone": "Europe/Berlin",
+                        "title": "Marketing Strategy"
+                    }
+                },
+                {
+                    "capability": "compose_reply",
+                    "depends_on": [
+                        "n1"
+                    ],
+                    "id": "n2",
+                    "inputs": {
+                        "attachments": [
+                            "$n1.file"
+                        ]
+                    }
+                }
+            ],
+            "version": 1
+        },
+        "utterance": "Create a meeting reminder for tomorrow at 10am for 'Marketing Strategy' and put it into my Outlook"
+    },
+    "u2_mail_me_the_invite": {
+        "plan": {
+            "language": "en",
+            "reply_node": "n3",
+            "tasks": [
+                {
+                    "capability": "calendar_event",
+                    "depends_on": [],
+                    "id": "n1",
+                    "params": {
+                        "duration_minutes": 60,
+                        "start": "2026-08-19T10:00:00",
+                        "timezone": "Europe/Berlin",
+                        "title": "Marketing Strategy"
+                    }
+                },
+                {
+                    "capability": "email_me",
+                    "depends_on": [
+                        "n1"
+                    ],
+                    "id": "n2",
+                    "inputs": {
+                        "attachments": [
+                            "$n1.file"
+                        ]
+                    }
+                },
+                {
+                    "capability": "compose_reply",
+                    "depends_on": [
+                        "n1",
+                        "n2"
+                    ],
+                    "id": "n3",
+                    "inputs": {
+                        "attachments": [
+                            "$n1.file"
+                        ],
+                        "text": "$n2.text"
+                    }
+                }
+            ],
+            "version": 1
+        },
+        "utterance": "Create a meeting reminder for tomorrow at 10am for 'Marketing Strategy' and mail the calendar entry to me"
+    },
+    "u3_mail_search_summarize": {
+        "plan": {
+            "language": "en",
+            "reply_node": "n3",
+            "tasks": [
+                {
+                    "capability": "email_search",
+                    "depends_on": [],
+                    "id": "n1",
+                    "params": {
+                        "from": "Oliver Braun",
+                        "query": "FPSenergy"
+                    }
+                },
+                {
+                    "capability": "chat",
+                    "depends_on": [
+                        "n1"
+                    ],
+                    "id": "n2",
+                    "inputs": {
+                        "text": "$n1.text"
+                    },
+                    "params": {
+                        "instruction": "Summarize the newest matching email."
+                    }
+                },
+                {
+                    "capability": "compose_reply",
+                    "depends_on": [
+                        "n2"
+                    ],
+                    "id": "n3",
+                    "inputs": {
+                        "text": "$n2.text"
+                    }
+                }
+            ],
+            "version": 1
+        },
+        "utterance": "What is the latest mail of Oliver Braun regarding FPSenergy, summarize that for me"
+    },
+    "u4_document_to_target": {
+        "plan": {
+            "language": "en",
+            "reply_node": "n3",
+            "tasks": [
+                {
+                    "capability": "document_generation",
+                    "depends_on": [],
+                    "id": "n1",
+                    "params": {
+                        "format": "docx",
+                        "topic": "Marketing plan with table of contents"
+                    }
+                },
+                {
+                    "capability": "save_to_folder",
+                    "depends_on": [
+                        "n1"
+                    ],
+                    "id": "n2",
+                    "inputs": {
+                        "attachments": [
+                            "$n1.file"
+                        ]
+                    },
+                    "params": {
+                        "channel": "nextcloud"
+                    }
+                },
+                {
+                    "capability": "compose_reply",
+                    "depends_on": [
+                        "n1",
+                        "n2"
+                    ],
+                    "id": "n3",
+                    "inputs": {
+                        "attachments": [
+                            "$n1.file"
+                        ]
+                    }
+                }
+            ],
+            "version": 1
+        },
+        "utterance": "Create a marketing plan document with a solid TOC for my company and put it into: Nextcloud"
+    }
+}

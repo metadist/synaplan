@@ -1,17 +1,25 @@
 <template>
   <div class="flex h-dvh overflow-hidden" data-testid="comp-main-layout">
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[300] focus:px-3 focus:py-2 focus:rounded-lg btn-primary"
+      data-testid="link-skip-to-content"
+    >
+      {{ $t('common.skipToContent') }}
+    </a>
     <SidebarV2 />
 
     <!--
-      Mobile push-drawer shell (§4.3): on small screens the content column
-      slides to the right (~85%, leaving a 15% peek) to reveal the drawer
-      underneath. On md+ this is just a plain flex column and the drawer /
-      toggle are hidden — the desktop rail (SidebarV2) stays the navigation.
+      Mobile push-drawer shell (§4.3): on phone chrome (narrow or short /
+      landscape-phone viewports) the content column slides to the right
+      (~85%, leaving a 15% peek) to reveal the drawer underneath. On desktop
+      chrome this is just a plain flex column and the drawer / toggle are
+      hidden — the desktop rail (SidebarV2) stays the navigation.
     -->
     <div class="v2-mobile-shell flex-1 flex min-w-0">
-      <!-- Drawer: sits underneath the sliding content, mobile only -->
+      <!-- Drawer: sits underneath the sliding content, phone chrome only -->
       <aside
-        class="v2-mobile-drawer md:hidden"
+        class="v2-mobile-drawer v2-phone-chrome"
         :aria-hidden="!sidebarStore.mobileDrawerOpen"
         :inert="!sidebarStore.mobileDrawerOpen"
         data-testid="nav-mobile-drawer"
@@ -39,7 +47,10 @@
         <div class="v2-status-bar-band" aria-hidden="true" data-testid="section-status-bar-band" />
 
         <main
+          id="main-content"
+          ref="mainRef"
           class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+          tabindex="-1"
           data-testid="section-primary-content"
         >
           <slot />
@@ -48,7 +59,7 @@
         <!-- Tap-catcher over the peeking content closes the drawer (mobile only) -->
         <button
           v-if="sidebarStore.mobileDrawerOpen"
-          class="v2-drawer-scrim md:hidden"
+          class="v2-drawer-scrim v2-phone-chrome"
           :aria-label="$t('common.close')"
           data-testid="btn-mobile-drawer-scrim"
           @click="closeDrawer"
@@ -58,7 +69,7 @@
 
     <!-- Mobile drawer toggle (top-left) — primary navigation entry on phones -->
     <button
-      class="v2-drawer-toggle fixed left-3 z-40 md:hidden flex items-center justify-center w-10 h-10 rounded-full surface-card shadow-lg txt-primary active:scale-95 transition-transform"
+      class="v2-drawer-toggle v2-phone-chrome fixed left-3 z-40 flex items-center justify-center w-10 h-10 rounded-full surface-card shadow-lg txt-primary active:scale-95 transition-transform"
       :aria-label="sidebarStore.mobileDrawerOpen ? $t('common.close') : $t('nav.menu')"
       :aria-expanded="sidebarStore.mobileDrawerOpen"
       data-testid="btn-mobile-drawer-toggle"
@@ -72,7 +83,7 @@
          left. Only for signed-out users; hidden while the drawer is open. -->
     <button
       v-if="showLoginButton"
-      class="v2-login-cta fixed right-3 z-40 md:hidden inline-flex items-center gap-1.5 h-10 px-4 rounded-full btn-primary shadow-lg text-sm font-semibold active:scale-95 transition-transform"
+      class="v2-login-cta v2-phone-chrome fixed right-3 z-40 inline-flex items-center gap-1.5 h-10 px-4 rounded-full btn-primary shadow-lg text-sm font-semibold active:scale-95 transition-transform"
       data-testid="btn-mobile-login-cta"
       @click="goToLogin"
     >
@@ -80,11 +91,16 @@
       <span>{{ $t('auth.signIn') }}</span>
     </button>
 
-    <!-- Incognito toggle (top-right, mobile) — mirrors the drawer toggle on
-         the left. Signed-in users on the chat route only (guests have the
-         login CTA in that spot and no incognito). Desktop gets its own
-         floating instance inside ChatView. -->
-    <div v-if="showIncognitoToggle" class="v2-incognito-toggle fixed right-3 z-40 md:hidden">
+    <!-- Incognito toggle + collapsed speed config (top-right, mobile) —
+         mirrors the drawer toggle on the left. Signed-in users on the chat
+         route only (guests have the login CTA in that spot and no incognito).
+         Desktop gets its own floating instances inside ChatView. The mix
+         button hides itself while ChatView shows the expanded mix card. -->
+    <div
+      v-if="showIncognitoToggle"
+      class="v2-incognito-toggle v2-phone-chrome fixed right-3 z-40 flex items-center gap-2"
+    >
+      <ModelMixControl />
       <IncognitoToggle />
     </div>
 
@@ -97,22 +113,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
+import { matchesPhoneChrome } from '../composables/usePhoneChrome'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
+import { useConfigStore } from '../stores/config'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
 import HelpHost from './help/HelpHost.vue'
 import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
 import IncognitoToggle from './IncognitoToggle.vue'
+import ModelMixControl from './chat/ModelMixControl.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 
 // Signed-out users get a prominent login shortcut in the top bar. Hidden while
 // the drawer is open so it never overlaps the sliding content / close button.
@@ -120,13 +140,44 @@ const showLoginButton = computed(() => !authStore.isAuthenticated && !sidebarSto
 
 // Incognito toggle (mobile, top-right): signed-in users on the chat route only.
 const showIncognitoToggle = computed(
-  () => authStore.isAuthenticated && route.name === 'chat' && !sidebarStore.mobileDrawerOpen
+  () =>
+    authStore.isAuthenticated &&
+    route.name === 'chat' &&
+    !sidebarStore.mobileDrawerOpen &&
+    configStore.setup.chatReady !== false
 )
 
 const goToLogin = () => {
   fireHaptic()
   router.push('/login')
 }
+
+/**
+ * Page-enter animation: a quick, subtle zoom-in of the content area on every
+ * navigation. Runs via the Web Animations API instead of a <Transition> so it
+ * covers BOTH navigation kinds uniformly: full view swaps (this layout
+ * remounts → onMounted) and sub-page switches inside a reused view like
+ * ConfigView (route change without remount → the fullPath watcher). Only
+ * compositor-friendly properties (transform/opacity) are animated, and the
+ * animation leaves no fill, so `position: fixed` descendants regain the
+ * viewport as containing block the moment it finishes.
+ */
+const mainRef = ref<HTMLElement | null>(null)
+const PAGE_ENTER_KEYFRAMES: Keyframe[] = [
+  { opacity: 0.35, transform: 'scale(0.985)' },
+  { opacity: 1, transform: 'scale(1)' },
+]
+const PAGE_ENTER_TIMING: KeyframeAnimationOptions = {
+  duration: 180,
+  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+}
+
+const playPageEnter = () => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  mainRef.value?.animate(PAGE_ENTER_KEYFRAMES, PAGE_ENTER_TIMING)
+}
+
+watch(() => route.fullPath, playPageEnter)
 
 /** Minimum horizontal travel (px) that counts as a swipe. */
 const SWIPE_THRESHOLD_PX = 60
@@ -135,7 +186,7 @@ let touchStartX = 0
 let touchStartY = 0
 let touchTracking = false
 
-const isMobileViewport = () => window.matchMedia('(max-width: 767px)').matches
+const isMobileViewport = () => matchesPhoneChrome()
 
 /**
  * Walk up from the touch target: if any ancestor can actually scroll
@@ -230,6 +281,14 @@ const removeNavGuard = router.beforeEach((_to, _from, next) => {
 
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && sidebarStore.mobileDrawerOpen) {
+    sidebarStore.closeMobileDrawer()
+  }
+}
+
+/** Rotating a phone to a desktop-sized window must not leave the drawer open
+ *  under a rail that is now the only navigation. */
+const closeDrawerOnDesktopChrome = () => {
+  if (!isMobileViewport() && sidebarStore.mobileDrawerOpen) {
     sidebarStore.closeMobileDrawer()
   }
 }
@@ -335,6 +394,7 @@ const onKeyboardDismissPointerCancel = () => {
 }
 
 onMounted(() => {
+  playPageEnter()
   measureTopTapBand()
   document.addEventListener('keydown', handleEscape)
   document.addEventListener('pointerdown', onKeyboardDismissPointerDown)
@@ -342,6 +402,7 @@ onMounted(() => {
   document.addEventListener('pointercancel', onKeyboardDismissPointerCancel)
   document.addEventListener('pointerdown', scrollToTopOnBandTap)
   window.addEventListener('resize', measureTopTapBand)
+  window.addEventListener('resize', closeDrawerOnDesktopChrome)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEscape)
@@ -350,6 +411,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointercancel', onKeyboardDismissPointerCancel)
   document.removeEventListener('pointerdown', scrollToTopOnBandTap)
   window.removeEventListener('resize', measureTopTapBand)
+  window.removeEventListener('resize', closeDrawerOnDesktopChrome)
   removeNavGuard()
 })
 </script>
@@ -387,9 +449,10 @@ onBeforeUnmount(() => {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Mobile-only push-drawer mechanics. On md+ everything below is inert: the
+/* Phone-chrome push-drawer mechanics. Keep in lockstep with PHONE_CHROME_MQ
+   in usePhoneChrome.ts. On desktop chrome everything below is inert: the
    drawer is display:none and the content layer carries no transform. */
-@media (max-width: 767px) {
+@media (max-width: 767px), (max-height: 519px) {
   .v2-mobile-drawer {
     position: absolute;
     inset: 0 auto 0 0;

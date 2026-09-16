@@ -8,9 +8,18 @@ use App\Service\File\FileHelper;
 use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final readonly class UrlContentResult
 {
+    /**
+     * @param string|null $finalUrl      URL the content was actually read from after
+     *                                   redirects / shortlink interstitials (reading mode only)
+     * @param string|null $blockedReason machine-readable reason when a page could not be
+     *                                   read for the user (`login_wall`, `bot_blocked`,
+     *                                   `unsupported_content`, …); null on success or for
+     *                                   plain transport errors
+     */
     public function __construct(
         public string $url,
         public string $extractedText,
@@ -18,7 +27,17 @@ final readonly class UrlContentResult
         public string $hostname,
         public bool $success,
         public ?string $error = null,
+        public ?string $finalUrl = null,
+        public ?string $blockedReason = null,
     ) {
+    }
+
+    /** Host of the final URL when known, else of the requested one. */
+    public function finalHostname(): string
+    {
+        $host = parse_url($this->finalUrl ?? $this->url, PHP_URL_HOST);
+
+        return is_string($host) && '' !== $host ? $host : $this->hostname;
     }
 }
 
@@ -34,6 +53,37 @@ final readonly class UrlContentService
     private const USER_AGENT = 'SynaplanBot/1.0 (+https://synaplan.com/bot)';
     private const ROBOTS_TXT_TIMEOUT = 3;
 
+    /** Reading mode (user-initiated, like a link preview): per-request timeout. */
+    private const READ_TIMEOUT_SECONDS = 12;
+
+    /** Reading mode: default text cap; callers pass their own budget. */
+    public const DEFAULT_READ_TEXT_LENGTH = 24000;
+
+    /** Reading mode: redirect hops followed manually (each hop is SSRF-checked). */
+    private const MAX_READ_REDIRECTS = 5;
+
+    /** Reading mode: how many URLs one call may read. */
+    public const MAX_READ_URLS = 6;
+
+    /**
+     * Reading-mode User-Agent. Honest about being a bot (contact URL kept) but
+     * shaped like a browser so CDN bot-filters that reject bare tokens let
+     * a user's own link through.
+     */
+    private const READER_USER_AGENT = 'Mozilla/5.0 (compatible; SynaplanBot/1.0; +https://synaplan.com/bot)';
+
+    /** Hosts known to serve a "you are leaving" interstitial instead of a 3xx. */
+    private const SHORTLINK_INTERSTITIAL_HOSTS = ['lnkd.in', 'l.facebook.com', 'lm.facebook.com', 'l.instagram.com', 'out.reddit.com', 'exit.sc', 'href.li', 'slack-redir.net'];
+
+    /** Response bodies that mean "log in first" even when the status is 200. */
+    private const LOGIN_WALL_MARKERS = ['authwall', 'sign in to linkedin', 'join linkedin', 'log in to facebook', 'log in or sign up to view', 'please log in to continue', 'sign in to continue', 'login_required'];
+    /**
+     * A targeted landmark (`<main>`, `class="entry-content"`, …) that yields
+     * less than this is treated as a failed extract and we fall back to the
+     * full body — page builders often put "content" in column class names.
+     */
+    private const MIN_USEFUL_TEXT_CHARS = 80;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private SsrfGuard $ssrfGuard,
@@ -42,22 +92,130 @@ final readonly class UrlContentService
     }
 
     /**
-     * Extract URLs from a message text.
+     * Extract http(s) URLs from a message or planner input.
+     *
+     * Handles the shapes a Saved Task / prompt editor actually stores:
+     * bare URLs, markdown links `[label](url)`, GFM autolinks `<url>`,
+     * HTML `href="url"`, and emphasis wrappers (`**url**`) from the
+     * prompt markdown toolbar. Decode HTML entities first so a
+     * formatter round-trip cannot hide `https://`.
      *
      * @return string[]
      */
     public function extractUrls(string $message): array
     {
-        preg_match_all(
-            '/https?:\/\/[^\s<>"{}|\\\\^`\[\]]+/i',
-            $message,
-            $matches
-        );
+        $decoded = html_entity_decode($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        $urls = array_unique($matches[0]);
+        $candidates = [];
+        foreach ($this->extractMarkdownLinkUrls($decoded) as $url) {
+            $candidates[] = $url;
+        }
+        foreach ($this->extractHrefUrls($decoded) as $url) {
+            $candidates[] = $url;
+        }
+        if (preg_match_all('/https?:\/\/[^\s<>"{}|\\\\^`\[\]]+/i', $decoded, $matches)) {
+            foreach ($matches[0] as $url) {
+                $candidates[] = $url;
+            }
+        }
 
-        // Clean trailing punctuation that's likely not part of the URL
-        return array_values(array_map(static fn (string $url): string => rtrim($url, '.,;:!?)'), $urls));
+        $urls = [];
+        foreach ($candidates as $raw) {
+            $normalized = $this->normalizeExtractedUrl($raw);
+            if (null !== $normalized) {
+                $urls[$normalized] = $normalized;
+            }
+        }
+
+        return array_values($urls);
+    }
+
+    /**
+     * Markdown `[label](url)` / `![alt](url)` and GFM `<https://…>` autolinks.
+     * Nested parentheses in the destination (Wikipedia `Foo_(bar)`) are kept.
+     *
+     * @return list<string>
+     */
+    private function extractMarkdownLinkUrls(string $message): array
+    {
+        $urls = [];
+        $length = \strlen($message);
+        $offset = 0;
+        while ($offset < $length) {
+            $pos = stripos($message, '](http', $offset);
+            if (false === $pos) {
+                break;
+            }
+            $start = $pos + 2;
+            $depth = 0;
+            $end = $start;
+            while ($end < $length) {
+                $ch = $message[$end];
+                if ('(' === $ch) {
+                    ++$depth;
+                } elseif (')' === $ch) {
+                    if (0 === $depth) {
+                        break;
+                    }
+                    --$depth;
+                } elseif (ctype_space($ch)) {
+                    break;
+                }
+                ++$end;
+            }
+            $urls[] = substr($message, $start, $end - $start);
+            $offset = $end + 1;
+        }
+
+        if (preg_match_all('/<(https?:\/\/[^>\s]+)>/i', $message, $auto)) {
+            foreach ($auto[1] as $url) {
+                $urls[] = $url;
+            }
+        }
+
+        return $urls;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extractHrefUrls(string $message): array
+    {
+        if (!preg_match_all('/\bhref\s*=\s*["\'](https?:\/\/[^"\']+)["\']/i', $message, $matches)) {
+            return [];
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * Strip trailing sentence punctuation and markdown emphasis without
+     * eating a balanced closing `)` that is part of the path.
+     */
+    private function normalizeExtractedUrl(string $url): ?string
+    {
+        $url = trim($url);
+        $url = rtrim($url, '.,;:!?');
+        $url = rtrim($url, '*_~`');
+
+        while (str_ends_with($url, ')')) {
+            $open = substr_count($url, '(');
+            $close = substr_count($url, ')');
+            if ($close <= $open) {
+                break;
+            }
+            $url = substr($url, 0, -1);
+        }
+
+        $parts = parse_url($url);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return null;
+        }
+        if (!\in_array(strtolower((string) $parts['scheme']), ['http', 'https'], true)) {
+            return null;
+        }
+
+        return $url;
     }
 
     /**
@@ -160,6 +318,362 @@ final readonly class UrlContentService
         }
 
         return $results;
+    }
+
+    /**
+     * Read a page ON BEHALF OF THE USER — the mode for links a user pasted
+     * into the chat or that a web search returned for their question.
+     *
+     * Differences from {@see fetch()} / {@see fetchForCrawling()}:
+     *  - redirects are followed hop by hop, and EVERY hop is SSRF-checked
+     *    (the HTTP client's own redirect following would let a public
+     *    shortlink bounce us to 169.254.169.254);
+     *  - shortlink interstitials without a 3xx (lnkd.in, l.facebook.com, …)
+     *    and `<meta http-equiv="refresh">` pages are resolved to their
+     *    target, so the user's LinkedIn share link yields the article, not
+     *    "This link will take you to a page that's not on LinkedIn";
+     *  - robots.txt / noindex are NOT consulted: this is a one-off read the
+     *    user asked for, like their browser's link preview — not indexing;
+     *  - login walls and bot blocks are reported as `blockedReason` so the
+     *    answering model can say "this page needs a login" instead of
+     *    guessing the content;
+     *  - the text cap is the caller's budget (default 24 000 chars), large
+     *    enough for a full article to be condensed downstream.
+     */
+    public function fetchForReading(string $url, int $maxChars = self::DEFAULT_READ_TEXT_LENGTH, ?ResponseInterface $firstHop = null): UrlContentResult
+    {
+        $hostname = $this->getHostname($url);
+        $current = $url;
+        $visited = [];
+
+        for ($hop = 0; $hop <= self::MAX_READ_REDIRECTS; ++$hop) {
+            if ($this->isBlockedUrl($current)) {
+                return $this->readFailure($url, $hostname, $current, 'URL points to a private/blocked address', 'blocked_address');
+            }
+            if (isset($visited[$current])) {
+                return $this->readFailure($url, $hostname, $current, 'Redirect loop', 'redirect_loop');
+            }
+            $visited[$current] = true;
+
+            try {
+                // A caller that reads several pages starts every first hop up
+                // front (see startReading()) so the transfers overlap instead
+                // of queueing behind each other's timeout.
+                $response = 0 === $hop && null !== $firstHop
+                    ? $firstHop
+                    : $this->startReadingRequest($current);
+
+                $statusCode = $response->getStatusCode();
+                $headers = $response->getHeaders(false);
+
+                if ($statusCode >= 300 && $statusCode < 400) {
+                    $location = $headers['location'][0] ?? null;
+                    if (null === $location || '' === $location) {
+                        return $this->readFailure($url, $hostname, $current, sprintf('HTTP %d without Location', $statusCode), 'bad_redirect');
+                    }
+                    $current = $this->resolveRelativeUrl($current, $location);
+                    continue;
+                }
+
+                if (999 === $statusCode || 401 === $statusCode || 403 === $statusCode || 429 === $statusCode) {
+                    $reason = 999 === $statusCode || 403 === $statusCode || 429 === $statusCode ? 'bot_blocked' : 'login_wall';
+
+                    return $this->readFailure($url, $hostname, $current, sprintf('HTTP %d', $statusCode), $reason);
+                }
+
+                if ($statusCode >= 400) {
+                    return $this->readFailure($url, $hostname, $current, sprintf('HTTP %d', $statusCode), null);
+                }
+
+                $contentType = strtolower($headers['content-type'][0] ?? '');
+                $content = $response->getContent(false);
+                if (strlen($content) > self::MAX_RESPONSE_SIZE) {
+                    $content = substr($content, 0, self::MAX_RESPONSE_SIZE);
+                }
+
+                if (str_contains($contentType, 'application/json') || str_starts_with($contentType, 'text/plain')) {
+                    return $this->readSuccess($url, $hostname, $current, $this->getHostname($current), $this->capText(trim($content), $maxChars));
+                }
+
+                if ('' !== $contentType && !str_contains($contentType, 'html') && !str_contains($contentType, 'xml')) {
+                    return $this->readFailure($url, $hostname, $current, sprintf('Unsupported content type %s', $contentType), 'unsupported_content');
+                }
+
+                // Interstitial / meta-refresh → one more hop to the real target.
+                $target = $this->resolveInterstitialTarget($current, $content);
+                if (null !== $target && $target !== $current && $hop < self::MAX_READ_REDIRECTS) {
+                    $this->logger->info('URL reading: following interstitial', [
+                        'from' => FileHelper::redactUrlForLogging($current),
+                        'to' => FileHelper::redactUrlForLogging($target),
+                    ]);
+                    $current = $target;
+                    continue;
+                }
+
+                $title = $this->extractTitle($content);
+                $metaDescription = $this->extractMetaDescription($content);
+                $bodyText = $this->extractTextForCrawl($content);
+
+                if ($this->looksLikeLoginWall($current, $content, $bodyText)) {
+                    $preview = '' !== $metaDescription ? $metaDescription : mb_substr($bodyText, 0, 300);
+
+                    return new UrlContentResult(
+                        url: $url,
+                        extractedText: $preview,
+                        title: $title,
+                        hostname: $hostname,
+                        success: false,
+                        error: 'Page requires a login',
+                        finalUrl: $current,
+                        blockedReason: 'login_wall',
+                    );
+                }
+
+                $parts = [];
+                if ('' !== $metaDescription && !str_contains($bodyText, $metaDescription)) {
+                    $parts[] = $metaDescription;
+                }
+                if ('' !== $bodyText) {
+                    $parts[] = $bodyText;
+                }
+                $text = $this->capText(implode("\n\n", $parts), $maxChars);
+
+                if ('' === trim($text)) {
+                    return $this->readFailure($url, $hostname, $current, 'Page has no readable text (client-rendered or empty)', 'no_text');
+                }
+
+                $this->logger->info('URL content read successfully', [
+                    'url' => FileHelper::redactUrlForLogging($url),
+                    'final_url' => FileHelper::redactUrlForLogging($current),
+                    'hops' => $hop,
+                    'text_length' => strlen($text),
+                ]);
+
+                return $this->readSuccess($url, $hostname, $current, $title, $text);
+            } catch (\Throwable $e) {
+                $this->logger->warning('Failed to read URL content', [
+                    'url' => FileHelper::redactUrlForLogging($current),
+                    'error' => $e->getMessage(),
+                ]);
+
+                return $this->readFailure($url, $hostname, $current, $e->getMessage(), null);
+            }
+        }
+
+        return $this->readFailure($url, $hostname, $current, 'Too many redirects', 'redirect_loop');
+    }
+
+    /**
+     * Start the first hop of a page read without consuming it.
+     *
+     * Symfony's HTTP client runs every started request concurrently in the
+     * background; reading three result pages sequentially therefore costs the
+     * slowest page, not the sum. Pass the response to {@see fetchForReading()}.
+     * Blocked addresses are not started — fetchForReading() rejects them first.
+     */
+    public function startReading(string $url): ?ResponseInterface
+    {
+        if ($this->isBlockedUrl($url)) {
+            return null;
+        }
+
+        try {
+            return $this->startReadingRequest($url);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to start URL read', [
+                'url' => FileHelper::redactUrlForLogging($url),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function startReadingRequest(string $url): ResponseInterface
+    {
+        return $this->httpClient->request('GET', $url, [
+            'timeout' => self::READ_TIMEOUT_SECONDS,
+            'max_redirects' => 0,
+            'headers' => [
+                'User-Agent' => self::READER_USER_AGENT,
+                'Accept' => 'text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.5',
+                'Accept-Language' => 'en,de;q=0.8,*;q=0.5',
+            ],
+        ]);
+    }
+
+    /**
+     * Read several pages for the user; order of results follows `$urls`.
+     *
+     * @param string[] $urls
+     *
+     * @return UrlContentResult[]
+     */
+    public function fetchManyForReading(array $urls, int $maxCharsPerPage = self::DEFAULT_READ_TEXT_LENGTH, int $limit = self::MAX_READ_URLS): array
+    {
+        $unique = array_values(array_unique(array_filter($urls, static fn (string $u): bool => '' !== trim($u))));
+        $results = [];
+        foreach (array_slice($unique, 0, max(1, $limit)) as $url) {
+            $results[] = $this->fetchForReading($url, $maxCharsPerPage);
+        }
+
+        return $results;
+    }
+
+    /**
+     * Target of a shortlink interstitial or `<meta http-equiv="refresh">`, or
+     * null when the page is a regular document.
+     */
+    private function resolveInterstitialTarget(string $currentUrl, string $html): ?string
+    {
+        if (preg_match('/<meta[^>]+http-equiv=["\']refresh["\'][^>]+content=["\']\s*\d+\s*;\s*url\s*=\s*([^"\'>\s]+)/i', $html, $m)) {
+            return $this->sanitizeTarget($currentUrl, html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
+
+        $host = strtolower($this->getHostname($currentUrl));
+        $isKnownInterstitial = in_array($host, self::SHORTLINK_INTERSTITIAL_HOSTS, true)
+            || (str_starts_with($host, 'www.') && in_array(substr($host, 4), self::SHORTLINK_INTERSTITIAL_HOSTS, true));
+        if (!$isKnownInterstitial) {
+            return null;
+        }
+
+        // LinkedIn puts the destination in the redirect-notice anchor; other
+        // interstitials use a `u=` / `url=` / `target=` query parameter.
+        $query = parse_url($currentUrl, PHP_URL_QUERY);
+        if (is_string($query) && '' !== $query) {
+            parse_str($query, $params);
+            foreach (['url', 'u', 'target', 'dest', 'to', 'q'] as $key) {
+                if (isset($params[$key]) && is_string($params[$key]) && str_starts_with($params[$key], 'http')) {
+                    return $this->sanitizeTarget($currentUrl, $params[$key]);
+                }
+            }
+        }
+
+        if (preg_match_all('/href=["\'](https?:\/\/[^"\']+)["\']/i', $html, $links)) {
+            $registrable = $this->registrableDomain($host);
+            foreach ($links[1] as $candidate) {
+                $decoded = html_entity_decode($candidate, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $candidateHost = strtolower($this->getHostname($decoded));
+                if ('' === $candidateHost || $this->registrableDomain($candidateHost) === $registrable) {
+                    continue;
+                }
+                if (in_array($this->registrableDomain($candidateHost), ['linkedin.com', 'licdn.com', 'facebook.com', 'fbcdn.net', 'instagram.com', 'reddit.com', 'redditstatic.com', 'slack.com'], true)) {
+                    continue;
+                }
+
+                return $this->sanitizeTarget($currentUrl, $decoded);
+            }
+        }
+
+        return null;
+    }
+
+    private function sanitizeTarget(string $base, string $target): ?string
+    {
+        $target = trim($target);
+        if ('' === $target) {
+            return null;
+        }
+        $absolute = $this->resolveRelativeUrl($base, $target);
+        $scheme = strtolower((string) parse_url($absolute, PHP_URL_SCHEME));
+
+        return in_array($scheme, ['http', 'https'], true) ? $absolute : null;
+    }
+
+    private function resolveRelativeUrl(string $base, string $location): string
+    {
+        if (preg_match('#^https?://#i', $location)) {
+            return $location;
+        }
+
+        $parsed = parse_url($base);
+        $scheme = $parsed['scheme'] ?? 'https';
+        $host = $parsed['host'] ?? '';
+        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+        $origin = $scheme.'://'.$host.$port;
+
+        if (str_starts_with($location, '//')) {
+            return $scheme.':'.$location;
+        }
+        if (str_starts_with($location, '/')) {
+            return $origin.$location;
+        }
+
+        $path = $parsed['path'] ?? '/';
+        $dir = substr($path, 0, (int) strrpos($path, '/') + 1);
+
+        return $origin.$dir.$location;
+    }
+
+    private function registrableDomain(string $host): string
+    {
+        $parts = explode('.', strtolower($host));
+        $count = count($parts);
+        if ($count <= 2) {
+            return strtolower($host);
+        }
+
+        // Two-level public suffixes (co.uk, com.au, …): keep three labels.
+        $secondLevel = $parts[$count - 2];
+        if (in_array($secondLevel, ['co', 'com', 'org', 'net', 'gov', 'edu', 'ac'], true) && 2 === strlen($parts[$count - 1])) {
+            return implode('.', array_slice($parts, -3));
+        }
+
+        return implode('.', array_slice($parts, -2));
+    }
+
+    private function looksLikeLoginWall(string $url, string $html, string $bodyText): bool
+    {
+        if (str_contains(strtolower($url), '/authwall') || str_contains(strtolower($url), '/login')) {
+            return true;
+        }
+
+        $haystack = strtolower(mb_substr($bodyText, 0, 2000)."\n".mb_substr($html, 0, 4000));
+        foreach (self::LOGIN_WALL_MARKERS as $marker) {
+            if (str_contains($haystack, $marker)) {
+                // Real articles mention "sign in" in their chrome too — only
+                // call it a wall when there is hardly any body text.
+                return mb_strlen($bodyText) < 1200;
+            }
+        }
+
+        return false;
+    }
+
+    private function capText(string $text, int $maxChars): string
+    {
+        $maxChars = max(200, $maxChars);
+        if (mb_strlen($text) <= $maxChars) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, $maxChars).'...';
+    }
+
+    private function readSuccess(string $url, string $hostname, string $finalUrl, string $title, string $text): UrlContentResult
+    {
+        return new UrlContentResult(
+            url: $url,
+            extractedText: $text,
+            title: $title,
+            hostname: $hostname,
+            success: true,
+            finalUrl: $finalUrl,
+        );
+    }
+
+    private function readFailure(string $url, string $hostname, string $finalUrl, string $error, ?string $blockedReason): UrlContentResult
+    {
+        return new UrlContentResult(
+            url: $url,
+            extractedText: '',
+            title: '',
+            hostname: $hostname,
+            success: false,
+            error: $error,
+            finalUrl: $finalUrl,
+            blockedReason: $blockedReason,
+        );
     }
 
     /**
@@ -411,6 +925,9 @@ final readonly class UrlContentService
         $sections = [];
         foreach ($successfulResults as $result) {
             $section = sprintf("--- URL: %s ---\n", $result->url);
+            if (null !== $result->finalUrl && $result->finalUrl !== $result->url) {
+                $section .= sprintf("Resolved to: %s\n", $result->finalUrl);
+            }
             if ('' !== $result->title) {
                 $section .= sprintf("Title: %s\n", $result->title);
             }
@@ -445,50 +962,100 @@ final readonly class UrlContentService
 
     private function extractTextWithLimit(string $html, bool $fullMode): string
     {
-        $contentPatterns = [
+        $targeted = $this->selectTargetedHtml($html);
+        $body = $this->selectBodyHtml($html);
+
+        $candidates = [];
+        if ('' !== $targeted) {
+            // Already scoped to a landmark — keep inner <header>/<nav>
+            // (article H1s often live in <header>).
+            $candidates[] = $this->htmlToPlainText($targeted, false);
+        }
+        $candidates[] = $this->htmlToPlainText($body, !$fullMode);
+        if (!$fullMode) {
+            // Last resort: keep nav/header/footer when chrome-stripping
+            // left almost nothing (JS builders often skip those tags).
+            $candidates[] = $this->htmlToPlainText($body, false);
+        }
+
+        $best = '';
+        foreach ($candidates as $text) {
+            if ($this->isUsefulText($text)) {
+                return $text;
+            }
+            if (mb_strlen($text) > mb_strlen($best)) {
+                $best = $text;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Prefer semantic landmarks. Avoid substring matches like Kubio's
+     * `h-column__content`, which previously ate the whole extract.
+     */
+    private function selectTargetedHtml(string $html): string
+    {
+        $patterns = [
             '/<main[^>]*>(.*?)<\/main>/is',
             '/<article[^>]*>(.*?)<\/article>/is',
-            '/<div[^>]*(?:role=["\']main["\']|id=["\']content["\']|class=["\'][^"\']*content[^"\']*["\'])[^>]*>(.*?)<\/div>/is',
+            '/<(?:div|section)[^>]+role=["\']main["\'][^>]*>(.*?)<\/(?:div|section)>/is',
+            '/<(?:div|section)[^>]+id=["\'](?:content|main|primary)["\'][^>]*>(.*?)<\/(?:div|section)>/is',
+            '/<(?:div|section)[^>]+class=["\'](?:[^"\']*\s)?(?:entry-content|post-content|page-content|site-content|main-content|article-content|wp-block-post-content)(?:\s[^"\']*)?["\'][^>]*>(.*?)<\/(?:div|section)>/is',
         ];
 
-        $content = '';
-        foreach ($contentPatterns as $pattern) {
+        foreach ($patterns as $pattern) {
             if (preg_match($pattern, $html, $matches)) {
-                $content = $matches[1];
-                break;
+                return $matches[1];
             }
         }
 
-        if ('' === $content) {
-            if (preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $matches)) {
-                $content = $matches[1];
-            } else {
-                $content = $html;
-            }
+        return '';
+    }
+
+    private function selectBodyHtml(string $html): string
+    {
+        if (preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $matches)) {
+            return $matches[1];
         }
 
+        return $html;
+    }
+
+    private function htmlToPlainText(string $content, bool $stripChrome): string
+    {
         $content = preg_replace('/<script[^>]*>.*?<\/script>/is', '', $content) ?? $content;
         $content = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $content) ?? $content;
         $content = preg_replace('/<svg[^>]*>.*?<\/svg>/is', '', $content) ?? $content;
         $content = preg_replace('/<noscript[^>]*>.*?<\/noscript>/is', '', $content) ?? $content;
 
-        if (!$fullMode) {
+        if ($stripChrome) {
             $content = preg_replace('/<nav[^>]*>.*?<\/nav>/is', '', $content) ?? $content;
             $content = preg_replace('/<header[^>]*>.*?<\/header>/is', '', $content) ?? $content;
             $content = preg_replace('/<footer[^>]*>.*?<\/footer>/is', '', $content) ?? $content;
         }
 
-        // Insert newlines before block-level elements to prevent word concatenation
         $content = preg_replace('/<\/(div|p|h[1-6]|li|section|article|header|footer|nav|main|blockquote|tr|td|th|dt|dd|figcaption|details|summary)>/i', "</$1>\n", $content) ?? $content;
         $content = preg_replace('/<(br|hr)\s*\/?>/i', "\n", $content) ?? $content;
 
         $text = strip_tags($content);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = str_replace(["\r\n", "\r", "\u{00A0}"], ["\n", "\n", ' '], $text);
         $text = preg_replace('/[ \t]+/', ' ', $text) ?? $text;
-        $text = preg_replace('/\n[ \t]*\n/', "\n\n", $text) ?? $text;
+        // Trim every line, then collapse runs of blank lines. A single
+        // non-overlapping `\n[ \t]*\n` pass leaves every second blank line
+        // alive, which on chrome-heavy pages (social feeds, menus) wasted
+        // most of the reading budget on whitespace.
+        $text = preg_replace('/[ \t]*\n[ \t]*/', "\n", $text) ?? $text;
         $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
 
         return trim($text);
+    }
+
+    private function isUsefulText(string $text): bool
+    {
+        return mb_strlen($text) >= self::MIN_USEFUL_TEXT_CHARS;
     }
 
     private function extractMetaDescription(string $html): string

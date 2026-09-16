@@ -5,6 +5,25 @@
       <p class="text-sm txt-secondary">{{ $t('files.generated.subtitle') }}</p>
     </div>
 
+    <!-- Kind filter: server-side origin_kind facet (image/video/audio/document/calendar) -->
+    <div class="flex flex-wrap gap-1.5 mb-4" data-testid="generated-kind-filter">
+      <button
+        v-for="option in kindOptions"
+        :key="option.value || 'all'"
+        type="button"
+        class="px-3 py-1.5 rounded-full text-xs font-medium transition-colors border"
+        :class="
+          kindFilter === option.value
+            ? 'bg-[var(--brand)]/15 text-[var(--brand)] border-[var(--brand)]/40'
+            : 'txt-secondary hover:txt-primary border-light-border/30 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5'
+        "
+        :data-testid="`btn-kind-${option.value || 'all'}`"
+        @click="setKindFilter(option.value)"
+      >
+        {{ $t(option.labelKey) }}
+      </button>
+    </div>
+
     <!-- Loading skeletons -->
     <div
       v-if="loading"
@@ -49,46 +68,22 @@
         class="group rounded-lg border border-light-border/15 dark:border-dark-border/5 bg-white dark:bg-white/[0.02]"
         data-testid="grid-tile"
       >
-        <div
-          :class="[
-            'w-full overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 relative flex items-center justify-center',
-            kindOf(file) === 'audio' ? 'p-2' : 'aspect-video',
-          ]"
-        >
-          <img
-            v-if="kindOf(file) === 'image'"
-            :src="downloadUrl(file.id)"
-            :alt="file.display_name || file.filename"
-            class="w-full h-full object-cover transition-transform group-hover:scale-105"
-            loading="lazy"
+        <div class="rounded-t-lg overflow-hidden">
+          <FilePreview
+            :file="file"
+            :playing="activePlayerId === file.id"
+            @play="activePlayerId = file.id"
+            @preview="openPreview(file)"
           />
-          <MessageVideo
-            v-else-if="kindOf(file) === 'video'"
-            :url="downloadUrl(file.id)"
-            :poster="file.thumb_url ?? undefined"
-            class="!my-0 w-full"
-          />
-          <MessageAudio
-            v-else-if="kindOf(file) === 'audio'"
-            :url="downloadUrl(file.id)"
-            class="!my-0 w-full"
-          />
-          <Icon v-else :icon="kindIcon(file)" class="w-10 h-10 text-gray-400" />
-          <div
-            v-if="!isInlineMediaKind(file)"
-            class="absolute bottom-2 right-2 bg-black/60 p-1 rounded backdrop-blur-sm"
-          >
-            <Icon :icon="kindIcon(file)" class="text-white w-4 h-4" />
-          </div>
         </div>
         <div class="p-2">
           <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
-            {{ file.display_name || file.filename }}
+            {{ fileDisplayName(file, translate, locale) }}
           </p>
           <p class="text-[10px] txt-secondary truncate">{{ file.uploaded_date }}</p>
-          <div v-if="file.is_vectorized" class="mt-1">
+          <div class="mt-1">
             <FileVectorPill
-              :state="file.vector_state ?? 'vectorized'"
+              :state="vectorStateOf(file)"
               :chunk-count="file.chunk_count ?? 0"
               :group-key="file.group_key ?? null"
             />
@@ -102,6 +97,12 @@
             hold their size, which keeps the trailing edge fixed.
           -->
           <div class="flex items-center gap-1 mt-1.5 min-w-0">
+            <FileOfficeActions
+              v-if="showOfficeActions(file)"
+              :file-id="file.id"
+              :filename="file.display_name || file.filename"
+              @preview="openPreview(file)"
+            />
             <button
               class="flex-1 min-w-0 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
               :title="$t('files.generated.download')"
@@ -120,16 +121,16 @@
             >
               <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
             </button>
-            <div v-if="!file.is_vectorized" class="relative shrink-0">
+            <div v-if="vectorStateOf(file) !== 'vectorized'" class="relative shrink-0">
               <button
                 class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:text-[var(--brand)] transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
-                :title="$t('files.indexPromptAction')"
+                :title="$t('files.describeSortAction')"
                 :disabled="isIndexing(file.id)"
                 :data-testid="`btn-generated-index-${file.id}`"
                 @click.stop="toggleKbMenu(file.id)"
               >
                 <Icon
-                  :icon="isIndexing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'"
+                  :icon="isIndexing(file.id) ? 'mdi:loading' : 'mdi:text-box-search-outline'"
                   class="w-3.5 h-3.5"
                   :class="isIndexing(file.id) && 'animate-spin'"
                 />
@@ -144,7 +145,7 @@
                   <div
                     class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary"
                   >
-                    {{ $t('files.indexPromptAction') }}
+                    {{ $t('files.describeSortAction') }}
                   </div>
                   <button
                     class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left"
@@ -226,36 +227,72 @@
         </button>
       </div>
     </div>
+    <DocumentPreviewModal
+      :open="previewFile !== null"
+      :file="previewFile"
+      @close="previewFile = null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import MessageVideo from '@/components/MessageVideo.vue'
-import MessageAudio from '@/components/MessageAudio.vue'
+import FilePreview from '@/components/files/FilePreview.vue'
+import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
+import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
+import { previewKindForFile } from '@/services/filePreview'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
-import { getApiBaseUrl } from '@/services/api/httpClient'
+import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useChatsStore } from '@/stores/chats'
 
-const { t } = useI18n()
+const DocumentPreviewModal = defineAsyncComponent(
+  () => import('@/components/files/DocumentPreviewModal.vue')
+)
+
+const { t, locale } = useI18n()
+const translate = (key: string, values?: Record<string, unknown>): string =>
+  t(key, (values ?? {}) as never)
 const router = useRouter()
 const { success: showSuccess, error: showError } = useNotification()
 const { confirm } = useDialog()
 const chatsStore = useChatsStore()
 
 const files = ref<FileItem[]>([])
+const previewFile = ref<{ id: number; filename: string } | null>(null)
 const loading = ref(false)
+// Only one media player is mounted at a time (#1499): tiles show a poster/icon
+// by default and mount the real <video>/<audio> only for the tile the user taps.
+// This keeps the grid lightweight and stays within the mobile WebView's
+// concurrent-media-element limit.
+const activePlayerId = ref<number | null>(null)
 const currentPage = ref(1)
 const totalCount = ref(0)
 const itemsPerPage = 30
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / itemsPerPage)))
+
+// Kind filter — '' means all kinds; other values map to BORIGINKIND server-side.
+const kindFilter = ref<FileOriginKind | ''>('')
+const kindOptions: Array<{ value: FileOriginKind | ''; labelKey: string }> = [
+  { value: '', labelKey: 'files.generated.kinds.all' },
+  { value: 'image', labelKey: 'files.generated.kinds.image' },
+  { value: 'video', labelKey: 'files.generated.kinds.video' },
+  { value: 'audio', labelKey: 'files.generated.kinds.audio' },
+  { value: 'document', labelKey: 'files.generated.kinds.document' },
+  { value: 'calendar', labelKey: 'files.generated.kinds.calendar' },
+]
+
+const setKindFilter = (kind: FileOriginKind | '') => {
+  if (kindFilter.value === kind) return
+  kindFilter.value = kind
+  void load(1)
+}
 
 // Knowledge-base menu + per-file busy state for index/delete actions.
 const folders = ref<Array<{ name: string; count: number }>>([])
@@ -285,9 +322,11 @@ const loadFolders = async () => {
 
 const load = async (page = currentPage.value) => {
   loading.value = true
+  activePlayerId.value = null
   try {
     const list = await filesService.listFiles({
       source: 'generated',
+      originKind: kindFilter.value || undefined,
       sort: 'date_desc',
       page,
       limit: itemsPerPage,
@@ -310,39 +349,15 @@ const previousPage = () => {
   if (currentPage.value > 1) load(currentPage.value - 1)
 }
 
-const kindOf = (file: FileItem): FileOriginKind => {
-  if (file.origin_kind) return file.origin_kind
-  const type = (file.file_type || '').toLowerCase()
-  if (/png|jpe?g|gif|webp|image/.test(type)) return 'image'
-  if (/mp4|webm|mov|avi|mkv|video/.test(type)) return 'video'
-  if (/mp3|wav|ogg|m4a|audio/.test(type)) return 'audio'
-  if (/ics/.test(type)) return 'calendar'
-  return 'document'
+const showOfficeActions = (file: FileItem): boolean => {
+  const kind = previewKindForFile(file)
+  if ('pdf' === kind) return true
+  return isOfficeConvertEnabled() && 'document' === kind
 }
 
-// Image/video/audio render an inline player (or thumbnail), so the corner
-// kind-badge is only useful for the icon-only kinds (calendar/document/unknown).
-const isInlineMediaKind = (file: FileItem): boolean => {
-  const kind = kindOf(file)
-  return 'image' === kind || 'video' === kind || 'audio' === kind
+const openPreview = (file: FileItem) => {
+  previewFile.value = { id: file.id, filename: file.display_name || file.filename }
 }
-
-const kindIcon = (file: FileItem): string => {
-  switch (kindOf(file)) {
-    case 'video':
-      return 'mdi:play-circle'
-    case 'audio':
-      return 'mdi:music-note'
-    case 'calendar':
-      return 'mdi:calendar'
-    case 'document':
-      return 'mdi:file-document-outline'
-    default:
-      return 'mdi:image'
-  }
-}
-
-const downloadUrl = (id: number): string => `${getApiBaseUrl()}/api/v1/files/${id}/download`
 
 const download = async (file: FileItem) => {
   try {
@@ -375,7 +390,7 @@ const addToKnowledgeBase = async (file: FileItem, groupKey?: string) => {
       if (res.groupKey) {
         showSuccess(t('files.describeSortDoneGroup', { group: res.groupKey }))
       } else {
-        showSuccess(t('files.indexPromptDone'))
+        showSuccess(t('files.describeSortDone'))
       }
       await Promise.all([load(), loadFolders()])
     } else {

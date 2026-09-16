@@ -20,6 +20,19 @@ test('classifies documentation as no-app-impact', () => {
   assert.equal(result.classification, 'no-app-impact')
 })
 
+test('classifies compute sidecars as no-app-impact', () => {
+  const result = classifyFiles(
+    [
+      entry('sidecars/synaplan-compute/cmd/synaplan-compute/main.go', 'A'),
+      entry('sidecars/synaplan-compute/internal/runner/hostconfig.go', 'A'),
+      entry('sidecars/synaplan-compute/README.md', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'no-app-impact')
+})
+
 test('classifies allow-listed internal backend files as backend-only', () => {
   const result = classifyFiles([
     entry('backend/src/Service/ReportExportService.php', 'M'),
@@ -34,6 +47,64 @@ test('classifies allow-listed internal backend files as backend-only', () => {
   )
 })
 
+test('classifies IAM AccessGate as backend-only', () => {
+  const result = classifyFiles([entry('backend/src/Service/Iam/AccessGate.php', 'A')], policy)
+
+  assert.equal(result.classification, 'backend-only')
+})
+
+test('classifies People page as ota-candidate', () => {
+  const result = classifyFiles([entry('frontend/src/views/PeopleView.vue', 'A')], policy)
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
+test('classifies platform-connect handshake as ota-candidate', () => {
+  const result = classifyFiles(
+    [
+      entry('frontend/src/platform-connect/clients.ts', 'A'),
+      entry('frontend/src/views/PlatformConnectView.vue', 'A'),
+      entry('frontend/src/composables/usePlatformLinksFeature.ts', 'A'),
+      entry('frontend/src/components/config/LinkedPlatformsConfiguration.vue', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
+test('classifies Share dialog as ota-candidate', () => {
+  const result = classifyFiles([entry('frontend/src/components/iam/ShareDialog.vue', 'A')], policy)
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
+test('classifies assistant/saved-task/widget kinds as backend-only', () => {
+  const result = classifyFiles(
+    [
+      entry('backend/src/Service/Iam/ResourceKind/AssistantKind.php', 'A'),
+      entry('backend/src/Service/Iam/ResourceKind/SavedTaskKind.php', 'A'),
+      entry('backend/src/Service/Iam/ResourceKind/WidgetKind.php', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'backend-only')
+})
+
+test('classifies more-kinds share cards as ota-candidate', () => {
+  const result = classifyFiles(
+    [
+      entry('frontend/src/components/config/TaskPromptsConfiguration.vue', 'M'),
+      entry('frontend/src/components/config/SavedTaskCard.vue', 'M'),
+      entry('frontend/src/views/WidgetsView.vue', 'M'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
 test('classifies web-layer application code and assets as ota-candidate', () => {
   const paths = [
     'frontend/src/views/ChatView.styles.css',
@@ -41,6 +112,7 @@ test('classifies web-layer application code and assets as ota-candidate', () => 
     'frontend/src/assets/logo.svg',
     'frontend/src/components/icons/ProviderIcon.vue',
     'frontend/src/components/ChatComposer.vue',
+    'frontend/src/components/ChatErrorNotice.vue',
     'frontend/src/composables/useNewFeature.ts',
     'frontend/src/router/index.ts',
     'frontend/src/generated/api-schemas.ts',
@@ -121,7 +193,9 @@ test('release and classification tooling does not trigger an app release', () =>
     '.github/workflows/azure-image.yml',
     '.github/mobile-impact-policy.json',
     'scripts/next-release-tag.mjs',
-    'tests/next-release-tag.test.mjs'
+    'scripts/ci-change-scope.mjs',
+    'tests/next-release-tag.test.mjs',
+    'tests/ci-change-scope.test.mjs'
   ]
 
   for (const path of toolingPaths) {
@@ -178,6 +252,8 @@ test('classifies all server-side code and server-delivered plugins as backend-on
     'backend/config/services.yaml',
     'backend/migrations/Version20260729120000.php',
     'backend/src/AI/Provider/OpenAIProvider.php',
+    'backend/src/AI/Exception/ChatFailureReason.php',
+    'backend/translations/ai_errors.en.yaml',
     'backend/src/Controller/ConfigController.php',
     'backend/src/Controller/OpenApiController.php',
     'backend/src/DTO/UserMemoryDTO.php',
@@ -194,6 +270,85 @@ test('classifies all server-side code and server-delivered plugins as backend-on
   for (const path of backendPaths) {
     assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'backend-only', path)
   }
+})
+
+test('classifies the model status surfaces as backend-only plus ota-candidate', () => {
+  const backendPaths = [
+    'backend/src/AI/Health/ModelHealthEvaluator.php',
+    'backend/src/AI/Health/Probe/PlatformKeyModelListProbe.php',
+    'backend/src/Command/ModelHealthCheckCommand.php',
+    'backend/src/Controller/AdminModelHealthController.php',
+    'backend/src/Entity/ModelHealth.php',
+    'backend/src/Repository/ModelHealthRepository.php'
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'backend-only', path)
+  }
+
+  // The status page is ordinary web-layer code and must stay shippable over
+  // the air. A store review for a monitoring screen would be pure friction.
+  const webPaths = [
+    'frontend/src/views/ModelStatusView.vue',
+    'frontend/src/services/api/adminModelStatusApi.ts'
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'ota-candidate', path)
+  }
+
+  // The scheduler slot that runs the check lives in container tooling and is
+  // never delivered to an installed app.
+  assert.equal(
+    classifyFiles([entry('_docker/backend/lib/container-runtime.sh', 'M')], policy).classification,
+    'no-app-impact'
+  )
+})
+
+test('classifies the first-run setup wizard as backend-only plus ota-candidate', () => {
+  const backendPaths = [
+    'backend/src/Command/AdminResetPasswordCommand.php',
+    'backend/src/Command/SetupResetCommand.php',
+    'backend/src/Controller/SetupController.php',
+    'backend/src/DTO/SetupAdminRequest.php',
+    'backend/src/DTO/SetupCompleteRequest.php',
+    'backend/src/EventSubscriber/SetupLockdownSubscriber.php',
+    'backend/src/Service/Setup/SetupConstants.php',
+    'backend/src/Service/Setup/SetupStateService.php'
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'backend-only', path)
+  }
+
+  // The wizard is the first screen a fresh install shows, so it has to stay
+  // fixable over the air. It touches no native seam on purpose: the router gate
+  // reads the setup flag straight from the runtime config instead of through
+  // `stores/config.ts`, and the server-switch escape hatch calls the existing
+  // native bridge rather than changing it.
+  const webPaths = [
+    'frontend/src/components/setup/SetupAccessStep.vue',
+    'frontend/src/components/setup/SetupAdminStep.vue',
+    'frontend/src/components/setup/SetupDoneStep.vue',
+    'frontend/src/components/setup/SetupProviderKeyForm.vue',
+    'frontend/src/components/setup/SetupProviderStep.vue',
+    'frontend/src/components/setup/SetupProviderTile.vue',
+    'frontend/src/composables/useSetupState.ts',
+    'frontend/src/router/setupGate.ts',
+    'frontend/src/services/api/setupApi.ts',
+    'frontend/src/views/SetupWizardView.vue'
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'ota-candidate', path)
+  }
+
+  // The demo-fixture opt-out that makes a virgin instance reproducible locally
+  // is container tooling and never reaches an installed app.
+  assert.equal(
+    classifyFiles([entry('_docker/backend/docker-entrypoint.sh', 'M')], policy).classification,
+    'no-app-impact'
+  )
 })
 
 test('uses the highest classification for mixed changes', () => {

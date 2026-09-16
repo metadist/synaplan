@@ -101,16 +101,12 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import OnboardingWelcomeStep from '@/components/onboarding/OnboardingWelcomeStep.vue'
 import { markOnboardingCompleted } from '@/composables/useOnboarding'
+import { languageOptions } from '@/i18n'
 
 const router = useRouter()
 const { locale } = useI18n()
 
-const languages = [
-  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { value: 'en', label: 'English', flag: '🇬🇧' },
-  { value: 'es', label: 'Español', flag: '🇪🇸' },
-  { value: 'tr', label: 'Türkçe', flag: '🇹🇷' },
-]
+const languages = languageOptions
 
 const currentLanguage = computed(() => locale.value)
 const currentLanguageOption = computed(

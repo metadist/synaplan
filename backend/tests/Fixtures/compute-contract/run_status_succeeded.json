@@ -1,0 +1,10 @@
+{
+  "runId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "status": "succeeded",
+  "exitCode": 0,
+  "startedAt": "2026-09-10T07:00:00Z",
+  "finishedAt": "2026-09-10T07:00:02Z",
+  "durationMs": 2000,
+  "usage": { "wallMs": 2000, "cpuSec": 0.0, "maxMemoryMb": 0, "bytesIn": 4096, "bytesOut": 8192 },
+  "truncated": { "stdout": false, "stderr": false }
+}

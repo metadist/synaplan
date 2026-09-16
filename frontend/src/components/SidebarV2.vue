@@ -1,18 +1,20 @@
 <template>
   <!--
-    Desktop navigation rail (§4.3 #1). On mobile the rail does not exist —
-    the bottom tab bar (MobileNav.vue) is the primary navigation there.
+    Desktop navigation rail (§4.3 #1). Hidden on phone chrome (narrow or
+    short / landscape-phone viewports — see usePhoneChrome.ts); the push-drawer
+    is the primary navigation there.
   -->
-  <aside
-    class="v2-sidebar-rail hidden md:flex flex-col"
-    style="width: 80px; min-width: 80px"
-    data-testid="comp-sidebar-v2"
-  >
+  <aside class="v2-sidebar-rail v2-desktop-chrome flex-col" data-testid="comp-sidebar-v2">
     <!-- Brand logo -->
     <div
       class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"
     >
-      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-auto" />
+      <img
+        :src="iconSrc"
+        :alt="configStore.branding.name"
+        class="h-7 w-auto"
+        data-testid="img-sidebar-brand"
+      />
     </div>
 
     <!-- New Chat Button -->
@@ -52,11 +54,19 @@
         ]"
         :title="item.description || item.label"
         :data-testid="`btn-sidebar-v2-nav-${item.key}`"
+        :aria-haspopup="item.children?.length ? 'menu' : undefined"
+        :aria-expanded="
+          item.children?.length
+            ? activeFlyout === 'nav' && activeFlyoutItem?.key === item.key
+            : undefined
+        "
         @click="handleNavClick(item)"
       >
         <component :is="item.icon" class="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+        <!-- Two-line clamp instead of truncate: longer rail labels (and their
+             translations) would otherwise be cut off on the 72px rail. -->
         <span
-          class="v2-rail-label text-[10px] font-medium leading-tight max-w-full truncate px-0.5"
+          class="v2-rail-label text-[10px] font-medium leading-tight max-w-full px-0.5 text-center line-clamp-2 break-words"
         >
           {{ item.label }}
         </span>
@@ -134,10 +144,18 @@
         data-testid="btn-sidebar-v2-user"
         @click="toggleUserMenu"
       >
-        <div
-          class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-xs font-semibold"
-        >
-          {{ initials }}
+        <div class="relative">
+          <div
+            class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-xs font-semibold"
+          >
+            {{ initials }}
+          </div>
+          <span
+            v-if="incomingStore.hasNew"
+            class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-sidebar)]"
+            data-testid="dot-sidebar-v2-incoming-new"
+            :aria-label="$t('iam.incoming.newCount', { count: incomingStore.unseenCount })"
+          />
         </div>
         <span class="v2-rail-label text-[10px] font-medium leading-tight">
           {{ $t('nav.account') }}
@@ -177,6 +195,7 @@
               </p>
             </div>
             <router-link
+              v-if="configStore.auth.registrationEnabled"
               to="/register"
               class="dropdown-item font-medium"
               style="color: var(--brand)"
@@ -214,6 +233,42 @@
               <span>{{ $t('nav.profile') }}</span>
             </button>
             <button
+              v-if="iamSharingEnabled"
+              role="menuitem"
+              class="dropdown-item"
+              :class="{ 'font-semibold': incomingStore.hasNew }"
+              data-testid="btn-sidebar-v2-incoming"
+              @click="handleNavigate('/chats/incoming')"
+            >
+              <span class="relative flex-shrink-0">
+                <InboxArrowDownIcon class="w-4 h-4" />
+                <span
+                  v-if="incomingStore.hasNew"
+                  class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--status-error)]"
+                  data-testid="dot-sidebar-v2-menu-incoming-new"
+                />
+              </span>
+              <span class="flex-1 truncate">{{
+                incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
+              }}</span>
+              <span
+                v-if="incomingStore.hasNew"
+                class="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+                data-testid="text-sidebar-v2-incoming-count"
+                >{{ incomingStore.unseenCount }}</span
+              >
+            </button>
+            <button
+              v-if="iamGroupsEnabled"
+              role="menuitem"
+              class="dropdown-item"
+              data-testid="btn-sidebar-v2-my-groups"
+              @click="handleNavigate('/groups')"
+            >
+              <UserGroupIcon class="w-4 h-4" />
+              <span>{{ $t('nav.myGroups') }}</span>
+            </button>
+            <button
               v-if="isMemoryServiceAvailable"
               role="menuitem"
               class="dropdown-item"
@@ -242,11 +297,11 @@
               <button
                 role="menuitem"
                 class="dropdown-item"
-                data-testid="btn-sidebar-v2-preferences"
-                @click="handleNavigate('/settings')"
+                data-testid="btn-sidebar-v2-feedback"
+                @click="handleNavigate('/feedbacks')"
               >
-                <Cog6ToothIcon class="w-4 h-4" />
-                <span>{{ $t('nav.preferences') }}</span>
+                <Icon icon="mdi:comment-quote-outline" class="w-4 h-4" />
+                <span>{{ $t('pageTitles.feedback') }}</span>
               </button>
               <button
                 v-if="
@@ -264,28 +319,46 @@
                 <span>{{ $t('nav.subscription') }}</span>
               </button>
             </div>
-            <!--
-              Logout is intentionally hidden while impersonating: clicking
-              it would clear the admin's session entirely (cookies + stash)
-              instead of just ending the impersonation, which is almost
-              never what the operator means. The "Exit" button on the
-              floating impersonation pill is the correct action here.
-            -->
-            <div
-              v-if="!isImpersonating"
-              class="border-t border-light-border/10 dark:border-dark-border/10"
-            >
-              <button
-                role="menuitem"
-                class="dropdown-item text-red-500 dark:text-red-400"
-                data-testid="btn-sidebar-v2-logout"
-                @click="handleLogout"
-              >
-                <ArrowRightOnRectangleIcon class="w-4 h-4" />
-                <span>{{ $t('settings.logout') }}</span>
-              </button>
-            </div>
           </template>
+
+          <!--
+            Preferences holds the language and the theme, both stored on the
+            device rather than on the account, so it stays outside the
+            guest/authenticated split and is offered to everyone.
+          -->
+          <div class="border-t border-light-border/10 dark:border-dark-border/10">
+            <button
+              role="menuitem"
+              class="dropdown-item"
+              data-testid="btn-sidebar-v2-preferences"
+              @click="handleNavigate('/settings')"
+            >
+              <Cog6ToothIcon class="w-4 h-4" />
+              <span>{{ $t('nav.preferences') }}</span>
+            </button>
+          </div>
+
+          <!--
+            Logout is intentionally hidden while impersonating: clicking
+            it would clear the admin's session entirely (cookies + stash)
+            instead of just ending the impersonation, which is almost
+            never what the operator means. The "Exit" button on the
+            floating impersonation pill is the correct action here.
+          -->
+          <div
+            v-if="!isGuestMode && !isImpersonating"
+            class="border-t border-light-border/10 dark:border-dark-border/10"
+          >
+            <button
+              role="menuitem"
+              class="dropdown-item text-red-500 dark:text-red-400"
+              data-testid="btn-sidebar-v2-logout"
+              @click="handleLogout"
+            >
+              <ArrowRightOnRectangleIcon class="w-4 h-4" />
+              <span>{{ $t('settings.logout') }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
@@ -301,70 +374,13 @@
       leave-from-class="opacity-100 scale-100"
       leave-to-class="opacity-0 scale-95"
     >
-      <div
+      <SidebarNavFlyout
         v-if="activeFlyout === 'nav' && activeFlyoutItem"
-        class="fixed inset-0 z-[200]"
-        data-testid="overlay-sidebar-v2-nav"
-        @click="closeFlyout"
-      >
-        <div
-          class="fixed w-56 dropdown-panel origin-top-left overflow-hidden"
-          :style="navDropdownStyle"
-          data-testid="dropdown-sidebar-v2-nav"
-          @click.stop
-        >
-          <!-- Header -->
-          <div class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10">
-            <p class="text-xs font-semibold txt-secondary uppercase tracking-wider">
-              {{ activeFlyoutItem.label }}
-            </p>
-          </div>
-
-          <!-- Children Links (with optional group headers) -->
-          <div class="py-1 max-h-[60vh] overflow-y-auto scroll-thin">
-            <template v-for="(section, sIdx) in groupedChildren" :key="sIdx">
-              <div
-                v-if="section.group"
-                class="px-3 pt-2.5 pb-1"
-                :class="{
-                  'border-t border-light-border/10 dark:border-dark-border/10 mt-1': sIdx > 0,
-                }"
-              >
-                <p
-                  class="text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
-                >
-                  {{ section.group }}
-                </p>
-              </div>
-              <router-link
-                v-for="child in section.items"
-                :key="child.path"
-                :to="child.path"
-                :data-testid="`link-sidebar-v2-${child.key}`"
-                class="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
-                :class="
-                  route.path === child.path
-                    ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
-                    : 'txt-secondary hover:txt-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.03]'
-                "
-                @click="closeFlyout()"
-              >
-                <span
-                  class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  :class="route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'"
-                />
-                <span class="flex-1 truncate">{{ child.label }}</span>
-                <span
-                  v-if="child.badge"
-                  class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
-                >
-                  {{ child.badge }}
-                </span>
-              </router-link>
-            </template>
-          </div>
-        </div>
-      </div>
+        :item="activeFlyoutItem"
+        :panel-style="navDropdownStyle"
+        :current-path="route.path"
+        @close="closeFlyout"
+      />
     </Transition>
   </Teleport>
 
@@ -402,7 +418,7 @@
                   </h2>
                   <p class="text-xs txt-secondary mt-0.5">
                     {{ chatList.length }}
-                    {{ chatList.length === 1 ? 'conversation' : 'conversations' }}
+                    {{ chatList.length === 1 ? $t('chat.conversation') : $t('chat.conversations') }}
                   </p>
                 </div>
               </div>
@@ -441,13 +457,22 @@
                 <span class="hidden sm:inline">{{ $t('chat.newChat') }}</span>
               </button>
             </div>
+
+            <!-- Private / Group filter (only with sharing on) -->
+            <div v-if="iamSharingEnabled" class="mt-3" data-testid="section-chat-manager-filter">
+              <ChatKindFilter
+                v-model="chatKindFilter"
+                :counts="chatKindCounts"
+                :new-count="incomingStore.unseenCount"
+              />
+            </div>
           </div>
 
           <!-- Chat List -->
           <div class="flex-1 overflow-y-auto scroll-thin px-3 pb-4 sm:px-4">
             <!-- Empty State -->
             <div
-              v-if="filteredChatList.length === 0 && chatSearchQuery"
+              v-if="filteredChatList.length === 0 && (chatSearchQuery || chatKindFilter !== 'all')"
               class="flex flex-col items-center justify-center py-10 gap-3"
             >
               <div
@@ -525,7 +550,13 @@
                   >
                     {{ getDisplayTitle(chat) }}
                   </p>
-                  <div class="flex items-center gap-2 mt-0.5">
+                  <div class="flex items-center gap-2 mt-0.5 min-w-0">
+                    <ChatKindPill
+                      v-if="iamSharingEnabled"
+                      :kind="chat.kind"
+                      :label="chat.kindLabel"
+                      :is-new="chat.isNew"
+                    />
                     <span class="text-[11px] txt-secondary">{{
                       formatTimestamp(chat.createdAt)
                     }}</span>
@@ -538,11 +569,20 @@
                     >
                       <Icon icon="mdi:link-variant" class="w-3 h-3" />
                     </span>
+                    <span
+                      v-if="isGenerating(chat)"
+                      class="text-[11px] text-[var(--brand)] flex items-center gap-1"
+                      :title="$t('chat.stillGenerating')"
+                      data-testid="indicator-chat-active-run"
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
+                      <span class="sr-only">{{ $t('chat.stillGenerating') }}</span>
+                    </span>
                   </div>
                 </div>
 
-                <!-- Actions -->
-                <div class="flex-shrink-0" @click.stop>
+                <!-- Actions (an incoming chat is someone else's: no rename/share/delete) -->
+                <div v-if="!chat.incoming" class="flex-shrink-0" @click.stop>
                   <button
                     class="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center sm:opacity-0 sm:group-hover/chat:opacity-100 focus:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
                     :class="chatMenuOpenId === chat.id && '!opacity-100 bg-black/5 dark:bg-white/5'"
@@ -558,12 +598,13 @@
 
           <!-- Footer -->
           <div
-            v-if="chatList.length > 5"
             class="flex-shrink-0 px-4 py-3 sm:px-5 border-t border-black/[0.04] dark:border-white/[0.04]"
           >
             <button
+              type="button"
               class="w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-xl text-sm sm:text-xs font-medium text-[var(--brand)] bg-[var(--brand)]/[0.06] hover:bg-[var(--brand)]/[0.12] active:bg-[var(--brand)]/[0.18] transition-all duration-150 group/show"
-              @click="((chatModalOpen = false), $router.push('/statistics#chats'))"
+              data-testid="btn-chat-v2-show-all"
+              @click="((chatModalOpen = false), $router.push('/chats'))"
             >
               <ChartBarIcon class="w-4 h-4 sm:w-3.5 sm:h-3.5 opacity-70" />
               {{ $t('chat.showAll') }}
@@ -632,6 +673,14 @@
     @shared="chatsStore.loadChats()"
     @unshared="chatsStore.loadChats()"
   />
+  <ShareDialog
+    :is-open="iamShareOpen"
+    kind="conversation"
+    :resource-id="iamShareResourceId"
+    :resource-name="shareModalChatTitle"
+    @close="iamShareOpen = false"
+    @public-link="openPublicLinkFromIam"
+  />
 
   <!-- Memories Dialog -->
   <MemoriesDialog :is-open="isMemoriesDialogOpen" @close="isMemoriesDialogOpen = false" />
@@ -656,6 +705,8 @@ import {
   Cog6ToothIcon,
   ChartBarIcon,
   UserCircleIcon,
+  UserGroupIcon,
+  InboxArrowDownIcon,
   ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -665,16 +716,34 @@ import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
-import { useNavItems, type NavChild, type NavItem } from '../composables/useNavItems'
+import {
+  useNavItems,
+  groupNavChildren,
+  hasNestedNavGroups,
+  type NavItem,
+} from '../composables/useNavItems'
+import SidebarNavFlyout from './SidebarNavFlyout.vue'
 import { useTheme } from '../composables/useTheme'
+import { useBrandLogo } from '../composables/useBrandLogo'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useUpdatesStore } from '../stores/updates'
 import { formatRunningVersion } from '@/utils/formatRunningVersion'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
+import { useIncomingStore } from '@/stores/incoming'
+import {
+  kindOfSharedItem,
+  matchesChatFilter,
+  type ChatKind,
+  type ChatListFilter,
+} from '@/utils/chatKind'
 import MemoriesDialog from './MemoriesDialog.vue'
 import ChatShareModal from './ChatShareModal.vue'
+import ShareDialog from './iam/ShareDialog.vue'
+import ChatKindPill from './iam/ChatKindPill.vue'
+import ChatKindFilter from './iam/ChatKindFilter.vue'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 
 const { t } = useI18n()
@@ -690,7 +759,8 @@ const updatesStore = useUpdatesStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
 const { navItems, isItemActive, isGuestMode, loadFeatureStatus } = useNavItems()
-const { theme } = useTheme()
+const { isDark } = useTheme()
+const { iconSrc } = useBrandLogo(isDark)
 const route = useRoute()
 const router = useRouter()
 const isMemoriesDialogOpen = ref(false)
@@ -718,11 +788,17 @@ const chatMenuStyle = ref<Record<string, string>>({})
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref('')
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
 const isCreatingChat = ref(false)
 const chatSearchQuery = ref('')
+const chatKindFilter = ref<ChatListFilter>('all')
+const incomingStore = useIncomingStore()
 
 const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
+const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
 
 type FlyoutType = 'nav' | null
 const activeFlyout = ref<FlyoutType>(null)
@@ -734,8 +810,10 @@ watch(
   (open) => {
     if (open) {
       chatSearchQuery.value = ''
+      chatKindFilter.value = 'all'
       chatMenuOpenId.value = null
       chatsStore.loadChats()
+      incomingStore.load()
     }
   }
 )
@@ -743,11 +821,18 @@ watch(
 onMounted(() => {
   loadFeatureStatus()
   document.addEventListener('keydown', handleEscape)
+  window.addEventListener('resize', handleViewportChange)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEscape)
+  window.removeEventListener('resize', handleViewportChange)
 })
+
+const handleViewportChange = () => {
+  closeFlyout()
+  userMenuOpen.value = false
+}
 
 const toggleUserMenu = () => {
   triggerHapticImpact('light')
@@ -768,6 +853,7 @@ const toggleUserMenu = () => {
     }
   }
   userMenuOpen.value = !userMenuOpen.value
+  if (userMenuOpen.value && authStore.isAuthenticated) incomingStore.refreshUnseen()
 }
 
 const handleEscape = (event: KeyboardEvent) => {
@@ -780,17 +866,6 @@ const handleEscape = (event: KeyboardEvent) => {
     closeFlyout()
   }
 }
-
-const isDark = computed(() => {
-  if (theme.value === 'dark') return true
-  if (theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-const logoIconSrc = computed(
-  () =>
-    `${import.meta.env.BASE_URL}${isDark.value ? 'single_bird-light.svg' : 'single_bird-dark.svg'}`
-)
 
 const initials = computed(() => {
   const email = authStore.user?.email || 'G'
@@ -822,25 +897,6 @@ watch(
   },
   { immediate: true }
 )
-
-const groupedChildren = computed(() => {
-  if (!activeFlyoutItem.value?.children) return []
-  const children = activeFlyoutItem.value.children
-  const hasGroups = children.some((c) => c.group)
-  if (!hasGroups) return [{ group: null, items: children }]
-
-  const groups: Array<{ group: string | null; items: NavChild[] }> = []
-  let currentGroup: string | null = null
-  for (const child of children) {
-    const g = child.group ?? null
-    if (g !== currentGroup) {
-      currentGroup = g
-      groups.push({ group: g, items: [] })
-    }
-    groups[groups.length - 1].items.push(child)
-  }
-  return groups
-})
 
 const handleQuickNewChat = async () => {
   if (isCreatingChat.value) return
@@ -882,7 +938,9 @@ const handleNavClick = (item: NavItem) => {
       const btn = navBtnRefs.value[item.path]
       if (btn) {
         const rect = btn.getBoundingClientRect()
-        const estimatedHeight = (item.children.length + 1) * 36 + 16
+        const groups = groupNavChildren(item.children)
+        const rowCount = hasNestedNavGroups(item.children) ? groups.length : item.children.length
+        const estimatedHeight = (rowCount + 2) * 40 + 16
         const maxTop = window.innerHeight - estimatedHeight - 8
         navDropdownStyle.value = {
           left: `${rect.right + 8}px`,
@@ -931,7 +989,19 @@ const chatActivityTimestamp = (chat: StoreChat): number => {
   return ts
 }
 
-const chatList = computed(() => {
+/**
+ * One row of the history sheet: my own chat (`private`) or a conversation
+ * someone shared with me (`incoming`, pilled by the group / person it came
+ * through). Incoming rows are read-only here — no rename, share or delete.
+ */
+type SheetChat = StoreChat & {
+  kind: ChatKind
+  kindLabel: string | null
+  isNew: boolean
+  incoming: boolean
+}
+
+const ownChatList = computed<SheetChat[]>(() => {
   return chatsStore.chats
     .filter((c) => {
       if (c.widgetSession) return false
@@ -945,15 +1015,55 @@ const chatList = computed(() => {
           c.title.startsWith('Chat '))
       return !isEmpty
     })
-    .slice()
-    .sort((a, b) => chatActivityTimestamp(b) - chatActivityTimestamp(a))
+    .map((c) => ({
+      ...c,
+      kind: 'private' as const,
+      kindLabel: null,
+      isNew: false,
+      incoming: false,
+    }))
 })
+
+const incomingChatList = computed<SheetChat[]>(() => {
+  if (!iamSharingEnabled.value) return []
+  const ownIds = new Set(chatsStore.chats.map((c) => c.id))
+  return incomingStore.chats
+    .filter((item) => !ownIds.has(Number(item.id)))
+    .map((item) => {
+      const { kind, label } = kindOfSharedItem(item)
+      const sharedAt = new Date((item.sharedAt ?? 0) * 1000).toISOString()
+      return {
+        id: Number(item.id),
+        title: item.name,
+        createdAt: sharedAt,
+        updatedAt: sharedAt,
+        messageCount: Number(item.meta?.messageCount ?? 0) || undefined,
+        source: 'web' as const,
+        access: item.permission as StoreChat['access'],
+        kind,
+        kindLabel: label,
+        isNew: item.isNew === true,
+        incoming: true,
+      }
+    })
+})
+
+const chatList = computed<SheetChat[]>(() => {
+  return [...ownChatList.value, ...incomingChatList.value].sort(
+    (a, b) => chatActivityTimestamp(b) - chatActivityTimestamp(a)
+  )
+})
+
+const chatKindCounts = computed<Partial<Record<ChatListFilter, number>>>(() => ({
+  private: ownChatList.value.length,
+  group: incomingChatList.value.length,
+}))
 
 const filteredChatList = computed(() => {
   const q = chatSearchQuery.value.toLowerCase().trim()
-  if (!q) return chatList.value
   return chatList.value.filter((c) => {
-    return getDisplayTitle(c).toLowerCase().includes(q)
+    if (!matchesChatFilter(c.kind, chatKindFilter.value)) return false
+    return !q || getDisplayTitle(c).toLowerCase().includes(q)
   })
 })
 
@@ -966,6 +1076,12 @@ const getDisplayTitle = (chat: StoreChat): string => {
 const formatTimestamp = (dateStr: string): string => {
   return formatRelativeTime(new Date(dateStr))
 }
+
+/**
+ * A turn keeps generating after the tab that started it navigated away, so the
+ * dot tells the user which chat is still worth returning to.
+ */
+const isGenerating = (chat: StoreChat): boolean => chatsStore.activeRunChatIds.has(chat.id)
 
 const getChannelIcon = (chat: StoreChat): string | null => {
   switch (chat.source) {
@@ -1048,12 +1164,22 @@ const handleChatDelete = async (chatId: number) => {
   }
 }
 
+const openPublicLinkFromIam = () => {
+  iamShareOpen.value = false
+  shareModalOpen.value = true
+}
+
 const handleChatShare = (chatId: number) => {
   const chat = chatsStore.chats.find((c) => c.id === chatId)
   shareModalChatId.value = chatId
   shareModalChatTitle.value = chat?.title || 'Chat'
-  shareModalOpen.value = true
   chatMenuOpenId.value = null
+  if (isIamSharingEnabled()) {
+    iamShareResourceId.value = String(chatId)
+    iamShareOpen.value = true
+    return
+  }
+  shareModalOpen.value = true
 }
 
 const toggleChatMenu = (chatId: number, event: MouseEvent) => {

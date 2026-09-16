@@ -8,9 +8,17 @@ use App\Entity\User;
 use App\Entity\Widget;
 use App\Message\CrawlWidgetUrlMessage;
 use App\Repository\PromptRepository;
+use App\Repository\ShareRepository;
 use App\Repository\WidgetRepository;
+use App\Service\Agent\AgentAccess;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\BillingService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\WidgetKind;
 use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
 use App\Service\UserMemoryService;
@@ -57,6 +65,11 @@ class WidgetController extends AbstractController
         private LoggerInterface $logger,
         private SlackNotificationService $slack,
         private string $uploadDir,
+        private AccessGate $accessGate,
+        private IamConfig $iamConfig,
+        private ShareRepository $shareRepository,
+        private ?AgentAccess $agentAccess = null,
+        private ?AgentConfig $agentConfig = null,
     ) {
     }
 
@@ -85,6 +98,7 @@ class WidgetController extends AbstractController
                             new OA\Property(property: 'widgetId', type: 'string', example: 'wdg_abc123...'),
                             new OA\Property(property: 'name', type: 'string'),
                             new OA\Property(property: 'taskPromptTopic', type: 'string'),
+                            new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
                             new OA\Property(property: 'status', type: 'string', enum: ['active', 'inactive']),
                             new OA\Property(property: 'config', type: 'object'),
                             new OA\Property(property: 'created', type: 'integer'),
@@ -109,6 +123,7 @@ class WidgetController extends AbstractController
                 'widgetId' => $widget->getWidgetId(),
                 'name' => $widget->getName(),
                 'taskPromptTopic' => $widget->getTaskPromptTopic(),
+                'agentId' => $widget->getAgentId(),
                 'status' => $widget->getStatus(),
                 'config' => $widget->getConfig(),
                 'allowedDomains' => $widget->getAllowedDomains(),
@@ -147,6 +162,7 @@ class WidgetController extends AbstractController
                 new OA\Property(property: 'name', type: 'string', example: 'Support Chat'),
                 new OA\Property(property: 'websiteUrl', type: 'string', example: 'https://example.com', description: 'Website URL - domain will be added to allowed domains'),
                 new OA\Property(property: 'taskPromptTopic', type: 'string', example: 'customer-support', description: 'Optional - defaults to tools:widget-default'),
+                new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
                 new OA\Property(property: 'config', type: 'object'),
             ]
         )
@@ -166,6 +182,7 @@ class WidgetController extends AbstractController
                         new OA\Property(property: 'widgetId', type: 'string', example: 'wdg_abc123...'),
                         new OA\Property(property: 'name', type: 'string'),
                         new OA\Property(property: 'taskPromptTopic', type: 'string'),
+                        new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
                         new OA\Property(property: 'status', type: 'string'),
                         new OA\Property(property: 'config', type: 'object'),
                         new OA\Property(property: 'allowedDomains', type: 'array', items: new OA\Items(type: 'string')),
@@ -199,6 +216,10 @@ class WidgetController extends AbstractController
                 $data['websiteUrl'] ?? null
             );
 
+            if (array_key_exists('agentId', $data)) {
+                $this->bindWidgetAgent($user, $widget, $data['agentId']);
+            }
+
             $widget->syncAllowedDomainsFromConfig();
 
             return $this->json([
@@ -209,6 +230,7 @@ class WidgetController extends AbstractController
                     'widgetId' => $widget->getWidgetId(),
                     'name' => $widget->getName(),
                     'taskPromptTopic' => $widget->getTaskPromptTopic(),
+                    'agentId' => $widget->getAgentId(),
                     'status' => $widget->getStatus(),
                     'config' => $widget->getConfig(),
                     'allowedDomains' => $widget->getAllowedDomains(),
@@ -240,7 +262,44 @@ class WidgetController extends AbstractController
         path: '/api/v1/widgets/{widgetId}',
         summary: 'Get widget details',
         security: [['Bearer' => []]],
-        tags: ['Widgets']
+        tags: ['Widgets'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Widget details; visitor stats only for the owner',
+                content: new OA\JsonContent(
+                    required: ['success', 'widget'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'widget',
+                            type: 'object',
+                            required: ['id', 'widgetId', 'name', 'taskPromptTopic', 'status', 'config', 'allowedDomains', 'isActive'],
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer'),
+                                new OA\Property(property: 'widgetId', type: 'string'),
+                                new OA\Property(property: 'name', type: 'string'),
+                                new OA\Property(property: 'taskPromptTopic', type: 'string'),
+                                new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
+                                new OA\Property(property: 'status', type: 'string'),
+                                new OA\Property(property: 'config', type: 'object'),
+                                new OA\Property(property: 'allowedDomains', type: 'array', items: new OA\Items(type: 'string')),
+                                new OA\Property(property: 'isActive', type: 'boolean'),
+                                new OA\Property(property: 'created', type: 'integer', format: 'int64'),
+                                new OA\Property(property: 'updated', type: 'integer', format: 'int64'),
+                                new OA\Property(property: 'stats', type: 'object', nullable: true, description: 'Owner only'),
+                                new OA\Property(property: 'access', type: 'string', enum: ['owner', 'read', 'edit', 'manage'], description: 'Present when sharing is enabled'),
+                                new OA\Property(property: 'shared', type: 'boolean', description: 'True when this widget belongs to someone else'),
+                                new OA\Property(property: 'ownerId', type: 'integer'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Widget does not reach this user'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
     )]
     #[OA\Parameter(
         name: 'widgetId',
@@ -260,28 +319,39 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Read)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        // Get statistics
-        $stats = $this->sessionService->getWidgetStats($widgetId);
+        // Visitor statistics belong to the owner (like the session list); a
+        // read share shows the configuration only — minus the credentials
+        // it carries (Slack webhook, external API token).
+        $isOwner = $widget->getOwnerId() === (int) $user->getId();
+        $widgetPayload = [
+            'id' => $widget->getId(),
+            'widgetId' => $widget->getWidgetId(),
+            'name' => $widget->getName(),
+            'taskPromptTopic' => $widget->getTaskPromptTopic(),
+            'agentId' => $widget->getAgentId(),
+            'status' => $widget->getStatus(),
+            'config' => $isOwner ? $widget->getConfig() : self::withoutSecrets($widget->getConfig()),
+            'allowedDomains' => $widget->getAllowedDomains(),
+            'isActive' => $this->widgetService->isWidgetActive($widget),
+            'created' => $widget->getCreated(),
+            'updated' => $widget->getUpdated(),
+            'stats' => $isOwner ? $this->sessionService->getWidgetStats($widgetId) : null,
+        ];
+        if ($this->iamConfig->isSharingEnabled((int) $user->getId())) {
+            $widgetPayload['access'] = $this->widgetAccess($user, $widget);
+            $widgetPayload['shared'] = $widget->getOwnerId() !== (int) $user->getId();
+            $widgetPayload['ownerId'] = $widget->getOwnerId();
+        }
 
         return $this->json([
             'success' => true,
-            'widget' => [
-                'id' => $widget->getId(),
-                'widgetId' => $widget->getWidgetId(),
-                'name' => $widget->getName(),
-                'taskPromptTopic' => $widget->getTaskPromptTopic(),
-                'status' => $widget->getStatus(),
-                'config' => $widget->getConfig(),
-                'allowedDomains' => $widget->getAllowedDomains(),
-                'isActive' => $this->widgetService->isWidgetActive($widget),
-                'created' => $widget->getCreated(),
-                'updated' => $widget->getUpdated(),
-                'stats' => $stats,
-            ],
+            'widget' => $widgetPayload,
         ]);
     }
 
@@ -293,7 +363,18 @@ class WidgetController extends AbstractController
         path: '/api/v1/widgets/{widgetId}',
         summary: 'Update widget',
         security: [['Bearer' => []]],
-        tags: ['Widgets']
+        tags: ['Widgets'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', example: 'Support Chat'),
+                    new OA\Property(property: 'config', type: 'object'),
+                    new OA\Property(property: 'status', type: 'string', enum: ['active', 'inactive']),
+                    new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
+                ]
+            )
+        )
     )]
     public function update(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -307,7 +388,9 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Edit)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
@@ -318,12 +401,18 @@ class WidgetController extends AbstractController
                 $this->widgetService->updateWidgetName($widget, $data['name']);
             }
 
-            if (isset($data['config'])) {
-                $this->widgetService->updateWidget($widget, $data['config']);
+            if (isset($data['config']) && is_array($data['config'])) {
+                // An editor only ever saw the masked credentials; a round-trip
+                // of the mask must not overwrite the owner's real values.
+                $this->widgetService->updateWidget($widget, self::withoutSecretMasks($data['config']));
             }
 
             if (isset($data['status']) && in_array($data['status'], ['active', 'inactive'])) {
                 $widget->setStatus($data['status']);
+            }
+
+            if (array_key_exists('agentId', $data)) {
+                $this->bindWidgetAgent($user, $widget, $data['agentId']);
             }
 
             $this->em->flush();
@@ -332,6 +421,8 @@ class WidgetController extends AbstractController
                 'success' => true,
                 'message' => 'Widget updated successfully',
             ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (\Exception $e) {
             $this->logger->error('Failed to update widget', [
                 'error' => $e->getMessage(),
@@ -367,11 +458,14 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Manage)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
         try {
+            $this->shareRepository->deleteByResource(WidgetKind::KEY, (string) $widget->getId());
             $this->widgetService->deleteWidget($widget);
 
             return $this->json([
@@ -1410,5 +1504,82 @@ class WidgetController extends AbstractController
         }
 
         return ['urls' => $urls, 'promptId' => $prompt->getId()];
+    }
+
+    /**
+     * Config keys that are credentials. They are the owner's alone; a sharee
+     * sees that the integration is configured, never the secret itself.
+     */
+    private const SECRET_CONFIG_KEYS = ['slackWebhookUrl', 'externalApiToken'];
+    private const SECRET_MASK = '***';
+
+    /**
+     * @param array<string, mixed> $config
+     *
+     * @return array<string, mixed>
+     */
+    private static function withoutSecrets(array $config): array
+    {
+        foreach (self::SECRET_CONFIG_KEYS as $key) {
+            if (isset($config[$key]) && is_string($config[$key]) && '' !== $config[$key]) {
+                $config[$key] = self::SECRET_MASK;
+            }
+        }
+
+        return $config;
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     *
+     * @return array<string, mixed>
+     */
+    private static function withoutSecretMasks(array $config): array
+    {
+        foreach (self::SECRET_CONFIG_KEYS as $key) {
+            if (self::SECRET_MASK === ($config[$key] ?? null)) {
+                unset($config[$key]);
+            }
+        }
+
+        return $config;
+    }
+
+    private function widgetAccess(User $user, Widget $widget): string
+    {
+        if ($widget->getOwnerId() === (int) $user->getId()) {
+            return 'owner';
+        }
+        $granted = $this->accessGate->highestGranted($user, WidgetKind::KEY, (string) $widget->getId());
+        if (null === $granted) {
+            return 'read';
+        }
+
+        return $granted->value;
+    }
+
+    private function bindWidgetAgent(User $user, Widget $widget, mixed $agentId): void
+    {
+        if (null === $agentId || '' === $agentId || 0 === $agentId) {
+            $this->widgetService->bindAgent($widget, null);
+
+            return;
+        }
+        $id = (int) $agentId;
+        if ($id < 1) {
+            throw new \InvalidArgumentException('agentId is invalid');
+        }
+        if (null === $this->agentConfig || !$this->agentConfig->isEnabled((int) $user->getId())) {
+            throw new \InvalidArgumentException('Assistants are not enabled');
+        }
+        if (null === $this->agentAccess) {
+            throw new \InvalidArgumentException('Assistants are not enabled');
+        }
+        try {
+            $this->agentAccess->require($user, $id, Permission::Use);
+        } catch (AgentNotAccessibleException) {
+            throw new \InvalidArgumentException('You cannot use this assistant');
+        }
+        $this->widgetService->bindAgent($widget, $id);
     }
 }

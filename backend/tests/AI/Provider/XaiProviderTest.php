@@ -6,6 +6,7 @@ namespace App\Tests\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\XaiProvider;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -169,6 +170,27 @@ class XaiProviderTest extends TestCase
         $request = $this->buildChatOptions([], ['model' => 'grok-4.5', 'cache_key' => 'thread-42'], false);
 
         $this->assertSame('thread-42', $request['prompt_cache_key']);
+    }
+
+    // ==================== STRUCTURED OUTPUT (Phase 2a) ====================
+
+    public function testChatRequestMergesStructuredOutputAsJsonSchema(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'grok-4.5',
+            'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
+        ], false);
+
+        $this->assertSame('json_schema', $request['response_format']['type']);
+        $this->assertSame('sort_result', $request['response_format']['json_schema']['name']);
+        $this->assertSame(['type' => 'object'], $request['response_format']['json_schema']['schema']);
+    }
+
+    public function testChatRequestWithoutStructuredOutputOmitsResponseFormat(): void
+    {
+        $request = $this->buildChatOptions([], ['model' => 'grok-4.5'], false);
+
+        $this->assertArrayNotHasKey('response_format', $request);
     }
 
     // ==================== REASONING EFFORT ====================

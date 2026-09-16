@@ -5,6 +5,7 @@ import { ref, computed } from 'vue'
 import { authService, type AuthUser, type ImpersonatorInfo } from '@/services/authService'
 import { useConfigStore } from '@/stores/config'
 import { clearPendingRedirect } from '@/utils/pendingAuthRedirect'
+import { beginSessionTeardown, endSessionTeardown } from '@/services/sessionTeardown'
 import { redeemPendingIapPurchaseAfterAuth } from '@/services/iapPostAuthRedemption'
 
 export type User = AuthUser
@@ -139,6 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
   function syncFromAuthService(): void {
     user.value = authService.getUser().value
     impersonator.value = authService.getImpersonator().value
+    if (user.value) endSessionTeardown()
     publishPrincipal()
   }
 
@@ -207,7 +209,25 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
 
+    const { beginAuthMutation, endAuthMutation, getInFlightRefresh } =
+      await import('@/services/api/httpClient')
+    // Same cookie-swap lock as impersonation: a refresh that started on the
+    // expired-session login page still carries the dead cookie. If it lands
+    // after this POST, it 401s and logout() clears the hint — the new session
+    // looks logged out even though the cookies were just set.
+    beginAuthMutation()
     try {
+      // Only the httpClient pool: authService._doRefresh waits on this lock
+      // before fetching, so joining it here would deadlock.
+      const pendingHttpRefresh = getInFlightRefresh()
+      if (pendingHttpRefresh) {
+        try {
+          await pendingHttpRefresh
+        } catch {
+          /* a failed stale refresh must not abort login */
+        }
+      }
+
       const result = await authService.login(email, password, recaptchaToken)
 
       if (result.success) {
@@ -229,6 +249,7 @@ export const useAuthStore = defineStore('auth', () => {
       error.value = 'Network error'
       return false
     } finally {
+      endAuthMutation()
       loading.value = false
     }
   }
@@ -259,6 +280,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(silent = false): Promise<void> {
+    // Before anything is cleared: from here until the browser leaves this page
+    // an unauthenticated state is the expected state, and nothing may navigate
+    // on its own or keep talking to protected endpoints. See sessionTeardown.
+    beginSessionTeardown()
+
     // Clear user immediately to prevent any auth checks during logout
     user.value = null
     impersonator.value = null
@@ -297,6 +323,15 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = false
       error.value = null
     }
+  }
+
+  /**
+   * Mirror a session that was opened outside `login()` — the setup wizard
+   * signs the new administrator in via cookies, then calls this so the rest
+   * of the SPA (and the completion-screen navigation) see a signed-in user.
+   */
+  function adoptCurrentSession(): void {
+    syncFromAuthService()
   }
 
   async function refreshUser(): Promise<void> {
@@ -419,29 +454,70 @@ export const useAuthStore = defineStore('auth', () => {
    * can show success / error notifications.
    */
   async function startImpersonation(userId: number): Promise<{ success: boolean; error?: string }> {
-    const { impersonationApi } = await import('@/services/api/impersonationApi')
-    const result = await impersonationApi.start(userId)
+    const [
+      { impersonationApi },
+      { beginAuthMutation, endAuthMutation, getInFlightRefresh, refreshAccessToken },
+    ] = await Promise.all([
+      import('@/services/api/impersonationApi'),
+      import('@/services/api/httpClient'),
+    ])
 
-    if (!result.success) {
-      return { success: false, error: result.error }
-    }
-
-    // Drop any chat / message state the admin had loaded before we swap the
-    // principal. The persisted `activeChatId` belongs to the admin and would
-    // 404 against the impersonated user (#999). Doing this before
-    // refreshUser() guarantees that whatever route re-renders next sees a
-    // clean slate.
+    // Guard the cookie-swap window (impersonate response -> /auth/me read)
+    // against the automatic 401 -> /auth/refresh path. A refresh that fires
+    // here still carries the admin's pre-swap cookies (the impersonation stash
+    // is not set yet), so the backend mints a REGULAR admin token that clobbers
+    // the impersonation cookie and /auth/me then reports no impersonator — the
+    // banner never mounts. The lock makes any concurrent 401 wait for the swap
+    // and retry with the new cookie instead of racing it.
+    beginAuthMutation()
     try {
-      await resetUserScopedClientState()
-      await teardownRealtimeState()
-    } catch (cleanupErr) {
-      console.warn('User state cleanup failed during impersonation start', cleanupErr)
+      // Let a refresh that started *before* the lock settle first, so our
+      // impersonate response is guaranteed to be the last writer of the cookie.
+      const inFlight = getInFlightRefresh()
+      if (inFlight) {
+        try {
+          await inFlight
+        } catch {
+          // A failed background refresh must not abort the swap.
+        }
+      }
+
+      // Mint a fresh admin access token as the guaranteed LAST writer before
+      // the swap. impersonationApi.start() is a raw fetch with no 401-retry, so
+      // without this it would fail outright if the admin's short-lived access
+      // cookie had already expired and no refresh happened to be in flight.
+      // Bypass the lock we hold — no competing refresh can run right now.
+      // Best-effort: on failure the impersonate call surfaces the real error.
+      await refreshAccessToken({ bypassMutationLock: true })
+
+      const result = await impersonationApi.start(userId)
+      if (!result.success) {
+        return { success: false, error: result.error }
+      }
+
+      // Drop any chat / message state the admin had loaded before we swap the
+      // principal. The persisted `activeChatId` belongs to the admin and would
+      // 404 against the impersonated user (#999). Doing this before
+      // refreshUser() guarantees that whatever route re-renders next sees a
+      // clean slate.
+      try {
+        await resetUserScopedClientState()
+        await teardownRealtimeState()
+      } catch (cleanupErr) {
+        console.warn('User state cleanup failed during impersonation start', cleanupErr)
+      }
+
+      // Re-fetch /auth/me so user + impersonator + level + isAdmin all reflect
+      // the post-swap session in one consistent step.
+      await refreshUser()
+    } finally {
+      // Release before the non-critical follow-ups below: config reload and the
+      // realtime resubscribe issue their own httpClient requests and must be
+      // able to refresh normally again.
+      endAuthMutation()
     }
 
-    // Re-fetch /auth/me so user + impersonator + level + isAdmin all reflect
-    // the post-swap session in one consistent step. We also reload the config
-    // store, since plugin/feature visibility is user-scoped.
-    await refreshUser()
+    // Reload the config store, since plugin/feature visibility is user-scoped.
     try {
       await useConfigStore().reload()
     } catch (err) {
@@ -461,40 +537,76 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Exit the active impersonation and restore the admin session. Same
-   * refresh pattern as `startImpersonation`.
+   * Exit the active impersonation and restore the admin session. The
+   * cookie-swap window matches `startImpersonation` (mutation lock, token
+   * refresh, API, user-state reset, `/auth/me`). Config reload and realtime
+   * resubscribe are fire-and-forget so the caller can `router.push('/admin')`
+   * as soon as the session is restored — those follow-ups must not delay the
+   * landing page past the banner hide (`refreshUser` clears `impersonator`).
    */
   async function stopImpersonation(): Promise<{ success: boolean; error?: string }> {
-    const { impersonationApi } = await import('@/services/api/impersonationApi')
-    const result = await impersonationApi.stop()
+    const [
+      { impersonationApi },
+      { beginAuthMutation, endAuthMutation, getInFlightRefresh, refreshAccessToken },
+    ] = await Promise.all([
+      import('@/services/api/impersonationApi'),
+      import('@/services/api/httpClient'),
+    ])
 
-    if (!result.success) {
-      return { success: false, error: result.error }
+    // Symmetric to startImpersonation: while exiting, a concurrent refresh
+    // still carrying the impersonation cookies (stash present) would be
+    // impersonation-aware and re-mint an impersonation token, clobbering the
+    // admin session the exit endpoint just restored. Guard the swap window.
+    beginAuthMutation()
+    try {
+      const inFlight = getInFlightRefresh()
+      if (inFlight) {
+        try {
+          await inFlight
+        } catch {
+          // A failed background refresh must not abort the swap.
+        }
+      }
+
+      // Keep the session alive as the last writer before exiting: the exit call
+      // is a raw fetch with no 401-retry, so a fresh (still impersonation-aware)
+      // token guarantees it can authenticate even if the current access cookie
+      // just expired. Bypass the lock we hold; best-effort.
+      await refreshAccessToken({ bypassMutationLock: true })
+
+      const result = await impersonationApi.stop()
+      if (!result.success) {
+        return { success: false, error: result.error }
+      }
+
+      // Symmetric to startImpersonation: the chat state currently in memory
+      // belongs to the impersonated user and must not bleed back into the
+      // admin's own session (#999).
+      try {
+        await resetUserScopedClientState()
+        await teardownRealtimeState()
+      } catch (cleanupErr) {
+        console.warn('User state cleanup failed during impersonation stop', cleanupErr)
+      }
+
+      await refreshUser()
+    } finally {
+      endAuthMutation()
     }
 
-    // Symmetric to startImpersonation: the chat state currently in memory
-    // belongs to the impersonated user and must not bleed back into the
-    // admin's own session (#999).
-    try {
-      await resetUserScopedClientState()
-      await teardownRealtimeState()
-    } catch (cleanupErr) {
-      console.warn('User state cleanup failed during impersonation stop', cleanupErr)
-    }
-
-    await refreshUser()
-    try {
-      await useConfigStore().reload()
-    } catch (err) {
-      console.warn('Config reload after impersonation stop failed:', err)
-    }
-
-    // Re-open realtime for the restored admin principal.
-    try {
-      await resubscribeRealtimeState()
-    } catch (realtimeErr) {
+    // Config reload + realtime resubscribe are user-scoped follow-ups, not
+    // part of the session swap. Awaiting them here delayed onExit's
+    // router.push('/admin') until after the banner already hid (refreshUser
+    // clears impersonator). CI then waited 15s for view-admin on the chat
+    // page and timed out. Kick them off without blocking the admin landing.
+    void useConfigStore()
+      .reload()
+      .catch((err) => {
+        console.warn('Config reload after impersonation stop failed:', err)
+      })
+    void resubscribeRealtimeState().catch((realtimeErr) => {
       console.warn('Realtime resubscribe after impersonation stop failed:', realtimeErr)
-    }
+    })
 
     return { success: true }
   }
@@ -526,6 +638,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
+    adoptCurrentSession,
     refreshUser,
     checkAuth,
     handleOAuthCallback,

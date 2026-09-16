@@ -52,9 +52,11 @@ Partner Network terms becomes the **alliance lead**.
    business days for the Seller Operations review of the listing itself. The
    automated AMI scan is usually under an hour.
 
-Fixed technical constraints, which the build already satisfies: the source AMI
-must live in **us-east-1**, unencrypted, EBS-backed and HVM, and every
-CloudFormation template needs an architecture diagram
+Fixed technical constraints, which the build enforces: the source AMI must live
+in **us-east-1**, be unencrypted, EBS-backed and HVM, and be shared with AWS
+Marketplace ingestion account `679593333241`. Marketplace encrypts its copy
+during ingestion; every buyer volume is also encrypted by the deployment
+templates. Every CloudFormation template needs an architecture diagram
 ([`deploy/aws/cloudformation/architecture.md`](../deploy/aws/cloudformation/architecture.md)).
 
 ## Who needs which access
@@ -112,30 +114,47 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
+The same command updates the roles later, and it has to be run again whenever
+the template changes: the account keeps the permissions it was deployed with, so
+a permission added here reaches the build role only after a redeploy. A missing
+one shows up as `AccessDenied` in the verification stack, after the AMI it was
+meant to verify has already been built.
+
 - **`AWSMarketplaceAmiIngestion`** lets AWS Marketplace copy a submitted AMI into
-  its own account for the security scan. Name it in the Management Portal under
-  Settings.
+  its own account for the security scan. Every submitted version names it, in the
+  Add Version form's *IAM access role ARN* field or, when a version is submitted
+  automatically, in the `AmiSource` that goes with it. Store its ARN as the repository secret
+  `AWS_MARKETPLACE_INGESTION_ROLE_ARN`.
 - **The build role** is assumed by this repository's release workflow through
   GitHub OIDC — there is no access key anywhere in this repository, and there
   must never be. Store its ARN as the repository secret
   `AWS_AMI_BUILD_ROLE_ARN`. Until that secret exists,
   [`aws-ami.yml`](../.github/workflows/aws-ami.yml) skips itself with a notice,
-  so releases stay green in the meantime.
+  so releases stay green in the meantime. The role trusts the workflow's
+  `ami-build` GitHub environment rather than a branch, so a deployment fix can
+  be built and verified from its pull request branch before it is merged; to
+  require a human approval per build, add a required-reviewers protection rule
+  to that environment in the repository settings.
 
 ## Submission sequence
 
 Each step is cheap, and each one catches what the next would otherwise catch
 later and slower.
 
-1. **Build the AMI.** Push a release tag; the workflow builds x86_64 and arm64 in
-   us-east-1, then launches the x86_64 image through
-   `synaplan-new-vpc.yaml`, runs the smoke test on it over Session Manager, and
+1. **Build the AMI.** After the release tag's CI run is green, `aws-ami.yml`
+   starts from that `workflow_run` and builds x86_64 in
+   us-east-1, verifies its snapshot is unencrypted, shares the source AMI with
+   the Marketplace ingestion account, then launches it through
+   `synaplan-new-vpc.yaml`, runs the smoke test over Session Manager, and
    deletes the stack. About 20 minutes and a few cents of instance time.
+   `arm64` can be built the same way by hand, for testing a Graviton image
+   outside Marketplace — see [Why x86_64 only](#why-x86_64-only).
 2. **Test Add Version** in the Management Portal. A free automated compliance
    scan that reports exactly what the review would otherwise reject: password
    authentication, root login, known CVEs, credentials left in the image.
    `deploy/aws/scripts/harden.sh` fails the Packer build on the first three, so
-   this should be a formality.
+   this should be a formality. Only needed while the listing is new — once the
+   secrets below are set, every release's versions are offered automatically.
 3. **Create the product** as a Limited listing — published, but visible only to
    the seller account and any account we allowlist. Subscribe and launch it the
    way a customer will, including one-click "Launch from Website". This is the
@@ -145,6 +164,149 @@ later and slower.
    three regions. Each region is real instance time for no extra signal beyond
    the third.
 5. **Request public visibility.**
+
+## Submitting a version automatically
+
+Once the listing exists,
+[`marketplace-versions.yml`](../.github/workflows/marketplace-versions.yml) offers
+each release to it through the Marketplace Catalog API. It runs hourly, and needs
+two secrets — without either of them it skips itself with a notice rather than
+failing every hour:
+
+| Secret | Value |
+| --- | --- |
+| `AWS_MARKETPLACE_PRODUCT_ID` | the listing's product ID, `prod-…` |
+| `AWS_MARKETPLACE_INGESTION_ROLE_ARN` | the `IngestionRoleArn` output of the roles stack |
+
+Nothing else has to be switched on, and nothing has to be switched over later.
+
+### Why x86_64 only
+
+An AWS Marketplace AMI product is tied to the CPU architecture of the versions
+it has already published: `AddInstanceTypes` is checked against that
+architecture, and answers `INVALID_AMI_ARCHITECTURE` for a Graviton instance
+type once any version is x86_64 — including when the arm64 version is added in
+the very same change set, so there is no ordering trick around it. A Graviton
+image would need a **separate** Marketplace listing, with its own product ID,
+not a second architecture on this one. `aws-ami.yml` still builds an arm64 image
+by hand on request, for testing outside Marketplace, but nothing here ever
+submits it.
+
+None of this is new. `deploy/aws/marketplace/README.md` opens with "AWS
+Marketplace AMI products are architecture-specific", and the arm64 CloudFormation
+templates next to it were generated for precisely that separate Graviton product.
+This page contradicted them — it claimed two architectures were two versions of
+one product and called that "AWS's rule" — and a release was spent finding out
+which of the two was right. The answer is written here now so the next reader
+starts from it.
+
+Titles still carry the architecture — `<version> (x86_64)` — because the first
+published version already did, and dropping it now would make the version
+picker inconsistent for buyers, not simpler.
+
+Only one version is ever in flight regardless: AWS answers a second
+`AddDeliveryOptions` on the same product with an error while one is still
+processing, and ingesting an AMI is slow — AWS copies the image into every
+region of the listing and scans it for vulnerabilities, which its own
+documentation puts at *a few hours*. When waiting out the hour is not worth it,
+start the workflow by hand: **Actions** → **Marketplace Versions** →
+**Run workflow**, from `main` — it refuses any other branch, because it would
+read that branch's version pin and offer a version nobody released.
+
+### What it submits, and what it will not
+
+The workflow keeps no state of its own, which is what makes an hourly job safe
+here. Everything it decides on, it reads:
+
+- **the release** from the version the deployment catalog pins on `main`, so a
+  tag whose rollout a guard held back is not offered;
+- **the image** from the `SynaplanVersion`, `Architecture` and `SmokeTested` tags
+  on the AMI;
+- **the recommended instance type** from the listing's own available types, and
+  each type's architecture from EC2;
+- **what is already submitted** from the listing *and* from the change set
+  history.
+
+Both halves of that last point are needed, because what the listing shows is not
+everything it has been sent. A version AWS is still ingesting is not part of the
+entity yet, and one that failed never becomes part of it. Only the change set
+history knows about either, and without it a version in flight would be sent a
+second time, for AWS to reject with `DUPLICATE_VERSION_TITLE`.
+
+Which architecture is still missing is decided in
+[`scripts/marketplace-change-set.mjs`](../scripts/marketplace-change-set.mjs),
+under test, rather than in the workflow. It was two lines of `jq` there once, and
+they were wrong: inside `index(...)` a `.` refers to that filter's own input, so
+the interpolated title never matched anything, every architecture always counted
+as missing, and the same version was offered again on every run.
+
+**A failed version is not retried.** AWS fails a version because it found
+something in the image, and the same image fails again; an hourly retry would
+only repeat a rejection somebody has already read. Build a new AMI, or dispatch
+the workflow once the reason is gone.
+
+`SmokeTested` is the tag [`aws-ami.yml`](../.github/workflows/aws-ami.yml) writes
+onto the x86_64 image once it booted and served. It is required, not preferred:
+the AMI build may be dispatched from any branch, so a deployment fix can be
+verified from its pull request, and that mark is what keeps such a trial build
+out of a public listing. Nothing in the build offers a version itself — one
+place submits, so a re-run cannot offer the same version twice.
+
+### The listing's instance types
+
+A version names a **recommended instance type**, and it has to be one the listing
+offers under *Compatibility*. It is read from there rather than chosen in code,
+because a type the listing does not offer is rejected —
+`RECOMMENDED_INSTANCE_TYPE_NOT_AVAILABLE` — and because a type once removed from
+`synaplan-new-vpc.yaml` should not need a code change here too. Which type
+belongs to which architecture is asked of EC2, not read off the family letter,
+though x86_64 is the only architecture this listing will ever check it against —
+see [Why x86_64 only](#why-x86_64-only).
+
+A listing offering **no** instance types at all fails the run rather than being
+skipped quietly: nothing could ever be offered, and waiting does not fix it. The
+listing should offer what
+[`synaplan-new-vpc.yaml`](../deploy/aws/cloudformation/synaplan-new-vpc.yaml)
+accepts for x86_64: `c7i.xlarge`, `m7i.xlarge`, `m7i.2xlarge`, `r7i.xlarge`. The
+first type the listing names is the one recommended, so its order there is worth
+a thought.
+
+A rejection is also what this workflow reports: it turns that run red and, if
+`DISCORD_RELEASE_WEBHOOK` is set, says so in the channel. It stays silent
+otherwise, because an hourly job that reports "nothing to do" teaches everyone to
+ignore it.
+
+A submitted version still sits in AWS review for days, and nothing here
+publishes it. If a submission turns out to be wrong, cancel its change set —
+`CancelChangeSet` is part of the build role's permissions:
+
+```bash
+aws marketplace-catalog cancel-change-set \
+  --catalog AWSMarketplace --change-set-id <id>
+```
+
+### Finding the product ID
+
+Management Portal → **Products** → **Server**. Open the listing; the ID is in the
+detail view and in the URL:
+
+```text
+https://aws.amazon.com/marketplace/management/products/server/prod-xxxxxxxxxxxxx
+```
+
+Or ask the API, with the build role's new catalog permissions:
+
+```bash
+aws marketplace-catalog list-entities \
+  --region us-east-1 \
+  --catalog AWSMarketplace \
+  --entity-type AmiProduct \
+  --query 'EntitySummaryList[].{Id:EntityId,Name:Name,Visibility:Visibility}'
+```
+
+An empty list means the listing has not been created yet — do the steps above
+first. `marketplace-versions.yml` stays skipped until the secret is set, so
+releases keep working in the meantime.
 
 ## Usage Instructions
 
@@ -283,3 +445,34 @@ Deliberately avoided: a NAT gateway (~32 USD/month — a public subnet with an
 internet gateway does the same job here), an Application Load Balancer
 (~18 USD/month — Caddy terminates TLS on the instance), and Secrets Manager
 (0.40 USD per secret per month — the Parameter Store standard tier is free).
+
+### What the seller account itself costs
+
+Not nothing, and it does not stay flat by itself. Two things accumulate:
+
+- **Every release leaves an AMI**, and a registered AMI keeps a 30 GiB snapshot
+  alive behind it. One release is cents a month; a year of releases is not.
+- **A cancelled workflow run leaves a Packer builder**, because the cancellation
+  kills Packer before it can terminate its own instance. A stopped instance costs
+  no compute, but its root volume is billed exactly like a running one.
+
+Both happened. Twenty-six AMIs had piled up since 4.2.4 — eleven of them from a
+single day of iterating on one release — and two builders sat stopped on 60 GiB
+of gp3 for eleven days. Together roughly 0.36 USD a day and rising, which is what
+a first surprise bill looks like on an account whose only purpose is one listing.
+
+[`aws-cleanup.yml`](../.github/workflows/aws-cleanup.yml) runs nightly against
+both. It keeps every image a published listing version launches from, the two
+newest releases, and anything without this pipeline's tags; it terminates
+builders older than six hours found by the `PackerBuilder` tag; and it reports
+unattached volumes rather than deleting them, because it cannot know what is on
+one. Which images may go is decided in
+[`scripts/ami-retention.mjs`](../scripts/ami-retention.mjs) under test, since a
+wrong answer breaks a buyer's launch and cannot be undone.
+
+Age alone is never the reason an image goes: the listing still offers 4.2.4 next
+to the current release, and that version launches from an image far older than
+any retention window would keep.
+
+Dispatch the workflow with **Only report what would be deleted** to read its
+reasoning before it acts.

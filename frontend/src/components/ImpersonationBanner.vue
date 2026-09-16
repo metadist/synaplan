@@ -79,6 +79,7 @@ import { Icon } from '@iconify/vue'
 
 import { useAuth } from '@/composables/useAuth'
 import { useNotification } from '@/composables/useNotification'
+import { getConfig } from '@/services/api/httpClient'
 
 /**
  * Persistent impersonation indicator.
@@ -124,9 +125,13 @@ async function onExit(): Promise<void> {
     const result = await stopImpersonation()
     if (result.success) {
       success(t('admin.impersonate.stopped'))
-      // Send the admin back to the user list so they can either pick another
-      // impersonation target or continue admin work without a stale view.
-      await router.push({ name: 'admin', query: { tab: 'users' } }).catch(() => {})
+      // stopImpersonation() kicks off config reload without awaiting it and
+      // that reload nulls the runtime-config cache first. Wait so People
+      // sees the real IAM flags when it decides whether to show the tab bar.
+      await getConfig()
+      // People is the only user list (NV01). Do not swallow navigation
+      // failures — a silent `.catch` left CI on `/` after the banner hid.
+      await router.push({ name: 'admin-people' })
     } else {
       error(result.error ?? t('admin.impersonate.stopFailed'))
     }

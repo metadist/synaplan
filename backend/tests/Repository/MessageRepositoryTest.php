@@ -164,45 +164,41 @@ class MessageRepositoryTest extends KernelTestCase
         $this->assertLessThanOrEqual(500, $totalChars, 'Total chars should not exceed limit');
     }
 
-    public function testFindChatHistoryIncludesFileTextInCharCount(): void
+    public function testFindChatHistoryDoesNotCountFileTextTowardCharBudget(): void
     {
-        // Create message with large file text
-        $message = new Message();
-        $message->setUserId($this->testUser->getId());
-        $message->setChat($this->testChat); // Use setChat()
-        $message->setTrackingId(time());
-        $message->setUnixTimestamp(time());
-        $message->setDateTime(date('YmdHis'));
-        $message->setText('Short text');  // 10 chars
-        $message->setFileText(str_repeat('x', 1000));  // 1000 chars
-        $message->setDirection('IN');
-        $message->setProviderIndex('WEB');
-        $message->setMessageType('TEST');
-        $message->setTopic('CHAT');
-        $message->setLanguage('en');
-        $message->setStatus('complete');
-        $this->em->persist($message);
+        $older = new Message();
+        $older->setUserId($this->testUser->getId());
+        $older->setChat($this->testChat);
+        $older->setTrackingId(time());
+        $older->setUnixTimestamp(time());
+        $older->setDateTime(date('YmdHis'));
+        $older->setText('Short text');
+        $older->setFileText(str_repeat('x', 1000));
+        $older->setDirection('IN');
+        $older->setProviderIndex('WEB');
+        $older->setMessageType('TEST');
+        $older->setTopic('CHAT');
+        $older->setLanguage('en');
+        $older->setStatus('complete');
+        $this->em->persist($older);
 
-        // Create second message
-        $message2 = new Message();
-        $message2->setUserId($this->testUser->getId());
-        $message2->setChat($this->testChat); // Use setChat()
-        $message2->setTrackingId(time());
-        $message2->setUnixTimestamp(time() + 1);
-        $message2->setDateTime(date('YmdHis'));
-        $message2->setText('Another message');
-        $message2->setDirection('IN');
-        $message2->setProviderIndex('WEB');
-        $message2->setMessageType('TEST');
-        $message2->setTopic('CHAT');
-        $message2->setLanguage('en');
-        $message2->setStatus('complete');
-        $this->em->persist($message2);
+        $newer = new Message();
+        $newer->setUserId($this->testUser->getId());
+        $newer->setChat($this->testChat);
+        $newer->setTrackingId(time());
+        $newer->setUnixTimestamp(time() + 1);
+        $newer->setDateTime(date('YmdHis'));
+        $newer->setText('Another message');
+        $newer->setDirection('IN');
+        $newer->setProviderIndex('WEB');
+        $newer->setMessageType('TEST');
+        $newer->setTopic('CHAT');
+        $newer->setLanguage('en');
+        $newer->setStatus('complete');
+        $this->em->persist($newer);
 
         $this->em->flush();
 
-        // Request with 500 char limit - should only return newest message
-        // because first message is 1010 chars (text + fileText)
         $history = $this->repository->findChatHistory(
             $this->testUser->getId(),
             $this->testChat->getId(),
@@ -210,8 +206,36 @@ class MessageRepositoryTest extends KernelTestCase
             500
         );
 
-        $this->assertCount(1, $history, 'Should only return 1 message within char limit');
-        $this->assertEquals('Another message', $history[0]->getText());
+        $this->assertCount(2, $history, 'fileText must not evict older text-only turns');
+        $this->assertEquals('Short text', $history[0]->getText());
+        $this->assertEquals('Another message', $history[1]->getText());
+    }
+
+    public function testFindChatHistoryExcludeMessageIdKeepsPriorTurnsWhenCurrentIsHuge(): void
+    {
+        $prior = $this->createTestMessage('My name is Thomas', 100);
+        $current = $this->createTestMessage(str_repeat('x', 20000), 200);
+
+        $withoutExclude = $this->repository->findChatHistory(
+            $this->testUser->getId(),
+            $this->testChat->getId(),
+            15,
+            15000
+        );
+        $this->assertCount(1, $withoutExclude);
+        $this->assertSame($current->getId(), $withoutExclude[0]->getId());
+
+        $history = $this->repository->findChatHistory(
+            $this->testUser->getId(),
+            $this->testChat->getId(),
+            15,
+            15000,
+            $current->getId(),
+        );
+
+        $this->assertCount(1, $history);
+        $this->assertSame($prior->getId(), $history[0]->getId());
+        $this->assertSame('My name is Thomas', $history[0]->getText());
     }
 
     public function testFindChatHistoryAlwaysReturnsAtLeastOneMessage(): void
@@ -539,6 +563,86 @@ class MessageRepositoryTest extends KernelTestCase
     public function testCountByChatIdsReturnsEmptyMapForEmptyInput(): void
     {
         $this->assertSame([], $this->repository->countByChatIds([]));
+    }
+
+    /**
+     * The live-chat quiet exception is an OR. Doctrine andWhere() does not
+     * wrap the expression, so without extra parens `unixTimestamp < :beforeUnix`
+     * would bypass user / cursor / source filters and leak other users' rows.
+     */
+    public function testFindDigestCandidatesLiveChatOrDoesNotBypassUserFilter(): void
+    {
+        $otherUser = new User();
+        $otherUser->setMail('digest_leak_'.time().'@test.com');
+        $otherUser->setPw('test123');
+        $otherUser->setProviderId('WEB');
+        $otherUser->setUserLevel('NEW');
+        $this->em->persist($otherUser);
+        $this->em->flush();
+
+        $otherChat = new Chat();
+        $otherChat->setUserId($otherUser->getId());
+        $otherChat->setTitle('Other user chat');
+        $this->em->persist($otherChat);
+        $this->em->flush();
+
+        $foreign = new Message();
+        $foreign->setUserId($otherUser->getId());
+        $foreign->setChat($otherChat);
+        $foreign->setTrackingId(time());
+        $foreign->setUnixTimestamp(100);
+        $foreign->setDateTime(date('YmdHis', 100));
+        $foreign->setText('foreign old message');
+        $foreign->setDirection('IN');
+        $foreign->setProviderIndex('WEB');
+        $foreign->setMessageType('TEST');
+        $foreign->setTopic('CHAT');
+        $foreign->setLanguage('en');
+        $foreign->setStatus('complete');
+        $this->em->persist($foreign);
+        $this->em->flush();
+
+        $ownOtherChat = new Chat();
+        $ownOtherChat->setUserId($this->testUser->getId());
+        $ownOtherChat->setTitle('Own other chat');
+        $this->em->persist($ownOtherChat);
+        $this->em->flush();
+
+        $own = new Message();
+        $own->setUserId($this->testUser->getId());
+        $own->setChat($ownOtherChat);
+        $own->setTrackingId(time());
+        $own->setUnixTimestamp(9_999_999);
+        $own->setDateTime(date('YmdHis', 9_999_999));
+        $own->setText('own recent other-chat should match via chatId');
+        $own->setDirection('IN');
+        $own->setProviderIndex('WEB');
+        $own->setMessageType('TEST');
+        $own->setTopic('CHAT');
+        $own->setLanguage('en');
+        $own->setStatus('complete');
+        $this->em->persist($own);
+        $this->em->flush();
+
+        $hits = $this->repository->findDigestCandidates(
+            $this->testUser->getId(),
+            0,
+            1_000,
+            50,
+            null,
+            $this->testChat->getId(),
+        );
+
+        $ids = array_map(static fn (Message $m): int => (int) $m->getId(), $hits);
+        $this->assertContains($own->getId(), $ids);
+        $this->assertNotContains($foreign->getId(), $ids);
+
+        $this->em->remove($own);
+        $this->em->remove($ownOtherChat);
+        $this->em->remove($foreign);
+        $this->em->remove($otherChat);
+        $this->em->remove($otherUser);
+        $this->em->flush();
     }
 
     /**

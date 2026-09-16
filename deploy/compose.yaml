@@ -20,6 +20,11 @@ x-app-command: &app-command
         export WHISPER_ENABLED=false
         ;;
     esac
+    case ",$${COMPOSE_PROFILES:-}," in
+      *,office,*)
+        export OFFICE_CONVERT_URL=http://collabora:9980
+        ;;
+    esac
     exec /usr/local/bin/docker-entrypoint.sh
 x-app-environment: &app-environment
   APP_ENV: prod
@@ -44,6 +49,39 @@ x-app-environment: &app-environment
   BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
   BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
   BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE: "${BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE:-false}"
+  # Auth-surface switches (issues #462 / #1517). Empty keeps the application
+  # default, which is enabled, so an existing deployment is unaffected. An
+  # install reachable from the open internet that nobody watches wants
+  # registration off; SSO-/OIDC-only deployments set both to "false".
+  REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
+  GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
+  # Feature-flag pins (docs/FEATURE_FLAGS.md). Every flag is ON by default and
+  # managed under Operate > System configuration > Features; an empty value here
+  # keeps it that way. "false" pins the feature off for this deployment and
+  # locks the admin toggle. Module gates (FEATURE_MODULES_GATE_<ID>) are per
+  # module and go into a compose override when a deployment needs one.
+  FEATURE_IAM_GROUPS_ENABLED: "${FEATURE_IAM_GROUPS_ENABLED:-}"
+  FEATURE_IAM_SHARING_ENABLED: "${FEATURE_IAM_SHARING_ENABLED:-}"
+  FEATURE_IAM_GROUP_POLICIES_ENABLED: "${FEATURE_IAM_GROUP_POLICIES_ENABLED:-}"
+  FEATURE_IAM_DIRECTORY_SYNC_ENABLED: "${FEATURE_IAM_DIRECTORY_SYNC_ENABLED:-}"
+  FEATURE_AGENTS_ENABLED: "${FEATURE_AGENTS_ENABLED:-}"
+  FEATURE_AGENTS_ROUTABLE_ENABLED: "${FEATURE_AGENTS_ROUTABLE_ENABLED:-}"
+  FEATURE_BUNDLE_ENABLED: "${FEATURE_BUNDLE_ENABLED:-}"
+  FEATURE_WORKFLOWS_BUILDER_ENABLED: "${FEATURE_WORKFLOWS_BUILDER_ENABLED:-}"
+  FEATURE_MULTITASK_URL_FETCH_ENABLED: "${FEATURE_MULTITASK_URL_FETCH_ENABLED:-}"
+  FEATURE_TOOLS_REGISTRY_ENABLED: "${FEATURE_TOOLS_REGISTRY_ENABLED:-}"
+  FEATURE_TOOLS_APPROVALS_ENABLED: "${FEATURE_TOOLS_APPROVALS_ENABLED:-}"
+  FEATURE_TOOLS_CUSTOM_HTTP_ENABLED: "${FEATURE_TOOLS_CUSTOM_HTTP_ENABLED:-}"
+  FEATURE_DOCUMENT_TOOLS_ENABLED: "${FEATURE_DOCUMENT_TOOLS_ENABLED:-}"
+  FEATURE_DESKTOP_AGENT_ENABLED: "${FEATURE_DESKTOP_AGENT_ENABLED:-}"
+  FEATURE_PLATFORM_LINKS_ENABLED: "${FEATURE_PLATFORM_LINKS_ENABLED:-}"
+  # First-run setup wizard. Empty keeps it enabled, which is what a deployment
+  # without BOOTSTRAP_ADMIN_* needs: the API stays closed with 503 SETUP_REQUIRED
+  # until someone creates the first administrator at /setup. It never appears once
+  # the installation has a user, so an upgrade is unaffected either way.
+  SETUP_WIZARD_ENABLED: "${SETUP_WIZARD_ENABLED:-}"
+  # Browser-side (cloud-backed) speech-to-text; air-gapped deployments set "false".
+  WEB_SPEECH_ENABLED: "${WEB_SPEECH_ENABLED:-}"
   DB_HOST: db
   DB_PORT: "3306"
   DB_NAME: "${MARIADB_DATABASE:-synaplan}"
@@ -60,6 +98,9 @@ x-app-environment: &app-environment
   REALTIME_ALLOWED_ORIGINS: "${REALTIME_ALLOWED_ORIGINS:-${APP_URL}}"
   QDRANT_URL: http://qdrant:6333
   TIKA_BASE_URL: http://tika:9998
+  # Empty until the `office` profile sets it in x-app-command.
+  OFFICE_CONVERT_URL: "${OFFICE_CONVERT_URL:-}"
+  OFFICE_CONVERT_TIMEOUT_MS: "${OFFICE_CONVERT_TIMEOUT_MS:-60000}"
   COMPOSE_PROFILES: "${COMPOSE_PROFILES:-}"
   OLLAMA_BASE_URL: ""
   AUTO_DOWNLOAD_MODELS: "false"
@@ -81,10 +122,6 @@ x-app-environment: &app-environment
   GOOGLE_GEMINI_API_KEY: "${GOOGLE_GEMINI_API_KEY:-}"
   MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
   XAI_API_KEY: "${XAI_API_KEY:-}"
-  # Whether visitors can create their own account. An install reachable from the
-  # open internet that nobody watches wants this off; the application default
-  # stays `true` so an existing deployment is unaffected.
-  REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-true}"
   # Operator billing. Empty keys mean open-source mode: no plans, no quotas, no
   # upgrade prompts, and every tier gate open (see docs/BILLING_SELFHOST.md).
   # Setting them turns this install into a paid product run by YOU, billed
@@ -191,7 +228,7 @@ services:
     networks: [internal]
 
   db:
-    image: mariadb:12.3.2@sha256:759869cb6f003234a95c6384cdee245b4bce7de26913fe607a8110362c0c007d
+    image: mariadb:12.3.3@sha256:ab1c3dd381940233af12512b97d47b508fd3a0f17fbe3ba388739b7bc17cbc0b
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
       MARIADB_DATABASE: "${MARIADB_DATABASE:-synaplan}"
@@ -214,7 +251,7 @@ services:
     networks: [internal]
 
   redis:
-    image: redis:7.4-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - ./data/redis:/data
@@ -228,7 +265,7 @@ services:
     networks: [internal]
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.1@sha256:8ba0c9443dadedc21b20254b3fc76f35c1998b29acc7cdec877ea0c3636c237e
+    image: centrifugo/centrifugo:v6.9.5@sha256:99730b3f481c7ee639dbd2147716e3c12bd3ad191df5e8427e050414806609a3
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     environment:
       CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: "${REALTIME_TOKEN_SECRET:?Set a stable Centrifugo token secret}"
@@ -264,7 +301,7 @@ services:
     networks: [internal]
 
   qdrant:
-    image: qdrant/qdrant:v1.18.3@sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286
+    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
     volumes:
       - ./data/qdrant:/qdrant/storage
     healthcheck:
@@ -276,8 +313,30 @@ services:
     restart: unless-stopped
     networks: [internal]
 
+  # Optional Collabora CODE — LibreOffice convert-to. Off by default so the
+  # official 8 GB self-host floor stays valid. Enable with COMPOSE_PROFILES=office
+  # (or `--profile office`). No published port.
+  collabora:
+    image: collabora/code:26.04.3.2.1@sha256:379b8f1fc955dd6d01ba24adf61d1b177048ddaae179ae8c1e6a6342daccb282
+    profiles: [office]
+    environment:
+      extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
+    mem_limit: 2g
+    # CODE 26.04 is distroless: no bash, so the /dev/tcp probe of 25.04 cannot
+    # run here. coolwsd --probe is the upstream check (it is what the image's
+    # own HEALTHCHECK runs) and needs the exec form — a plain string would go
+    # through CMD-SHELL and fail for the same reason.
+    healthcheck:
+      test: ["CMD", "/usr/bin/coolwsd", "--probe", "--use-env-vars"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    networks: [internal]
+
   ollama:
-    image: ollama/ollama:latest@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
+    image: ollama/ollama:latest@sha256:0c0a83210471fb50226bcdc2d6611d20ab13ae87e024cc304c94a6a5765c5e65
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0

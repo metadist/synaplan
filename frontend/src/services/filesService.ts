@@ -182,6 +182,7 @@ export const fileSourceSchema = z.enum([
   'widget',
   'api',
   'generated',
+  'compute',
 ])
 export type FileSource = z.infer<typeof fileSourceSchema>
 
@@ -194,7 +195,14 @@ export const fileVectorStateSchema = z.enum([
 ])
 export type FileVectorState = z.infer<typeof fileVectorStateSchema>
 
-export const fileOriginKindSchema = z.enum(['image', 'video', 'audio', 'calendar', 'document'])
+export const fileOriginKindSchema = z.enum([
+  'image',
+  'video',
+  'audio',
+  'calendar',
+  'document',
+  'artefact',
+])
 export type FileOriginKind = z.infer<typeof fileOriginKindSchema>
 
 export const fileItemSchema = z.object({
@@ -216,6 +224,10 @@ export const fileItemSchema = z.object({
   provider: z.string().nullable().optional(),
   thumb_url: z.string().nullable().optional(),
   text_preview: z.string(),
+  /** Length of the stored extract; 0 on a failed row means nothing was readable. */
+  extracted_text_length: z.number().optional(),
+  /** Plain-language reason when the row failed with an empty extract. */
+  error: z.string().nullable().optional(),
   uploaded_at: z.number(),
   uploaded_date: z.string(),
   message_id: z.number().nullable(),
@@ -575,13 +587,16 @@ const uploadFilesBatch = async (
             const refreshResult = await refreshAccessToken()
             if (refreshResult.success) {
               resolve(await sendXhr(true))
+            } else if (refreshResult.transient) {
+              reject(
+                new UploadFailedError('gateway', 'Authentication temporarily unavailable', 503)
+              )
             } else {
               window.location.href = '/login?reason=session_expired'
               reject(new Error('Session expired'))
             }
           } catch {
-            window.location.href = '/login?reason=session_expired'
-            reject(new Error('Session expired'))
+            reject(new UploadFailedError('network', 'Authentication temporarily unavailable', 0))
           }
         } else if (xhr.status === 401) {
           window.location.href = '/login?reason=session_expired'
@@ -821,12 +836,93 @@ export const getFileContent = async (
  * @param fileId File ID
  * @param filename Original filename for download
  */
+export const exportUrl = (fileId: number, format = 'pdf', inline = false): string => {
+  const params = new URLSearchParams({ format })
+  if (inline) params.set('inline', '1')
+  return `${getApiBaseUrl()}/api/v1/files/${fileId}/export?${params.toString()}`
+}
+
+export const exportFile = async (
+  fileId: number,
+  format: 'pdf',
+  filename: string
+): Promise<void> => {
+  const blob = await httpClient<Blob>(`/api/v1/files/${fileId}/export`, {
+    responseType: 'blob',
+    params: { format },
+  })
+  await saveOrDownloadBlob(blob, filename)
+}
+
+export const exportGuestFile = async (
+  sessionId: string,
+  fileId: number,
+  format: 'pdf',
+  filename: string
+): Promise<void> => {
+  const blob = await httpClient<Blob>(
+    `/api/v1/guest/files/${encodeURIComponent(sessionId)}/${fileId}/export`,
+    {
+      responseType: 'blob',
+      params: { format },
+    }
+  )
+  await saveOrDownloadBlob(blob, filename)
+}
+
+const CombineFilesResponseSchema = z.object({
+  id: z.number(),
+  filename: z.string(),
+  file_type: z.string(),
+  file_size: z.number(),
+})
+
+export const combineFiles = async (
+  fileIds: number[],
+  filename?: string,
+  format: 'pdf' | 'docx' | 'xlsx' | 'pptx' = 'pdf'
+): Promise<z.infer<typeof CombineFilesResponseSchema>> => {
+  return httpClient('/api/v1/files/combine', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileIds, filename, format }),
+    schema: CombineFilesResponseSchema,
+  })
+}
+
+const FileRevisionsResponseSchema = z.object({
+  revisions: z.array(
+    z.object({
+      version: z.number(),
+      summary: z.string(),
+      source: z.string(),
+      created: z.number(),
+    })
+  ),
+})
+
+export type FileRevision = z.infer<typeof FileRevisionsResponseSchema>['revisions'][number]
+
+export const listFileRevisions = async (
+  fileId: number
+): Promise<z.infer<typeof FileRevisionsResponseSchema>> => {
+  return httpClient(`/api/v1/files/${fileId}/revisions`, {
+    schema: FileRevisionsResponseSchema,
+  })
+}
+
+export const restoreFileRevision = async (fileId: number, version: number): Promise<void> => {
+  await httpClient(`/api/v1/files/${fileId}/revisions/${version}/restore`, {
+    method: 'POST',
+  })
+}
+
 export const downloadFile = async (fileId: number, filename: string): Promise<void> => {
   const blob = await httpClient<Blob>(`/api/v1/files/${fileId}/download`, {
     responseType: 'blob',
   })
 
-  // Web → anchor download; native → Filesystem + share sheet (Epic 7.1).
+  // Web → anchor download; Android → Documents; iOS → share sheet (Epic 7.1).
   await saveOrDownloadBlob(blob, filename)
 }
 
@@ -930,11 +1026,13 @@ export interface StorageStats {
   remaining_formatted: string
   max_file_size: number
   max_file_size_formatted: string
+  unlimited?: boolean
 }
 
 export interface StorageStatsResponse {
   success: boolean
   user_level: string
+  rate_limit_level?: string
   storage: StorageStats
 }
 
@@ -1109,6 +1207,12 @@ export default {
   getFileContent,
   downloadFile,
   downloadGuestFile,
+  exportFile,
+  exportGuestFile,
+  exportUrl,
+  combineFiles,
+  listFileRevisions,
+  restoreFileRevision,
   shareFile,
   unshareFile,
   getShareInfo,

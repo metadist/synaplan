@@ -60,16 +60,17 @@ final class ResultAssembler
                     $jobKeys[$node->id] = $mediaJob['job_id'];
                 }
             }
-            if (NodeStatus::Done === $status) {
+            if (NodeStatus::Done === $status || NodeStatus::Stopped === $status) {
                 ++$successCount;
             } elseif (NodeStatus::Failed === $status) {
                 ++$failureCount;
-            } elseif (NodeStatus::Running === $status || NodeStatus::Pending === $status) {
+            } elseif (NodeStatus::Running === $status || NodeStatus::Pending === $status || NodeStatus::WaitingApproval === $status) {
                 // A node still running (async media detached to a background job)
                 // or pending (blocked by such a dependency) means the plan is
                 // IN PROGRESS, not failed. Counting these as failures made
                 // `all_failed` true for async media plans, which triggered the
                 // legacy fallback and a second, duplicate generation (#1218).
+                // waiting_approval is the same: the run is paused, not dead.
                 ++$inProgressCount;
             }
         }
@@ -80,7 +81,13 @@ final class ResultAssembler
         $allFailed = 0 === $successCount && 0 === $inProgressCount;
         $replyResult = $context->getResult($plan->replyNode);
 
-        if (null !== $replyResult && $replyResult->isSuccessful()) {
+        // A reply node that SUCCEEDED but produced neither text nor files (e.g.
+        // an authored compose_reply without wired inputs) must not yield a
+        // blank answer — recover from the other nodes like on a failure.
+        $replyHasOutput = null !== $replyResult && $replyResult->isSuccessful()
+            && ('' !== ($replyResult->text ?? '') || [] !== $replyResult->files);
+
+        if ($replyHasOutput) {
             $content = $replyResult->text ?? '';
             $files = $replyResult->files;
             $metadata = $replyResult->metadata;
@@ -194,6 +201,7 @@ final class ResultAssembler
                 'capability' => $node->capability->value,
                 'kind' => $node->capability->uiKind(),
                 'state' => $nodeStatus,
+                'depends_on' => $node->dependsOn,
             ];
             if (null !== $nodeResult) {
                 if ('search' === $node->capability->uiKind()) {
@@ -231,6 +239,9 @@ final class ResultAssembler
                 }
                 if (null !== $nodeResult->error && '' !== $nodeResult->error) {
                     $card['error'] = $nodeResult->error;
+                }
+                if (true === ($nodeResult->metadata['used_workspace'] ?? false)) {
+                    $card['used_workspace'] = true;
                 }
                 $mediaJob = $nodeResult->metadata['media_job'] ?? null;
                 if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {

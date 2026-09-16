@@ -109,8 +109,8 @@ export interface UsageStats {
     status: string
   }>
   /**
-   * Sum across all six tracked action types (MESSAGES + IMAGES + VIDEOS + AUDIOS
-   * + FILE_ANALYSIS + EMBEDDINGS). Do NOT use for the headline "chat messages
+   * Sum across all tracked action types (MESSAGES + IMAGES + VIDEOS + AUDIOS
+   * + FILE_ANALYSIS + EMBEDDINGS + RERANK). Do NOT use for the headline "chat messages"
    * used" number — use `total_messages` instead so it matches the free-tier
    * limit (50/50) surfaced in LimitReachedModal.
    */
@@ -242,6 +242,6 @@ export async function downloadUsageExport(sinceTimestamp?: number): Promise<void
     responseType: 'blob',
   })
 
-  // Web → anchor download; native → Filesystem + share sheet (Epic 7.1).
+  // Web → anchor download; Android → Documents; iOS → share sheet (Epic 7.1).
   await saveOrDownloadBlob(blob, `synaplan-usage-${Date.now()}.csv`)
 }

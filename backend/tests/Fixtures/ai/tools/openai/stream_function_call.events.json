@@ -1,0 +1,74 @@
+[
+  {
+    "event": "response.output_item.added",
+    "data": {
+      "type": "response.output_item.added",
+      "output_index": 0,
+      "item": {
+        "type": "function_call",
+        "id": "fc_1",
+        "call_id": "call_weather_1",
+        "name": "get_weather",
+        "arguments": "",
+        "status": "in_progress"
+      }
+    }
+  },
+  {
+    "event": "response.function_call_arguments.delta",
+    "data": {
+      "type": "response.function_call_arguments.delta",
+      "output_index": 0,
+      "item_id": "fc_1",
+      "delta": "{\"city\":"
+    }
+  },
+  {
+    "event": "response.function_call_arguments.delta",
+    "data": {
+      "type": "response.function_call_arguments.delta",
+      "output_index": 0,
+      "item_id": "fc_1",
+      "delta": "\"Berlin\"}"
+    }
+  },
+  {
+    "event": "response.output_item.done",
+    "data": {
+      "type": "response.output_item.done",
+      "output_index": 0,
+      "item": {
+        "type": "function_call",
+        "id": "fc_1",
+        "call_id": "call_weather_1",
+        "name": "get_weather",
+        "arguments": "{\"city\":\"Berlin\"}",
+        "status": "completed"
+      }
+    }
+  },
+  {
+    "event": "response.completed",
+    "data": {
+      "type": "response.completed",
+      "response": {
+        "id": "resp_tools_1",
+        "status": "completed",
+        "output": [
+          {
+            "type": "function_call",
+            "id": "fc_1",
+            "call_id": "call_weather_1",
+            "name": "get_weather",
+            "arguments": "{\"city\":\"Berlin\"}"
+          }
+        ],
+        "usage": {
+          "input_tokens": 20,
+          "output_tokens": 8,
+          "total_tokens": 28
+        }
+      }
+    }
+  }
+]

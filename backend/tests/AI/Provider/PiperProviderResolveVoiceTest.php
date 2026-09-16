@@ -72,7 +72,7 @@ class PiperProviderResolveVoiceTest extends TestCase
         // The core bug: a German reply must be spoken with a German voice even
         // when the configured TEXT2SOUND default model is an English voice.
         self::assertSame(
-            'de_DE-thorsten-medium',
+            'de_DE-kerstin-low',
             $this->resolveVoice([
                 'language' => 'de',
                 'model' => 'en_US-lessac-medium',
@@ -82,8 +82,8 @@ class PiperProviderResolveVoiceTest extends TestCase
 
     public function testLocaleCodeIsNormalizedToShortForm(): void
     {
-        self::assertSame('de_DE-thorsten-medium', $this->resolveVoice(['language' => 'de_DE']));
-        self::assertSame('de_DE-thorsten-medium', $this->resolveVoice(['language' => 'de-DE']));
+        self::assertSame('de_DE-kerstin-low', $this->resolveVoice(['language' => 'de_DE']));
+        self::assertSame('de_DE-kerstin-low', $this->resolveVoice(['language' => 'de-DE']));
     }
 
     public function testConfiguredModelMatchingLanguageIsPreserved(): void
@@ -91,10 +91,10 @@ class PiperProviderResolveVoiceTest extends TestCase
         // A user-picked German voice must not be flattened to the generic
         // language default when it already targets the requested language.
         self::assertSame(
-            'de_DE-kerstin-low',
+            'de_DE-thorsten-medium',
             $this->resolveVoice([
                 'language' => 'de',
-                'model' => 'de_DE-kerstin-low',
+                'model' => 'de_DE-thorsten-medium',
             ])
         );
     }

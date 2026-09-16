@@ -70,6 +70,30 @@ describe('History Store', () => {
     expect(store.messages[0].isStreaming).toBe(false)
   })
 
+  it('keeps a snapshotted processing timeline after the stream ends', () => {
+    const store = useHistoryStore()
+    const id = store.addStreamingMessage('assistant')
+    store.messages[0].processingSteps = [
+      {
+        id: 1,
+        key: 'understand',
+        status: 'classified',
+        metadata: {},
+        startedAt: 1,
+        endedAt: 2,
+        state: 'done',
+        afterAnswer: false,
+      },
+    ]
+    store.messages[0].processingModel = { name: 'Grok 4' }
+
+    store.finishStreamingMessage(id)
+
+    expect(store.messages[0].isStreaming).toBe(false)
+    expect(store.messages[0].processingSteps).toHaveLength(1)
+    expect(store.messages[0].processingModel).toEqual({ name: 'Grok 4' })
+  })
+
   // #1058: measured thinking duration from thinkingStartedAt
   it('finishStreamingMessage sets thinkingTime from thinkingStartedAt', () => {
     const store = useHistoryStore()
@@ -556,6 +580,44 @@ describe('History Store', () => {
     }
   })
 
+  it('stops waiting when a finished plan never saved a reply and no run is live', async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+
+    const getChatMessages = vi.fn().mockResolvedValue({
+      success: true,
+      messages: [{ id: 1, direction: 'IN', text: 'Research that', timestamp: 1700000000 }],
+      pagination: { hasMore: false },
+      inProgressTurn: {
+        reply_node: 'n1',
+        cards: [{ nodeId: 'n1', capability: 'chat', kind: 'text', state: 'done' }],
+      },
+    })
+
+    vi.doMock('@/services/api', () => ({
+      chatApi: { getChatMessages },
+    }))
+
+    try {
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+
+      await store.loadMessages(42)
+
+      const bubble = store.messages.at(-1)
+      expect(bubble?.id).toBe('in-progress-turn')
+      expect(bubble?.isStreaming).toBe(false)
+      expect(bubble?.errorReason).toBe('empty_answer')
+      expect(bubble?.canRetryModel).toBe(true)
+      expect(bubble?.taskPlan?.active).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(4000)
+      expect(getChatMessages).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('preserves all loaded pages when polling an in-progress turn', async () => {
     vi.useFakeTimers()
     vi.resetModules()
@@ -792,6 +854,81 @@ describe('History Store', () => {
       } finally {
         vi.useRealTimers()
       }
+    })
+  })
+
+  /**
+   * A turn keeps generating after the tab that started it navigates away, so
+   * the history response points a returning client at the still-running run.
+   * The store only has to report it faithfully — ChatView owns the re-attach.
+   */
+  describe('loadMessages — active run discovery', () => {
+    const activeRun = {
+      runId: 'run-42',
+      trackId: '1700000000',
+      lastSeq: 7,
+      partialText: 'Half an answer',
+    }
+
+    const loadWith = async (response: Record<string, unknown>, offset = 0) => {
+      vi.resetModules()
+      const getChatMessages = vi.fn().mockResolvedValue({
+        success: true,
+        messages: [],
+        pagination: { hasMore: false },
+        ...response,
+      })
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      await store.loadMessages(42, offset)
+
+      return store
+    }
+
+    it('exposes the still-running turn reported by the first page', async () => {
+      const store = await loadWith({ activeRun })
+
+      expect(store.activeRun).toEqual(activeRun)
+    })
+
+    it('reports no run when the turn already finished', async () => {
+      const store = await loadWith({ activeRun: null })
+
+      expect(store.activeRun).toBeNull()
+    })
+
+    it('keeps a known run when older pages are loaded on scroll-back', async () => {
+      // Only the first page carries `activeRun`; paging through history must
+      // not clear the run the client is currently attached to.
+      vi.resetModules()
+      const getChatMessages = vi
+        .fn()
+        .mockResolvedValueOnce({
+          success: true,
+          messages: [],
+          pagination: { hasMore: true },
+          activeRun,
+        })
+        .mockResolvedValueOnce({ success: true, messages: [], pagination: { hasMore: false } })
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+
+      await store.loadMessages(42)
+      await store.loadMessages(42, 50)
+
+      expect(store.activeRun).toEqual(activeRun)
+    })
+
+    it('forgets the run when the chat is cleared', async () => {
+      const store = await loadWith({ activeRun })
+
+      store.clear()
+
+      expect(store.activeRun).toBeNull()
     })
   })
 })

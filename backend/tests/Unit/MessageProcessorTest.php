@@ -5,12 +5,16 @@ namespace App\Tests\Unit;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
+use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\ConversationSummaryService;
+use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
+use App\Service\Message\RollingSummaryResult;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -18,8 +22,12 @@ use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PromptService;
+use App\Service\Research\ReadPagesResult;
+use App\Service\Research\WebResearchService;
 use App\Service\Search\BraveSearchService;
+use App\Service\UrlContentResult;
 use App\Service\UrlContentService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -36,6 +44,7 @@ class MessageProcessorTest extends TestCase
     private BraveSearchService&MockObject $braveSearchService;
     private SearchQueryGenerator&MockObject $searchQueryGenerator;
     private LoggerInterface&MockObject $logger;
+    private ConversationSummaryService&MockObject $conversationSummaryService;
     private MessageProcessor $processor;
 
     protected function setUp(): void
@@ -50,6 +59,7 @@ class MessageProcessorTest extends TestCase
         $this->braveSearchService = $this->createMock(BraveSearchService::class);
         $this->searchQueryGenerator = $this->createMock(SearchQueryGenerator::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->conversationSummaryService = $this->createMock(ConversationSummaryService::class);
 
         $this->processor = new MessageProcessor(
             $this->messageRepository,
@@ -59,15 +69,17 @@ class MessageProcessorTest extends TestCase
             $this->router,
             $this->modelConfigService,
             $this->promptService,
-            $this->braveSearchService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
             $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
             $this->createMock(UrlContentService::class),
             $this->logger,
             $this->createMock(MultitaskRoutingConfig::class),
             $this->createMock(TaskPlanner::class),
             $this->createMock(TaskPlanStore::class),
             $this->createMock(TaskPlanExecutor::class),
-            $this->createMock(ConversationSummaryService::class)
+            $this->conversationSummaryService,
+            $this->createMock(AgentConfig::class),
         );
     }
 
@@ -113,6 +125,89 @@ class MessageProcessorTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertArrayHasKey('response', $result);
         $this->assertArrayHasKey('classification', $result);
+    }
+
+    /**
+     * A handler that answered under a different route (MediaGenerationHandler
+     * handing a misrouted "audio" turn to the chat answer) reports it via
+     * `effective_classification`. The classification returned to the
+     * persistence layer must reflect that — otherwise the stored turn is a
+     * mediamaker/audio row for a chat answer.
+     */
+    public function testProcessFoldsEffectiveClassificationReportedByHandler(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'intent' => 'image_generation',
+            'media_type' => 'audio',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->router->method('route')->willReturn([
+            'content' => 'Sefr, yek, do …',
+            'metadata' => [
+                'provider' => 'test',
+                'model' => 'test',
+                MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY => [
+                    'topic' => 'general',
+                    'intent' => 'chat',
+                    'media_type' => null,
+                    'rerouted_from' => 'mediamaker:audio',
+                ],
+            ],
+        ]);
+
+        $result = $this->processor->process($message);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('general', $result['classification']['topic']);
+        $this->assertSame('chat', $result['classification']['intent']);
+        $this->assertArrayNotHasKey('media_type', $result['classification']);
+        $this->assertSame('mediamaker:audio', $result['classification']['rerouted_from']);
+        $this->assertSame('de', $result['classification']['language'], 'untouched keys survive');
+    }
+
+    public function testProcessStreamFoldsEffectiveClassificationReportedByHandler(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'intent' => 'image_generation',
+            'media_type' => 'audio',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->router->method('routeStream')->willReturn([
+            'metadata' => [
+                MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY => ['topic' => 'general', 'intent' => 'chat', 'media_type' => null],
+            ],
+        ]);
+
+        $result = $this->processor->processStream($message, static function (string $chunk): void {});
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('general', $result['classification']['topic']);
+        $this->assertSame('chat', $result['classification']['intent']);
+        $this->assertArrayNotHasKey('media_type', $result['classification']);
     }
 
     public function testProcessCallsStatusCallback(): void
@@ -723,6 +818,95 @@ class MessageProcessorTest extends TestCase
         $this->processor->process($message, ['force_web_search' => true]);
     }
 
+    /**
+     * Channel parity: the NON-streaming `process()` path (email, MCP, generic
+     * webhook) must apply the rolling conversation summary exactly like
+     * `processStream()` — condensed summary into options, verbatim tail as the
+     * remaining history.
+     */
+    public function testProcessAppliesRollingSummaryForChatWithPersistedChat(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getId')->willReturn(99);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getChatId')->willReturn(500);
+        $message->method('getFile')->willReturn(0);
+
+        $tail = [$this->createMock(Message::class)];
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->expects($this->once())
+            ->method('findChatHistory')
+            ->with(1, 500, MessageProcessor::HISTORY_MAX_MESSAGES, MessageProcessor::HISTORY_MAX_CHARS, 99)
+            ->willReturn([]);
+        $this->messageRepository->method('countByChatId')->willReturn(40);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'CHAT',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->conversationSummaryService
+            ->expects($this->once())
+            ->method('buildRollingContext')
+            ->with($this->anything(), 40, 1, 500)
+            ->willReturn(new RollingSummaryResult(true, 'CONDENSED OLDER TURNS', $tail, 25));
+
+        $this->router
+            ->expects($this->once())
+            ->method('route')
+            ->with(
+                $message,
+                $tail,
+                $this->anything(),
+                $this->anything(),
+                $this->callback(static fn (array $options): bool => 'CONDENSED OLDER TURNS' === ($options['conversation_summary'] ?? null)),
+            )
+            ->willReturn([
+                'content' => 'Response',
+                'metadata' => ['provider' => 'test', 'model' => 'test'],
+            ]);
+
+        $result = $this->processor->process($message);
+
+        $this->assertTrue($result['success']);
+    }
+
+    /**
+     * The summary step only serves the chat-style path with a persisted chat;
+     * legacy trackingId-only messages must not touch the summary service.
+     */
+    public function testProcessSkipsRollingSummaryWithoutChatId(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getChatId')->willReturn(null);
+        $message->method('getFile')->willReturn(0);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'CHAT',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->conversationSummaryService
+            ->expects($this->never())
+            ->method('buildRollingContext');
+
+        $this->router->method('route')->willReturn([
+            'content' => 'Response',
+            'metadata' => ['provider' => 'test', 'model' => 'test'],
+        ]);
+
+        $this->processor->process($message);
+    }
+
     public function testProcessLoadsConversationHistory(): void
     {
         $message = $this->createMock(Message::class);
@@ -751,5 +935,345 @@ class MessageProcessorTest extends TestCase
         ]);
 
         $this->processor->process($message);
+    }
+
+    /**
+     * A message that is nothing but a link: the page is read (redirects and
+     * interstitials resolved by the research service), its content rides on
+     * the classification for the answer model, and the sorter's search vote
+     * is dropped — searching for a URL string is useless, the page IS the
+     * answer source.
+     */
+    public function testLinkOnlyMessageIsAnsweredFromTheReadPageInsteadOfSearchingTheUrl(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(77);
+        $message->method('getText')->willReturn('https://lnkd.in/p/d_-_Y6Ye');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn(['https://lnkd.in/p/d_-_Y6Ye']);
+        $urlContent->expects($this->never())->method('fetchMultiple');
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $page = new UrlContentResult('https://lnkd.in/p/d_-_Y6Ye', 'Article about hydrogen hubs in Hamburg.', 'Hydrogen hubs', 'lnkd.in', true, null, 'https://www.example.com/hydrogen');
+        $read = new ReadPagesResult([$page], ['https://lnkd.in/p/d_-_Y6Ye' => 'Article about hydrogen hubs in Hamburg.']);
+        $research->expects($this->once())->method('readMentionedUrls')
+            ->with(['https://lnkd.in/p/d_-_Y6Ye'], 'https://lnkd.in/p/d_-_Y6Ye', 1)
+            ->willReturn($read);
+        $research->method('formatMentionedUrlsForPrompt')->willReturn("## Linked Pages\nArticle about hydrogen hubs in Hamburg.");
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->braveSearchService->expects($this->never())->method('search');
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification) {
+                $this->assertStringContainsString('hydrogen hubs', $classification['url_content']);
+                $this->assertSame(1, $classification['url_pages_read']);
+                $this->assertSame('https://www.example.com/hydrogen', $classification['url_pages'][0]['final_url']);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $statuses = [];
+        $processor->processStream($message, static function (): void {}, static function (array $event) use (&$statuses): void {
+            $statuses[] = $event['status'];
+        });
+
+        $this->assertNotContains('searching', $statuses);
+    }
+
+    /**
+     * A research question: the search runs, and its results are deepened
+     * with the read pages before the answer model sees them. The sources
+     * are streamed first (fast), the pages-read update follows.
+     */
+    public function testResearchQuestionSearchesAndReadsTheResultPages(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(78);
+        $message->method('getText')->willReturn('Die VAE wollen 40 Mrd. in Deutschland investieren — in welche Sektoren?');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn([]);
+
+        $rawResults = ['query' => 'VAE 40 Milliarden Deutschland Sektoren', 'results' => [
+            ['title' => 'Handelsblatt', 'url' => 'https://www.handelsblatt.com/a', 'description' => 'teaser'],
+        ]];
+        $deepened = $rawResults + ['pages_read' => 1, 'pages_attempted' => 1];
+        $deepened['results'][0]['page_content'] = 'Wasserstoff, Chemie, Häfen, Halbleiter.';
+        $deepened['results'][0]['fetched'] = true;
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $research->expects($this->once())->method('deepen')
+            ->with(
+                $this->callback(static fn (array $r): bool => $r['results'] === $rawResults['results'] && $r['query'] === $rawResults['query']),
+                'Die VAE wollen 40 Mrd. in Deutschland investieren — in welche Sektoren?',
+                1,
+                $this->isInstanceOf(\Closure::class),
+                3,
+            )
+            ->willReturn($deepened);
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+            'read_pages' => 3,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('VAE 40 Milliarden Deutschland Sektoren');
+        $this->braveSearchService->method('search')->willReturn($rawResults);
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification, $chunk, $status, $options) {
+                $this->assertSame('Wasserstoff, Chemie, Häfen, Halbleiter.', $options['search_results']['results'][0]['page_content']);
+                $this->assertSame(1, $options['search_results']['pages_read']);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $events = [];
+        $processor->processStream($message, static function (): void {}, static function (array $event) use (&$events): void {
+            $events[] = [$event['status'], $event['metadata']];
+        });
+
+        $statuses = array_column($events, 0);
+        $this->assertContains('search_complete', $statuses);
+        $this->assertContains('pages_read', $statuses);
+        $this->assertLessThan(array_search('pages_read', $statuses, true), array_search('search_complete', $statuses, true));
+        $pagesRead = $events[array_search('pages_read', $statuses, true)][1];
+        $this->assertSame(1, $pagesRead['pages_read']);
+        $this->assertTrue($pagesRead['results'][0]['fetched']);
+    }
+
+    public function testResearchQuestionSkipsPageDumpsWhenRouterVotesZero(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(79);
+        $message->method('getText')->willReturn('Was ist das aktuelle Wetter in Berlin?');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn([]);
+
+        $rawResults = ['query' => 'Wetter Berlin', 'results' => [
+            ['title' => 'DWD', 'url' => 'https://www.dwd.de/a', 'description' => '18°C'],
+        ]];
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $research->expects($this->never())->method('deepen');
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+            'read_pages' => 0,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('Wetter Berlin');
+        $this->braveSearchService->method('search')->willReturn($rawResults);
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification, $chunk, $status, $options) {
+                $this->assertArrayNotHasKey('page_content', $options['search_results']['results'][0]);
+                $this->assertArrayNotHasKey('pages_read', $options['search_results']);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $events = [];
+        $processor->processStream($message, static function (): void {}, static function (array $event) use (&$events): void {
+            $events[] = $event['status'];
+        });
+
+        $this->assertContains('search_complete', $events);
+        $this->assertNotContains('pages_read', $events);
+    }
+
+    private function processorWith(UrlContentService $urlContent, WebResearchService $research): MessageProcessor
+    {
+        return new MessageProcessor(
+            $this->messageRepository,
+            $this->searchResultRepository,
+            $this->preProcessor,
+            $this->classifier,
+            $this->router,
+            $this->modelConfigService,
+            $this->promptService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
+            $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
+            $urlContent,
+            $this->logger,
+            $this->createMock(MultitaskRoutingConfig::class),
+            $this->createMock(TaskPlanner::class),
+            $this->createMock(TaskPlanStore::class),
+            $this->createMock(TaskPlanExecutor::class),
+            $this->conversationSummaryService,
+            $this->createMock(AgentConfig::class),
+            $research,
+        );
+    }
+
+    public function testSavedTaskPrefetchesMarkdownWrappedUrlWithoutScreenshotFlag(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getText')->willReturn('Check and summarize [the page](https://example.com/news)');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->expects($this->once())
+            ->method('extractUrls')
+            ->with('Check and summarize [the page](https://example.com/news)')
+            ->willReturn(['https://example.com/news']);
+        $urlContent->expects($this->once())
+            ->method('fetchMultiple')
+            ->with(['https://example.com/news'])
+            ->willReturn([]);
+        $urlContent->expects($this->never())->method('formatForPrompt');
+
+        $processor = new MessageProcessor(
+            $this->messageRepository,
+            $this->searchResultRepository,
+            $this->preProcessor,
+            $this->classifier,
+            $this->router,
+            $this->modelConfigService,
+            $this->promptService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
+            $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
+            $urlContent,
+            $this->logger,
+            $this->createMock(MultitaskRoutingConfig::class),
+            $this->createMock(TaskPlanner::class),
+            $this->createMock(TaskPlanStore::class),
+            $this->createMock(TaskPlanExecutor::class),
+            $this->conversationSummaryService,
+            $this->createMock(AgentConfig::class),
+        );
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->expects($this->never())->method('classify');
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'prompt' => 'saved instruction',
+            'metadata' => ['tool_files' => true, 'tool_mcp' => false],
+        ]);
+        $this->router
+            ->expects($this->once())
+            ->method('route')
+            ->willReturnCallback(function ($msg, $history, $classification) {
+                $this->assertSame('saved_task', $classification['source'] ?? null);
+
+                return [
+                    'content' => 'Summary',
+                    'metadata' => ['provider' => 'test', 'model' => 'test'],
+                ];
+            });
+
+        $result = $processor->process($message, [
+            'fixed_task_prompt' => 'saved-123',
+            'saved_task' => true,
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testChatSavedTaskRunGoesThroughTheSorterAndCarriesTheTaskId(): void
+    {
+        // A chat-saved task reruns without a fixed prompt: the AI sorter runs
+        // exactly like for the typed turn (web search vote, language, …) and
+        // the task id rides on the classification so the executor can replay
+        // the pinned steps.
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getText')->willReturn('Load https://example.com/ and mail me a summary');
+        $message->method('hasFiles')->willReturn(false);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+        $this->router
+            ->expects($this->once())
+            ->method('route')
+            ->willReturnCallback(function ($msg, $history, $classification) {
+                $this->assertSame('ai_sorting', $classification['source'] ?? null);
+                $this->assertSame(42, $classification['saved_task_id'] ?? null);
+
+                return [
+                    'content' => 'Summary',
+                    'metadata' => ['provider' => 'test', 'model' => 'test'],
+                ];
+            });
+
+        $result = $this->processor->process($message, [
+            'saved_task' => true,
+            'saved_task_id' => 42,
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(42, $result['classification']['saved_task_id'] ?? null);
     }
 }

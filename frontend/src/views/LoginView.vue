@@ -1,7 +1,7 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-12 relative overflow-hidden"
-    :class="isNativeApp() ? 'items-start' : 'items-center'"
+    class="h-dvh min-h-dvh bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-6 sm:py-12 relative overflow-y-auto overflow-x-hidden"
+    :class="isNativeApp() ? 'items-start' : 'items-start sm:items-center'"
     :style="
       isNativeApp() ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)' } : undefined
     "
@@ -15,7 +15,7 @@
         class="absolute -bottom-24 right-1/4 w-[28rem] h-[28rem] bg-brand/4 dark:bg-brand/8 rounded-full blur-3xl animate-float-delayed"
       ></div>
       <img
-        :src="birdSrc"
+        :src="iconSrc"
         alt=""
         class="absolute top-[8%] right-[5%] w-[280px] opacity-[0.035] dark:opacity-[0.06] rotate-12 pointer-events-none select-none"
       />
@@ -64,7 +64,7 @@
 
     <div class="w-full max-w-sm auth-card-enter relative z-10" data-testid="section-card">
       <div
-        class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-8"
+        class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-6 sm:p-8"
         :class="
           isDark
             ? 'ring-1 ring-white/[0.04] shadow-black/30'
@@ -74,8 +74,8 @@
           backgroundColor: isDark ? 'rgba(15, 15, 16, 0.8)' : 'rgba(255, 255, 255, 0.95)',
         }"
       >
-        <div class="text-center mb-8" data-testid="section-header">
-          <div class="auth-accent-enter mb-5">
+        <div class="text-center mb-[18px] sm:mb-8" data-testid="section-header">
+          <div class="auth-accent-enter mb-4 sm:mb-5">
             <div class="w-10 h-[3px] bg-brand rounded-full mx-auto"></div>
           </div>
           <h1 class="text-2xl font-bold txt-primary auth-title-enter">
@@ -168,6 +168,8 @@
                 </div>
               </div>
             </Transition>
+
+            <DemoLoginHint @continue="continueAsDemoAdmin" />
 
             <!-- Social login -->
             <div
@@ -298,6 +300,7 @@
                 <button
                   type="button"
                   class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
                   data-testid="btn-toggle-password"
                   @click="showPassword = !showPassword"
                 >
@@ -362,7 +365,7 @@
 
             <p
               v-if="config.auth.registrationEnabled"
-              class="mt-6 text-center text-sm txt-secondary"
+              class="mt-[21px] -mb-[3px] sm:mt-6 sm:mb-0 text-center text-sm txt-secondary"
             >
               {{ $t('auth.noAccount') }}
               <router-link
@@ -373,28 +376,29 @@
                 {{ $t('auth.signUp') }}
               </router-link>
             </p>
+            <RegistrationClosedHint v-else />
           </div>
         </template>
       </div>
 
       <!-- Footer -->
-      <div class="mt-8 flex justify-center">
+      <div class="mt-6 sm:mt-8 flex justify-center">
         <a
           :href="config.branding.homepageUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="group inline-flex items-center gap-1.5 opacity-40 hover:opacity-60 transition-all duration-300"
+          class="group inline-flex items-center gap-1.5 transition-all duration-300"
           :data-testid="config.billing.enabled ? 'link-homepage' : 'link-powered-by'"
         >
           <span
             v-if="config.branding.showPoweredBy"
-            class="text-[10px] txt-secondary tracking-wide"
+            class="text-[10px] txt-secondary group-hover:txt-primary tracking-wide transition-colors duration-300"
             >{{ $t('branding.poweredBy') }}</span
           >
           <img
             :src="logoSrc"
             :alt="config.branding.name"
-            class="h-3.5 opacity-70 group-hover:opacity-100 transition-opacity duration-300"
+            class="h-3.5 opacity-50 group-hover:opacity-100 transition-opacity duration-300"
           />
         </a>
       </div>
@@ -403,9 +407,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { supportedLanguages } from '@/i18n'
 import {
   SunIcon,
   MoonIcon,
@@ -427,6 +432,13 @@ import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
+import DemoLoginHint from '@/components/auth/DemoLoginHint.vue'
+import RegistrationClosedHint from '@/components/auth/RegistrationClosedHint.vue'
+import {
+  FIRST_RUN_ADMIN_EMAIL,
+  FIRST_RUN_ADMIN_PASSWORD,
+  FIRST_RUN_SETUP_PATH,
+} from '@/constants/firstRunAdmin'
 import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -449,11 +461,7 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const { logoSrc } = useBrandLogo(isDark)
-const birdSrc = computed(
-  () =>
-    `${import.meta.env.BASE_URL}${isDark.value ? 'single_bird-light.svg' : 'single_bird-dark.svg'}`
-)
+const { logoSrc, iconSrc } = useBrandLogo(isDark)
 
 const email = ref('')
 const password = ref('')
@@ -463,9 +471,10 @@ const loginSuccess = ref(false)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const languages = ['de', 'en', 'es', 'tr']
-  const currentIndex = languages.indexOf(locale.value)
-  locale.value = languages[(currentIndex + 1) % languages.length]
+  const currentIndex = supportedLanguages.indexOf(
+    locale.value as (typeof supportedLanguages)[number]
+  )
+  locale.value = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
   localStorage.setItem('language', locale.value)
 }
 
@@ -521,7 +530,23 @@ const loadSocialProviders = async () => {
   }
 }
 
+watch(
+  () => config.setup.demoLoginHint,
+  (show) => {
+    if (!show) return
+    const emailFromQuery = route.query.email
+    if (typeof emailFromQuery === 'string' && emailFromQuery !== '') return
+    if (email.value === '') email.value = FIRST_RUN_ADMIN_EMAIL
+    if (password.value === '') password.value = FIRST_RUN_ADMIN_PASSWORD
+  },
+  { immediate: true }
+)
+
 onMounted(async () => {
+  const emailFromQuery = route.query.email
+  if (typeof emailFromQuery === 'string' && emailFromQuery !== '') {
+    email.value = emailFromQuery
+  }
   const reason = route.query.reason as string
   if (reason === 'session_expired') sessionExpired.value = true
   if (route.query.registered === 'true') justRegistered.value = true
@@ -538,9 +563,50 @@ onMounted(async () => {
   const keycloakProvider = socialProviders.value.find((p) => p.id === 'keycloak')
   if (keycloakProvider?.auto_redirect) {
     oidcAutoRedirect.value = true
-    if (!sessionExpired.value) handleSocialLogin('keycloak')
+    if (!sessionExpired.value) {
+      handleSocialLogin('keycloak')
+    } else if (allowExpiredAutoRedirect()) {
+      // An expired session on an auto-redirect instance goes straight back
+      // to the IdP too: a live SSO session silently re-logs the user in, a
+      // dead one shows the IdP's login. Rate-limited so that a token that
+      // keeps failing app-side (e.g. a misconfigured audience) degrades to
+      // the manual sign-in page below instead of a redirect loop.
+      handleSocialLogin('keycloak')
+    }
   }
 })
+
+/**
+ * One auto-redirect per window for expired sessions; bouncing back here
+ * sooner means app-side token validation is failing while the IdP session
+ * is alive, and redirecting again would loop.
+ */
+const EXPIRED_AUTOREDIRECT_KEY = 'synaplan_expired_autoredirect_at'
+const EXPIRED_AUTOREDIRECT_WINDOW_MS = 30_000
+
+function allowExpiredAutoRedirect(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(EXPIRED_AUTOREDIRECT_KEY) ?? 0)
+    if (Date.now() - last < EXPIRED_AUTOREDIRECT_WINDOW_MS) return false
+    sessionStorage.setItem(EXPIRED_AUTOREDIRECT_KEY, String(Date.now()))
+    return true
+  } catch {
+    // No sessionStorage (rare) - prefer the safe manual page over a
+    // potential loop.
+    return false
+  }
+}
+
+const continueAsDemoAdmin = async () => {
+  email.value = FIRST_RUN_ADMIN_EMAIL
+  password.value = FIRST_RUN_ADMIN_PASSWORD
+  if (!route.query.redirect) {
+    await router.replace({
+      query: { ...route.query, redirect: FIRST_RUN_SETUP_PATH },
+    })
+  }
+  await handleLogin()
+}
 
 const handleLogin = async () => {
   clearError()

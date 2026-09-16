@@ -37,12 +37,18 @@ frontend/tests/e2e/
 ## Running Tests
 
 ```bash
-make -C frontend test-e2e                          # full suite
+make -C frontend test-e2e                          # full suite (headless)
 npx playwright test --grep "widget"                # single test by name
 npx playwright test tests/chat.spec.ts             # single file
+HEADED=1 make -C frontend test-e2e                 # opt-in: real browser windows
+npx playwright test --headed                       # same, Playwright CLI flag
 npx playwright test --ui                           # interactive UI mode
 npx playwright show-report                         # view last report
 ```
+
+Browsers stay **headless** locally and in CI. Four headed workers used to
+open a window each and flood the desktop. Watch a run only with `HEADED=1`
+or `--headed`.
 
 Against the local test stack (`docker compose -f docker-compose.test.yml up -d`):
 
@@ -59,7 +65,8 @@ backend reaches it container-to-container either way.
 ## 0. Tags & CI Matrix
 
 **`@ci` is the only authoritative tag.** The CI workflow runs `--grep "@ci"`
-(chromium 2 shards, one firefox cross-browser smoke, chromium-mobile) — a test
+(chromium 3 shards, one firefox cross-browser smoke, chromium-mobile,
+chromium-ollama, chromium-minimal) — a test
 without `@ci` in its title chain does not run in CI, period. Other tags:
 
 | Tag | Meaning |
@@ -69,6 +76,8 @@ without `@ci` in its title chain does not run in CI, period. Other tags:
 | `@layout` | Layout guard — runs in chromium desktop + chromium-mobile only. |
 | `@visual` | Snapshot tests — separate CI-only project (baselines from the ubuntu runner). |
 | `@oidc`, `@oidc-redirect` | OIDC jobs only (dedicated matrix entries with Keycloak). |
+| `@ollama` | Own **chromium-ollama** project and CI job, and excluded from the sharded chromium run. The tagged spec repoints the CHAT default model for the whole installation, so it needs a test stack to itself — see below. |
+| `@minimal` | Own **chromium-minimal** project and CI job on the `docker-compose.minimal.yml` overlay. Proves every optional feature module is absent (chat + text upload still work; gated WhatsApp answers the uniform 404). Excluded from the sharded chromium run. |
 | `@smoke`, `@auth`, `@api`, … | Informational grouping — no CI effect, historically inconsistent. Don't rely on them for filtering. |
 
 When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on
@@ -95,6 +104,30 @@ firefox-only flake, without new signal.
 Do NOT tag browser-agnostic logic (chat rename/delete, memories, task prompts,
 profile, settings CRUD, …) — chromium already covers it. Keep the
 `@crossbrowser` set small and high-value; it is a required gate.
+
+### Tests that change installation-wide state need their own project
+
+The sharded chromium jobs run **four spec files at a time in one shared test
+stack**. A test that changes settings for the whole installation — anything
+posted with `global: true`, e.g. the default CHAT model — therefore changes them
+under every test running beside it, which then talks to the wrong model and
+fails.
+
+Playwright decides *which* files share a shard, and it does so by file (the
+config sets no `fullyParallel`). So "it passes today" only means the collision
+has not been scheduled yet: adding a spec file or changing the shard count
+reshuffles the assignment. This is not theoretical — it took down four tests at
+once when the suite went from two shards to three, and the failures stopped the
+moment the offending spec finished and restored the default.
+
+If your test must change global state, give it its own project in
+`playwright.config.ts` plus its own entry in the `e2e` matrix in
+`.github/workflows/ci.yml`, and exclude its tag from the `chromium` project's
+`grepInvert`. Every matrix entry starts its own stack, so the change stays
+inside that job. `chromium-ollama` is the worked example.
+
+Prefer not needing it: scope the change to the test's own user or workspace when
+the API allows it. A dedicated job costs a runner and ~2 min.
 
 ---
 
@@ -178,7 +211,7 @@ Import from `config/config.ts`:
 Every async operation must expose exactly one terminal state:
 
 * **success** → `[data-testid="message-done"]`
-* **error** → `[data-testid="message-topic-error"]`
+* **error** → `[data-testid="chat-error-notice"]`
 
 Tests must race for exactly one of them. No implicit completion detection.
 
@@ -189,7 +222,7 @@ const result = await Promise.race([
   bubble.locator(selectors.chat.messageDone)
     .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
     .then(() => 'done' as const),
-  bubble.locator(selectors.chat.messageTopicError)
+  bubble.locator(selectors.chat.chatError)
     .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
     .then(() => 'error' as const),
 ])
@@ -204,6 +237,16 @@ if (result === 'error') {
 * If error is expected: deterministic ERROR state appears → pass immediately.
 
 Only use deterministic UI hooks (`data-testid`), never text scanning.
+
+### Non-terminal states (recorded CI flakes)
+
+Assert the **stable terminal DOM**, never an intermediate signal the app discards or that loading shares with another state. Three failures that passed on `retries: 1`:
+
+* **Transient deep-link URLs.** `ChatView` reads `/?chat=<id>` from Saved Tasks "Run now" / "Show results" and immediately `router.replace`-strips the query. `toHaveURL(/[?&]chat=\d+/)` races that window (CI saw `/channels/tasks` then `/` with the chat already on screen). Wait for `selectors.pages.chat` + `ChatHelper.waitForAnswer`, not the query string.
+* **Loading that unmounts the same nodes as empty.** Admin user search sets `usersLoading` and replaces the table with a spinner — `select-user-level-*` count drops to 0 while the request is still in flight. `toHaveCount(0)` then passes, the next `fill('')` overlaps, and a stale empty response overwrites the restored list ("No users found" with an empty search box). Wait for a dedicated empty-state testid that only renders **after** loading finishes (`admin-users-empty`), never for "zero of the loaded rows".
+* **Keep-alive against stub control APIs.** A `beforeAll` Playwright `APIRequestContext` reused against `ollama-stub` `/__requests` after the chat (~6s idle) hits Node's default `keepAliveTimeout` (5s) → `socket hang up`. The chat UI had already succeeded. Retry once on that error in the stub helper; keep the stub's `keepAliveTimeout` above the longest chat wait. Do not treat a long-lived context as a live connection to a Node stub.
+* **No global model-default mutations from a parallel `@ci` spec.** `POST /api/v1/config/models/defaults` with `global: true` is process-wide. `afterAll` restore is not isolation — other workers already raced. Pin defaults in `globalSetup` only (TestProvider). Per-spec provider switches must be user-scoped or a dedicated serial job.
+* **Impersonation exit: banner hidden ≠ admin page mounted.** `refreshUser()` clears `impersonator` (banner hides) before `onExit` can `router.push({ name: 'admin' })`. Awaiting config reload / realtime inside `stopImpersonation` delayed that push; CI then sat on `/` for 15s waiting for `view-admin`. Return from stop as soon as the session is restored, and wait for `selectors.pages.admin`, not a pause after the banner.
 
 ---
 

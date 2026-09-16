@@ -5,7 +5,7 @@
   >
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
-        <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
+        <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
       </div>
 
       <div class="surface-card p-8 text-center" data-testid="section-verify-card">
@@ -97,23 +97,17 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTheme } from '../composables/useTheme'
+import { useBrandLogo } from '@/composables/useBrandLogo'
+import { useConfigStore } from '@/stores/config'
 import { authApi } from '@/services/api'
 
 const route = useRoute()
 const themeStore = useTheme()
-
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-const logoSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-)
+const config = useConfigStore()
+const { logoSrc } = useBrandLogo(themeStore.isDark)
 
 const loading = ref(true)
 const verified = ref(false)

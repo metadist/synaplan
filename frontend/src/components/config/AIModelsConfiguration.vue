@@ -1,28 +1,22 @@
 <template>
   <div class="space-y-6" data-testid="page-config-ai-models">
-    <TabNav
-      :model-value="activeTab"
-      :tabs="tabNavItems"
-      :aria-label="$t('config.aiModels.title')"
-      mobile-trigger-testid="tab-ai-models-mobile-trigger"
-      mobile-menu-testid="tab-ai-models-mobile-menu"
-      @update:model-value="onModelsTabChange"
-    />
-
-    <div
-      v-show="activeTab === 'choice'"
-      class="surface-card p-6 relative"
-      :class="openDropdown ? 'z-20' : 'z-0'"
-      data-testid="section-default-config"
+    <PageHeader
+      :title="$t('config.aiModels.title')"
+      :subtitle="$t('config.aiModels.description')"
+      icon="heroicons:cpu-chip"
+      data-testid="section-header"
     >
-      <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-2xl font-semibold txt-primary flex items-center gap-2 min-w-0">
-          <CpuChipIcon class="w-6 h-6 flex-shrink-0 text-[var(--brand)]" />
-          {{ $t('config.aiModels.defaultConfigTitle') }}
-        </h2>
+      <!-- Reset applies to the default-model choices, so it only shows on that tab.
+           v-if on the template keeps PageHeader's actions wrapper (and its flex gap)
+           from rendering empty on the other tabs.
+           The suggested selection spans the key-based cloud providers, so the
+           button is hidden unless every requiresKey provider has credentials —
+           otherwise it would point defaults at models this install cannot use.
+           URL/local providers (Ollama, custom endpoints) do not count. -->
+      <template v-if="activeTab === 'choice' && allProvidersAvailable" #actions>
         <button
           type="button"
-          class="self-start sm:self-auto flex-shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"
           data-testid="btn-reset-defaults"
           @click="confirmResetDefaults"
@@ -30,7 +24,27 @@
           <ArrowPathIcon :class="['w-4 h-4', resetting && 'animate-spin']" />
           {{ $t('config.aiModels.resetDefaults') }}
         </button>
-      </div>
+      </template>
+      <TabNav
+        :model-value="activeTab"
+        :tabs="tabNavItems"
+        :aria-label="$t('config.aiModels.title')"
+        mobile-trigger-testid="tab-ai-models-mobile-trigger"
+        mobile-menu-testid="tab-ai-models-mobile-menu"
+        @update:model-value="onModelsTabChange"
+      />
+    </PageHeader>
+
+    <div
+      v-show="activeTab === 'choice'"
+      class="surface-card p-6 relative"
+      :class="openDropdown ? 'z-20' : 'z-0'"
+      data-testid="section-default-config"
+    >
+      <h3 class="text-lg font-semibold txt-primary mb-6 flex items-center gap-2 min-w-0">
+        <CpuChipIcon class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
+        {{ $t('config.aiModels.defaultConfigTitle') }}
+      </h3>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
@@ -78,6 +92,20 @@
               <LockClosedIcon class="w-3 h-3" />
               {{ $t('config.embeddingSwitch.premium.badge') }}
             </span>
+            <span
+              v-if="isCapabilityLocked(capability as Capability)"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30"
+              data-testid="badge-set-by-admin"
+            >
+              {{ $t('config.setByAdmin') }}
+            </span>
+            <span
+              v-else-if="defaultSources[capability as Capability] === 'group'"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium txt-secondary"
+              data-testid="badge-from-group"
+            >
+              {{ $t('config.fromGroup') }}
+            </span>
           </label>
           <div class="relative">
             <button
@@ -86,15 +114,20 @@
                 'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
                 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
                 openDropdown === capability && 'ring-2 ring-[var(--brand)]',
-                capability === 'VECTORIZE' &&
-                  isVectorizeAdminOnly &&
+                ((capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
+                  isCapabilityLocked(capability as Capability)) &&
                   'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
               ]"
-              :disabled="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+              :disabled="
+                (capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
+                isCapabilityLocked(capability as Capability)
+              "
               :title="
-                capability === 'VECTORIZE' && isVectorizeAdminOnly
-                  ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
-                  : undefined
+                isCapabilityLocked(capability as Capability)
+                  ? $t('config.setByAdmin')
+                  : capability === 'VECTORIZE' && isVectorizeAdminOnly
+                    ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
+                    : undefined
               "
               data-testid="btn-model-dropdown"
               @click="toggleDropdown(capability as Capability)"
@@ -327,6 +360,14 @@
                   <div class="flex items-center gap-2">
                     <ServiceIcon :service="model.service" :size="16" />
                     <span class="txt-primary text-sm font-medium">{{ model.name }}</span>
+                    <span
+                      v-if="model.features?.includes('tool_use')"
+                      class="pill text-[10px] whitespace-nowrap"
+                      :title="$t('config.aiModels.toolUseTooltip')"
+                      data-testid="badge-model-tool-use"
+                    >
+                      {{ $t('config.aiModels.toolUseBadge') }}
+                    </span>
                   </div>
                 </td>
                 <td class="py-3 px-2 sm:px-3">
@@ -462,7 +503,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowPathIcon,
   ChevronDownIcon,
@@ -475,6 +516,7 @@ import {
 import AddModelForm from '@/components/config/AddModelForm.vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
@@ -494,7 +536,7 @@ import {
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { ApiError } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
-import type { AIModel, Capability } from '@/types/ai-models'
+import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import {
   dedupeModelsByPurpose,
   type ModelWithPurposes,
@@ -507,10 +549,41 @@ type ModelsTabId = 'choice' | 'list' | 'runs' | 'edit'
 
 const authStore = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 
 const activeTab = ref<ModelsTabId>('choice')
 const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
+const MODELS_TABS = ['choice', 'list', 'runs', 'edit'] as const
+
+function parseModelsTab(raw: unknown): ModelsTabId | null {
+  if (typeof raw !== 'string') return null
+  return (MODELS_TABS as readonly string[]).includes(raw) ? (raw as ModelsTabId) : null
+}
+
+function canOpenModelsTab(tab: ModelsTabId): boolean {
+  if (tab === 'edit' || tab === 'runs') return authStore.isAdmin
+  return true
+}
+
+function applyTabFromQuery(): void {
+  const tab = parseModelsTab(route.query.tab)
+  if (!tab || !canOpenModelsTab(tab)) return
+  activeTab.value = tab
+}
+
+function syncTabToUrl(tab: ModelsTabId): void {
+  const query = { ...route.query }
+  if (tab === 'choice') {
+    delete query.tab
+  } else {
+    query.tab = tab
+  }
+  const current = typeof route.query.tab === 'string' ? route.query.tab : undefined
+  const next = typeof query.tab === 'string' ? query.tab : undefined
+  if (current === next) return
+  void router.replace({ query })
+}
 
 const tabNavItems = computed<TabNavItem[]>(() => {
   const items: TabNavItem[] = [
@@ -547,7 +620,10 @@ const tabNavItems = computed<TabNavItem[]>(() => {
 })
 
 function onModelsTabChange(id: string) {
-  activeTab.value = id as ModelsTabId
+  const tab = id as ModelsTabId
+  if (!canOpenModelsTab(tab)) return
+  activeTab.value = tab
+  syncTabToUrl(tab)
 }
 
 function onAdminModelCreated() {
@@ -576,6 +652,19 @@ const loading = ref(false)
 const saving = ref(false)
 const resetting = ref(false)
 const availableModels = ref<ModelsData>({})
+const providers = ref<ProviderAvailability[]>([])
+
+// "Select suggested models" applies the seeded recommendation, which spans
+// the cloud providers. Only offer it when ALL key-based providers have keys
+// (empty = not loaded yet, treat as unavailable). URL/local providers like
+// Ollama or custom endpoints don't count: they are optional extras that most
+// installations never configure, and the suggestion does not depend on them.
+const allProvidersAvailable = computed(() => {
+  const keyProviders = providers.value.filter((p) => p.requiresKey)
+  return keyProviders.length > 0 && keyProviders.every((p) => p.available)
+})
+const defaultLocked = ref<Partial<Record<Capability, boolean>>>({})
+const defaultSources = ref<Partial<Record<Capability, 'admin' | 'group' | 'user'>>>({})
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
   CHAT: null,
@@ -676,6 +765,8 @@ onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 
+  applyTabFromQuery()
+
   // Check for highlight query parameter
   const highlightParam = route.query.highlight as string | undefined
   if (!highlightParam) return
@@ -711,6 +802,13 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
   document.removeEventListener('keydown', handleKeydown)
 })
+
+watch(
+  () => route.query.tab,
+  () => {
+    applyTabFromQuery()
+  }
+)
 
 // Watch for route changes to handle highlight parameter
 watch(
@@ -766,6 +864,7 @@ const loadData = async () => {
 
     if (modelsRes.success) {
       availableModels.value = modelsRes.models
+      providers.value = modelsRes.providers ?? []
     }
 
     if (defaultsRes.success) {
@@ -775,6 +874,8 @@ const loadData = async () => {
       }
       defaultConfig.value = mergedDefaults
       originalConfig.value = { ...mergedDefaults }
+      defaultLocked.value = defaultsRes.locked ?? {}
+      defaultSources.value = defaultsRes.sources ?? {}
     }
   } catch (error) {
     console.error('Failed to load models:', error)
@@ -823,11 +924,18 @@ const getSelectedModelObj = (purpose: Capability): AIModel | null => {
   return selectedId ? (models.find((m) => m.id === selectedId) ?? null) : null
 }
 
+function isCapabilityLocked(capability: Capability): boolean {
+  return defaultLocked.value[capability] === true
+}
+
 const toggleDropdown = (capability: Capability) => {
   // Belt-and-braces: the button has `:disabled` for non-admin VECTORIZE,
   // but a determined user could still toggle the v-if dropdown via the
   // devtools or a stale ref. Bail here so the dropdown never opens.
-  if (capability === 'VECTORIZE' && isVectorizeAdminOnly.value) {
+  if (
+    isCapabilityLocked(capability) ||
+    (capability === 'VECTORIZE' && isVectorizeAdminOnly.value)
+  ) {
     openDropdown.value = null
     return
   }
@@ -1163,7 +1271,9 @@ const saveConfiguration = async () => {
     // 403 `{ error: 'requires_premium', message: 'Switching the embedding
     // model requires an active paid subscription. Current level: NEW.', ... }`
     // and `httpClient.ApiError` now exposes both the message and the code.
-    if (err instanceof ApiError && 403 === err.status) {
+    if (err instanceof ApiError && 409 === err.status) {
+      showError(t('config.setByAdmin'))
+    } else if (err instanceof ApiError && 403 === err.status) {
       const reason =
         'requires_premium' === err.code
           ? t('config.aiModels.saveErrorPremiumRequired', { reason: err.message })
@@ -1192,7 +1302,14 @@ const confirmResetDefaults = async () => {
   try {
     const response = await resetDefaultModels()
     if (response.success) {
-      success(t('config.aiModels.resetDefaultsSuccess'))
+      // The backend skips a suggested model whose provider has no key, so on an
+      // install without credentials it applies nothing. Saying "applied" then
+      // would be wrong.
+      if (Object.keys(response.defaults).length === 0) {
+        warning(t('config.aiModels.resetDefaultsNoneApplied'))
+      } else {
+        success(t('config.aiModels.resetDefaultsSuccess'))
+      }
       await loadData()
     }
   } catch {

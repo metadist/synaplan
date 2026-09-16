@@ -13,6 +13,7 @@ import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, isMediaPartType } from '@/utils/mediaParts'
 import { isChannelSource } from '@/utils/channelSource'
+import { extractPastedBlocks } from '@/utils/pastedContent'
 import {
   buildUploadUrl,
   isAudioFileType,
@@ -227,6 +228,12 @@ export function parseContentWithThinking(
           content: part.content,
           language: part.language,
         })
+      } else if (part.type === 'json') {
+        parts.push({
+          type: 'json',
+          content: part.content,
+          language: part.language ?? 'json',
+        })
       } else if (part.type === 'text' && part.content.trim()) {
         parts.push({
           type: 'text',
@@ -244,11 +251,19 @@ export function parseContentWithThinking(
       }
     })
   } else if (content) {
-    // For user messages, just add as text
-    parts.push({
-      type: 'text',
-      content,
+    const extracted = extractPastedBlocks(content)
+    extracted.blocks.forEach((block) => {
+      parts.push({
+        type: 'pastedText',
+        content: block,
+      })
     })
+    if (extracted.text) {
+      parts.push({
+        type: 'text',
+        content: extracted.text,
+      })
+    }
   }
 
   return parts.length > 0 ? parts : [{ type: 'text', content: '' }]
@@ -279,6 +294,9 @@ export interface ApiLoadedMessageRow {
   originalTopic?: string
   originalMediaType?: string
   original_media_type?: string
+  errorReason?: string | null
+  canRetryModel?: boolean | null
+  errorDebug?: string | null
   provider?: string
   aiModels?: Message['aiModels']
   webSearch?: Message['webSearch']
@@ -286,6 +304,7 @@ export interface ApiLoadedMessageRow {
   multitask?: boolean
   quotedText?: string | null
   quotedMessageId?: number | null
+  agentId?: number | null
   file?: { path: string; type: string }
   files?: ApiLoadedAttachmentFile[]
   /** Per-node render state for DAG turns — present only on OUT messages of DAG turns. */
@@ -296,6 +315,7 @@ export interface ApiLoadedMessageRow {
       capability: string
       kind: string
       state: string
+      depends_on?: string[]
       text?: string
       url?: string
       type?: string
@@ -304,6 +324,8 @@ export interface ApiLoadedMessageRow {
       /** Compact web-search summary fields (search cards only) */
       query?: string
       resultsCount?: number
+      used_workspace?: boolean
+      usedWorkspace?: boolean
       /** #1229 smart collapse: card prose is contained in the answer body. */
       redundant?: boolean
     }>
@@ -444,12 +466,16 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         capability: c.capability,
         kind,
         state,
+        dependsOn: Array.isArray(c.depends_on)
+          ? c.depends_on.filter((id): id is string => typeof id === 'string')
+          : [],
         text: c.text ?? '',
         url: cardUrl,
         mediaType: c.type,
         error: c.error,
         query: c.query,
         resultsCount: c.resultsCount,
+        usedWorkspace: c.used_workspace === true || c.usedWorkspace === true,
         jobId: typeof c.job_id === 'string' ? c.job_id : undefined,
         // #1229 smart collapse: assembly-time redundancy flag. The body stays
         // the canonical answer surface; the duplicated card collapses (the
@@ -523,9 +549,13 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     topic: m.topic,
     originalTopic: m.originalTopic || null,
     originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,
+    errorReason: role === 'assistant' ? (m.errorReason ?? null) : null,
+    canRetryModel: role === 'assistant' ? (m.canRetryModel ?? undefined) : undefined,
+    errorDebug: role === 'assistant' ? (m.errorDebug ?? null) : null,
     backendMessageId: m.id,
     quotedText: m.quotedText ?? null,
     quotedMessageId: m.quotedMessageId ?? null,
+    agentId: m.agentId && m.agentId > 0 ? m.agentId : null,
     files: files.length > 0 ? files : undefined,
     aiModels: m.aiModels || null,
     webSearch: m.webSearch || null,
@@ -554,6 +584,21 @@ export interface ApiInProgressTurn {
     resultsCount?: number | null
     type?: string | null
   }>
+}
+
+/**
+ * A turn that is still generating, as reported by the chat history endpoints.
+ *
+ * The backend keeps a turn alive after the client that started it disconnects
+ * and mirrors its Server-Sent Events into a replayable log. `partialText` is
+ * the answer so far (for an instant repaint) and `runId` is what the client
+ * re-attaches to in order to receive the rest live.
+ */
+export interface ApiActiveRun {
+  runId: string
+  trackId: string
+  lastSeq: number
+  partialText: string
 }
 
 /** Stable client id for the synthesized in-progress assistant bubble (#1142). */
@@ -722,6 +767,11 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   }
   if (persisted.originalMediaType) {
     local.originalMediaType = persisted.originalMediaType
+  }
+  if (persisted.errorReason) {
+    local.errorReason = persisted.errorReason
+    local.canRetryModel = persisted.canRetryModel
+    local.errorDebug = persisted.errorDebug ?? null
   }
   if (persisted.wasMultitask) {
     local.wasMultitask = true

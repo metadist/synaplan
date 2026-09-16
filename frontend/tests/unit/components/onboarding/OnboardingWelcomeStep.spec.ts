@@ -84,7 +84,7 @@ describe('OnboardingWelcomeStep — AI processing notice', () => {
   })
 
   it('carries the notice in every supported locale', () => {
-    for (const locale of ['de', 'en', 'es', 'tr'] as const) {
+    for (const locale of ['de', 'en', 'es', 'fr', 'tr'] as const) {
       i18n.global.locale.value = locale
 
       const notice = mountStep().find('[data-testid="section-onboarding-ai-notice"]')

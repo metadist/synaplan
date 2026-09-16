@@ -74,11 +74,21 @@ parameters:
     env(THEHIVE_API_KEY): ''
     env(HIGGSFIELD_API_KEY): ''
     env(HIGGSFIELD_API_SECRET): ''
+    env(ELEVENLABS_API_KEY): ''
     env(HUGGINGFACE_API_KEY): ''
     # TrustedTokens (TNG) — German sovereign OpenAI-compatible inference.
     env(TRUSTEDTOKENS_API_KEY): ''
+    # A2Agent — Chinese frontier models (Qwen, DeepSeek, MiniMax) via gateway.
+    env(A2AGENT_API_KEY): ''
     # xAI (Grok chat/vision, Grok Imagine image/video, Grok voice TTS/STT).
     env(XAI_API_KEY): ''
+    env(PERPLEXITY_API_KEY): ''
+    env(TAVILY_API_KEY): ''
+    env(EXA_API_KEY): ''
+    env(FIRECRAWL_API_KEY): ''
+    env(JINA_API_KEY): ''
+    env(COHERE_API_KEY): ''
+    env(VOYAGE_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''
     env(GMAIL_USERNAME): ''
@@ -89,6 +99,8 @@ parameters:
     env(QDRANT_URL): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
+    env(QDRANT_DIGESTS_COLLECTION): ''
+    env(QDRANT_ROUTING_ANCHORS_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
@@ -122,9 +134,51 @@ parameters:
     env(IAP_STORE_PRICE_BUSINESS): '129.99'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
+    env(WHATSAPP_ENABLED): 'false'
     env(CLOUDFLARE_ACCOUNT_ID): ''
     env(CLOUDFLARE_API_TOKEN): ''
     env(EMBEDDING_FALLBACK_PROVIDER): ''
+
+    # Container-safe defaults for the remaining strictly-bound env vars.
+    # Compose passes these through .env/env_file, but bare images (Kubernetes,
+    # plain docker run) ship no .env, so a missing var used to crash service
+    # instantiation (e.g. /api/v1/messages/stream 500ing on WHATSAPP_ENABLED).
+    # Values mirror backend/.env.example; where the Dockerfile bakes an ENV
+    # (BRAVE_SEARCH_*, TIKA_*, RASTERIZE_*) that one wins inside containers,
+    # so these match the Dockerfile too.
+    env(TIKA_TIMEOUT_MS): '30000'
+    env(TIKA_RETRIES): '2'
+    env(TIKA_RETRY_BACKOFF_MS): '1000'
+    env(TIKA_MIN_LENGTH): '10'
+    env(TIKA_MIN_ENTROPY): '3.0'
+    # Docling sidecar. Empty = off (OSS / fresh-install default).
+    env(DOCLING_BASE_URL): ''
+    env(DOCLING_TIMEOUT_MS): '120000'
+    env(DOCLING_MAX_BYTES): '52428800'
+    # SearXNG sidecar. Empty = off (OSS / fresh-install default).
+    env(SEARXNG_BASE_URL): ''
+    # Office convert (Collabora CODE). Empty = disabled (OSS default).
+    env(OFFICE_CONVERT_URL): ''
+    env(OFFICE_CONVERT_TIMEOUT_MS): '60000'
+    # Secure compute sidecar. Empty URL or token = module absent.
+    env(COMPUTE_URL): ''
+    env(COMPUTE_TOKEN): ''
+    env(OFFICE_TEXT_MAX_ROWS): '500'
+    env(OFFICE_COMBINE_MAX_FILES): '20'
+    env(RASTERIZE_DPI): '150'
+    env(RASTERIZE_PAGE_CAP): '10'
+    env(RASTERIZE_TIMEOUT_MS): '30000'
+    env(WHISPER_ENABLED): 'true'
+    env(WHISPER_DEFAULT_MODEL): 'base'
+    env(WHISPER_BINARY): '/usr/local/bin/whisper'
+    env(WHISPER_MODELS_PATH): '%kernel.project_dir%/var/whisper'
+    env(FFMPEG_BINARY): '/usr/bin/ffmpeg'
+    env(BRAVE_SEARCH_ENABLED): 'false'
+    env(BRAVE_SEARCH_API_URL): 'https://api.search.brave.com/res/v1'
+    env(BRAVE_SEARCH_COUNT): '10'
+    env(BRAVE_SEARCH_COUNTRY): 'us'
+    env(BRAVE_SEARCH_SEARCH_LANG): 'en'
+    env(STRIPE_AUTOMATIC_TAX): 'false'
 
     # Piper TTS Service default (localhost for native; Docker Compose overrides via env)
     env(SYNAPLAN_TTS_URL): ''
@@ -173,6 +227,25 @@ services:
             tags: ['app.multitask.runner']
         App\Realtime\Authorizer\ChannelAuthorizerInterface:
             tags: ['app.realtime.authorizer']
+        App\Service\Destination\DestinationProvider:
+            tags: ['app.destination.provider']
+        App\Service\OAuth\OAuthProviderSource:
+            tags: ['app.oauth.provider_source']
+        App\Service\Connection\ConnectionTester:
+            tags: ['app.connection.tester']
+        # Free provider catalog lookups for model outage detection — collected
+        # by ModelListProbeRegistry. Never inference, always metadata.
+        App\AI\Health\Probe\ModelListProbeInterface:
+            tags: ['app.model_list_probe']
+        App\Service\Document\Tool\DocumentToolInterface:
+            tags: ['app.document_tool']
+        App\Service\Iam\ResourceKind\ShareableResourceKindInterface:
+            tags: ['app.iam.resource_kind']
+        # Plug adapter interfaces (extractor / web_search / rerank) are tagged
+        # via registerForAutoconfiguration in App\Kernel::build() instead of here:
+        # _instanceof is file-scoped and never reaches plugin services loaded
+        # through the fluent API, so a plugin adapter would otherwise be invisible
+        # to its registry. Autoconfiguration applies container-wide (core + plugins).
 
     App\:
         resource: '../src/'
@@ -181,6 +254,12 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Test/'
+            # Feature-module value objects and the compiler pass are not services.
+            - '../src/Module/Contract/'
+            - '../src/Module/DependencyInjection/'
+            - '../src/Module/Exception/'
+            # Factory product of PluginResourceKindCatalog — never a singleton.
+            - '../src/Service/Iam/ResourceKind/PluginResourceKind.php'
 
     # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
     # the project dir for Symfony Process cwd. Alias binds the interface.
@@ -190,15 +269,23 @@ services:
     App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
         alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
-    # Images a document turn may embed: attachments, upstream node output and
-    # the pictures of the conversation, validated against the uploads dir.
-    App\Service\File\DocumentImageCatalog:
+    # Every file a conversation has in hand — attachments, upstream node output
+    # and the artifacts generated earlier in the thread — validated against the
+    # uploads dir. Single resolver behind media edits, document embedding and
+    # the routing file inventory.
+    App\Service\File\ConversationFileCatalog:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
     # email_me DAG node: resolves upstream file descriptors to absolute paths
     # under the shared uploads dir before attaching them to the result mail.
     App\Service\Multitask\Execution\Runner\EmailMeRunner:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # calendar_event DAG node: the stored .ics lives under the shared uploads
+    # dir; the runner needs the absolute path for a calendar-channel delivery.
+    App\Service\Multitask\Execution\Runner\CalendarEventRunner:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
@@ -250,8 +337,30 @@ services:
                     - '%env(default::GOOGLE_API_KEY)%'
                 mistral: '%env(MISTRAL_API_KEY)%'
                 trustedtokens: '%env(TRUSTEDTOKENS_API_KEY)%'
+                a2agent: '%env(A2AGENT_API_KEY)%'
                 huggingface: '%env(HUGGINGFACE_API_KEY)%'
                 xai: '%env(XAI_API_KEY)%'
+                perplexity: '%env(PERPLEXITY_API_KEY)%'
+                # Media and speech providers share the store so Models & keys
+                # is the one editor for every instance key.
+                thehive: '%env(THEHIVE_API_KEY)%'
+                higgsfield: '%env(HIGGSFIELD_API_KEY)%'
+                elevenlabs: '%env(ELEVENLABS_API_KEY)%'
+            # Secret halves for key + secret providers (ProviderKeyCatalog secretEnvVar).
+            $envSecrets:
+                higgsfield: '%env(HIGGSFIELD_API_SECRET)%'
+
+    App\Plug\PlugKeyStore:
+        arguments:
+            $envKeys:
+                tavily: '%env(TAVILY_API_KEY)%'
+                exa: '%env(EXA_API_KEY)%'
+                firecrawl: '%env(FIRECRAWL_API_KEY)%'
+                jina: '%env(JINA_API_KEY)%'
+                cohere: '%env(COHERE_API_KEY)%'
+                voyage: '%env(VOYAGE_API_KEY)%'
+            # Keys plugins declare in provides.plugs (set by App\Kernel).
+            $pluginProviders: '%plug.plugin_keys%'
 
     # Written by _docker/backend/docker-entrypoint.sh during AUTO_DOWNLOAD_MODELS pulls.
     App\Service\LocalAi\LocalAiDownloadStatusService:
@@ -263,8 +372,8 @@ services:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.chat', key: 'anthropic' }
+            - { name: 'app.ai.vision', key: 'anthropic' }
 
     App\AI\Provider\OpenAIProvider:
         arguments:
@@ -272,65 +381,79 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $storeResponses: '%env(bool:OPENAI_STORE_RESPONSES)%'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.speech_to_text' }
-            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.chat', key: 'openai' }
+            - { name: 'app.ai.embedding', key: 'openai' }
+            - { name: 'app.ai.vision', key: 'openai' }
+            - { name: 'app.ai.image_generation', key: 'openai' }
+            - { name: 'app.ai.speech_to_text', key: 'openai' }
+            - { name: 'app.ai.text_to_speech', key: 'openai' }
 
     App\AI\Provider\OllamaProvider:
         arguments:
             $baseUrl: '%env(OLLAMA_BASE_URL)%'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.chat', key: 'ollama' }
+            - { name: 'app.ai.embedding', key: 'ollama' }
 
     App\AI\Provider\TritonProvider:
         arguments:
             $serverUrl: '%env(TRITON_SERVER_URL)%'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.chat', key: 'triton' }
+            - { name: 'app.ai.embedding', key: 'triton' }
 
     App\AI\Provider\GroqProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.chat', key: 'groq' }
+            - { name: 'app.ai.vision', key: 'groq' }
+            - { name: 'app.ai.speech_to_text', key: 'groq' }
 
     App\AI\Provider\MistralProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.speech_to_text' }
-            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.chat', key: 'mistral' }
+            - { name: 'app.ai.vision', key: 'mistral' }
+            - { name: 'app.ai.speech_to_text', key: 'mistral' }
+            - { name: 'app.ai.text_to_speech', key: 'mistral' }
 
     App\AI\Provider\TrustedTokensProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.chat', key: 'trustedtokens' }
+            - { name: 'app.ai.vision', key: 'trustedtokens' }
+
+    App\AI\Provider\A2AgentProvider:
+        arguments:
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat', key: 'a2agent' }
+            - { name: 'app.ai.vision', key: 'a2agent' }
 
     App\AI\Provider\XaiProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.video_generation' }
-            - { name: 'app.ai.text_to_speech' }
-            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.chat', key: 'xai' }
+            - { name: 'app.ai.vision', key: 'xai' }
+            - { name: 'app.ai.image_generation', key: 'xai' }
+            - { name: 'app.ai.video_generation', key: 'xai' }
+            - { name: 'app.ai.text_to_speech', key: 'xai' }
+            - { name: 'app.ai.speech_to_text', key: 'xai' }
+
+    App\AI\Provider\PerplexityProvider:
+        arguments:
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
+        tags:
+            - { name: 'app.ai.chat', key: 'perplexity' }
 
     App\AI\Provider\GoogleProvider:
         arguments:
@@ -340,24 +463,16 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $vertexAccessToken: '%env(GOOGLE_VERTEX_ACCESS_TOKEN)%'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.video_generation' }
-            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.chat', key: 'google' }
+            - { name: 'app.ai.vision', key: 'google' }
+            - { name: 'app.ai.image_generation', key: 'google' }
+            - { name: 'app.ai.video_generation', key: 'google' }
+            - { name: 'app.ai.speech_to_text', key: 'google' }
+            - { name: 'app.ai.text_to_speech', key: 'google' }
 
     App\AI\Provider\TheHiveProvider:
-        arguments:
-            $apiKey: '%env(THEHIVE_API_KEY)%'
         tags:
-            - { name: 'app.ai.image_generation' }
-
-    # Higgsfield credentials: platform-wide env defaults + per-user override
-    # (encrypted in BCONFIG via EncryptionService).
-    App\AI\Credential\HiggsfieldCredentialResolver:
-        arguments:
-            $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'
-            $platformApiSecret: '%env(HIGGSFIELD_API_SECRET)%'
+            - { name: 'app.ai.image_generation', key: 'thehive' }
 
     # Anthropic Messages gateway: admin-set UPSTREAM_URL in BCONFIG wins;
     # MESSAGES_GATEWAY_UPSTREAM_URL is the env fallback for the local smoke harness.
@@ -369,38 +484,63 @@ services:
         tags:
             - { name: 'app.messages.translator' }
 
+    # Higgsfield: instance pair from ProviderKeyStore (Models & keys, env
+    # bootstrap) + per-user override resolved by HiggsfieldCredentialResolver.
     App\AI\Provider\HiggsfieldProvider:
-        arguments:
-            $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'
-            $platformApiSecret: '%env(HIGGSFIELD_API_SECRET)%'
         tags:
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.video_generation' }
+            - { name: 'app.ai.image_generation', key: 'higgsfield' }
+            - { name: 'app.ai.video_generation', key: 'higgsfield' }
 
     App\AI\Provider\PiperProvider:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $ttsUrl: '%env(default:synaplan_tts_url_default:SYNAPLAN_TTS_URL)%'
         tags:
-            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.text_to_speech', key: 'piper' }
+
+    App\AI\Provider\WhisperProvider:
+        tags:
+            - { name: 'app.ai.speech_to_text', key: 'whisper' }
 
     App\AI\Provider\HuggingFaceProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.embedding' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.video_generation' }
+            - { name: 'app.ai.chat', key: 'huggingface' }
+            - { name: 'app.ai.vision', key: 'huggingface' }
+            - { name: 'app.ai.embedding', key: 'huggingface' }
+            - { name: 'app.ai.image_generation', key: 'huggingface' }
+            - { name: 'app.ai.video_generation', key: 'huggingface' }
 
     App\AI\Provider\CloudflareProvider:
         arguments:
             $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
             $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
         tags:
-            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.embedding', key: 'cloudflare' }
+
+    # Model health: the account-scoped Cloudflare catalog needs the same
+    # credentials as the provider itself.
+    App\AI\Health\Probe\CloudflareModelListProbe:
+        arguments:
+            $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
+            $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
+
+    # Ollama is always registered as a provider; an empty URL means the
+    # Cloud-AI profile never enabled local AI — that is Unconfigured, not
+    # an outage (#1704).
+    App\AI\Health\Probe\OllamaModelListProbe:
+        arguments:
+            $baseUrl: '%env(OLLAMA_BASE_URL)%'
+
+    App\AI\Health\Probe\ModelListProbeRegistry:
+        arguments:
+            $probes: !tagged_iterator app.model_list_probe
+
+    # The scheduled re-check discovers imported models through this port; the
+    # concrete discovery service is the only implementation.
+    App\AI\Import\ModelDiscovererInterface: '@App\AI\Import\ModelDiscoveryService'
 
     # Generic "OpenAI Compatible" provider (LocalAI, vLLM, LiteLLM, Ollama /v1,
     # …). Endpoints are configured at runtime and stored encrypted in BCONFIG
@@ -409,9 +549,9 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
-            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.chat', key: 'openaicompatible' }
+            - { name: 'app.ai.embedding', key: 'openaicompatible' }
+            - { name: 'app.ai.vision', key: 'openaicompatible' }
 
     # AI Facade
     App\AI\Service\AiFacade:
@@ -483,6 +623,11 @@ services:
     App\Realtime\Publisher\RealtimePublisherInterface:
         alias: App\Realtime\Publisher\CentrifugoPublisher
 
+    App\Service\Stt\SttSessionStore:
+        arguments:
+            $storageDir: '%kernel.project_dir%/var/stt'
+            $ttlSeconds: 7200
+
     # Whisper Service for Audio Transcription
     App\Service\WhisperService:
         arguments:
@@ -501,6 +646,11 @@ services:
             $braveSearchCount: '%env(int:BRAVE_SEARCH_COUNT)%'
             $braveSearchCountry: '%env(BRAVE_SEARCH_COUNTRY)%'
             $braveSearchLang: '%env(BRAVE_SEARCH_SEARCH_LANG)%'
+
+    # Callers use the gateway; $override is a unit-test seam (never autowired).
+    App\Plug\WebSearch\WebSearchGateway:
+        arguments:
+            $override: null
 
     # Discord Webhook Notification Service
     App\Service\DiscordNotificationService:
@@ -537,11 +687,22 @@ services:
         arguments:
             $appUrl: '%env(APP_URL)%'
 
+    # Synaplan Desktop: pairing mints a scoped key + device row; the returned
+    # apiBaseUrl is the public app URL the client will call.
+    App\Service\Desktop\PairingService:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:
         arguments:
             $uploadsDir: '%kernel.project_dir%/var/uploads'
-    App\Service\Message\MessageSorter: ~
+    App\Service\Message\MessageSorter:
+        arguments:
+            $officePdfRouting: '@App\Service\File\Office\OfficePdfRoutingDecorator'
+    App\Service\Multitask\TaskPlanner:
+        arguments:
+            $officePdfRouting: '@App\Service\File\Office\OfficePdfRoutingDecorator'
     App\Service\Message\MessageClassifier: ~
     App\Service\Message\InferenceRouter: ~
     App\Service\Message\MessageProcessor: ~
@@ -581,6 +742,15 @@ services:
     App\Service\MediaGenerationServiceInterface:
         alias: App\Service\MediaGenerationService
 
+    App\Service\Desktop\DesktopGeneratedMediaService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # Model availability detection talks to provider listing endpoints; the
+    # interface keeps the diff logic testable without credentials or network.
+    App\AI\Service\ProviderModelInventoryInterface:
+        alias: App\AI\Service\ProviderModelInventory
+
     App\Service\Media\GeneratedFileRegistrar:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
@@ -594,7 +764,6 @@ services:
     App\Service\ModelConfigService:
         arguments:
             $cache: '@cache.model_config'
-            $environment: '%kernel.environment%'
 
     # Shares the model_config pool so applying provider defaults invalidates
     # the same cached lookups ModelConfigService serves from.
@@ -638,10 +807,61 @@ services:
             $bootstrapAdminPassword: '%env(string:BOOTSTRAP_ADMIN_PASSWORD)%'
             $bootstrapAdminForcePasswordChange: '%env(bool:BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE)%'
 
+    # Development aid: reopens the first-run setup wizard. Refuses to run outside
+    # dev/test, which is why it needs the environment injected.
+    App\Command\SetupResetCommand:
+        arguments:
+            $environment: '%kernel.environment%'
+
     # Encryption Service (for sensitive data like IMAP passwords)
     App\Service\EncryptionService:
         arguments:
             $secretKey: '%env(APP_SECRET)%'
+
+    App\Service\Credential\CredentialVaultInterface: '@App\Service\Credential\AesCredentialVault'
+
+    App\Service\Destination\DestinationRegistry:
+        arguments:
+            $providers: !tagged_iterator app.destination.provider
+
+    # Outbound OAuth2 (connector plan 07 F3). The app registration itself lives
+    # in BCONFIG so an operator can set it in the Admin UI without a restart;
+    # only APP_URL (for the default redirect URI) comes from the environment.
+    App\Service\OAuth\OAuthProviderRegistry:
+        arguments:
+            $sources: !tagged_iterator app.oauth.provider_source
+
+    App\Service\Connection\ConnectionService:
+        arguments:
+            $testers: !tagged_iterator app.connection.tester
+
+    App\Service\Microsoft\MicrosoftOAuthConfig:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Controller\MicrosoftConnectionController:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+
+    App\Service\Dropbox\DropboxOAuthConfig:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Controller\DropboxConnectionController:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+
+    App\Service\Mcp\McpOAuthConsentService:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Service\Mcp\McpOAuthTokenProvider:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Controller\McpOAuthController:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
 
     # Social Login Controllers (Google & GitHub OAuth)
     App\Controller\GoogleAuthController:
@@ -693,6 +913,12 @@ services:
             $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
             $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
+
+    App\Service\Iam\DirectoryGroupSync:
+        arguments:
+            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
 
     # Keycloak OIDC OAuth Controller
     App\Controller\KeycloakAuthController:
@@ -794,6 +1020,12 @@ services:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
 
+    # Read-only media credential for <img>/<audio>/<video>, which cannot send
+    # an Authorization header. Derives its own signing key from APP_SECRET.
+    App\Service\Media\MediaAccessTokenService:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
     # OAuth login responder (web cookies vs native deep-link handoff)
     App\Service\OAuthLoginResponder:
         arguments:
@@ -839,6 +1071,120 @@ services:
             $tikaRetryBackoffMs: '%env(int:TIKA_RETRY_BACKOFF_MS)%'
             $tikaHttpUser: '%env(TIKA_HTTP_USER)%'
             $tikaHttpPass: '%env(TIKA_HTTP_PASS)%'
+
+    App\Plug\Extraction\Docling\DoclingClient:
+        arguments:
+            $baseUrl: '%env(DOCLING_BASE_URL)%'
+            $timeoutMs: '%env(int:DOCLING_TIMEOUT_MS)%'
+
+    App\Plug\WebSearch\Client\SearxngClient:
+        arguments:
+            $baseUrl: '%env(SEARXNG_BASE_URL)%'
+
+    App\Plug\Extraction\Adapter\DoclingExtractor:
+        arguments:
+            $maxBytes: '%env(int:DOCLING_MAX_BYTES)%'
+
+    App\Service\File\Office\OfficeConverterClient:
+        arguments:
+            $officeConvertUrl: '%env(OFFICE_CONVERT_URL)%'
+            $officeConvertTimeoutMs: '%env(int:OFFICE_CONVERT_TIMEOUT_MS)%'
+
+    # Feature-module descriptors (_devextras/planning/20260910-feature-modules).
+    # Each one reads the SAME env expression as the service it describes so
+    # "configured" can never drift from the runtime behaviour. Scalars only —
+    # descriptors must stay cheap to construct; probes happen in status().
+    App\Module\Probe\SidecarHealthProbeInterface:
+        alias: App\Module\Probe\HttpSidecarHealthProbe
+
+    App\Module\Sidecar\TikaModule:
+        arguments:
+            $baseUrl: '%env(TIKA_BASE_URL)%'
+            $httpUser: '%env(TIKA_HTTP_USER)%'
+            $httpPass: '%env(TIKA_HTTP_PASS)%'
+
+    App\Module\Sidecar\DoclingModule:
+        arguments:
+            $baseUrl: '%env(DOCLING_BASE_URL)%'
+
+    App\Module\Sidecar\OfficeConvertModule:
+        arguments:
+            $baseUrl: '%env(OFFICE_CONVERT_URL)%'
+
+    App\Module\Sidecar\ComputeModule:
+        arguments:
+            $baseUrl: '%env(COMPUTE_URL)%'
+            $token: '%env(COMPUTE_TOKEN)%'
+
+    App\Service\Compute\ComputeConfig:
+        arguments:
+            $computeUrl: '%env(COMPUTE_URL)%'
+            $computeToken: '%env(COMPUTE_TOKEN)%'
+
+    App\Service\Compute\ComputeArtefactStore:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Multitask\Execution\Runner\CodeRunRunner:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Module\Sidecar\SearxngModule:
+        arguments:
+            $baseUrl: '%env(SEARXNG_BASE_URL)%'
+
+    App\Module\Sidecar\PiperTtsModule:
+        arguments:
+            # Raw value on purpose: PiperProvider receives the defaulted URL and
+            # therefore always reports available; the module tells apart
+            # "operator pointed at a TTS service" from "compose default".
+            $ttsUrl: '%env(SYNAPLAN_TTS_URL)%'
+
+    App\Module\Sidecar\LocalAiModule:
+        arguments:
+            $baseUrl: '%env(OLLAMA_BASE_URL)%'
+
+    App\Module\Commerce\StripeBillingModule:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
+            $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+
+    App\Module\Channel\WhatsappModule:
+        arguments:
+            $enabled: '%env(bool:WHATSAPP_ENABLED)%'
+            $accessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
+            $webhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+
+    App\Service\File\Office\StructuredTextExtractor:
+        arguments:
+            $officeTextMaxRows: '%env(int:OFFICE_TEXT_MAX_ROWS)%'
+
+    App\Service\File\Office\DocumentCombineService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $officeCombineMaxFiles: '%env(int:OFFICE_COMBINE_MAX_FILES)%'
+
+    App\Service\File\GeneratedDocumentStore:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Document\Persist\DocumentRevisionService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Document\DocumentEditCoordinator:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Document\Tool\MergeDocumentsTool:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Document\DocumentOfficeMergeService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $officeCombineMaxFiles: '%env(int:OFFICE_COMBINE_MAX_FILES)%'
 
     App\Service\File\FileStorageService:
         arguments:
@@ -888,6 +1234,18 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    App\Service\File\Office\DocumentThumbnailGenerator:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\File\Office\DocumentExportService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\MessageHandler\GenerateDocumentThumbnailMessageHandler:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     App\Service\File\OgImageService:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
@@ -924,6 +1282,8 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
+            $digestsCollection: '%env(default::QDRANT_DIGESTS_COLLECTION)%'
+            $routingAnchorsCollection: '%env(default::QDRANT_ROUTING_ANCHORS_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect
@@ -944,6 +1304,11 @@ services:
     app.monolog_formatter:
         class: Monolog\Formatter\FormatterInterface
         factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
+
+    # Stamps the request correlation id onto every log record (see RequestIdSubscriber).
+    App\Monolog\RequestIdProcessor:
+        tags:
+            - { name: monolog.processor }
 
     # Plugin services are loaded dynamically by Kernel::loadPluginServices()
     # No manual plugin entries needed — drop plugin into /plugins/ and restart.
@@ -1014,13 +1379,13 @@ when@dev:
             arguments:
                 $uploadDir: '%kernel.project_dir%/var/uploads'
             tags:
-                - { name: 'app.ai.chat' }
-                - { name: 'app.ai.embedding' }
-                - { name: 'app.ai.vision' }
-                - { name: 'app.ai.image_generation' }
-                - { name: 'app.ai.speech_to_text' }
-                - { name: 'app.ai.text_to_speech' }
-                - { name: 'app.ai.file_analysis' }
+                - { name: 'app.ai.chat', key: 'test' }
+                - { name: 'app.ai.embedding', key: 'test' }
+                - { name: 'app.ai.vision', key: 'test' }
+                - { name: 'app.ai.image_generation', key: 'test' }
+                - { name: 'app.ai.speech_to_text', key: 'test' }
+                - { name: 'app.ai.text_to_speech', key: 'test' }
+                - { name: 'app.ai.file_analysis', key: 'test' }
 
 when@test:
     services:
@@ -1033,11 +1398,11 @@ when@test:
             arguments:
                 $uploadDir: '%kernel.project_dir%/var/uploads'
             tags:
-                - { name: 'app.ai.chat' }
-                - { name: 'app.ai.embedding' }
-                - { name: 'app.ai.vision' }
-                - { name: 'app.ai.image_generation' }
-                - { name: 'app.ai.speech_to_text' }
-                - { name: 'app.ai.text_to_speech' }
-                - { name: 'app.ai.file_analysis' }
+                - { name: 'app.ai.chat', key: 'test' }
+                - { name: 'app.ai.embedding', key: 'test' }
+                - { name: 'app.ai.vision', key: 'test' }
+                - { name: 'app.ai.image_generation', key: 'test' }
+                - { name: 'app.ai.speech_to_text', key: 'test' }
+                - { name: 'app.ai.text_to_speech', key: 'test' }
+                - { name: 'app.ai.file_analysis', key: 'test' }
 

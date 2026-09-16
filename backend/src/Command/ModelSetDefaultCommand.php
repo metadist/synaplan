@@ -29,7 +29,7 @@ class ModelSetDefaultCommand extends Command
     {
         $this
             ->addArgument('model', InputArgument::REQUIRED,
-                'Model key (e.g. groq:llama-3.3-70b-versatile, ollama:bge-m3)')
+                'Model key (e.g. groq:qwen/qwen3.6-27b:chat, ollama:bge-m3)')
             ->addArgument('capabilities', InputArgument::IS_ARRAY | InputArgument::REQUIRED,
                 'Capabilities to set this model as default for (e.g. chat vectorize)')
             ->setHelp(

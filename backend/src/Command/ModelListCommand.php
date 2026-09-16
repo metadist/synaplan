@@ -28,14 +28,16 @@ class ModelListCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        // Get BIDs of models currently in the database
-        $enabledBids = $this->connection->fetchFirstColumn('SELECT BID FROM BMODELS');
-        $enabledBids = array_map('intval', $enabledBids);
+        // BACTIVE, not row existence: app:model:disable soft-disables (the row
+        // stays because BMESSAGES references the BID), so a present row says
+        // nothing about whether the model can serve a request.
+        $activeByBid = $this->connection->fetchAllKeyValue('SELECT BID, BACTIVE FROM BMODELS');
 
         $rows = [];
         foreach (ModelCatalog::all() as $model) {
             $key = strtolower($model['service']).':'.strtolower(str_replace(':', '-', $model['providerId']));
-            $enabled = in_array($model['id'], $enabledBids, true);
+            $state = $activeByBid[$model['id']] ?? null;
+            $enabled = null !== $state && 1 === (int) $state;
 
             $rows[] = [
                 $enabled ? '<info>yes</info>' : 'no',

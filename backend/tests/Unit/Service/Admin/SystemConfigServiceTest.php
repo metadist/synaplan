@@ -4,14 +4,27 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Admin;
 
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
+use App\Entity\Config;
+use App\Module\Contract\FeatureModuleInterface;
+use App\Module\Gate\ModuleGateConfig;
+use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
+use App\Seed\ModuleGateSeeder;
 use App\Service\Admin\SystemConfigService;
+use App\Service\Digest\MessageDigestConfig;
 use App\Service\EncryptionService;
+use App\Service\Feature\FeatureFlagEnv;
+use App\Service\GuestChatConfig;
 use App\Service\Message\ConversationSummaryConstants;
+use App\Service\Microsoft\MicrosoftOAuthConfig;
+use App\Service\RegistrationConfig;
+use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 
 /**
  * Focused tests for SystemConfigService's database-backed config writes —
@@ -20,6 +33,8 @@ use Psr\Log\NullLogger;
  */
 final class SystemConfigServiceTest extends TestCase
 {
+    use BuildsAllModules;
+
     private ConfigRepository&MockObject $configRepository;
     private SystemConfigService $service;
 
@@ -29,9 +44,10 @@ final class SystemConfigServiceTest extends TestCase
 
         // ProviderKeyStore is final (not mockable); a real instance over the
         // same repository mock is inert for these multitask-focused tests.
+        $encryption = new EncryptionService('test-secret', new NullLogger());
         $providerKeyStore = new ProviderKeyStore(
             $this->configRepository,
-            new EncryptionService('test-secret', new NullLogger()),
+            $encryption,
             new NullLogger(),
         );
 
@@ -41,7 +57,52 @@ final class SystemConfigServiceTest extends TestCase
             configRepository: $this->configRepository,
             defaultTtsUrl: 'http://localhost:10200',
             providerKeyStore: $providerKeyStore,
+            encryption: $encryption,
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
         );
+    }
+
+    /**
+     * REGISTRATION_ENABLED is stored in BCONFIG but an explicit environment
+     * variable still wins. Without the marker the page would show a toggle the
+     * admin can move while nothing changes.
+     */
+    public function testAccessFlagIsReportedAsPinnedByTheEnvironment(): void
+    {
+        $envWasSet = \array_key_exists('REGISTRATION_ENABLED', $_ENV);
+        $original = $envWasSet ? $_ENV['REGISTRATION_ENABLED'] : null;
+        $_ENV['REGISTRATION_ENABLED'] = 'false';
+
+        try {
+            $values = $this->service->getValues();
+
+            $this->assertTrue($values['REGISTRATION_ENABLED']['envOverride']);
+            $this->assertSame('false', $values['REGISTRATION_ENABLED']['effectiveValue']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['REGISTRATION_ENABLED'] = $original;
+            } else {
+                unset($_ENV['REGISTRATION_ENABLED']);
+            }
+        }
+    }
+
+    public function testAccessFlagWithoutAnEnvironmentVariableIsNotMarked(): void
+    {
+        $envWasSet = \array_key_exists('GUEST_CHAT_ENABLED', $_ENV);
+        $original = $envWasSet ? $_ENV['GUEST_CHAT_ENABLED'] : null;
+        unset($_ENV['GUEST_CHAT_ENABLED']);
+
+        try {
+            $values = $this->service->getValues();
+
+            $this->assertArrayNotHasKey('envOverride', $values['GUEST_CHAT_ENABLED']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['GUEST_CHAT_ENABLED'] = $original;
+            }
+        }
     }
 
     /**
@@ -60,6 +121,51 @@ final class SystemConfigServiceTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertFalse($result['requiresRestart']);
+    }
+
+    /**
+     * A database-backed secret must never reach BCONFIG in plain text — the row
+     * is readable by anyone with DB access and by every other config reader.
+     */
+    public function testM365ClientSecretIsEncryptedBeforeItIsStored(): void
+    {
+        $stored = null;
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->willReturnCallback(function (int $owner, string $group, string $setting, string $value) use (&$stored) {
+                self::assertSame(0, $owner);
+                self::assertSame(MicrosoftOAuthConfig::CONFIG_GROUP, $group);
+                self::assertSame(MicrosoftOAuthConfig::KEY_CLIENT_SECRET, $setting);
+                $stored = $value;
+
+                return new Config();
+            });
+
+        $result = $this->service->setValue('M365_CLIENT_SECRET', 'super-secret');
+
+        self::assertTrue($result['success']);
+        self::assertIsString($stored);
+        self::assertNotSame('super-secret', $stored);
+        self::assertSame(
+            'super-secret',
+            (new EncryptionService('test-secret', new NullLogger()))->decrypt($stored),
+        );
+    }
+
+    public function testM365ClientSecretIsMaskedWhenRead(): void
+    {
+        $this->configRepository->expects($this->atLeastOnce())->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => MicrosoftOAuthConfig::CONFIG_GROUP === $group
+                && MicrosoftOAuthConfig::KEY_CLIENT_SECRET === $setting
+                    ? 'some-ciphertext'
+                    : null
+        );
+
+        $secret = $this->service->getValues()['M365_CLIENT_SECRET'];
+
+        self::assertTrue($secret['isSet']);
+        self::assertTrue($secret['isMasked']);
+        self::assertStringNotContainsString('some-ciphertext', $secret['value']);
     }
 
     /**
@@ -90,6 +196,27 @@ final class SystemConfigServiceTest extends TestCase
         $this->configRepository->expects($this->never())->method('deleteValue');
 
         $this->service->setValue('MULTITASK_ROUTING_ENABLED', 'true');
+    }
+
+    public function testMcpClientWritesToTheMcpGroupRow(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->with(0, 'MCP', 'CLIENT_ENABLED', 'true');
+
+        $result = $this->service->setValue('MCP_CLIENT_ENABLED', 'true', 7);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['requiresRestart']);
+    }
+
+    public function testEnablingMcpClientClearsActingAdminPerUserOverride(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('deleteValue')
+            ->with(7, 'MCP', 'CLIENT_ENABLED');
+
+        $this->service->setValue('MCP_CLIENT_ENABLED', 'true', 7);
     }
 
     /**
@@ -183,6 +310,186 @@ final class SystemConfigServiceTest extends TestCase
         $this->assertFalse($result['success']);
     }
 
+    /**
+     * The deep-memory knobs are exposed under flat DIGEST_* admin keys but
+     * must land in the BCONFIG rows MessageDigestConfig reads: group DIGEST
+     * with the bare setting name, ownerId 0.
+     */
+    public function testDigestKnobWritesToTheDigestGroupRow(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->with(0, MessageDigestConfig::CONFIG_GROUP, 'RECENCY_HALF_LIFE_DAYS', '90');
+
+        $result = $this->service->setValue('DIGEST_RECENCY_HALF_LIFE_DAYS', '90', 7);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['requiresRestart']);
+    }
+
+    public function testDigestScoreKnobsRejectOutOfRangeValues(): void
+    {
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $this->assertFalse($this->service->setValue('DIGEST_MIN_SCORE', '1.5', 7)['success']);
+        $this->assertFalse($this->service->setValue('DIGEST_PULL_MIN_SCORE', '-0.1', 7)['success']);
+    }
+
+    public function testDigestScoreKnobsAcceptFractions(): void
+    {
+        $this->configRepository->expects($this->exactly(2))->method('setValue');
+
+        $this->assertTrue($this->service->setValue('DIGEST_MIN_SCORE', '0.55', 7)['success']);
+        $this->assertTrue($this->service->setValue('DIGEST_PULL_MIN_SCORE', '0.7', 7)['success']);
+    }
+
+    public function testDigestCountKnobsRejectNonPositiveValuesButPullTopNAllowsZero(): void
+    {
+        $written = [];
+        $this->configRepository->method('setValue')
+            ->willReturnCallback(static function (int $ownerId, string $group, string $key, string $value) use (&$written): Config {
+                $written[] = $key;
+
+                return new Config();
+            });
+
+        $this->assertFalse($this->service->setValue('DIGEST_BATCH_SIZE', '0', 7)['success']);
+        $this->assertFalse($this->service->setValue('DIGEST_MAX_PER_USER', '2.5', 7)['success']);
+        $this->assertFalse($this->service->setValue('DIGEST_PULL_TOP_N', '-1', 7)['success']);
+
+        // 0 is a valid PULL_TOP_N: it disables verbatim pulling.
+        $this->assertTrue($this->service->setValue('DIGEST_PULL_TOP_N', '0', 7)['success']);
+        $this->assertSame(['PULL_TOP_N'], $written);
+    }
+
+    public function testDigestDefaultsMirrorTheConfigClass(): void
+    {
+        $this->configRepository->method('getValue')->willReturn(null);
+
+        $values = $this->service->getValues();
+
+        $this->assertFalse($values['DIGEST_ENABLED']['isSet']);
+        $this->assertSame(
+            var_export(MessageDigestConfig::DEFAULT_ENABLED, true),
+            $values['DIGEST_ENABLED']['value'],
+        );
+        $this->assertSame(
+            (string) MessageDigestConfig::DEFAULT_MAX_PER_USER,
+            $values['DIGEST_MAX_PER_USER']['value'],
+        );
+        $this->assertSame(
+            (string) MessageDigestConfig::DEFAULT_MIN_SCORE,
+            $values['DIGEST_MIN_SCORE']['value'],
+        );
+        $this->assertSame(
+            (string) MessageDigestConfig::DEFAULT_RECENCY_HALF_LIFE_DAYS,
+            $values['DIGEST_RECENCY_HALF_LIFE_DAYS']['value'],
+        );
+    }
+
+    public function testIamFlagsWriteToTheIamGroupRow(): void
+    {
+        $calls = [];
+        $this->configRepository->expects($this->exactly(2))
+            ->method('setValue')
+            ->willReturnCallback(
+                static function (int $owner, string $group, string $setting, string $value) use (&$calls): Config {
+                    $calls[] = [$owner, $group, $setting, $value];
+
+                    return new Config();
+                }
+            );
+
+        $groups = $this->service->setValue('FEATURE_IAM_GROUPS_ENABLED', 'true', 1);
+        $sharing = $this->service->setValue('FEATURE_IAM_SHARING_ENABLED', 'true', 1);
+
+        $this->assertTrue($groups['success']);
+        $this->assertFalse($groups['requiresRestart']);
+        $this->assertTrue($sharing['success']);
+        $this->assertSame([
+            [0, 'IAM', 'GROUPS_ENABLED', 'true'],
+            [0, 'IAM', 'SHARING_ENABLED', 'true'],
+        ], $calls);
+    }
+
+    public function testIamFlagOneIsShownAsEnabled(): void
+    {
+        $this->configRepository->expects($this->atLeastOnce())
+            ->method('getValue')
+            ->willReturnCallback(
+                static fn (int $owner, string $group, string $setting): ?string => 0 === $owner
+                    && 'IAM' === $group
+                    && 'GROUPS_ENABLED' === $setting
+                        ? '1'
+                        : null
+            );
+
+        $values = $this->service->getValues();
+
+        $this->assertSame('true', $values['FEATURE_IAM_GROUPS_ENABLED']['value']);
+        $this->assertTrue($values['FEATURE_IAM_GROUPS_ENABLED']['isSet']);
+    }
+
+    /**
+     * Every toggle on the Features tab is keyed by the environment variable
+     * that pins it, so the "locked by {key}" hint names a variable that exists
+     * and docs/FEATURE_FLAGS.md can be derived from the schema.
+     */
+    public function testFeatureTabKeysAreTheirOwnEnvironmentVariable(): void
+    {
+        $schema = $this->service->getSchema();
+
+        $this->assertArrayHasKey('features', $schema['tabs']);
+
+        $seen = [];
+        foreach ($schema['tabs']['features']['sections'] as $section) {
+            foreach ($section['fields'] as $key) {
+                $field = $schema['fields'][$key];
+                $this->assertSame('features', $field['tab'], $key);
+                $this->assertSame('boolean', $field['type'], $key);
+                $this->assertSame('database', $field['source'] ?? null, $key);
+                $this->assertSame(FeatureFlagEnv::envVarFor($field['dbGroup'] ?? '', $field['dbKey'] ?? ''), $key);
+                $seen[] = $key;
+            }
+        }
+
+        foreach ([
+            'FEATURE_IAM_GROUPS_ENABLED', 'FEATURE_IAM_SHARING_ENABLED', 'FEATURE_IAM_GROUP_POLICIES_ENABLED',
+            'FEATURE_IAM_DIRECTORY_SYNC_ENABLED', 'FEATURE_AGENTS_ENABLED', 'FEATURE_AGENTS_ROUTABLE_ENABLED',
+            'FEATURE_BUNDLE_ENABLED', 'FEATURE_WORKFLOWS_BUILDER_ENABLED', 'FEATURE_MULTITASK_URL_FETCH_ENABLED',
+            'FEATURE_TOOLS_REGISTRY_ENABLED', 'FEATURE_TOOLS_APPROVALS_ENABLED', 'FEATURE_TOOLS_CUSTOM_HTTP_ENABLED',
+            'FEATURE_DOCUMENT_TOOLS_ENABLED', 'FEATURE_DESKTOP_AGENT_ENABLED', 'FEATURE_PLATFORM_LINKS_ENABLED',
+        ] as $expected) {
+            $this->assertContains($expected, $seen);
+            $this->assertSame('true', $schema['fields'][$expected]['default'], $expected.' ships ON');
+        }
+    }
+
+    public function testFeatureFlagPinnedByTheEnvironmentIsReportedAsLocked(): void
+    {
+        $this->configRepository->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'WORKFLOWS' === $group ? '1' : null
+        );
+        $service = new SystemConfigService(
+            projectDir: sys_get_temp_dir(),
+            logger: new NullLogger(),
+            configRepository: $this->configRepository,
+            defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: new ProviderKeyStore($this->configRepository, new EncryptionService('test-secret', new NullLogger()), new NullLogger()),
+            encryption: new EncryptionService('test-secret', new NullLogger()),
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
+            featureFlagEnv: new FeatureFlagEnv(['FEATURE_WORKFLOWS_BUILDER_ENABLED' => 'false']),
+        );
+
+        $values = $service->getValues();
+
+        $this->assertTrue($values['FEATURE_WORKFLOWS_BUILDER_ENABLED']['envOverride']);
+        $this->assertSame('false', $values['FEATURE_WORKFLOWS_BUILDER_ENABLED']['effectiveValue']);
+        $this->assertSame('true', $values['FEATURE_WORKFLOWS_BUILDER_ENABLED']['value'], 'the stored row is still shown');
+        $this->assertArrayNotHasKey('envOverride', $values['FEATURE_AGENTS_ENABLED']);
+    }
+
     public function testConversationSummaryDefaultsMirrorTheConstants(): void
     {
         // No BCONFIG rows exist by default (there is no seeder), so what the
@@ -204,5 +511,278 @@ final class SystemConfigServiceTest extends TestCase
             (string) ConversationSummaryConstants::TIERS,
             $values['CONVERSATION_SUMMARY_TIERS']['value'],
         );
+    }
+
+    public function testDoclingFieldsLiveOnTheProcessingTabNextToTika(): void
+    {
+        $schema = $this->service->getSchema();
+
+        self::assertSame(
+            ['DOCLING_BASE_URL', 'DOCLING_TIMEOUT_MS', 'DOCLING_MAX_BYTES'],
+            $schema['tabs']['processing']['sections']['docling']['fields'],
+        );
+        self::assertSame('processing', $schema['fields']['DOCLING_BASE_URL']['tab']);
+        self::assertSame('url', $schema['fields']['DOCLING_BASE_URL']['type']);
+        self::assertSame('docling', $schema['fields']['DOCLING_TIMEOUT_MS']['section']);
+    }
+
+    public function testDoclingConnectionTestFailsWhenUrlIsEmpty(): void
+    {
+        $envWasSet = \array_key_exists('DOCLING_BASE_URL', $_ENV);
+        $original = $envWasSet ? $_ENV['DOCLING_BASE_URL'] : null;
+        $_ENV['DOCLING_BASE_URL'] = '';
+
+        try {
+            $result = $this->service->testConnection('docling');
+
+            self::assertFalse($result['success']);
+            self::assertStringContainsString('DOCLING_BASE_URL', $result['message']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['DOCLING_BASE_URL'] = $original;
+            } else {
+                unset($_ENV['DOCLING_BASE_URL']);
+            }
+        }
+    }
+
+    /**
+     * Assistants, the workflow builder and bundle export write their own
+     * BCONFIG group, not the default QDRANT_SEARCH group. The Features-tab
+     * keys are the FEATURE_* pins that #1827 introduced.
+     */
+    public function testProductFeatureFlagsWriteToTheirOwnGroupRow(): void
+    {
+        $calls = [];
+        $this->configRepository->expects($this->exactly(4))
+            ->method('setValue')
+            ->willReturnCallback(
+                static function (int $owner, string $group, string $setting, string $value) use (&$calls): Config {
+                    $calls[] = [$owner, $group, $setting, $value];
+
+                    return new Config();
+                }
+            );
+
+        foreach ([
+            'FEATURE_AGENTS_ENABLED',
+            'FEATURE_AGENTS_ROUTABLE_ENABLED',
+            'FEATURE_BUNDLE_ENABLED',
+            'FEATURE_WORKFLOWS_BUILDER_ENABLED',
+        ] as $key) {
+            $this->assertTrue($this->service->setValue($key, 'true', 1)['success'], $key);
+        }
+
+        $this->assertSame([
+            [0, 'AGENTS', 'ENABLED', 'true'],
+            [0, 'AGENTS', 'ROUTABLE_ENABLED', 'true'],
+            [0, 'BUNDLE', 'ENABLED', 'true'],
+            [0, 'WORKFLOWS', 'BUILDER_ENABLED', 'true'],
+        ], $calls);
+    }
+
+    /**
+     * AgentConfig resolves the per-user row before the global one, and a per-user
+     * row is exactly how these features were enabled while there was no UI. An
+     * admin who has one would otherwise not see their own change.
+     */
+    public function testEnablingAssistantsClearsActingAdminPerUserOverride(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('deleteValue')
+            ->with(7, 'AGENTS', 'ENABLED');
+
+        $this->service->setValue('FEATURE_AGENTS_ENABLED', 'true', 7);
+    }
+
+    public function testBundleFlagWriteWithoutActingUserDoesNotDeleteAnything(): void
+    {
+        $this->configRepository->expects($this->never())->method('deleteValue');
+
+        $this->service->setValue('FEATURE_BUNDLE_ENABLED', 'true');
+    }
+
+    public function testAssistantsAndWorkflowFlagsLiveOnTheFeaturesTab(): void
+    {
+        $schema = $this->service->getSchema();
+
+        self::assertSame(
+            ['FEATURE_AGENTS_ENABLED', 'FEATURE_AGENTS_ROUTABLE_ENABLED', 'FEATURE_BUNDLE_ENABLED'],
+            $schema['tabs']['features']['sections']['assistants']['fields'],
+        );
+        self::assertContains(
+            'FEATURE_WORKFLOWS_BUILDER_ENABLED',
+            $schema['tabs']['features']['sections']['tasks']['fields'],
+        );
+        self::assertSame('true', $schema['fields']['FEATURE_AGENTS_ENABLED']['default']);
+        self::assertSame('boolean', $schema['fields']['FEATURE_BUNDLE_ENABLED']['type']);
+        self::assertArrayNotHasKey('assistants', $schema['tabs']['routing']['sections']);
+        self::assertArrayNotHasKey('portability', $schema['tabs']['interface']['sections']);
+    }
+
+    /**
+     * A field naming a tab or section that does not exist is invisible in the
+     * admin UI while still looking configured in the schema — the exact state
+     * the assistants flags were in before they were listed here.
+     */
+    public function testEveryFieldIsRenderedByAnExistingTabSection(): void
+    {
+        $schema = $this->service->getSchema();
+
+        $placed = [];
+        foreach ($schema['tabs'] as $tabId => $tab) {
+            foreach ($tab['sections'] as $sectionId => $section) {
+                foreach ($section['fields'] as $field) {
+                    self::assertArrayHasKey($field, $schema['fields'], \sprintf('%s.%s lists unknown field %s', $tabId, $sectionId, $field));
+                    $placed[$field] = true;
+                }
+            }
+        }
+
+        foreach ($schema['fields'] as $key => $field) {
+            self::assertArrayHasKey($field['tab'], $schema['tabs'], $key.' points at an unknown tab');
+            self::assertArrayHasKey(
+                $field['section'],
+                $schema['tabs'][$field['tab']]['sections'],
+                $key.' points at an unknown section',
+            );
+            self::assertArrayHasKey($key, $placed, $key.' is defined but no tab section lists it');
+        }
+    }
+
+    /**
+     * NV05 (D2): instance provider keys have one editor — Models & keys. The
+     * legacy field stays readable but a write is refused and the message
+     * names the new home, so an API client learns where to go.
+     */
+    public function testManagedByFieldsRefuseSave(): void
+    {
+        $this->configRepository->expects(self::never())->method('setValue');
+
+        foreach (['OPENAI_API_KEY', 'HIGGSFIELD_API_SECRET', 'THEHIVE_API_KEY'] as $key) {
+            $result = $this->service->setValue($key, 'sk-new-value');
+
+            self::assertFalse($result['success'], $key.' must not be writable here');
+            self::assertSame(ProviderKeyCatalog::MANAGED_BY, $result['managedBy'] ?? null);
+            self::assertStringContainsString('Models & keys', $result['message'] ?? '');
+            self::assertStringContainsString($key, $result['message'] ?? '');
+        }
+    }
+
+    /**
+     * The coverage lock: a provider key added to system config without a
+     * catalog entry would silently reopen a second editor. Every managed env
+     * var must be flagged, and every `*_API_KEY` / `*_API_SECRET` password
+     * field on the AI tab must be managed — tokens (Cloudflare, Vertex) are the
+     * documented exceptions because they are not provider keys.
+     */
+    public function testEveryCatalogEnvVarIsMarkedManagedInSystemConfig(): void
+    {
+        $fields = $this->service->getSchema()['fields'];
+
+        foreach (ProviderKeyCatalog::managedEnvVars() as $envVar) {
+            if (!isset($fields[$envVar])) {
+                continue; // aliases like GEMINI_API_KEY have no config field
+            }
+            self::assertSame(ProviderKeyCatalog::MANAGED_BY, $fields[$envVar]['managedBy'] ?? null, $envVar.' must be managed by Models & keys');
+            self::assertSame('database', $fields[$envVar]['source'] ?? null, $envVar.' is stored by the key store, not .env');
+        }
+
+        foreach ($fields as $key => $field) {
+            if ('ai' !== $field['tab'] || 'password' !== $field['type']) {
+                continue;
+            }
+            if (!str_ends_with($key, '_API_KEY') && !str_ends_with($key, '_API_SECRET')) {
+                continue;
+            }
+            self::assertArrayHasKey('managedBy', $field, $key.' is a provider key without a ProviderKeyCatalog entry — add it to the catalog instead of a second editor');
+        }
+    }
+
+    /**
+     * Reading stays possible so the response shape does not change: the
+     * status comes from the store, and the secret half of a pair reports its
+     * own presence instead of copying the key's.
+     */
+    public function testManagedFieldsReportTheStoreStatus(): void
+    {
+        $values = $this->service->getValues();
+
+        self::assertFalse($values['OPENAI_API_KEY']['isSet']);
+        self::assertSame('none', $values['OPENAI_API_KEY']['keySource'] ?? null);
+        self::assertFalse($values['HIGGSFIELD_API_SECRET']['isSet']);
+
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $store = new ProviderKeyStore(
+            $this->configRepository,
+            $encryption,
+            new NullLogger(),
+            ['higgsfield' => 'hf-key-from-env'],
+            ['higgsfield' => 'hf-secret-from-env'],
+        );
+        $service = new SystemConfigService(
+            projectDir: sys_get_temp_dir(),
+            logger: new NullLogger(),
+            configRepository: $this->configRepository,
+            defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: $store,
+            encryption: $encryption,
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
+        );
+
+        $values = $service->getValues();
+        self::assertTrue($values['HIGGSFIELD_API_KEY']['isSet']);
+        self::assertTrue($values['HIGGSFIELD_API_KEY']['isMasked']);
+        self::assertSame('env', $values['HIGGSFIELD_API_KEY']['keySource'] ?? null);
+        self::assertTrue($values['HIGGSFIELD_API_SECRET']['isSet']);
+        self::assertStringNotContainsString('hf-key-from-env', $values['HIGGSFIELD_API_KEY']['value']);
+
+        // After the store imports the env pair into BCONFIG, the card must
+        // still say "environment / Helm", not "UI override".
+        self::assertSame('hf-key-from-env', $store->getKey('higgsfield'));
+        $afterImport = $service->getValues();
+        self::assertSame('env', $afterImport['HIGGSFIELD_API_KEY']['keySource'] ?? null);
+        self::assertSame('env', $afterImport['HIGGSFIELD_API_SECRET']['keySource'] ?? null);
+    }
+
+    /**
+     * FM21: with a module registry the Features tab must expose each
+     * MODULES.GATE_<ID> field and use the seeder's new-install default.
+     * The setUp() service omits $modules, so this path is not covered there.
+     */
+    public function testModuleGateSchemaDefaultsFollowTheSeeder(): void
+    {
+        $modules = $this->allModules();
+        $factories = [];
+        foreach ($modules as $id => $module) {
+            $factories[$id] = static fn (): FeatureModuleInterface => $module;
+        }
+
+        $service = new SystemConfigService(
+            projectDir: sys_get_temp_dir(),
+            logger: new NullLogger(),
+            configRepository: $this->configRepository,
+            defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: new ProviderKeyStore(
+                $this->configRepository,
+                new EncryptionService('test-secret', new NullLogger()),
+                new NullLogger(),
+            ),
+            encryption: new EncryptionService('test-secret', new NullLogger()),
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
+            modules: new ModuleRegistry(new ServiceLocator($factories)),
+        );
+
+        $fields = $service->getSchema()['fields'];
+        foreach (array_keys($modules) as $id) {
+            $key = FeatureFlagEnv::envVarFor(ModuleGateConfig::GROUP, ModuleGateConfig::settingFor($id));
+            $this->assertArrayHasKey($key, $fields, $id);
+            $expected = '1' === ModuleGateSeeder::defaultValue($id) ? 'true' : 'false';
+            $this->assertSame($expected, $fields[$key]['default'], $key);
+            $this->assertSame(ModuleGateConfig::GROUP, $fields[$key]['dbGroup']);
+            $this->assertSame(ModuleGateConfig::settingFor($id), $fields[$key]['dbKey']);
+        }
     }
 }

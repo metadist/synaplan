@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\AI\Exception\ChatFailureClassifier;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\DiscordNotificationService;
 use App\Service\EmailChatService;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
@@ -26,6 +29,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\SharedLockInterface;
+use Symfony\Component\Translation\IdentityTranslator;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -69,6 +73,11 @@ class WhatsAppServiceTest extends TestCase
     private $emailChatService;
     /** @var UserMemoryService&\PHPUnit\Framework\MockObject\MockObject */
     private $memoryService;
+    /** @var \App\Service\Digest\MessageReferenceResolver&\PHPUnit\Framework\MockObject\MockObject */
+    private $messageReferenceResolver;
+    /** @var ConversationSummaryRefreshDispatcher&\PHPUnit\Framework\MockObject\MockObject */
+    private $summaryRefreshDispatcher;
+    private ChatErrorPresenter $chatErrorPresenter;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -106,6 +115,15 @@ class WhatsAppServiceTest extends TestCase
         $this->emailChatService = $this->createMock(EmailChatService::class);
         $this->memoryService = $this->createMock(UserMemoryService::class);
         $this->memoryService->method('resolveMemoryTags')->willReturnArgument(0);
+        $this->messageReferenceResolver = $this->createMock(\App\Service\Digest\MessageReferenceResolver::class);
+        $this->messageReferenceResolver->method('resolveMessageTags')->willReturnArgument(0);
+        $this->summaryRefreshDispatcher = $this->createMock(ConversationSummaryRefreshDispatcher::class);
+        // Real presenter over an identity translator: classification stays under
+        // test while the catalog lookup collapses to the translation key.
+        $this->chatErrorPresenter = new ChatErrorPresenter(
+            new IdentityTranslator(),
+            new ChatFailureClassifier(),
+        );
 
         // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
@@ -122,6 +140,9 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -151,6 +172,9 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
@@ -176,6 +200,9 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -392,6 +419,9 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -1218,6 +1248,9 @@ class WhatsAppServiceTest extends TestCase
             $lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -1560,6 +1593,9 @@ class WhatsAppServiceTest extends TestCase
             $lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -1987,6 +2023,27 @@ class WhatsAppServiceTest extends TestCase
     }
 
     /**
+     * Channel parity (rolling summary): after the outgoing WhatsApp reply is
+     * persisted, the turn must dispatch an async summary refresh for the chat
+     * — exactly like the web streaming path does.
+     */
+    public function testTurnDispatchesConversationSummaryRefresh(): void
+    {
+        $chat = $this->createMock(Chat::class);
+        $chat->method('getId')->willReturn(777);
+        // Configured BEFORE dispatchTurn(), so this expectation wins over the
+        // helper's id-less default chat mock.
+        $this->emailChatService->method('findOrCreateWhatsAppChat')->willReturn($chat);
+
+        $this->summaryRefreshDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with(777, 1);
+
+        $this->dispatchTurn(['content' => 'Hello back!', 'metadata' => []]);
+    }
+
+    /**
      * Audio has no caption on WhatsApp — the response text must go out as its
      * own message BEFORE the audio instead of being silently dropped.
      */
@@ -2047,9 +2104,11 @@ class WhatsAppServiceTest extends TestCase
     /**
      * Document outputs (.ics / .docx from DAG nodes) were silently dropped
      * before — the primary-file gate must accept type 'document' and pass the
-     * required filename.
+     * required filename. Confirmation text is a separate message: Meta accepts
+     * sendMedia() then fetches the link asynchronously, and a 401 on that
+     * fetch would otherwise drop both the file and a caption-only reply.
      */
-    public function testDocumentPrimaryFileIsSentWithFilenameAndCaption(): void
+    public function testDocumentPrimaryFileSendsTextThenDocument(): void
     {
         $sends = $this->dispatchTurn([
             'content' => 'Your meeting invite is attached.',
@@ -2058,10 +2117,59 @@ class WhatsAppServiceTest extends TestCase
             ],
         ]);
 
-        $this->assertCount(1, $sends);
-        $this->assertSame('document', $sends[0]['type']);
-        $this->assertSame('meeting.ics', $sends[0]['document']['filename']);
-        $this->assertSame('Your meeting invite is attached.', $sends[0]['document']['caption']);
+        $this->assertCount(2, $sends);
+        $this->assertSame('text', $sends[0]['type']);
+        $this->assertStringContainsString('Your meeting invite is attached.', $sends[0]['text']['body']);
+        $this->assertSame('document', $sends[1]['type']);
+        $this->assertSame('meeting.ics', $sends[1]['document']['filename']);
+        $this->assertArrayNotHasKey('caption', $sends[1]['document']);
+    }
+
+    /**
+     * Generated office files use `{name}_{timestamp}.docx`, which
+     * StaticUploadController will not serve anonymously. When the file is on
+     * disk we publish a `{userId}_document_{ts}.docx` copy Meta can fetch,
+     * while the WhatsApp filename stays the original display name.
+     */
+    public function testDocumentUrlIsRewrittenToAnonymouslyFetchableFilename(): void
+    {
+        $relative = '01/000/00001/'.date('Y').'/'.date('m').'/notes_1736189000.docx';
+        $absolute = '/tmp/test_uploads/'.$relative;
+        if (!is_dir(dirname($absolute))) {
+            mkdir(dirname($absolute), 0775, true);
+        }
+        file_put_contents($absolute, 'docx-bytes');
+
+        $publishedCopies = [];
+        try {
+            $sends = $this->dispatchTurn([
+                'content' => 'The requested text has been saved to your Dropbox as a Word document.',
+                'metadata' => [
+                    'file' => ['path' => '/api/v1/files/uploads/'.$relative, 'type' => 'document'],
+                ],
+            ]);
+
+            $this->assertCount(2, $sends);
+            $this->assertSame('text', $sends[0]['type']);
+            $this->assertStringContainsString('saved to your Dropbox', $sends[0]['text']['body']);
+            $this->assertSame('document', $sends[1]['type']);
+            $this->assertSame('notes_1736189000.docx', $sends[1]['document']['filename']);
+            $linkPath = (string) parse_url($sends[1]['document']['link'], PHP_URL_PATH);
+            $this->assertMatchesRegularExpression(
+                '/\/\d+_document_\d+\.docx$/',
+                $linkPath,
+                'Meta must fetch an anonymously-servable filename, not the generated office name',
+            );
+            $publishedRelative = ltrim((string) preg_replace('#^/api/v1/files/uploads/#', '', $linkPath), '/');
+            if ('' !== $publishedRelative) {
+                $publishedCopies[] = '/tmp/test_uploads/'.$publishedRelative;
+            }
+        } finally {
+            @unlink($absolute);
+            foreach ($publishedCopies as $copy) {
+                @unlink($copy);
+            }
+        }
     }
 
     /**

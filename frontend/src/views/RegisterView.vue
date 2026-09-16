@@ -15,7 +15,7 @@
         class="absolute -bottom-24 right-1/4 w-[28rem] h-[28rem] bg-brand/4 dark:bg-brand/8 rounded-full blur-3xl animate-float-delayed"
       ></div>
       <img
-        :src="birdSrc"
+        :src="iconSrc"
         alt=""
         class="absolute top-[8%] right-[5%] w-[280px] opacity-[0.035] dark:opacity-[0.06] rotate-12 pointer-events-none select-none"
       />
@@ -268,6 +268,7 @@
                 <button
                   type="button"
                   class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
                   data-testid="btn-toggle-password"
                   @click="showPassword = !showPassword"
                 >
@@ -307,6 +308,9 @@
                 <button
                   type="button"
                   class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  :aria-label="
+                    showConfirmPassword ? $t('auth.hidePassword') : $t('auth.showPassword')
+                  "
                   data-testid="btn-toggle-confirm-password"
                   @click="showConfirmPassword = !showConfirmPassword"
                 >
@@ -395,18 +399,18 @@
           :href="config.branding.homepageUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="group inline-flex items-center gap-1.5 opacity-40 hover:opacity-60 transition-all duration-300"
+          class="group inline-flex items-center gap-1.5 transition-all duration-300"
           :data-testid="config.billing.enabled ? 'link-homepage' : 'link-powered-by'"
         >
           <span
             v-if="config.branding.showPoweredBy"
-            class="text-[10px] txt-secondary tracking-wide"
+            class="text-[10px] txt-secondary group-hover:txt-primary tracking-wide transition-colors duration-300"
             >{{ $t('branding.poweredBy') }}</span
           >
           <img
             :src="logoSrc"
             :alt="config.branding.name"
-            class="h-3.5 opacity-70 group-hover:opacity-100 transition-opacity duration-300"
+            class="h-3.5 opacity-50 group-hover:opacity-100 transition-opacity duration-300"
           />
         </a>
       </div>
@@ -418,6 +422,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { supportedLanguages } from '@/i18n'
 import {
   SunIcon,
   MoonIcon,
@@ -454,11 +459,7 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const { logoSrc } = useBrandLogo(isDark)
-const birdSrc = computed(
-  () =>
-    `${import.meta.env.BASE_URL}${isDark.value ? 'single_bird-light.svg' : 'single_bird-dark.svg'}`
-)
+const { logoSrc, iconSrc } = useBrandLogo(isDark)
 
 const fullName = ref('')
 const email = ref('')
@@ -470,9 +471,10 @@ const focusedField = ref<string | null>(null)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const languages = ['de', 'en', 'es', 'tr']
-  const currentIndex = languages.indexOf(locale.value)
-  locale.value = languages[(currentIndex + 1) % languages.length]
+  const currentIndex = supportedLanguages.indexOf(
+    locale.value as (typeof supportedLanguages)[number]
+  )
+  locale.value = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
   localStorage.setItem('language', locale.value)
 }
 

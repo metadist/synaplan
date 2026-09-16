@@ -1,0 +1,133 @@
+import { describe, expect, it, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { createI18n } from 'vue-i18n'
+import AssistantBuilder from '@/components/assistants/AssistantBuilder.vue'
+import { emptyAgentDraft } from '@/services/api/agentsApi'
+import { useAgentsStore } from '@/stores/agents'
+import en from '@/i18n/en.json'
+
+vi.mock('@/services/api/agentsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api/agentsApi')>()
+  return {
+    ...actual,
+    agentsApi: {
+      gallery: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      clone: vi.fn(),
+      remove: vi.fn(),
+      list: vi.fn(),
+      triggers: vi.fn().mockResolvedValue({
+        savedTasksEnabled: true,
+        availableKinds: ['mail', 'widget', 'whatsapp'],
+        rows: [],
+      }),
+    },
+  }
+})
+
+vi.mock('@/services/api/promptsApi', () => ({
+  promptsApi: {
+    getPrompt: vi.fn().mockResolvedValue({ prompt: 'Be helpful' }),
+    updatePrompt: vi.fn(),
+    getPromptFiles: vi.fn().mockResolvedValue([]),
+    uploadPromptFile: vi.fn(),
+    deletePromptFile: vi.fn(),
+  },
+}))
+
+vi.mock('@/stores/aiConfig', () => ({
+  useAiConfigStore: () => ({
+    models: {},
+    loadModels: vi.fn(),
+  }),
+}))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({ user: { id: 4 } }),
+}))
+
+vi.mock('@/services/filesService', () => ({
+  getFileGroups: vi.fn().mockResolvedValue([]),
+}))
+
+vi.mock('@/services/api/iamApi', () => ({
+  iamApi: { listSharedWithMe: vi.fn().mockResolvedValue([]) },
+}))
+
+vi.mock('@/services/api/mcpServersApi', () => ({
+  mcpServersApi: { list: vi.fn().mockResolvedValue({ servers: [] }) },
+}))
+
+vi.mock('@/services/api/chatApi', () => ({
+  chatApi: { streamMessage: vi.fn() },
+}))
+
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({ error: vi.fn(), success: vi.fn() }),
+}))
+
+vi.mock('@/composables/useDialog', () => ({
+  useDialog: () => ({ confirm: vi.fn().mockResolvedValue(false) }),
+}))
+
+function mountBuilder() {
+  setActivePinia(createPinia())
+  const store = useAgentsStore()
+  store.current = {
+    id: 3,
+    slug: 'contract-review',
+    name: 'Contract review',
+    description: null,
+    icon: '',
+    status: 'draft',
+    promptId: 9,
+    parentId: null,
+    source: 'manual',
+    routable: false,
+    publishedVersionId: null,
+    draft: emptyAgentDraft(),
+    createdAt: 1,
+    updatedAt: 1,
+  }
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const wrapper = mount(AssistantBuilder, {
+    global: {
+      plugins: [i18n],
+      stubs: { Icon: true, AssistantPublishSection: true, BuilderTriggers: true },
+    },
+  })
+  return { wrapper, store }
+}
+
+describe('AssistantBuilder', () => {
+  it('disables Save while clean', () => {
+    const { wrapper, store } = mountBuilder()
+    expect(store.dirty).toBe(false)
+    expect(wrapper.get('[data-testid="btn-save-assistant"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('shows a field-level validation error', async () => {
+    const { wrapper, store } = mountBuilder()
+    store.fieldErrors = { name: 'name must not be empty' }
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('[data-testid="error-name"]').text()).toContain('name must not be empty')
+  })
+
+  it('caps the name field at 128 characters', () => {
+    const { wrapper } = mountBuilder()
+    expect(wrapper.get('[data-testid="input-assistant-name"]').attributes('maxlength')).toBe('128')
+  })
+
+  it('lists draft errors that the basics form does not pin to a field', async () => {
+    const { wrapper, store } = mountBuilder()
+    store.fieldErrors = { 'tools.foo': 'Unknown key "tools.foo" in agent.v1' }
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('[data-testid="notice-save-errors"]').text()).toContain(
+      'This part could not be saved.'
+    )
+    expect(wrapper.get('[data-testid="notice-save-errors"]').text()).toContain('tools.foo')
+  })
+})

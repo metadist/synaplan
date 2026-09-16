@@ -8,6 +8,7 @@ use App\Entity\GuestSession;
 use App\Entity\User;
 use App\Repository\GuestSessionRepository;
 use App\Repository\UserRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,6 +30,35 @@ final class GuestSessionService
      */
     public const MAX_MESSAGES_PER_IP = 5;
 
+    /**
+     * Dedicated processing identity for browser guest chat (issue #1879).
+     * Must stay `ANONYMOUS` so `RATELIMITS_ANONYMOUS` and BUSELOG attribution
+     * apply instead of the lowest-id ADMIN account.
+     */
+    public const PROCESSING_USER_EMAIL = 'guest-processor@synaplan.internal';
+
+    public static function isReservedProcessorEmail(string $email): bool
+    {
+        return 0 === strcasecmp(trim($email), self::PROCESSING_USER_EMAIL);
+    }
+
+    /**
+     * True only for the runtime-created guest processor, not a human who
+     * happened to register the reserved address.
+     */
+    public static function isSystemProcessor(User $user): bool
+    {
+        if (!self::isReservedProcessorEmail($user->getMail())) {
+            return false;
+        }
+        if ('guest' !== $user->getProviderId()) {
+            return false;
+        }
+        $details = $user->getUserDetails();
+
+        return true === ($details['system'] ?? false);
+    }
+
     private ?User $cachedProcessingUser = null;
 
     /**
@@ -44,6 +74,7 @@ final class GuestSessionService
         private GuestSessionRepository $sessionRepository,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private GuestChatConfig $guestChatConfig,
         private int $maxSessionsPerIp = self::MAX_SESSIONS_PER_IP,
     ) {
     }
@@ -121,6 +152,15 @@ final class GuestSessionService
 
     public function getSession(string $sessionId): ?GuestSession
     {
+        // GUEST_CHAT_ENABLED=false (issue #1517): resolve no session for ANY
+        // consumer - guest turns also flow through StreamController's
+        // guestSession parameter, not only through GuestChatController's own
+        // (separately gated) endpoints. A stale stored session must not keep
+        // consuming AI after the operator turns the trial off.
+        if (!$this->guestChatConfig->isEnabled()) {
+            return null;
+        }
+
         return $this->sessionRepository->findBySessionId($sessionId);
     }
 
@@ -163,8 +203,12 @@ final class GuestSessionService
     }
 
     /**
-     * Resolve the system admin used as processing context for guest messages.
-     * Uses the admin with the lowest ID for deterministic behaviour.
+     * Resolve the system user used as processing context for guest messages.
+     *
+     * Issue #1879: this used to be the lowest-id ADMIN, which bypassed every
+     * rate limit and booked guest token cost onto a real person's ledger.
+     * A dedicated `ANONYMOUS` account is found or created at runtime so
+     * existing installs pick it up on the first guest turn without a seeder.
      * The result is cached for the lifetime of the service instance.
      */
     public function getProcessingUser(): ?User
@@ -173,23 +217,91 @@ final class GuestSessionService
             return $this->cachedProcessingUser;
         }
 
-        $admin = $this->userRepository->createQueryBuilder('u')
-            ->where('u.userLevel = :level')
-            ->setParameter('level', 'ADMIN')
-            ->orderBy('u.id', 'ASC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        $user = $this->userRepository->findByEmail(self::PROCESSING_USER_EMAIL);
+        if ($user) {
+            if (!self::isSystemProcessor($user)) {
+                $this->logger->error('Guest processing email is occupied by a non-system account; refusing to mutate it', [
+                    'user_id' => $user->getId(),
+                    'level' => $user->getUserLevel(),
+                ]);
 
-        if (!$admin) {
-            $this->logger->error('No admin user found for guest processing context');
+                return null;
+            }
+            $this->cachedProcessingUser = $this->ensureAnonymousLevel($user);
+
+            return $this->cachedProcessingUser;
+        }
+
+        $created = $this->createProcessingUser();
+        if (null === $created) {
+            return null;
+        }
+
+        $this->cachedProcessingUser = $created;
+
+        return $created;
+    }
+
+    /**
+     * Guest traffic must never inherit ADMIN (unlimited) limits.
+     */
+    private function ensureAnonymousLevel(User $user): User
+    {
+        if ('ANONYMOUS' === $user->getUserLevel()) {
+            return $user;
+        }
+
+        $this->logger->warning('Guest processing user was not ANONYMOUS; correcting level', [
+            'user_id' => $user->getId(),
+            'previous_level' => $user->getUserLevel(),
+        ]);
+        $user->setUserLevel('ANONYMOUS');
+        $this->em->flush();
+
+        return $user;
+    }
+
+    private function createProcessingUser(): ?User
+    {
+        $user = new User();
+        $user->setMail(self::PROCESSING_USER_EMAIL);
+        $user->setPw(null);
+        $user->setType('WEB');
+        $user->setProviderId('guest');
+        $user->setUserLevel('ANONYMOUS');
+        $user->setCreated(date('Y-m-d\TH:i:s'));
+        $user->setUserDetails([
+            'firstName' => 'Guest',
+            'lastName' => 'Processor',
+            'created_via' => 'guest_chat',
+            'system' => true,
+        ]);
+
+        try {
+            $this->em->persist($user);
+            $this->em->flush();
+        } catch (UniqueConstraintViolationException) {
+            $existing = $this->userRepository->findByEmail(self::PROCESSING_USER_EMAIL);
+            if ($existing && self::isSystemProcessor($existing)) {
+                return $this->ensureAnonymousLevel($existing);
+            }
+
+            $this->logger->error('Guest processing user create raced and could not be re-loaded');
+
+            return null;
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to create guest processing user', [
+                'error' => $e->getMessage(),
+            ]);
 
             return null;
         }
 
-        $this->cachedProcessingUser = $admin;
+        $this->logger->info('Created anonymous guest processing user', [
+            'user_id' => $user->getId(),
+        ]);
 
-        return $admin;
+        return $user;
     }
 
     /**

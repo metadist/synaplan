@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Exception\StructuredOutputViolationException;
 use App\Service\Exception\StreamCancelledException;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -89,6 +90,11 @@ final readonly class CircuitBreaker
         } catch (StreamCancelledException $e) {
             // The user pressed Stop. The provider was healthy — counting this
             // would open the circuit for everyone after a few cancellations.
+            throw $e;
+        } catch (StructuredOutputViolationException $e) {
+            // The provider was up and answered; it rejected the model's own
+            // JSON against our schema. AiFacade heals that in-process — a
+            // handful of them must not fail every other call fast for a minute.
             throw $e;
         } catch (\Exception $e) {
             // Failure

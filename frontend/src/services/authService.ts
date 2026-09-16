@@ -140,6 +140,16 @@ export const authService = {
   },
 
   /**
+   * Take over a session the server already opened. Used by the setup wizard
+   * after POST /admin, which sets the auth cookies (and native Bearer tokens)
+   * itself — there is no typed login to go through.
+   */
+  adoptSession(sessionUser: AuthUser): void {
+    user.value = sessionUser
+    impersonator.value = null
+  },
+
+  /**
    * Register User
    */
   async register(
@@ -233,6 +243,13 @@ export const authService = {
     try {
       const response = await authFetch('/api/v1/auth/me')
 
+      // SETUP_REQUIRED and other 5xx must not look like "logged out". The
+      // wizard signs the administrator in while the rest of the API is still
+      // closed; wiping the session here would send them to /login at the end.
+      if (response.status >= 500) {
+        return user.value
+      }
+
       if (response.status === 401) {
         // Don't try to refresh if already logging out
         if (isLoggingOut.value) {
@@ -261,7 +278,11 @@ export const authService = {
             return data.user
           }
         }
-        // Refresh failed or retry failed, clear auth silently
+        // A 502/503 refresh during restart leaves the hint in place.
+        // Do not tear the session down — keep whoever we already are.
+        if (hasAuthHint()) {
+          return user.value
+        }
         await this.logout(true)
         return null
       }
@@ -277,8 +298,10 @@ export const authService = {
 
       return data.user
     } catch {
-      // Network errors are expected (e.g., offline) - don't log
-      return null
+      // Network errors are expected (e.g., offline) - keep whoever we already
+      // are, the same way token refresh does. Returning null would let
+      // refreshUser() wipe a session the wizard just opened.
+      return user.value
     }
   },
 
@@ -307,7 +330,19 @@ export const authService = {
     }
   },
 
+  /**
+   * Refresh already in flight, if any. Login awaits this so a 401 handler
+   * cannot clear the session hint after the new cookies are written.
+   */
+  getInFlightRefresh(): Promise<boolean> | null {
+    return isRefreshing.value ? refreshPromise : null
+  },
+
   async _doRefresh(): Promise<boolean> {
+    const { awaitAuthMutation, isAuthMutationInProgress } =
+      await import('@/services/api/httpClient')
+    await awaitAuthMutation()
+
     try {
       const native = isNativeApp()
       const response = await authFetch(
@@ -333,6 +368,9 @@ export const authService = {
         // and let the caller retry once the node is back. This matches the
         // network-error branch below, which also preserves the session.
         if (401 === response.status || 403 === response.status) {
+          if (isAuthMutationInProgress()) {
+            return false
+          }
           clearSessionHint()
           await this.logout(true) // Silent logout
         }

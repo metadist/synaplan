@@ -7,14 +7,20 @@ namespace App\AI\Provider;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\SupportsInlineReferenceImage;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
@@ -43,8 +49,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * @see https://docs.x.ai/developers/model-capabilities/imagine
  * @see https://docs.x.ai/developers/model-capabilities/audio/voice
  */
-final class XaiProvider implements ChatProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, TextToSpeechProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface
+final class XaiProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, TextToSpeechProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface
 {
+    use ChatCompletionsToolSupport;
+
     private const PROVIDER_NAME = 'xai';
     private const DISPLAY_NAME = 'xAI';
     private const ENV_VAR = 'XAI_API_KEY';
@@ -198,6 +206,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         // Injectable so unit tests can poll without real sleeps.
         private readonly int $pollIntervalSeconds = self::POLL_INTERVAL_SECONDS,
         private readonly ?ProviderKeyStore $keyStore = null,
+        private readonly StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -310,10 +319,10 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             $response = $this->client()->chat()->create($requestOptions);
             $responseArray = $response->toArray();
 
-            return [
+            return $this->mergeChatCompletionsToolResult([
                 'content' => $response->choices[0]->message->content ?? '',
                 'usage' => $this->parseUsage($responseArray['usage'] ?? []),
-            ];
+            ], $responseArray['choices'][0] ?? []);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -322,7 +331,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
                 'model' => $options['model'] ?? 'unknown',
             ]);
 
-            throw new ProviderException('xAI chat error: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, self::PROVIDER_NAME, 'chat', 'xAI chat error');
         }
     }
 
@@ -363,7 +372,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
                 'model' => $options['model'] ?? 'unknown',
             ]);
 
-            throw new ProviderException('xAI streaming error: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, self::PROVIDER_NAME, 'chat_stream', 'xAI streaming error');
         }
     }
 
@@ -1174,6 +1183,8 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         if (is_string($content) && '' !== $content) {
             $callback($content);
         }
+
+        $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $callback);
     }
 
     /**
@@ -1218,7 +1229,12 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             $request['stream_options'] = ['include_usage' => true];
         }
 
-        return $request;
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $request = array_merge($request, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
+        }
+
+        return $this->applyChatCompletionsToolOptions($request, $options);
     }
 
     /**

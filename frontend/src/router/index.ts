@@ -15,7 +15,20 @@ import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
+import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
+import { resolveRegistrationRedirect } from '@/router/registrationGate'
+import {
+  ensureWizardRequired,
+  invalidateSetupWizardRequired,
+  isSetupRecheckRoute,
+  resolveSetupGate,
+  SETUP_ROUTE,
+} from '@/router/setupGate'
 import { i18n } from '@/i18n'
+import { inferNavContext } from '@/router/navContext'
+import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
+import { aiAccountsRouteGuard } from '@/composables/useAiAccounts'
+import { adminUsersTabRedirect, groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
 
@@ -37,15 +50,16 @@ const guardSubscription = (
 // #462: on SSO-/OIDC-only instances (REGISTRATION_ENABLED=false) the /register
 // route must be unreachable by direct URL, not just hidden from the login page.
 const guardRegistration = (
-  _to: RouteLocationNormalized,
+  to: RouteLocationNormalized,
   _from: RouteLocationNormalized,
   next: NavigationGuardNext
 ) => {
-  if (!useConfigStore().auth.registrationEnabled) {
-    next({ name: 'login' })
-  } else {
-    next()
+  const redirect = resolveRegistrationRedirect(useConfigStore().auth.registrationEnabled, to.query)
+  if (redirect) {
+    next(redirect)
+    return
   }
+  next()
 }
 
 /**
@@ -114,21 +128,40 @@ const router = createRouter({
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login' },
     },
     {
-      // Bridge page loaded inside an Office.context.ui.displayDialogAsync
-      // popup from the Synamail Outlook add-in. Issues a scoped API key
-      // and posts it back to the parent taskpane via messageParent.
-      // See AddinConnectView.vue for the protocol details, and
-      // Synamail/docs/SYNAPLAN_INTEGRATION.md for the cross-repo plan.
+      // Partner-platform confirm card (Nextcloud / ownCloud / Outlook).
+      // Outlook keeps working when PLATFORM_LINKS is off. Synamail still
+      // opens /addin/connect; that route redirects here with client=outlook.
+      path: '/connect/platform',
+      name: 'platform-connect',
+      component: () => import('@/views/PlatformConnectView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.platformConnect' },
+    },
+    {
+      // Kept so Synamail's buildDialogUrl stays unchanged. Every query
+      // param survives; client=outlook is forced last so a forged client
+      // on this legacy path cannot switch delivery mode.
       path: '/addin/connect',
       name: 'addin-connect',
-      component: () => import('@/views/AddinConnectView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.addinConnect' },
+      redirect: (to) => ({
+        path: '/connect/platform',
+        query: { ...to.query, client: 'outlook' },
+      }),
     },
     {
       path: '/logged-out',
       name: 'logged-out',
       component: () => import('@/views/LoggedOutView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
+    },
+    {
+      // First-run setup of the INSTALLATION (not of a user): reachable only
+      // while the instance has no administrator. The beforeEach guard forces
+      // every other route here in that state and pushes this route away
+      // otherwise, so it can never be reached on a running instance.
+      path: '/setup',
+      name: SETUP_ROUTE,
+      component: () => import('@/views/SetupWizardView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.setup' },
     },
     {
       // MOBILE-APP SEAM (first-run onboarding): native-only first-run welcome
@@ -190,7 +223,7 @@ const router = createRouter({
     //
     // Canonical URL tree since the 2026-06 navigation IA cleanup (§4.6):
     //   /channels/*  — ways conversations reach Synaplan (widgets, email, API)
-    //   /ai/*        — AI machinery (models, instructions, routing, summarizer)
+    //   /ai/*        — AI machinery (models, instructions, routing)
     //   /files/*     — knowledge base (browse + search)
     // The old /tools/* and /config/* paths redirect below (kept ≥ 2 releases
     // for bookmarks/docs; see redirects.spec.ts).
@@ -237,10 +270,40 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.mcpServers' },
     },
     {
+      path: '/channels/connections',
+      name: 'channels-connections',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.connections' },
+    },
+    {
+      path: '/channels/tasks',
+      name: 'channels-saved-tasks',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.savedTasks' },
+    },
+    {
+      path: '/channels/approvals',
+      name: 'channels-approvals',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.approvals' },
+    },
+    {
       path: '/channels/agents',
       name: 'channels-agents',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.aiAgents' },
+    },
+    {
+      path: '/channels/desktop',
+      name: 'channels-desktop',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.desktop' },
+    },
+    {
+      path: '/channels/platform-links',
+      name: 'channels-platform-links',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.linkedPlatforms' },
     },
     {
       path: '/channels/api',
@@ -261,16 +324,32 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels' },
     },
     {
-      path: '/ai/providers/higgsfield',
-      name: 'ai-provider-higgsfield',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configProviderHiggsfield' },
+      path: '/ai/providers',
+      name: 'ai-accounts',
+      component: () => import('@/views/AiAccountsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.aiAccounts' },
+      beforeEnter: aiAccountsRouteGuard,
     },
     {
       path: '/ai/instructions',
       name: 'ai-instructions',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts' },
+      beforeEnter: instructionsRouteGuard,
+    },
+    {
+      path: '/ai/assistants',
+      name: 'ai-assistants',
+      component: () => import('@/views/AssistantsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.assistants' },
+      beforeEnter: assistantsRouteGuard,
+    },
+    {
+      path: '/ai/assistants/:id',
+      name: 'ai-assistant-builder',
+      component: () => import('@/views/AssistantsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.assistantBuilder' },
+      beforeEnter: assistantsRouteGuard,
     },
     {
       path: '/ai/routing',
@@ -278,17 +357,9 @@ const router = createRouter({
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt' },
     },
-    {
-      // Transitional: the page retires into the chat Tools dropdown (Q3);
-      // the backend POST /api/v1/summary/generate API is a stable contract
-      // (Nextcloud + plugin consumers) and is documented on /channels/api/docs.
-      path: '/ai/summarizer',
-      name: 'ai-summarizer',
-      component: () => import('@/views/ToolsView.vue'),
-      meta: { requiresAuth: true, helpId: 'tools.docSummary', titleKey: 'pageTitles.docSummary' },
-    },
-
     // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
+    // The Summarizer page now arms Tools › Summarize a document in chat.
+    // POST /api/v1/summary/generate stays (Nextcloud + plugin consumers).
     { path: '/tools', redirect: '/channels' },
     { path: '/tools/chat-widget', redirect: '/channels/widgets' },
     { path: '/tools/chat-widget/live-support', redirect: '/channels/widgets/live-support' },
@@ -304,7 +375,12 @@ const router = createRouter({
       redirect: (to) => ({ path: `/channels/widgets/${to.params.widgetId}`, query: to.query }),
     },
     { path: '/tools/mail-handler', redirect: '/channels/email' },
-    { path: '/tools/doc-summary', redirect: '/ai/summarizer' },
+    { path: '/ai/summarizer', redirect: { path: '/', query: { tool: 'summarize' } } },
+    { path: '/tools/doc-summary', redirect: { path: '/', query: { tool: 'summarize' } } },
+    {
+      path: '/ai/providers/higgsfield',
+      redirect: { path: '/ai/providers', query: { section: 'higgsfield' } },
+    },
     {
       path: '/plugins/:pluginName',
       name: 'plugin-view',
@@ -373,6 +449,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
     },
     {
+      path: '/files/workspace',
+      name: 'files-workspace',
+      component: () => import('@/views/WorkspaceView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.filesWorkspace' },
+    },
+    {
       // Vector storage (Qdrant/MariaDB) inventory: how many files and vectors
       // are stored for the user, plus a global admin view.
       path: '/files/vectors',
@@ -395,12 +477,27 @@ const router = createRouter({
       name: 'statistics',
       component: () => import('@/views/StatisticsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.statistics' },
+      beforeEnter: (to) => {
+        if (to.hash === '#chats') {
+          return { path: '/chats' }
+        }
+        return true
+      },
     },
     {
+      path: '/chats',
+      name: 'chats',
+      component: () => import('@/views/ChatsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.allChats' },
+    },
+    {
+      // Language and theme are stored on the device, not on the account, so a
+      // guest can reach this page. The account block inside it hides itself
+      // when nobody is signed in.
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.settings' },
+      meta: { requiresAuth: false, titleKey: 'pageTitles.settings' },
     },
     {
       path: '/testv',
@@ -413,6 +510,21 @@ const router = createRouter({
       name: 'profile',
       component: () => import('@/views/ProfileView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.profile' },
+    },
+    {
+      path: '/groups',
+      name: 'my-groups',
+      component: () => import('@/views/MyGroupsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.myGroups' },
+      beforeEnter: groupsRouteGuard,
+    },
+    {
+      // Conversations other people or groups shared with me ("incoming").
+      // Sibling of /files/incoming, which is the file inbox.
+      path: '/chats/incoming',
+      name: 'chats-incoming',
+      component: () => import('@/views/ChatsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.incoming' },
     },
     {
       // Dead end for an account that still carries a deployment-generated
@@ -428,12 +540,19 @@ const router = createRouter({
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.admin' },
+      beforeEnter: adminUsersTabRedirect,
     },
     {
       path: '/admin/features',
       name: 'admin-features',
       component: () => import('@/views/FeatureStatusView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
+    },
+    {
+      path: '/admin/model-status',
+      name: 'admin-model-status',
+      component: () => import('@/views/ModelStatusView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminModelStatus' },
     },
     {
       path: '/admin/config',
@@ -446,6 +565,13 @@ const router = createRouter({
       name: 'admin-setup',
       component: () => import('@/views/ProviderSetupView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminSetup' },
+    },
+    {
+      path: '/admin/people',
+      name: 'admin-people',
+      component: () => import('@/views/PeopleView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminPeople' },
+      beforeEnter: peopleRouteGuard,
     },
     {
       path: '/subscription',
@@ -485,6 +611,10 @@ router.afterEach((to, from) => {
   // load or in-place query/hash updates.
   if (to.path !== from.path) {
     triggerHapticImpact('light')
+  }
+
+  if (!to.meta.context) {
+    to.meta.context = inferNavContext(to.path, to.meta as Record<string, unknown>)
   }
 
   const titleKey = to.meta.titleKey as string | undefined
@@ -627,7 +757,26 @@ function targetPath(target: RouteLocationRaw): string {
 
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
+  // First-run setup comes BEFORE the auth wait: leftover cookies from a wiped
+  // admin must not stall the visitor on /login, and the 10s auth timeout must
+  // not skip the wizard. Answered from the runtime config the SPA already holds,
+  // so this adds no request to a normal navigation; the visibilitychange handler
+  // below is what re-asks the server after a CLI reset.
+  const wizardRequired = await ensureWizardRequired({
+    fresh: isSetupRecheckRoute(to.name),
+  }).catch(() => false)
+
+  const setupGate = resolveSetupGate({
+    wizardRequired,
+    routeName: to.name,
+    isNativeOnboarding: 'onboarding' === to.name && isNativeApp(),
+  })
+  if ('force' === setupGate) {
+    next({ name: SETUP_ROUTE })
+    return
+  }
+
   // Wait for initial auth check with timeout to prevent hanging
   try {
     await Promise.race([
@@ -636,8 +785,17 @@ router.beforeEach(async (to, from, next) => {
     ])
   } catch (err) {
     console.error('Auth initialization failed:', err)
+    if ('release' === setupGate) {
+      next({ name: 'login' })
+      return
+    }
     // If auth check times out, allow navigation to public routes only
-    if (to.meta.public || to.meta.requiresAuth === false) {
+    // (guest-allowed routes count as protected while the trial is disabled)
+    if (
+      to.meta.public ||
+      (to.meta.requiresAuth === false &&
+        !(to.meta.allowGuest === true && !useConfigStore().auth.guestChatEnabled))
+    ) {
       next()
       return
     }
@@ -657,7 +815,15 @@ router.beforeEach(async (to, from, next) => {
   }
 
   const { isAuthenticated, isAdmin, user } = useAuth()
-  const requiresAuth = to.meta.requiresAuth !== false // Default to true
+
+  if ('release' === setupGate) {
+    next(isAuthenticated.value ? resolveDefaultRoute() : { name: 'login' })
+    return
+  }
+
+  const guestChatEnabled = useConfigStore().auth.guestChatEnabled
+  const guestTrialOff = to.meta.allowGuest === true && !guestChatEnabled
+  const requiresAuth = to.meta.requiresAuth !== false || guestTrialOff // Default to true
   const requiresAdminAccess = to.meta.requiresAdmin === true
   const isPublicRoute = to.meta.public === true
 
@@ -693,11 +859,13 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
-    // Guest users: redirect to chat with feature-gate modal instead of login
+    // Guest users: redirect to chat with feature-gate modal instead of login.
+    // Skipped when the guest trial is disabled - chat itself requires auth
+    // then, so this redirect would loop; the stored key is also stale.
     const guestStore = useGuestStore()
     const hasStoredGuestSession =
       !guestStore.initialized && !!localStorage.getItem(GUEST_STORAGE_KEY)
-    if (guestStore.isGuestMode || hasStoredGuestSession) {
+    if (guestChatEnabled && (guestStore.isGuestMode || hasStoredGuestSession)) {
       const featureKey = mapPathToFeatureKey(to.path)
       next({ name: 'chat', query: { restricted: featureKey } })
       return
@@ -738,15 +906,12 @@ router.beforeEach(async (to, from, next) => {
     // entry. No loop is possible: the chat branch above only redirects here
     // while `shouldShowOnboarding` is true, which requires native + signed-out.
     next(authenticated ? resolveDefaultRoute() : { name: 'chat' })
-  } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
-    // Already logged in, redirect to home (but check for loops)
-    const home = resolveDefaultRoute()
-    if (from.path === targetPath(home) || detectRedirectLoop('/')) {
-      // Prevent ping-pong between login and the home route
-      next()
-      return
-    }
-    next(home)
+  } else if (authenticated && isGuestOnlyAuthRoute(to.name)) {
+    // Signed-in users who type /login or /register belong in the app, not on
+    // a second sign-in form. Do not special-case "came from home": that is
+    // exactly the navigation this must catch (chat → /login, or a /login
+    // bookmark while the session cookie is still valid).
+    next(resolveDefaultRoute())
   } else {
     next()
   }
@@ -786,5 +951,30 @@ router.onError((error, to) => {
     stack: error.stack ?? '',
   })
 })
+
+// `app:setup:reset` cannot touch this tab. When the operator comes back from
+// the terminal, re-ask the server and send them into the wizard if it reopened.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if ('visible' !== document.visibilityState) {
+      return
+    }
+
+    invalidateSetupWizardRequired()
+    void (async () => {
+      const required = await ensureWizardRequired({ fresh: true, probe: true })
+      if (!required) {
+        return
+      }
+
+      const current = router.currentRoute.value
+      if (SETUP_ROUTE === current.name || ('onboarding' === current.name && isNativeApp())) {
+        return
+      }
+
+      await router.replace({ name: SETUP_ROUTE })
+    })()
+  })
+}
 
 export default router

@@ -1,0 +1,7 @@
+{
+    "id": "undeclared_search",
+    "name": "undeclared_search",
+    "namespace": "Plugin\\UndeclaredSearch",
+    "version": "1.0.0",
+    "description": "Test fixture: a plug adapter the manifest fails to declare in provides.plugs."
+}

@@ -1,0 +1,15 @@
+/bin/
+/dist/
+/*.exe
+*.test
+*.out
+coverage.out
+.idea/
+.vscode/
+scratch/
+workspaces/
+.env
+.env.*
+!.env.example
+/tmp/
+*.log

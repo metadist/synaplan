@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
-use App\AI\Service\AiFacade;
 use App\Entity\WidgetSession;
 use App\Repository\MessageRepository;
-use App\Repository\UserRepository;
 use App\Repository\WidgetSessionRepository;
-use App\Service\ModelConfigService;
-use App\Service\RateLimitService;
+use App\Service\Chat\ChatTitleService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -42,10 +39,7 @@ class WidgetSessionServiceTest extends TestCase
             $overrides['em'] ?? $this->createStub(EntityManagerInterface::class),
             $overrides['sessionRepository'] ?? $this->createStub(WidgetSessionRepository::class),
             $overrides['messageRepository'] ?? $this->createStub(MessageRepository::class),
-            $this->createStub(UserRepository::class),
-            $this->createStub(AiFacade::class),
-            $this->createStub(ModelConfigService::class),
-            $this->createStub(RateLimitService::class),
+            $this->createStub(ChatTitleService::class),
             $this->createStub(LoggerInterface::class),
         );
     }

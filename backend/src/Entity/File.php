@@ -14,6 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERSESSIONID'], name: 'idx_file_session')]
 #[ORM\Index(columns: ['BFILETYPE'], name: 'idx_file_type')]
 #[ORM\Index(columns: ['BSTATUS'], name: 'idx_file_status')]
+#[ORM\Index(columns: ['BSTATUS', 'BUPDATEDAT'], name: 'idx_file_status_updated')]
 #[ORM\Index(columns: ['BGROUPKEY'], name: 'idx_file_groupkey')]
 #[ORM\Index(columns: ['BUSERID', 'BSOURCE'], name: 'idx_file_user_source')]
 #[ORM\Index(columns: ['BUSERID', 'BSOURCE', 'BSOURCEID'], name: 'idx_file_user_source_sid')]
@@ -39,6 +40,7 @@ class File
         'widget',
         'api',
         'generated',
+        'compute',
     ];
 
     /**
@@ -63,6 +65,7 @@ class File
         'audio',
         'calendar',
         'document',
+        'artefact',
     ];
 
     /**
@@ -243,10 +246,11 @@ class File
     private ?string $thumbPath = null;
 
     /**
-     * 1 for files created during an incognito chat session: they are excluded
-     * from all file listings, never vectorized, and deleted automatically ?
-     * by the frontend on session end (best effort) and by the
-     * `app:files:reap-ephemeral` command as a safety net.
+     * 1 for files that must not appear in the Files list: incognito-session
+     * media, and chat attachments that have not yet been sent with a message
+     * (issue #1911). They are never vectorized via the library listings and
+     * are deleted by the frontend on remove (best effort) and by
+     * `app:files:reap-ephemeral` as a safety net.
      */
     #[ORM\Column(name: 'BEPHEMERAL', type: 'boolean', options: ['default' => 0])]
     private bool $ephemeral = false;
@@ -254,9 +258,18 @@ class File
     #[ORM\Column(name: 'BCREATEDAT', type: 'bigint')]
     private int $createdAt;
 
+    /**
+     * Last status change. The stuck-file reaper uses this so a re-process of
+     * an old upload is not treated as already expired (issue #1913).
+     */
+    #[ORM\Column(name: 'BUPDATEDAT', type: 'bigint')]
+    private int $updatedAt;
+
     public function __construct()
     {
-        $this->createdAt = time();
+        $now = time();
+        $this->createdAt = $now;
+        $this->updatedAt = $now;
     }
 
     // Getters and Setters
@@ -358,6 +371,7 @@ class File
     public function setStatus(string $status): self
     {
         $this->status = $status;
+        $this->updatedAt = time();
 
         return $this;
     }
@@ -370,6 +384,18 @@ class File
     public function setCreatedAt(int $createdAt): self
     {
         $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): int
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(int $updatedAt): self
+    {
+        $this->updatedAt = $updatedAt;
 
         return $this;
     }
@@ -577,6 +603,22 @@ class File
     public function setEphemeral(bool $ephemeral): self
     {
         $this->ephemeral = $ephemeral;
+
+        return $this;
+    }
+
+    /**
+     * A staged chat attachment becomes a real library row once the message
+     * that references it is sent. Incognito turns stay ephemeral.
+     */
+    public function keepAfterChatSend(bool $incognito): self
+    {
+        if ($incognito) {
+            return $this;
+        }
+        if ($this->ephemeral && 'chat_attachment' === $this->source) {
+            $this->ephemeral = false;
+        }
 
         return $this;
     }

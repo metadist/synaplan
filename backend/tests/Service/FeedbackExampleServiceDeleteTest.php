@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\Exception\MemoryServiceUnavailableException;
@@ -16,6 +17,7 @@ use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -57,16 +59,20 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->feedbackConfig = $this->createMock(FeedbackConfigService::class);
 
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(true);
+
         $this->service = new FeedbackExampleService(
             $this->aiFacade,
             $this->modelConfigService,
             $this->rateLimitService,
             $this->memoryService,
             $this->vectorSearchService,
-            $this->braveSearchService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
             $this->promptRepository,
             $this->logger,
             $this->feedbackConfig,
+            $structuredOutputConfig,
         );
     }
 

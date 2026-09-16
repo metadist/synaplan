@@ -29,6 +29,7 @@ final readonly class UploadOptions
         public ?string $sourceEtag = null,
         public bool $overwrite = false,
         public bool $retainSource = true,
+        public ?int $vectorizeModelId = null,
     ) {
     }
 

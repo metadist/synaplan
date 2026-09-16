@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
+use App\AI\StructuredOutput\Schema\MemoryExtractionSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -25,6 +28,8 @@ final readonly class MemoryExtractionService
         private PromptRepository $promptRepository,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
+        private StructuredOutputConfig $structuredOutputConfig,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -172,17 +177,23 @@ PROMPT;
         try {
             $extractionConfig = $this->getExtractionModelConfig($message->getUserId());
 
+            $aiOptions = [
+                'temperature' => 0.3, // Low temperature for consistent extraction
+                'model' => $extractionConfig['model'],
+                'provider' => $extractionConfig['provider'],
+            ];
+
+            if ($this->structuredOutputConfig->isEnabled($message->getUserId())) {
+                $aiOptions['structured_output'] = MemoryExtractionSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 $message->getUserId(),
-                [
-                    'temperature' => 0.3, // Low temperature for consistent extraction
-                    'model' => $extractionConfig['model'],
-                    'provider' => $extractionConfig['provider'],
-                ]
+                $aiOptions
             );
 
             $content = $response['content'] ?? '';
@@ -311,87 +322,85 @@ PROMPT;
             return [];
         }
 
-        // Try to find JSON in response (handles markdown code blocks)
-        $jsonPattern = '/\[[\s\S]*?\]/';
-        if (preg_match($jsonPattern, $content, $matches)) {
-            $jsonString = $matches[0];
-        } else {
-            $jsonString = $content;
-        }
-
-        try {
-            $memories = json_decode($jsonString, true, 512, JSON_THROW_ON_ERROR);
-
-            if (!is_array($memories)) {
-                return [];
+        $decoded = $this->jsonDecoder->decode($content);
+        if (!$decoded->success) {
+            // A model that answers "nothing to save" in prose rather than as
+            // `null` is not a parse problem worth alerting on.
+            if (false === stripos($content, 'null')) {
+                $this->logger->warning('Failed to parse memories JSON', [
+                    'content' => $content,
+                    'error' => $decoded->errorReason,
+                ]);
             }
-
-            // Validate structure and handle actions
-            $validated = [];
-            foreach ($memories as $memory) {
-                $action = $memory['action'] ?? 'create';
-
-                if ('delete' === $action) {
-                    $memoryId = $memory['memory_id'] ?? null;
-                    if (null === $memoryId) {
-                        $this->logger->warning('Delete action missing memory_id, skipping', [
-                            'memory' => $memory,
-                        ]);
-                        continue;
-                    }
-
-                    $validated[] = [
-                        'action' => 'delete',
-                        'memory_id' => (int) $memoryId,
-                    ];
-                    continue;
-                }
-
-                if (!isset($memory['category'], $memory['key'], $memory['value'])) {
-                    continue;
-                }
-
-                if (mb_strlen($memory['key']) < 3 || mb_strlen($memory['value']) < 3) {
-                    continue;
-                }
-
-                $validatedMemory = [
-                    'action' => $action,
-                    'category' => $memory['category'],
-                    'key' => $memory['key'],
-                    'value' => $memory['value'],
-                ];
-
-                // For updates, memory_id is required
-                if ('update' === $action) {
-                    $memoryId = $memory['memory_id'] ?? null;
-                    if (null === $memoryId) {
-                        $this->logger->warning('Update action missing memory_id, treating as create', [
-                            'memory' => $memory,
-                        ]);
-                        $validatedMemory['action'] = 'create';
-                    } else {
-                        $validatedMemory['memory_id'] = (int) $memoryId;
-                    }
-                }
-
-                $validated[] = $validatedMemory;
-            }
-
-            return $validated;
-        } catch (\JsonException $e) {
-            // If parsing fails, check if it's a null response
-            if (false !== stripos($content, 'null')) {
-                return [];
-            }
-
-            $this->logger->warning('Failed to parse memories JSON', [
-                'content' => $content,
-                'error' => $e->getMessage(),
-            ]);
 
             return [];
         }
+
+        // The schema path wraps the actions under `memories` (a bare array
+        // root is not expressible in structured output); the prose-instruction
+        // fallback still returns them bare.
+        $memories = $decoded->data['memories'] ?? $decoded->data;
+        if (!is_array($memories)) {
+            return [];
+        }
+
+        // Validate structure and handle actions
+        $validated = [];
+        foreach ($memories as $memory) {
+            if (!is_array($memory)) {
+                continue;
+            }
+
+            $action = $memory['action'] ?? 'create';
+
+            if ('delete' === $action) {
+                $memoryId = $memory['memory_id'] ?? null;
+                if (null === $memoryId) {
+                    $this->logger->warning('Delete action missing memory_id, skipping', [
+                        'memory' => $memory,
+                    ]);
+                    continue;
+                }
+
+                $validated[] = [
+                    'action' => 'delete',
+                    'memory_id' => (int) $memoryId,
+                ];
+                continue;
+            }
+
+            if (!isset($memory['category'], $memory['key'], $memory['value'])) {
+                continue;
+            }
+
+            if (mb_strlen($memory['key']) < 3 || mb_strlen($memory['value']) < 3) {
+                continue;
+            }
+
+            $validatedMemory = [
+                'action' => $action,
+                'category' => $memory['category'],
+                'key' => $memory['key'],
+                'value' => $memory['value'],
+            ];
+
+            // For updates, memory_id is required
+            if ('update' === $action) {
+                $memoryId = $memory['memory_id'] ?? null;
+                if (null === $memoryId) {
+                    $this->logger->warning('Update action missing memory_id, treating as create', [
+                        'memory' => $memory,
+                    ]);
+                    $validatedMemory['action'] = 'create';
+                } else {
+                    $validatedMemory['memory_id'] = (int) $memoryId;
+                }
+            }
+
+            $validated[] = $validatedMemory;
+        }
+
+        return $validated;
     }
 
     /**

@@ -4,6 +4,8 @@ namespace App\Service\RAG;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Plug\Rerank\RerankStage;
+use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\RAG\VectorStorage\DTO\SearchQuery;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -38,7 +40,10 @@ final readonly class VectorSearchService
         private ModelConfigService $modelConfigService,
         private VectorStorageFacade $vectorStorage,
         private RateLimitService $rateLimitService,
+        private RagScopeResolver $ragScopeResolver,
+        private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private RerankStage $rerankStage,
     ) {
     }
 
@@ -49,11 +54,13 @@ final readonly class VectorSearchService
      * fans it out across memories + RAG + feedback searches. Skipping the
      * embedding round-trip here is the dominant TTFT win.
      *
-     * @param int               $userId   User ID for filtering
-     * @param array<int, float> $vector   Already-embedded query vector
-     * @param string|null       $groupKey Optional group filter
-     * @param int               $limit    Number of results (default: 10)
-     * @param float             $minScore Minimum similarity score (0-1, default: 0.3)
+     * @param int               $userId    User ID for filtering
+     * @param array<int, float> $vector    Already-embedded query vector
+     * @param string|null       $groupKey  Optional group filter
+     * @param int               $limit     Number of results (default: 10)
+     * @param float             $minScore  Minimum similarity score (0-1, default: 0.3)
+     * @param string|null       $queryText Original query; required for rerank. When
+     *                                     omitted, storage limit stays $limit (C5).
      *
      * @return array Top-K similar documents
      */
@@ -63,23 +70,43 @@ final readonly class VectorSearchService
         ?string $groupKey = null,
         int $limit = 10,
         float $minScore = 0.3,
+        ?string $queryText = null,
+        ?array $explicitScopes = null,
     ): array {
         if (empty($vector)) {
             return [];
         }
 
+        // An assistant with no knowledge scopes (own folder off, no folders,
+        // own files not included) searches nothing. Return early rather than
+        // build an empty-scope query, which would raise EmptyRagScopeException
+        // and log a warning on every turn.
+        if (null !== $explicitScopes && [] === $explicitScopes) {
+            return [];
+        }
+
         try {
+            // An assistant chat passes the exact scopes its runtime resolved
+            // (owner folders it may still use); otherwise expand the viewer's
+            // own IAM grants. The two are never mixed.
+            $scopes = $explicitScopes ?? $this->ragScopeResolver->resolve($userId, $groupKey);
+            $storageLimit = $this->rerankStage->storageLimit($limit, $queryText);
             $searchQuery = new SearchQuery(
                 userId: $userId,
                 vector: $this->normalizeQueryVector(array_map('floatval', $vector)),
-                groupKey: $groupKey,
-                limit: $limit,
+                groupKey: null !== $explicitScopes ? null : $groupKey,
+                limit: $storageLimit,
                 minScore: $minScore,
+                scopes: $scopes,
             );
 
             $results = $this->vectorStorage->search($searchQuery);
+            $names = $this->ownerNames($results, $userId);
 
-            return array_map(static function ($result): array {
+            $mapped = array_map(static function ($result) use ($userId, $names): array {
+                $ownerId = $result->ownerId ?? $userId;
+                $shared = $result->shared || $ownerId !== $userId;
+
                 return [
                     'chunk_id' => $result->chunkId,
                     'file_id' => $result->fileId,
@@ -92,8 +119,19 @@ final readonly class VectorSearchService
                     'score' => $result->score,
                     'file_name' => $result->fileName,
                     'mime_type' => $result->mimeType,
+                    'owner_id' => $ownerId,
+                    'owner_name' => $shared ? ($names[$ownerId] ?? null) : null,
+                    'shared' => $shared,
                 ];
             }, $results);
+
+            if (null !== $queryText && '' !== trim($queryText)) {
+                $user = $this->userRepository->find($userId);
+
+                return $this->rerankStage->apply($queryText, $mapped, $limit, $user instanceof User ? $user : null);
+            }
+
+            return $mapped;
         } catch (\Throwable $e) {
             $this->logger->warning('VectorSearchService::semanticSearchByVector failed', [
                 'user_id' => $userId,
@@ -127,6 +165,7 @@ final readonly class VectorSearchService
         ?string $groupKey = null,
         int $limit = 10,
         float $minScore = 0.3,
+        ?array $explicitScopes = null,
     ): array {
         // 1. Get embedding model from DB
         $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
@@ -182,34 +221,15 @@ final readonly class VectorSearchService
             return [];
         }
 
-        // 3. Search via Facade
-        $searchQuery = new SearchQuery(
-            userId: $userId,
-            vector: $this->normalizeQueryVector(array_map('floatval', $queryEmbedding)),
-            groupKey: $groupKey,
-            limit: $limit,
-            minScore: $minScore,
+        return $this->semanticSearchByVector(
+            $userId,
+            $queryEmbedding,
+            $groupKey,
+            $limit,
+            $minScore,
+            $query,
+            $explicitScopes,
         );
-
-        $results = $this->vectorStorage->search($searchQuery);
-
-        // 4. Map DTOs to arrays for backward compatibility
-        return array_map(function ($result) {
-            return [
-                'chunk_id' => $result->chunkId,
-                'file_id' => $result->fileId, // Mapped from BMID/file_id
-                'message_id' => $result->fileId, // Legacy key
-                'chunk_text' => $result->text,
-                'start_line' => $result->startLine,
-                'end_line' => $result->endLine,
-                'group_key' => $result->groupKey,
-                'distance' => $result->score, // Legacy: 'distance' key contained similarity score (1.0 = identical)
-                'score' => $result->score, // Add score explicitly
-                'file_name' => $result->fileName,
-                'mime_type' => $result->mimeType,
-                // Add other fields if needed by consumers
-            ];
-        }, $results);
     }
 
     /**
@@ -333,5 +353,40 @@ final readonly class VectorSearchService
         }
 
         return array_pad($vector, self::QUERY_VECTOR_DIMENSION, 0.0);
+    }
+
+    /**
+     * @param list<VectorStorage\DTO\SearchResult> $results
+     *
+     * @return array<int, string>
+     */
+    private function ownerNames(array $results, int $searcherId): array
+    {
+        $ids = [];
+        foreach ($results as $result) {
+            $ownerId = $result->ownerId ?? $searcherId;
+            if ($ownerId !== $searcherId) {
+                $ids[$ownerId] = $ownerId;
+            }
+        }
+        if ([] === $ids) {
+            return [];
+        }
+
+        $names = [];
+        foreach ($this->userRepository->findBy(['id' => array_values($ids)]) as $user) {
+            $details = $user->getUserDetails();
+            $name = null;
+            foreach (['full_name', 'first_name'] as $key) {
+                $value = $details[$key] ?? null;
+                if (is_string($value) && '' !== trim($value)) {
+                    $name = trim($value);
+                    break;
+                }
+            }
+            $names[(int) $user->getId()] = $name ?? (string) $user->getMail();
+        }
+
+        return $names;
     }
 }

@@ -135,6 +135,16 @@ export async function openApp(page: Page): Promise<void> {
   await page.waitForSelector(selectors.chat.textInput, { timeout: TIMEOUTS.STANDARD })
 }
 
+/**
+ * Sign in through the UI, typically to become somebody else (the admin) than
+ * the worker user every context is already signed in as.
+ *
+ * Drops the existing session first: the sign-in form is a guest-only route, so
+ * a context that still carries the worker's cookies is sent to the app and the
+ * form never renders. The session hint left in localStorage needs no cleanup —
+ * the refresh it triggers fails without the cookies and clears it, and a
+ * successful sign-in writes a fresh one.
+ */
 export async function login(page: Page, credentials?: { user: string; pass: string }) {
   if (process.env.AUTH_METHOD === 'oidc') {
     return loginViaOidcButton(page, credentials)
@@ -142,6 +152,7 @@ export async function login(page: Page, credentials?: { user: string; pass: stri
 
   const creds = CREDENTIALS.getCredentials(credentials)
 
+  await page.context().clearCookies()
   await page.goto('/login')
 
   await page.fill(selectors.login.email, creds.user)

@@ -42,6 +42,9 @@ enum Capability: string
     /** Pull data from one of the user's connected external MCP servers (McpClient, read-only v1). */
     case McpFetch = 'mcp_fetch';
 
+    /** Perform a WRITE action (create/update) on a connected external MCP server that opted in to writes (McpClient). */
+    case McpAction = 'mcp_action';
+
     /** Live read-only IMAP search over the user's connected mailboxes (InboundEmailHandler accounts). */
     case EmailSearch = 'email_search';
 
@@ -60,14 +63,70 @@ enum Capability: string
     /** Office document generation (ChatHandler officemaker + DocumentGeneratorService). */
     case DocumentGeneration = 'document_generation';
 
+    /**
+     * Convert an office file that already exists in the conversation to PDF with
+     * the office engine (DocumentExportService, no model) — the same conversion
+     * as the file chip's "Download as PDF", so the original layout survives
+     * instead of being re-authored from a text extract (#1691).
+     */
+    case DocumentExport = 'document_export';
+
+    /**
+     * Merge two or more office/PDF files that already exist in the conversation
+     * into one PDF (DocumentCombineService, no model) — the same merge as the
+     * file chip's Combine action (#1694).
+     */
+    case DocumentCombine = 'document_combine';
+
     /** Calendar event / meeting invite as a downloadable .ics file (CalendarEventService, no model). */
     case CalendarEvent = 'calendar_event';
 
     /** Mail the assembled results to the account owner as one multi-MIME email (InternalEmailService, no model). */
     case EmailMe = 'email_me';
 
+    /** Put generated files into a connected WebDAV/Nextcloud folder (FileSendService / WebDavDestinationProvider). */
+    case SaveToFolder = 'save_to_folder';
+
     /** Final assembly of text + N file attachments into one OUT message (ResultAssembler, no model). */
     case ComposeReply = 'compose_reply';
+
+    /**
+     * Call a registered tool (custom HTTP or MCP) from an authored Saved Task.
+     * Hidden from the planner catalog ({@see SkillDescriptor::$available}).
+     */
+    case ToolCall = 'tool_call';
+
+    /**
+     * HMAC-signed HTTPS POST of a step result to an external URL.
+     * Hidden from the planner catalog.
+     */
+    case OutboundWebhook = 'outbound_webhook';
+
+    /**
+     * Gate: on false the run stops and dependents are skipped (not failed).
+     * Hidden from the planner catalog.
+     */
+    case Condition = 'condition';
+
+    /**
+     * Run a short Python or Node script on attached files (secure compute).
+     * Planner-visible only when {@see \App\Service\Compute\ComputeConfig::isEnabled()}.
+     */
+    case CodeRun = 'code_run';
+
+    /**
+     * Capabilities that exist only for the Steps editor (flag-gated at validate).
+     *
+     * @return list<string>
+     */
+    public static function builderOnlyValues(): array
+    {
+        return [
+            self::ToolCall->value,
+            self::OutboundWebhook->value,
+            self::Condition->value,
+        ];
+    }
 
     /**
      * @return list<string> all capability string values
@@ -86,14 +145,19 @@ enum Capability: string
         return match ($this) {
             self::ExtractText => 'extract',
             self::Chat, self::Summarize, self::Translate, self::RagQuery, self::FileAnalysis => 'text',
-            self::WebSearch, self::UrlFetch, self::McpFetch, self::EmailSearch => 'search',
+            self::WebSearch, self::UrlFetch, self::McpFetch, self::McpAction, self::EmailSearch => 'search',
             self::ImageGeneration => 'image',
             self::VideoGeneration => 'video',
             self::Text2Sound => 'audio',
-            self::DocumentGeneration => 'document',
+            self::DocumentGeneration, self::DocumentExport, self::DocumentCombine => 'document',
             self::CalendarEvent => 'document',
             self::EmailMe => 'email',
+            self::SaveToFolder => 'folder',
             self::ComposeReply => 'hidden',
+            self::ToolCall => 'search',
+            self::OutboundWebhook => 'email',
+            self::Condition => 'text',
+            self::CodeRun => 'compute',
         };
     }
 

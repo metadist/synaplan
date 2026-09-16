@@ -16,8 +16,9 @@ use Psr\Log\LoggerInterface;
  *   1. Per-user encrypted BCONFIG row (group="higgsfield", setting="api_key"
  *      and "api_secret"). Per-user values are AES-256-CBC encrypted at rest
  *      via {@see EncryptionService} (which derives its key from APP_SECRET).
- *   2. Platform-wide env credentials (HIGGSFIELD_API_KEY / HIGGSFIELD_API_SECRET)
- *      injected at construction time.
+ *   2. The instance pair from Models & keys ({@see ProviderKeyStore}, provider
+ *      `higgsfield`): a pair saved in the admin UI, or the
+ *      HIGGSFIELD_API_KEY / HIGGSFIELD_API_SECRET bootstrap.
  *
  * A null return value means no credentials are configured for the given user
  * AND no platform fallback is set — the provider should treat that as "not
@@ -32,13 +33,13 @@ final class HiggsfieldCredentialResolver
     public const CONFIG_GROUP = 'higgsfield';
     public const SETTING_API_KEY = 'api_key';
     public const SETTING_API_SECRET = 'api_secret';
+    public const PROVIDER = 'higgsfield';
 
     public function __construct(
         private readonly ConfigRepository $configRepository,
         private readonly EncryptionService $encryption,
         private readonly LoggerInterface $logger,
-        private readonly string $platformApiKey = '',
-        private readonly string $platformApiSecret = '',
+        private readonly ProviderKeyStore $keyStore,
     ) {
     }
 
@@ -60,10 +61,11 @@ final class HiggsfieldCredentialResolver
             }
         }
 
-        if ('' !== $this->platformApiKey && '' !== $this->platformApiSecret) {
+        $platform = $this->platformCredentials();
+        if (null !== $platform) {
             return [
-                'api_key' => $this->platformApiKey,
-                'api_secret' => $this->platformApiSecret,
+                'api_key' => $platform['api_key'],
+                'api_secret' => $platform['api_secret'],
                 'source' => 'platform',
             ];
         }
@@ -84,7 +86,7 @@ final class HiggsfieldCredentialResolver
      */
     public function hasPlatformCredentials(): bool
     {
-        return '' !== $this->platformApiKey && '' !== $this->platformApiSecret;
+        return null !== $this->platformCredentials();
     }
 
     /**
@@ -132,6 +134,23 @@ final class HiggsfieldCredentialResolver
         $creds = $this->loadUserCredentials($userId);
 
         return null === $creds ? '' : $this->mask($creds['api_key']);
+    }
+
+    /**
+     * The instance pair. The store only reports a key when the secret half is
+     * present too, so a half pair never reaches the provider.
+     *
+     * @return array{api_key: string, api_secret: string}|null
+     */
+    private function platformCredentials(): ?array
+    {
+        $key = $this->keyStore->getKey(self::PROVIDER);
+        $secret = $this->keyStore->getSecret(self::PROVIDER);
+        if (null === $key || '' === $key || null === $secret || '' === $secret) {
+            return null;
+        }
+
+        return ['api_key' => $key, 'api_secret' => $secret];
     }
 
     /**

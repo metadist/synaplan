@@ -9,6 +9,7 @@ use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\Client\ClientContextResolver;
+use App\Service\GuestSessionService;
 use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
 use App\Service\NativeAuthHandoffService;
@@ -99,6 +100,24 @@ class AuthController extends AbstractController
         $firstName = trim((string) ($details['firstName'] ?? $details['first_name'] ?? ''));
 
         return '' !== $firstName ? $firstName : null;
+    }
+
+    /**
+     * Login and every refresh branch (app, OIDC, impersonation recovery)
+     * share this body so a leftover cookie cannot keep a blocked account
+     * signed in after CookieTokenAuthenticator stopped claiming those routes.
+     */
+    private function accountSuspendedResponse(User $user, string $action): JsonResponse
+    {
+        $this->logger->warning($action.' blocked for suspended account', [
+            'user_id' => $user->getId(),
+        ]);
+
+        return $this->json([
+            'error' => 'Account suspended',
+            'code' => 'ACCOUNT_SUSPENDED',
+            'message' => 'This account has been suspended. Please contact support.',
+        ], Response::HTTP_FORBIDDEN);
     }
 
     #[Route('/native/exchange', name: 'native_exchange', methods: ['POST'])]
@@ -211,6 +230,17 @@ class AuthController extends AbstractController
             return $this->json([
                 'error' => 'reCAPTCHA verification failed. Please try again.',
             ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (GuestSessionService::isReservedProcessorEmail($dto->email)) {
+            $this->logger->warning('Registration attempt with reserved guest-processor email', [
+                'ip' => $request->getClientIp(),
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'message' => 'If this email is not already registered, you will receive a verification email shortly.',
+            ], Response::HTTP_OK);
         }
 
         // Check if user exists
@@ -354,12 +384,7 @@ class AuthController extends AbstractController
 
         // Suspended/banned accounts cannot sign in (Apple Guideline 1.2).
         if (!$user->isActive()) {
-            $this->logger->warning('Login blocked for suspended account', ['user_id' => $user->getId()]);
-
-            return $this->json([
-                'error' => 'Account suspended',
-                'message' => 'This account has been suspended. Please contact support.',
-            ], Response::HTTP_FORBIDDEN);
+            return $this->accountSuspendedResponse($user, 'Login');
         }
 
         // Generate tokens
@@ -418,6 +443,7 @@ class AuthController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Invalid or expired refresh token')]
+    #[OA\Response(response: 403, description: 'Account suspended or banned')]
     public function refresh(Request $request): Response
     {
         // Check if this is an OIDC user (has OIDC refresh token cookie)
@@ -465,15 +491,24 @@ class AuthController extends AbstractController
             ], Response::HTTP_UNAUTHORIZED);
         }
 
+        $existingRefresh = $this->tokenService->validateRefreshToken($refreshTokenString);
+        $refreshOwner = $existingRefresh?->getUser();
+        if ($refreshOwner instanceof User && !$refreshOwner->isActive()) {
+            return $this->tokenService->clearAuthCookies(
+                $this->accountSuspendedResponse($refreshOwner, 'Refresh')
+            );
+        }
+
         $result = $this->tokenService->refreshTokens($refreshTokenString);
 
         if (!$result) {
-            $response = new JsonResponse([
+            // Do not Set-Cookie-clear here. A failed refresh that started
+            // before a concurrent login would otherwise wipe the cookies that
+            // login just wrote, and the user lands back on /login as a guest.
+            return new JsonResponse([
                 'error' => 'Invalid or expired refresh token',
                 'code' => 'INVALID_REFRESH_TOKEN',
             ], Response::HTTP_UNAUTHORIZED);
-
-            return $this->tokenService->clearAuthCookies($response);
         }
 
         $this->logger->info('Token refreshed', ['user_id' => $result['user']->getId()]);
@@ -502,6 +537,12 @@ class AuthController extends AbstractController
         $response->headers->setCookie(
             $this->tokenService->createAccessCookie($result['access_token'])
         );
+        // Sliding window: rewrite the refresh cookie so its Max-Age matches
+        // the extended BTOKENS row. Without this the browser would still drop
+        // the cookie after the original login TTL even though the DB row lives on.
+        $response->headers->setCookie(
+            $this->tokenService->createRefreshCookie($refreshTokenString)
+        );
 
         return $response;
     }
@@ -510,7 +551,7 @@ class AuthController extends AbstractController
      * Refresh the access token for an active impersonation session.
      *
      * Delegates to {@see ImpersonationService::issueRefreshedImpersonationAccessToken},
-     * which validates the admin's stashed refresh token (DB-backed, 7d TTL),
+     * which validates the admin's stashed refresh token (DB-backed, 30d TTL),
      * recovers the impersonation target from the existing access cookie's
      * payload (signature-only verification — expiry is expected), and mints a
      * fresh impersonation access token. On failure we conservatively clear
@@ -522,6 +563,38 @@ class AuthController extends AbstractController
         $result = $this->impersonationService->issueRefreshedImpersonationAccessToken($request);
 
         if (!$result) {
+            // A refresh that raced the cookie-swap can leave a valid admin stash
+            // next to a plain admin access token. Recover the admin session
+            // instead of wiping cookies (which logged the admin out).
+            $recovered = $this->impersonationService->recoverAdminSessionFromStash($request);
+            if ($recovered) {
+                /** @var User $admin */
+                $admin = $recovered['user'];
+
+                $this->logger->info('Impersonation refresh recovered admin session', [
+                    'admin_id' => $admin->getId(),
+                ]);
+
+                $response = new JsonResponse([
+                    'success' => true,
+                    'user' => [
+                        'id' => $admin->getId(),
+                        'email' => $admin->getMail(),
+                        'level' => $admin->getUserLevel(),
+                        'emailVerified' => $admin->isEmailVerified(),
+                        'isAdmin' => $admin->isAdmin(),
+                        'memoriesEnabled' => $admin->isMemoriesEnabled(),
+                        'firstName' => $this->extractFirstName($admin),
+                    ],
+                ]);
+
+                $response->headers->setCookie(
+                    $this->tokenService->createAccessCookie($recovered['access_token'])
+                );
+
+                return $response;
+            }
+
             $response = new JsonResponse([
                 'error' => 'Impersonation session expired',
                 'code' => 'IMPERSONATION_EXPIRED',
@@ -566,6 +639,18 @@ class AuthController extends AbstractController
      */
     private function refreshOidcTokens(Request $request, string $oidcRefreshToken, string $provider): Response
     {
+        $existingOidcAccess = $request->cookies->get(OidcTokenService::OIDC_ACCESS_COOKIE);
+        if (is_string($existingOidcAccess) && '' !== $existingOidcAccess) {
+            $knownUser = $this->oidcTokenService->getUserFromOidcToken($existingOidcAccess, $provider);
+            if ($knownUser instanceof User && !$knownUser->isActive()) {
+                $response = $this->accountSuspendedResponse($knownUser, 'OIDC refresh');
+                $this->tokenService->clearAuthCookies($response);
+                $this->oidcTokenService->clearOidcCookies($response);
+
+                return $response;
+            }
+        }
+
         $newTokens = $this->oidcTokenService->refreshOidcTokens($oidcRefreshToken, $provider);
 
         if (!$newTokens) {
@@ -596,6 +681,14 @@ class AuthController extends AbstractController
                 'code' => 'USER_NOT_FOUND',
             ], Response::HTTP_UNAUTHORIZED);
 
+            $this->tokenService->clearAuthCookies($response);
+            $this->oidcTokenService->clearOidcCookies($response);
+
+            return $response;
+        }
+
+        if (!$user->isActive()) {
+            $response = $this->accountSuspendedResponse($user, 'OIDC refresh');
             $this->tokenService->clearAuthCookies($response);
             $this->oidcTokenService->clearOidcCookies($response);
 
@@ -672,6 +765,12 @@ class AuthController extends AbstractController
         if ($refreshTokenString) {
             $this->tokenService->revokeRefreshToken($refreshTokenString);
         }
+
+        // During impersonation the regular refresh cookie is cleared and the
+        // admin's real refresh token sits in the stash. Revoke it too so logging
+        // out mid-impersonation actually kills the admin session in the DB, not
+        // just the cleared cookie.
+        $this->impersonationService->revokeStashedAdminRefreshToken($request);
 
         $responseData = [
             'success' => true,
@@ -1068,16 +1167,23 @@ class AuthController extends AbstractController
         description: 'Logout from all devices by revoking all refresh tokens',
         tags: ['Authentication']
     )]
-    public function revokeAll(#[CurrentUser] ?User $user): Response
+    public function revokeAll(Request $request, #[CurrentUser] ?User $user): Response
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $count = $this->tokenService->revokeAllUserTokens($user);
+        // During impersonation `#[CurrentUser]` resolves to the impersonated
+        // target. "Log out everywhere" must act on the real operator — the admin
+        // whose refresh token is stashed — never on the impersonated victim, and
+        // it must revoke the admin's stashed token which a target-scoped revoke
+        // would leave alive.
+        $sessionOwner = $this->impersonationService->resolveStashedAdmin($request) ?? $user;
+
+        $count = $this->tokenService->revokeAllUserTokens($sessionOwner);
 
         $this->logger->info('All sessions revoked', [
-            'user_id' => $user->getId(),
+            'user_id' => $sessionOwner->getId(),
             'sessions_revoked' => $count,
         ]);
 

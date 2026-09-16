@@ -25,9 +25,20 @@
          uses the full width; md+ keeps the roomier px-4. -->
     <div class="max-w-4xl mx-auto px-3 py-2 md:px-4 md:py-4">
       <!-- File and Quote Display (above input) -->
-      <div v-if="uploadedFiles.length > 0 || quote" class="mb-3 flex flex-wrap gap-2">
+      <div
+        v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
+        class="mb-3 flex flex-wrap gap-2 max-h-28 overflow-y-auto"
+      >
         <!-- Quoted reference chip -->
         <QuoteChip v-if="quote" :quote="quote" @remove="emit('clearQuote')" />
+
+        <PastedTextCard
+          v-for="block in pastedBlocks"
+          :key="block.id"
+          :content="block.content"
+          @open="openPastedBlock(block.id)"
+          @remove="removePastedBlock(block.id)"
+        />
 
         <!-- Uploaded Files -->
         <div
@@ -40,12 +51,61 @@
           <span v-if="file.processing" class="text-xs txt-muted">(processing...)</span>
           <button
             class="icon-ghost p-0 min-w-0 w-auto h-auto"
-            aria-label="Remove file"
+            :aria-label="$t('files.removeFile')"
             :disabled="file.processing"
+            data-testid="btn-remove-chat-file"
             @click="removeFile(index)"
           >
             <XMarkIcon class="w-4 h-4" />
           </button>
+        </div>
+      </div>
+
+      <!-- DS16: waiting/failed cards for jobs dispatched to a paired computer. -->
+      <div v-if="desktopJobs.length > 0" class="mb-3 flex flex-col gap-2">
+        <DesktopJobCard
+          v-for="job in desktopJobs"
+          :key="job.id"
+          :job-id="job.id"
+          :device-name="job.deviceName"
+          @dismiss="dismissDesktopJob(job.id)"
+        />
+      </div>
+
+      <div
+        v-if="summarizeArmed"
+        class="mb-3 flex flex-wrap items-end gap-3"
+        data-testid="summarize-options"
+      >
+        <div class="min-w-[8rem]">
+          <label class="block text-xs font-medium txt-secondary mb-1" for="summarize-length">
+            {{ $t('chatInput.tools.summarizeLength') }}
+          </label>
+          <select
+            id="summarize-length"
+            v-model="summarizeLength"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-summarize-length"
+          >
+            <option v-for="length in summarizeLengthOptions" :key="length" :value="length">
+              {{ $t(summarizeLengthOptionKey(length)) }}
+            </option>
+          </select>
+        </div>
+        <div class="min-w-[8rem]">
+          <label class="block text-xs font-medium txt-secondary mb-1" for="summarize-language">
+            {{ $t('chatInput.tools.summarizeLanguage') }}
+          </label>
+          <select
+            id="summarize-language"
+            v-model="summarizeLanguage"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-summarize-language"
+          >
+            <option v-for="language in summarizeLanguageOptions" :key="language" :value="language">
+              {{ $t(`chatInput.tools.summarizeLang.${language}`) }}
+            </option>
+          </select>
         </div>
       </div>
 
@@ -88,6 +148,35 @@
           (via `md:contents` on the control bar).
         -->
         <div class="flex flex-col md:block">
+          <!-- Voice activity strip.
+               Only shown on the record-then-transcribe path (see
+               `showVoiceActivity`): there the transcript arrives in one piece
+               when the user stops, so between tapping the microphone and
+               releasing it the composer is completely inert. The Web Speech
+               path writes recognised words into the textarea as they arrive
+               and is its own progress indicator. -->
+          <div
+            v-if="showVoiceActivity"
+            class="voice-activity"
+            role="status"
+            aria-live="polite"
+            data-testid="chat-voice-activity"
+          >
+            <template v-if="transcribing">
+              <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" aria-hidden="true" />
+            </template>
+            <template v-else>
+              <span class="voice-activity__pulse" aria-hidden="true"></span>
+              <span class="voice-activity__meter" aria-hidden="true">
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+              </span>
+            </template>
+            <span>{{ voiceActivityLabel }}</span>
+          </div>
+
           <!-- Textarea row. Mobile: full width with a comfortable 12px horizontal
                inset (matches the control bar below) so text never sits flush
                against the card edge. md+: py-2 (16px) + textarea min-h-[40px] =
@@ -175,6 +264,19 @@
                   <span class="font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
                 </button>
 
+                <!-- One-tap photo path: opens the OS camera directly on mobile
+                 (via the `capture` input below) and an image-filtered picker on
+                 desktop — no detour through the file-manager modal. -->
+                <button
+                  type="button"
+                  class="pill text-xs md:text-sm self-start"
+                  data-testid="btn-plus-photo"
+                  @click="handlePlusPhoto"
+                >
+                  <Icon icon="mdi:camera-outline" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span class="font-medium">{{ $t('chatInput.plusMenu.photo') }}</span>
+                </button>
+
                 <!-- Guest-mode rows: same `.pill` chip style as "Attach files"
                      above (and the real Model/Tools/Knowledge triggers in the
                      authenticated branch below) for a consistent list. -->
@@ -227,6 +329,8 @@
                     @toggle-thinking="toggleThinking"
                     @toggle-voice-reply="toggleVoiceReply"
                     @toggle-enhance="toggleEnhance"
+                    @summarize-document="armSummarize"
+                    @run-on-device="handleRunOnDevice"
                   />
                   <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
                 </template>
@@ -236,8 +340,22 @@
                 type="file"
                 multiple
                 class="hidden"
-                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt,.jar"
                 data-testid="input-chat-file"
+                @change="handleFileSelect"
+              />
+
+              <!-- Camera capture input for the "Take photo" shortcut. `capture`
+                 opens the rear camera directly on mobile; desktop browsers
+                 ignore it and show an image-filtered file picker. Uploads go
+                 through the same pipeline as paste/drag (no file modal). -->
+              <input
+                ref="cameraInputRef"
+                type="file"
+                class="hidden"
+                accept="image/*,.heic,.heif"
+                capture="environment"
+                data-testid="input-chat-camera"
                 @change="handleFileSelect"
               />
             </div>
@@ -326,6 +444,13 @@
       @close="fileSelectionModalVisible = false"
       @select="handleFilesSelected"
     />
+
+    <PastedTextModal
+      :visible="editingPastedBlock !== null"
+      :content="editingPastedBlock?.content ?? ''"
+      @close="closePastedBlock"
+      @save="savePastedBlock"
+    />
   </div>
 </template>
 
@@ -344,30 +469,46 @@ import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
 import ToolBadge from './ToolBadge.vue'
+import DesktopJobCard from './DesktopJobCard.vue'
 import ModelDropdown from './ModelDropdown.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
+import PastedTextCard from './chat/PastedTextCard.vue'
+import PastedTextModal from './chat/PastedTextModal.vue'
 import { parseCommand } from '../commands/parse'
-import { type Command } from '@/stores/commands'
+import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
+import { useSummarizeTool, type SummarizeLength } from '@/composables/useSummarizeTool'
 import { chatApi } from '@/services/api/chatApi'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { FileItem } from '@/services/filesService'
-import { getFileGroups } from '@/services/filesService'
+import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { useAutoPersist, useAttachmentPersist } from '@/composables/useInputPersistence'
+import {
+  useAutoPersist,
+  useAttachmentPersist,
+  usePastedBlocksPersist,
+} from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
 import { useIncognitoStore } from '@/stores/incognito'
+import { useDialog } from '@/composables/useDialog'
+import { desktopApi } from '@/services/api/desktopApi'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
+import {
+  createPastedBlockId,
+  shouldBecomeBlock,
+  wrapPastedBlocks,
+  type PastedTextBlock,
+} from '@/utils/pastedContent'
 
 interface UploadedFile {
   file_id: number
@@ -375,6 +516,8 @@ interface UploadedFile {
   file_type: string
   name?: string
   processing: boolean
+  /** Picked in the composer, not from the Files library — DELETE on remove. */
+  staged?: boolean
 }
 
 interface Props {
@@ -401,6 +544,7 @@ const keyboardOpen = useKeyboardOpen()
 
 const plusMenuOpen = ref(false)
 const plusMenuRef = ref<HTMLElement | null>(null)
+const cameraInputRef = ref<HTMLInputElement | null>(null)
 
 const togglePlusMenu = () => {
   triggerHapticImpact('light')
@@ -415,6 +559,16 @@ const handlePlusAttach = () => {
     return
   }
   triggerFileUpload()
+}
+
+const handlePlusPhoto = () => {
+  plusMenuOpen.value = false
+  if (isGuestMode.value) {
+    emit('guestFeatureGate', 'attach')
+    return
+  }
+  if (uploading.value) return
+  cameraInputRef.value?.click()
 }
 
 const handlePlusGate = (key: string) => {
@@ -433,6 +587,8 @@ const message = ref('')
 const originalMessage = ref('')
 const enhancedMessage = ref('')
 const uploadedFiles = ref<UploadedFile[]>([])
+const pastedBlocks = ref<PastedTextBlock[]>([])
+const editingPastedBlockId = ref<string | null>(null)
 const uploading = ref(false)
 const uploadAbortController = ref<AbortController | null>(null)
 const enhanceEnabled = ref(false)
@@ -459,6 +615,7 @@ const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
 const isRecording = ref(false)
+const transcribing = ref(false)
 const audioRecorder = ref<AudioRecorder | null>(null)
 const webSpeechService = ref<WebSpeechService | null>(null)
 const interimTranscript = ref('')
@@ -480,11 +637,143 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
+const commandsStore = useCommandsStore()
 const incognitoStore = useIncognitoStore()
+const dialog = useDialog()
 const { warning, error: showError, success } = useNotification()
+
+// DS16: jobs dispatched to a paired computer via "Run on this computer".
+// Rendered as waiting/failed cards above the composer until dismissed.
+const desktopJobs = ref<Array<{ id: number; deviceName: string }>>([])
+
+/**
+ * Send the typed instruction to a paired computer as a `skill.run` job. There is
+ * deliberately no planner hook (prompt-injection risk, §2.3): the user picks the
+ * skill explicitly. The server never verifies the skill exists — an uninstalled
+ * skill fails honestly on the device, surfaced by the waiting/failed card.
+ */
+const handleRunOnDevice = async (device: { id: number; name: string }) => {
+  const prompt = message.value.trim()
+  if (!prompt) {
+    warning(t('config.desktop.run.needPrompt'))
+    return
+  }
+
+  const skill = (
+    await dialog.prompt({
+      title: t('config.desktop.run.skillTitle'),
+      message: t('config.desktop.run.skillMessage', { name: device.name }),
+      placeholder: t('config.desktop.run.skillPlaceholder'),
+      confirmText: t('config.desktop.run.action'),
+    })
+  )?.trim()
+  if (!skill) return
+
+  if (!/^[a-z0-9-]{1,64}$/.test(skill)) {
+    showError(t('config.desktop.run.invalidSkill'))
+    return
+  }
+
+  try {
+    const { jobId } = await desktopApi.enqueueJob({
+      deviceId: device.id,
+      skill,
+      prompt,
+      chatId: chatsStore.activeChatId,
+    })
+    desktopJobs.value.push({ id: jobId, deviceName: device.name })
+    message.value = ''
+    success(t('config.desktop.run.sent', { name: device.name }))
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('config.desktop.run.enqueueFailed'))
+  }
+}
+
+const dismissDesktopJob = (jobId: number) => {
+  desktopJobs.value = desktopJobs.value.filter((j) => j.id !== jobId)
+}
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const {
+  buildSummarizeInstruction,
+  defaultLanguage,
+  languageOptions: summarizeLanguageOptions,
+  lengthOptions: summarizeLengthOptions,
+} = useSummarizeTool()
+
+const summarizeArmed = ref(false)
+const summarizeLength = ref<SummarizeLength>('medium')
+const summarizeLanguage = ref(defaultLanguage())
+const lastSummarizeInstruction = ref('')
+
+const summarizeLengthOptionKey = (length: SummarizeLength): string =>
+  `chatInput.tools.summarizeLength${length.charAt(0).toUpperCase()}${length.slice(1)}`
+
+const applySummarizeInstruction = () => {
+  const instruction = buildSummarizeInstruction({
+    length: summarizeLength.value,
+    language: summarizeLanguage.value,
+  })
+  message.value = instruction
+  lastSummarizeInstruction.value = instruction
+}
+
+const prefillSummarizeInstructionIfEmpty = () => {
+  if (!summarizeArmed.value) {
+    return
+  }
+  if (message.value.trim() && message.value !== lastSummarizeInstruction.value) {
+    return
+  }
+  applySummarizeInstruction()
+}
+
+const disarmSummarize = (options?: { clearPrefill?: boolean }) => {
+  if (options?.clearPrefill && message.value === lastSummarizeInstruction.value) {
+    message.value = ''
+  }
+  summarizeArmed.value = false
+  lastSummarizeInstruction.value = ''
+}
+
+const armSummarize = () => {
+  if (isGuestMode.value) {
+    emit('guestFeatureGate', 'attach')
+    return
+  }
+  summarizeArmed.value = true
+  if (uploadedFiles.value.length > 0) {
+    prefillSummarizeInstructionIfEmpty()
+    return
+  }
+  handlePlusAttach()
+}
+
+watch(
+  () => uploadedFiles.value.length,
+  (count, prev) => {
+    if (!summarizeArmed.value) {
+      return
+    }
+    if (count === 0 && (prev ?? 0) > 0) {
+      disarmSummarize({ clearPrefill: true })
+      return
+    }
+    if (count > 0) {
+      prefillSummarizeInstructionIfEmpty()
+    }
+  }
+)
+
+watch([summarizeLength, summarizeLanguage], () => {
+  if (!summarizeArmed.value || uploadedFiles.value.length === 0) {
+    return
+  }
+  if (!message.value.trim() || message.value === lastSummarizeInstruction.value) {
+    applySummarizeInstruction()
+  }
+})
 
 /**
  * Get the speech recognition language code from the current UI locale.
@@ -512,7 +801,8 @@ const speechLanguage = computed(() => {
 
 /**
  * Determine if microphone button should be shown.
- * Show when: Web Speech API is supported OR any backend speech-to-text is available.
+ * Show when: Web Speech API is usable (supported and not vetoed by
+ * WEB_SPEECH_ENABLED) OR any backend speech-to-text is available.
  * Backend speech-to-text includes: local Whisper.cpp OR API models (Groq/OpenAI Whisper).
  *
  * MOBILE-APP SEAM: in the app the Web Speech API does not count (see
@@ -521,10 +811,10 @@ const speechLanguage = computed(() => {
  */
 const showMicrophoneButton = computed(() => {
   const speechToTextAvailable = configStore.speech.speechToTextAvailable
-  const webSpeechSupported = isWebSpeechSupported() && !isNativeApp()
 
-  // Show if either browser API or backend transcription is available
-  return webSpeechSupported || speechToTextAvailable
+  // Show if either browser API (when the deployment allows it) or backend
+  // transcription is available
+  return useWebSpeech.value || speechToTextAvailable
 })
 
 /**
@@ -546,7 +836,10 @@ const textareaPaddingRightPx = computed(() => {
  * Determine which speech recognition method to use.
  * Priority: Web Speech API FIRST (real-time streaming), Whisper as fallback.
  *
- * - Web Speech API: Real-time streaming, works in Chrome/Edge/Safari
+ * - Web Speech API: Real-time streaming, works in Chrome/Edge/Safari. Streams
+ *   the audio to the browser vendor's cloud, so deployments can veto it with
+ *   WEB_SPEECH_ENABLED=false (air-gapped / data residency); Chromium builds
+ *   without Google API keys also advertise it without ever returning text.
  * - Whisper backend: Record-then-transcribe, works everywhere
  *
  * MOBILE-APP SEAM: never in the app. `isWebSpeechSupported()` only checks that
@@ -558,8 +851,27 @@ const textareaPaddingRightPx = computed(() => {
  * triggers the real iOS/Android permission prompt.
  */
 const useWebSpeech = computed(() => {
-  return isWebSpeechSupported() && !isNativeApp()
+  return isWebSpeechSupported() && !isNativeApp() && configStore.speech.webSpeechEnabled
 })
+
+/**
+ * Whether to show the animated "recording / transcribing" strip.
+ *
+ * Scoped to the record-then-transcribe path, which is what the native app
+ * always uses (see the seam on `useWebSpeech`) and what any browser without
+ * the Web Speech API falls back to. On that path no text reaches the textarea
+ * until the upload completes, so a live microphone is otherwise indistinguishable
+ * from a dead one. The Web Speech path already streams words in as it hears them.
+ */
+const showVoiceActivity = computed(
+  () => !useWebSpeech.value && (isRecording.value || transcribing.value)
+)
+
+const voiceActivityLabel = computed(() =>
+  transcribing.value
+    ? t('chatInput.voiceStatus.transcribing')
+    : t('chatInput.voiceStatus.recording')
+)
 
 // Input persistence - auto-save with proper debouncing. Disabled during an
 // incognito session: drafts must never survive in localStorage.
@@ -578,6 +890,17 @@ const { clearAttachments: clearPersistedAttachments } = useAttachmentPersist(
   computed(() => incognitoStore.active)
 )
 
+const { clearPastedBlocks: clearPersistedBlocks } = usePastedBlocksPersist(
+  pastedBlocks,
+  'chat',
+  computed(() => chatsStore.activeChatId),
+  computed(() => incognitoStore.active)
+)
+
+const editingPastedBlock = computed(
+  () => pastedBlocks.value.find((block) => block.id === editingPastedBlockId.value) ?? null
+)
+
 const emit = defineEmits<{
   send: [
     message: string,
@@ -590,6 +913,7 @@ const emit = defineEmits<{
       ragGroupKey?: string
       quotedText?: string
       quotedMessageId?: number
+      language?: string
     },
   ]
   stop: []
@@ -601,21 +925,31 @@ const canSend = computed(() => {
   const trimmedMessage = message.value.trim()
   const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0
+  const hasPastedBlocks = pastedBlocks.value.length > 0
   const filesReady = uploadedFiles.value.every((f) => !f.processing)
+  const readyFileCount = uploadedFiles.value.filter((f) => !f.processing).length
+
+  if (summarizeArmed.value && readyFileCount === 0) {
+    return false
+  }
 
   // A tool badge (search/image/video) needs a query or description to act on,
   // so an active tool with an empty textarea (and no files) can't be sent.
-  if (activeTool.value && !hasMessage && !hasFiles) {
+  if (activeTool.value && !hasMessage && !hasFiles && !hasPastedBlocks) {
     return false
   }
 
-  // Prevent sending if only a raw command is typed (e.g., just "/pic" without arguments)
+  // Prevent sending if only a raw command is typed (e.g., just "/pic" without arguments).
+  // Commands that take no arguments (e.g. /help) are sendable as-is.
   const isOnlyCommand = trimmedMessage.startsWith('/') && !trimmedMessage.includes(' ')
-  if (isOnlyCommand && !hasFiles) {
-    return false
+  if (isOnlyCommand && !hasFiles && !hasPastedBlocks) {
+    const cmd = commandsStore.getCommand(trimmedMessage.slice(1))
+    if (!cmd || cmd.requiresArgs) {
+      return false
+    }
   }
 
-  return (hasMessage || hasFiles) && filesReady && !uploading.value
+  return (hasMessage || hasFiles || hasPastedBlocks) && filesReady && !uploading.value
 })
 
 const currentChatModel = computed(() => {
@@ -768,7 +1102,7 @@ const sendMessage = () => {
   // ChatView/backend contract stays identical to the old slash-command flow.
   // The textarea only holds the query; ChatView strips the prefix for display
   // and uses the webSearch flag for /search (see handleSendMessage).
-  const query = message.value
+  const query = wrapPastedBlocks(message.value, pastedBlocks.value)
   let messageToSend = query
   if (activeTool.value === 'pic' || activeTool.value === 'vid') {
     messageToSend = `/${activeTool.value} ${query}`.trim()
@@ -785,10 +1119,14 @@ const sendMessage = () => {
     ragGroupKey: selectedGroupKey.value || undefined,
     quotedText: props.quote?.text || undefined,
     quotedMessageId: props.quote?.messageId || undefined,
+    ...(summarizeArmed.value ? { language: summarizeLanguage.value } : {}),
   }
   emit('send', messageToSend, options)
+  disarmSummarize()
   message.value = ''
   uploadedFiles.value = []
+  pastedBlocks.value = []
+  editingPastedBlockId.value = null
   plusMenuOpen.value = false
   paletteVisible.value = false
   mentionPaletteVisible.value = false
@@ -803,6 +1141,12 @@ const sendMessage = () => {
   // Clear persisted input after successful send
   clearPersistedInput()
   clearPersistedAttachments()
+  clearPersistedBlocks()
+
+  // Sending via the button moves focus onto that button, so the next message
+  // would need a click back into the composer. Refocus synchronously — inside
+  // the click gesture — so the mobile keyboard stays open as well.
+  textareaRef.value?.focus()
 }
 
 const toggleThinking = () => {
@@ -907,7 +1251,12 @@ const handleKeyDown = (e: KeyboardEvent) => {
 }
 
 const removeFile = (index: number) => {
+  const file = uploadedFiles.value[index]
+  if (!file) return
   uploadedFiles.value.splice(index, 1)
+  if (file.staged && file.file_id > 0) {
+    void deleteFile(file.file_id).catch(() => {})
+  }
 }
 
 const triggerFileUpload = () => {
@@ -971,61 +1320,114 @@ const handleDragLeave = () => {
   isDragging.value = false
 }
 
-// Clipboard paste handler for images and files
+const isComposerTextarea = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+  if (target instanceof HTMLTextAreaElement && target.closest('[data-testid="comp-chat-input"]')) {
+    return true
+  }
+  return Boolean(
+    target.closest('[data-testid="input-chat-message"], [data-testid="input-textarea"]')
+  )
+}
+
+const addPastedBlock = (content: string) => {
+  pastedBlocks.value.push({
+    id: createPastedBlockId(),
+    content,
+  })
+  triggerHapticImpact('light')
+}
+
+const removePastedBlock = (id: string) => {
+  pastedBlocks.value = pastedBlocks.value.filter((block) => block.id !== id)
+  if (editingPastedBlockId.value === id) {
+    editingPastedBlockId.value = null
+  }
+  triggerHapticImpact('light')
+}
+
+const openPastedBlock = (id: string) => {
+  editingPastedBlockId.value = id
+}
+
+const closePastedBlock = () => {
+  editingPastedBlockId.value = null
+  if (typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches) {
+    textareaRef.value?.focus()
+  }
+}
+
+const savePastedBlock = (content: string) => {
+  const id = editingPastedBlockId.value
+  if (!id) {
+    return
+  }
+  if (!content.trim()) {
+    removePastedBlock(id)
+    closePastedBlock()
+    return
+  }
+  pastedBlocks.value = pastedBlocks.value.map((block) =>
+    block.id === id ? { ...block, content } : block
+  )
+  closePastedBlock()
+}
+
+// Clipboard paste handler for images, files, and large text
 const handlePaste = async (event: ClipboardEvent) => {
-  if (props.isGuestMode) {
-    const items = event.clipboardData?.items
-    if (items) {
-      for (const item of items) {
-        if (item.type.startsWith('image/') || item.kind === 'file') {
-          event.preventDefault()
-          emit('guestFeatureGate', 'files')
-          return
+  const items = event.clipboardData?.items
+
+  if (items) {
+    const filesToUpload: File[] = []
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+          const extension = item.type.split('/')[1] || 'png'
+          const namedFile = new File([file], `pasted-image-${timestamp}.${extension}`, {
+            type: file.type,
+          })
+          filesToUpload.push(namedFile)
+        }
+      } else if (item.kind === 'file') {
+        const file = item.getAsFile()
+        if (file) {
+          filesToUpload.push(file)
         }
       }
     }
+
+    if (filesToUpload.length > 0) {
+      event.preventDefault()
+      if (props.isGuestMode) {
+        emit('guestFeatureGate', 'files')
+        return
+      }
+      try {
+        await uploadFiles(filesToUpload)
+        success(t('chatInput.filesPasted', { count: filesToUpload.length }))
+      } catch {
+        showError(t('chatInput.uploadError'))
+      }
+      return
+    }
+  }
+
+  const pastedText = event.clipboardData?.getData('text/plain') ?? ''
+  if (!pastedText || !shouldBecomeBlock(pastedText)) {
     return
   }
 
-  const items = event.clipboardData?.items
-  if (!items) return
-
-  const filesToUpload: File[] = []
-
-  for (const item of items) {
-    // Handle pasted images (screenshots, copied images)
-    if (item.type.startsWith('image/')) {
-      const file = item.getAsFile()
-      if (file) {
-        // Generate a meaningful filename for pasted images
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-        const extension = item.type.split('/')[1] || 'png'
-        const namedFile = new File([file], `pasted-image-${timestamp}.${extension}`, {
-          type: file.type,
-        })
-        filesToUpload.push(namedFile)
-      }
-    }
-    // Handle pasted files (from file manager)
-    else if (item.kind === 'file') {
-      const file = item.getAsFile()
-      if (file) {
-        filesToUpload.push(file)
-      }
-    }
+  if (!isComposerTextarea(event.target) && !isComposerTextarea(document.activeElement)) {
+    return
   }
 
-  if (filesToUpload.length > 0) {
-    // Prevent default paste behavior for files/images
-    event.preventDefault()
-    try {
-      await uploadFiles(filesToUpload)
-      success(t('chatInput.filesPasted', { count: filesToUpload.length }))
-    } catch {
-      showError(t('chatInput.uploadError'))
-    }
-  }
-  // If no files, let the default paste behavior handle text
+  event.preventDefault()
+  addPastedBlock(pastedText)
 }
 
 const uploadFiles = async (files: File[]) => {
@@ -1047,6 +1449,7 @@ const uploadFiles = async (files: File[]) => {
       file_type: file.name.split('.').pop() || 'unknown',
       name: file.name,
       processing: true,
+      staged: true,
     }
     uploadedFiles.value.push(tempFile)
 
@@ -1071,6 +1474,9 @@ const uploadFiles = async (files: File[]) => {
         if (index !== -1) {
           uploadedFiles.value.splice(index, 1)
         }
+        if (result.file_id) {
+          void deleteFile(result.file_id).catch(() => {})
+        }
 
         const errorKey =
           result.extraction_error === 'audio_transcription_failed'
@@ -1087,6 +1493,7 @@ const uploadFiles = async (files: File[]) => {
           filename: result.filename,
           file_type: result.file_type,
           processing: false,
+          staged: true,
         }
       }
 
@@ -1162,7 +1569,8 @@ async function loadKnowledgeGroups(): Promise<void> {
 function applyFolderFromQuery(): void {
   const folder = route.query.folder
   if (typeof folder !== 'string' || folder === '') return
-  if (knowledgeGroups.value.some((g) => g.name === folder)) {
+  const isSharedPicker = folder.startsWith('shared:')
+  if (isSharedPicker || knowledgeGroups.value.some((g) => g.name === folder)) {
     selectedGroupKey.value = folder
   }
   const rest = { ...route.query }
@@ -1185,7 +1593,7 @@ watch(
 watch(
   () => route.query.folder,
   (folder) => {
-    if (typeof folder === 'string' && folder !== '' && knowledgeGroups.value.length > 0) {
+    if (typeof folder === 'string' && folder !== '') {
       applyFolderFromQuery()
     }
   }
@@ -1193,8 +1601,9 @@ watch(
 
 /**
  * Toggle speech recording using hybrid approach.
- * Uses Web Speech API for real-time transcription when available and whisperEnabled=false.
- * Falls back to Whisper.cpp backend recording when whisperEnabled=true.
+ * Uses Web Speech API for real-time transcription when the browser has it and
+ * the deployment allows it (see `useWebSpeech`), otherwise records for the
+ * server-side transcription path.
  */
 const toggleRecording = async () => {
   if (isRecording.value) {
@@ -1207,9 +1616,15 @@ const toggleRecording = async () => {
       webSpeechService.value = null
     }
     if (audioRecorder.value) {
+      // Do NOT clear `isRecording` here: MediaRecorder's onstop event fires
+      // asynchronously, so a synchronous clear would unmount the activity
+      // strip for a frame before `transcribeAudio` sets `transcribing`. The
+      // recorder's onStop/onError callbacks and transcribeAudio's `finally`
+      // own the flag from this point on.
       audioRecorder.value.stopRecording()
+    } else {
+      isRecording.value = false
     }
-    isRecording.value = false
     return
   }
 
@@ -1372,6 +1787,12 @@ const transcribeAudio = async (audioBlob: Blob) => {
     return
   }
 
+  // Set before the first await so the activity strip switches straight from
+  // "recording" to "transcribing". This only avoids a blink because the stop
+  // tap in `toggleRecording` deliberately leaves `isRecording` true until the
+  // recorder's callbacks run, and AudioRecorder invokes this callback before
+  // its own onStop — so the strip is still mounted when `transcribing` is set.
+  transcribing.value = true
   uploading.value = true
 
   try {
@@ -1380,11 +1801,15 @@ const transcribeAudio = async (audioBlob: Blob) => {
     const result = await chatApi.transcribeAudio(audioBlob, undefined, {
       incognito: incognitoStore.active,
     })
-    if (incognitoStore.active) {
+    if (incognitoStore.active && result.file_id) {
       incognitoStore.registerFile(result.file_id)
     }
 
-    if (result.text) {
+    if (result.extraction_error === 'audio_transcription_failed') {
+      // Same upload-file endpoint as attachments: empty text here means STT
+      // is missing or failed, not "no speech" (issue #1908).
+      showError(t('chatInput.dictationSttFailed'))
+    } else if (result.text) {
       message.value += (message.value ? ' ' : '') + result.text
       nextTick(() => textareaRef.value?.focus())
     } else {
@@ -1396,6 +1821,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
     showError(t('chatInput.transcriptionFailed', { error: error.message || 'Unknown error' }))
   } finally {
     isRecording.value = false
+    transcribing.value = false
     uploading.value = false
   }
 }
@@ -1483,6 +1909,23 @@ const submitText = (text: string) => {
   nextTick(() => sendMessage())
 }
 
+/**
+ * MOBILE-APP SEAM: start voice dictation for the iOS Shortcuts "Start
+ * dictation" action. No-op when already recording. Returns false (and a
+ * toast) when this server has no speech-to-text path.
+ */
+const startDictation = async (): Promise<boolean> => {
+  if (isRecording.value) {
+    return true
+  }
+  if (!showMicrophoneButton.value) {
+    showError(t('chatInput.dictationUnavailable'))
+    return false
+  }
+  await toggleRecording()
+  return isRecording.value
+}
+
 // Expose textarea ref, uploadFiles, setInputText, submitText for parent component
 // ATTENTION: needs to be typed when using vue-tsc -b
 defineExpose<{
@@ -1490,10 +1933,106 @@ defineExpose<{
   uploadFiles: (files: File[]) => Promise<void>
   setInputText: (text: string) => void
   submitText: (text: string) => void
+  startDictation: () => Promise<boolean>
+  armSummarize: () => void
 }>({
   textareaRef,
   uploadFiles,
   setInputText,
   submitText,
+  startDictation,
+  armSummarize,
 })
 </script>
+
+<style scoped>
+/*
+ * Voice activity strip for the record-then-transcribe path.
+ *
+ * Three cues at once so the state reads at a glance: a pulsing red dot (the
+ * universal "we are recording" mark), a four-bar level meter that keeps moving
+ * so a live microphone never looks frozen, and the label. Colors come from the
+ * shared status tokens, which covers light, dark and the V2 glass design
+ * without a second definition. Follows the `.typing-dot` pattern in
+ * ChatMessage.vue.
+ */
+.voice-activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--txt-secondary);
+}
+
+.voice-activity__pulse {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--status-error);
+  animation: voice-pulse 1.4s ease-in-out infinite;
+}
+
+.voice-activity__meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+
+.voice-activity__bar {
+  width: 3px;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--brand);
+  animation: voice-level 1s ease-in-out infinite;
+}
+
+/* Staggered so the meter sweeps left-to-right instead of pumping in unison. */
+.voice-activity__bar:nth-child(1) {
+  animation-delay: -0.9s;
+}
+.voice-activity__bar:nth-child(2) {
+  animation-delay: -0.6s;
+}
+.voice-activity__bar:nth-child(3) {
+  animation-delay: -0.3s;
+}
+
+@keyframes voice-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes voice-level {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* The motion is decoration — the label and the live region carry the meaning. */
+@media (prefers-reduced-motion: reduce) {
+  .voice-activity__pulse,
+  .voice-activity__bar {
+    animation: none;
+  }
+  .voice-activity__bar {
+    transform: scaleY(0.7);
+  }
+}
+</style>

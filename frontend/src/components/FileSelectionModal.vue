@@ -58,7 +58,7 @@
                 type="file"
                 multiple
                 class="hidden"
-                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.md,.csv,.xlsx,.xls,.pptx,.ppt,.odt,.ods,.ics"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.rtf,.txt,.md,.csv,.xlsx,.xls,.pptx,.ppt,.odt,.ods,.odp,.pages,.numbers,.key,.ics,.jar"
                 data-testid="input-file-selection-upload"
                 @change="handleFileUpload"
               />
@@ -194,7 +194,7 @@
                   class="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center"
                 >
                   <img
-                    v-if="isImageFile(file.file_type)"
+                    v-if="isImageFile(file.file_type) && getDownloadUrl(file.id)"
                     :src="getDownloadUrl(file.id)"
                     :alt="file.filename"
                     class="w-full h-full object-cover"
@@ -208,7 +208,10 @@
                   />
                   <Icon
                     :icon="getFileIcon(file.file_type)"
-                    :class="['w-6 h-6 txt-secondary', isImageFile(file.file_type) ? 'hidden' : '']"
+                    :class="[
+                      'w-6 h-6 txt-secondary',
+                      isImageFile(file.file_type) && getDownloadUrl(file.id) ? 'hidden' : '',
+                    ]"
                   />
                 </div>
 
@@ -247,7 +250,10 @@
                   @click.stop
                 >
                   <button
-                    v-if="!['vectorized', 'extracting', 'vectorizing'].includes(file.status)"
+                    v-if="
+                      !['vectorized', 'extracting', 'vectorizing'].includes(file.status) &&
+                      !skipsExtraction(extensionOf(file.filename) || file.file_type)
+                    "
                     class="p-1 sm:p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
                     :title="$t('fileSelection.reVectorize')"
                     data-testid="btn-file-revectorize"
@@ -362,7 +368,9 @@ import filesService, {
   UploadBlockedError,
   UploadFailedError,
 } from '@/services/filesService'
+import { extensionOf, skipsExtraction } from '@/services/filePreview'
 import { getApiBaseUrl } from '@/services/api/httpClient'
+import { useMediaSrc } from '@/services/api/mediaAuth'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
@@ -822,8 +830,12 @@ const isImageFile = (fileType: string): boolean => {
   return type.includes('image') || /jpg|jpeg|png|gif|webp/.test(type)
 }
 
+// Used for the bare <img> thumbnail: a no-op on web, on native it appends a
+// read-only media token because <img> can't send auth headers
+// (MOBILE-APP SEAM, see mediaAuth.ts).
+const { mediaSrc } = useMediaSrc()
 const getDownloadUrl = (fileId: number): string => {
-  return `${getApiBaseUrl()}/api/v1/files/${fileId}/download`
+  return mediaSrc(`${getApiBaseUrl()}/api/v1/files/${fileId}/download`)
 }
 
 const getFileIcon = (fileType: string): string => {

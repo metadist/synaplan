@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Credential;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
+use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\EncryptionService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -31,12 +32,17 @@ class HiggsfieldCredentialResolverTest extends TestCase
 
     private function resolver(string $platformKey = '', string $platformSecret = ''): HiggsfieldCredentialResolver
     {
+        // The instance pair comes from ProviderKeyStore (Models & keys / env
+        // bootstrap); the store itself is covered by ProviderKeyStoreTest.
+        $store = $this->createStub(ProviderKeyStore::class);
+        $store->method('getKey')->willReturn('' === $platformKey ? null : $platformKey);
+        $store->method('getSecret')->willReturn('' === $platformSecret ? null : $platformSecret);
+
         return new HiggsfieldCredentialResolver(
             $this->configRepository,
             $this->encryption,
             new NullLogger(),
-            $platformKey,
-            $platformSecret,
+            $store,
         );
     }
 

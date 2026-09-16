@@ -62,6 +62,30 @@ final readonly class OllamaModelInventory
         return $pulled;
     }
 
+    /**
+     * List every model pulled on the Ollama server, for the import preview.
+     *
+     * `ok = false` means the server was unreachable (no provider registered or
+     * the call threw); `ok = true` with an empty list means a reachable server
+     * that has nothing pulled. Not cached — import is a rare, explicit action
+     * and must see the live list.
+     *
+     * @return array{ok: bool, models: list<array{name: string, size: int, family: string}>}
+     */
+    public function listPulled(): array
+    {
+        $provider = $this->ollamaProvider();
+        if (null === $provider) {
+            return ['ok' => false, 'models' => []];
+        }
+
+        try {
+            return ['ok' => true, 'models' => $provider->listPulledModels()];
+        } catch (\Throwable) {
+            return ['ok' => false, 'models' => []];
+        }
+    }
+
     private function ollamaProvider(): ?OllamaProvider
     {
         foreach ($this->providerRegistry->getUniqueProviders() as $provider) {

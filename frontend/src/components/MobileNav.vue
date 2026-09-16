@@ -2,8 +2,10 @@
   <!--
     Mobile push-drawer content (§4.3): primary navigation on phones. Rendered
     underneath the sliding content by MainLayout. A single scroll column holds
-    the primary buttons, the expandable "More" section and the paginated chat
-    history (infinite scroll). Hidden on md+ (desktop uses the SidebarV2 rail).
+    the primary buttons (New chat, History, Sources, More), the expandable
+    "More" section and the paginated chat history (infinite scroll). History
+    jumps to the list below so the control sits in the same place as the
+    desktop rail. Hidden on md+ (desktop uses the SidebarV2 rail).
   -->
   <div class="v2-drawer-nav flex flex-col h-full" data-testid="nav-mobile-drawer-content">
     <!-- Clearance for the fixed toggle button + safe area -->
@@ -31,6 +33,16 @@
           />
           <PlusIcon v-else class="w-5 h-5" aria-hidden="true" />
           <span class="flex-1 text-left">{{ $t('chat.newChat') }}</span>
+        </button>
+
+        <button
+          class="v2-drawer-item"
+          :class="historyActive && 'v2-drawer-item--active'"
+          data-testid="btn-mobile-nav-history"
+          @click="handleHistoryClick"
+        >
+          <ClockIcon class="w-5 h-5" aria-hidden="true" />
+          <span class="flex-1 text-left">{{ $t('nav.history') }}</span>
         </button>
 
         <button
@@ -87,34 +99,100 @@
                 </button>
 
                 <div v-if="expandedSection === item.key && item.children" class="pl-4 pb-1">
-                  <router-link
-                    v-for="child in item.children"
-                    :key="child.key"
-                    :to="child.path"
-                    class="v2-drawer-child"
-                    :class="
-                      route.path === child.path
-                        ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
-                        : 'txt-secondary'
-                    "
-                    :data-nav-active="route.path === child.path ? 'true' : undefined"
-                    :data-testid="`link-mobile-more-${child.key}`"
-                    @click="closeDrawer"
+                  <!-- Same hierarchy as the desktop flyout: grouped items
+                       (Manage) nest under a second accordion; flat lists
+                       (Operate / Plugins) stay one tap away. -->
+                  <template
+                    v-for="(section, sIdx) in groupNavChildren(item.children)"
+                    :key="section.key ?? section.group ?? sIdx"
                   >
-                    <span
-                      class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      :class="
-                        route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'
-                      "
-                    />
-                    <span class="flex-1 truncate">{{ child.label }}</span>
-                    <span
-                      v-if="child.badge"
-                      class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
-                    >
-                      {{ child.badge }}
-                    </span>
-                  </router-link>
+                    <template v-if="section.key">
+                      <button
+                        type="button"
+                        class="v2-drawer-child w-full"
+                        :class="
+                          expandedGroup === section.key || isGroupCurrent(item.path, section)
+                            ? 'text-[var(--brand)] font-medium'
+                            : 'txt-secondary'
+                        "
+                        :aria-expanded="expandedGroup === section.key"
+                        :data-testid="`btn-mobile-more-group-${section.key}`"
+                        @click="toggleGroup(section.key)"
+                      >
+                        <span class="flex-1 text-left truncate">{{ section.group }}</span>
+                        <Icon
+                          icon="mdi:chevron-down"
+                          class="w-4 h-4 flex-shrink-0 transition-transform"
+                          :class="expandedGroup === section.key && 'rotate-180'"
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <div v-if="expandedGroup === section.key" class="pl-3">
+                        <router-link
+                          v-for="child in section.items"
+                          :key="child.key"
+                          :to="child.path"
+                          class="v2-drawer-child"
+                          :class="
+                            route.path === child.path
+                              ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                              : 'txt-secondary'
+                          "
+                          :data-nav-active="route.path === child.path ? 'true' : undefined"
+                          :data-testid="`link-mobile-more-${child.key}`"
+                          @click="closeDrawer"
+                        >
+                          <span
+                            class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            :class="
+                              route.path === child.path
+                                ? 'bg-[var(--brand)]'
+                                : 'bg-current opacity-20'
+                            "
+                          />
+                          <span class="flex-1 truncate">{{ child.label }}</span>
+                          <span
+                            v-if="child.badge"
+                            class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+                          >
+                            {{ child.badge }}
+                          </span>
+                        </router-link>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <router-link
+                        v-for="child in section.items"
+                        :key="child.key"
+                        :to="child.path"
+                        class="v2-drawer-child"
+                        :class="
+                          route.path === child.path
+                            ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                            : 'txt-secondary'
+                        "
+                        :data-nav-active="route.path === child.path ? 'true' : undefined"
+                        :data-testid="`link-mobile-more-${child.key}`"
+                        @click="closeDrawer"
+                      >
+                        <span
+                          class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          :class="
+                            route.path === child.path
+                              ? 'bg-[var(--brand)]'
+                              : 'bg-current opacity-20'
+                          "
+                        />
+                        <span class="flex-1 truncate">{{ child.label }}</span>
+                        <span
+                          v-if="child.badge"
+                          class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+                        >
+                          {{ child.badge }}
+                        </span>
+                      </router-link>
+                    </template>
+                  </template>
                 </div>
               </div>
 
@@ -131,6 +209,7 @@
 
                 <template v-if="isGuestMode">
                   <router-link
+                    v-if="configStore.auth.registrationEnabled"
                     to="/register"
                     class="v2-drawer-account font-medium"
                     style="color: var(--brand)"
@@ -175,6 +254,44 @@
                     <span>{{ $t('nav.profile') }}</span>
                   </button>
                   <button
+                    v-if="iamSharingEnabled"
+                    class="v2-drawer-account"
+                    :class="
+                      isPathActive('/chats/incoming') ? 'v2-drawer-account--active' : 'txt-primary'
+                    "
+                    :data-nav-active="isPathActive('/chats/incoming') ? 'true' : undefined"
+                    data-testid="btn-mobile-more-incoming"
+                    @click="handleNavigate('/chats/incoming')"
+                  >
+                    <span class="relative flex-shrink-0">
+                      <InboxArrowDownIcon class="w-5 h-5" />
+                      <span
+                        v-if="incomingStore.hasNew"
+                        class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--status-error)]"
+                        data-testid="dot-mobile-more-incoming-new"
+                      />
+                    </span>
+                    <span class="flex-1 truncate text-left">{{
+                      incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
+                    }}</span>
+                    <span
+                      v-if="incomingStore.hasNew"
+                      class="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+                      >{{ incomingStore.unseenCount }}</span
+                    >
+                  </button>
+                  <button
+                    v-if="iamGroupsEnabled"
+                    class="v2-drawer-account"
+                    :class="isPathActive('/groups') ? 'v2-drawer-account--active' : 'txt-primary'"
+                    :data-nav-active="isPathActive('/groups') ? 'true' : undefined"
+                    data-testid="btn-mobile-more-my-groups"
+                    @click="handleNavigate('/groups')"
+                  >
+                    <UserGroupIcon class="w-5 h-5" />
+                    <span>{{ $t('nav.myGroups') }}</span>
+                  </button>
+                  <button
                     v-if="isMemoryServiceAvailable"
                     class="v2-drawer-account"
                     :class="[
@@ -207,13 +324,15 @@
                   </button>
                   <button
                     class="v2-drawer-account"
-                    :class="isPathActive('/settings') ? 'v2-drawer-account--active' : 'txt-primary'"
-                    :data-nav-active="isPathActive('/settings') ? 'true' : undefined"
-                    data-testid="btn-mobile-more-preferences"
-                    @click="handleNavigate('/settings')"
+                    :class="
+                      isPathActive('/feedbacks') ? 'v2-drawer-account--active' : 'txt-primary'
+                    "
+                    :data-nav-active="isPathActive('/feedbacks') ? 'true' : undefined"
+                    data-testid="btn-mobile-more-feedback"
+                    @click="handleNavigate('/feedbacks')"
                   >
-                    <Cog6ToothIcon class="w-5 h-5" />
-                    <span>{{ $t('nav.preferences') }}</span>
+                    <Icon icon="mdi:comment-quote-outline" class="w-5 h-5" />
+                    <span>{{ $t('pageTitles.feedback') }}</span>
                   </button>
                   <button
                     v-if="
@@ -247,16 +366,33 @@
                     <RocketLaunchIcon class="w-5 h-5" />
                     <span>{{ $t('nav.upgrade') }}</span>
                   </button>
-                  <button
-                    v-if="!isImpersonating"
-                    class="v2-drawer-account text-red-500 dark:text-red-400"
-                    data-testid="btn-mobile-more-logout"
-                    @click="handleLogout"
-                  >
-                    <ArrowRightOnRectangleIcon class="w-5 h-5" />
-                    <span>{{ $t('settings.logout') }}</span>
-                  </button>
                 </template>
+
+                <!--
+                  Preferences holds the language and the theme, both stored on
+                  the device rather than on the account, so it stays outside the
+                  guest/authenticated split and is offered to everyone.
+                -->
+                <button
+                  class="v2-drawer-account"
+                  :class="isPathActive('/settings') ? 'v2-drawer-account--active' : 'txt-primary'"
+                  :data-nav-active="isPathActive('/settings') ? 'true' : undefined"
+                  data-testid="btn-mobile-more-preferences"
+                  @click="handleNavigate('/settings')"
+                >
+                  <Cog6ToothIcon class="w-5 h-5" />
+                  <span>{{ $t('nav.preferences') }}</span>
+                </button>
+
+                <button
+                  v-if="!isGuestMode && !isImpersonating"
+                  class="v2-drawer-account text-red-500 dark:text-red-400"
+                  data-testid="btn-mobile-more-logout"
+                  @click="handleLogout"
+                >
+                  <ArrowRightOnRectangleIcon class="w-5 h-5" />
+                  <span>{{ $t('settings.logout') }}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -264,7 +400,12 @@
       </nav>
 
       <!-- Chat history (paginated, infinite scroll) -->
-      <div class="mt-4 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+      <div
+        id="section-mobile-history"
+        ref="historySection"
+        class="mt-4 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]"
+        data-testid="section-mobile-history"
+      >
         <p
           class="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider txt-secondary opacity-70"
         >
@@ -413,6 +554,14 @@
     @shared="chatsStore.loadChatHistory(true)"
     @unshared="chatsStore.loadChatHistory(true)"
   />
+  <ShareDialog
+    :is-open="iamShareOpen"
+    kind="conversation"
+    :resource-id="iamShareResourceId"
+    :resource-name="shareModalChatTitle"
+    @close="iamShareOpen = false"
+    @public-link="openPublicLinkFromIam"
+  />
 
   <!-- Guest hint popover -->
   <GuestHintPopover
@@ -430,6 +579,7 @@ import {
   Bars3Icon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
+  ClockIcon,
   Cog6ToothIcon,
   CreditCardIcon,
   FolderIcon,
@@ -437,6 +587,8 @@ import {
   RocketLaunchIcon,
   ServerIcon,
   UserCircleIcon,
+  UserGroupIcon,
+  InboxArrowDownIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import {
@@ -450,12 +602,21 @@ import { useConfigStore } from '../stores/config'
 import { useSidebarStore } from '../stores/sidebar'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { useAuth } from '../composables/useAuth'
-import { useNavItems, type NavItem } from '../composables/useNavItems'
+import {
+  useNavItems,
+  groupNavChildren,
+  isNavChildActive,
+  type NavChildGroup,
+  type NavItem,
+} from '../composables/useNavItems'
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
+import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
+import { useIncomingStore } from '@/stores/incoming'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 import ChatShareModal from './ChatShareModal.vue'
+import ShareDialog from './iam/ShareDialog.vue'
 
 const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
@@ -474,6 +635,7 @@ const { navItems, isItemActive, isGuestMode } = useNavItems()
 
 const moreExpanded = ref(false)
 const expandedSection = ref<string | null>(null)
+const expandedGroup = ref<string | null>(null)
 const isCreatingChat = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
@@ -481,15 +643,21 @@ const featureGateKey = ref('general')
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref('')
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
 const chatMenuOpenId = ref<number | null>(null)
 const chatMenuStyle = ref<Record<string, string>>({})
 
 const scrollContainer = ref<HTMLElement | null>(null)
+const historySection = ref<HTMLElement | null>(null)
 const historySentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
 const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
+const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const incomingStore = useIncomingStore()
 
 /** Everything that is not a primary button lands in the "More" section. */
 const moreSections = computed(() =>
@@ -497,6 +665,7 @@ const moreSections = computed(() =>
 )
 
 const filesActive = computed(() => route.path.startsWith('/files'))
+const historyActive = computed(() => route.path === '/' || route.path.startsWith('/chat'))
 const moreActive = computed(() => moreSections.value.some((item) => isItemActive(item)))
 
 // Account-block entries live inside the "More" panel but outside navItems, so
@@ -504,7 +673,15 @@ const moreActive = computed(() => moreSections.value.some((item) => isItemActive
 // row the user is on (Profile, Memories, Statistics, Preferences, Subscription).
 const isPathActive = (path: string) => route.path.startsWith(path)
 const accountActive = computed(() =>
-  ['/profile', '/memories', '/statistics', '/settings', '/subscription'].some(isPathActive)
+  [
+    '/profile',
+    '/groups',
+    '/memories',
+    '/statistics',
+    '/feedbacks',
+    '/settings',
+    '/subscription',
+  ].some(isPathActive)
 )
 
 // Widget sessions live in their dedicated view — never in the main history.
@@ -528,6 +705,16 @@ const handleNewChat = async () => {
       isCreatingChat.value = false
     }, 300)
   }
+}
+
+const handleHistoryClick = () => {
+  triggerHapticImpact('light')
+  // Collapse "More" so the history list sits directly under the primary
+  // buttons — the same place the desktop History rail item opens its sheet.
+  moreExpanded.value = false
+  nextTick(() => {
+    historySection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 const handleFilesClick = () => {
@@ -559,6 +746,14 @@ const handleSectionClick = async (item: NavItem) => {
   closeDrawer()
   await router.push(item.path)
 }
+
+const toggleGroup = (key: string) => {
+  triggerHapticImpact('light')
+  expandedGroup.value = expandedGroup.value === key ? null : key
+}
+
+const isGroupCurrent = (sectionPath: string, section: NavChildGroup): boolean =>
+  section.items.some((child) => isNavChildActive(child, sectionPath, route.path))
 
 const handleNavigate = async (path: string) => {
   closeDrawer()
@@ -683,12 +878,22 @@ const handleChatDelete = async (chatId: number) => {
   }
 }
 
+const openPublicLinkFromIam = () => {
+  iamShareOpen.value = false
+  shareModalOpen.value = true
+}
+
 const handleChatShare = (chatId: number) => {
   const chat = chatsStore.historyChats.find((c) => c.id === chatId)
   shareModalChatId.value = chatId
   shareModalChatTitle.value = chat?.title || 'Chat'
-  shareModalOpen.value = true
   chatMenuOpenId.value = null
+  if (isIamSharingEnabled()) {
+    iamShareResourceId.value = String(chatId)
+    iamShareOpen.value = true
+    return
+  }
+  shareModalOpen.value = true
 }
 
 const setupObserver = () => {
@@ -712,6 +917,16 @@ const syncExpansionToActiveRoute = () => {
   moreExpanded.value = activeSection !== undefined || accountActive.value
   expandedSection.value =
     activeSection?.children && activeSection.children.length > 0 ? activeSection.key : null
+  if (activeSection?.children) {
+    const match = groupNavChildren(activeSection.children).find(
+      (section) =>
+        section.key &&
+        section.items.some((child) => isNavChildActive(child, activeSection.path, route.path))
+    )
+    expandedGroup.value = match?.key ?? null
+  } else {
+    expandedGroup.value = null
+  }
 }
 
 // Bring the active (deepest) nav entry into view once the sections are expanded.

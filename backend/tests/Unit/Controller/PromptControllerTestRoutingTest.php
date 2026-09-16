@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Controller\PromptController;
 use App\Entity\Prompt;
 use App\Entity\User;
@@ -12,8 +13,11 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\File\FileUploadService;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\IamConfig;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlanValidator;
@@ -82,8 +86,13 @@ final class PromptControllerTestRoutingTest extends TestCase
                     new NullLogger(),
                 ),
                 $this->createMock(RateLimitService::class),
+                $this->alwaysOnStructuredOutputConfig(),
             ),
             $this->createMock(FileUploadService::class),
+            $this->createMock(AccessGate::class),
+            $this->createMock(IamConfig::class),
+            $this->createMock(UserRepository::class),
+            $this->createMock(ShareRepository::class),
         );
 
         $container = new Container();
@@ -94,6 +103,14 @@ final class PromptControllerTestRoutingTest extends TestCase
             }
         });
         $this->controller->setContainer($container);
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     private function makeUser(int $id = 1): User&MockObject

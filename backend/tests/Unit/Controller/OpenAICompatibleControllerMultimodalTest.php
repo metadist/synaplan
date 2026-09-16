@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\AI\Exception\ProviderException;
+use App\AI\OpenAI\OpenAiGatewayToolLoop;
 use App\AI\Service\AiFacade;
 use App\Controller\OpenAICompatibleController;
 use App\Entity\User;
 use App\Repository\ModelRepository;
+use App\Service\Api\OpenAiToolCallingGate;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -53,11 +55,14 @@ final class OpenAICompatibleControllerMultimodalTest extends TestCase
         ]);
 
         $metered = null;
+        $meteredAction = null;
         $rateLimits = $this->createMock(RateLimitService::class);
         $rateLimits->expects($this->once())
             ->method('recordUsage')
-            ->willReturnCallback(static function (User $u, string $action, array $metadata) use (&$metered): RecordedUsage {
+            ->willReturnCallback(static function (User $u, string $action, array $metadata) use (&$metered, &$meteredAction): RecordedUsage {
+                unset($u);
                 $metered = $metadata;
+                $meteredAction = $action;
 
                 return new RecordedUsage('0.000000', '0.000000', 0, 0, 0);
             });
@@ -66,6 +71,7 @@ final class OpenAICompatibleControllerMultimodalTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertIsArray($metered);
+        self::assertSame('MESSAGES', $meteredAction);
         self::assertIsString($metered['input_text']);
         self::assertSame("What is on this page?\n[image]", $metered['input_text']);
     }
@@ -162,6 +168,8 @@ final class OpenAICompatibleControllerMultimodalTest extends TestCase
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['isSessionSummaryEnabled' => false]),
             $this->createMock(MessageBusInterface::class),
             new NullLogger(),
+            $this->createMock(OpenAiToolCallingGate::class),
+            $this->createMock(OpenAiGatewayToolLoop::class),
         );
     }
 

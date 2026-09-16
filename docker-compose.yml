@@ -1,22 +1,155 @@
 # Synaplan - Standard Installation (Recommended)
 #
-# This is the default configuration for Synaplan with all features:
-# - Local Ollama AI models (gpt-oss:20b, bge-m3)
-# - Whisper audio transcription with model downloads
-# - All features enabled
-# - Download size: ~9GB
+# Cloud AI by default, exactly like a self-hosted install (deploy/compose.yaml):
+# - No AI weights are downloaded; add one provider key and chat works
+# - Whisper audio transcription (tiny model, ~75 MB)
+# - Download size: ~3 GB
 #
 # Usage:
 #   docker compose up -d
 #
-# To switch to minimal install (cloud AI only, smaller footprint):
-#   docker compose down
-#   docker compose -f docker-compose-minimal.yml up -d
+# To add local AI (Ollama + the bge-m3 embedding model, ~1 GB extra):
+#   COMPOSE_PROFILES=local-ai docker compose up -d
+# The same variable does the same thing in production -- see deploy/README.md.
+#
+# Lean by design -- core vs optional building blocks
+# ---------------------------------------------------
+# Core (always):     frontend, backend, worker, scheduler, db (MariaDB), redis
+# On by default,     qdrant (memories / vectors), centrifugo (live support),
+#   switchable:      tika (text extraction), whisper (audio transcription)
+#                    -> stop one:  docker compose stop <name>
+#                       (Synaplan keeps running; the matching feature hides)
+#                    -> keep it off across restarts: give it a profile in a
+#                       docker-compose.override.yml, e.g.
+#                         services: { qdrant: { profiles: [optional] } }
+# Opt-in profiles:   local-ai (Ollama + local embedding model, ~1 GB)
+#                    office   (Collabora CODE, office files, ~2 GB RAM)
+#                    tts      (Piper text-to-speech)
+#                    oidc     (Keycloak, SSO test realm)
+#                    -> COMPOSE_PROFILES=local-ai,office docker compose up -d
+# The boot page at http://localhost:5173 shows which blocks are running.
 #
 services:
+  # ----------------------------------------------------------------------------
+  # Startup notes (one-shot) - human-readable guidance for `docker compose up`.
+  #
+  # `docker compose up -d` detaches immediately and only prints container
+  # status lines, so this tiny container carries the "please wait" notes in
+  # its logs and reports READY once backend + frontend actually answer:
+  #
+  #   docker compose logs -f startup-notes
+  #
+  # With attached `docker compose up` (no -d) the notes appear directly in the
+  # terminal. restart: "no" makes it one-shot; every later `up` re-runs it,
+  # which then finishes in seconds because the stack is already healthy.
+  # ----------------------------------------------------------------------------
+  startup-notes:
+    image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    container_name: synaplan-startup-notes
+    command:
+      - sh
+      - -c
+      # Quoted heredoc = no shell expansion in the banner; $$ = compose escape.
+      - |
+        started=$$(date +%s)
+        elapsed() { echo $$(( $$(date +%s) - started )); }
+        cat <<'EOF'
+
+        ============================================================
+         Synaplan is starting
+        ============================================================
+         OPEN  http://localhost:5173  RIGHT NOW -- a live status
+         screen shows every boot step (database, backend, AI model
+         download) and switches to the app automatically.
+
+         The first start takes a few minutes depending on your
+         machine and connection. In the background Docker is:
+           - building the backend dev image (first run only)
+           - installing frontend dependencies (npm ci)
+           - running database migrations + seeding
+
+         When everything is ready:
+           App      http://localhost:5173
+           Login    admin@synaplan.com / admin123
+           API      http://localhost:8000  (docs: /api/doc)
+           Mail UI  http://localhost:8025  (MailHog)
+           DB UI    http://localhost:8082  (phpMyAdmin)
+
+         Chat needs one AI provider key -- the app greets you with
+         a first-run setup screen and guides you (free key: Groq).
+
+         LEAN BY DESIGN -- optional building blocks
+           Core is small: app + MariaDB + Redis. Everything else is a
+           block you switch on when you need it, off when you don't:
+             Qdrant      memories / vectors  on   (docker compose stop qdrant)
+             Centrifugo  live support        on   (REALTIME_ENABLED=false)
+             Tika        text extraction     on   (docker compose stop tika)
+             Ollama      local AI            off  (COMPOSE_PROFILES=local-ai)
+             Collabora   office files        off  (--profile office)
+             TTS         spoken answers      off  (--profile tts)
+           Off = Synaplan keeps running, the feature simply stays hidden.
+           The status screen lists the live state of every block.
+
+         Follow this readiness check:  docker compose logs -f startup-notes
+         Follow the whole stack:       docker compose logs -f
+        ============================================================
+
+        EOF
+        echo "[startup-notes] waiting for the backend (image build + migrations can take a while on first boot)..."
+        i=0
+        until wget -q -T 3 -O /dev/null http://backend/api/health 2>/dev/null; do
+          i=$$((i + 1))
+          if [ $$((i % 6)) -eq 0 ]; then
+            echo "[startup-notes] still waiting for the backend... ($$(elapsed)s elapsed -- normal on first boot)"
+          fi
+          if [ "$$(elapsed)" -ge 1500 ]; then
+            echo "[startup-notes] backend still not ready after 25 minutes -- something is probably wrong."
+            echo "[startup-notes] check:  docker compose ps   and   docker compose logs backend"
+            exit 1
+          fi
+          sleep 5
+        done
+        echo "[startup-notes] backend is up (after $$(elapsed)s)"
+        echo "[startup-notes] waiting for the frontend dev server (npm ci + schema generation + Vite start)..."
+        # The boot-status onboarding page answers on :5173 long before Vite
+        # does, so "port answers" is not enough: the app is only ready when
+        # the port answers AND the boot page's status feed is gone (the
+        # entrypoint stops it right before Vite takes over). Vite answers
+        # /boot-status.json too (SPA html fallback, 200), so we must inspect
+        # the BODY: only the real feed contains "boot":true.
+        while true; do
+          # A failed /boot-status.json fetch must NOT count as ready: `! wget | grep`
+          # is true when wget itself fails, which used to print READY too early.
+          body=$$(wget -q -T 3 -O - http://frontend:5173/boot-status.json 2>/dev/null) || body=""
+          if wget -q -T 3 -O /dev/null http://frontend:5173 2>/dev/null \
+            && [ -n "$$body" ] \
+            && ! printf '%s' "$$body" | grep -q '"boot":true'; then
+            break
+          fi
+          if [ "$$(elapsed)" -ge 1800 ]; then
+            echo "[startup-notes] frontend still not ready after 30 minutes -- something is probably wrong."
+            echo "[startup-notes] check:  docker compose logs frontend"
+            exit 1
+          fi
+          sleep 5
+        done
+        cat <<EOF
+
+        ============================================================
+         Synaplan is READY (took $$(elapsed)s)
+
+           Open   http://localhost:5173
+           Login  admin@synaplan.com / admin123
+        ============================================================
+
+        EOF
+    restart: "no"
+    networks:
+      - synaplan-network
+
   # Vue.js Frontend
   frontend:
-    image: node:24@sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584
+    image: node:24@sha256:6dac556d980b7f0e5498d08f08cee0ca67798b4ad6c23964a9214920e67758d0
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -28,33 +161,49 @@ services:
       # behind any domain / reverse proxy). Set ALLOWED_HOSTS to a
       # comma-separated allow-list to restrict to ONLY those hosts.
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
+      # Probed by the boot-status onboarding page (see /boot-status mount).
+      # The entrypoint blanks the Ollama URL unless the `local-ai` profile is
+      # on, so the page shows local AI as an opt-in block instead of probing a
+      # container that was never started.
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
+      BOOT_STATUS_OLLAMA_URL: http://ollama:11434
+      BOOT_STATUS_DB_HOST: db
+      # Optional building blocks the boot page lists with a live on/off state
+      # (TCP probe per entry). A profile that is not enabled leaves the host
+      # name unresolvable, so the block shows as "off" with its enable command.
+      BOOT_STATUS_COMPANIONS: qdrant=qdrant:6333,centrifugo=centrifugo:8000,tika=tika:9998,collabora=collabora:9980,tts=tts:10200
     ports:
       - "5173:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
+      # Boot-status onboarding page: a zero-dependency Node server the entrypoint
+      # runs on :5173 BEFORE npm ci, so the browser shows live boot progress
+      # instead of a connection error during a cold first start.
+      - ./_docker/frontend/boot-status:/boot-status:ro
+      # Read-only view of the backend's var/ so the boot-status page can show
+      # backend boot milestones (boot-status.json) and the Ollama model download
+      # progress (ollama-download.json) written by the backend entrypoint.
+      - ./backend/var:/synaplan-backend-var:ro
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
-    depends_on:
-      # service_STARTED, not service_healthy: the Vite dev server does not need a
-      # HEALTHY backend to boot -- its only backend dependency is schema generation
-      # (20-generate-schemas.sh), which already polls the backend for ~5 min and,
-      # combined with `restart: unless-stopped`, retries until it succeeds.
-      #
-      # Gating on service_healthy made `docker compose up -d` BLOCK for the
-      # backend's 900s health start_period. If that blocking command was ever
-      # interrupted (Ctrl+C, IDE/tool timeout, laptop sleep) the frontend was left
-      # in state "Created" and NEVER started -- and restart policies do not cover a
-      # container that never started, so it sat there forever ("just wait" never
-      # helped). service_started returns immediately, so the stack self-heals.
-      backend:
-        condition: service_started
-    # Vite dev server readiness: npm ci + schema generation + server start can
-    # take 1-3 min (longer on a cold first boot while the backend is still
-    # running migrations). Without this healthcheck the container shows
-    # "Started" immediately, which is misleading -- the dev server is not yet
-    # listening. start_period matches the schema script's 5-min poll ceiling.
+    # NO depends_on -- on purpose. The frontend must start IMMEDIATELY so the
+    # boot-status onboarding page binds :5173 within seconds of `up -d`, even
+    # while the backend image is still building on a fresh checkout. The only
+    # real backend dependency is schema generation (20-generate-schemas.sh),
+    # which polls the backend API for up to ~15 min and, combined with
+    # `restart: unless-stopped`, retries until it succeeds.
+    #
+    # (History: gating on service_healthy made `up -d` block for the backend's
+    # 900s start_period and could strand the frontend in state "Created";
+    # service_started fixed that but still delayed the boot page by the whole
+    # image build + db health wait. No dependency is both faster and safer.)
+    #
+    # Vite dev server readiness: the boot-status page answers on :5173 within
+    # seconds, so this healthcheck turns healthy early -- it verifies that port
+    # 5173 serves SOMETHING useful (boot page first, Vite after the handover).
+    # start_period still covers a slow cold boot of the real dev server.
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173',r=>{r.resume();process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
       interval: 10s
@@ -72,7 +221,7 @@ services:
   # rendering chunks (native binary + JS heap), which OOM-killed every build
   # and left dist-widget without widget.js.
   frontend-widgets:
-    image: node:24@sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584
+    image: node:24@sha256:6dac556d980b7f0e5498d08f08cee0ca67798b4ad6c23964a9214920e67758d0
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -134,16 +283,47 @@ services:
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
       APP_ENV: dev
+      # Demo user fixtures. Set SEED_DEMO_DATA=false to boot an EMPTY database
+      # and walk through the first-run setup wizard at /setup, the way a
+      # production install sees it. Production never loads fixtures at all.
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      # Local Docker Nextcloud (http://nextcloud) — ignored unless APP_ENV=dev.
+      DAV_ALLOW_INSECURE_LOCAL: "1"
       # APP_SECRET loaded from backend/.env (env_file above)
       APP_URL: http://localhost:8000
       PLUGINS_DIR: /plugins
       FRONTEND_URL: http://localhost:5173
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
-      OLLAMA_BASE_URL: http://ollama:11434
+      # Empty until the `local-ai` profile sets it in the command below. An
+      # empty URL means "no local AI here", which the health probes report as
+      # not-configured rather than as an outage (#1704).
+      # The command wrapper exports it for the app process only, so a
+      # `docker compose exec backend php bin/console …` session does NOT see
+      # it. Put OLLAMA_BASE_URL=http://ollama:11434 next to
+      # COMPOSE_PROFILES=local-ai in ./.env when you need console commands to
+      # reach the local models too.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
+      # Optional Docling sidecar (profile `docling`). The URL is always set so
+      # enabling the profile needs no extra env; an empty .env value keeps it
+      # off outside compose. A down sidecar is unavailable, never a failed upload.
+      DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
+      DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
+      SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
+      # Collabora CODE convert-to. Local default is the compose service name.
+      # Override with OFFICE_CONVERT_URL for an external CODE, or set
+      # OFFICE_CONVERT_URL=disabled to turn the engine off. The sidecar still
+      # needs `--profile office` (it is not started by a plain `up -d`).
+      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
+      OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
+      # Secure compute sidecar. Empty = absent. Set both when using --profile compute:
+      #   COMPUTE_URL=http://compute:8080 COMPUTE_TOKEN=$(openssl rand -hex 32)
+      COMPUTE_URL: ${COMPUTE_URL:-}
+      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-}
       AI_DEFAULT_PROVIDER: ollama
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
@@ -169,7 +349,7 @@ services:
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
       # AI Provider API Keys (loaded from backend/.env via env_file above)
       # GROQ_API_KEY is automatically loaded from backend/.env
-      AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-true}
+      AUTO_DOWNLOAD_MODELS: "false"
       ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-false}
       # reCAPTCHA (optional - disabled by default)
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
@@ -184,7 +364,9 @@ services:
       WHISPER_DEFAULT_MODEL: tiny
       WHISPER_ENABLED: "true"
       FFMPEG_BINARY: /usr/bin/ffmpeg
-      # Piper TTS Service (self-hosted, voice conversations)
+      # Piper TTS (optional). Default reaches a host-bound synaplan-tts
+      # (`docker compose --profile tts` or the standalone repo on :10200).
+      # Image: ghcr.io/metadist/synaplan-tts — 4 baked voices (en/de/es/tr).
       SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
       # Raise PHP's `max_file_uploads` (base-php default is 20). The Files /
       # RAG manager allows selecting any number of files but PHP silently
@@ -196,6 +378,22 @@ services:
       # your env if you need more / less. Honored by base-php's
       # 99-synaplan-env.ini render step.
       PHP_MAX_FILE_UPLOADS: "100"
+    # Local AI is opt-in: `COMPOSE_PROFILES=local-ai docker compose up -d`.
+    # Compose cannot make one service's environment depend on an enabled
+    # profile, so the app roles derive it here -- the same wrapper, and the
+    # same list-ELEMENT match, that deploy/compose.yaml uses in production.
+    # Matching the whole value instead would let "local-ai,office" start
+    # Ollama while leaving the app pointed at no local AI at all.
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        case ",$${COMPOSE_PROFILES:-}," in
+          *,local-ai,*)
+            export OLLAMA_BASE_URL=http://ollama:11434
+            export AUTO_DOWNLOAD_MODELS=true
+            ;;
+        esac
+        exec /usr/local/bin/docker-entrypoint.sh
     depends_on:
       db:
         condition: service_healthy
@@ -287,13 +485,23 @@ services:
       # overrides both to prod for production.
       APP_ENV: ${APP_ENV:-dev}
       APP_DEBUG: "0"
+      DAV_ALLOW_INSECURE_LOCAL: "1"
       APP_URL: http://backend
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
-      OLLAMA_BASE_URL: http://ollama:11434
+      # Empty until the `local-ai` profile sets it in the command below.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
+      DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
+      DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
+      SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
+      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
+      OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
+      COMPUTE_URL: ${COMPUTE_URL:-}
+      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-}
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
@@ -325,6 +533,15 @@ services:
     command:
       - |
         set -u
+
+        # Local AI is opt-in and must resolve to the SAME answer as the backend
+        # role, otherwise a queued embedding job would look for an Ollama the
+        # web container knows nothing about. Same wrapper as deploy/compose.yaml.
+        case ",$${COMPOSE_PROFILES:-}," in
+          *,local-ai,*)
+            export OLLAMA_BASE_URL=http://ollama:11434
+            ;;
+        esac
 
         # Resolve the env once so cache:warmup, dbal:run-sql, and
         # messenger:consume all agree. APP_ENV is set in the service env
@@ -435,9 +652,88 @@ services:
     networks:
       - synaplan-network
 
+  # Scheduler — media reaper, saved-task tick, ephemeral-file / approval
+  # expiry, and the other periodic backstops. Production compose already
+  # runs this role; without it locally a stalled image job never reaches
+  # timed_out and the chat bubble stays on __IMAGE_GENERATING__ (issue #1890).
+  #
+  # APP_ENV is pinned to `dev`, same as the backend service. RedisService
+  # namespaces media jobs as synaplan:{env}:mediajob:*; interpolating the
+  # host APP_ENV would send the scheduler to synaplan:prod while local
+  # jobs stay under synaplan:dev.
+  scheduler:
+    image: ghcr.io/metadist/synaplan:latest
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: _docker/backend/Dockerfile
+      target: dev
+    container_name: synaplan-scheduler
+    env_file:
+      - path: backend/.env
+        required: false
+    volumes:
+      - ./backend:/var/www/backend
+      - /var/www/backend/var/cache
+      - ./plugins:/plugins:ro
+      - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_docker/backend/lib:/usr/local/bin/lib:ro
+      - ./_docker/backend/container-healthcheck.sh:/usr/local/bin/container-healthcheck:ro
+    environment:
+      APP_ENV: dev
+      SYNAPLAN_WEB_HEALTH_URL: http://backend/api/health
+      DAV_ALLOW_INSECURE_LOCAL: "1"
+      # Public URLs, same as the backend: approval digest/instant mail
+      # builds browser links from FRONTEND_URL ?? APP_URL.
+      APP_URL: http://localhost:8000
+      FRONTEND_URL: http://localhost:5173
+      PLUGINS_DIR: /plugins
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
+      QDRANT_URL: http://qdrant:6333
+      LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
+      REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      REALTIME_ENABLED: ${REALTIME_ENABLED:-true}
+      REALTIME_API_URL: ${REALTIME_API_URL:-http://centrifugo:8000/api}
+      REALTIME_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
+      REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
+      MAILER_DSN: smtp://mailhog:1025
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        case ",$${COMPOSE_PROFILES:-}," in
+          *,local-ai,*)
+            export OLLAMA_BASE_URL=http://ollama:11434
+            ;;
+        esac
+        exec /usr/local/bin/docker-entrypoint.sh
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        # Wait for Composer bootstrap on a fresh checkout; vendor/ is
+        # bind-mounted and this role does not run docker-entrypoint.d.
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "docker-host:host-gateway"
+    networks:
+      - synaplan-network
+
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.3.2@sha256:759869cb6f003234a95c6384cdee245b4bce7de26913fe607a8110362c0c007d
+    image: mariadb:12.3.3@sha256:ab1c3dd381940233af12512b97d47b508fd3a0f17fbe3ba388739b7bc17cbc0b
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -480,7 +776,7 @@ services:
     # client publications from 7.x, whereas Redis 8.x dropped pub/sub fan-out to
     # the Centrifugo node (control messages arrived, publications did not),
     # which silently broke realtime delivery to dashboard + widget clients.
-    image: redis:7.4-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     container_name: synaplan-redis
     command: >-
       redis-server
@@ -508,7 +804,7 @@ services:
   # Authentication uses short-lived JWTs issued by the PHP backend.
   # ----------------------------------------------------------------------------
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.1@sha256:8ba0c9443dadedc21b20254b3fc76f35c1998b29acc7cdec877ea0c3636c237e
+    image: centrifugo/centrifugo:v6.9.5@sha256:99730b3f481c7ee639dbd2147716e3c12bd3ad191df5e8427e050414806609a3
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
@@ -543,8 +839,13 @@ services:
       - synaplan-network
 
   # Ollama - Local AI Models (GPU-accelerated if NVIDIA available)
+  #
+  # Opt-in: `COMPOSE_PROFILES=local-ai docker compose up -d`. Off by default so
+  # a fresh clone reaches a working app without pulling ~1 GB of weights; the
+  # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
-    image: ollama/ollama:latest@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
+    profiles: [local-ai]
+    image: ollama/ollama:latest@sha256:0c0a83210471fb50226bcdc2d6611d20ab13ae87e024cc304c94a6a5765c5e65
     container_name: synaplan-ollama
     ports:
       - "11435:11434"
@@ -609,6 +910,43 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Optional Docling document extraction — https://github.com/docling-project/docling-serve
+  # CPU image (~4.4 GB) so the sidecar runs without a GPU. Not started by default.
+  # Enable with:  docker compose --profile docling up -d
+  # No mem_limit in dev (cgroup limits break some sandboxes; see frontend-widgets).
+  # Ask-first Docker change: recorded in _devextras/planning/202609_ai_plugs/02_sprint_2_docling.md
+  docling:
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.33.0@sha256:546cf392145a0a578f23e4250663a37a5fb727fe6b57fd163e301584ad8bc18c
+    container_name: synaplan-docling
+    profiles: [docling]
+    restart: unless-stopped
+    environment:
+      DOCLING_SERVE_ENABLE_UI: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - synaplan-network
+
+  # Optional SearXNG meta search — enable with: docker compose --profile searxng up -d
+  # No published host port (JSON API is only on the compose network). No mem_limit
+  # (cgroup limits break some sandboxes). Pin includes the multi-arch digest.
+  searxng:
+    image: searxng/searxng:2026.8.22-9fea41204@sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e
+    container_name: synaplan-searxng
+    profiles: [searxng]
+    restart: unless-stopped
+    volumes:
+      - ./_devextras/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-synaplan-dev-searxng-secret-change-me}
     networks:
       - synaplan-network
 
@@ -679,7 +1017,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7@sha256:f1f1f01e472c8a78df40d8f2a49a925274eda4d3d80d5f6edbb5c880ee3c01c6
+    image: quay.io/keycloak/keycloak:26.7@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     container_name: synaplan-keycloak
     depends_on:
       keycloak_certs:
@@ -712,7 +1050,7 @@ services:
       - synaplan-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.7@sha256:f1f1f01e472c8a78df40d8f2a49a925274eda4d3d80d5f6edbb5c880ee3c01c6
+    image: quay.io/keycloak/keycloak:26.7@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     container_name: synaplan-keycloak-setup
     depends_on:
       keycloak:
@@ -731,9 +1069,93 @@ services:
     networks:
       - synaplan-network
 
+  # Optional Collabora CODE — LibreOffice convert-to over HTTP.
+  # Not started by default (keeps ~2 GB RAM off the core stack). Enable with:
+  #   docker compose --profile office up -d
+  # Docs: docs/DEVELOPMENT.md ("Office conversion")
+  # No published port: the backend talks to collabora:9980 on the compose network.
+  collabora:
+    image: collabora/code:26.04.3.2.1@sha256:379b8f1fc955dd6d01ba24adf61d1b177048ddaae179ae8c1e6a6342daccb282
+    container_name: synaplan-collabora
+    profiles: [office]
+    restart: unless-stopped
+    mem_limit: 2g
+    environment:
+      extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
+    # CODE 26.04 is distroless: no bash, so the /dev/tcp probe of 25.04 cannot
+    # run here. coolwsd --probe is the upstream check (it is what the image's
+    # own HEALTHCHECK runs) and needs the exec form — a plain string would go
+    # through CMD-SHELL and fail for the same reason.
+    healthcheck:
+      test: ["CMD", "/usr/bin/coolwsd", "--probe", "--use-env-vars"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - synaplan-network
+
+  # Optional Piper TTS — four baked voices (en, de, es, tr).
+  # Not started by default (keeps the core stack small). Enable with:
+  #   docker compose --profile tts up -d
+  # Image: https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts
+  # Docs:  https://docs.synaplan.com/index.php/tts
+  # Extra voices: mount more .onnx + .onnx.json into /voices-extra (see the
+  # synaplan-tts README). The UI locale / detected reply language selects
+  # the matching baked voice automatically.
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:3c8ed60619be4ae1913e64ac35c28aa9b48da66e0e5006c972b91d0a5d278bb2
+    container_name: synaplan-tts
+    profiles: [tts]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:10200:10200"
+    volumes:
+      - tts_extra_voices:/voices-extra
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium
+    networks:
+      - synaplan-network
+
+  # Optional secure compute — short Python/Node file work for the assistant.
+  # Not started by default. Enable with:
+  #   COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
+  #     COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
+  #     docker compose --profile compute up -d
+  # Then turn COMPUTE.ENABLED on (Operate → System config). Never publish :8080.
+  # The sidecar never pulls runtime images. Build them first:
+  #   make -C sidecars/synaplan-compute images
+  # and pin those digests in sidecars/synaplan-compute/internal/images/map.go.
+  compute:
+    build:
+      context: ./sidecars/synaplan-compute
+    container_name: synaplan-compute
+    profiles: [compute]
+    restart: unless-stopped
+    # Distroless nonroot (65532) cannot open a root:docker 0660 socket.
+    # Pass the host docker GID (stat -c %g /var/run/docker.sock).
+    group_add:
+      - ${COMPUTE_DOCKER_GID:-998}
+    environment:
+      # Empty default so `docker compose` interpolates without --profile compute.
+      # The sidecar refuses to start unless the token is at least 32 bytes.
+      COMPUTE_AUTH_TOKEN: ${COMPUTE_TOKEN:-}
+      COMPUTE_LISTEN: :8080
+      COMPUTE_SCRATCH_DIR: /scratch
+      COMPUTE_WORKSPACES_DIR: /workspaces
+      COMPUTE_MAX_CONCURRENT: ${COMPUTE_MAX_CONCURRENT:-2}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - compute_scratch:/scratch
+      - compute_workspaces:/workspaces
+    networks:
+      - synaplan-network
+
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
-    image: qdrant/qdrant:v1.18.3@sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286
+    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
     container_name: synaplan-qdrant
     ports:
       - "6333:6333"
@@ -749,6 +1171,9 @@ volumes:
   whisper_models:
   qdrant_storage:
   keycloak_certs:
+  tts_extra_voices:
+  compute_scratch:
+  compute_workspaces:
 
 networks:
   synaplan-network:

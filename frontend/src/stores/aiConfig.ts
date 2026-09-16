@@ -11,18 +11,34 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
   const defaults = ref<DefaultModels>({})
   const loading = ref(false)
 
-  const loadModels = async () => {
-    loading.value = true
-    try {
-      const response = await configApi.getModels()
-      if (response.success) {
-        models.value = response.models
-      }
-    } catch (error) {
-      console.error('Failed to load models:', error)
-    } finally {
-      loading.value = false
+  // Booting the chat asks for the catalog twice in the same tick: ChatView
+  // loads it directly, and the model-mix store's ensureLoaded() checks for a
+  // populated catalog, still finds it empty and asks again. The backend
+  // serialises the two identical requests, so the second one answered seconds
+  // late and held back everything ChatView awaits behind it — the chat list,
+  // the first chat and with it the composer. Racing callers now share the one
+  // request that is already in flight.
+  let modelsRequest: Promise<void> | null = null
+
+  const loadModels = async (): Promise<void> => {
+    if (modelsRequest) {
+      return modelsRequest
     }
+    loading.value = true
+    modelsRequest = (async () => {
+      try {
+        const response = await configApi.getModels()
+        if (response.success) {
+          models.value = response.models
+        }
+      } catch (error) {
+        console.error('Failed to load models:', error)
+      } finally {
+        loading.value = false
+        modelsRequest = null
+      }
+    })()
+    return modelsRequest
   }
 
   const loadDefaults = async () => {

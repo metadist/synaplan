@@ -32,22 +32,6 @@ export const mockTools: Tool[] = [
     ],
   },
   {
-    id: 'doc-summary',
-    name: 'Doc Summary',
-    description: 'Automatically summarize documents and extract key information',
-    category: 'Documents',
-    icon: 'DocumentTextIcon',
-    color: 'purple',
-    tags: ['AI Generated', 'Text Processing'],
-    commands: [
-      {
-        command: '/docs [text]',
-        description: 'Searches your uploads for the specified text',
-        parameters: 'Local Search, Multiple Formats',
-      },
-    ],
-  },
-  {
     id: 'mail-handler',
     name: 'Mail Handler',
     description: 'Process and manage email communications automatically',

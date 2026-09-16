@@ -6,6 +6,9 @@ namespace App\Service;
 
 use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\WidgetMemorySuggestionSchema;
+use App\AI\StructuredOutput\Schema\WidgetPromptMetadataSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\DTO\UserMemoryDTO;
 use App\Entity\Prompt;
 use App\Entity\User;
@@ -38,6 +41,7 @@ final readonly class WidgetSetupService
         private RateLimitService $rateLimitService,
         private UrlContentService $urlContentService,
         private LoggerInterface $logger,
+        private StructuredOutputConfig $structuredOutputConfig,
     ) {
     }
 
@@ -49,7 +53,7 @@ final readonly class WidgetSetupService
     /**
      * Resolve AI model configuration with multi-level fallback.
      *
-     * Priority: preferredModelId → SUMMARIZE capability default → user default CHAT → global default CHAT.
+     * Priority: preferredModelId → Text Analytics (ANALYZE) → user default CHAT → global default CHAT.
      *
      * @return array{provider: string, model: string, model_id: int}
      *
@@ -59,8 +63,7 @@ final readonly class WidgetSetupService
     {
         $candidates = array_filter([
             $preferredModelId,
-            // #1320: SUMMARIZE capability default (→ SORT → CHAT) instead of a
-            // hardcoded lightweight model id.
+            // Text Analytics (ANALYZE → CHAT), never a hardcoded model id.
             $this->modelConfigService->getSummaryModelConfig($user->getId())['model_id'],
             $this->modelConfigService->getDefaultModel('CHAT', $user->getId()),
             $this->modelConfigService->getDefaultModel('CHAT', 0),
@@ -281,6 +284,10 @@ PROMPT;
             'model' => $modelConfig['model'],
         ];
 
+        if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+            $aiOptions['structured_output'] = WidgetMemorySuggestionSchema::build();
+        }
+
         try {
             $response = $this->aiFacade->chat([
                 ['role' => 'system', 'content' => $systemPrompt],
@@ -459,6 +466,10 @@ PROMPT;
                     'provider' => $metaModelConfig['provider'],
                     'model' => $metaModelConfig['model'],
                 ];
+
+                if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                    $aiOptions['structured_output'] = WidgetPromptMetadataSchema::build();
+                }
 
                 $response = $this->aiFacade->chat(
                     [['role' => 'user', 'content' => $metadataPrompt]],
@@ -673,13 +684,13 @@ PROMPT;
     /**
      * Resolve setup interview prompt and model for a widget.
      *
-     * Fallback chain: custom per-widget -> system default -> SUMMARIZE capability default.
+     * Fallback chain: custom per-widget -> system default -> Text Analytics (ANALYZE).
      *
      * @return array{prompt: string, modelId: int}
      */
     private function resolveSetupConfig(Widget $widget): array
     {
-        // #1320: SUMMARIZE capability default instead of a hardcoded model id.
+        // Text Analytics (ANALYZE → CHAT), never a hardcoded model id.
         $modelId = $this->modelConfigService->getSummaryModelConfig($widget->getOwnerId())['model_id'] ?? 0;
 
         // 1. Try custom per-widget prompt

@@ -34,6 +34,10 @@ const provider = (overrides: Partial<ProviderKeyStatus> = {}): ProviderKeyStatus
     maskedKey: '',
     consoleUrl: 'https://console.groq.com/keys',
     envVar: 'GROQ_API_KEY',
+    secretEnvVar: null,
+    hasSecret: false,
+    testable: true,
+    chat: true,
     freeTier: true,
     recommended: true,
     ...overrides,
@@ -132,5 +136,115 @@ describe('ProviderKeyCard', () => {
     const wrapper = mountCard({ consoleUrl: '' })
 
     expect(wrapper.find('a').attributes('href')).toBeTruthy()
+  })
+
+  // NV05 (D2): media/speech providers live on the same card grid. A pair
+  // provider gets a second password input; single-key providers never do.
+  it('shows the secret input only for a key+secret provider and sends both halves', async () => {
+    expect(mountCard().find('[data-testid="provider-secret-input-groq"]').exists()).toBe(false)
+
+    saveProviderKey.mockResolvedValue({
+      success: true,
+      provider: 'higgsfield',
+      maskedKey: 'hf••••abcd',
+      defaultsApplied: false,
+      tested: true,
+    })
+    const wrapper = mountCard({
+      name: 'higgsfield',
+      displayName: 'Higgsfield',
+      envVar: 'HIGGSFIELD_API_KEY',
+      secretEnvVar: 'HIGGSFIELD_API_SECRET',
+      chat: false,
+      recommended: false,
+      freeTier: false,
+    })
+
+    const save = wrapper.get('[data-testid="provider-key-save-higgsfield"]')
+    await wrapper.get('[data-testid="provider-key-input-higgsfield"]').setValue('hf-key')
+    // Key alone is not enough for a pair provider.
+    expect(save.attributes('disabled')).toBeDefined()
+
+    await wrapper.get('[data-testid="provider-secret-input-higgsfield"]').setValue('hf-secret')
+    expect(save.attributes('disabled')).toBeUndefined()
+    await save.trigger('click')
+    await flushPromises()
+
+    expect(saveProviderKey).toHaveBeenCalledWith('higgsfield', 'hf-key', {
+      applyDefaults: false,
+      secret: 'hf-secret',
+    })
+    // No chat defaults for a media provider ⇒ no "use as default" affordance.
+    expect(wrapper.find('[data-testid="provider-key-apply-defaults-higgsfield"]').exists()).toBe(
+      false
+    )
+    expect(wrapper.find('[data-testid="provider-key-make-default-higgsfield"]').exists()).toBe(
+      false
+    )
+  })
+
+  it('shows the env/Helm badge for an environment key and does not look unsaved', () => {
+    const wrapper = mountCard({
+      configured: true,
+      source: 'env',
+      origin: null,
+      maskedKey: 'gsk_••••envk',
+    })
+
+    expect(wrapper.get('[data-testid="provider-key-source-env-groq"]').text()).toContain(
+      'environment'
+    )
+    expect(wrapper.text()).toContain('gsk_••••envk')
+    expect(wrapper.text()).toContain('Connected')
+  })
+
+  it('says a key was saved but not tested when the provider offers no check', async () => {
+    saveProviderKey.mockResolvedValue({
+      success: true,
+      provider: 'thehive',
+      maskedKey: 'th••••abcd',
+      defaultsApplied: false,
+      tested: false,
+    })
+    const wrapper = mountCard({
+      name: 'thehive',
+      displayName: 'TheHive',
+      envVar: 'THEHIVE_API_KEY',
+      testable: false,
+      chat: false,
+      recommended: false,
+      freeTier: false,
+      configured: true,
+      source: 'db',
+      origin: 'ui',
+      maskedKey: 'th••••abcd',
+    })
+
+    expect(wrapper.find('[data-testid="provider-key-test-thehive"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="provider-key-save-thehive"]').text()).toBe('Save')
+    expect(wrapper.text()).toContain('Saved — not tested')
+
+    await wrapper.get('[data-testid="provider-key-input-thehive"]').setValue('th-key')
+    await wrapper.get('[data-testid="provider-key-save-thehive"]').trigger('click')
+    await flushPromises()
+
+    expect(notifications.success.mock.calls[0]?.[0]).toContain('not tested')
+  })
+
+  it('does not call an env-supplied untestable key “saved”', () => {
+    const wrapper = mountCard({
+      name: 'thehive',
+      displayName: 'TheHive',
+      envVar: 'THEHIVE_API_KEY',
+      testable: false,
+      chat: false,
+      configured: true,
+      source: 'env',
+      origin: null,
+      maskedKey: 'th••••envk',
+    })
+
+    expect(wrapper.find('[data-testid="provider-key-untested-thehive"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="provider-key-source-env-thehive"]').exists()).toBe(true)
   })
 })

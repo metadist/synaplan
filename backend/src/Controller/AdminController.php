@@ -4,9 +4,12 @@ namespace App\Controller;
 
 use App\Entity\Prompt;
 use App\Entity\User;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UseLogRepository;
 use App\Repository\UserRepository;
+use App\Service\Iam\GroupService;
+use App\Service\Iam\IamConfig;
 use App\Service\UsageStatsService;
 use App\Service\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,6 +33,9 @@ class AdminController extends AbstractController
         private UseLogRepository $useLogRepository,
         private UsageStatsService $usageStatsService,
         private UserDeletionService $userDeletionService,
+        private IamConfig $iamConfig,
+        private GroupService $groupService,
+        private ExternalIdentityRepository $externalIdentityRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -88,6 +94,25 @@ class AdminController extends AbstractController
                             new OA\Property(property: 'created', type: 'string', format: 'date-time', example: '2024-01-15 10:30:00'),
                             new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
                             new OA\Property(property: 'locale', type: 'string', example: 'en'),
+                            new OA\Property(
+                                property: 'groups',
+                                type: 'array',
+                                description: 'Present when IAM groups are enabled.',
+                                items: new OA\Items(
+                                    type: 'object',
+                                    properties: [
+                                        new OA\Property(property: 'id', type: 'integer'),
+                                        new OA\Property(property: 'name', type: 'string'),
+                                        new OA\Property(property: 'role', type: 'string'),
+                                    ]
+                                )
+                            ),
+                            new OA\Property(
+                                property: 'identities',
+                                type: 'array',
+                                description: 'Present when IAM groups are enabled.',
+                                items: new OA\Items(type: 'string', example: 'OIDC')
+                            ),
                         ]
                     )
                 ),
@@ -131,7 +156,21 @@ class AdminController extends AbstractController
             ->getQuery()
             ->getResult();
 
-        $usersData = array_map(function (User $u) {
+        $iamEnabled = $this->iamConfig->isGroupsEnabled((int) $user->getId());
+        $groupsByUser = [];
+        $identitiesByUser = [];
+        if ($iamEnabled) {
+            $userIds = array_values(array_filter(array_map(
+                static fn (User $u): ?int => $u->getId(),
+                $users,
+            )));
+            $groupsByUser = $this->groupService->groupsByUserIds($userIds);
+            foreach ($this->externalIdentityRepository->findByUserIds($userIds) as $identity) {
+                $identitiesByUser[$identity->getUserId()][] = $identity->badge();
+            }
+        }
+
+        $usersData = array_map(function (User $u) use ($iamEnabled, $groupsByUser, $identitiesByUser) {
             // Get email from BMAIL field
             $email = $u->getMail();
 
@@ -156,7 +195,7 @@ class AdminController extends AbstractController
                 $level = 'NEW';
             }
 
-            return [
+            $row = [
                 'id' => $u->getId(),
                 'email' => $email,
                 'level' => $level,
@@ -167,6 +206,12 @@ class AdminController extends AbstractController
                 'isAdmin' => $u->isAdmin(),
                 'locale' => $u->getLocale(),
             ];
+            if ($iamEnabled) {
+                $row['groups'] = $groupsByUser[(int) $u->getId()] ?? [];
+                $row['identities'] = array_values(array_unique($identitiesByUser[(int) $u->getId()] ?? []));
+            }
+
+            return $row;
         }, $users);
 
         return $this->json([

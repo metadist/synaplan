@@ -1,6 +1,18 @@
 import { useConfigStore } from '@/stores/config'
 
 /**
+ * Public origin for links that leave the app (share URLs, absolute media).
+ *
+ * Never use `window.location.origin` for these: in the native shell that is
+ * `capacitor://localhost` / `https://localhost`, which is not a reachable
+ * platform URL. `appBaseUrl` already remaps the native case to the real
+ * backend/web origin (Epic 3).
+ */
+function publicAppBaseUrl(): string {
+  return useConfigStore().appBaseUrl.replace(/\/$/, '')
+}
+
+/**
  * Normalize media URLs to absolute URLs
  * Converts relative paths to absolute URLs using appBaseUrl
  */
@@ -12,10 +24,17 @@ export function normalizeMediaUrl(url: string | undefined | null): string {
     return url
   }
 
-  const config = useConfigStore()
-
   // Add leading slash if missing
   const normalizedPath = url.startsWith('/') ? url : `/${url}`
 
-  return `${config.appBaseUrl}${normalizedPath}`
+  return `${publicAppBaseUrl()}${normalizedPath}`
+}
+
+/**
+ * HTTPS URL a recipient can open for a publicly shared chat.
+ *
+ * Path is the SPA/crawler page (`/shared/{token}`), not the JSON API route.
+ */
+export function buildChatShareUrl(shareToken: string): string {
+  return `${publicAppBaseUrl()}/shared/${shareToken}`
 }

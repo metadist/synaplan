@@ -52,7 +52,13 @@ final readonly class PluginManager
                 if ($content) {
                     $data = json_decode($content, true);
                     if ($data) {
-                        $plugins[] = PluginManifest::fromArray($data);
+                        try {
+                            $plugins[] = PluginManifest::fromArray($data);
+                        } catch (InvalidPluginManifestException $e) {
+                            $this->logger->error('Plugin failed to load: '.$e->getMessage(), [
+                                'plugin' => basename($dir),
+                            ]);
+                        }
                     }
                 }
             }
@@ -89,7 +95,13 @@ final readonly class PluginManager
                 if ($content) {
                     $data = json_decode($content, true);
                     if ($data) {
-                        $plugins[] = PluginManifest::fromArray($data);
+                        try {
+                            $plugins[] = PluginManifest::fromArray($data);
+                        } catch (InvalidPluginManifestException $e) {
+                            $this->logger->error('Plugin failed to load: '.$e->getMessage(), [
+                                'plugin' => basename($dir),
+                            ]);
+                        }
                     }
                 }
             }

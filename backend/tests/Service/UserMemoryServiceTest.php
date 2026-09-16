@@ -483,6 +483,133 @@ final class UserMemoryServiceTest extends TestCase
         $this->assertSame('text-embedding-3-large', $upsertedPayload['embedding_model']);
     }
 
+    /**
+     * #1570: Qdrant can hold memory points that no longer have an active SQL
+     * row (SQL reset / failed purge). Those orphans were retrieved and used in
+     * replies but never shown in the SQL-backed Memories UI. Retrieval must
+     * drop any hit that is not an active SQL row so "X memories used" matches
+     * the list the user can actually manage.
+     */
+    public function testSearchRelevantMemoriesDropsHitsWithoutActiveSqlRow(): void
+    {
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 8, 0.1),
+            'usage' => ['total_tokens' => 3],
+        ]);
+        $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
+
+        $this->qdrantClient->method('searchMemories')->willReturn([
+            ['id' => 'mem_1_10', 'score' => 0.9, 'payload' => ['user_id' => 1, 'category' => 'personal', 'key' => 'age', 'value' => '33']],
+            ['id' => 'mem_1_20', 'score' => 0.8, 'payload' => ['user_id' => 1, 'category' => 'personal', 'key' => 'hobby', 'value' => 'homelab']],
+        ]);
+
+        // Only memory 10 still has an active SQL row; 20 is a Qdrant orphan.
+        $this->memoryRepository->expects($this->once())
+            ->method('filterActiveIds')
+            ->with(1, [10, 20])
+            ->willReturn([10]);
+
+        $result = $this->service->searchRelevantMemories(1, 'how old am I?');
+
+        self::assertCount(1, $result);
+        self::assertSame(10, $result[0]['id']);
+    }
+
+    public function testSearchFallsBackToRecentSqlMemoriesWhenReconcileDropsEveryHit(): void
+    {
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 8, 0.1),
+            'usage' => ['total_tokens' => 3],
+        ]);
+        $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
+
+        $this->qdrantClient->method('searchMemories')->willReturn([
+            ['id' => 'mem_1_10', 'score' => 0.9, 'payload' => ['user_id' => 1, 'category' => 'personal', 'key' => 'age', 'value' => '33']],
+        ]);
+        $this->memoryRepository->method('filterActiveIds')->willReturn([]);
+        $this->memoryRepository->method('findActiveForUser')->willReturn([
+            $this->makeMemory(99, 1, 'teal', 'favorite_color'),
+        ]);
+
+        $result = $this->service->searchRelevantMemories(1, 'what is my favorite color?');
+
+        self::assertCount(1, $result);
+        self::assertSame(99, $result[0]['id']);
+        self::assertSame('favorite_color', $result[0]['key']);
+        self::assertSame('teal', $result[0]['value']);
+    }
+
+    public function testEmptyVectorHitSetDoesNotFallBackToUnrelatedSqlMemories(): void
+    {
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 8, 0.1),
+            'usage' => ['total_tokens' => 3],
+        ]);
+        $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
+        $this->qdrantClient->method('searchMemories')->willReturn([]);
+        $this->memoryRepository->expects($this->never())->method('findActiveForUser');
+
+        $result = $this->service->searchRelevantMemories(1, 'something I have never stored');
+
+        self::assertSame([], $result);
+    }
+
+    public function testOrphanFallbackPreservesCategoryFilter(): void
+    {
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 8, 0.1),
+            'usage' => ['total_tokens' => 3],
+        ]);
+        $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
+        $this->qdrantClient->method('searchMemories')->willReturn([
+            ['id' => 'mem_1_10', 'score' => 0.9, 'payload' => ['user_id' => 1, 'category' => 'work', 'key' => 'age', 'value' => '33']],
+        ]);
+        $this->memoryRepository->method('filterActiveIds')->willReturn([]);
+        $this->memoryRepository->expects($this->once())
+            ->method('findActiveForUser')
+            ->with(1, 'work', null, self::greaterThan(0))
+            ->willReturn([
+                $this->makeMemory(77, 1, 'standup notes', 'ritual'),
+            ]);
+
+        $result = $this->service->searchRelevantMemories(1, 'standup', 'work');
+
+        self::assertCount(1, $result);
+        self::assertSame(77, $result[0]['id']);
+    }
+
+    /**
+     * The reconciliation is scoped to the user-facing memory load. Hidden
+     * feedback namespaces are internal and never appear in the Memories list,
+     * so a feedback search (includeHidden=true) must not touch SQL.
+     */
+    public function testHiddenFeedbackSearchSkipsSqlReconciliation(): void
+    {
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 8, 0.1),
+            'usage' => ['total_tokens' => 3],
+        ]);
+        $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
+
+        $this->qdrantClient->method('searchMemories')->willReturn([
+            ['id' => 'mem_1_10', 'score' => 0.9, 'payload' => ['user_id' => 1, 'category' => 'feedback_negative', 'key' => 'x', 'value' => 'y']],
+        ]);
+
+        $this->memoryRepository->expects($this->never())->method('filterActiveIds');
+
+        $result = $this->service->searchRelevantMemories(
+            1,
+            'query',
+            'feedback_negative',
+            5,
+            0.5,
+            'feedback_false_positive',
+            true,
+        );
+
+        self::assertCount(1, $result);
+    }
+
     private function makeMemory(
         int $id,
         int $userId,

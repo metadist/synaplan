@@ -58,8 +58,39 @@ downloads are disabled, and an AI provider key can be added after login under
 
 ### Create the First Administrator
 
-Before the first start, set a unique email and strong password in the deployment
-environment:
+There are three ways to get the first administrator, and you only need one of
+them.
+
+**In the browser.** Leave `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`
+empty and open the instance in a browser after the first start. A production
+installation without an administrator serves a short setup wizard at `/setup`:
+create the administrator, optionally paste an AI provider key, and decide whether
+strangers may sign up or chat as guests. Everything else is closed while that is
+pending — the API answers `503 SETUP_REQUIRED` for every other route — so there
+is no half-configured state to stumble into.
+
+> **The window between the first start and the first administrator is open.** The
+> account belongs to whoever fills in that form first, exactly as in Open WebUI,
+> Immich or n8n. On a publicly reachable host, either complete the wizard right
+> after the deployment, or use the bootstrap variables below so the window never
+> exists.
+
+Set `SETUP_WIZARD_ENABLED=false` to switch the wizard off entirely. An instance
+without an administrator then has no way in through the browser, which is what
+you want when the account is only ever created by automation or by an identity
+provider.
+
+**Through an identity provider.** For an OIDC/SSO deployment there is no local
+administrator to create at all: accounts appear on first sign-in, and an
+administrator is whoever carries a matching role claim. Switch the wizard off,
+point the instance at the provider, and leave the bootstrap variables empty —
+the empty database is then a normal steady state, not a pending setup. See
+[SSO-only instances](CONFIGURATION.md#sso-only-instances-no-local-accounts) for
+the full variable set and how the admin role mapping behaves.
+
+**Through the deployment environment.** Preferable for automated and
+platform-managed installs, because no browser step is involved. Before the first
+start, set a unique email and strong password:
 
 ```dotenv
 BOOTSTRAP_ADMIN_EMAIL=admin@example.com
@@ -74,9 +105,8 @@ addresses can still be refused: the part before the `@` may not be longer than 6
 characters or contain a dot at the start, at the end, or twice in a row, and each
 part of the domain name may not be longer than 63 characters or start or end with
 a hyphen. If your own address is refused, put a different valid address in
-`BOOTSTRAP_ADMIN_EMAIL`, or leave both bootstrap variables empty, sign up in the
-app afterwards, and make that account the administrator (see
-[User Management](ADMIN.md#user-management)).
+`BOOTSTRAP_ADMIN_EMAIL`, or leave both bootstrap variables empty and use the
+setup wizard instead.
 
 The password must be 8 to 64 characters long; below 16 characters it must also
 contain at least one uppercase letter, one lowercase letter, and one number. A
@@ -105,9 +135,8 @@ rewrites it.
 > [Outgoing Email](EMAIL.md#outgoing-email-smtp).
 
 **Set both variables together, or leave both empty.** Leaving both empty is a
-valid choice: no administrator is created automatically, and you can promote one
-later (see [User Management](ADMIN.md#user-management)). Setting only one of the
-two is a configuration error.
+valid choice: no administrator is created automatically, and the setup wizard
+described above takes over. Setting only one of the two is a configuration error.
 
 > **A half-configured pair stops the container on purpose.** Each application
 > container checks the pair first and, when only one value is set, prints which
@@ -169,6 +198,21 @@ COMPOSE_PROFILES=local-ai \
 Enabling the profile installs the local AI services; a local chat model remains
 an additional opt-in. Leave `COMPOSE_PROFILES` empty to keep the Cloud-AI
 default.
+
+### Optional office conversion (Collabora)
+
+The optional `office` profile starts a Collabora CODE sidecar (~2 GB RAM) for
+office thumbnails, PDF export, preview, and combine. It is **off by default**
+so the official 8 GB Cloud-AI floor stays valid. Umbrel / AWS Marketplace /
+Elestio stay off unless you opt in.
+
+```bash
+COMPOSE_PROFILES=office \
+  docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+The deploy entrypoint sets `OFFICE_CONVERT_URL=http://collabora:9980` when
+`office` is in `COMPOSE_PROFILES`. See [Development Guide](DEVELOPMENT.md#office-conversion-optional).
 
 ### Evaluate on Elestio
 
@@ -248,10 +292,10 @@ deployment contract.
 
 - **Docker** & **Docker Compose** (v2.0+)
 - **Git**
-- 8GB RAM minimum (16GB recommended for local AI)
-- ~9GB disk space (Standard) or ~5GB (Minimal). Add ~14GB if you enable the local
-  chat model (`ENABLE_LOCAL_GPT_OSS=true`, see
-  [Standard Development Stack](#standard-development-stack))
+- 8GB RAM minimum (16GB recommended once you add the `local-ai` profile)
+- ~3GB disk space. Add ~1GB for the `local-ai` profile, and ~14GB more if you
+  also enable the local chat model (`ENABLE_LOCAL_GPT_OSS=true`, see
+  [Local AI Profile](#local-ai-profile))
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The
 > Quick Start below already does: `docker compose up -d` builds the backend and
@@ -278,28 +322,17 @@ That's it! Visit http://localhost:5173 after ~2 minutes, log in as
 
 ### Standard Development Stack
 
-Full-featured installation with local AI models and audio transcription.
+Full-featured installation on cloud AI — no model weights are downloaded.
 
 | Component | Size | Description |
 |-----------|------|-------------|
-| Base services | ~5 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika, Qdrant |
-| Ollama embedding model | ~4 GB | `bge-m3` for RAG / semantic search |
-| **Total** | **~9 GB** | Everything except the local chat model |
+| Base services | ~3 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika, Qdrant |
+| Whisper `tiny` | ~75 MB | Local audio transcription, no key needed |
+| **Total** | **~3 GB** | Chat works as soon as you add one provider key |
 
 ```bash
 docker compose up -d
 ```
-
-**Local chat model is opt-in.** The standard install downloads the embedding model
-only. A local chat model (`gpt-oss:20b`, another ~14 GB, needs a GPU or a strong
-CPU box) is pulled only when you ask for it:
-
-```bash
-ENABLE_LOCAL_GPT_OSS=true docker compose up -d
-```
-
-Until then — or while the download runs — chat needs a cloud provider key
-(see [Connect an AI Provider](#connect-an-ai-provider)).
 
 **What's included:**
 - Full web app and REST API
@@ -308,36 +341,42 @@ Until then — or while the download runs — chat needs a cloud provider key
 - Redis (cache, sessions, locks, message queues, realtime engine)
 - Centrifugo WebSocket gateway (live chat takeover, realtime events)
 - Background worker (Symfony Messenger consumer for async AI/indexing jobs)
-- Local Ollama server (embedding model downloaded automatically, chat model opt-in)
 - Whisper audio transcription
 - Cloud AI support (Groq, OpenAI, Anthropic, Gemini, xAI, …)
 - Qdrant vector database (AI memories, RAG, feedback)
 - Dev tools (phpMyAdmin, MailHog)
 
-### Minimal Development Stack (Cloud AI Only)
+### Local AI Profile
 
-Fastest way to start—uses cloud AI providers, skips large local models.
+Adds an Ollama server and the `bge-m3` embedding model, so RAG and semantic
+search run on your own hardware with no provider key.
 
 | Component | Size | Description |
 |-----------|------|-------------|
-| Base services | ~5 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika |
-| **Total** | **~5 GB** | No local AI models (`AUTO_DOWNLOAD_MODELS=false`) |
+| Ollama + `bge-m3` | ~1 GB | Embeddings for RAG / semantic search |
 
 ```bash
-# Start minimal stack
-docker compose -f docker-compose-minimal.yml up -d
+COMPOSE_PROFILES=local-ai docker compose up -d
 ```
 
-**Excluded (saves ~4 GB):**
-- Ollama (local AI models)
-- Whisper models (audio transcription)
-- Local embedding models
+`COMPOSE_PROFILES` is the same switch a self-hosted install uses in
+`deploy/.env`, so the development stack and production behave identically.
+Combine profiles with a comma (`local-ai,office`).
 
-**Upgrade to Standard later:**
+**Local chat model is opt-in on top of that.** A local chat model
+(`gpt-oss:20b`, another ~14 GB, needs a GPU or a strong CPU box) is pulled only
+when you ask for it:
+
 ```bash
-docker compose -f docker-compose-minimal.yml down
-docker compose up -d
+COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true docker compose up -d
 ```
+
+Until then — or while the download runs — chat needs a cloud provider key
+(see [Connect an AI Provider](#connect-an-ai-provider)).
+
+> `docker compose exec` sessions do not inherit the URL the profile exports, so
+> add `OLLAMA_BASE_URL=http://ollama:11434` next to `COMPOSE_PROFILES=local-ai`
+> in `./.env` when console commands must reach the local models too.
 
 ---
 
@@ -373,11 +412,11 @@ On first start, the system:
 
 1. Creates `backend/.env` from template
 2. Installs dependencies (Composer, npm)
-3. Generates JWT keypair for authentication
+3. Signs session cookies with `APP_SECRET` from `backend/.env` — no keypair to generate; keep the value stable so sessions survive restarts ([details](ADMIN.md#sessions-survive-restarts))
 4. Creates database schema
 5. Loads test fixtures (if database is empty)
-6. Downloads the Ollama embedding model in the background — standard install only,
-   and only while `AUTO_DOWNLOAD_MODELS=true` (the Minimal stack sets it to `false`)
+6. Downloads the Ollama embedding model in the background — only with the
+   `local-ai` profile, which is what sets `AUTO_DOWNLOAD_MODELS=true`
 7. Points chat at a provider that has a usable key, if the default one has none
 8. Starts all services
 

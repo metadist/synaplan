@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
+use App\AI\Health\ModelHealthRecorder;
 use App\AI\Provider\GoogleProvider;
 use App\AI\Provider\XaiProvider;
 use App\AI\Service\AiFacade;
@@ -48,6 +49,7 @@ class AiFacadeAsyncVideoTest extends TestCase
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(HiggsfieldCredentialResolver::class),
             $this->createMock(TranscriptionUsageRecorder::class),
+            $this->createMock(ModelHealthRecorder::class),
             '/tmp'
         );
     }

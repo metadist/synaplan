@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\ApiKey;
+use App\Entity\DesktopDevice;
 use App\Entity\User;
 use App\Mcp\McpServerFactory;
+use App\Repository\DesktopDeviceRepository;
 use GuzzleHttp\Psr7\ServerRequest;
 use Mcp\Server\Transport\Http\Middleware\DnsRebindingProtectionMiddleware;
 use Mcp\Server\Transport\Http\Middleware\ProtocolVersionMiddleware;
@@ -38,6 +41,7 @@ class McpController extends AbstractController
 
     public function __construct(
         private readonly McpServerFactory $serverFactory,
+        private readonly DesktopDeviceRepository $desktopDeviceRepository,
         private readonly LoggerInterface $logger,
         private readonly string $appUrl,
         private readonly string $oidcDiscoveryUrl,
@@ -73,8 +77,10 @@ class McpController extends AbstractController
             ],
         );
 
+        $device = $this->resolveDesktopDevice($request);
+
         try {
-            $psrResponse = $this->serverFactory->build($user)->run($transport);
+            $psrResponse = $this->serverFactory->build($user, $device)->run($transport);
         } catch (\InvalidArgumentException $e) {
             // A malformed / unknown `Mcp-Session-Id` makes the SDK throw while
             // parsing the header (Uuid::fromString) instead of producing a
@@ -92,6 +98,21 @@ class McpController extends AbstractController
         }
 
         return $this->toSymfonyResponse($psrResponse);
+    }
+
+    /**
+     * If this MCP request was authenticated by an API key that backs a paired
+     * computer, resolve that device so the factory can expose the desktop
+     * check-in tools. OIDC-bearer and non-desktop key requests resolve to null.
+     */
+    private function resolveDesktopDevice(Request $request): ?DesktopDevice
+    {
+        $apiKey = $request->attributes->get('api_key');
+        if (!$apiKey instanceof ApiKey || null === $apiKey->getId()) {
+            return null;
+        }
+
+        return $this->desktopDeviceRepository->findByApiKeyId((int) $apiKey->getId());
     }
 
     /**

@@ -1,0 +1,6 @@
+{
+  "schema": "agent.v1",
+  "behaviour": {
+    "memory": "shared"
+  }
+}

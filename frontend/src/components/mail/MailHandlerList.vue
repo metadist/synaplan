@@ -1,27 +1,15 @@
 <template>
   <div class="space-y-6">
-    <!-- Hero Header -->
-    <div class="relative overflow-hidden surface-card rounded-2xl">
-      <div
-        class="absolute inset-0 bg-gradient-to-br from-[var(--brand)]/5 via-transparent to-purple-500/5"
-      ></div>
-      <div
-        class="absolute top-0 right-0 w-64 h-64 bg-[var(--brand)]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
-      ></div>
-      <div class="relative px-8 py-8 flex items-center justify-between gap-6">
-        <div class="flex items-center gap-5 min-w-0">
-          <div
-            class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-purple-500 flex items-center justify-center shadow-lg shadow-[var(--brand)]/20 shrink-0"
-          >
-            <EnvelopeIcon class="w-7 h-7 text-white" />
-          </div>
-          <div class="min-w-0">
-            <h1 class="text-2xl font-bold txt-primary">{{ $t('mail.savedHandlers') }}</h1>
-            <p class="text-sm txt-secondary mt-1">{{ $t('mail.savedHandlersDesc') }}</p>
-          </div>
-        </div>
+    <!-- Header -->
+    <PageHeader
+      :title="$t('mail.savedHandlers')"
+      :subtitle="$t('mail.savedHandlersDesc')"
+      icon="heroicons:envelope"
+    >
+      <!-- v-if on the template keeps PageHeader's actions wrapper from rendering
+           empty (with its flex gap) when there are no handlers yet. -->
+      <template v-if="handlers.length > 0" #actions>
         <button
-          v-if="handlers.length > 0"
           class="btn-primary px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-[var(--brand)]/20 hover:shadow-xl hover:shadow-[var(--brand)]/30 transition-all shrink-0"
           data-testid="btn-create-handler"
           @click="$emit('create')"
@@ -29,8 +17,8 @@
           <PlusIcon class="w-5 h-5" />
           {{ $t('mail.createHandler') }}
         </button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Bulk actions bar -->
     <transition
@@ -269,6 +257,7 @@ import {
   CheckIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import type { SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 import { useDateFormat } from '@/composables/useDateFormat'
 import MailHandlerActivityLogModal from './MailHandlerActivityLogModal.vue'

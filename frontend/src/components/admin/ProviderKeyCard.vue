@@ -36,21 +36,42 @@
         {{ $t('adminSetup.freeTier') }}
       </span>
       <span v-if="provider.configured" class="font-mono">{{ provider.maskedKey }}</span>
-      <span v-if="provider.configured && provider.source === 'env'">
-        ({{ $t('adminSetup.sourceEnv') }})
+      <span
+        v-if="provider.configured && provider.source === 'env'"
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--status-success-muted)] text-[var(--status-success-text)] font-medium"
+        :data-testid="`provider-key-source-env-${provider.name}`"
+      >
+        <Icon icon="mdi:server-network" class="w-3.5 h-3.5" />
+        {{ $t('adminSetup.sourceEnv') }}
       </span>
       <span v-if="provider.configured && provider.source === 'db' && provider.origin === 'env'">
         ({{ $t('adminSetup.sourceDbFromEnv') }})
       </span>
-      <span v-if="isDefaultChat" class="inline-flex items-center gap-1 txt-brand font-medium">
+      <span
+        v-if="
+          provider.configured &&
+          !provider.testable &&
+          provider.source === 'db' &&
+          provider.origin === 'ui'
+        "
+        class="inline-flex items-center gap-1"
+        :data-testid="`provider-key-untested-${provider.name}`"
+      >
+        <Icon icon="mdi:shield-off-outline" class="w-3.5 h-3.5" />
+        {{ $t('adminSetup.savedNotTested') }}
+      </span>
+      <span
+        v-if="isDefaultChat && provider.configured"
+        class="inline-flex items-center gap-1 txt-brand font-medium"
+      >
         <Icon icon="mdi:star" class="w-3.5 h-3.5" />
         {{ $t('adminSetup.currentDefault') }}
       </span>
     </div>
 
-    <!-- Key input -->
+    <!-- Key input (+ secret half for key + secret providers) -->
     <div class="flex flex-col gap-2">
-      <div class="flex gap-2">
+      <div class="flex flex-col gap-2" :class="{ 'sm:flex-row': !needsSecret }">
         <input
           v-model="keyInput"
           type="password"
@@ -59,21 +80,39 @@
               ? $t('adminSetup.replaceKeyPlaceholder')
               : $t('adminSetup.keyPlaceholder')
           "
-          class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+          class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :aria-label="$t('adminSetup.keyAriaLabel', { provider: provider.displayName })"
           :data-testid="`provider-key-input-${provider.name}`"
           autocomplete="off"
           @keydown.enter="save"
         />
+        <input
+          v-if="needsSecret"
+          v-model="secretInput"
+          type="password"
+          :placeholder="$t('adminSetup.secretPlaceholder')"
+          class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :aria-label="$t('adminSetup.secretAriaLabel', { provider: provider.displayName })"
+          :data-testid="`provider-secret-input-${provider.name}`"
+          autocomplete="off"
+          @keydown.enter="save"
+        />
         <button
-          class="btn-primary whitespace-nowrap"
-          :disabled="saving || keyInput.trim() === ''"
+          type="button"
+          class="btn-primary whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="saving || !canSave"
           :data-testid="`provider-key-save-${provider.name}`"
           @click="save"
         >
           <Icon v-if="saving" icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          <span v-else>{{ $t('adminSetup.saveAndTest') }}</span>
+          <span v-else>{{
+            provider.testable ? $t('adminSetup.saveAndTest') : $t('adminSetup.saveUntested')
+          }}</span>
         </button>
       </div>
+      <p v-if="needsSecret" class="text-xs txt-secondary">
+        {{ $t('adminSetup.secretHint', { provider: provider.displayName }) }}
+      </p>
       <p
         v-if="provider.source === 'db' && provider.origin === 'ui'"
         class="text-xs txt-secondary"
@@ -89,8 +128,9 @@
         {{ $t('adminSetup.sourceDbFromEnvHint') }}
       </p>
       <label
-        v-if="keyInput.trim() !== ''"
+        v-if="keyInput.trim() !== '' && hasChatDefaults"
         class="flex items-center gap-2 text-sm txt-secondary cursor-pointer"
+        :data-testid="`provider-key-apply-defaults-${provider.name}`"
       >
         <input v-model="applyDefaultsChecked" type="checkbox" class="accent-[var(--brand)]" />
         {{ $t('adminSetup.applyDefaultsOnSave') }}
@@ -110,8 +150,11 @@
       </a>
       <template v-if="provider.configured">
         <button
-          class="txt-secondary hover:txt-primary inline-flex items-center gap-1"
+          v-if="provider.testable"
+          type="button"
+          class="txt-secondary hover:txt-primary inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="testing"
+          :data-testid="`provider-key-test-${provider.name}`"
           @click="test"
         >
           <Icon
@@ -122,9 +165,11 @@
           {{ $t('adminSetup.testKey') }}
         </button>
         <button
-          v-if="!isDefaultChat"
-          class="txt-secondary hover:txt-primary inline-flex items-center gap-1"
+          v-if="!isDefaultChat && hasChatDefaults"
+          type="button"
+          class="txt-secondary hover:txt-primary inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="applying"
+          :data-testid="`provider-key-make-default-${provider.name}`"
           @click="makeDefault"
         >
           <Icon
@@ -136,8 +181,10 @@
         </button>
         <button
           v-if="provider.source === 'db'"
-          class="text-[var(--status-error)] hover:underline inline-flex items-center gap-1"
+          type="button"
+          class="text-[var(--status-error)] hover:underline inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="removing"
+          :data-testid="`provider-key-remove-${provider.name}`"
           @click="remove"
         >
           <Icon
@@ -182,11 +229,26 @@ const { confirm } = useDialog()
 const { success, error: showError } = useNotification()
 
 const keyInput = ref('')
+const secretInput = ref('')
 const saving = ref(false)
 const testing = ref(false)
 const applying = ref(false)
 const removing = ref(false)
 const helpMeta = computed(() => providerHelpByName(props.provider.name))
+
+/** Key + secret providers (Higgsfield): both halves or nothing. */
+const needsSecret = computed(() => Boolean(props.provider.secretEnvVar))
+const canSave = computed(
+  () => keyInput.value.trim() !== '' && (!needsSecret.value || secretInput.value.trim() !== '')
+)
+
+/**
+ * Media and speech providers serve no chat model, so "use as default" and
+ * "also use for chat" would bind the install to nothing. Mirrors
+ * ProviderDefaultsService::supports() on the server.
+ */
+// Media/speech providers share the card but never become the chat default.
+const hasChatDefaults = computed(() => props.provider.chat)
 
 // Offer "also make this the default" only while it is not already the default.
 // A ref alone would keep the initial value after the parent re-fetches, so the
@@ -194,7 +256,9 @@ const helpMeta = computed(() => providerHelpByName(props.provider.name))
 const applyDefaultsTouched = ref(false)
 const applyDefaultsOverride = ref(false)
 const applyDefaultsChecked = computed({
-  get: () => (applyDefaultsTouched.value ? applyDefaultsOverride.value : !props.isDefaultChat),
+  get: () =>
+    hasChatDefaults.value &&
+    (applyDefaultsTouched.value ? applyDefaultsOverride.value : !props.isDefaultChat),
   set: (value: boolean) => {
     applyDefaultsTouched.value = true
     applyDefaultsOverride.value = value
@@ -203,17 +267,22 @@ const applyDefaultsChecked = computed({
 
 const save = async () => {
   const key = keyInput.value.trim()
-  if (key === '' || saving.value) return
+  if (!canSave.value || saving.value) return
   saving.value = true
   try {
     const result = await saveProviderKey(props.provider.name, key, {
       applyDefaults: applyDefaultsChecked.value,
+      ...(needsSecret.value ? { secret: secretInput.value.trim() } : {}),
     })
     keyInput.value = ''
+    secretInput.value = ''
+    // Say what happened: a provider without a probe was stored, not verified.
     success(
       result.defaultsApplied
         ? t('adminSetup.savedWithDefaults', { provider: props.provider.displayName })
-        : t('adminSetup.saved', { provider: props.provider.displayName })
+        : result.tested
+          ? t('adminSetup.saved', { provider: props.provider.displayName })
+          : t('adminSetup.savedUntested', { provider: props.provider.displayName })
     )
     emit('changed')
   } catch (err) {

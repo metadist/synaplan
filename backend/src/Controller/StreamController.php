@@ -3,28 +3,49 @@
 namespace App\Controller;
 
 use App\AI\Service\AiFacade;
+use App\AI\Service\ProviderDisplayNames;
 use App\Entity\Chat;
 use App\Entity\File;
+use App\Entity\GuestSession;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
+use App\Entity\WidgetSession;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Agent\AgentService;
+use App\Service\Agent\Exception\AgentArchivedException;
+use App\Service\Agent\Exception\AgentNotAccessibleException;
+use App\Service\Agent\Exception\AgentNotPublishedException;
+use App\Service\Chat\ChatTitleService;
+use App\Service\Chat\Run\ChatRun;
+use App\Service\Chat\Run\ChatRunRecorder;
+use App\Service\Chat\Run\ChatRunService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
+use App\Service\File\GeneratedDocumentBundle;
+use App\Service\File\GeneratedDocumentStore;
+use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\ChatErrorNotifier;
+use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ChatErrorView;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\PerfTimer;
 use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
@@ -40,6 +61,7 @@ use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\InputBag;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -71,6 +93,16 @@ class StreamController extends AbstractController
     private const MAX_INCOGNITO_HISTORY_MESSAGES = MessageProcessor::HISTORY_MAX_MESSAGES;
     private const MAX_INCOGNITO_HISTORY_CHARS = MessageProcessor::HISTORY_MAX_CHARS;
 
+    /**
+     * UI locales accepted as a BLANG seed, mirroring the SPA's
+     * `supportedLanguages` (frontend/src/i18n/index.ts) and
+     * {@see User::getLocale()}. Anything else falls back to `en` so a crafted
+     * value cannot poison BMESSAGES.BLANG (varchar(2)).
+     *
+     * @var list<string>
+     */
+    private const SUPPORTED_UI_LANGUAGES = ['de', 'en', 'es', 'fr', 'tr'];
+
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
@@ -80,6 +112,7 @@ class StreamController extends AbstractController
         private WidgetService $widgetService,
         private WidgetSessionService $widgetSessionService,
         private GuestSessionService $guestSessionService,
+        private GuestChatConfig $guestChatConfig,
         private RateLimitService $rateLimitService,
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
@@ -87,6 +120,7 @@ class StreamController extends AbstractController
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private ConversationSummaryRefreshDispatcher $conversationSummaryRefreshDispatcher,
+        private ChatTitleService $chatTitleService,
         private DocumentGeneratorService $documentGenerator,
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private MediaCancellationStore $cancellationStore,
@@ -96,8 +130,33 @@ class StreamController extends AbstractController
         private UsageStatsService $usageStatsService,
         private UsageTaximeterConfig $usageTaximeterConfig,
         private PremiumFeatureGate $premiumFeatureGate,
+        private ChatRunService $chatRunService,
+        private ChatErrorPresenter $chatErrorPresenter,
+        private ChatErrorNotifier $chatErrorNotifier,
+        private AgentConfig $agentConfig,
+        private AgentService $agentService,
+        private AgentRuntimeResolver $agentRuntimeResolver,
+        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
+        private ?GeneratedDocumentStore $generatedDocumentStore = null,
+        private ?ProviderDisplayNames $providerDisplayNames = null,
     ) {
     }
+
+    /**
+     * Recorder for the turn currently being streamed by THIS request, mirroring
+     * every SSE event into a replayable Redis log so a returning client can
+     * re-attach. Set at the top of the stream callback and cleared in its
+     * `finally`, so it never leaks into the next request in worker mode.
+     */
+    private ?ChatRunRecorder $activeRun = null;
+
+    /**
+     * One-shot guard for the "connection aborted" log line. Detaching mid-turn
+     * is the normal case now (the turn keeps generating for a client that comes
+     * back), so logging per suppressed event would flood the log with one line
+     * per token for the rest of the answer.
+     */
+    private bool $abortLogged = false;
 
     private function suppressUnparseableOfficemakerEnvelope(
         string $text,
@@ -220,14 +279,14 @@ class StreamController extends AbstractController
     #[OA\Get(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response',
-        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments. NOTE: the message rides in the URL, so long texts can exceed proxy request-line limits (HTTP 431/414) — prefer the POST variant for anything beyond a few KB.',
+        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments. Status events include memories_loaded and docs_loaded (documentation citations for the synaplan topic). NOTE: the message rides in the URL, so long texts can exceed proxy request-line limits (HTTP 431/414) — prefer the POST variant for anything beyond a few KB.',
         security: [['Bearer' => []]],
         tags: ['Messages']
     )]
     #[OA\Post(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response (POST body)',
-        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
+        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, agentId, draft, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
         security: [['Bearer' => []]],
         tags: ['Messages'],
         requestBody: new OA\RequestBody(
@@ -240,7 +299,7 @@ class StreamController extends AbstractController
                     new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
                     new OA\Property(property: 'reasoning', type: 'string', enum: ['0', '1'], example: '0'),
                     new OA\Property(property: 'webSearch', type: 'string', enum: ['0', '1'], example: '0'),
-                    new OA\Property(property: 'language', type: 'string', enum: ['de', 'en', 'es', 'tr'], example: 'de', description: 'Active UI locale from the client. Seeds BLANG on the inbound message so the sorter / Brave search / reply language prefer the interface language when the message language cannot be detected.'),
+                    new OA\Property(property: 'language', type: 'string', enum: ['de', 'en', 'es', 'fr', 'tr'], example: 'de', description: 'Active UI locale from the client. Seeds BLANG on the inbound message so the sorter / Brave search / reply language prefer the interface language when the message language cannot be detected.'),
                     new OA\Property(property: 'modelId', type: 'string', example: '53'),
                     new OA\Property(property: 'fileIds', type: 'string', example: '1,2,3'),
                     new OA\Property(property: 'guestSession', type: 'string', example: 'gs_abc123'),
@@ -302,7 +361,7 @@ class StreamController extends AbstractController
         in: 'query',
         required: false,
         description: 'Active UI locale from the client (de/en/es/tr). Seeds inbound BLANG for sorting, Brave search_lang/ui_lang, and the reply language directive.',
-        schema: new OA\Schema(type: 'string', enum: ['de', 'en', 'es', 'tr'], example: 'de')
+        schema: new OA\Schema(type: 'string', enum: ['de', 'en', 'es', 'fr', 'tr'], example: 'de')
     )]
     #[OA\Parameter(
         name: 'modelId',
@@ -345,6 +404,20 @@ class StreamController extends AbstractController
         required: false,
         description: 'ID of a specific prompt to use. Takes precedence over promptTopic. The prompt must belong to the current user or be a system prompt.',
         schema: new OA\Schema(type: 'integer', example: 42)
+    )]
+    #[OA\Parameter(
+        name: 'agentId',
+        in: 'query',
+        required: false,
+        description: 'ID of an assistant to pin this chat to. When AGENTS.ENABLED is on, classification skips the sorter and the reply uses that assistant. Ignored when the flag is off. The prompt must belong to the current user.',
+        schema: new OA\Schema(type: 'integer', example: 7)
+    )]
+    #[OA\Parameter(
+        name: 'draft',
+        in: 'query',
+        required: false,
+        description: 'When 1, pin the owner\'s unpublished draft (test panel). Non-owners receive 403. Ignored when agentId is absent.',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
     )]
     #[OA\Parameter(
         name: 'ragGroupKey',
@@ -464,6 +537,16 @@ class StreamController extends AbstractController
                 // Guest Mode: Check for guest session parameter (query or POST body)
                 $guestSessionId = $params->get('guestSession');
                 if ($guestSessionId) {
+                    if (!$this->guestChatConfig->isEnabled()) {
+                        // Distinguish "trial disabled" from "session expired" so
+                        // clients do not offer a new-trial/sign-up flow that the
+                        // instance cannot serve (issue #1517).
+                        return $this->json([
+                            'error' => 'Guest chat is disabled on this instance.',
+                            'code' => GuestChatConfig::DISABLED_CODE,
+                        ], Response::HTTP_FORBIDDEN);
+                    }
+
                     $guestSession = $this->guestSessionService->getSession($guestSessionId);
                     if ($guestSession && !$guestSession->isExpired()) {
                         if (!$this->guestSessionService->checkLimit($guestSession)) {
@@ -520,6 +603,20 @@ class StreamController extends AbstractController
         $fileIds = $params->get('fileIds', ''); // NEW: comma-separated list or single ID
         $promptTopic = $params->get('promptTopic');
         $promptId = $params->get('promptId');
+        $agentIdParam = $params->getInt('agentId') ?: null;
+        $pinnedAgentId = $this->resolvePinnedAgentId($user, $agentIdParam);
+        $draftRequested = $this->isTruthyFlag($params->get('draft'));
+        if ($draftRequested) {
+            $draftDenied = $this->denyDraftIfNotOwner($user, $pinnedAgentId);
+            if (null !== $draftDenied) {
+                return $draftDenied;
+            }
+        }
+        $pinnedAgentVersionId = null;
+        $agentAccessDenied = $this->denyAgentRuntime($user, $pinnedAgentId, $draftRequested, is_numeric($chatId) ? (int) $chatId : null, $pinnedAgentVersionId);
+        if (null !== $agentAccessDenied) {
+            return $agentAccessDenied;
+        }
         // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
         // which then flows into a string-typed processing option and 500s
         // downstream. `getString()` rejects non-scalar input with a clean 400,
@@ -664,7 +761,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId, $draftRequested, $pinnedAgentVersionId) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -702,7 +799,7 @@ class StreamController extends AbstractController
             );
 
             // Helper to save error message
-            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId, $intendedChat, $incognito) {
+            $saveError = function ($chat, $incomingMessage, ChatErrorView $view, string $provider = 'system') use ($user, $trackId, $intendedChat, $incognito, $uiLanguage, $pinnedAgentId, $pinnedAgentVersionId) {
                 if (!$incomingMessage) {
                     return null;
                 }
@@ -732,13 +829,14 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMessageType('WEB');
                     $outgoingMessage->setFile(0);
                     $outgoingMessage->setTopic('ERROR');
-                    $outgoingMessage->setLanguage('en');
-                    $outgoingMessage->setText($errorMessage);
+                    $outgoingMessage->setLanguage($uiLanguage);
+                    $outgoingMessage->setText($view->userText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     $displayProvider = $intendedChat['provider'] ?? $provider;
                     $displayModel = $intendedChat['name'] ?? 'unknown';
@@ -747,7 +845,7 @@ class StreamController extends AbstractController
                     if (null !== ($intendedChat['id'] ?? null)) {
                         $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedChat['id']);
                     }
-                    $outgoingMessage->setMeta('error_type', $errorType);
+                    $this->persistChatErrorMeta($outgoingMessage, $view);
 
                     $incomingMessage->setTopic('ERROR');
                     $incomingMessage->setStatus('error');
@@ -764,6 +862,22 @@ class StreamController extends AbstractController
 
             $chat = null;
             $incomingMessage = null;
+
+            // Open a resumable run for this turn: every SSE event below is
+            // mirrored into a replayable Redis log so a client that reloads or
+            // navigates away can re-attach and keep watching (see ChatRun).
+            //
+            // Incognito is deliberately excluded — it promises that nothing of
+            // the turn is kept server-side, and a resumable buffer is exactly
+            // that. Incognito turns therefore stream as before, without resume.
+            $this->activeRun = $incognito ? null : $this->chatRunService->begin(
+                $this->resolveRunOwnerKey($user, $isWidgetMode ? $widgetSession : null, $isGuestMode ? $guestSession : null),
+                is_numeric($chatId) ? (int) $chatId : null,
+                (string) $trackId,
+            );
+            if (null !== $this->activeRun) {
+                $this->sendSSE('run_started', ['runId' => $this->activeRun->getRunId()]);
+            }
 
             try {
                 // Load chat — skipped in incognito mode: the turn has no
@@ -861,6 +975,11 @@ class StreamController extends AbstractController
                     }
                 }
 
+                $this->stampAgentId($incomingMessage, $pinnedAgentId, $pinnedAgentVersionId);
+                if (null !== $pinnedAgentId && !$incognito) {
+                    $this->em->flush();
+                }
+
                 // Issue #1024: relay the operator prompt to WhatsApp before AI processing so
                 // the full conversation flow (prompt + response) is visible on the WhatsApp side.
                 // Guards: widget/guest users are not platform operators; continue-messages use a
@@ -880,6 +999,7 @@ class StreamController extends AbstractController
                         if ($file && $file->getUserId() === $user->getId()) {
                             // Associate file with message using ManyToMany relationship
                             $incomingMessage->addFile($file);
+                            $file->keepAfterChatSend($incognito);
                             ++$fileCount;
 
                             $this->logger->info('StreamController: File attached to message', [
@@ -986,6 +1106,16 @@ class StreamController extends AbstractController
                     // duplicate media recordUsage() below.
                     'record_media_usage' => true,
                 ];
+
+                if (null !== $pinnedAgentId) {
+                    $processingOptions['agentId'] = $pinnedAgentId;
+                    if ($draftRequested) {
+                        $processingOptions['agentDraft'] = true;
+                    }
+                    if (null !== $pinnedAgentVersionId) {
+                        $processingOptions['agentVersionId'] = $pinnedAgentVersionId;
+                    }
+                }
 
                 // Quoted reference ("Mention in chat"): ChatHandler injects this
                 // as a dedicated context block in the system prompt.
@@ -1158,6 +1288,15 @@ class StreamController extends AbstractController
                                     ]);
                                 }
                                 $reasoningBuffer .= $content;
+                                // Stream the reasoning as it is produced so the
+                                // client can show the model thinking live. The
+                                // buffered <think> block still follows with the
+                                // first answer token: it is what gets persisted
+                                // and what the client reconciles the live part
+                                // against, so nothing is rendered twice.
+                                if ('' !== $content) {
+                                    $this->sendSSE('reasoning', ['chunk' => $content]);
+                                }
                             } else {
                                 // If we have buffered reasoning, close it and send
                                 if ($hasReasoningStarted) {
@@ -1284,9 +1423,16 @@ class StreamController extends AbstractController
                             return;
                         }
 
+                        $metadata = is_array($statusUpdate['metadata'] ?? null) ? $statusUpdate['metadata'] : [];
+                        // "claude-opus-4-8 by Anthropic": the narration names
+                        // the vendor, routing only knows the service key.
+                        if (null !== $this->providerDisplayNames) {
+                            $metadata = $this->providerDisplayNames->enrich($metadata);
+                        }
+
                         $this->sendSSE($statusUpdate['status'], [
                             'message' => $statusUpdate['message'],
-                            'metadata' => $statusUpdate['metadata'] ?? [],
+                            'metadata' => $metadata,
                             'timestamp' => $statusUpdate['timestamp'],
                         ]);
                     },
@@ -1335,57 +1481,17 @@ class StreamController extends AbstractController
                 }
 
                 if (!$result['success']) {
-                    // Build user-friendly error message as AI response
-                    $isDev = 'dev' === $this->getParameter('kernel.environment');
+                    $isAdmin = $this->isGranted('ROLE_ADMIN');
+                    $errorLang = $this->resolveErrorLanguage($result, $uiLanguage);
+                    $errorView = $this->presentChatFailure($result, $errorLang, $isAdmin);
+                    $errorMessage = $errorView->userText;
 
-                    $errorMessage = '## ⚠️ '.$result['error']."\n\n";
+                    $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? ($result['provider'] ?? null), $user->getId(), [
+                        'model' => $intendedChat['name'] ?? null,
+                        'chat_id' => $chat?->getId(),
+                    ]);
 
-                    // Add installation instructions ONLY in dev mode
-                    if ($isDev && isset($result['context'])) {
-                        $context = $result['context'];
-
-                        // If a specific model was requested, show it prominently
-                        if (isset($context['requested_model']) && isset($context['install_command'])) {
-                            $errorMessage .= "### 💡 Install the Model You Selected\n\n";
-                            $errorMessage .= "```bash\n".$context['install_command']."\n```\n\n";
-                        }
-
-                        // Show alternative models if available
-                        if (isset($context['suggested_models'])) {
-                            $errorMessage .= "### 📦 Or Try These Alternatives\n\n";
-
-                            if (isset($context['suggested_models']['quick'])) {
-                                $errorMessage .= "**Quick & Light:**\n";
-                                foreach ($context['suggested_models']['quick'] as $model) {
-                                    $errorMessage .= "- `{$model}`\n";
-                                }
-                                $errorMessage .= "\n";
-                            }
-
-                            if (isset($context['suggested_models']['medium'])) {
-                                $errorMessage .= "**Medium (Better Quality):**\n";
-                                foreach ($context['suggested_models']['medium'] as $model) {
-                                    $errorMessage .= "- `{$model}`\n";
-                                }
-                                $errorMessage .= "\n";
-                            }
-
-                            if (isset($context['suggested_models']['large'])) {
-                                $errorMessage .= "**Large (Best Quality):**\n";
-                                foreach ($context['suggested_models']['large'] as $model) {
-                                    $errorMessage .= "- `{$model}`\n";
-                                }
-                                $errorMessage .= "\n";
-                            }
-                        }
-
-                        $errorMessage .= '*After downloading, refresh the page and try again.*';
-                    } elseif (!$isDev) {
-                        // Production: Generic message without technical details
-                        $errorMessage .= '*Please contact your system administrator or try selecting a different AI model.*';
-                    }
-
-                    // Stream the error message as data chunks (like normal AI response)
+                    // Stream the localized error as data chunks (like a normal AI response)
                     $this->sendSSE('data', ['chunk' => $errorMessage]);
 
                     // Recover original classification topic for correct frontend model selection
@@ -1413,7 +1519,7 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMessageType('WEB');
                     $outgoingMessage->setFile(0);
                     $outgoingMessage->setTopic('ERROR');
-                    $outgoingMessage->setLanguage('en');
+                    $outgoingMessage->setLanguage($errorLang);
                     $outgoingMessage->setText($errorMessage);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
@@ -1422,6 +1528,7 @@ class StreamController extends AbstractController
                         $this->em->persist($outgoingMessage);
                         $this->em->flush(); // Flush to get message ID for metadata
                     }
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     // Store error details in metadata (show user's selected chat model, not literal "error")
                     $outgoingMessage->setMeta(
@@ -1432,7 +1539,7 @@ class StreamController extends AbstractController
                     if (null !== ($intendedChat['id'] ?? null)) {
                         $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedChat['id']);
                     }
-                    $outgoingMessage->setMeta('error_type', $result['error'] ?? 'unknown');
+                    $this->persistChatErrorMeta($outgoingMessage, $errorView);
                     if ($originalTopic) {
                         $outgoingMessage->setMeta('original_topic', $originalTopic);
                     }
@@ -1469,8 +1576,9 @@ class StreamController extends AbstractController
                         'topic' => 'ERROR',
                         'originalTopic' => $originalTopic,
                         'originalMediaType' => $originalMediaType,
-                        'language' => 'en',
+                        'language' => $errorLang,
                         'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
+                        ...$errorView->toSseFields(),
                     ];
 
                     if (isset($result['error_hint'])) {
@@ -1541,6 +1649,7 @@ class StreamController extends AbstractController
 
                 $finalText = $responseText;
                 $generatedFile = null;
+                $generatedBundle = null;
 
                 if ($originalOutgoingMessage) {
                     // Continuation: append new text to the original message
@@ -1579,17 +1688,22 @@ class StreamController extends AbstractController
                         // The document text is complete — now convert it into the
                         // actual office file. The frontend translates the stage;
                         // never send hardcoded user-facing strings from here.
-                        $this->sendSSE('generating_file', [
-                            'metadata' => [
-                                'stage' => 'converting',
-                                'filename' => $fileEnvelope['filename'],
-                            ],
-                        ]);
+                        $convertingMeta = [
+                            'stage' => 'converting',
+                            'filename' => $fileEnvelope['filename'],
+                        ];
+                        if (null !== $this->generatedDocumentStore
+                            && $this->generatedDocumentStore->willExportPdf($fileEnvelope, $incomingMessage)) {
+                            $convertingMeta['export'] = 'pdf';
+                            $convertingMeta['tool'] = GeneratedDocumentStore::CONVERTER_LABEL;
+                        }
+                        $this->sendSSE('generating_file', ['metadata' => $convertingMeta]);
 
-                        $generatedFile = $this->storeGeneratedFileInStream($fileEnvelope, $incomingMessage, $incognito);
+                        $generatedBundle = $this->storeGeneratedDocumentInStream($fileEnvelope, $incomingMessage, $incognito);
+                        $generatedFile = $generatedBundle?->primary();
 
                         if ($generatedFile) {
-                            $finalText = "__FILE_GENERATED__:{$fileEnvelope['filename']}";
+                            $finalText = "__FILE_GENERATED__:{$generatedFile->getFileName()}";
                             $this->logger->info('StreamController: File generation successful', [
                                 'file_id' => $generatedFile->getId(),
                                 'filename' => $generatedFile->getFileName(),
@@ -1659,6 +1773,17 @@ class StreamController extends AbstractController
                     // text must not be saved as an empty bubble — surface the
                     // failure marker the frontend translates
                     // (message.fileGenerationFailed) instead.
+                    if (null === $generatedFile && isset($response['metadata']['generated_file']) && is_array($response['metadata']['generated_file'])) {
+                        $fromToolsId = (int) ($response['metadata']['generated_file']['id'] ?? 0);
+                        if ($fromToolsId > 0) {
+                            $fromTools = $this->em->getRepository(File::class)->find($fromToolsId);
+                            if ($fromTools && $fromTools->getUserId() === $user->getId()) {
+                                $generatedFile = $fromTools;
+                                $finalText = "__FILE_GENERATED__:{$generatedFile->getFileName()}";
+                            }
+                        }
+                    }
+
                     if ('' === trim($finalText) && 'officemaker' === ($classification['topic'] ?? '')) {
                         $finalText = '__FILE_GENERATION_FAILED__';
                         $this->logger->error('StreamController: document generation produced neither file nor text');
@@ -1678,6 +1803,7 @@ class StreamController extends AbstractController
                     $outgoingMessage->setText($finalText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     // Incognito: the OUT message stays transient. addFile() below
                     // is in-memory only — the File rows themselves exist (marked
@@ -1687,7 +1813,14 @@ class StreamController extends AbstractController
                         $this->em->flush();
                     }
 
-                    if ($generatedFile) {
+                    if ($generatedBundle) {
+                        foreach ($generatedBundle->files() as $storedFile) {
+                            $outgoingMessage->addFile($storedFile);
+                        }
+                        if (!$incognito) {
+                            $this->em->flush();
+                        }
+                    } elseif ($generatedFile) {
                         $outgoingMessage->addFile($generatedFile);
                         if (!$incognito) {
                             $this->em->flush();
@@ -1733,6 +1866,10 @@ class StreamController extends AbstractController
 
                 if (!empty($response['metadata']['usage'])) {
                     $outgoingMessage->setMeta('ai_chat_usage', json_encode($response['metadata']['usage']));
+                }
+
+                if (isset($response['metadata']['docs']) && is_array($response['metadata']['docs']) && [] !== $response['metadata']['docs']) {
+                    $outgoingMessage->setMeta('docs', json_encode($response['metadata']['docs'], JSON_UNESCAPED_SLASHES));
                 }
 
                 if (!empty($response['metadata']['response_id'])) {
@@ -1786,6 +1923,7 @@ class StreamController extends AbstractController
                         (string) json_encode($response['metadata']['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
                     );
                 }
+                $this->persistTaskPlanDefinition($outgoingMessage, $response['metadata'] ?? []);
 
                 // Multi-task async media (DAG): image/video generation nodes create
                 // their MediaJob with the INCOMING user message id (the runner's
@@ -1847,10 +1985,15 @@ class StreamController extends AbstractController
                     $incomingMessage->setMeta('web_search_results_count', (string) $searchCount);
                     $outgoingMessage->setMeta('web_search_query', $searchQuery);
                     $outgoingMessage->setMeta('web_search_results_count', (string) $searchCount);
+                    $pagesRead = (int) ($effectiveSearchResults['pages_read'] ?? 0);
+                    if ($pagesRead > 0) {
+                        $outgoingMessage->setMeta('web_search_pages_read', (string) $pagesRead);
+                    }
 
                     $this->logger->info('StreamController: Stored search results metadata', [
                         'query' => $searchQuery,
                         'results_count' => $searchCount,
+                        'pages_read' => $pagesRead,
                     ]);
                 }
 
@@ -1891,6 +2034,20 @@ class StreamController extends AbstractController
                     $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
                 }
 
+                // Name the conversation once its first exchange is stored, so
+                // the sidebar stops filling with "Hi" and "New Chat" (#1500).
+                // Runs at most once per chat: titleWebChatIfNeeded() returns
+                // null as soon as a title exists, including one the user typed.
+                // Widget sessions title themselves on their own trigger, and
+                // incognito turns persist nothing to name.
+                $generatedChatTitle = null;
+                if (!$isWidgetMode && !$isGuestMode && !$incognito && $chat) {
+                    $generatedChatTitle = $this->chatTitleService->titleWebChatIfNeeded(
+                        $chat,
+                        (int) $user->getId(),
+                    );
+                }
+
                 $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                     'provider' => $response['metadata']['provider'] ?? 'unknown',
                     'model' => $response['metadata']['model'] ?? 'unknown',
@@ -1901,6 +2058,8 @@ class StreamController extends AbstractController
                     'source' => $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB'),
                     'response_text' => $finalText,
                     'input_text' => $messageText,
+                    'agentId' => $pinnedAgentId,
+                    'agentVersionId' => $pinnedAgentVersionId,
                 ]);
 
                 // Usage taximeter (issue: chat usage display). Build the
@@ -2032,6 +2191,12 @@ class StreamController extends AbstractController
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                 ];
 
+                // Only present on the turn that named the chat, so the sidebar
+                // can pick the title up without refetching the chat list.
+                if (null !== $generatedChatTitle) {
+                    $completeData['chatTitle'] = $generatedChatTitle;
+                }
+
                 // Usage taximeter: per-message usage (switch-independent) and,
                 // only when the display is enabled for authenticated web users,
                 // the live daily totals (so the two SUM queries are skipped when
@@ -2061,6 +2226,10 @@ class StreamController extends AbstractController
                     ]);
                 }
 
+                if (isset($response['metadata']['docs']) && is_array($response['metadata']['docs']) && [] !== $response['metadata']['docs']) {
+                    $completeData['docs'] = $response['metadata']['docs'];
+                }
+
                 // Include feedbacks used for this response
                 // Send only feedback IDs (frontend loads full feedbacks from store)
                 if (isset($response['metadata']['feedbacks']) && is_array($response['metadata']['feedbacks'])) {
@@ -2071,6 +2240,16 @@ class StreamController extends AbstractController
                     $this->logger->debug('StreamController: Including feedback IDs in complete event', [
                         'count' => count($completeData['feedbackIds']),
                     ]);
+                }
+
+                if (isset($response['metadata']['documentChanges']) && is_array($response['metadata']['documentChanges'])) {
+                    $completeData['documentChanges'] = $response['metadata']['documentChanges'];
+                }
+                if (isset($response['metadata']['documentVersion'])) {
+                    $completeData['documentVersion'] = (int) $response['metadata']['documentVersion'];
+                }
+                if (!empty($response['metadata']['documentFidelityLossy'])) {
+                    $completeData['documentFidelityLossy'] = true;
                 }
 
                 // Include generated file info if present
@@ -2120,8 +2299,7 @@ class StreamController extends AbstractController
 
                         $this->sendSSE('tts_generating', ['language' => $language]);
 
-                        $ttsText = TtsTextSanitizer::sanitize($responseText);
-                        $ttsText = mb_substr($ttsText, 0, 4000);
+                        $ttsText = TtsTextSanitizer::prepareForSynthesis($responseText);
 
                         if (!empty(trim($ttsText))) {
                             $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
@@ -2264,6 +2442,11 @@ class StreamController extends AbstractController
 
                 $this->sendSSE('complete', $completeData);
 
+                // Close the run only AFTER `complete` was recorded, so a client
+                // that re-attaches in the last moments still replays the
+                // terminal event instead of an open-ended log.
+                $this->activeRun?->finish(ChatRun::STATUS_COMPLETE, $outgoingMessage->getId());
+
                 usleep(100000);
 
                 $this->logger->info('Streamed message processed', [
@@ -2279,28 +2462,31 @@ class StreamController extends AbstractController
                     'context' => $e->getContext(),
                 ]);
 
-                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), $e->getProviderName(), 'provider_error');
+                $isAdmin = $this->isGranted('ROLE_ADMIN');
+                $errorView = $this->presentChatFailure(['exception' => $e, 'error' => $e->getMessage(), 'provider' => $e->getProviderName(), 'context' => $e->getContext()], $uiLanguage, $isAdmin);
+                $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? $e->getProviderName(), $user->getId(), [
+                    'model' => $intendedChat['name'] ?? null,
+                    'chat_id' => $chat?->getId(),
+                ]);
+
+                $messageId = $saveError($chat, $incomingMessage, $errorView, $e->getProviderName());
 
                 $errorData = [
-                    'error' => $e->getMessage(),
+                    'error' => $errorView->userText,
                     'provider' => $intendedChat['provider'] ?? $e->getProviderName(),
                     'model' => $intendedChat['name'] ?? 'unknown',
                     'model_id' => $intendedChat['id'],
                     'topic' => 'ERROR',
                     'trackId' => $trackId,
+                    ...$errorView->toSseFields(),
                 ];
 
                 if ($messageId) {
                     $errorData['messageId'] = $messageId;
                 }
 
-                // Add installation instructions if available
-                if ($context = $e->getContext()) {
-                    $errorData['install_command'] = $context['install_command'] ?? null;
-                    $errorData['suggested_models'] = $context['suggested_models'] ?? null;
-                }
-
                 $this->sendSSE('error', $errorData);
+                $this->activeRun?->finish(ChatRun::STATUS_ERROR, $messageId);
             } catch (StreamCancelledException) {
                 // Explicit user cancel (/stop-stream flagged the turn) — not an
                 // error and not a disconnect. The frontend persists the partial
@@ -2309,21 +2495,30 @@ class StreamController extends AbstractController
                     'user_id' => $user->getId(),
                     'track_id' => (string) $trackId,
                 ]);
+                $this->activeRun?->finish(ChatRun::STATUS_CANCELLED);
             } catch (\Exception $e) {
                 $this->logger->error('Streaming failed', [
                     'user_id' => $user->getId(),
                     'error' => $e->getMessage(),
                 ]);
 
-                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), 'system', 'exception');
+                $isAdmin = $this->isGranted('ROLE_ADMIN');
+                $errorView = $this->presentChatFailure(['exception' => $e, 'error' => $e->getMessage()], $uiLanguage, $isAdmin);
+                $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? 'system', $user->getId(), [
+                    'model' => $intendedChat['name'] ?? null,
+                    'chat_id' => $chat?->getId(),
+                ]);
+
+                $messageId = $saveError($chat, $incomingMessage, $errorView, 'system');
 
                 $errorData = [
-                    'error' => 'Failed to process message: '.$e->getMessage(),
+                    'error' => $errorView->userText,
                     'provider' => $intendedChat['provider'] ?? 'system',
                     'model' => $intendedChat['name'] ?? 'unknown',
                     'model_id' => $intendedChat['id'],
                     'topic' => 'ERROR',
                     'trackId' => $trackId,
+                    ...$errorView->toSseFields(),
                 ];
 
                 if ($messageId) {
@@ -2331,10 +2526,41 @@ class StreamController extends AbstractController
                 }
 
                 $this->sendSSE('error', $errorData);
+                $this->activeRun?->finish(ChatRun::STATUS_ERROR, $messageId);
+            } finally {
+                // Safety net: every path above marks its own outcome, but an
+                // early `return` (rate limit, chat not found, non-streaming
+                // model) or a Throwable that is not an Exception must not leave
+                // the run `running` — a client would then wait on a heartbeat
+                // that never ticks again. finish() is idempotent, so this only
+                // fires when nothing else closed the run.
+                $this->activeRun?->finishFromRecordedOutcome();
+                $this->activeRun = null;
+                $this->abortLogged = false;
             }
         });
 
         return $response;
+    }
+
+    /**
+     * Owner scope for a resumable run, used to gate the re-attach endpoint.
+     *
+     * Widget and guest turns run under a shared processing user, so the user id
+     * alone would let one visitor replay another's conversation — those scopes
+     * key on the session instead.
+     */
+    private function resolveRunOwnerKey(User $user, ?WidgetSession $widgetSession, ?GuestSession $guestSession): string
+    {
+        if (null !== $widgetSession) {
+            return ChatRunService::ownerKeyForWidget($widgetSession->getSessionId());
+        }
+
+        if (null !== $guestSession) {
+            return ChatRunService::ownerKeyForGuest($guestSession->getSessionId());
+        }
+
+        return ChatRunService::ownerKeyForUser((int) $user->getId());
     }
 
     /**
@@ -2432,16 +2658,28 @@ class StreamController extends AbstractController
                         return;
                     }
 
+                    $metadata = is_array($statusUpdate['metadata'] ?? null) ? $statusUpdate['metadata'] : [];
+                    if (null !== $this->providerDisplayNames) {
+                        $metadata = $this->providerDisplayNames->enrich($metadata);
+                    }
+
                     $this->sendSSE($statusUpdate['status'], [
                         'message' => $statusUpdate['message'],
-                        'metadata' => $statusUpdate['metadata'] ?? [],
+                        'metadata' => $metadata,
                         'timestamp' => $statusUpdate['timestamp'],
                     ]);
                 }
             );
 
             if (!$result['success']) {
-                $errorMessage = (string) ($result['error'] ?? 'Failed to process message');
+                $isAdmin = $this->isGranted('ROLE_ADMIN');
+                $errorLang = $this->resolveErrorLanguage($result, $message->getLanguage() ?: 'en');
+                $errorView = $this->presentChatFailure($result, $errorLang, $isAdmin);
+                $errorMessage = $errorView->userText;
+                $this->chatErrorNotifier->notify($errorView, $result['provider'] ?? null, $user->getId(), [
+                    'model' => $intendedModelId ? $this->modelConfigService->getModelName($intendedModelId) : null,
+                    'chat_id' => $chat?->getId(),
+                ]);
                 $failedClassification = $result['classification'] ?? null;
                 $originalTopic = null;
                 $originalMediaType = null;
@@ -2465,7 +2703,7 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMessageType('WEB');
                 $outgoingMessage->setFile(0);
                 $outgoingMessage->setTopic('ERROR');
-                $outgoingMessage->setLanguage('en');
+                $outgoingMessage->setLanguage($errorLang);
                 $outgoingMessage->setText($errorMessage);
                 $outgoingMessage->setDirection('OUT');
                 $outgoingMessage->setStatus('complete');
@@ -2487,7 +2725,7 @@ class StreamController extends AbstractController
                 if (null !== $intendedModelId) {
                     $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedModelId);
                 }
-                $outgoingMessage->setMeta('error_type', $errorMessage);
+                $this->persistChatErrorMeta($outgoingMessage, $errorView);
                 if (null !== $originalTopic) {
                     $outgoingMessage->setMeta('original_topic', $originalTopic);
                 }
@@ -2518,8 +2756,9 @@ class StreamController extends AbstractController
                     'topic' => 'ERROR',
                     'originalTopic' => $originalTopic,
                     'originalMediaType' => $originalMediaType,
-                    'language' => 'en',
+                    'language' => $errorLang,
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
+                    ...$errorView->toSseFields(),
                 ]);
 
                 return;
@@ -2601,6 +2840,10 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($metadata['usage']));
             }
 
+            if (isset($metadata['docs']) && is_array($metadata['docs']) && [] !== $metadata['docs']) {
+                $outgoingMessage->setMeta('docs', json_encode($metadata['docs'], JSON_UNESCAPED_SLASHES));
+            }
+
             if (!empty($metadata['response_id'])) {
                 $outgoingMessage->setMeta('openai_response_id', $metadata['response_id']);
             }
@@ -2625,6 +2868,7 @@ class StreamController extends AbstractController
                     (string) json_encode($metadata['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
                 );
             }
+            $this->persistTaskPlanDefinition($outgoingMessage, $metadata);
 
             // Mirror the streaming branch: rebind every async node job to the OUT
             // message, and give a job that already finished while bound to the IN
@@ -2661,6 +2905,10 @@ class StreamController extends AbstractController
                 $message->setMeta('web_search_results_count', (string) $searchCount);
                 $outgoingMessage->setMeta('web_search_query', $searchQuery);
                 $outgoingMessage->setMeta('web_search_results_count', (string) $searchCount);
+                $pagesRead = (int) ($effectiveSearchResults['pages_read'] ?? 0);
+                if ($pagesRead > 0) {
+                    $outgoingMessage->setMeta('web_search_pages_read', (string) $pagesRead);
+                }
             }
 
             $message->setTopic((string) ($classification['topic'] ?? $message->getTopic()));
@@ -2698,6 +2946,8 @@ class StreamController extends AbstractController
                 'source' => $source,
                 'response_text' => $content,
                 'input_text' => $message->getText(),
+                'agentId' => $options['agentId'] ?? null,
+                'agentVersionId' => $options['agentVersionId'] ?? null,
             ]);
 
             // Usage taximeter (mirrors the streaming branch): per-message usage
@@ -2782,6 +3032,11 @@ class StreamController extends AbstractController
                 $completeData['memoryIds'] = array_map(fn ($memory) => $memory['id'], $metadata['memories']);
             }
 
+            if (isset($metadata['docs']) && is_array($metadata['docs']) && [] !== $metadata['docs']) {
+                $completeData['docs'] = $metadata['docs'];
+                $outgoingMessage->setMeta('docs', json_encode($metadata['docs'], JSON_UNESCAPED_SLASHES));
+            }
+
             if (isset($metadata['feedbacks']) && is_array($metadata['feedbacks'])) {
                 $completeData['feedbackIds'] = array_filter(
                     array_map(fn ($feedback) => $feedback['id'] ?? null, $metadata['feedbacks']),
@@ -2795,7 +3050,23 @@ class StreamController extends AbstractController
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            $this->sendSSE('error', ['error' => 'Failed to process: '.$e->getMessage()]);
+            $isAdmin = $this->isGranted('ROLE_ADMIN');
+            $errorLang = $message->getLanguage() ?: 'en';
+            $errorView = $this->presentChatFailure(
+                ['exception' => $e, 'error' => $e->getMessage()],
+                $errorLang,
+                $isAdmin,
+            );
+            $this->chatErrorNotifier->notify($errorView, 'system', $user->getId(), [
+                'chat_id' => $chat?->getId(),
+            ]);
+            $this->sendSSE('error', [
+                'error' => $errorView->userText,
+                'topic' => 'ERROR',
+                'trackId' => $trackId,
+                'language' => $errorLang,
+                ...$errorView->toSseFields(),
+            ]);
         }
     }
 
@@ -2832,6 +3103,74 @@ class StreamController extends AbstractController
         }
 
         $this->memoryExtractionDispatcher->dispatch($payload);
+    }
+
+    /**
+     * Owner-only draft test mode. Missing pin or a foreign assistant → 403.
+     */
+    private function denyDraftIfNotOwner(?User $user, ?int $agentId): ?JsonResponse
+    {
+        if (null === $user || null === $agentId || $agentId < 1) {
+            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            $this->agentService->requireOwned($agentId, (int) $user->getId());
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
+        return null;
+    }
+
+    private function isTruthyFlag(mixed $value): bool
+    {
+        return true === $value || 1 === $value || '1' === (string) $value || 'true' === $value;
+    }
+
+    private function resolvePinnedAgentId(?User $user, ?int $agentId): ?int
+    {
+        if (null === $user || null === $agentId || $agentId < 1) {
+            return null;
+        }
+        if (!$this->agentConfig->isEnabled((int) $user->getId())) {
+            return null;
+        }
+
+        return $agentId;
+    }
+
+    /**
+     * @param-out int|null $agentVersionId
+     */
+    private function denyAgentRuntime(?User $user, ?int $agentId, bool $draft, ?int $chatId, ?int &$agentVersionId): ?JsonResponse
+    {
+        $agentVersionId = null;
+        if (null === $user || null === $agentId || $agentId < 1) {
+            return null;
+        }
+
+        try {
+            $profile = $this->agentRuntimeResolver->resolve($agentId, $user, $draft, $chatId);
+            $agentVersionId = $profile->agentVersionId;
+        } catch (AgentNotAccessibleException|AgentNotPublishedException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        } catch (AgentArchivedException) {
+            return $this->json(['error' => 'archived'], Response::HTTP_GONE);
+        }
+
+        return null;
+    }
+
+    private function stampAgentId(Message $message, ?int $agentId, ?int $agentVersionId = null): void
+    {
+        if (null === $agentId || $agentId < 1) {
+            return;
+        }
+        $message->setMeta('AGENTID', (string) $agentId);
+        if (null !== $agentVersionId && $agentVersionId > 0) {
+            $message->setMeta('AGENTVERSIONID', (string) $agentVersionId);
+        }
     }
 
     /**
@@ -2880,6 +3219,8 @@ class StreamController extends AbstractController
                 'published' => $result['age'] ?? null,
                 'source' => $result['profile']['name'] ?? null,
                 'thumbnail' => $result['thumbnail'] ?? null,
+                'fetched' => (bool) ($result['fetched'] ?? false),
+                'final_url' => is_string($result['final_url'] ?? null) ? $result['final_url'] : null,
             ];
         }, $rawSearchResults['results']);
     }
@@ -2954,6 +3295,30 @@ class StreamController extends AbstractController
     }
 
     /**
+     * Persist the executed DAG's node definitions (inputs/params, dependencies)
+     * on the OUT message. "Schedule this" turns them into the Saved Task's
+     * authored graph so a rerun replays the very steps the user saw work —
+     * without it a rerun re-plans from the instruction text and can degrade a
+     * `url_fetch → chat → email_me` turn into a single chat answer.
+     *
+     * @param array<string, mixed> $metadata handler-result metadata
+     */
+    private function persistTaskPlanDefinition(Message $message, array $metadata): void
+    {
+        $definition = $metadata[TaskPlanExecutor::PLAN_DEFINITION_KEY] ?? null;
+        if (!is_array($definition) || !is_array($definition['tasks'] ?? null) || [] === $definition['tasks']) {
+            return;
+        }
+
+        $encoded = json_encode($definition, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+        if (false === $encoded) {
+            return;
+        }
+
+        $message->setMeta(TaskPlanExecutor::PLAN_DEFINITION_META, $encoded);
+    }
+
+    /**
      * Persist `original_topic` / `original_media_type` meta on a MEDIAMAKER
      * outgoing message so the chat-message badge label (#583) and the
      * "Again" model dropdown surface a stable media type both during live
@@ -3000,11 +3365,26 @@ class StreamController extends AbstractController
      * it as an error would add a second outgoing message for the same tracking
      * id, so the chat showed two cancellation cards for one Stop click.
      *
+     * The `cancelled` marker is the intended signal. The message match is a
+     * safety net for any path that still reports a cancel as a plain failure:
+     * one leaked result would otherwise persist a second card carrying raw
+     * English text (#1501), which no translation layer can repair afterwards.
+     *
      * @param array<string, mixed> $result
      */
     private function isCancelledResult(array $result): bool
     {
-        return true !== ($result['success'] ?? false) && true === ($result['cancelled'] ?? false);
+        if (true === ($result['success'] ?? false)) {
+            return false;
+        }
+
+        if (true === ($result['cancelled'] ?? false)) {
+            return true;
+        }
+
+        $error = $result['error'] ?? null;
+
+        return \is_string($error) && 1 === preg_match('/cancell?ed by user/i', $error);
     }
 
     /**
@@ -3133,12 +3513,6 @@ class StreamController extends AbstractController
 
     private function sendSSE(string $status, array $data): void
     {
-        if (connection_aborted()) {
-            error_log('🔴 StreamController: Connection aborted');
-
-            return;
-        }
-
         // Sanitize all string values in data to ensure valid UTF-8
         $sanitizedData = $this->sanitizeUtf8($data);
 
@@ -3146,6 +3520,21 @@ class StreamController extends AbstractController
             'status' => $status,
             ...$sanitizedData,
         ];
+
+        // Record BEFORE the abort guard. Below it the buffer would stop filling
+        // at exactly the moment it is needed: the client is gone, the turn keeps
+        // generating, and everything produced from here on is precisely what a
+        // re-attaching client has to replay.
+        $this->activeRun?->record($event);
+
+        if (connection_aborted()) {
+            if (!$this->abortLogged) {
+                $this->abortLogged = true;
+                error_log('🔴 StreamController: Connection aborted — continuing in background');
+            }
+
+            return;
+        }
 
         echo 'data: '.json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
 
@@ -3227,6 +3616,20 @@ class StreamController extends AbstractController
         }
 
         return $entities;
+    }
+
+    /**
+     * @param array{filename: string, content: string, extension: string, export?: string} $fileData
+     */
+    private function storeGeneratedDocumentInStream(array $fileData, Message $message, bool $ephemeral = false): ?GeneratedDocumentBundle
+    {
+        if (null !== $this->generatedDocumentStore) {
+            return $this->generatedDocumentStore->store($fileData, $message, $ephemeral);
+        }
+
+        $file = $this->storeGeneratedFileInStream($fileData, $message, $ephemeral);
+
+        return null !== $file ? new GeneratedDocumentBundle($file) : null;
     }
 
     private function storeGeneratedFileInStream(array $fileData, Message $message, bool $ephemeral = false): ?File
@@ -3324,10 +3727,14 @@ class StreamController extends AbstractController
             // from uploads (default 'web_upload') and can be regenerated from
             // BFILETEXT on download when the on-disk binary goes missing.
             $file->setSource('generated');
+            // Kind powers the Generated gallery's type filter (BORIGINKIND);
+            // everything this path writes is a document format (docx/xlsx/…).
+            $file->setOriginKind('document');
             $file->setEphemeral($ephemeral);
 
             $this->em->persist($file);
             $this->em->flush();
+            $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
             $this->logger->info('StreamController: File generated and stored successfully', [
                 'file_id' => $file->getId(),
@@ -3687,7 +4094,7 @@ class StreamController extends AbstractController
      */
     private function resolveUiLanguage(mixed $requested, ?User $user): string
     {
-        $supported = ['de', 'en', 'es', 'tr'];
+        $supported = self::SUPPORTED_UI_LANGUAGES;
 
         if (is_string($requested)) {
             $normalized = strtolower(trim($requested));
@@ -3754,5 +4161,34 @@ class StreamController extends AbstractController
         ]);
 
         return true;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    private function presentChatFailure(array $result, string $lang, bool $includeDiagnostics): ChatErrorView
+    {
+        return $this->chatErrorPresenter->presentFromResult($result, $lang, $includeDiagnostics);
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    private function resolveErrorLanguage(array $result, string $fallback): string
+    {
+        $classification = $result['classification'] ?? null;
+        if (is_array($classification) && isset($classification['language']) && is_string($classification['language']) && '' !== trim($classification['language'])) {
+            return $classification['language'];
+        }
+
+        return '' !== trim($fallback) ? $fallback : 'en';
+    }
+
+    private function persistChatErrorMeta(Message $outgoing, ChatErrorView $view): void
+    {
+        // `canRetryWithOtherModel` is derived from the reason, so persisting it
+        // separately would only create a second source of truth to keep in sync.
+        $outgoing->setMeta('error_reason', $view->reason->value);
+        $outgoing->setMeta('error_debug', $view->rawMessage);
     }
 }

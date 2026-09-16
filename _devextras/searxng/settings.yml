@@ -1,0 +1,14 @@
+# Local SearXNG for Synaplan web search (compose profile `searxng`).
+# JSON is off upstream by default; the adapter needs it. Limiter is off
+# because this container is not published on a host port.
+use_default_settings: true
+
+search:
+  formats:
+    - html
+    - json
+
+server:
+  limiter: false
+  secret_key: synaplan-dev-searxng-secret-change-me
+  image_proxy: false

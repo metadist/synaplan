@@ -88,6 +88,10 @@ security:
         - { path: ^/api/v1/auth/forgot-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/resend-verification, roles: PUBLIC_ACCESS }
+        # Refresh is public on purpose: the 5-minute access cookie is often
+        # expired (or unsigned after an APP_SECRET rotation) when this is
+        # called. CookieTokenAuthenticator must not claim this path, or the
+        # DB-backed 30-day refresh token in BTOKENS is never consulted.
         - { path: ^/api/v1/auth/refresh, roles: PUBLIC_ACCESS }
         # Native (mobile) OAuth handoff exchange — auth IS the signed handoff token
         - { path: ^/api/v1/auth/native/exchange, roles: PUBLIC_ACCESS }
@@ -119,11 +123,40 @@ security:
         - { path: ^/api/v1/auth/apple/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/apple/native, roles: PUBLIC_ACCESS }
 
+        # Outbound connector consent: the provider redirects the browser here
+        # cross-site, where the SameSite=Strict auth cookie is not sent. The
+        # HMAC-signed OAuth state identifies the user instead; /start (which
+        # mints that state) stays authenticated.
+        - { path: ^/api/v1/connections/m365/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/connections/dropbox/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/mcp-servers/oauth/callback, roles: PUBLIC_ACCESS }
+
+        # Desktop pairing exchange: a fresh Synaplan Desktop client has no
+        # session yet, so it swaps a (rate-limited, one-time, TTL'd) pairing
+        # code for its scoped key here. Anchored exactly so it never exposes the
+        # other /api/v1/desktop/* routes, which stay behind the catch-all below.
+        # When DESKTOP_AGENT.ENABLED is off the controller still 404s (C8).
+        - { path: ^/api/v1/desktop/pair$, roles: PUBLIC_ACCESS }
+
+        # Partner-instance handshake: anonymous register (pending), public
+        # confirm-card lookup, instance self-check, and code exchange. All
+        # 404 when PLATFORM_LINKS.ENABLED is off. Session routes stay auth'd.
+        - { path: ^/api/v1/platform-links/instances$, methods: [POST], roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/platform-links/instances/self$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/platform-links/instances/[^/]+/public$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/platform-links/exchange$, methods: [POST], roles: PUBLIC_ACCESS }
+
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
 
         # Public file uploads endpoint (controller handles auth internally)
         - { path: ^/api/v1/files/uploads/, roles: PUBLIC_ACCESS }
+
+        # File download for <img>/<video>/<audio>. Those elements cannot send
+        # an Authorization header, so the native shell identifies the owner
+        # with a read-only media_token query param. The controller still
+        # rejects unauthenticated requests (cookie, Bearer, or media token).
+        - { path: ^/api/v1/files/\d+/download$, methods: [GET, HEAD], roles: PUBLIC_ACCESS }
 
         # Plugin assets (static JS/CSS files, served without auth for ES module loading)
         - { path: ^/api/v1/user/[^/]+/plugins/[^/]+/assets/, roles: PUBLIC_ACCESS }
@@ -168,6 +201,7 @@ security:
         # Webhook endpoints (email webhook is public, WhatsApp requires verification)
         - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/whatsapp, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/webhooks/saved-tasks/, roles: PUBLIC_ACCESS }
 
         # Stripe webhook (public - secured by signature verification)
         - { path: ^/api/v1/stripe/webhook, roles: PUBLIC_ACCESS }
@@ -181,6 +215,16 @@ security:
 
         # Public subscription plans (no auth needed to view plans)
         - { path: ^/api/v1/subscription/plans, roles: PUBLIC_ACCESS }
+
+        # First-run setup. Public because on a virgin installation there is no
+        # account to authenticate with — that is the whole point. Both endpoints
+        # refuse with 409 as soon as SetupStateService says setup is done, so
+        # they are dead ends on every installation that has ever had a user.
+        # /complete is NOT listed: by then the wizard is signed in as the
+        # administrator it just created, so it goes through the catch-all below
+        # and its own ROLE_ADMIN check.
+        - { path: ^/api/v1/setup/state$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/setup/admin$, roles: PUBLIC_ACCESS }
 
         # All other API routes require authentication
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

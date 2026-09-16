@@ -20,6 +20,7 @@ final class PromptCatalogTest extends TestCase
         $topics = array_column(PromptCatalog::all(), 'topic');
 
         $this->assertContains('general', $topics);
+        $this->assertContains('synaplan', $topics);
         $this->assertContains('mediamaker', $topics);
         $this->assertContains('docsummary', $topics);
         $this->assertContains('officemaker', $topics);
@@ -33,6 +34,7 @@ final class PromptCatalogTest extends TestCase
         // accidentally be marked as routable. Indexer filters them by prefix.
         $this->assertContains('tools:sort', $topics);
         $this->assertContains('tools:enhance', $topics);
+        $this->assertContains('tools:rerank_listwise', $topics);
     }
 
     /**
@@ -57,6 +59,202 @@ final class PromptCatalogTest extends TestCase
         $metadata = $general['metadata'] ?? [];
         $this->assertSame('1', $metadata['tool_mcp'] ?? null, 'general must seed tool_mcp=1 (MCP on by default)');
         $this->assertArrayNotHasKey('tool_internet', $metadata, 'general must NOT seed tool_internet — absent = auto (classifier decides)');
+    }
+
+    /**
+     * Attachment questions split in two: "upload a photo and ask 'what is
+     * that?'" is answered FROM the file (BWEBSEARCH=0), while "how much does
+     * this cost?" needs live info ABOUT the file's subject (BWEBSEARCH=1 —
+     * the pipeline builds the search phrase from the file content, see
+     * AttachmentSearchContextResolver). Pin both sides of the rule and the
+     * concrete examples smaller models pattern-match on.
+     */
+    public function testSortPromptRoutesAttachmentQuestions(): void
+    {
+        $sort = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:sort' === $entry['topic']) {
+                $sort = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($sort);
+        $prompt = $sort['prompt'];
+
+        $this->assertStringContainsString('Questions answerable from an attached file alone', $prompt);
+        $this->assertStringContainsString('Attachment + live information = search', $prompt);
+        $this->assertStringContainsString('"What is that?" → general, BWEBSEARCH: 0', $prompt);
+        $this->assertStringContainsString('"Was ist das?" → general, BWEBSEARCH: 0', $prompt);
+        $this->assertStringContainsString('"How much does this cost?" → general, BWEBSEARCH: 1, BREADPAGES: 2', $prompt);
+        $this->assertStringContainsString('BREADPAGES', $prompt);
+        $this->assertStringContainsString('welche Sektoren/Unternehmen', $prompt);
+    }
+
+    /**
+     * "Teach me the Persian numbers with a children's song" was voted
+     * mediamaker/audio and the legacy TTS path read the request back as an
+     * MP3. Songs, poems and lessons are CONTENT: they route to `general`,
+     * and only an explicit "read it to me" adds a spoken step (BMULTI 1).
+     * Pin the rule and the worked examples the sorter pattern-matches on,
+     * and make sure the old contradictory example (poem+MP3 → mediamaker)
+     * cannot creep back in.
+     */
+    public function testSortPromptKeepsSongAndPoemRequestsOutOfAudioMediamaker(): void
+    {
+        $prompt = $this->catalogPrompt('tools:sort');
+
+        $this->assertStringContainsString('spoken output never wins over the text it', $prompt);
+        $this->assertStringContainsString('"Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei" → BTOPIC: "general", BMULTI: 0', $prompt);
+        $this->assertStringContainsString('"Make a song about my cat" → BTOPIC: "general", BMULTI: 0', $prompt);
+        $this->assertStringContainsString('"Write a poem and read it to me as MP3" → BTOPIC: "general", BMULTI: 1', $prompt);
+        $this->assertStringNotContainsString('"Write a poem and read it to me as MP3" → BTOPIC: "mediamaker"', $prompt);
+        $this->assertStringContainsString('"audio" means READING OUT text that is already there', $prompt);
+        $this->assertStringContainsString('"Sing me a song about the sea" → NOT mediamaker', $prompt);
+    }
+
+    /**
+     * The sorter sees the topics through `[DYNAMICLIST]`, which is rendered
+     * from each topic's runtime `shortDescription` — BEFORE the rules above.
+     * A description that still advertises "audio" wholesale hands the model a
+     * contradiction, so the mediamaker description must carry the same
+     * boundary: TTS of existing text only, songs/poems/lessons are `general`.
+     */
+    public function testMediamakerDescriptionLimitsAudioToExistingText(): void
+    {
+        $description = $this->catalogShortDescription('mediamaker');
+
+        $this->assertStringContainsString('images and videos', $description);
+        $this->assertStringContainsString('text-to-speech of text that ALREADY EXISTS', $description);
+        $this->assertStringContainsString('NOT for songs, poems, stories or lessons', $description);
+        $this->assertStringNotContainsString('images, videos and audio', $description);
+    }
+
+    private function catalogShortDescription(string $topic): string
+    {
+        foreach (PromptCatalog::all() as $entry) {
+            if ($topic === $entry['topic']) {
+                return $entry['shortDescription'];
+            }
+        }
+
+        $this->fail(sprintf('catalog has no entry for topic "%s"', $topic));
+    }
+
+    /**
+     * When the sorter still mis-votes audio, the extraction prompts are the
+     * next line of defence: the script must be what the listener should hear —
+     * written on the spot if the message only describes it — and never the
+     * user's instruction itself.
+     */
+    public function testAudioExtractionPromptsNeverReturnTheInstructionItself(): void
+    {
+        $audioExtract = $this->catalogPrompt('tools:mediamaker_audio_extract');
+        $this->assertStringContainsString('NEVER return the user\'s request or instruction itself', $audioExtract);
+        $this->assertStringContainsString('WRITE that content in the user\'s language', $audioExtract);
+        $this->assertStringContainsString('Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei', $audioExtract);
+
+        $mediamaker = $this->catalogPrompt('mediamaker');
+        $this->assertStringContainsString('never the user\'s request itself', $mediamaker);
+        $this->assertStringContainsString('WRITE it in the user\'s language', $mediamaker);
+    }
+
+    private function catalogPrompt(string $topic): string
+    {
+        foreach (PromptCatalog::all() as $entry) {
+            if ($topic === $entry['topic']) {
+                return $entry['prompt'];
+            }
+        }
+
+        $this->fail(sprintf('catalog has no prompt for topic "%s"', $topic));
+    }
+
+    /**
+     * The search-query prompt must resolve deictic references against the
+     * "Attached file content" block SearchQueryGenerator sends — otherwise
+     * "what is that?" + photo searches for the literal words again.
+     */
+    public function testSearchPromptResolvesAttachmentReferences(): void
+    {
+        $search = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:search' === $entry['topic']) {
+                $search = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($search);
+        $prompt = $search['prompt'];
+
+        $this->assertStringContainsString('Attached file content', $prompt);
+        $this->assertStringContainsString('NEVER search for the literal question words', $prompt);
+        // Worked example: deictic price question + product photo.
+        $this->assertStringContainsString('sony wh-1000xm6 price', $prompt);
+    }
+
+    public function testSynaplanTopicIsRoutableAndHasPlaceholders(): void
+    {
+        $synaplan = null;
+        $general = null;
+        $sort = null;
+        $plan = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('synaplan' === $entry['topic']) {
+                $synaplan = $entry;
+            }
+            if ('general' === $entry['topic']) {
+                $general = $entry;
+            }
+            if ('tools:sort' === $entry['topic']) {
+                $sort = $entry;
+            }
+            if ('tools:plan' === $entry['topic']) {
+                $plan = $entry;
+            }
+        }
+
+        $this->assertNotNull($synaplan);
+        $this->assertStringStartsNotWith('tools:', $synaplan['topic']);
+        $this->assertNotSame('', $synaplan['shortDescription']);
+        $this->assertSame(1, substr_count($synaplan['prompt'], '[PLATFORM_CAPABILITIES]'));
+        $this->assertSame(1, substr_count($synaplan['prompt'], '[PLATFORM_DOCS]'));
+
+        $this->assertNotNull($general);
+        $this->assertSame(1, substr_count($general['prompt'], '[PLATFORM_CAPABILITIES]'));
+
+        $this->assertNotNull($sort);
+        $this->assertStringContainsString('Questions about Synaplan itself', $sort['prompt']);
+        $this->assertStringContainsString('BTOPIC "synaplan"', $sort['prompt']);
+
+        $this->assertNotNull($plan);
+        $this->assertStringContainsString('topic_id: "synaplan"', $plan['prompt']);
+        // Engine-off default: the planner still refuses real PDFs. The live
+        // OfficePdfRoutingDecorator rewrites this only when OFFICE_CONVERT_URL is set.
+        $this->assertStringContainsString('Real PDFs are NOT supported', $plan['prompt']);
+    }
+
+    public function testGeneralPromptDoesNotBounceAlreadyPhrasedCreateRequests(): void
+    {
+        $general = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('general' === $entry['topic']) {
+                $general = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($general);
+        $this->assertStringContainsString('do not bounce them', $general['prompt']);
+        $this->assertStringContainsString('PDF', $general['prompt']);
+    }
+
+    public function testOfficeMakerPdfAppendixKeepsBexportOnFollowUpEdits(): void
+    {
+        $appendix = PromptCatalog::officeMakerPdfExportAppendix();
+        $this->assertStringContainsString('earlier in this conversation', $appendix);
+        $this->assertStringContainsString('Keep BEXPORT', $appendix);
     }
 
     public function testTopicsAreUniquePerLanguage(): void

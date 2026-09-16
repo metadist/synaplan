@@ -86,6 +86,29 @@ class FileStorageServiceTest extends TestCase
         $this->assertStringContainsString('not allowed', $result['error']);
     }
 
+    public function testJarUploadsAreAllowedAndNeverExtracted(): void
+    {
+        $this->assertContains('jar', FileStorageService::getAllowedExtensions());
+        $this->assertTrue(FileStorageService::skipsExtraction('jar'));
+        $this->assertTrue(FileStorageService::skipsExtraction('JAR'));
+        $this->assertFalse(FileStorageService::skipsExtraction('pdf'));
+
+        $testFile = $this->createTestFile('mod.jar', "PK\x03\x04store-only");
+        $uploadedFile = new UploadedFile(
+            $testFile,
+            'mod.jar',
+            'application/java-archive',
+            null,
+            true
+        );
+
+        $result = $this->service->storeUploadedFile($uploadedFile, 123);
+
+        $this->assertTrue($result['success']);
+        $this->assertNull($result['error']);
+        $this->assertTrue($this->service->fileExists($result['path']));
+    }
+
     public function testStoreUploadedFileWithLargeSize(): void
     {
         // Create a file that reports as larger than allowed

@@ -30,6 +30,16 @@
               <span class="hidden sm:inline">{{ $t('widgets.setupChat.title') }}</span>
             </button>
             <button
+              v-if="canShareWidget"
+              type="button"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm inline-flex items-center gap-2"
+              data-testid="btn-share-widget"
+              @click="openWidgetShare"
+            >
+              <Icon icon="heroicons:share" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('iam.share') }}</span>
+            </button>
+            <button
               v-if="widget"
               class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors inline-flex items-center gap-2"
               data-testid="btn-widget-settings"
@@ -41,6 +51,19 @@
           </div>
         </div>
       </div>
+
+      <SharedResourceBanner
+        v-if="widget?.shared"
+        class="mx-4 lg:mx-6 mt-3"
+        kind="widget"
+        :owner-name="sharedWidgetMeta?.ownerName ?? widget.ownerName ?? null"
+        :shared-via="sharedWidgetMeta?.sharedVia ?? widget.sharedVia"
+        :permission="
+          widget.access && widget.access !== 'owner'
+            ? widget.access
+            : (sharedWidgetMeta?.permission ?? null)
+        "
+      />
 
       <!-- Data Processing Notice -->
       <div
@@ -1079,6 +1102,12 @@
                   </div>
                 </section>
 
+                <WidgetAssistantBinding
+                  v-if="widget"
+                  :widget="widget"
+                  @updated="onWidgetAssistantUpdated"
+                />
+
                 <!-- Expert: Prompt -->
                 <details class="group">
                   <summary
@@ -1209,6 +1238,13 @@
       @close="showKnowledgeFilePicker = false"
       @select="handleKnowledgePickerSelect"
     />
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="widget"
+      :resource-id="iamShareResourceId"
+      :resource-name="widget?.name || ''"
+      @close="iamShareOpen = false"
+    />
   </MainLayout>
 </template>
 
@@ -1227,6 +1263,7 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import SetupChatModal from '@/components/widgets/SetupChatModal.vue'
 import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
+import WidgetAssistantBinding from '@/components/widgets/WidgetAssistantBinding.vue'
 import WidgetAiSetupPanel from '@/components/widgets/WidgetAiSetupPanel.vue'
 import FlowNodeEditor from '@/components/widgets/FlowNodeEditor.vue'
 import FilePicker from '@/components/widgets/FilePicker.vue'
@@ -1235,6 +1272,10 @@ import { promptsApi, type PromptMetadata } from '@/services/api/promptsApi'
 import { chatApi } from '@/services/api/chatApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
+import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { iamApi, type IamSharedItem } from '@/services/api/iamApi'
 import {
   WIDGET_RULES_BLOCK_START,
   WIDGET_RULES_BLOCK_END,
@@ -1281,6 +1322,23 @@ const saving = ref(false)
 const autoSaveStatus = ref<'idle' | 'unsaved' | 'saving' | 'saved'>('idle')
 const dataReady = ref(false)
 const widget = ref<widgetsApi.Widget | null>(null)
+
+function onWidgetAssistantUpdated(agentId: number | null): void {
+  if (widget.value) {
+    widget.value = { ...widget.value, agentId }
+  }
+}
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
+const sharedWidgetMeta = ref<IamSharedItem | null>(null)
+const canShareWidget = computed(
+  () => isIamSharingEnabled() && widget.value !== null && widget.value.shared !== true
+)
+const openWidgetShare = () => {
+  if (!widget.value) return
+  iamShareResourceId.value = String(widget.value.id)
+  iamShareOpen.value = true
+}
 const setupModalWidget = ref<widgetsApi.Widget | null>(null)
 const advancedWidget = ref<widgetsApi.Widget | null>(null)
 const promptId = ref(0)
@@ -1892,6 +1950,15 @@ const loadData = async () => {
   loading.value = true
   try {
     widget.value = await widgetsApi.getWidget(widgetId)
+    sharedWidgetMeta.value = null
+    if (widget.value.shared && isIamSharingEnabled()) {
+      try {
+        const items = await iamApi.listSharedWithMe('widget')
+        sharedWidgetMeta.value = items.find((item) => item.id === String(widget.value?.id)) ?? null
+      } catch {
+        sharedWidgetMeta.value = null
+      }
+    }
     const topic = widget.value.taskPromptTopic
     if (topic && topic !== DEFAULT_WIDGET_TOPIC) {
       const prompts = await promptsApi.getPrompts()

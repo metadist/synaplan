@@ -96,7 +96,9 @@ export default {
       headers.set('Cache-Control', 'no-cache, no-store, must-revalidate')
       headers.set('Pragma', 'no-cache')
       headers.set('Expires', '0')
-    } else if (isHashedAsset(pathname)) {
+    } else if (isHashedAsset(pathname) && response.ok) {
+      // Only mark existing assets immutable; let the origin's no-store 404 for
+      // a missing hash pass through instead of pinning it at the edge.
       headers.set('Cache-Control', 'public, max-age=31536000, immutable')
     } else if (isHtmlNavigation(request, pathname)) {
       headers.set('Cache-Control', 'no-cache')

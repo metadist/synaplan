@@ -34,18 +34,29 @@ class SyncModelPricesCommandTest extends TestCase
         $this->priceHistoryRepository = $this->createMock(ModelPriceHistoryRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
 
+        // An empty registry by default, so no test here depends on which LiteLLM
+        // errors the live ModelCatalog::LITELLM_DEVIATIONS happens to record.
+        $this->commandTester = $this->buildCommandTester([]);
+    }
+
+    /**
+     * @param array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}> $deviations
+     */
+    private function buildCommandTester(array $deviations): CommandTester
+    {
         $command = new SyncModelPricesCommand(
             $this->httpClient,
             $this->modelRepository,
             $this->priceHistoryRepository,
             $this->em,
             new NullLogger(),
+            $deviations,
         );
 
         $application = new Application();
         $application->addCommand($command);
 
-        $this->commandTester = new CommandTester($application->find('app:sync-model-prices'));
+        return new CommandTester($application->find('app:sync-model-prices'));
     }
 
     public function testSuccessWithNoModels(): void
@@ -220,10 +231,10 @@ class SyncModelPricesCommandTest extends TestCase
 
     public function testMatchesPrefixedModelKey(): void
     {
-        $model = $this->createModelMock('groq', 'llama-3.3-70b-versatile', 0.5, 0.8);
+        $model = $this->createModelMock('groq', 'qwen/qwen3.6-27b', 0.5, 0.8);
 
         $this->mockLiteLLMResponse([
-            'groq/llama-3.3-70b-versatile' => [
+            'groq/qwen/qwen3.6-27b' => [
                 'input_cost_per_token' => 0.0000006,
                 'output_cost_per_token' => 0.0000008,
                 'mode' => 'chat',
@@ -297,10 +308,10 @@ class SyncModelPricesCommandTest extends TestCase
 
     public function testMatchesCaseInsensitiveServicePrefix(): void
     {
-        $model = $this->createModelMock('Groq', 'llama-3.3-70b-versatile', 0.5, 0.8);
+        $model = $this->createModelMock('Groq', 'qwen/qwen3.6-27b', 0.5, 0.8);
 
         $this->mockLiteLLMResponse([
-            'groq/llama-3.3-70b-versatile' => [
+            'groq/qwen/qwen3.6-27b' => [
                 'input_cost_per_token' => 0.0000006,
                 'output_cost_per_token' => 0.0000008,
                 'mode' => 'chat',
@@ -537,6 +548,421 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertStringContainsString('gpt-image-1', $output);
     }
 
+    public function testResolutionTierDriftIsDetectedWhenHeadlineMatches(): void
+    {
+        // Veo-shaped row: the headline per-second rate still agrees with LiteLLM's
+        // base rate, but the 1080p tier that billing actually charges from has
+        // moved. Comparing the headline alone reports "unchanged" and hides a live
+        // mispricing, which is exactly how the Veo 3.1 Fast overcharge stayed
+        // invisible.
+        $model = $this->createNonTokenModelMock(
+            'google',
+            'veo-3.1-fast-generate-preview',
+            priceIn: 0.0,
+            inUnit: '-',
+            priceOut: 0.10,
+            outUnit: 'persec',
+            mode: 'per_second',
+            id: 195,
+            resolutionPrices: ['720p' => 0.10, '1080p' => 0.18, '4K' => 0.30],
+        );
+
+        $this->mockLiteLLMResponse([
+            'gemini/veo-3.1-fast-generate-preview' => [
+                'mode' => 'video_generation',
+                'output_cost_per_second' => 0.10,
+                'output_cost_per_second_1080p' => 0.12,
+                'output_cost_per_second_4k' => 0.30,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Non-per-token price drift', $output);
+        $this->assertStringContainsString('resolution tiers', $output);
+        $this->assertStringContainsString('1080p:', $output);
+        // The tiers that agree must not be listed, or every report becomes noise.
+        $this->assertStringNotContainsString('720p:', $output);
+        $this->assertStringNotContainsString('4K:', $output);
+    }
+
+    public function testResolutionTierWithoutUpstreamKeyBillsAtTheBaseRate(): void
+    {
+        // Veo 3.1 Standard: Google charges one rate for both 720p and 1080p, so
+        // LiteLLM publishes no _1080p key at all — it only lists tiers that cost
+        // more than the base. An absent tier key therefore means "bills at the base
+        // rate" and must not be read as drift.
+        $model = $this->createNonTokenModelMock(
+            'google',
+            'veo-3.1-generate-preview',
+            priceIn: 0.0,
+            inUnit: '-',
+            priceOut: 0.40,
+            outUnit: 'persec',
+            mode: 'per_second',
+            id: 45,
+            resolutionPrices: ['720p' => 0.40, '1080p' => 0.40, '4K' => 0.60],
+        );
+
+        $this->mockLiteLLMResponse([
+            'gemini/veo-3.1-generate-preview' => [
+                'mode' => 'video_generation',
+                'output_cost_per_second' => 0.40,
+                'output_cost_per_second_4k' => 0.60,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('1 unchanged', $output);
+        $this->assertStringNotContainsString('Non-per-token price drift', $output);
+    }
+
+    public function testTieredHeadlineIsNotComparedAgainstLiteLLMBaseRate(): void
+    {
+        // xAI Grok Imagine Video (#1772): the catalog sets the headline to the
+        // default render (720p = 0.07), LiteLLM's base rate is its cheapest tier
+        // (480p = 0.05), and the two tier tables agree exactly. Comparing headline
+        // against base flagged a correctly priced row every day. On a tiered row
+        // only the tiers — the table billing charges from — are compared.
+        $model = $this->createNonTokenModelMock(
+            'xAI',
+            'grok-imagine-video',
+            priceIn: 0.0,
+            inUnit: '-',
+            priceOut: 0.07,
+            outUnit: 'persec',
+            mode: 'per_second',
+            id: 317,
+            resolutionPrices: ['480p' => 0.05, '720p' => 0.07],
+        );
+
+        $this->mockLiteLLMResponse([
+            'xai/grok-imagine-video' => [
+                'mode' => 'video_generation',
+                'output_cost_per_second' => 0.05,
+                'output_cost_per_second_480p' => 0.05,
+                'output_cost_per_second_720p' => 0.07,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('1 unchanged', $output);
+        $this->assertStringNotContainsString('Non-per-token price drift', $output);
+    }
+
+    public function testTieredRowStillDriftsWhenATierMoves(): void
+    {
+        // Skipping the headline must not blind the check: a repriced 720p tier on
+        // the same xAI row is still drift.
+        $model = $this->createNonTokenModelMock(
+            'xAI',
+            'grok-imagine-video',
+            priceIn: 0.0,
+            inUnit: '-',
+            priceOut: 0.07,
+            outUnit: 'persec',
+            mode: 'per_second',
+            id: 317,
+            resolutionPrices: ['480p' => 0.05, '720p' => 0.07],
+        );
+
+        $this->mockLiteLLMResponse([
+            'xai/grok-imagine-video' => [
+                'mode' => 'video_generation',
+                'output_cost_per_second' => 0.05,
+                'output_cost_per_second_720p' => 0.09,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('720p: 0.07000000 vs 0.09000000', $this->commandTester->getDisplay());
+    }
+
+    public function testRerankOutputRateFromLiteLLMIsIgnored(): void
+    {
+        // Jina (#1772): LiteLLM mirrors the input rate into output_cost_per_token
+        // on its rerank entry. A reranker returns scores, never billable output,
+        // so only the input side is compared; here it agrees → unchanged.
+        $model = $this->createModelMock('jina', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 345);
+
+        $this->mockLiteLLMResponse([
+            'jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.00000005,
+                'output_cost_per_token' => 0.00000005,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('1 unchanged', $this->commandTester->getDisplay());
+    }
+
+    public function testRerankPerQueryPricingIsAStructuralMismatch(): void
+    {
+        // A catalog row still on implicit per_token (no json.pricing_mode)
+        // cannot be compared to LiteLLM's per_request query rate — that stays
+        // a structural mismatch. BID 346 now authors per_request; see the
+        // same-mode test below.
+        $model = $this->createModelMock('cohere', 'rerank-v3.5', 2.0, 0.0, id: 346);
+
+        $this->mockLiteLLMResponse([
+            'rerank-v3.5' => [
+                'mode' => 'rerank',
+                'input_cost_per_query' => 0.002,
+                'input_cost_per_token' => 0.0,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('litellm=per_request', $output);
+        $this->assertStringNotContainsString('Null-price protected', $output);
+    }
+
+    public function testRerankPerQueryPricingMatchesCatalogPerRequest(): void
+    {
+        $model = $this->createMock(Model::class);
+        $model->method('getId')->willReturn(346);
+        $model->method('getService')->willReturn('cohere');
+        $model->method('getProviderId')->willReturn('rerank-v3.5');
+        $model->method('getPriceIn')->willReturn(2.0);
+        $model->method('getPriceOut')->willReturn(0.0);
+        $model->method('getInUnit')->willReturn('per1K');
+        $model->method('getOutUnit')->willReturn('-');
+        $model->method('getJson')->willReturn(['pricing_mode' => 'per_request']);
+
+        $this->mockLiteLLMResponse([
+            'rerank-v3.5' => [
+                'mode' => 'rerank',
+                'input_cost_per_query' => 0.002,
+                'input_cost_per_token' => 0.0,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('1 unchanged', $output);
+        $this->assertStringNotContainsString('Pricing-mode mismatch', $output);
+    }
+
+    public function testKnownDeviationIsReportedButIsNotDrift(): void
+    {
+        // The catalog keeps Jina's official $0.05 while LiteLLM says 0.018. With
+        // the LiteLLM value pinned in the registry the row is a known deviation:
+        // listed for transparency, excluded from the drift exit code.
+        $model = $this->createModelMock('jina', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 345);
+        $tester = $this->buildCommandTester($this->jinaDeviation());
+
+        $this->mockLiteLLMResponse([
+            'jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.000000018,
+                'output_cost_per_token' => 0.000000018,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $output = $tester->getDisplay();
+        $this->assertStringContainsString('Known LiteLLM deviations', $output);
+        $this->assertStringContainsString('https://api.jina.ai/v1/models', $output);
+        $this->assertStringNotContainsString('[DRY-RUN]', $output);
+        $this->assertStringNotContainsString('Price drift detected', $output);
+    }
+
+    public function testDeviationBecomesObsoleteWhenLiteLLMAgrees(): void
+    {
+        // Upstream fixed its value: LiteLLM now says exactly what the catalog says.
+        // The entry is dead weight — reported for deletion, not as drift.
+        $model = $this->createModelMock('jina', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 345);
+        $tester = $this->buildCommandTester($this->jinaDeviation());
+
+        $this->mockLiteLLMResponse([
+            'jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.00000005,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $output = $tester->getDisplay();
+        $this->assertStringContainsString('Obsolete LiteLLM deviations', $output);
+        $this->assertStringContainsString('delete the LITELLM_DEVIATIONS entry', $output);
+        $this->assertStringNotContainsString('Known LiteLLM deviations', $output);
+    }
+
+    public function testDeviationDoesNotSilenceAThirdValue(): void
+    {
+        // LiteLLM moved off the pinned 0.018 to a value nobody has verified. The
+        // entry covers exactly the pair a human looked at — anything else is drift.
+        $model = $this->createModelMock('jina', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 345);
+        $tester = $this->buildCommandTester($this->jinaDeviation());
+
+        $this->mockLiteLLMResponse([
+            'jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.00000003,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $tester->getStatusCode());
+        $this->assertStringContainsString('[DRY-RUN] jina-reranker-v2-base-multilingual', $tester->getDisplay());
+    }
+
+    public function testDeviationIsScopedToTheService(): void
+    {
+        // Same providerId at another service must not inherit the entry.
+        $model = $this->createModelMock('voyage', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 999);
+        $tester = $this->buildCommandTester($this->jinaDeviation());
+
+        $this->mockLiteLLMResponse([
+            'voyage/jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.000000018,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $tester->getStatusCode());
+    }
+
+    public function testLiteLLMSourceUrlIsPrintedNextToFlaggedModels(): void
+    {
+        // LiteLLM records where it read a price; the report hands that URL to the
+        // person verifying so this repo never keeps its own list of price pages.
+        $model = $this->createModelMock('openai', 'gpt-4o', 3.0, 15.0);
+
+        $this->mockLiteLLMResponse([
+            'gpt-4o' => [
+                'input_cost_per_token' => 0.000005,
+                'output_cost_per_token' => 0.000020,
+                'mode' => 'chat',
+                'source' => 'https://openai.com/api/pricing/',
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true]);
+
+        $this->assertStringContainsString('| source: https://openai.com/api/pricing/', $this->commandTester->getDisplay());
+    }
+
+    /**
+     * @return array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     */
+    private function jinaDeviation(): array
+    {
+        return [
+            'jina:jina-reranker-v2-base-multilingual' => [
+                'litellm_in' => 0.018,
+                'litellm_out' => 0.0,
+                'source' => 'https://api.jina.ai/v1/models',
+                'verifiedOn' => '2026-09-10',
+                'reason' => 'LiteLLM lists the pre-increase rate.',
+            ],
+        ];
+    }
+
     public function testModeMismatchImageIsReportedNotDrift(): void
     {
         // dall-e-3 is per_token in the catalog, LiteLLM flat per_image → mode
@@ -642,7 +1068,7 @@ class SyncModelPricesCommandTest extends TestCase
     {
         // A per_token catalog model that LiteLLM reports as flat per_image is a
         // structural mode mismatch — permanent, so it must NEVER fail the drift gate
-        // (otherwise the weekly CI would be red forever).
+        // (otherwise the scheduled CI would be red forever).
         $model = $this->createModelMock('openai', 'dall-e-3', 0.0, 0.0);
 
         $this->mockLiteLLMResponse([
@@ -660,6 +1086,93 @@ class SyncModelPricesCommandTest extends TestCase
         $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+    }
+
+    /**
+     * A gateway resells an upstream model under the upstream's own id, so
+     * A2Agent's `deepseek-v4-pro` collides with LiteLLM's top-level
+     * `deepseek-v4-pro` — DeepSeek's first-party rate. The two are different
+     * products at different prices, and comparing them flagged a row that
+     * matches its official page ($0.435/$0.870, a2agent.me/models).
+     */
+    public function testBareIdAtAForeignVendorIsNotMatched(): void
+    {
+        $model = $this->createModelMock('A2Agent', 'deepseek-v4-pro', 0.435, 0.87, 362);
+
+        $this->mockLiteLLMResponse([
+            'deepseek-v4-pro' => [
+                'litellm_provider' => 'deepseek',
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.00000132,
+                'output_cost_per_token' => 0.00000396,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('A2Agent/deepseek-v4-pro (ID 362)', $output);
+        $this->assertStringContainsString('at vendor "deepseek", not ours', $output);
+        $this->assertStringContainsString('1 unmatched', $output);
+        $this->assertStringNotContainsString('[DRY-RUN]', $output);
+    }
+
+    public function testBareIdAtTheSameVendorStillDrifts(): void
+    {
+        $model = $this->createModelMock('OpenAI', 'gpt-4o', 3.0, 15.0);
+
+        $this->mockLiteLLMResponse([
+            'gpt-4o' => [
+                'litellm_provider' => 'openai',
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.0000025,
+                'output_cost_per_token' => 0.00001,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('[DRY-RUN] gpt-4o', $this->commandTester->getDisplay());
+    }
+
+    /**
+     * Google's bare ids are attributed to the `vertex_ai-*` families rather than
+     * to a plain "google", so the vendor aliases match as a prefix.
+     */
+    public function testBareIdMatchesGooglesVertexAiFamilies(): void
+    {
+        $model = $this->createModelMock('Google', 'gemini-2.5-pro', 1.25, 10.0);
+
+        $this->mockLiteLLMResponse([
+            'gemini-2.5-pro' => [
+                'litellm_provider' => 'vertex_ai-language-models',
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.0000025,
+                'output_cost_per_token' => 0.00002,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('[DRY-RUN] gemini-2.5-pro', $this->commandTester->getDisplay());
     }
 
     private function mockLiteLLMResponse(array $data): void
@@ -695,7 +1208,13 @@ class SyncModelPricesCommandTest extends TestCase
         string $outUnit,
         string $mode,
         int $id = 1,
+        array $resolutionPrices = [],
     ): Model {
+        $json = ['pricing_mode' => $mode];
+        if ([] !== $resolutionPrices) {
+            $json['resolution_prices'] = $resolutionPrices;
+        }
+
         $model = $this->createMock(Model::class);
         $model->method('getId')->willReturn($id);
         $model->method('getService')->willReturn($service);
@@ -704,7 +1223,7 @@ class SyncModelPricesCommandTest extends TestCase
         $model->method('getPriceOut')->willReturn($priceOut);
         $model->method('getInUnit')->willReturn($inUnit);
         $model->method('getOutUnit')->willReturn($outUnit);
-        $model->method('getJson')->willReturn(['pricing_mode' => $mode]);
+        $model->method('getJson')->willReturn($json);
 
         return $model;
     }

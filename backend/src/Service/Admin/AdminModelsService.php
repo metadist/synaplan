@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
+use App\AI\Credential\ChatReadinessService;
 use App\Entity\Model;
 use App\Entity\ModelPriceHistory;
 use App\Repository\ConfigRepository;
@@ -20,6 +21,7 @@ final readonly class AdminModelsService
         private ModelImportService $importService,
         private ModelSqlValidator $sqlValidator,
         private ModelPriceHistoryRepository $priceHistoryRepository,
+        private ChatReadinessService $chatReadiness,
     ) {
     }
 
@@ -217,6 +219,11 @@ final readonly class AdminModelsService
      */
     public function serializeModel(Model $model): array
     {
+        // The admin catalog shows every row, so it carries the availability
+        // verdict per row — the UI greys unavailable providers out and badges
+        // Ollama models that are not pulled instead of hiding anything.
+        $availability = $this->chatReadiness->modelAvailability($model->getService(), $model->getProviderId());
+
         return [
             'id' => $model->getId(),
             'service' => $model->getService(),
@@ -235,6 +242,8 @@ final readonly class AdminModelsService
             'json' => $model->getJson(),
             'isSystemModel' => $model->isSystemModel(),
             'showWhenFree' => $model->getShowWhenFree(),
+            'providerAvailable' => $availability['available'],
+            'unavailableReason' => $availability['reason'],
         ];
     }
 

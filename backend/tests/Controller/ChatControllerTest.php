@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\Chat;
 use App\Entity\Message;
+use App\Entity\MessageMeta;
 use App\Entity\User;
 use App\Service\TokenService;
 use App\Tests\Trait\AuthenticatedTestTrait;
@@ -415,6 +416,22 @@ class ChatControllerTest extends WebTestCase
 
         $chatId = $chat->getId();
 
+        $message = new Message();
+        $message->setUserId($this->user->getId());
+        $message->setChat($chat);
+        $message->setTrackingId(time());
+        $message->setUnixTimestamp(time());
+        $message->setDateTime(date('YmdHis'));
+        $message->setText('Please summarize this note.');
+        $message->setDirection('IN');
+        $message->setProviderIndex('WEB');
+        $this->em->persist($message);
+        $this->em->flush();
+
+        $messageId = (int) $message->getId();
+        $message->setMeta('ai_chat_model', 'test-model');
+        $this->em->flush();
+
         $this->client->request(
             'DELETE',
             '/api/v1/chats/'.$chatId,
@@ -425,9 +442,14 @@ class ChatControllerTest extends WebTestCase
 
         $this->assertResponseIsSuccessful();
 
-        // Verify deletion in database
-        $deletedChat = $this->em->getRepository(Chat::class)->find($chatId);
-        $this->assertNull($deletedChat);
+        $this->em->clear();
+
+        $this->assertNull($this->em->getRepository(Chat::class)->find($chatId));
+        $this->assertNull($this->em->getRepository(Message::class)->find($messageId));
+        $this->assertSame(
+            [],
+            $this->em->getRepository(MessageMeta::class)->findBy(['messageId' => $messageId]),
+        );
     }
 
     /**

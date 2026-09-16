@@ -1,0 +1,36 @@
+# TLS with a real, publicly trusted certificate.
+#
+# Used when the instance has a domain name (stack parameter `DomainName`, or the
+# `synaplan:domain` tag). Caddy obtains and renews the certificate from Let's
+# Encrypt automatically, which needs the domain's A record to point at this
+# instance and port 80 and 443 reachable from the internet.
+
+{
+	email {$SYNAPLAN_ACME_EMAIL}
+}
+
+{$SYNAPLAN_DOMAIN} {
+	encode zstd gzip
+
+	# The application container binds to 127.0.0.1 only, so this proxy is the
+	# only way in and TLS can never be bypassed.
+	reverse_proxy 127.0.0.1:8000 {
+		# Chat responses stream token by token; buffering them would make the
+		# assistant appear to answer all at once, minutes late.
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /var/log/caddy/synaplan.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}

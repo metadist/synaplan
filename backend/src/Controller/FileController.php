@@ -8,16 +8,31 @@ use App\Entity\File;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Repository\ModelRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\Document\DocumentKind;
+use App\Service\Document\DocumentOfficeMergeService;
+use App\Service\Document\Persist\DocumentRevisionService;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileHelper;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
+use App\Service\File\InvalidProcessModelHintException;
+use App\Service\File\Office\DocumentCombineException;
+use App\Service\File\Office\DocumentCombineService;
+use App\Service\File\Office\DocumentExportService;
+use App\Service\File\Office\DocumentThumbnailGenerator;
+use App\Service\File\Office\OfficeConverterClient;
+use App\Service\File\ProcessModelHints;
 use App\Service\File\UploadOptions;
+use App\Service\Iam\KnowledgeFolderShareCleanup;
+use App\Service\Iam\SharedFileAccess;
+use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
+use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
 use App\Service\WidgetService;
 use OpenApi\Attributes as OA;
@@ -40,6 +55,7 @@ class FileController extends AbstractController
         private FileListService $fileListService,
         private FileStorageService $storageService,
         private StorageQuotaService $storageQuotaService,
+        private RateLimitService $rateLimitService,
         private FileRepository $fileRepository,
         private MessageRepository $messageRepository,
         private WidgetSessionRepository $widgetSessionRepository,
@@ -48,9 +64,132 @@ class FileController extends AbstractController
         private VectorMigrationService $migrationService,
         private DocumentGeneratorService $documentGenerator,
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
+        private MediaAccessTokenService $mediaAccessTokenService,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private DocumentExportService $documentExportService,
+        private OfficeConverterClient $officeConverter,
+        private DocumentCombineService $documentCombineService,
+        private DocumentRevisionService $documentRevisionService,
+        private DocumentOfficeMergeService $documentOfficeMergeService,
+        private SharedFileAccess $sharedFileAccess,
+        private KnowledgeFolderShareCleanup $folderShareCleanup,
+        private ModelRepository $modelRepository,
     ) {
+    }
+
+    /**
+     * Mint a short-lived, read-only credential for loading the caller's media.
+     *
+     * MOBILE-APP SEAM (Epic 7): media elements cannot send an `Authorization`
+     * header, and the native shell has no cookie because it runs cross-origin
+     * on `capacitor://localhost`. Clients attach this token to media URLs
+     * instead of the session access token, so a URL that leaks cannot be used
+     * for anything but reading that user's own media, and only briefly.
+     */
+    #[Route('/media-token', name: 'media_token', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/media-token',
+        summary: 'Issue a short-lived read-only token for loading media URLs',
+        tags: ['Files'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Media access token',
+                content: new OA\JsonContent(
+                    required: ['token', 'expiresIn'],
+                    properties: [
+                        new OA\Property(property: 'token', type: 'string', description: 'Attach as the media_token query parameter', example: 'eyJ1aWQiOjF9.9f86d0818...'),
+                        new OA\Property(property: 'expiresIn', type: 'integer', description: 'Lifetime in seconds', example: 1800),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function mediaToken(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        return $this->json([
+            'token' => $this->mediaAccessTokenService->generate($user),
+            'expiresIn' => MediaAccessTokenService::TTL,
+        ]);
+    }
+
+    #[Route('/combine', name: 'combine', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/combine',
+        summary: 'Combine office documents and PDFs into one PDF',
+        description: 'Exports each input to PDF (when needed) and merges them with pdfunite. PDF-only sets work without the office engine; mixed office sets answer 503 when the engine is off.',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['fileIds'],
+                properties: [
+                    new OA\Property(property: 'fileIds', type: 'array', items: new OA\Items(type: 'integer'), example: [12, 15, 18]),
+                    new OA\Property(property: 'filename', type: 'string', example: 'pack.pdf'),
+                    new OA\Property(property: 'format', type: 'string', enum: ['pdf', 'docx', 'xlsx', 'pptx'], example: 'pdf'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Combined PDF created',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 99),
+                        new OA\Property(property: 'filename', type: 'string', example: 'pack.pdf'),
+                        new OA\Property(property: 'file_type', type: 'string', example: 'pdf'),
+                        new OA\Property(property: 'file_size', type: 'integer', example: 24576),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid selection'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'One or more files were not found'),
+            new OA\Response(response: 503, description: 'Office engine required for mixed office inputs'),
+        ]
+    )]
+    public function combineFiles(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $payload = $request->toArray();
+        $fileIds = $payload['fileIds'] ?? $payload['file_ids'] ?? [];
+        if (!is_array($fileIds)) {
+            return $this->json(['error' => 'fileIds must be an array'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $filename = $payload['filename'] ?? null;
+        $filename = is_string($filename) ? $filename : null;
+        $format = strtolower(is_string($payload['format'] ?? null) ? $payload['format'] : 'pdf');
+
+        try {
+            if ('pdf' === $format) {
+                $file = $this->documentCombineService->combineToPdf($user, $fileIds, $filename);
+            } elseif (DocumentKind::isKnown($format)) {
+                $file = $this->documentOfficeMergeService->combine($user, $fileIds, $format, $filename);
+            } else {
+                return $this->json(['error' => 'Unsupported combine format', 'reason' => 'unsupported'], Response::HTTP_BAD_REQUEST);
+            }
+        } catch (DocumentCombineException $e) {
+            return $this->json(['error' => $e->getMessage(), 'reason' => $e->reason], $e->getCode());
+        }
+
+        return $this->json([
+            'id' => $file->getId(),
+            'filename' => $file->getFileName(),
+            'file_type' => $file->getFileType(),
+            'file_size' => $file->getFileSize(),
+        ], Response::HTTP_CREATED);
     }
 
     #[Route('/upload', name: 'upload', methods: ['POST'])]
@@ -67,12 +206,14 @@ class FileController extends AbstractController
                         new OA\Property(property: 'files[]', type: 'array', items: new OA\Items(type: 'string', format: 'binary')),
                         new OA\Property(property: 'group_key', type: 'string', example: 'customer-support'),
                         new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
-                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'widget', 'api', 'generated'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source.'),
+                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'widget', 'api', 'generated', 'compute'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source. compute = result of a file-work run.'),
                         new OA\Property(property: 'original_name', type: 'string', example: '/Shared/Q3 Report.pdf', description: 'The file name at the source, preserved even when the stored name is normalised. Falls back to the uploaded filename.'),
                         new OA\Property(property: 'source_id', type: 'string', example: '12345', description: 'Stable external id of the file at its source (e.g. the Nextcloud file id). Enables overwrite-in-place and bulk stale checks. Sent with a single file per request.'),
                         new OA\Property(property: 'source_etag', type: 'string', example: 'a1b2c3', description: 'External version/etag captured at ingest; a differing value reported later marks the knowledge copy stale.'),
                         new OA\Property(property: 'overwrite', type: 'boolean', example: true, description: 'Replace the existing file matching (source, source_id) — or (group_key, original_name) — in place instead of creating a duplicate. Keeps the file id stable.'),
                         new OA\Property(property: 'retain_source', type: 'boolean', example: true, description: 'When false, the stored binary is discarded after successful vectorization; the row, extracted text and vectors are kept. Defaults to true.'),
+                        new OA\Property(property: 'vectorize_model', type: 'string', example: 'ollama:bge-m3:vectorize', description: 'Optional catalog key for this file\'s embedding model. Omitted uses the account VECTORIZE default. Ignored on DESKTOP: knowledge folders so index and search stay on the same model. Unknown or non-VECTORIZE keys return 400.'),
+                        new OA\Property(property: 'analyze_model', type: 'string', example: 'anthropic:claude-sonnet-4:chat', description: 'Optional ANALYZE catalog key. Unknown or non-ANALYZE keys return 400. The extract+vectorize pipeline does not run document analysis, so this value is not applied for process_level=vectorize.'),
                     ]
                 )
             )
@@ -80,7 +221,7 @@ class FileController extends AbstractController
         responses: [
             new OA\Response(response: 200, description: 'All files uploaded successfully'),
             new OA\Response(response: 206, description: 'Partial success — some files failed'),
-            new OA\Response(response: 400, description: 'No files provided'),
+            new OA\Response(response: 400, description: 'No files provided, or an unknown / wrong-capability model hint'),
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
@@ -115,7 +256,12 @@ class FileController extends AbstractController
         $overwrite = $request->request->getBoolean('overwrite');
         $retainSource = !$request->request->has('retain_source') || $request->request->getBoolean('retain_source');
 
-        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource);
+        $hints = $this->processModelHints($request);
+        if ($hints instanceof JsonResponse) {
+            return $hints;
+        }
+
+        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource, $hints->vectorizeModelId);
 
         $uploadedFiles = $request->files->get('files', []);
 
@@ -258,13 +404,21 @@ class FileController extends AbstractController
         summary: 'Trigger extraction and vectorization for a stored file',
         tags: ['Files'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'vectorize_model', type: 'string', example: 'ollama:bge-m3:vectorize', description: 'Optional VECTORIZE catalog key. Ignored when the file lives in a DESKTOP: folder (index uses the workspace search default).'),
+                new OA\Property(property: 'analyze_model', type: 'string', example: 'anthropic:claude-sonnet-4:chat', description: 'Validated as an ANALYZE catalog key (400 if unknown). Not applied on extract+vectorize.'),
+            ])
+        ),
         responses: [
             new OA\Response(response: 200, description: 'Processing result'),
+            new OA\Response(response: 400, description: 'Unknown or wrong-capability model hint'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'File not found'),
         ]
     )]
-    public function processFile(int $id, #[CurrentUser] ?User $user): JsonResponse
+    public function processFile(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -279,7 +433,12 @@ class FileController extends AbstractController
             return $this->json(['success' => true, 'status' => $file->getStatus(), 'already_processed' => true]);
         }
 
-        $result = $this->uploadService->processFile($file, $user);
+        $hints = $this->processModelHints($request);
+        if ($hints instanceof JsonResponse) {
+            return $hints;
+        }
+
+        $result = $this->uploadService->processFile($file, $user, $hints);
 
         return $this->json($result);
     }
@@ -319,7 +478,7 @@ class FileController extends AbstractController
         $statusCode = match ($result['errorType'] ?? null) {
             'not_found' => Response::HTTP_NOT_FOUND,
             'rate_limited' => Response::HTTP_TOO_MANY_REQUESTS,
-            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            'empty_content', 'not_extractable' => Response::HTTP_UNPROCESSABLE_ENTITY,
             default => Response::HTTP_INTERNAL_SERVER_ERROR,
         };
 
@@ -393,7 +552,7 @@ class FileController extends AbstractController
         $statusCode = match ($result['errorType'] ?? null) {
             'not_found' => Response::HTTP_NOT_FOUND,
             'rate_limited' => Response::HTTP_TOO_MANY_REQUESTS,
-            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            'empty_content', 'not_extractable' => Response::HTTP_UNPROCESSABLE_ENTITY,
             default => Response::HTTP_INTERNAL_SERVER_ERROR,
         };
 
@@ -427,7 +586,10 @@ class FileController extends AbstractController
         path: '/api/v1/files/{id}/download',
         summary: 'Download a file',
         tags: ['Files'],
-        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: MediaAccessTokenService::QUERY_PARAM, in: 'query', required: false, description: 'Read-only media token from /api/v1/files/media-token, for clients that cannot send an Authorization header', schema: new OA\Schema(type: 'string')),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'File content'),
             new OA\Response(response: 401, description: 'Not authenticated'),
@@ -435,14 +597,23 @@ class FileController extends AbstractController
             new OA\Response(response: 404, description: 'File not found'),
         ]
     )]
-    public function downloadFile(int $id, #[CurrentUser] ?User $user): Response
+    public function downloadFile(int $id, Request $request, #[CurrentUser] ?User $user): Response
     {
+        // An <img>/<video> pointing at this route carries a media token in the
+        // URL instead of a header; it grants nothing but reading this user's
+        // own files (see MediaAccessTokenService).
+        $user ??= $this->mediaAccessTokenService->resolveUser($request);
+
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $file = $this->fileRepository->find($id);
         if (!$file) {
+            if ($this->sharedFileAccess->isMissingReferencedFile($user, $id)) {
+                return $this->json(['error' => 'iam.fileUnavailable'], Response::HTTP_GONE);
+            }
+
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
@@ -468,6 +639,202 @@ class FileController extends AbstractController
 
         $response = new BinaryFileResponse($absolutePath);
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, $file->getFileName());
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate');
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+
+        return $response;
+    }
+
+    #[Route('/{id}/export', name: 'export', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/{id}/export',
+        summary: 'Export a file to another format (PDF)',
+        description: 'Converts an office document to PDF via Collabora CODE. An already-PDF file is returned as-is. Answers 503 when the office engine is disabled and the source is not a PDF.',
+        tags: ['Files'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'format', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['pdf'], example: 'pdf')),
+            new OA\Parameter(name: 'inline', in: 'query', required: false, description: 'Set to 1 to send Content-Disposition: inline (preview)', schema: new OA\Schema(type: 'integer', enum: [0, 1])),
+            new OA\Parameter(name: MediaAccessTokenService::QUERY_PARAM, in: 'query', required: false, description: 'Read-only media token from /api/v1/files/media-token, for clients that cannot send an Authorization header', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'File content'),
+            new OA\Response(response: 400, description: 'Unsupported format'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File not found'),
+            new OA\Response(response: 503, description: 'Office conversion is not configured'),
+        ]
+    )]
+    public function exportFile(int $id, Request $request, #[CurrentUser] ?User $user): Response
+    {
+        $user ??= $this->mediaAccessTokenService->resolveUser($request);
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $file = $this->fileRepository->find($id);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (!$this->isFileAccessibleByUser($file, $user)) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+        if ('pdf' !== strtolower((string) $request->query->get('format', ''))) {
+            return $this->json(['error' => 'Unsupported export format'], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->streamExportedPdf($file, '1' === (string) $request->query->get('inline'));
+    }
+
+    #[Route('/{id}/revisions', name: 'revisions', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/{id}/revisions',
+        summary: 'List structured document versions',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Revision list',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(
+                            property: 'revisions',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'version', type: 'integer', example: 2),
+                                    new OA\Property(property: 'summary', type: 'string', example: 'Formatted column D'),
+                                    new OA\Property(property: 'source', type: 'string', example: 'model'),
+                                    new OA\Property(property: 'created', type: 'integer', example: 1756828800),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found'),
+        ]
+    )]
+    public function listRevisions(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        $rows = [];
+        foreach ($this->documentRevisionService->listFor($file) as $revision) {
+            $rows[] = [
+                'version' => $revision->getVersion(),
+                'summary' => $revision->getSummary(),
+                'source' => $revision->getSource(),
+                'created' => $revision->getCreated(),
+            ];
+        }
+
+        return $this->json(['revisions' => $rows]);
+    }
+
+    #[Route('/{id}/revisions/{version}/restore', name: 'revisions_restore', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/revisions/{version}/restore',
+        summary: 'Restore a previous structured document version',
+        tags: ['Files'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'version', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Version restored'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File or version not found'),
+        ]
+    )]
+    public function restoreRevision(int $id, int $version, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        $restored = $this->documentRevisionService->restore($file, $version);
+        if (null === $restored) {
+            return $this->json(['error' => 'Version not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json([
+            'id' => $restored->getId(),
+            'filename' => $restored->getFileName(),
+            'file_size' => $restored->getFileSize(),
+        ]);
+    }
+
+    #[Route('/{id}/thumb', name: 'thumb', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/{id}/thumb',
+        summary: 'Serve a file thumbnail (e.g. a video poster frame)',
+        description: 'Returns the generated thumbnail image for a file (video poster frames from ThumbnailService, plus office/PDF first-page posters from DocumentThumbnailGenerator). Responds 404 when the file has no thumbnail, letting the client fall back to a type icon.',
+        tags: ['Files'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: MediaAccessTokenService::QUERY_PARAM, in: 'query', required: false, description: 'Read-only media token from /api/v1/files/media-token, for clients that cannot send an Authorization header', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Thumbnail image'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File or thumbnail not found'),
+        ]
+    )]
+    public function thumbnail(int $id, Request $request, #[CurrentUser] ?User $user): Response
+    {
+        // Same read-only media-token path as downloadFile(): an <img> poster
+        // carries the token in the URL because it cannot send an auth header.
+        $user ??= $this->mediaAccessTokenService->resolveUser($request);
+
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file) {
+            if ($this->sharedFileAccess->isMissingReferencedFile($user, $id)) {
+                return $this->json(['error' => 'iam.fileUnavailable'], Response::HTTP_GONE);
+            }
+
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$this->isFileAccessibleByUser($file, $user)) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $thumbPath = $file->getThumbPath();
+        if (null === $thumbPath || '' === $thumbPath) {
+            return $this->json(['error' => 'No thumbnail'], Response::HTTP_NOT_FOUND);
+        }
+
+        $absolutePath = $this->uploadDir.'/'.ltrim($thumbPath, '/');
+        if (!FileHelper::fileExistsNfs($absolutePath)) {
+            return $this->json(['error' => 'Thumbnail not found on disk'], Response::HTTP_NOT_FOUND);
+        }
+
+        $response = new BinaryFileResponse($absolutePath);
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE);
+        $response->setPrivate();
+        // A poster frame is immutable for the life of the file, so it is safe to
+        // cache briefly in the browser to avoid re-fetching on every grid render.
+        $response->headers->set('Cache-Control', 'private, max-age=3600');
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
 
         return $response;
     }
@@ -537,8 +904,15 @@ class FileController extends AbstractController
         }
 
         $file = $this->fileRepository->find($id);
-        if (!$file || $file->getUserId() !== $user->getId()) {
+        if (!$file) {
+            if ($this->sharedFileAccess->isMissingReferencedFile($user, $id)) {
+                return $this->json(['error' => 'iam.fileUnavailable'], Response::HTTP_GONE);
+            }
+
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (!$this->isFileAccessibleByUser($file, $user)) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
         return $this->json([
@@ -566,7 +940,7 @@ class FileController extends AbstractController
             new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
             new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
             new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s): none, pending, vectorized, failed, not_applicable, stale (comma-separated for groups)', schema: new OA\Schema(type: 'string', example: 'stale')),
-            new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter generated media by kind: image, video, audio, calendar, document', schema: new OA\Schema(type: 'string', example: 'image')),
+            new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter by origin kind: image, video, audio, calendar, document, artefact', schema: new OA\Schema(type: 'string', example: 'image')),
             new OA\Parameter(name: 'incoming', in: 'query', required: false, description: 'Filter the Incoming inbox: 1 = only incoming, 0 = exclude incoming', schema: new OA\Schema(type: 'boolean')),
             new OA\Parameter(name: 'sort', in: 'query', required: false, description: 'Sort order: date_desc (default), date_asc, name_asc, name_desc, size_asc, size_desc', schema: new OA\Schema(type: 'string', example: 'date_desc')),
             new OA\Parameter(name: 'date_from', in: 'query', required: false, description: 'Unix timestamp lower bound', schema: new OA\Schema(type: 'integer')),
@@ -795,13 +1169,16 @@ class FileController extends AbstractController
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
+        $this->documentRevisionService->deleteForFile($file);
         $this->vectorStorageFacade->deleteByFile($user->getId(), $file->getId());
 
         if ($file->getFilePath()) {
             $this->storageService->deleteFile($file->getFilePath());
         }
 
+        $groupKey = $file->getGroupKey();
         $this->fileRepository->delete($file);
+        $this->folderShareCleanup->forgetIfEmpty($user->getId(), $groupKey);
 
         return $this->json(['success' => true, 'message' => 'File deleted successfully']);
     }
@@ -915,7 +1292,10 @@ class FileController extends AbstractController
         summary: 'Get storage quota statistics',
         tags: ['Files'],
         responses: [
-            new OA\Response(response: 200, description: 'Storage statistics'),
+            new OA\Response(
+                response: 200,
+                description: 'Storage statistics. Admins and open-source mode have unlimited storage (unlimited=true). user_level is the billing plan (purchase gating); rate_limit_level is the effective group quota tier.',
+            ),
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
@@ -928,6 +1308,7 @@ class FileController extends AbstractController
         return $this->json([
             'success' => true,
             'user_level' => $user->getRateLimitLevel(),
+            'rate_limit_level' => $this->rateLimitService->resolveRateLimitLevel($user),
             'storage' => $this->storageQuotaService->getStorageStats($user),
         ]);
     }
@@ -1055,7 +1436,11 @@ class FileController extends AbstractController
             return $this->json(['error' => 'groupKey is required'], Response::HTTP_BAD_REQUEST);
         }
 
+        $previousGroupKey = $file->getGroupKey();
         $this->fileRepository->updateGroupKey($file, $newGroupKey);
+        if ($previousGroupKey !== $newGroupKey) {
+            $this->folderShareCleanup->forgetIfEmpty($user->getId(), $previousGroupKey);
+        }
 
         $chunksUpdated = $this->vectorStorageFacade->updateGroupKey($user->getId(), $file->getId(), $newGroupKey);
 
@@ -1090,8 +1475,10 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
+        $previousGroupKey = $file->getGroupKey();
         $file->setGroupKey(null);
         $this->fileRepository->save($file);
+        $this->folderShareCleanup->forgetIfEmpty($user->getId(), $previousGroupKey);
 
         // Keep the vectors — just move them to the ungrouped DEFAULT bucket so
         // the file stays searchable globally but no longer belongs to a folder.
@@ -1327,11 +1714,40 @@ class FileController extends AbstractController
 
         $statusCode = match ($result['errorType'] ?? null) {
             'not_found' => Response::HTTP_NOT_FOUND,
-            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            'empty_content', 'not_extractable' => Response::HTTP_UNPROCESSABLE_ENTITY,
             default => Response::HTTP_INTERNAL_SERVER_ERROR,
         };
 
         return $this->json($result, $statusCode);
+    }
+
+    private function streamExportedPdf(File $file, bool $inline): Response
+    {
+        $ext = DocumentThumbnailGenerator::extensionOf($file);
+        $needsEngine = !DocumentThumbnailGenerator::isPdf($ext);
+        if ($needsEngine && !$this->officeConverter->isEnabled()) {
+            return $this->json(['error' => 'Office conversion is not configured'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $path = $this->documentExportService->exportToPdf($file);
+        if (null === $path) {
+            return $this->json(
+                ['error' => 'Export failed'],
+                $needsEngine ? Response::HTTP_SERVICE_UNAVAILABLE : Response::HTTP_NOT_FOUND,
+            );
+        }
+
+        $response = new BinaryFileResponse($path);
+        $response->setContentDisposition(
+            $inline ? ResponseHeaderBag::DISPOSITION_INLINE : ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            DocumentExportService::pdfDownloadName($file),
+        );
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate');
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+
+        return $response;
     }
 
     private function isFileAccessibleByUser(File $file, User $user): bool
@@ -1353,6 +1769,21 @@ class FileController extends AbstractController
             }
         }
 
-        return false;
+        return $this->sharedFileAccess->canRead($user, $file);
+    }
+
+    /**
+     * Optional catalog-key overrides from multipart fields or a JSON body.
+     */
+    private function processModelHints(Request $request): ProcessModelHints|JsonResponse
+    {
+        try {
+            return ProcessModelHints::fromRequest($request, $this->modelRepository);
+        } catch (InvalidProcessModelHintException $e) {
+            return $this->json([
+                'error' => $e->getMessage(),
+                'code' => $e->errorCode,
+            ], Response::HTTP_BAD_REQUEST);
+        }
     }
 }

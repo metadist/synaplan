@@ -37,14 +37,25 @@ final readonly class NodeResult
         return new self(NodeStatus::Done, $text, $files, $metadata);
     }
 
-    public static function failed(string $error): self
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    public static function failed(string $error, array $metadata = []): self
     {
-        return new self(NodeStatus::Failed, error: $error);
+        return new self(NodeStatus::Failed, error: $error, metadata: $metadata);
     }
 
     public static function skipped(string $reason): self
     {
         return new self(NodeStatus::Skipped, error: $reason);
+    }
+
+    /**
+     * A condition evaluated false. Dependents skip; the run itself completed.
+     */
+    public static function stopped(string $reason = 'Condition was not met'): self
+    {
+        return new self(NodeStatus::Stopped, error: $reason);
     }
 
     /**
@@ -56,6 +67,23 @@ final readonly class NodeResult
     public static function running(array $metadata = []): self
     {
         return new self(NodeStatus::Running, metadata: $metadata);
+    }
+
+    /**
+     * Unattended write paused until the owner approves.
+     *
+     * @param array<string, mixed> $args
+     * @param array<string, mixed> $metadata
+     */
+    public static function waitingApproval(int $approvalId, array $args = [], array $metadata = []): self
+    {
+        return new self(
+            NodeStatus::WaitingApproval,
+            metadata: array_merge($metadata, [
+                'approval_id' => $approvalId,
+                'approved_args' => $args,
+            ]),
+        );
     }
 
     public function firstFile(): ?array
@@ -75,6 +103,18 @@ final readonly class NodeResult
 
     public function isSettledUnsuccessful(): bool
     {
-        return NodeStatus::Failed === $this->status || NodeStatus::Skipped === $this->status;
+        return NodeStatus::Failed === $this->status
+            || NodeStatus::Skipped === $this->status
+            || NodeStatus::Stopped === $this->status;
+    }
+
+    public function isStopped(): bool
+    {
+        return NodeStatus::Stopped === $this->status;
+    }
+
+    public function isWaitingApproval(): bool
+    {
+        return NodeStatus::WaitingApproval === $this->status;
     }
 }

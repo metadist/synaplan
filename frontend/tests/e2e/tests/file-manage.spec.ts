@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url'
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
+import { getRuntimeFeatures } from '../helpers/features'
 import { FIXTURE_PATHS } from '../config/test-data'
 import { TIMEOUTS } from '../config/config'
 
@@ -13,6 +14,7 @@ const fixtureName = path.basename(fixturePath)
 
 const FILES = selectors.files
 const CHAT = selectors.chat
+const SHARE = selectors.share
 
 /**
  * Knowledge-folder management: create a folder, upload into it, scope a chat
@@ -23,8 +25,9 @@ const CHAT = selectors.chat
 test.describe('@ci File Management', () => {
   // @crossbrowser: file input / upload handling is a classic browser-API
   // divergence (setInputFiles, multipart, drag targets) worth a Gecko check.
-  test('@crossbrowser user can create a folder, upload into it, use it in chat and delete the file', async ({
+  test('@crossbrowser user can create a folder, upload into it, share it, use it in chat and delete the file', async ({
     page,
+    request,
   }) => {
     // Upload + vectorization plus create/open/use-in-chat/delete navigations
     // routinely push this past the 60s default under CI load — the recorded
@@ -83,11 +86,38 @@ test.describe('@ci File Management', () => {
       ).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
     })
 
-    await test.step('Act: "Use in chat" opens a chat scoped to the folder', async () => {
+    await test.step('Assert: the share button sits on the tile without hovering', async () => {
       // Return to the root grid deterministically instead of depending on the
       // in-folder back button (which is absent if a refresh bounced us to root).
       await page.goto('/files')
       await page.locator(FILES.page).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      const card = page.locator(FILES.folderCard(folderName))
+      await card.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+      const shareButton = page.locator(FILES.btnShareFolder(folderName))
+      if (!(await getRuntimeFeatures(request)).iamSharing) {
+        // Sharing pinned off for this deployment: the tile must not offer it.
+        await expect(shareButton).toHaveCount(0)
+        return
+      }
+
+      // Move the pointer away from the grid: the share affordance is the one
+      // action that must be visible at rest, unlike delete / use-in-chat.
+      await page.mouse.move(0, 0)
+      await expect(shareButton).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(shareButton).toHaveCSS('opacity', '1')
+      // Sibling of the tile button, not nested in it: clicking share must not
+      // also open the folder.
+      await shareButton.click()
+      const dialog = page.locator(SHARE.iamShareModal)
+      await expect(dialog).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(dialog).toContainText(folderName)
+      await expect(page.locator(FILES.btnBackToRoot)).toHaveCount(0)
+      await page.locator(SHARE.iamShareClose).click()
+      await expect(dialog).toHaveCount(0, { timeout: TIMEOUTS.STANDARD })
+    })
+
+    await test.step('Act: "Use in chat" opens a chat scoped to the folder', async () => {
       const card = page.locator(FILES.folderCard(folderName))
       await card.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await card.hover()

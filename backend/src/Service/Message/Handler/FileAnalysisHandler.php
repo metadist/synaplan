@@ -2,15 +2,21 @@
 
 namespace App\Service\Message\Handler;
 
+use App\AI\Exception\ChatFailureClassifier;
+use App\AI\Exception\ChatFailureReason;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\Context\ContextCondenser;
+use App\Service\Context\ModelContextWindow;
 use App\Service\File\FileTypeResolver;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * File Analysis Handler.
@@ -32,11 +38,29 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('app.message.handler')]
 final readonly class FileAnalysisHandler implements MessageHandlerInterface
 {
+    /** Historical flat completion budget; still the floor for models without catalog metadata. */
+    private const MIN_ANSWER_OUTPUT_TOKENS = 4000;
+
+    /** Upper bound for the requested completion budget (reasoning tokens count against it). */
+    private const MAX_ANSWER_OUTPUT_TOKENS = 16000;
+
+    /** Locales shipped in `translations/ai_errors.*.yaml`. */
+    private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
+
+    private const AUDIO_PENDING_FALLBACK = 'The recording is still being prepared. Please wait a moment and send your question again.';
+
+    private const AUDIO_FAILED_FALLBACK = 'This recording could not be transcribed. Speech-to-text is not set up on this server, or the audio could not be understood. Connect a speech-to-text service under Settings, or try a different file.';
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?ContextCondenser $contextCondenser = null,
+        private ?ModelContextWindow $modelContextWindow = null,
+        private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
+        private ?ChatErrorPresenter $chatErrorPresenter = null,
+        private ?TranslatorInterface $translator = null,
     ) {
     }
 
@@ -119,8 +143,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             case 'document_extraction_failed':
                 return $this->buildDocumentExtractionError($route);
 
-            case 'audio_not_transcribed':
-                return $this->buildAudioNotTranscribedError($route['audio_files']);
+            case 'audio_transcription_pending':
+            case 'audio_transcription_failed':
+                return $this->buildAudioTranscriptionError($route, $message);
 
             case 'video_transcription_pending':
             case 'video_transcription_failed':
@@ -213,8 +238,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
                 return ['metadata' => $error['metadata']];
 
-            case 'audio_not_transcribed':
-                $error = $this->buildAudioNotTranscribedError($route['audio_files']);
+            case 'audio_transcription_pending':
+            case 'audio_transcription_failed':
+                $error = $this->buildAudioTranscriptionError($route, $message);
                 $streamCallback($error['content']);
 
                 return ['metadata' => $error['metadata']];
@@ -447,19 +473,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Voice message reply failed', [
-                'error' => $e->getMessage(),
+            $this->logAndRethrow('FileAnalysisHandler: Voice message reply failed', [
                 'files' => $this->describeFileList($audioFiles),
-            ]);
-
-            return [
-                'content' => 'Voice message reply failed: '.$e->getMessage(),
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            ], $e);
         }
     }
 
@@ -534,20 +550,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Streaming voice message reply failed', [
-                'error' => $e->getMessage(),
+            $this->logAndRethrow('FileAnalysisHandler: Streaming voice message reply failed', [
                 'files' => $this->describeFileList($audioFiles),
-            ]);
-
-            $streamCallback('Voice message reply failed: '.$e->getMessage());
-
-            return [
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            ], $e);
         }
     }
 
@@ -572,9 +577,6 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
         );
 
-        $systemPrompt = $this->buildDocumentsSystemPrompt($documents).$this->buildLanguageDirective($classification);
-        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
-
         // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
@@ -598,20 +600,19 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'document_count' => count($documents),
         ]);
 
-        try {
-            $messages = [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $finalPrompt],
-            ];
+        $outputTokens = $this->answerOutputTokens($modelId);
+        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
+        $languageDirective = $this->buildLanguageDirective($classification);
+        $fitted = $this->fitDocumentsToModel($documents, $finalPrompt, $modelId, $message->getUserId(), $outputTokens, $progressCallback);
 
-            $result = $this->aiFacade->chat(
-                $messages,
+        try {
+            $result = $this->chatWithOverflowRetry(
+                $fitted,
+                $finalPrompt,
+                $languageDirective,
                 $message->getUserId(),
-                [
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'max_tokens' => 4000,
-                ]
+                ['provider' => $provider, 'model' => $modelName, 'max_tokens' => $outputTokens],
+                null,
             );
 
             $this->notify($progressCallback, 'complete', 'Analysis complete.');
@@ -628,19 +629,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Chat analysis failed', [
-                'error' => $e->getMessage(),
+            $this->logAndRethrow('FileAnalysisHandler: Chat analysis failed', [
                 'files' => $this->describeFileList($documents),
-            ]);
-
-            return [
-                'content' => 'Document analysis failed: '.$e->getMessage(),
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            ], $e);
         }
     }
 
@@ -663,9 +654,6 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'generating',
             count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
         );
-
-        $systemPrompt = $this->buildDocumentsSystemPrompt($documents).$this->buildLanguageDirective($classification);
-        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
 
         // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
@@ -690,21 +678,19 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'document_count' => count($documents),
         ]);
 
-        try {
-            $messages = [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $finalPrompt],
-            ];
+        $outputTokens = $this->answerOutputTokens($modelId);
+        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
+        $languageDirective = $this->buildLanguageDirective($classification);
+        $fitted = $this->fitDocumentsToModel($documents, $finalPrompt, $modelId, $message->getUserId(), $outputTokens, $progressCallback);
 
-            $result = $this->aiFacade->chatStream(
-                $messages,
-                $streamCallback,
+        try {
+            $result = $this->chatWithOverflowRetry(
+                $fitted,
+                $finalPrompt,
+                $languageDirective,
                 $message->getUserId(),
-                [
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'max_tokens' => 4000,
-                ]
+                ['provider' => $provider, 'model' => $modelName, 'max_tokens' => $outputTokens],
+                $streamCallback,
             );
 
             $this->notify($progressCallback, 'complete', 'Analysis complete.');
@@ -720,20 +706,137 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Chat streaming analysis failed', [
-                'error' => $e->getMessage(),
+            $this->logAndRethrow('FileAnalysisHandler: Chat streaming analysis failed', [
                 'files' => $this->describeFileList($documents),
+            ], $e);
+        }
+    }
+
+    /**
+     * Completion budget for the analysis answer. Reasoning models (GPT-6 Astra
+     * & co.) spend hidden thinking tokens against `max_tokens`, so the old
+     * flat 4 000 left a few hundred tokens for the visible reply — the "short
+     * or weird" answers users reported on big spreadsheets.
+     */
+    private function answerOutputTokens(?int $modelId): int
+    {
+        if (null === $this->modelContextWindow) {
+            return self::MIN_ANSWER_OUTPUT_TOKENS;
+        }
+
+        return $this->modelContextWindow->answerOutputTokens($modelId, self::MIN_ANSWER_OUTPUT_TOKENS, self::MAX_ANSWER_OUTPUT_TOKENS);
+    }
+
+    /**
+     * Fit every document's text into the answering model's window. The budget
+     * is derived from the model's catalog context window; documents share it
+     * proportionally to their size. Oversized texts go through the
+     * question-aware condenser (stacked map-reduce) so the model sees a
+     * focused view instead of a hard cut — or, without a condenser, a
+     * head/tail trim that at least never overflows the provider.
+     *
+     * @param list<array<string, mixed>> $documents
+     *
+     * @return list<array<string, mixed>> documents with `text` fitted and `fit_strategy` set
+     */
+    private function fitDocumentsToModel(array $documents, string $question, ?int $modelId, ?int $userId, int $outputTokens, ?callable $progressCallback): array
+    {
+        if (null === $this->contextCondenser || null === $this->modelContextWindow) {
+            return $documents;
+        }
+
+        $allText = implode("\n", array_map(static fn (array $doc): string => (string) ($doc['text'] ?? ''), $documents));
+        $totalChars = mb_strlen($allText);
+        if (0 === $totalChars) {
+            return $documents;
+        }
+
+        $totalBudget = $this->modelContextWindow->attachmentCharBudget($modelId, $allText, $userId, $outputTokens);
+        if ($totalChars <= $totalBudget) {
+            return $documents;
+        }
+
+        $this->notify($progressCallback, 'generating', count($documents) > 1
+            ? 'Documents are large — condensing them for the model...'
+            : 'Document is large — condensing it for the model...');
+
+        $fitted = [];
+        foreach ($documents as $doc) {
+            $text = (string) ($doc['text'] ?? '');
+            $docChars = mb_strlen($text);
+            $docBudget = max(1000, (int) floor($totalBudget * ($docChars / $totalChars)));
+
+            $result = $this->contextCondenser->fit($text, $question, $docBudget, $userId, function (array $progress) use ($progressCallback, $doc): void {
+                $this->notify($progressCallback, 'generating', sprintf(
+                    'Condensing %s — part %d of %d%s...',
+                    (string) ($doc['name'] ?? 'document'),
+                    $progress['chunk'],
+                    $progress['chunks'],
+                    $progress['level'] > 1 ? sprintf(' (round %d)', $progress['level']) : '',
+                ));
+            });
+
+            $note = $result->provenanceNote();
+            $doc['text'] = null !== $note ? $note."\n\n".$result->text : $result->text;
+            $doc['fit_strategy'] = $result->strategy;
+            $fitted[] = $doc;
+
+            $this->logger->info('FileAnalysisHandler: fitted document to model window', $result->toLogContext() + [
+                'file' => $doc['name'] ?? '',
+                'model_id' => $modelId,
+            ]);
+        }
+
+        return $fitted;
+    }
+
+    /**
+     * One analysis call, retried ONCE with a halved attachment budget when the
+     * provider rejects the request for size (context_length_exceeded / 413).
+     * Token estimates are approximate; this is the safety net for the cases
+     * where the estimate was still too generous.
+     *
+     * @param list<array<string, mixed>> $documents
+     * @param array<string, mixed>       $aiOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function chatWithOverflowRetry(array $documents, string $finalPrompt, string $languageDirective, ?int $userId, array $aiOptions, ?callable $streamCallback): array
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $this->buildDocumentsSystemPrompt($documents).$languageDirective],
+            ['role' => 'user', 'content' => $finalPrompt],
+        ];
+
+        try {
+            return null !== $streamCallback
+                ? $this->aiFacade->chatStream($messages, $streamCallback, $userId, $aiOptions)
+                : $this->aiFacade->chat($messages, $userId, $aiOptions);
+        } catch (\Throwable $e) {
+            $reason = $this->failureClassifier->classify($e);
+            if (null === $this->contextCondenser || !in_array($reason, [ChatFailureReason::ContextLengthExceeded, ChatFailureReason::RequestTooLarge], true)) {
+                throw $e;
+            }
+
+            $this->logger->warning('FileAnalysisHandler: provider rejected request size, retrying with halved attachment budget', [
+                'reason' => $reason->value,
+                'error' => $e->getMessage(),
             ]);
 
-            $streamCallback('Document analysis failed: '.$e->getMessage());
+            $retryDocs = [];
+            foreach ($documents as $doc) {
+                $text = (string) ($doc['text'] ?? '');
+                $halved = $this->contextCondenser->trimmed($text, max(1000, (int) floor(mb_strlen($text) / 2)));
+                $doc['text'] = $halved->text;
+                $doc['fit_strategy'] = 'retry_'.$halved->strategy;
+                $retryDocs[] = $doc;
+            }
 
-            return [
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            $messages[0]['content'] = $this->buildDocumentsSystemPrompt($retryDocs).$languageDirective;
+
+            return null !== $streamCallback
+                ? $this->aiFacade->chatStream($messages, $streamCallback, $userId, $aiOptions)
+                : $this->aiFacade->chat($messages, $userId, $aiOptions);
         }
     }
 
@@ -755,7 +858,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $prompt .= "=== EXTRACTED CONTENT ===\n";
             $prompt .= $doc['text']."\n";
             $prompt .= "=== END OF CONTENT ===\n\n";
-            $prompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points.';
+            $prompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.';
 
             return $prompt;
         }
@@ -833,7 +936,8 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'image_count' => count($images),
         ]);
 
-        $perImage = $this->analyzeImageBatch($message, $images, $userPrompt, $provider, $modelName, $progressCallback, $this->buildLanguageDirective($classification));
+        $perImage = $this->analyzeImageBatch($message, $images, $userPrompt, $provider, $modelName, $progressCallback, $this->buildLanguageDirective($classification), $classification);
+        $this->throwIfImageBatchFullyFailed($perImage);
         $content = $this->combineImageAnalyses($perImage, $images);
 
         $this->notify($progressCallback, 'complete', 'Analysis complete.');
@@ -897,6 +1001,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      * aggregator can render a partial response without throwing.
      *
      * @param list<array<string, mixed>> $images
+     * @param array<string, mixed>       $classification
      *
      * @return list<array<string, mixed>>
      */
@@ -908,6 +1013,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ?string $modelName,
         ?callable $progressCallback,
         string $languageDirective = '',
+        array $classification = [],
     ): array {
         $perImagePrompt = !empty($userPrompt)
             ? $userPrompt
@@ -934,10 +1040,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'full_path' => $fullPath,
                     'image_index' => $index,
                 ]);
+                $missing = new \RuntimeException('File not found: '.$image['name']);
                 $results[] = [
                     'name' => $image['name'],
                     'error' => 'file_not_found',
-                    'message' => "File not found: {$image['name']}",
+                    'message' => $this->userFacingAnalysisError($missing, $classification),
+                    'exception' => $missing,
                 ];
 
                 continue;
@@ -971,7 +1079,8 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 $results[] = [
                     'name' => $image['name'],
                     'error' => 'analysis_failed',
-                    'message' => 'Image analysis failed: '.$e->getMessage(),
+                    'message' => $this->userFacingAnalysisError($e, $classification),
+                    'exception' => $e,
                 ];
             }
         }
@@ -992,18 +1101,69 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         if (1 === count($results)) {
             $only = $results[0];
 
-            return $only['content'] ?? $only['message'] ?? 'Image analysis failed.';
+            return $only['content'] ?? $only['message'] ?? $this->fallbackImageFailureCopy();
         }
 
         $parts = [];
         foreach ($results as $index => $entry) {
             $position = $index + 1;
             $name = $entry['name'] ?? ($images[$index]['name'] ?? 'image '.$position);
-            $body = $entry['content'] ?? $entry['message'] ?? 'Image analysis failed.';
+            $body = $entry['content'] ?? $entry['message'] ?? $this->fallbackImageFailureCopy();
             $parts[] = "### Image {$position}: {$name}\n\n{$body}";
         }
 
         return implode("\n\n---\n\n", $parts);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     *
+     * @throws \Exception
+     */
+    private function logAndRethrow(string $log, array $context, \Exception $e): never
+    {
+        $this->logger->error($log, $context + ['error' => $e->getMessage()]);
+
+        throw $e;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $results
+     */
+    private function throwIfImageBatchFullyFailed(array $results): void
+    {
+        foreach ($results as $entry) {
+            if (isset($entry['content'])) {
+                return;
+            }
+        }
+        foreach ($results as $entry) {
+            $exception = $entry['exception'] ?? null;
+            if ($exception instanceof \Throwable) {
+                throw $exception;
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     */
+    private function userFacingAnalysisError(\Throwable $e, array $classification): string
+    {
+        $lang = 'en';
+        if (isset($classification['language']) && is_string($classification['language']) && '' !== trim($classification['language'])) {
+            $lang = $classification['language'];
+        }
+        if ($this->chatErrorPresenter instanceof ChatErrorPresenter) {
+            return $this->chatErrorPresenter->present($e, $lang)->userText;
+        }
+
+        return 'Something went wrong while answering this request. Please try again.';
+    }
+
+    private function fallbackImageFailureCopy(): string
+    {
+        return $this->userFacingAnalysisError(new \RuntimeException('Image analysis failed'), []);
     }
 
     /**
@@ -1134,24 +1294,27 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      * categorization.
      *
      * Priority rules:
-     *  1. Any audio attachment is missing its transcript → surface
-     *     `audio_not_transcribed` immediately. Audio is the slowest
+     *  1. Any audio attachment is still being transcribed → surface
+     *     `audio_transcription_pending`. Audio is the slowest
      *     attachment to prepare in a multi-file bubble; processing
      *     only the subset that's ready silently drops the rest
      *     (Copilot review on PR #986). The user needs to wait/retry.
-     *  2. Any document is still being extracted → surface
+     *  2. Any audio finished with no transcript → surface
+     *     `audio_transcription_failed` with copy that does not promise
+     *     retry will work (issue #1908: missing STT is a terminal failure).
+     *  3. Any document is still being extracted → surface
      *     `document_extraction_pending`. Same reasoning: don't run
      *     the chat model on half a bundle.
-     *  3. Any document finished extraction with no usable text →
+     *  4. Any document finished extraction with no usable text →
      *     surface `document_extraction_failed` so the user knows
      *     the file is unusable.
-     *  4. Documents with extracted text → chat-model "document" path.
+     *  5. Documents with extracted text → chat-model "document" path.
      *     Any transcribed audio is appended as virtual "transcript"
      *     documents so its content reaches the model too.
-     *  5. Otherwise audio-only (one or many) with transcripts → the
+     *  6. Otherwise audio-only (one or many) with transcripts → the
      *     conversational voice-reply path.
-     *  6. Otherwise images → the vision path.
-     *  7. Otherwise → `unsupported`.
+     *  7. Otherwise images → the vision path.
+     *  8. Otherwise → `unsupported`.
      *
      * @param list<array<string, mixed>> $filesInfo
      *
@@ -1172,7 +1335,8 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $documentsPending = [];
         $documentsFailed = [];
         $audioWithText = [];
-        $audioMissingText = [];
+        $audioPending = [];
+        $audioFailed = [];
         $videoWithText = [];
         $videoPending = [];
         $videoFailed = [];
@@ -1183,7 +1347,16 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 if ('' !== trim((string) ($info['text'] ?? ''))) {
                     $audioWithText[] = $info;
                 } else {
-                    $audioMissingText[] = $info;
+                    $isStillExtracting = in_array(
+                        (string) ($info['status'] ?? ''),
+                        ['uploaded', 'extracting'],
+                        true
+                    );
+                    if ($isStillExtracting) {
+                        $audioPending[] = $info;
+                    } else {
+                        $audioFailed[] = $info;
+                    }
                 }
                 continue;
             }
@@ -1246,23 +1419,32 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         // first" without the user being told.
         //
         // Resolution priorities, in order:
-        //   1. Any audio attachment missing a transcript → tell the
-        //      user audio is still being prepared, regardless of how
-        //      many documents are ready. Audio transcription is
-        //      usually the slowest path in a multi-file bubble.
-        //   2. Any document still being extracted → tell the user
+        //   1. Any audio still being transcribed → tell the user to
+        //      wait. Audio is usually the slowest path in a bubble.
+        //   2. Any audio that finished with no transcript → tell the
+        //      user this server could not transcribe it (issue #1908).
+        //      Do not promise "try again in a moment" when retry cannot
+        //      succeed without an STT backend.
+        //   3. Any document still being extracted → tell the user
         //      to wait. Acting on only the ready subset has caused
         //      "where's the rest of my plan?" support escalations.
-        //   3. Any document that finished extraction with no text →
+        //   4. Any document that finished extraction with no text →
         //      surface the extraction-failed message so the user
         //      knows that file is unusable, even if other docs
         //      succeeded.
         // Only once every attached doc/audio is ready do we hand
         // the bundle off to the documents/audio chat pipelines.
-        if ([] !== $audioMissingText) {
+        if ([] !== $audioPending) {
             return [
-                'kind' => 'audio_not_transcribed',
-                'audio_files' => $audioMissingText,
+                'kind' => 'audio_transcription_pending',
+                'audio_files' => $audioPending,
+            ];
+        }
+
+        if ([] !== $audioFailed) {
+            return [
+                'kind' => 'audio_transcription_failed',
+                'audio_files' => $audioFailed,
             ];
         }
 
@@ -1479,20 +1661,59 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * @param list<array<string, mixed>> $audioFiles
+     * Distinct pending vs failed copy for audio without a transcript
+     * (issue #1908). Pending still asks the user to wait; failed names
+     * that speech-to-text is missing or the audio could not be understood
+     * and does not promise a retry that cannot succeed.
+     *
+     * @param array{kind: string, audio_files?: list<array<string, mixed>>} $route
      *
      * @return array{content: string, metadata: array<string, mixed>}
      */
-    private function buildAudioNotTranscribedError(array $audioFiles): array
+    private function buildAudioTranscriptionError(array $route, Message $message): array
     {
+        $audioFiles = $route['audio_files'] ?? [];
+        $isStillProcessing = 'audio_transcription_pending' === $route['kind'];
+
         $this->logger->error('FileAnalysisHandler: Audio file(s) without transcription', [
             'files' => $this->describeFileList($audioFiles),
+            'still_processing' => $isStillProcessing,
         ]);
 
+        $locale = $this->normalizeLocale($message->getLanguage());
+        $content = $isStillProcessing
+            ? $this->trans('file_analysis.audio_pending', self::AUDIO_PENDING_FALLBACK, $locale)
+            : $this->trans('file_analysis.audio_failed', self::AUDIO_FAILED_FALLBACK, $locale);
+
         return [
-            'content' => 'Audio transcription failed or is not yet available. Please try again in a moment.',
-            'metadata' => ['error' => 'audio_not_transcribed'],
+            'content' => $content,
+            'metadata' => [
+                'error' => $isStillProcessing
+                    ? 'audio_transcription_in_progress'
+                    : 'audio_transcription_failed',
+            ],
         ];
+    }
+
+    private function normalizeLocale(string $lang): string
+    {
+        $normalized = strtolower(substr(trim($lang), 0, 2));
+
+        return in_array($normalized, self::SUPPORTED_LOCALES, true) ? $normalized : 'en';
+    }
+
+    private function trans(string $key, string $fallback, string $locale): string
+    {
+        if (null === $this->translator) {
+            return $fallback;
+        }
+
+        $translated = $this->translator->trans($key, [], 'ai_errors', $locale);
+        if ('' === $translated || $translated === $key) {
+            return $fallback;
+        }
+
+        return $translated;
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\File;
+use App\Entity\Message;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -248,22 +249,82 @@ class FileRepository extends ServiceEntityRepository
      */
     public function findImagesByMessageIds(int $userId, array $messageIds, int $limit = 30): array
     {
+        return $this->findByMessageIds($userId, $messageIds, $limit, true);
+    }
+
+    /**
+     * Every file linked to the given chat messages, newest first.
+     *
+     * The unfiltered sibling of {@see findImagesByMessageIds()}: a follow-up
+     * request can reference any artifact of the conversation, not just a
+     * picture, so the shared conversation catalog needs documents and audio
+     * through the same BMESSAGEID channel.
+     *
+     * @param list<int> $messageIds
+     *
+     * @return list<File>
+     */
+    public function findFilesByMessageIds(int $userId, array $messageIds, int $limit = 30): array
+    {
+        return $this->findByMessageIds($userId, $messageIds, $limit, false);
+    }
+
+    /**
+     * Every file linked to the given chat messages, without a result cap.
+     *
+     * Used by conversation cleanup, where truncating the result would leave
+     * rows pointing at deleted messages (#1826).
+     *
+     * @param list<int> $messageIds
+     *
+     * @return list<File>
+     */
+    public function findAllFilesByMessageIds(int $userId, array $messageIds): array
+    {
+        return $this->findByMessageIds($userId, $messageIds, null, false);
+    }
+
+    /**
+     * @param list<int> $messageIds
+     *
+     * @return list<File>
+     */
+    private function findByMessageIds(int $userId, array $messageIds, ?int $limit, bool $imagesOnly): array
+    {
         if ([] === $messageIds) {
             return [];
         }
 
-        return $this->createQueryBuilder('f')
+        // Generated documents are stored with a null BMESSAGEID and linked
+        // through BMESSAGE_FILE_ATTACHMENTS (`Message::addFile()`). Cleanup
+        // and the conversation file list must see both channels.
+        $attachedIds = $this->getEntityManager()->createQueryBuilder()
+            ->select('attached.id')
+            ->from(Message::class, 'msg')
+            ->innerJoin('msg.files', 'attached')
+            ->where('msg.id IN (:messageIds)')
+            ->andWhere('attached.userId = :userId')
+            ->getDQL();
+
+        $qb = $this->createQueryBuilder('f')
+            ->distinct()
             ->where('f.userId = :userId')
-            ->andWhere('f.messageId IN (:messageIds)')
-            ->andWhere('f.fileMime LIKE :imageMime OR f.fileType IN (:imageTypes)')
+            ->andWhere('(f.messageId IN (:messageIds) OR f.id IN ('.$attachedIds.'))')
             ->setParameter('userId', $userId)
             ->setParameter('messageIds', $messageIds)
-            ->setParameter('imageMime', 'image/%')
-            ->setParameter('imageTypes', ['image', 'png', 'jpg', 'jpeg', 'gif', 'webp'])
-            ->orderBy('f.id', 'DESC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->orderBy('f.id', 'DESC');
+
+        if (null !== $limit) {
+            $qb->setMaxResults($limit);
+        }
+
+        if ($imagesOnly) {
+            $qb->andWhere('f.fileMime LIKE :imageMime OR f.fileType IN (:imageTypes)')
+                ->setParameter('imageMime', 'image/%')
+                ->setParameter('imageTypes', ['image', 'png', 'jpg', 'jpeg', 'gif', 'webp']);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**
@@ -354,6 +415,37 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<File>
+     */
+    public function findByUserAndGroupKey(int $userId, string $groupKey): array
+    {
+        return $this->createQueryBuilder('f')
+            ->where('f.userId = :userId')
+            ->andWhere('f.groupKey = :groupKey')
+            ->setParameter('userId', $userId)
+            ->setParameter('groupKey', $groupKey)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function existsForUserAndGroupKey(int $userId, string $groupKey): bool
+    {
+        $count = (int) $this->createQueryBuilder('f')
+            ->select('COUNT(f.id)')
+            ->where('f.userId = :userId')
+            ->andWhere('f.groupKey = :groupKey')
+            ->andWhere('f.ephemeral = false')
+            ->andWhere('f.groupKey IS NOT NULL')
+            ->andWhere("f.groupKey != ''")
+            ->setParameter('userId', $userId)
+            ->setParameter('groupKey', $groupKey)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $count > 0;
+    }
+
+    /**
      * @return array<string, int> group name => file count
      */
     public function getGroupCountsByUser(int $userId): array
@@ -390,6 +482,28 @@ class FileRepository extends ServiceEntityRepository
             ->where('f.ephemeral = true')
             ->andWhere('f.createdAt < :cutoff')
             ->setParameter('cutoff', $cutoffTimestamp)
+            ->orderBy('f.createdAt', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Files stuck in extracting/vectorizing after the /process request died.
+     * Ages from last status change so a re-process of an old upload is not
+     * treated as already expired.
+     *
+     * @param list<string> $statuses
+     *
+     * @return File[]
+     */
+    public function findStaleProcessing(int $cutoffUnix, array $statuses, int $limit = 200): array
+    {
+        return $this->createQueryBuilder('f')
+            ->where('f.status IN (:statuses)')
+            ->andWhere('COALESCE(f.updatedAt, f.createdAt) < :cutoff')
+            ->setParameter('statuses', $statuses, \Doctrine\DBAL\ArrayParameterType::STRING)
+            ->setParameter('cutoff', $cutoffUnix)
             ->orderBy('f.createdAt', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()

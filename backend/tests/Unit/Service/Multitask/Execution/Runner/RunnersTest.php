@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Connection;
 use App\Entity\Message;
+use App\Entity\Prompt;
+use App\Repository\ConnectionRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Calendar\CalendarEventService;
+use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\Destination\DestinationRegistry;
+use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\FileStorageService;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\FileAnalysisHandler;
@@ -25,10 +31,13 @@ use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
 use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
 use App\Service\Multitask\Execution\Runner\WebSearchRunner;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Search\BraveSearchService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -116,7 +125,7 @@ final class RunnersTest extends TestCase
             return ['provider' => 'groq', 'model' => 'gpt-oss-120b'];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n2', Capability::Summarize, ['n1'], ['text' => 'long input text']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -125,6 +134,37 @@ final class RunnersTest extends TestCase
         self::assertSame('THE SUMMARY', $result->text);
         // The upstream text reached the model as the user turn.
         self::assertSame('long input text', $captured[1]['content']);
+    }
+
+    /**
+     * Planner `summarize` nodes must use Text Analytics (ANALYZE), never the
+     * leftover hidden SUMMARIZE slot that was seeded to Groq and is not on
+     * the AI Models purpose list.
+     */
+    public function testSummarizeUsesAnalyzeCapabilityNotLegacySummarize(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('THE SUMMARY');
+
+            return ['provider' => 'anthropic', 'model' => 'claude-sonnet-5'];
+        });
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->expects(self::once())
+            ->method('getDefaultModel')
+            ->with('ANALYZE', 1)
+            ->willReturn(55);
+        $modelConfig->method('getProviderForModel')->with(55)->willReturn('anthropic');
+        $modelConfig->method('getModelName')->with(55)->willReturn('claude-sonnet-5');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n2', Capability::Summarize, ['n1'], ['text' => 'excel contents']);
+
+        $result = $runner->run($node, $this->context($this->message('summarize these spreadsheets')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(55, $result->metadata['model_id'] ?? null);
     }
 
     /**
@@ -146,7 +186,7 @@ final class RunnersTest extends TestCase
             return [];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n2', Capability::Chat, [], ['text' => 'wie wird das Wetter heute?']);
 
         $context = $this->context($this->message('wie wird das Wetter heute?'));
@@ -185,7 +225,7 @@ final class RunnersTest extends TestCase
         $modelConfig->expects(self::once())->method('getProviderForModel')->with(999)->willReturn('ollama');
         $modelConfig->expects(self::once())->method('getModelName')->with(999)->willReturn('nemotron-3-nano');
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'Was ist die Hauptstadt von Frankreich']);
 
         $context = new NodeContext(
@@ -200,9 +240,113 @@ final class RunnersTest extends TestCase
         self::assertSame(999, $result->metadata['model_id'] ?? null);
     }
 
+    /**
+     * Intermediate chat nodes must load the Task Prompt named in params.topic_id
+     * so Saved Tasks actually run the instruction the user saved (E1).
+     */
+    public function testChatRunnerUsesTopicIdSystemPrompt(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $capturedSystem = null;
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb) use (&$capturedSystem): array {
+            $capturedSystem = $messages[0]['content'] ?? null;
+            $cb('extracted meetings');
+
+            return [];
+        });
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('Extract meeting requests. Ignore newsletters.');
+
+        $promptService = $this->createMock(PromptService::class);
+        $promptService->expects(self::once())
+            ->method('getPromptWithMetadata')
+            ->with('meeting-requests', 1, 'en')
+            ->willReturn([
+                'prompt' => $prompt,
+                'metadata' => ['aiModel' => -1],
+            ]);
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultModel')->willReturn(76);
+        $modelConfig->method('getProviderForModel')->willReturn('groq');
+        $modelConfig->method('getModelName')->willReturn('gpt-oss-120b');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n2', Capability::Chat, ['n1'], ['text' => 'inbox dump'], ['topic_id' => 'meeting-requests']);
+
+        $result = $runner->run($node, $this->context($this->message('inbox dump')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertIsString($capturedSystem);
+        self::assertStringContainsString('Extract meeting requests. Ignore newsletters.', $capturedSystem);
+    }
+
+    public function testChatRunnerFallsBackWhenTopicIdIsUnknown(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $capturedSystem = null;
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb) use (&$capturedSystem): array {
+            $capturedSystem = $messages[0]['content'] ?? null;
+            $cb('ok');
+
+            return [];
+        });
+
+        $promptService = $this->createMock(PromptService::class);
+        $promptService->method('getPromptWithMetadata')->willReturn(null);
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultModel')->willReturn(76);
+        $modelConfig->method('getProviderForModel')->willReturn('groq');
+        $modelConfig->method('getModelName')->willReturn('gpt-oss-120b');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'hello'], ['topic_id' => 'does-not-exist']);
+
+        $result = $runner->run($node, $this->context($this->message('hello')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertIsString($capturedSystem);
+        self::assertStringContainsString('helpful assistant', $capturedSystem);
+        self::assertStringNotContainsString('does-not-exist', $capturedSystem);
+    }
+
+    public function testChatRunnerUsesTopicPinnedModelWhenUserDidNotSelectOne(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('ok');
+
+            return [];
+        });
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('Be brief.');
+
+        $promptService = $this->createMock(PromptService::class);
+        $promptService->method('getPromptWithMetadata')->willReturn([
+            'prompt' => $prompt,
+            'metadata' => ['aiModel' => 42],
+        ]);
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->expects(self::never())->method('getDefaultModel');
+        $modelConfig->expects(self::once())->method('getProviderForModel')->with(42)->willReturn('ollama');
+        $modelConfig->expects(self::once())->method('getModelName')->with(42)->willReturn('pinned-model');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'hello'], ['topic_id' => 'brief']);
+
+        $result = $runner->run($node, $this->context($this->message('hello')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(42, $result->metadata['model_id'] ?? null);
+    }
+
     public function testChatRunnerFailsOnEmptyInput(): void
     {
-        $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => '']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -232,7 +376,7 @@ final class RunnersTest extends TestCase
             return [];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::RagQuery, [], ['text' => 'what does our contract say about notice periods?']);
 
         $context = new NodeContext(
@@ -261,7 +405,7 @@ final class RunnersTest extends TestCase
         $vectorSearch = $this->createMock(VectorSearchService::class);
         $vectorSearch->method('semanticSearch')->willThrowException(new \RuntimeException('qdrant down'));
 
-        $runner = new ChatRunner($aiFacade, $this->createMock(ModelConfigService::class), $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $this->createMock(ModelConfigService::class), $vectorSearch, new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::RagQuery, [], ['text' => 'question']);
 
         $result = $runner->run($node, $this->context($this->message('question')));
@@ -277,7 +421,7 @@ final class RunnersTest extends TestCase
         $aiFacade->method('chatStream')->willThrowException(new \RuntimeException('groq 500'));
         $modelConfig = $this->createMock(ModelConfigService::class);
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n2', Capability::Summarize, [], ['text' => 'input']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -316,6 +460,36 @@ final class RunnersTest extends TestCase
         $result = $runner->run($node, $this->context($this->message()));
 
         self::assertFalse($result->isSuccessful());
+    }
+
+    public function testText2SoundTruncatesLongTextBeforeSynthesize(): void
+    {
+        $longText = str_repeat('Word ', 1500);
+
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade
+            ->expects(self::once())
+            ->method('synthesize')
+            ->with(
+                self::callback(static function (string $text): bool {
+                    return mb_strlen($text) <= \App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS;
+                }),
+                self::anything(),
+                self::anything(),
+            )
+            ->willReturn([
+                'relativePath' => '1/000/2026/06/tts_x.mp3',
+                'provider' => 'openai',
+                'model' => 'tts-1',
+            ]);
+
+        $runner = new Text2SoundRunner($aiFacade, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n3', Capability::Text2Sound, ['n2'], ['text' => $longText], ['format' => 'mp3']);
+
+        $result = $runner->run($node, $this->context($this->message()));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertLessThanOrEqual(\App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS, mb_strlen((string) $result->files[0]['source_text']));
     }
 
     public function testMediaGenerationRunnerProducesImageFile(): void
@@ -508,7 +682,26 @@ final class RunnersTest extends TestCase
             'error' => null,
         ]);
 
-        return new CalendarEventRunner(new CalendarEventService(), $storage, $this->createMock(LoggerInterface::class));
+        return new CalendarEventRunner(
+            new CalendarEventService(),
+            $storage,
+            $this->inertCalendarDelivery(),
+            $this->createMock(LoggerInterface::class),
+        );
+    }
+
+    /**
+     * A real (final readonly) delivery service with empty collaborators — the
+     * tests never set `params.channel`, so it is never invoked.
+     */
+    private function inertCalendarDelivery(): RequestedCalendarDelivery
+    {
+        return new RequestedCalendarDelivery(
+            $this->createMock(ConnectionRepository::class),
+            new DestinationRegistry([]),
+            new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)),
+            $this->createMock(LoggerInterface::class),
+        );
     }
 
     /**
@@ -546,6 +739,346 @@ final class RunnersTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertCount(1, $result->files);
+    }
+
+    public function testCalendarEventPausesForApprovalAndDoesNotStore(): void
+    {
+        $storage = $this->createMock(FileStorageService::class);
+        $storage->expects(self::never())->method('storeRawContent');
+
+        $gate = $this->createMock(StepApprovalGate::class);
+        $gate->expects(self::once())
+            ->method('consult')
+            ->with(
+                self::anything(),
+                self::anything(),
+                'skill:calendar_event',
+                self::callback(static function (array $args): bool {
+                    return isset($args['title'], $args['start'], $args['end'], $args['timezone'], $args['channel'])
+                        && array_key_exists('location', $args)
+                        && array_key_exists('description', $args)
+                        && array_key_exists('attendees', $args)
+                        && array_key_exists('organizer_email', $args);
+                }),
+            )
+            ->willReturn(NodeResult::waitingApproval(5, ['title' => 'Sync']));
+
+        $runner = new CalendarEventRunner(
+            new CalendarEventService(),
+            $storage,
+            $this->inertCalendarDelivery(),
+            $this->createMock(LoggerInterface::class),
+            approvalGate: $gate,
+        );
+
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+            'title' => 'Sync',
+            'start' => '2026-06-10T15:00:00',
+            'timezone' => 'Europe/Berlin',
+        ]);
+
+        $result = $runner->run($node, $this->context($this->message()));
+
+        self::assertTrue($result->isWaitingApproval());
+        self::assertSame(5, $result->metadata['approval_id']);
+    }
+
+    /**
+     * Phase M step M6: `params.channel` naming a calendar channel delivers the
+     * event into that connected calendar (here: an m365 connection's
+     * "outlook" channel via the `m365_calendar` provider) — and the .ics stays
+     * attached to the reply as the download fallback.
+     */
+    public function testCalendarEventWithChannelParamDeliversIntoTheConnectedCalendar(): void
+    {
+        $uploadDir = sys_get_temp_dir().'/calrunner_'.uniqid();
+        mkdir($uploadDir.'/1/000', 0777, true);
+
+        try {
+            $storage = $this->createMock(FileStorageService::class);
+            $storage->method('storeRawContent')->willReturnCallback(
+                static function (string $content, int $userId, string $filename) use ($uploadDir): array {
+                    $relative = '1/000/'.$filename;
+                    file_put_contents($uploadDir.'/'.$relative, $content);
+
+                    return ['success' => true, 'path' => $relative, 'size' => strlen($content), 'mime' => 'text/calendar'];
+                }
+            );
+
+            $m365 = new Connection(1, Connection::TYPE_M365, 'ada@contoso.com');
+            $m365->setConfig(['channel' => 'm365', 'channel_calendar' => 'outlook']);
+            $m365->setScopes(['Calendars.ReadWrite']);
+            (new \ReflectionProperty(Connection::class, 'id'))->setValue($m365, 3);
+
+            $connections = $this->createMock(ConnectionRepository::class);
+            $connections->method('findByOwner')->willReturn([$m365]);
+            $connections->method('findByIdAndOwner')->willReturn($m365);
+
+            $provider = new class implements \App\Service\Destination\DestinationProvider {
+                /** @var array<string, mixed>|null */
+                public ?array $lastParams = null;
+
+                public function id(): string
+                {
+                    return 'm365_calendar';
+                }
+
+                public function send(\App\Service\Destination\ShareableFile $file, array $params): \App\Service\Destination\DestinationResult
+                {
+                    $this->lastParams = $params;
+
+                    return \App\Service\Destination\DestinationResult::success('1', [
+                        'created' => '1',
+                        'skipped' => '0',
+                        'webLink' => 'https://outlook.office.com/evt',
+                    ]);
+                }
+            };
+
+            $runner = new CalendarEventRunner(
+                new CalendarEventService(),
+                $storage,
+                new RequestedCalendarDelivery(
+                    $connections,
+                    new DestinationRegistry([$provider]),
+                    new PlannerChannelCatalog($connections),
+                    $this->createMock(LoggerInterface::class),
+                ),
+                $this->createMock(LoggerInterface::class),
+                uploadDir: $uploadDir,
+            );
+
+            $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+                'title' => 'Marketing Strategy',
+                'start' => '2026-06-10T10:00:00',
+                'timezone' => 'Europe/Berlin',
+                'channel' => 'outlook',
+            ]);
+
+            $result = $runner->run($node, $this->context($this->message()));
+
+            self::assertTrue($result->isSuccessful(), (string) $result->error);
+            self::assertCount(1, $result->files, 'the .ics download stays attached');
+            self::assertStringContainsString('Added the event to outlook', (string) $result->text);
+            self::assertStringContainsString('https://outlook.office.com/evt', (string) $result->text);
+            self::assertTrue($result->metadata['calendar_delivery']['ok'] ?? false);
+            self::assertSame('outlook', $result->metadata['calendar_delivery']['channel'] ?? null);
+            self::assertSame(3, $provider->lastParams['connection_id'] ?? null);
+        } finally {
+            array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
+            @rmdir($uploadDir.'/1/000');
+            @rmdir($uploadDir.'/1');
+            @rmdir($uploadDir);
+        }
+    }
+
+    /**
+     * A failed calendar delivery must degrade to the .ics download with an
+     * honest note — never sink the node.
+     */
+    public function testCalendarEventWithUnknownChannelDegradesToTheDownload(): void
+    {
+        $uploadDir = sys_get_temp_dir().'/calrunner_'.uniqid();
+        mkdir($uploadDir.'/1/000', 0777, true);
+
+        try {
+            $storage = $this->createMock(FileStorageService::class);
+            $storage->method('storeRawContent')->willReturnCallback(
+                static function (string $content, int $userId, string $filename) use ($uploadDir): array {
+                    $relative = '1/000/'.$filename;
+                    file_put_contents($uploadDir.'/'.$relative, $content);
+
+                    return ['success' => true, 'path' => $relative, 'size' => strlen($content), 'mime' => 'text/calendar'];
+                }
+            );
+
+            $runner = new CalendarEventRunner(
+                new CalendarEventService(),
+                $storage,
+                $this->inertCalendarDelivery(),
+                $this->createMock(LoggerInterface::class),
+                uploadDir: $uploadDir,
+            );
+
+            $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+                'title' => 'Sync',
+                'start' => '2026-06-10T15:00:00',
+                'timezone' => 'UTC',
+                'channel' => 'invented',
+            ]);
+
+            $result = $runner->run($node, $this->context($this->message()));
+
+            self::assertTrue($result->isSuccessful(), 'delivery failure must not sink the node');
+            self::assertCount(1, $result->files);
+            self::assertStringContainsString('no calendar with this name', (string) $result->text);
+            self::assertFalse($result->metadata['calendar_delivery']['ok'] ?? true);
+        } finally {
+            array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
+            @rmdir($uploadDir.'/1/000');
+            @rmdir($uploadDir.'/1');
+            @rmdir($uploadDir);
+        }
+    }
+
+    /**
+     * Issue #1891: when the planner omitted params.channel but the user asked
+     * to put the event in a calendar, deliver into the connected calendar.
+     */
+    public function testCalendarEventWithoutChannelStillDeliversWhenUserAsked(): void
+    {
+        $uploadDir = sys_get_temp_dir().'/calrunner_'.uniqid();
+        mkdir($uploadDir.'/1/000', 0777, true);
+
+        try {
+            $storage = $this->createMock(FileStorageService::class);
+            $storage->method('storeRawContent')->willReturnCallback(
+                static function (string $content, int $userId, string $filename) use ($uploadDir): array {
+                    $relative = '1/000/'.$filename;
+                    file_put_contents($uploadDir.'/'.$relative, $content);
+
+                    return ['success' => true, 'path' => $relative, 'size' => strlen($content), 'mime' => 'text/calendar'];
+                }
+            );
+
+            $caldav = new Connection(1, 'caldav', 'personal');
+            $caldav->setStatus(Connection::STATUS_CONNECTED);
+            $caldav->setConfig(['channel' => 'calendar']);
+            (new \ReflectionProperty(Connection::class, 'id'))->setValue($caldav, 9);
+
+            $connections = $this->createMock(ConnectionRepository::class);
+            $connections->method('findByOwner')->willReturn([$caldav]);
+            $connections->method('findByIdAndOwner')->willReturn($caldav);
+
+            $provider = new class implements \App\Service\Destination\DestinationProvider {
+                /** @var array<string, mixed>|null */
+                public ?array $lastParams = null;
+
+                public function id(): string
+                {
+                    return 'caldav';
+                }
+
+                public function send(\App\Service\Destination\ShareableFile $file, array $params): \App\Service\Destination\DestinationResult
+                {
+                    $this->lastParams = $params;
+
+                    return \App\Service\Destination\DestinationResult::success('1', [
+                        'created' => '1',
+                        'skipped' => '0',
+                    ]);
+                }
+            };
+
+            $runner = new CalendarEventRunner(
+                new CalendarEventService(),
+                $storage,
+                new RequestedCalendarDelivery(
+                    $connections,
+                    new DestinationRegistry([$provider]),
+                    new PlannerChannelCatalog($connections),
+                    $this->createMock(LoggerInterface::class),
+                ),
+                $this->createMock(LoggerInterface::class),
+                uploadDir: $uploadDir,
+            );
+
+            $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+                'title' => 'Nextcloud Test',
+                'start' => '2026-09-15T09:00:00',
+                'timezone' => 'UTC',
+            ]);
+
+            $result = $runner->run($node, $this->context($this->message(
+                'Create a meeting reminder called Nextcloud Test for tomorrow at 9:00 and put it in my calendar'
+            )));
+
+            self::assertTrue($result->isSuccessful(), (string) $result->error);
+            self::assertCount(1, $result->files);
+            self::assertStringContainsString('Added the event to calendar', (string) $result->text);
+            self::assertTrue($result->metadata['calendar_delivery']['ok'] ?? false);
+            self::assertSame('calendar', $result->metadata['calendar_delivery']['channel'] ?? null);
+            self::assertSame(9, $provider->lastParams['connection_id'] ?? null);
+        } finally {
+            array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
+            @rmdir($uploadDir.'/1/000');
+            @rmdir($uploadDir.'/1');
+            @rmdir($uploadDir);
+        }
+    }
+
+    /**
+     * Issue #1891: the same phrasing with no calendar connected must still
+     * attach the .ics and say the event was not added.
+     */
+    public function testCalendarEventWithoutChannelSaysSoWhenNoCalendarIsConnected(): void
+    {
+        $uploadDir = sys_get_temp_dir().'/calrunner_'.uniqid();
+        mkdir($uploadDir.'/1/000', 0777, true);
+
+        try {
+            $storage = $this->createMock(FileStorageService::class);
+            $storage->method('storeRawContent')->willReturnCallback(
+                static function (string $content, int $userId, string $filename) use ($uploadDir): array {
+                    $relative = '1/000/'.$filename;
+                    file_put_contents($uploadDir.'/'.$relative, $content);
+
+                    return ['success' => true, 'path' => $relative, 'size' => strlen($content), 'mime' => 'text/calendar'];
+                }
+            );
+
+            $runner = new CalendarEventRunner(
+                new CalendarEventService(),
+                $storage,
+                $this->inertCalendarDelivery(),
+                $this->createMock(LoggerInterface::class),
+                uploadDir: $uploadDir,
+            );
+
+            $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+                'title' => 'Nextcloud Test',
+                'start' => '2026-09-15T09:00:00',
+                'timezone' => 'UTC',
+            ]);
+
+            $result = $runner->run($node, $this->context($this->message(
+                'Create a meeting reminder called Nextcloud Test for tomorrow at 9:00 and put it in my calendar'
+            )));
+
+            self::assertTrue($result->isSuccessful());
+            self::assertCount(1, $result->files);
+            self::assertStringContainsString('was not added to a calendar', (string) $result->text);
+            self::assertStringContainsString('Settings → Connections', (string) $result->text);
+            self::assertFalse($result->metadata['calendar_delivery']['ok'] ?? true);
+        } finally {
+            array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
+            @rmdir($uploadDir.'/1/000');
+            @rmdir($uploadDir.'/1');
+            @rmdir($uploadDir);
+        }
+    }
+
+    /**
+     * A plain "create an invite" request without a put-in-calendar ask must
+     * stay silent on delivery — only the .ics is attached.
+     */
+    public function testCalendarEventWithoutChannelStaysSilentWhenUserDidNotAsk(): void
+    {
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+            'title' => 'Sync',
+            'start' => '2026-06-10T15:00:00',
+            'timezone' => 'UTC',
+        ]);
+
+        $result = $this->calendarRunner()->run(
+            $node,
+            $this->context($this->message('Create a meeting reminder called Sync for tomorrow at 15:00')),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
+        self::assertArrayNotHasKey('calendar_delivery', $result->metadata);
+        self::assertStringNotContainsString('was not added', (string) $result->text);
     }
 
     public function testCalendarEventParamsWinOverInputs(): void
@@ -695,7 +1228,7 @@ final class RunnersTest extends TestCase
         $queryGen = $this->createMock(SearchQueryGenerator::class);
         $queryGen->method('generate')->willReturn('mars news');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'latest mars news']);
 
         $result = $runner->run($node, $this->context($this->message('latest mars news')));
@@ -711,7 +1244,7 @@ final class RunnersTest extends TestCase
         $brave = $this->createMock(BraveSearchService::class);
         $brave->method('isEnabled')->willReturn(false);
 
-        $runner = new WebSearchRunner($this->createMock(SearchQueryGenerator::class), $brave, $this->createMock(LoggerInterface::class));
+        $runner = new WebSearchRunner($this->createMock(SearchQueryGenerator::class), WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'anything']);
 
         $result = $runner->run($node, $this->context($this->message('anything')));
@@ -732,7 +1265,7 @@ final class RunnersTest extends TestCase
         $queryGen = $this->createMock(SearchQueryGenerator::class);
         $queryGen->expects(self::never())->method('generate');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => '$message.text']);
 
         $context = new NodeContext(
@@ -761,7 +1294,7 @@ final class RunnersTest extends TestCase
         $queryGen = $this->createMock(SearchQueryGenerator::class);
         $queryGen->method('generate')->willReturn('rover landing');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
         // Planner narrowed this node to a sub-aspect of the request.
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'only the rover landing part']);
 
@@ -793,7 +1326,7 @@ final class RunnersTest extends TestCase
         $repo = $this->createMock(SearchResultRepository::class);
         $repo->expects(self::once())->method('saveSearchResults');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class), $repo);
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class), $repo);
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'AI breakthrough']);
 
         $result = $runner->run($node, $this->context($this->message('AI breakthrough')));
@@ -816,7 +1349,7 @@ final class RunnersTest extends TestCase
         $repo = $this->createMock(SearchResultRepository::class);
         $repo->expects(self::never())->method('saveSearchResults');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class), $repo);
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class), $repo);
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => '$message.text']);
 
         $context = new NodeContext(

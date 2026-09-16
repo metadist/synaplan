@@ -23,6 +23,7 @@ const BRAND_COLOR_STYLE_ID = 'brand-color-vars'
 export function applyBrandingTheme(): void {
   applyColors()
   applyFonts()
+  applyIcon()
 }
 
 /**
@@ -145,6 +146,77 @@ function applyFonts(): void {
       document.head.appendChild(styleEl)
     }
     styleEl.textContent = `h1,h2,h3,h4,h5,h6{font-family:${heading};}`
+  }
+}
+
+/**
+ * Point the document favicon at `branding.iconUrl` when configured.
+ * Empty keeps the bundled Synaplan bird from index.html.
+ *
+ * index.html ships both an SVG icon and a PNG fallback. Overwriting every
+ * href with one URL while leaving the original `type` would mismatch (e.g.
+ * type="image/png" pointing at an .svg), which some browsers then ignore.
+ * Collapse to a single correctly-typed <link rel="icon"> instead.
+ */
+function applyIcon(): void {
+  const iconUrl = config.branding.iconUrl
+  if (!iconUrl) {
+    return
+  }
+
+  const type = iconMimeType(iconUrl)
+  const icons = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'))
+  const [primary, ...extras] = icons
+
+  if (primary) {
+    primary.href = iconUrl
+    primary.removeAttribute('sizes')
+    if (type) {
+      primary.type = type
+    } else {
+      primary.removeAttribute('type')
+    }
+    extras.forEach((link) => link.remove())
+  } else {
+    const link = document.createElement('link')
+    link.rel = 'icon'
+    link.href = iconUrl
+    if (type) {
+      link.type = type
+    }
+    document.head.appendChild(link)
+  }
+
+  const apple = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+  if (apple) {
+    apple.href = iconUrl
+  }
+}
+
+function iconMimeType(url: string): string | undefined {
+  let pathname: string
+  try {
+    pathname = new URL(url, 'https://placeholder.local').pathname
+  } catch {
+    pathname = url.split(/[?#]/)[0] ?? url
+  }
+
+  switch (pathname.split('.').pop()?.toLowerCase()) {
+    case 'svg':
+      return 'image/svg+xml'
+    case 'png':
+      return 'image/png'
+    case 'ico':
+      return 'image/x-icon'
+    case 'webp':
+      return 'image/webp'
+    case 'gif':
+      return 'image/gif'
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg'
+    default:
+      return undefined
   }
 }
 

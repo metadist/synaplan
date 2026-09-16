@@ -18,6 +18,13 @@ export type Capability =
   | 'TEXT2SOUND'
   | 'ANALYZE'
 
+/**
+ * Why a model cannot be used on this installation:
+ * - provider_unavailable: the provider has no API key / base URL configured
+ * - not_pulled: the Ollama model is not pulled on the local server
+ */
+export type ModelUnavailableReason = 'provider_unavailable' | 'not_pulled'
+
 export interface AIModel {
   id: number
   service: string
@@ -32,6 +39,18 @@ export interface AIModel {
   description: string | null
   isSystemModel: boolean
   features: string[]
+  /** Only false in admin views requested with includeUnavailable; regular responses contain available models only. */
+  available?: boolean
+  unavailableReason?: ModelUnavailableReason | null
+}
+
+/** Per-provider availability of this installation, from /config/models. */
+export interface ProviderAvailability {
+  name: string
+  displayName: string
+  available: boolean
+  /** True for cloud providers configured via a platform API key; false for URL/local providers (Ollama, custom endpoints). */
+  requiresKey: boolean
 }
 
 export interface AgainData {

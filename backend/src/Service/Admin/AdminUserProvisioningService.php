@@ -7,6 +7,7 @@ namespace App\Service\Admin;
 use App\Entity\ApiKey;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use App\Service\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,6 +39,7 @@ final class AdminUserProvisioningService
         private readonly EntityManagerInterface $em,
         private readonly UserLifecycleService $userLifecycleService,
         private readonly LoggerInterface $logger,
+        private readonly ExternalIdentityRepository $externalIdentityRepository,
     ) {
     }
 
@@ -52,9 +54,15 @@ final class AdminUserProvisioningService
             return null;
         }
 
-        // Match the two JSON markers we write in provision(). Doctrine has no
-        // portable JSON operator here, so a LIKE on the serialized column is
-        // used — exactly like OidcUserService::findBySub().
+        $identity = $this->externalIdentityRepository->findOneByTriple($source, '', $externalId);
+        if (null !== $identity) {
+            $user = $this->userRepository->find($identity->getUserId());
+            if ($user instanceof User) {
+                return $user;
+            }
+        }
+
+        // JSON fallback for rows written before BEXTERNALIDENTITIES existed.
         $qb = $this->userRepository->createQueryBuilder('u');
         $qb->where('u.userDetails LIKE :src')
             ->andWhere('u.userDetails LIKE :ext')
@@ -105,6 +113,7 @@ final class AdminUserProvisioningService
         $existing = $this->findByExternalIdentity($source, $externalId);
         if (null !== $existing) {
             $this->syncDetails($existing, $email, $displayName);
+            $this->upsertIdentity((int) $existing->getId(), $source, $externalId);
             $this->em->flush();
 
             return ['user' => $existing, 'created' => false];
@@ -131,6 +140,8 @@ final class AdminUserProvisioningService
             ],
         );
 
+        $this->upsertIdentity((int) $user->getId(), $source, $externalId);
+
         $this->logger->info('Provisioned external user', [
             'user_id' => $user->getId(),
             'source' => $source,
@@ -138,6 +149,11 @@ final class AdminUserProvisioningService
         ]);
 
         return ['user' => $user, 'created' => true];
+    }
+
+    private function upsertIdentity(int $userId, string $source, string $externalId): void
+    {
+        $this->externalIdentityRepository->upsert($userId, $source, $externalId);
     }
 
     /**

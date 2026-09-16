@@ -3,7 +3,15 @@ Description=Synaplan first-boot setup (data volume, configuration, TLS)
 Documentation=https://github.com/metadist/synaplan/blob/main/deploy/aws/README.md
 # The script reads instance metadata and writes to the SSM Parameter Store, so
 # it needs the network; it also mounts the data volume every other unit uses.
-After=network-online.target cloud-init.target docker.service
+#
+# It must NOT order itself after cloud-init.target: that target sits after
+# multi-user.target, while this unit's WantedBy pulls it before it — a cycle
+# systemd resolves by silently never starting this unit, Caddy or the stack.
+# One verification instance sat idle for its whole fifty-minute window that
+# way. Nothing here needs cloud-init anyway: configuration travels as instance
+# tags and SSM parameters, never as user data, and the instance metadata
+# service answers as soon as the network is up. test-firstboot.sh enforces it.
+After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service
 Before=synaplan.service caddy.service

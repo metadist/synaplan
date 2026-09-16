@@ -59,7 +59,7 @@ export const mockAvailableModels: AIModel[] = [
     id: 3,
     purpose: 'chat',
     service: 'Groq',
-    name: 'Llama 3.3 70b versatile',
+    name: 'Qwen 3.6 27B',
     description: 'Fast API service via groq',
   },
   {
@@ -73,8 +73,8 @@ export const mockAvailableModels: AIModel[] = [
     id: 75,
     purpose: 'pic2text',
     service: 'Groq',
-    name: 'llama-4-scout-17b-16e-instruct',
-    description: 'Groq Llama4 16e vision model for image analysis',
+    name: 'Qwen 3.6 27B Vision',
+    description: 'Groq Qwen 3.6 27B vision model for image analysis',
   },
   {
     id: 76,
@@ -159,14 +159,14 @@ export const mockAvailableModels: AIModel[] = [
     id: 86,
     purpose: 'sort',
     service: 'Groq',
-    name: 'Llama 3.3 70b versatile',
+    name: 'Qwen 3.6 27B',
     description: 'Fast API service for sorting tasks',
   },
   {
     id: 87,
     purpose: 'summarize',
     service: 'Groq',
-    name: 'Llama 3.3 70b versatile',
+    name: 'Qwen 3.6 27B',
     description: 'Fast API service for summarization',
   },
   {
@@ -180,10 +180,10 @@ export const mockAvailableModels: AIModel[] = [
 
 export const mockDefaultConfig: DefaultModelConfig = {
   chat: 'gpt-S (OpenAI)',
-  pic2text: 'llama-4-scout-17b-16e-instruct (Groq)',
-  sort: 'Llama 3.3 70b versatile (Groq)',
+  pic2text: 'Qwen 3.6 27B Vision (Groq)',
+  sort: 'Qwen 3.6 27B (Groq)',
   sound2text: 'whisper-large-v3 (Groq)',
-  summarize: 'Llama 3.3 70b versatile (Groq)',
+  summarize: 'Qwen 3.6 27B (Groq)',
   text2pic: 'gpt-image-1 (OpenAI)',
   text2sound: 'tts-1 with Nova (OpenAI)',
   text2vid: 'Veo 2.0 (Google)',

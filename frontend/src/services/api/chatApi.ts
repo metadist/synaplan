@@ -3,11 +3,17 @@
  */
 
 import { z } from 'zod'
-import { httpClient, getApiBaseUrl } from './httpClient'
+import {
+  httpClient,
+  getApiBaseUrl,
+  awaitAuthMutation,
+  isDefinitiveAuthRejection,
+} from './httpClient'
 import { isNativeApp } from './nativeRuntime'
 import { getNativeAccessToken, hasNativeTokens } from './nativeAuth'
 import { UserMemorySchema } from './userMemoriesApi'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
+import { isSessionTerminating } from '@/services/sessionTeardown'
 import { GetApiChatsMessagesResponseSchema } from '@/generated/api-schemas'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
@@ -128,6 +134,11 @@ async function refreshAccessToken(): Promise<boolean> {
 
   tokenRefreshPromise = (async () => {
     try {
+      // This pool is invisible to the httpClient auth-mutation lock. Let an
+      // in-progress impersonation swap settle first, else this fires with
+      // pre-swap cookies and clobbers the new session.
+      await awaitAuthMutation()
+
       const refreshResponse = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
@@ -139,9 +150,9 @@ async function refreshAccessToken(): Promise<boolean> {
         return true
       }
 
-      // Server rejected the refresh - the cookie is gone. Clear the hint
-      // so subsequent calls short-circuit instead of repeating the dance.
-      clearSessionHint()
+      if (isDefinitiveAuthRejection(refreshResponse.status)) {
+        clearSessionHint()
+      }
       return false
     } catch {
       return false
@@ -210,10 +221,13 @@ async function getSseToken(): Promise<string | null> {
             '🔒 Token refresh succeeded but SSE token fetch failed - authentication expired'
           )
           throw new Error('Authentication required')
-        } else {
-          // Refresh failed - session expired
+        } else if (!hasSessionHint()) {
+          // Refresh failed and the hint was cleared — the cookie is dead.
           console.error('🔒 Token refresh failed - session expired')
           throw new Error('Authentication required')
+        } else {
+          // Transient refresh failure (restart / 502). Keep the session.
+          return null
         }
       }
 
@@ -227,8 +241,14 @@ async function getSseToken(): Promise<string | null> {
 
       return cachedSseToken
     } catch (error) {
-      // If error is "Authentication required", redirect to login
-      if (error instanceof Error && error.message === 'Authentication required') {
+      // If error is "Authentication required", redirect to login — unless a
+      // logout is already under way, whose navigation this would cancel
+      // (see sessionTeardown).
+      if (
+        error instanceof Error &&
+        error.message === 'Authentication required' &&
+        !isSessionTerminating()
+      ) {
         // Trigger auth failure handling (redirect to login)
         window.location.href = `/login?reason=session_expired`
       }
@@ -382,12 +402,93 @@ export interface IncognitoHistoryEntry {
  * the client — the backend keeps streaming and persists the result
  * (detach-on-navigation, #1225); an explicit Stop goes through /stop-stream.
  */
+/**
+ * Read one SSE response body, dispatching every frame to `onUpdate`.
+ *
+ * Shared by the streaming POST and the re-attach GET so both speak exactly the
+ * same event dialect — a re-attached turn must render through the identical
+ * handler as a live one, otherwise the two paths drift.
+ *
+ * Returns whether a terminal event was seen; the caller decides what a stream
+ * without one means. `complete` AND `error` both end a turn — every
+ * `sendSSE('error', …)` in the backend returns right after it, and the run log
+ * marks both as terminal. Counting only `complete` would make a genuine backend
+ * failure (rate limit, cost budget, missing model) look like a dropped
+ * connection, so the caller would retry the turn and then append a bogus
+ * "Connection interrupted" on top of the real error the user needs to read.
+ */
+async function readSseBody(
+  body: ReadableStream<Uint8Array>,
+  onUpdate: (data: StreamUpdatePayload) => void,
+  isStopped: () => boolean,
+  onEventId?: (seq: number) => void
+): Promise<boolean> {
+  let terminalReceived = false
+
+  const processEvent = (eventChunk: string) => {
+    const lines = eventChunk.split('\n')
+
+    // The attach endpoint tags every frame with its sequence number so a
+    // dropped re-attach can resume instead of replaying from the start.
+    const idLine = lines.find((line) => line.startsWith('id:'))
+    if (idLine && onEventId) {
+      const seq = Number.parseInt(idLine.slice(3).trim(), 10)
+      if (Number.isFinite(seq)) onEventId(seq)
+    }
+
+    const jsonStr = lines
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trim())
+      .filter(Boolean)
+      .join('')
+
+    if (!jsonStr) return
+
+    try {
+      const data = JSON.parse(jsonStr) as StreamUpdatePayload
+      terminalReceived = terminalReceived || data.status === 'complete' || data.status === 'error'
+      onUpdate(data)
+    } catch (error) {
+      console.error('Failed to parse SSE data:', error, 'Raw data:', jsonStr)
+    }
+  }
+
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split('\n\n')
+      buffer = events.pop() ?? ''
+
+      for (const eventChunk of events) {
+        if (isStopped()) return terminalReceived
+        processEvent(eventChunk)
+      }
+    }
+
+    if (!isStopped() && buffer.trim() !== '') {
+      processEvent(buffer)
+    }
+  } finally {
+    reader.cancel().catch(() => {
+      // ignore cancellation errors
+    })
+  }
+
+  return terminalReceived
+}
+
 function openStreamPost(
   body: Record<string, string | IncognitoHistoryEntry[]>,
   onUpdate: (data: StreamUpdatePayload) => void
 ): () => void {
   const controller = new AbortController()
-  let completionReceived = false
   let isStopped = false
 
   const authInit = sseTokenFetchInit()
@@ -403,25 +504,6 @@ function openStreamPost(
       body: JSON.stringify(body),
       signal: controller.signal,
     })
-
-  const processEvent = (eventChunk: string) => {
-    const jsonStr = eventChunk
-      .split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).trim())
-      .filter(Boolean)
-      .join('')
-
-    if (!jsonStr) return
-
-    try {
-      const data = JSON.parse(jsonStr) as StreamUpdatePayload
-      completionReceived = completionReceived || data.status === 'complete'
-      onUpdate(data)
-    } catch (error) {
-      console.error('Failed to parse SSE data:', error, 'Raw data:', jsonStr)
-    }
-  }
 
   ;(async () => {
     try {
@@ -441,7 +523,7 @@ function openStreamPost(
       if (!response.ok) {
         console.error(`🚫 Stream connection failed (HTTP ${response.status})`)
         onUpdate(
-          response.status === 401
+          response.status === 401 && !hasSessionHint()
             ? {
                 status: 'error',
                 error: 'Authentication required. Please log in again to continue.',
@@ -457,38 +539,12 @@ function openStreamPost(
         return
       }
 
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const events = buffer.split('\n\n')
-          buffer = events.pop() ?? ''
-
-          for (const eventChunk of events) {
-            if (isStopped) return
-            processEvent(eventChunk)
-          }
-        }
-
-        if (!isStopped && buffer.trim() !== '') {
-          processEvent(buffer)
-        }
-      } finally {
-        reader.cancel().catch(() => {
-          // ignore cancellation errors
-        })
-      }
+      const terminalReceived = await readSseBody(response.body, onUpdate, () => isStopped)
 
       // Stream closed without a terminal event: the backend always ends a
       // turn with 'complete' or 'error', so this is a dropped connection or
       // a crashed worker — surface it instead of leaving an empty bubble.
-      if (!completionReceived && !isStopped) {
+      if (!terminalReceived && !isStopped) {
         console.error('❌ Stream ended without completion event')
         onUpdate({ status: 'error', error: 'Connection interrupted' })
       }
@@ -505,6 +561,131 @@ function openStreamPost(
     isStopped = true
     controller.abort()
   }
+}
+
+/** Identity a re-attach request needs when it is not an authenticated app user. */
+export interface AttachStreamIdentity {
+  /** Guest chat: the server-issued guest session id. */
+  guestSessionId?: string
+  /** Embedded widget: the widget id + its server-issued session id. */
+  widgetId?: string
+  widgetSessionId?: string
+}
+
+export interface AttachStreamOptions extends AttachStreamIdentity {
+  /** Run id from the `run_started` event or from `activeRun` in the history response. */
+  runId: string
+  /** Replay events after this sequence number; 0 replays the whole turn. */
+  from?: number
+  onUpdate: (data: StreamUpdatePayload) => void
+}
+
+/**
+ * Re-attach to a turn that is still generating on the server.
+ *
+ * The backend keeps a turn alive across a client disconnect and mirrors its
+ * events into a replayable log, so this replays whatever was missed and then
+ * follows the live tail — a reload or a trip to another view continues the
+ * answer instead of losing it.
+ *
+ * If the attach connection itself drops before the turn ends, it resumes once
+ * from the last sequence number it saw. A second failure is reported as a
+ * regular transport drop, which the chat view recovers from by reloading the
+ * persisted history.
+ *
+ * Returns a cleanup function that detaches without affecting the turn.
+ */
+function openStreamAttach(opts: AttachStreamOptions): () => void {
+  const controller = new AbortController()
+  let isStopped = false
+  let cursor = opts.from ?? 0
+
+  const authInit = sseTokenFetchInit()
+  const headers: Record<string, string> = {
+    ...((authInit.headers as Record<string, string> | undefined) ?? {}),
+    Accept: 'text/event-stream',
+  }
+  if (opts.widgetId && opts.widgetSessionId) {
+    headers['X-Widget-Id'] = opts.widgetId
+    headers['X-Widget-Session'] = opts.widgetSessionId
+  }
+
+  const doFetch = () => {
+    const params = new URLSearchParams({ runId: opts.runId, from: String(cursor) })
+    if (opts.guestSessionId) params.set('guestSession', opts.guestSessionId)
+
+    return fetch(`${getApiBaseUrl()}/api/v1/messages/stream/attach?${params}`, {
+      method: 'GET',
+      credentials: authInit.credentials,
+      headers,
+      signal: controller.signal,
+    })
+  }
+
+  ;(async () => {
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        let response = await doFetch()
+
+        if (response.status === 401) {
+          const refreshed = await refreshAccessToken()
+          if (refreshed && !isStopped) {
+            response = await doFetch()
+          }
+        }
+
+        if (isStopped) return
+
+        // 404 means the run is gone (expired, or it finished and its short
+        // terminal retention lapsed). Nothing to replay — hand the caller the
+        // same transport-drop signal a mid-turn disconnect produces so it
+        // recovers from the persisted history.
+        if (!response.ok || !response.body) {
+          onAttachDrop(opts.onUpdate)
+          return
+        }
+
+        const terminalReceived = await readSseBody(
+          response.body,
+          opts.onUpdate,
+          () => isStopped,
+          (seq) => {
+            cursor = seq
+          }
+        )
+
+        // The turn is over — either it finished or it failed, and the caller
+        // has already been handed that outcome. Retrying would replay the log a
+        // second time and then report a drop that never happened.
+        if (terminalReceived || isStopped) return
+      }
+
+      // Two attempts, still no terminal event: treat it as a dropped stream.
+      // The turn may well have finished in the meantime — the chat view
+      // resolves that by reconciling with the server.
+      onAttachDrop(opts.onUpdate)
+    } catch (error) {
+      if (isStopped || (error instanceof DOMException && error.name === 'AbortError')) {
+        return
+      }
+      console.error('🚫 Stream re-attach failed:', error)
+      onAttachDrop(opts.onUpdate)
+    }
+  })()
+
+  return () => {
+    isStopped = true
+    controller.abort()
+  }
+}
+
+/**
+ * Report a re-attach that ended without the turn completing, using the exact
+ * message the live transport emits for a dropped connection so both paths land
+ * in the same recovery (see `isRecoverableStreamError`).
+ */
+function onAttachDrop(onUpdate: (data: StreamUpdatePayload) => void): void {
+  onUpdate({ status: 'error', error: 'Connection interrupted' })
 }
 
 export const chatApi = {
@@ -553,6 +734,10 @@ export const chatApi = {
     incognito?: boolean
     /** Incognito only: the in-memory transcript (oldest first) for context. */
     history?: IncognitoHistoryEntry[]
+    /** Pin this turn to an assistant (gallery chat or test panel). */
+    agentId?: number
+    /** Owner-only: use the unpublished draft (test panel). */
+    draft?: boolean
   }): () => void {
     const paramsObj: Record<string, string | IncognitoHistoryEntry[]> = {
       message: opts.message,
@@ -575,6 +760,8 @@ export const chatApi = {
     if (opts.ragGroupKey) paramsObj.ragGroupKey = opts.ragGroupKey
     if (opts.quotedText) paramsObj.quotedText = opts.quotedText
     if (opts.quotedMessageId) paramsObj.quotedMessageId = opts.quotedMessageId.toString()
+    if (opts.agentId) paramsObj.agentId = opts.agentId.toString()
+    if (opts.draft) paramsObj.draft = '1'
 
     if (opts.fileIds && opts.fileIds.length > 0) {
       paramsObj.fileIds = opts.fileIds.join(',')
@@ -583,6 +770,15 @@ export const chatApi = {
     // POST transport: parameters travel in the JSON body, so long pasted
     // texts never hit URL length limits and no auth token leaks into the URL.
     return openStreamPost(paramsObj, opts.onUpdate)
+  },
+
+  /**
+   * Re-attach to a turn that is still generating (page reload, chat switch,
+   * second tab). Events arrive through the same `onUpdate` contract as
+   * `streamMessage`, so the caller renders them with the identical handler.
+   */
+  attachStream(opts: AttachStreamOptions): () => void {
+    return openStreamAttach(opts)
   },
 
   async getHistory(limit = 50, trackId?: number): Promise<unknown> {
@@ -688,11 +884,12 @@ export const chatApi = {
     options?: { incognito?: boolean }
   ): Promise<{
     success: boolean
-    file_id: number
+    file_id?: number
     filename: string
     text?: string
     language?: string
     duration?: number
+    extraction_error?: 'audio_transcription_failed' | 'document_extraction_failed'
   }> {
     // Derive the extension from the actual recording MIME so Safari/macOS
     // (audio/mp4) uploads as `.m4a` and stays on the transcription path,
@@ -701,6 +898,7 @@ export const chatApi = {
 
     const formData = new FormData()
     formData.append('file', audioBlob, resolvedFilename)
+    formData.append('purpose', 'dictation')
     if (options?.incognito) {
       formData.append('incognito', '1')
     }

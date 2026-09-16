@@ -6,19 +6,29 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\Repository\UserRepository;
 use App\Service\InternalEmailService;
+use App\Service\Microsoft\M365MailSender;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Tool\Source\SkillToolSource;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * `email_me` runner — mails the assembled task results to the ACCOUNT OWNER as
  * one multi-MIME email (text + attachments produced by upstream nodes). No
- * model call; pure side-channel delivery via {@see InternalEmailService}.
+ * model call; pure side-channel delivery.
+ *
+ * Transport: when the owner has a connected Microsoft 365 account whose
+ * consent includes `Mail.Send`, the mail is sent FROM their own mailbox via
+ * {@see M365MailSender} (it lands in their Outlook Sent items — the "email
+ * write with Microsoft Office" path). Otherwise, and whenever the Graph send
+ * fails, the system-SMTP {@see InternalEmailService} path delivers instead —
+ * the user always gets their mail.
  *
  * Inputs (resolved like {@see ComposeReplyRunner}):
  *   - `text`        : string (typically "$nX.text")
@@ -39,7 +49,9 @@ final readonly class EmailMeRunner implements TaskRunner
         private UserRepository $userRepository,
         private TranslatorInterface $translator,
         private LoggerInterface $logger,
+        private ?M365MailSender $m365MailSender = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?StepApprovalGate $approvalGate = null,
     ) {
     }
 
@@ -89,10 +101,19 @@ final readonly class EmailMeRunner implements TaskRunner
         }
 
         $locale = $this->locale($context);
-        $subject = $this->translator->trans('email.task_result.subject', [], 'emails', $locale);
+        $subject = $this->subject($node, $context, $locale);
+
+        $gated = $this->approvalGate?->consult($context, $node, SkillToolSource::nameFor(Capability::EmailMe), [
+            'to' => $address,
+            'subject' => $subject,
+            'attachment_count' => count($attachments),
+        ]);
+        if (null !== $gated) {
+            return $gated;
+        }
 
         try {
-            $this->emailService->sendTaskResultEmail($address, $subject, $text, $attachments);
+            $this->deliver($userId, $address, $subject, $text, $attachments);
         } catch (\Throwable $e) {
             $this->logger->warning('EmailMeRunner: delivery failed', [
                 'user_id' => $userId,
@@ -116,6 +137,71 @@ final readonly class EmailMeRunner implements TaskRunner
             'email_sent_to' => $this->maskAddress($address),
             'attachment_count' => count($attachments),
         ]);
+    }
+
+    /**
+     * Prefer the owner's own M365 mailbox (`Mail.Send`), fall back to the
+     * internal SMTP path on any Graph problem — a mail that lands beats a
+     * transport preference.
+     *
+     * @param list<array{path: string, type: string|null}> $attachments
+     */
+    private function deliver(int $userId, string $address, string $subject, string $text, array $attachments): void
+    {
+        if (null !== $this->m365MailSender && $this->m365MailSender->isAvailableFor($userId)) {
+            try {
+                $this->m365MailSender->sendTaskResultEmail($userId, $address, $subject, $text, $attachments);
+
+                return;
+            } catch (\Throwable $e) {
+                $this->logger->info('EmailMeRunner: M365 send failed, falling back to internal SMTP', [
+                    'user_id' => $userId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $this->emailService->sendTaskResultEmail($address, $subject, $text, $attachments);
+    }
+
+    /**
+     * Prefer an authored `params.subject`, then the Saved Task name so
+     * scheduled result mails are distinguishable in the inbox, then the
+     * generic translated fallback for planner-generated `email_me` steps.
+     */
+    private function subject(TaskNode $node, NodeContext $context, string $locale): string
+    {
+        $param = $this->singleLineSubject($node->params['subject'] ?? null);
+        if (null !== $param) {
+            return $param;
+        }
+
+        $taskName = $this->singleLineSubject($context->options['saved_task_name'] ?? null);
+        if (null !== $taskName) {
+            return $this->translator->trans(
+                'email.task_result.subject_named',
+                ['%name%' => $taskName],
+                'emails',
+                $locale
+            );
+        }
+
+        return $this->translator->trans('email.task_result.subject', [], 'emails', $locale);
+    }
+
+    /**
+     * MIME Subject is one header line. CR/LF in an authored subject or Saved
+     * Task name would split the header (or make Mailer/Graph reject the send).
+     */
+    private function singleLineSubject(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        $line = trim(str_replace(["\r", "\n"], ' ', $value));
+        $collapsed = preg_replace('/ {2,}/', ' ', $line);
+
+        return is_string($collapsed) && '' !== $collapsed ? $collapsed : null;
     }
 
     /**

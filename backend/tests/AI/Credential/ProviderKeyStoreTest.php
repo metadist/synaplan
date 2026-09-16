@@ -75,14 +75,15 @@ final class ProviderKeyStoreTest extends TestCase
 
     /**
      * @param array<string, string|list<string|null>|null> $envKeys
+     * @param array<string, string|null>                   $envSecrets
      */
-    private function makeStore(array $envKeys = []): ProviderKeyStore
+    private function makeStore(array $envKeys = [], array $envSecrets = []): ProviderKeyStore
     {
-        return new ProviderKeyStore($this->configRepository, $this->encryption, new NullLogger(), $envKeys);
+        return new ProviderKeyStore($this->configRepository, $this->encryption, new NullLogger(), $envKeys, $envSecrets);
     }
 
     /**
-     * @return array{key: string, origin: string}|null the decrypted stored payload
+     * @return array{key: string, origin: string, secret?: string}|null the decrypted stored payload
      */
     private function storedPayload(string $provider): ?array
     {
@@ -91,8 +92,104 @@ final class ProviderKeyStoreTest extends TestCase
             return null;
         }
 
-        /* @var array{key: string, origin: string} */
+        /* @var array{key: string, origin: string, secret?: string} */
         return json_decode($this->encryption->decrypt($config->getValue()), true, 8, JSON_THROW_ON_ERROR);
+    }
+
+    // ---- key + secret pairs (Higgsfield) ----
+
+    public function testSecretProviderRefusesAKeyWithoutItsSecret(): void
+    {
+        $store = $this->makeStore();
+
+        try {
+            $store->saveKey('higgsfield', 'hf-key');
+            self::fail('a half pair must be rejected');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('secret', $e->getMessage());
+        }
+
+        self::assertSame([], $this->store, 'nothing may be persisted for a half pair');
+        self::assertNull($store->getKey('higgsfield'));
+    }
+
+    public function testSecretProviderStoresBothHalvesEncryptedAndResolvesThem(): void
+    {
+        $store = $this->makeStore();
+        $store->saveKey('higgsfield', 'hf-key-1234567890', ProviderKeyStore::ORIGIN_UI, 'hf-secret-abcdefgh');
+
+        self::assertSame('hf-key-1234567890', $store->getKey('higgsfield'));
+        self::assertSame('hf-secret-abcdefgh', $store->getSecret('higgsfield'));
+
+        $raw = $this->store['0|'.ProviderKeyStore::CONFIG_GROUP.'|higgsfield']->getValue();
+        self::assertStringNotContainsString('hf-secret-abcdefgh', $raw);
+
+        $status = $store->getStatus('higgsfield');
+        self::assertTrue($status['configured']);
+        self::assertTrue($status['hasSecret']);
+        self::assertStringNotContainsString('abcdefgh', $status['maskedKey'], 'the secret is never shown, not even masked');
+    }
+
+    public function testSingleKeyProviderIgnoresAStraySecret(): void
+    {
+        $store = $this->makeStore();
+        $store->saveKey('groq', 'gsk_key', ProviderKeyStore::ORIGIN_UI, 'should-be-dropped');
+
+        self::assertNull($store->getSecret('groq'));
+        self::assertArrayNotHasKey('secret', $this->storedPayload('groq') ?? []);
+        self::assertFalse($store->getStatus('groq')['hasSecret']);
+    }
+
+    public function testHalfEnvPairIsNotConfigured(): void
+    {
+        $keyOnly = $this->makeStore(['higgsfield' => 'hf-env-key']);
+        self::assertNull($keyOnly->getKey('higgsfield'));
+        self::assertNull($keyOnly->getSecret('higgsfield'));
+        self::assertSame([], $this->store, 'a half env pair must not be imported');
+        $keyOnlyStatus = $keyOnly->getStatus('higgsfield');
+        self::assertFalse($keyOnlyStatus['configured'], 'key without secret is not connected');
+        self::assertSame('env', $keyOnlyStatus['source']);
+        self::assertFalse($keyOnlyStatus['hasSecret']);
+
+        $secretOnly = $this->makeStore([], ['higgsfield' => 'hf-env-secret']);
+        self::assertNull($secretOnly->getKey('higgsfield'));
+        $secretOnlyStatus = $secretOnly->getStatus('higgsfield');
+        self::assertFalse($secretOnlyStatus['configured']);
+        self::assertSame('env', $secretOnlyStatus['source']);
+        self::assertTrue($secretOnlyStatus['hasSecret']);
+    }
+
+    public function testFullEnvPairIsImportedAndFollowsSecretRotation(): void
+    {
+        $store = $this->makeStore(['higgsfield' => 'hf-env-key'], ['higgsfield' => 'hf-env-secret-v1']);
+
+        self::assertSame('hf-env-key', $store->getKey('higgsfield'));
+        self::assertSame('hf-env-secret-v1', $store->getSecret('higgsfield'));
+        $payload = $this->storedPayload('higgsfield');
+        self::assertNotNull($payload);
+        self::assertSame('hf-env-secret-v1', $payload['secret'] ?? null);
+        self::assertSame(ProviderKeyStore::ORIGIN_ENV, $payload['origin']);
+
+        $status = $store->getStatus('higgsfield');
+        self::assertSame('db', $status['source']);
+        self::assertTrue($status['hasSecret']);
+
+        // Operator rotates only the secret: the env-origin row follows.
+        $rotated = $this->makeStore(['higgsfield' => 'hf-env-key'], ['higgsfield' => 'hf-env-secret-v2']);
+        self::assertSame('hf-env-secret-v2', $rotated->getSecret('higgsfield'));
+        self::assertSame('hf-env-secret-v2', $this->storedPayload('higgsfield')['secret'] ?? null);
+    }
+
+    public function testMediaAndSpeechProvidersAreSupported(): void
+    {
+        foreach (['thehive', 'higgsfield', 'elevenlabs'] as $provider) {
+            self::assertTrue(ProviderKeyStore::isSupported($provider), $provider.' must live in the one key store');
+            self::assertTrue(ProviderKeyCatalog::has($provider));
+        }
+
+        $store = $this->makeStore(['thehive' => 'hive-env-key']);
+        self::assertSame('hive-env-key', $store->getKey('thehive'));
+        self::assertNull($store->getSecret('thehive'), 'a single-key provider has no secret half');
     }
 
     public function testUnsupportedProviderResolvesToNull(): void
@@ -337,5 +434,43 @@ final class ProviderKeyStoreTest extends TestCase
         foreach (ProviderKeyStore::SUPPORTED_PROVIDERS as $provider) {
             self::assertTrue(ProviderKeyCatalog::has($provider), sprintf('ProviderKeyCatalog is missing metadata for "%s"', $provider));
         }
+        foreach (ProviderKeyCatalog::providerNames() as $provider) {
+            self::assertTrue(ProviderKeyStore::isSupported($provider), sprintf('ProviderKeyStore cannot store a key for catalog provider "%s"', $provider));
+        }
+    }
+
+    public function testCatalogDescribesSecretsAndTestability(): void
+    {
+        self::assertSame('HIGGSFIELD_API_SECRET', ProviderKeyCatalog::secretEnvVarFor('higgsfield'));
+        self::assertTrue(ProviderKeyCatalog::requiresSecret('higgsfield'));
+        self::assertFalse(ProviderKeyCatalog::requiresSecret('groq'));
+        self::assertSame('higgsfield', ProviderKeyCatalog::providerForEnvVar('HIGGSFIELD_API_SECRET'));
+        self::assertTrue(ProviderKeyCatalog::isSecretEnvVar('HIGGSFIELD_API_SECRET'));
+        self::assertFalse(ProviderKeyCatalog::isSecretEnvVar('HIGGSFIELD_API_KEY'));
+
+        self::assertFalse(ProviderKeyCatalog::isTestable('thehive'), 'no free authenticated endpoint — saved untested');
+        self::assertTrue(ProviderKeyCatalog::isTestable('elevenlabs'));
+
+        // Only a real model listing may feed model health / the inventory.
+        self::assertTrue(ProviderKeyCatalog::listsModels('groq'));
+        foreach (['huggingface', 'higgsfield', 'elevenlabs', 'thehive'] as $provider) {
+            self::assertFalse(ProviderKeyCatalog::listsModels($provider), $provider.' must not be read as a model listing');
+        }
+
+        self::assertContains('HIGGSFIELD_API_SECRET', ProviderKeyCatalog::managedEnvVars());
+        self::assertContains('THEHIVE_API_KEY', ProviderKeyCatalog::managedEnvVars());
+
+        self::assertTrue(ProviderKeyCatalog::servesChat('groq'));
+        foreach (['thehive', 'higgsfield', 'elevenlabs'] as $provider) {
+            self::assertFalse(ProviderKeyCatalog::servesChat($provider), $provider.' never makes chat ready');
+        }
+    }
+
+    public function testA2AgentCatalogUsesBearerKeyPlaceholderAndPaidTier(): void
+    {
+        $meta = ProviderKeyCatalog::get('a2agent');
+
+        self::assertFalse($meta['freeTier']);
+        self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
     }
 }

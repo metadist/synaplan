@@ -53,21 +53,29 @@ export class ChatHelper {
     // fast at the done/error race below, so this does not mask real breakage.
     await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
 
+    const errorNotice = newBubble.locator(selectors.chat.chatError)
     const result = await Promise.race([
       newBubble
         .locator(selectors.chat.messageDone)
         .waitFor({ state: 'visible', timeout: raceTimeout })
         .then(() => 'done' as const),
-      newBubble
-        .locator(selectors.chat.messageTopicError)
-        .waitFor({ state: 'visible', timeout: raceTimeout })
-        .then(() => 'error' as const),
+      errorNotice.waitFor({ state: 'visible', timeout: raceTimeout }).then(() => 'error' as const),
     ])
-    if (result === 'error') {
-      throw new Error('Assistant message ended in error state (messageTopicError visible)')
+    // message-done must not be treated as success when the honest error
+    // notice is also (or subsequently) on the bubble — the catalog sentence
+    // is no longer in section-message-text, so reading the body would hang.
+    if (result === 'error' || (await errorNotice.isVisible())) {
+      const explanation = errorNotice.locator('[data-testid="chat-error-body"]')
+      const text = (await explanation.isVisible()) ? (await explanation.innerText()).trim() : ''
+      throw new Error(
+        text
+          ? `Assistant message ended in error state: ${text}`
+          : 'Assistant message ended in error state (chat-error-notice visible)'
+      )
     }
 
     const answerBody = newBubble.locator(selectors.chat.assistantAnswerBody).last()
+    await answerBody.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
     // Wait for the bubble's textContent to stabilise before reading it.
     //
@@ -116,7 +124,7 @@ export class ChatHelper {
     await this.page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
     await this.page.reload()
     await this.page
-      .locator(selectors.nav.sidebarV2Channels)
+      .locator(selectors.nav.sidebarV2Manage)
       .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 
@@ -188,6 +196,32 @@ export class ChatHelper {
     await expect(attachButton).toBeEnabled({ timeout: 30_000 })
     await attachButton.click()
     await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  }
+
+  /**
+   * Pick an Again-dropdown model the CI stub can answer.
+   * The list is rating-sorted, so `.first()` is often a cloud model with no
+   * key in CI (Groq qwen, …) and the turn ends on chat-error-notice.
+   */
+  async pickCiAgainOption(bubble: Locator): Promise<void> {
+    const dropdown = bubble.locator(selectors.chat.againDropdownPanel)
+    await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    const options = dropdown.locator(selectors.chat.againDropdownItem)
+    await options.first().waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+    const stub = options.filter({ hasText: /test-model/i })
+    if ((await stub.count()) > 0) {
+      await stub.first().click()
+      return
+    }
+
+    const active = dropdown.locator('button.dropdown-item.dropdown-item--active')
+    if ((await active.count()) > 0 && (await active.first().isEnabled())) {
+      await active.first().click()
+      return
+    }
+
+    await options.first().click()
   }
 
   async openLatestAgainDropdown(): Promise<{

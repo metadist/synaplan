@@ -24,6 +24,10 @@ export interface StreamSearchResult {
   published?: string
   source?: string
   thumbnail?: string
+  /** True when the page body was read for the answer (deep research). */
+  fetched?: boolean
+  /** Where the URL actually resolved to (redirects / shortlinks), if different. */
+  final_url?: string | null
   [key: string]: unknown
 }
 
@@ -50,6 +54,12 @@ export interface StreamFeedbackRow {
   value?: string
 }
 
+export interface StreamDocRef {
+  slug: string
+  title: string
+  url: string
+}
+
 /** A task node as announced in the `plan` event (multitask routing). */
 export interface StreamTaskNode {
   node_id: string
@@ -73,6 +83,8 @@ export interface StreamEventMetadata {
   language?: string
   memories?: StreamMemoryRow[]
   feedbacks?: StreamFeedbackRow[]
+  /** Platform documentation cited for this turn (`docs_loaded`). */
+  docs?: StreamDocRef[]
   /** Multitask routing (status === 'plan'): the visible task list + reply node. */
   plan?: StreamTaskNode[]
   reply_node?: string
@@ -98,6 +110,13 @@ export interface StreamEventMetadata {
   results_count?: number
   query?: string
   results?: StreamSearchResult[]
+  /** Deep research (status === 'reading_pages' / 'pages_read'): result pages read. */
+  pages_total?: number
+  pages_read?: number
+  pages_attempted?: number
+  /** Linked pages (status === 'fetching_urls' / 'urls_fetched'). */
+  urls_total?: number
+  urls_read?: number
   [key: string]: unknown
 }
 
@@ -112,6 +131,12 @@ export interface StreamPerfPayload {
 export interface StreamUpdatePayload {
   status?: string
   chunk?: string
+  /**
+   * Id of the resumable run backing this turn, sent once as `run_started`.
+   * Lets the client re-attach to the still-generating turn after a reload or
+   * a trip to another view (`chatApi.attachStream`).
+   */
+  runId?: string
   error?: string
   message?: string
   messageId?: number
@@ -123,15 +148,31 @@ export interface StreamUpdatePayload {
   metadata?: StreamEventMetadata
   links?: StreamLinkItem[]
   generatedFile?: StreamGeneratedFile
+  documentChanges?: Array<{
+    labelKey: string
+    labelParams?: Record<string, unknown>
+    ok: boolean
+  }>
+  documentVersion?: number
+  documentFidelityLossy?: boolean
   searchResults?: StreamSearchResult[]
   memoryIds?: number[]
   feedbackIds?: number[]
+  docs?: StreamDocRef[]
   provider?: string
   model?: string
   model_id?: number | null
   topic?: string
   originalTopic?: string | null
   originalMediaType?: string | null
+  errorReason?: string | null
+  canRetryModel?: boolean
+  errorDebug?: string | null
+  /**
+   * Title the server generated for this chat, sent only on the turn that
+   * named it (#1500).
+   */
+  chatTitle?: string
   limit_type?: string
   action_type?: string
   used?: number

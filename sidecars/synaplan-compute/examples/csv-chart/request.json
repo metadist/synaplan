@@ -1,0 +1,13 @@
+{
+  "protocol": 1,
+  "owner": "user:123",
+  "workspace": { "kind": "run" },
+  "image": "python",
+  "entry": { "program": "python", "args": ["main.py"] },
+  "files": [
+    { "name": "data.csv", "role": "input" },
+    { "name": "main.py", "role": "input" }
+  ],
+  "limits": { "timeoutSec": 60, "memoryMb": 512, "cpu": 1.0, "pids": 128, "outputMb": 50 },
+  "egress": { "allow": [] }
+}

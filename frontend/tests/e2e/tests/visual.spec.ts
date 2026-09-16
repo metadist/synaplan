@@ -64,12 +64,11 @@ test.describe('@visual UI guard — capped snapshots', () => {
     await expect(uploadForm).toHaveScreenshot('files-upload-form.png', SNAPSHOT_OPTS)
   })
 
-  test('channels flyout', async ({ page }) => {
+  test('manage flyout', async ({ page }) => {
     await openApp(page)
-    await ensureAdvancedMode(page)
-    await page.locator(NAV.sidebarV2Channels).click()
+    await page.locator(NAV.sidebarV2Manage).click()
     const flyout = page.locator(NAV.navDropdown)
     await expect(flyout).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await expect(flyout).toHaveScreenshot('channels-flyout.png', SNAPSHOT_OPTS)
+    await expect(flyout).toHaveScreenshot('manage-flyout.png', SNAPSHOT_OPTS)
   })
 })

@@ -37,3 +37,33 @@ framework:
             limit: 120
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
+        # First-run setup endpoints (PUBLIC_ACCESS, keyed per client IP in
+        # SetupController). They are only reachable on an installation that has
+        # not a single user yet, and the very first successful POST closes the
+        # window for good — so this limit exists to blunt scripted hammering of
+        # a virgin instance, not to ration a workflow. A human needs one or two
+        # attempts; 10/minute leaves room for a mistyped password.
+        setup_attempt:
+            policy: 'sliding_window'
+            limit: 10
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
+        # People picker (`GET /api/v1/iam/subjects`), keyed per user in
+        # ShareController. A person typing a name fires one request per
+        # keystroke, so 60/minute is generous for real use while making a
+        # scripted walk over the directory (one probe per letter) slow
+        # enough to be pointless.
+        iam_subject_search:
+            policy: 'sliding_window'
+            limit: 60
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
+        # Public Saved Task webhook (`POST /api/v1/webhooks/saved-tasks/{token}`,
+        # PUBLIC_ACCESS), keyed per task in SavedTaskWebhookIngress. One start
+        # per second is far beyond any real integration and keeps a leaked
+        # address from flooding the owner's usage quota.
+        saved_task_webhook:
+            policy: 'sliding_window'
+            limit: 60
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'

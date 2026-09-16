@@ -8,20 +8,26 @@ use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Token Service for Access/Refresh Token Authentication.
  *
- * Access Token: Short-lived (5 min), stored in HttpOnly cookie
- * Refresh Token: Long-lived (7 days), stored in HttpOnly cookie + DB
+ * Access Token: Short-lived (5 min), stored in HttpOnly cookie, HMAC-signed
+ * with {@see $appSecret}. A backend restart does not invalidate it.
+ *
+ * Refresh Token: Long-lived (30 days of inactivity), stored in an HttpOnly
+ * cookie and in {@see Token} / BTOKENS. Each successful refresh slides the
+ * expiry forward, so a user who opens the app at least once a month stays
+ * signed in. Restarting PHP, Redis, or the container does not revoke it.
  */
 final readonly class TokenService
 {
     // Token lifetimes
-    public const ACCESS_TOKEN_TTL = 300;        // 5 minutes
-    public const REFRESH_TOKEN_TTL = 604800;    // 7 days
+    public const ACCESS_TOKEN_TTL = 300;          // 5 minutes
+    public const REFRESH_TOKEN_TTL = 2_592_000;   // 30 days
 
     // Cookie names
     public const ACCESS_COOKIE = 'access_token';
@@ -36,6 +42,8 @@ final readonly class TokenService
         private UserRepository $userRepository,
         private LoggerInterface $logger,
         private AuthCookieFactory $authCookieFactory,
+        #[Autowire('%env(APP_SECRET)%')]
+        private string $appSecret,
     ) {
     }
 
@@ -181,21 +189,40 @@ final readonly class TokenService
             return null;
         }
 
-        // Check if user is still active/not banned
-        // Add your user status check here if needed
+        // /auth/refresh is PUBLIC_ACCESS so the firewall user_checker never
+        // runs here. Refuse before minting an access cookie or sliding the
+        // 30-day BTOKENS expiry, or a suspended account stays signed in.
+        if (!$user->isActive()) {
+            $this->logger->warning('Refresh blocked for suspended account', [
+                'user_id' => $user->getId(),
+            ]);
+
+            return null;
+        }
 
         // Generate new access token
         $accessToken = $this->generateAccessToken($user);
 
-        // Optionally rotate refresh token (more secure but more complex)
-        // For now, keep the same refresh token
+        // Keep the same refresh-token string (no rotation) but slide its
+        // absolute expiry so activity keeps the session alive for weeks.
+        $this->extendRefreshToken($refreshToken);
 
         $this->logger->info('Tokens refreshed', ['user_id' => $user->getId()]);
 
         return [
             'access_token' => $accessToken,
             'user' => $user,
+            'refresh_token' => $refreshToken->getToken(),
         ];
+    }
+
+    /**
+     * Slide the refresh token's DB expiry forward by {@see REFRESH_TOKEN_TTL}.
+     */
+    public function extendRefreshToken(Token $token): void
+    {
+        $token->setExpires(time() + self::REFRESH_TOKEN_TTL);
+        $this->tokenRepository->save($token);
     }
 
     /**
@@ -363,12 +390,14 @@ final readonly class TokenService
     }
 
     /**
-     * Sign data with app secret.
+     * Sign data with the injected app secret.
+     *
+     * Must not read $_ENV: FrankenPHP workers do not always populate it the
+     * same way getenv() / the container does, and a missing value would
+     * silently sign with a fallback and reject every existing access cookie.
      */
     private function sign(string $data): string
     {
-        $secret = $_ENV['APP_SECRET'] ?? 'default_secret_change_me';
-
-        return hash_hmac('sha256', $data, $secret);
+        return hash_hmac('sha256', $data, $this->appSecret);
     }
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick, ref } from 'vue'
 import { useChatsStore } from '@/stores/chats'
 
 vi.mock('@/services/authService', () => ({
@@ -9,8 +10,26 @@ vi.mock('@/services/authService', () => ({
 }))
 
 const httpClientMock = vi.hoisted(() => vi.fn())
+const isIamSharingEnabledMock = vi.hoisted(() => vi.fn(() => true))
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: httpClientMock,
+}))
+vi.mock('@/composables/useIamFeature', () => ({
+  isIamSharingEnabled: () => isIamSharingEnabledMock(),
+  isIamGroupsEnabled: () => false,
+}))
+
+// The incoming (shared-with-me) store only matters for ensureValidActiveChat;
+// by default nothing is incoming, so the historical fallback behaviour holds.
+const incomingOpenableMock = vi.hoisted(() => vi.fn<(id: number) => boolean>(() => false))
+const incomingLoaded = ref(false)
+vi.mock('@/stores/incoming', () => ({
+  useIncomingStore: () => ({
+    get loaded() {
+      return incomingLoaded.value
+    },
+    isOpenable: (id: number) => incomingOpenableMock(id),
+  }),
 }))
 
 function chatPayload(id: number) {
@@ -31,6 +50,8 @@ describe('Chats Store', () => {
     setActivePinia(createPinia())
     localStorage.clear()
     vi.clearAllMocks()
+    incomingOpenableMock.mockReturnValue(false)
+    incomingLoaded.value = false
   })
 
   describe('createChat', () => {
@@ -156,6 +177,79 @@ describe('Chats Store', () => {
       await store.loadChats()
 
       expect(store.activeChatId).toBe(9)
+    })
+
+    it('keeps an incoming (shared-with-me) chat that is not in my own list', async () => {
+      incomingOpenableMock.mockImplementation((id: number) => id === 13)
+      localStorage.setItem('synaplan_active_chat_id', '13')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+
+      await store.loadChats()
+
+      expect(store.activeChatId).toBe(13)
+    })
+
+    it('falls back to my first chat when the stored id is neither mine nor incoming', async () => {
+      incomingOpenableMock.mockReturnValue(false)
+      localStorage.setItem('synaplan_active_chat_id', '13')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+
+      await store.loadChats()
+
+      expect(store.activeChatId).toBe(9)
+    })
+
+    it('re-validates a kept foreign id once the incoming list has loaded without it', async () => {
+      incomingOpenableMock.mockReturnValue(true)
+      localStorage.setItem('synaplan_active_chat_id', '13')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+      await store.loadChats()
+      expect(store.activeChatId).toBe(13)
+
+      incomingOpenableMock.mockReturnValue(false)
+      incomingLoaded.value = true
+      await nextTick()
+
+      expect(store.activeChatId).toBe(9)
+    })
+  })
+
+  describe('applyChatTitle', () => {
+    const untitled = () => ({
+      id: 1,
+      title: 'New Chat',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      messageCount: 2,
+    })
+
+    it('shows the title the server generated for the chat', () => {
+      const store = useChatsStore()
+      store.chats = [untitled()]
+
+      store.applyChatTitle(1, 'Invoice import problem')
+
+      expect(store.chats[0].title).toBe('Invoice import problem')
+    })
+
+    it('does not PATCH — the server already persisted the title', () => {
+      const store = useChatsStore()
+      store.chats = [untitled()]
+
+      store.applyChatTitle(1, 'Invoice import problem')
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+    })
+
+    it('ignores a title for a chat that is not in the list', () => {
+      const store = useChatsStore()
+      store.chats = [untitled()]
+
+      expect(() => store.applyChatTitle(999, 'Somewhere else')).not.toThrow()
+      expect(store.chats[0].title).toBe('New Chat')
     })
   })
 
@@ -309,6 +403,130 @@ describe('Chats Store', () => {
     })
   })
 
+  describe('loadConversationAccess', () => {
+    it('skips the request and treats the chat as owned when sharing is off', async () => {
+      isIamSharingEnabledMock.mockReturnValueOnce(false)
+      const store = useChatsStore()
+
+      await store.loadConversationAccess(3)
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+      expect(store.conversationAccess).toBe('owner')
+    })
+
+    it('treats a missing access field as owner', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 3 } })
+
+      await store.loadConversationAccess(3)
+
+      expect(store.conversationAccess).toBe('owner')
+    })
+
+    it('records a shared read-only chat', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 4, access: 'read' } })
+
+      await store.loadConversationAccess(4)
+
+      expect(store.conversationAccess).toBe('read')
+    })
+
+    it('records who owns an incoming chat and how it reached the viewer', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chat: {
+          id: 13,
+          access: 'use',
+          owner: { id: 2, name: 'Alice' },
+          sharedVia: { type: 'group', name: 'Sales' },
+        },
+      })
+
+      await store.loadConversationAccess(13)
+
+      expect(store.conversationAccess).toBe('use')
+      expect(store.conversationSource).toEqual({
+        owner: { id: 2, name: 'Alice' },
+        sharedVia: { type: 'group', name: 'Sales' },
+      })
+    })
+
+    it('clears the source when sharing is off', async () => {
+      isIamSharingEnabledMock.mockReturnValueOnce(false)
+      const store = useChatsStore()
+
+      await store.loadConversationAccess(3)
+
+      expect(store.conversationSource).toBeNull()
+    })
+
+    it('clears access while loading and does not fall back to owner on error', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockRejectedValueOnce(new Error('network'))
+
+      await store.loadConversationAccess(5)
+
+      expect(store.conversationAccess).toBeNull()
+    })
+
+    it("treats a chat from the viewer's own list as owned without asking", async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce(chatPayload(9))
+      await store.createChat()
+      httpClientMock.mockClear()
+
+      await store.loadConversationAccess(9)
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+      expect(store.conversationAccess).toBe('owner')
+    })
+
+    it('settles as owned when nothing is open, so the composer is not withheld', () => {
+      const store = useChatsStore()
+
+      store.resolveConversationAccessAsOwn()
+
+      expect(store.conversationAccess).toBe('owner')
+      expect(store.conversationSource).toBeNull()
+    })
+
+    it('drops an in-flight probe once the answer is known to be owned', async () => {
+      const store = useChatsStore()
+      let resolveProbe: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveProbe = resolve
+        })
+      )
+      const probe = store.loadConversationAccess(4)
+      store.resolveConversationAccessAsOwn()
+
+      resolveProbe({ chat: { id: 4, access: 'read' } })
+      await probe
+
+      expect(store.conversationAccess).toBe('owner')
+    })
+
+    it('ignores a stale response after a newer load started', async () => {
+      const store = useChatsStore()
+      let resolveFirst: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      )
+      const first = store.loadConversationAccess(1)
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 2, access: 'use' } })
+      await store.loadConversationAccess(2)
+
+      resolveFirst({ chat: { id: 1, access: 'owner' } })
+      await first
+
+      expect(store.conversationAccess).toBe('use')
+    })
+  })
+
   describe('noteExternalActivity', () => {
     it('bumps an already-loaded chat instead of reloading', async () => {
       const store = useChatsStore()
@@ -342,6 +560,71 @@ describe('Chats Store', () => {
 
       expect(httpClientMock).toHaveBeenCalledWith('/api/v1/chats')
       expect(store.chats.map((c) => c.id)).toContain(42)
+    })
+  })
+
+  /**
+   * A turn survives the client that started it, so the list marks the chats
+   * where an answer is still being written after the user moved on.
+   */
+  describe('loadChats — chats with a generating turn', () => {
+    it('tracks the chats the server reports as still generating', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat, chatPayload(2).chat],
+        activeRunChatIds: [2],
+      })
+
+      await store.loadChats()
+
+      expect(store.activeRunChatIds.has(2)).toBe(true)
+      expect(store.activeRunChatIds.has(1)).toBe(false)
+    })
+
+    it('clears the marker once the turn finished', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat],
+        activeRunChatIds: [1],
+      })
+      await store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce({ chats: [chatPayload(1).chat] })
+      await store.loadChats()
+
+      expect(store.activeRunChatIds.size).toBe(0)
+    })
+
+    /**
+     * The server's answer only arrives with a chat-list fetch, which happens on
+     * entry. Without the live updates below the marker would be a snapshot from
+     * app start: never lighting up when the user walks away from a running turn,
+     * never going out when it finishes.
+     */
+    it('marks and unmarks a chat live, replacing the Set so templates re-render', async () => {
+      const store = useChatsStore()
+      const initial = store.activeRunChatIds
+
+      store.markChatGenerating(7, true)
+
+      expect(store.activeRunChatIds.has(7)).toBe(true)
+      expect(store.activeRunChatIds).not.toBe(initial)
+
+      const marked = store.activeRunChatIds
+      store.markChatGenerating(7, false)
+
+      expect(store.activeRunChatIds.has(7)).toBe(false)
+      expect(store.activeRunChatIds).not.toBe(marked)
+    })
+
+    it('keeps the other chats when one turn ends', async () => {
+      const store = useChatsStore()
+      store.markChatGenerating(1, true)
+      store.markChatGenerating(2, true)
+
+      store.markChatGenerating(1, false)
+
+      expect([...store.activeRunChatIds]).toEqual([2])
     })
   })
 })

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "synaplan-docs-manifest/1",
+  "description": "Machine-readable catalog exported by the Synaplan docs site.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "generated_at", "site_url", "version", "pages"],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "synaplan-docs-manifest/1"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "site_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]{4}\\.[0-9]{2}$"
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/page"
+      }
+    }
+  },
+  "$defs": {
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slug",
+        "title",
+        "section",
+        "description",
+        "url",
+        "raw_url",
+        "sha256",
+        "bytes",
+        "updated_at"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "raw_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
+use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
@@ -67,6 +68,7 @@ class AiFacadeTranscribeTest extends TestCase
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(HiggsfieldCredentialResolver::class),
             $this->transcriptionUsageRecorder,
+            $this->createMock(ModelHealthRecorder::class),
             '/tmp'
         );
     }
@@ -337,6 +339,32 @@ class AiFacadeTranscribeTest extends TestCase
             ->with(42, 21, 'groq', 'whisper-large-v3', 12.5, ['language' => 'en']);
 
         $this->facade->transcribe('audio.mp3', 42);
+    }
+
+    public function testTranscribeRecordsCallerSuppliedModelIdWhenProviderIsNamed(): void
+    {
+        $this->modelConfig->expects($this->never())->method('resolveSttDefault');
+
+        $groq = $this->mockSttProvider('groq');
+        $groq->method('transcribe')->willReturn([
+            'text' => 'from session',
+            'language' => 'en',
+            'duration' => 3.0,
+            'segments' => [],
+        ]);
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')
+            ->with('groq')
+            ->willReturn($groq);
+
+        $this->transcriptionUsageRecorder->expects($this->once())
+            ->method('record')
+            ->with(42, 330, 'groq', 'whisper-large-v3', 3.0, ['language' => 'en']);
+
+        $this->facade->transcribe('audio.mp3', 42, [
+            'provider' => 'groq',
+            'model' => 'whisper-large-v3',
+            'model_id' => 330,
+        ]);
     }
 
     private function mockSttProvider(string $name): SpeechToTextProviderInterface&MockObject

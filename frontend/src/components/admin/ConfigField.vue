@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
 import { providerHelpByEnvVar } from '@/utils/providerHelp'
+
+const { t } = useI18n()
 
 interface Props {
   fieldKey: string
@@ -52,12 +55,17 @@ const inputType = computed(() => {
   return 'text'
 })
 
-// Placeholder for masked fields
+/**
+ * An example value beats repeating the description inside the input: the
+ * description is already shown above the field, and "what does a valid value
+ * look like?" is the question an admin actually has. Fields without an example
+ * keep the previous behaviour.
+ */
 const placeholder = computed(() => {
-  if (props.value.isMasked && !isDirty.value) {
-    return props.value.isSet ? '••••••••' : props.schema.description
+  if (props.value.isMasked && !isDirty.value && props.value.isSet) {
+    return '••••••••'
   }
-  return props.schema.description
+  return props.schema.placeholder || props.schema.description
 })
 
 // Handle input change
@@ -112,11 +120,37 @@ const showDbOverrideHint = computed(
     !isDirty.value
 )
 
+/**
+ * The reverse case of showDbOverrideHint: a stored value that an environment
+ * variable pins. Without this the toggle moves and nothing happens.
+ */
+const isPinnedByEnv = computed(() => props.value.envOverride === true)
+
+/**
+ * What the instance actually does, which is what the toggle has to show while an
+ * environment variable pins the field. The stored row usually still holds the
+ * shipped default, so rendering `localValue` here would put an "Enabled" switch
+ * directly above a hint reading "Currently: Disabled".
+ */
+const displayedValue = computed(() =>
+  isPinnedByEnv.value ? (props.value.effectiveValue ?? localValue.value) : localValue.value
+)
+
+const effectiveValueLabel = computed(() =>
+  props.value.effectiveValue === 'true' ? t('common.enabled') : t('common.disabled')
+)
+
 const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 </script>
 
 <template>
-  <div class="config-field">
+  <!--
+    A field with another editor (managedBy: instance provider keys live under
+    AI infrastructure › Models & keys) is never rendered as an input here —
+    the parent shows ManagedKeysStatusCard instead. This guard keeps that
+    true for any caller.
+  -->
+  <div v-if="!schema.managedBy" class="config-field">
     <div class="flex items-center justify-between mb-1.5">
       <div class="flex items-center gap-1.5 min-w-0">
         <label :for="fieldKey" class="flex items-center gap-2 text-sm font-medium txt-primary">
@@ -141,27 +175,38 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 
     <!-- Boolean Toggle -->
     <div v-if="schema.type === 'boolean'" class="flex items-center gap-3">
+      <!--
+        The track colour lives on an inner element on purpose: the V2 design
+        sets a flat background on every `[role="switch"]`, which would beat a
+        utility class on the button itself and make on and off look identical.
+      -->
       <button
+        :id="fieldKey"
         type="button"
-        :disabled="disabled"
+        :disabled="disabled || isPinnedByEnv"
         :class="[
-          'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2',
-          localValue === 'true' ? 'bg-[var(--brand)]' : 'bg-gray-300 dark:bg-gray-600',
-          disabled && 'opacity-50 cursor-not-allowed',
+          'relative inline-flex h-6 w-11 flex-shrink-0 items-center cursor-pointer rounded-full bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2',
+          (disabled || isPinnedByEnv) && 'opacity-50 cursor-not-allowed',
         ]"
         role="switch"
-        :aria-checked="localValue === 'true'"
+        :aria-checked="displayedValue === 'true'"
         @click="handleToggle"
       >
         <span
           :class="[
-            'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-            localValue === 'true' ? 'translate-x-5' : 'translate-x-0',
+            'pointer-events-none absolute inset-0 rounded-full transition-colors duration-200 ease-in-out',
+            displayedValue === 'true' ? 'bg-[var(--brand)]' : 'bg-[var(--status-neutral)]',
+          ]"
+        />
+        <span
+          :class="[
+            'pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+            displayedValue === 'true' ? 'translate-x-5' : 'translate-x-0.5',
           ]"
         />
       </button>
       <span class="text-sm txt-secondary">
-        {{ localValue === 'true' ? $t('common.enabled') : $t('common.disabled') }}
+        {{ displayedValue === 'true' ? $t('common.enabled') : $t('common.disabled') }}
       </span>
     </div>
 
@@ -210,6 +255,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
           v-if="schema.type === 'password'"
           type="button"
           class="absolute right-2 top-1/2 -translate-y-1/2 p-1 txt-secondary hover:txt-primary"
+          :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
           @click="showPassword = !showPassword"
         >
           <Icon :icon="showPassword ? 'mdi:eye-off' : 'mdi:eye'" class="w-5 h-5" />
@@ -242,6 +288,19 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
       data-testid="config-field-db-override-hint"
     >
       {{ $t('admin.config.dbOverridesEnv') }}
+    </p>
+
+    <p
+      v-if="isPinnedByEnv"
+      class="text-xs text-[var(--status-warning-text)] mt-1.5"
+      data-testid="config-field-env-override-hint"
+    >
+      {{
+        $t('admin.config.envOverridesDb', {
+          key: fieldKey,
+          value: effectiveValueLabel,
+        })
+      }}
     </p>
   </div>
 </template>

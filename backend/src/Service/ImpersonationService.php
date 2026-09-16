@@ -7,6 +7,8 @@ namespace App\Service;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
+use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\IamConfig;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
@@ -69,6 +71,8 @@ final readonly class ImpersonationService
         private UserRepository $userRepository,
         private LoggerInterface $logger,
         private AuthCookieFactory $authCookieFactory,
+        private AuditLogWriter $auditLogWriter,
+        private IamConfig $iamConfig,
     ) {
     }
 
@@ -92,6 +96,9 @@ final readonly class ImpersonationService
         Request $request,
         Response $response,
     ): void {
+        if ($this->iamConfig->isImpersonationDisabled((int) $admin->getId())) {
+            throw new AccessDeniedException('iam.impersonationDisabled');
+        }
         $this->assertCanImpersonate($admin, $target, $request);
 
         $currentRefresh = $request->cookies->get(TokenService::REFRESH_COOKIE);
@@ -117,12 +124,21 @@ final readonly class ImpersonationService
         $response->headers->setCookie($this->tokenService->createAccessCookie($impersonationAccess));
         $response->headers->setCookie($this->tokenService->createClearRefreshCookie());
 
+        $ip = (string) $request->getClientIp();
+        $this->auditLogWriter->record(
+            (int) $admin->getId(),
+            'impersonation.start',
+            'user',
+            (string) $target->getId(),
+            ['targetUserId' => (int) $target->getId()],
+            $ip,
+        );
         $this->logger->warning('Admin started impersonation', [
             'admin_id' => $admin->getId(),
             'admin_email' => $admin->getMail(),
             'target_user_id' => $target->getId(),
             'target_email' => $target->getMail(),
-            'ip' => $request->getClientIp(),
+            'ip' => $ip,
         ]);
     }
 
@@ -168,10 +184,21 @@ final readonly class ImpersonationService
         $response->headers->setCookie($this->tokenService->createRefreshCookie($stashRefresh));
         $this->attachClearStashCookies($response);
 
+        $ip = (string) $request->getClientIp();
+        $targetId = $this->impersonationTargetIdFromRequest($request, $admin);
+        $this->auditLogWriter->record(
+            (int) $admin->getId(),
+            'impersonation.stop',
+            'user',
+            null !== $targetId ? (string) $targetId : '',
+            ['targetUserId' => $targetId],
+            $ip,
+        );
         $this->logger->warning('Admin stopped impersonation', [
             'admin_id' => $admin->getId(),
             'admin_email' => $admin->getMail(),
-            'ip' => $request->getClientIp(),
+            'target_user_id' => $targetId,
+            'ip' => $ip,
         ]);
 
         return $admin;
@@ -228,7 +255,7 @@ final readonly class ImpersonationService
         }
 
         $target = $this->userRepository->find($payload['user_id']);
-        if (!$target instanceof User) {
+        if (!$target instanceof User || !$target->isActive()) {
             return null;
         }
 
@@ -238,6 +265,47 @@ final readonly class ImpersonationService
         );
 
         return ['access_token' => $freshAccess, 'user' => $target];
+    }
+
+    /**
+     * Recover a clean admin session when a refresh raced the cookie-swap and
+     * left a valid admin stash next to a plain admin access token (no
+     * `impersonator_id`). Mints a fresh admin access token from the stash so the
+     * still-valid admin is not logged out; the stash is kept so
+     * `/impersonate/exit` can tear it down. Returns null when this is not the
+     * recoverable state (no/invalid stash, or a genuine impersonation token).
+     *
+     * @return array{access_token: string, user: User}|null
+     */
+    public function recoverAdminSessionFromStash(Request $request): ?array
+    {
+        $stashRefresh = $request->cookies->get(self::ADMIN_REFRESH_STASH_COOKIE);
+        if (!is_string($stashRefresh) || '' === $stashRefresh) {
+            return null;
+        }
+
+        $admin = $this->resolveAdminFromStashedRefresh($stashRefresh);
+        if (!$admin) {
+            return null;
+        }
+
+        // Skip a genuine impersonation token — the normal refresh path owns it.
+        $accessTokenString = $request->cookies->get(TokenService::ACCESS_COOKIE);
+        if (is_string($accessTokenString) && '' !== $accessTokenString) {
+            $payload = $this->tokenService->decodeAccessTokenIgnoringExpiry($accessTokenString);
+            if ($payload && isset($payload['impersonator_id'])) {
+                return null;
+            }
+        }
+
+        $this->logger->info('Impersonation swap recovered to admin session', [
+            'admin_id' => $admin->getId(),
+        ]);
+
+        return [
+            'access_token' => $this->tokenService->generateAccessToken($admin),
+            'user' => $admin,
+        ];
     }
 
     /**
@@ -269,9 +337,9 @@ final readonly class ImpersonationService
 
         $admin = $this->userRepository->find($payload['impersonator_id']);
 
-        // Re-verify role on every read: the user might have been demoted
-        // since impersonation started.
-        if (!$admin instanceof User || !$admin->isAdmin()) {
+        // Re-verify role and account status on every read: the user might
+        // have been demoted or suspended since impersonation started.
+        if (!$admin instanceof User || !$admin->isAdmin() || !$admin->isActive()) {
             return null;
         }
 
@@ -302,6 +370,38 @@ final readonly class ImpersonationService
     }
 
     /**
+     * Resolve the admin behind a valid impersonation stash, or null when no
+     * valid stash is present. Lets logout / revoke-all act on the real operator
+     * (the admin) instead of the impersonated target that `#[CurrentUser]`
+     * resolves to during an active impersonation.
+     */
+    public function resolveStashedAdmin(Request $request): ?User
+    {
+        $stashRefresh = $request->cookies->get(self::ADMIN_REFRESH_STASH_COOKIE);
+        if (!is_string($stashRefresh) || '' === $stashRefresh) {
+            return null;
+        }
+
+        return $this->resolveAdminFromStashedRefresh($stashRefresh);
+    }
+
+    /**
+     * Revoke the stashed admin refresh token in the DB, if present. During
+     * impersonation the regular refresh cookie is cleared and the admin's real
+     * refresh token lives in the stash, so a plain logout would revoke nothing.
+     * Returns true when a stash token was actually revoked.
+     */
+    public function revokeStashedAdminRefreshToken(Request $request): bool
+    {
+        $stashRefresh = $request->cookies->get(self::ADMIN_REFRESH_STASH_COOKIE);
+        if (!is_string($stashRefresh) || '' === $stashRefresh) {
+            return false;
+        }
+
+        return $this->tokenService->revokeRefreshToken($stashRefresh);
+    }
+
+    /**
      * @throws AccessDeniedException
      */
     private function assertCanImpersonate(User $admin, User $target, Request $request): void
@@ -320,15 +420,43 @@ final readonly class ImpersonationService
     }
 
     /**
+     * Recover the impersonated user id from the (possibly expired) access
+     * cookie. Used by stop-audit so the row names the target, not the admin.
+     * Returns null when the token is missing, unreadable, or the impersonator
+     * claim does not match the admin resolved from the stash.
+     */
+    private function impersonationTargetIdFromRequest(Request $request, User $admin): ?int
+    {
+        $accessTokenString = $request->cookies->get(TokenService::ACCESS_COOKIE);
+        if (!is_string($accessTokenString) || '' === $accessTokenString) {
+            return null;
+        }
+
+        $payload = $this->tokenService->decodeAccessTokenIgnoringExpiry($accessTokenString);
+        if (!$payload || !isset($payload['user_id'], $payload['impersonator_id'])) {
+            return null;
+        }
+
+        if ((int) $payload['impersonator_id'] !== (int) $admin->getId()) {
+            return null;
+        }
+
+        $targetId = (int) $payload['user_id'];
+
+        return $targetId > 0 ? $targetId : null;
+    }
+
+    /**
      * Validate the stashed refresh token against the DB and return the admin
-     * user it belongs to, or null on any failure (revoked, expired, demoted).
+     * user it belongs to, or null on any failure (revoked, expired, demoted,
+     * or suspended).
      */
     private function resolveAdminFromStashedRefresh(string $stashRefresh): ?User
     {
         $tokenEntity = $this->tokenService->validateRefreshToken($stashRefresh);
         $admin = $tokenEntity?->getUser();
 
-        if (!$admin instanceof User || !$admin->isAdmin()) {
+        if (!$admin instanceof User || !$admin->isAdmin() || !$admin->isActive()) {
             return null;
         }
 

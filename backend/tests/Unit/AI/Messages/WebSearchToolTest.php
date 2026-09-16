@@ -6,7 +6,9 @@ namespace App\Tests\Unit\AI\Messages;
 
 use App\AI\Messages\Tools\AnthropicServerTools;
 use App\AI\Messages\Tools\WebSearchTool;
+use App\Plug\WebSearch\SearchResultSet;
 use App\Service\Search\BraveSearchService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -26,11 +28,15 @@ final class WebSearchToolTest extends TestCase
     {
         $brave = $this->createMock(BraveSearchService::class);
         $brave->method('isEnabled')->willReturn(true);
+        $legacy = [
+            'query' => 'ecb interest rate',
+            'results' => [['title' => 'ECB', 'url' => 'https://example.test/ecb']],
+            'query_metadata' => ['total' => 1],
+        ];
         $brave->expects($this->once())
             ->method('search')
             ->with('ecb interest rate', ['count' => 3, 'search_lang' => 'de', 'country' => 'de', 'freshness' => 'pw'])
-            ->willReturn(['query' => 'ecb interest rate', 'results' => [['title' => 'ECB']]]);
-        $brave->method('formatResultsForAI')->willReturn('Web Search Results …');
+            ->willReturn($legacy);
 
         $result = $this->tool($brave)->execute([
             'query' => 'ecb interest rate',
@@ -40,7 +46,7 @@ final class WebSearchToolTest extends TestCase
         ]);
 
         self::assertFalse($result['isError']);
-        self::assertSame('Web Search Results …', $result['text']);
+        self::assertSame(SearchResultSet::fromLegacyArray($legacy)->formatForAi(), $result['text']);
         self::assertSame(1, $result['resultCount']);
     }
 
@@ -52,7 +58,6 @@ final class WebSearchToolTest extends TestCase
             ->method('search')
             ->with('anything', ['count' => 10])
             ->willReturn(['query' => 'anything', 'results' => []]);
-        $brave->method('formatResultsForAI')->willReturn('no results');
 
         $this->tool($brave)->execute(['query' => 'anything', 'max_results' => 500]);
     }
@@ -114,6 +119,6 @@ final class WebSearchToolTest extends TestCase
 
     private function tool(BraveSearchService $brave): WebSearchTool
     {
-        return new WebSearchTool($brave, new NullLogger());
+        return new WebSearchTool(WebSearchGatewayFactory::fromBrave($brave), new NullLogger());
     }
 }

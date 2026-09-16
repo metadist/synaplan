@@ -11,41 +11,46 @@ use App\Controller\ConfigController;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Module\Gate\ModuleGateConfig;
+use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Repository\UserRepository;
+use App\Service\Auth\DemoLoginHint;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
+use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
+use App\Service\Config\FeatureStatusReporter;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
-use App\Service\Infrastructure\RedisService;
+use App\Service\GuestChatConfig;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
+use App\Service\MailerConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
-use App\Service\Search\BraveSearchService;
+use App\Service\Setup\SetupStateService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
+use App\Service\WebSpeechConfig;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 /**
- * Coverage for the platform summary model endpoints: the SUMMARIZE slot
- * (DEFAULTMODEL.SUMMARIZE) drives the rolling conversation summary and was
- * previously only reachable through the seeder or direct SQL.
- *
- * Unlike the planner selection this row is global (ownerId 0) and admin-gated:
- * the summary runs inside the pipeline for every user's chat.
+ * Coverage for the leftover platform summary-model admin endpoints.
+ * Runtime no longer reads DEFAULTMODEL.SUMMARIZE (summaries use ANALYZE);
+ * these tests lock the HTTP contract that still writes that unused slot.
  */
 final class ConfigControllerSummaryModelTest extends TestCase
 {
@@ -67,7 +72,6 @@ final class ConfigControllerSummaryModelTest extends TestCase
             $this->configRepository,
             $this->modelRepository,
             $this->createStub(ProviderRegistry::class),
-            $this->createStub(BraveSearchService::class),
             $this->createStub(WhisperService::class),
             $this->createStub(PluginManager::class),
             $this->createStub(BillingService::class),
@@ -75,17 +79,34 @@ final class ConfigControllerSummaryModelTest extends TestCase
             $this->createStub(EmbeddingModelChangeGuard::class),
             $this->createStub(EmbeddingMetadataService::class),
             $this->modelConfigService,
-            new RedisService('', 'test', new NullLogger()),
             new ClientContextResolver(),
             $this->createStub(BrandingService::class),
             $this->createStub(MobileVersionService::class),
             $this->createStub(MarketingNewsConfig::class),
             $this->createStub(UsageTaximeterConfig::class),
+            $this->createStub(ProgressNarrationConfig::class),
             $this->createStub(RegistrationConfig::class),
+            $this->createStub(GuestChatConfig::class),
+            $this->createStub(WebSpeechConfig::class),
+            $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
+            $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
+            $this->createStub(\App\Service\Agent\AgentConfig::class),
+            $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
+            $this->createStub(\App\Service\Iam\IamConfig::class),
             $this->createStub(ChatReadinessService::class),
+            new DemoLoginHint(
+                $this->createStub(UserRepository::class),
+                $this->createStub(UserPasswordHasherInterface::class),
+                'test',
+            ),
+            $this->createStub(SetupStateService::class),
             $this->createStub(AiProviderDisclosure::class),
             $this->createStub(LocalAiDownloadStatusService::class),
+            new MailerConfig(),
             new CapabilityService(),
+            $this->createStub(FeatureStatusReporter::class),
+            $this->createStub(ModuleRegistry::class),
+            $this->createStub(ModuleGateConfig::class),
             'http://qdrant.example',
         );
 

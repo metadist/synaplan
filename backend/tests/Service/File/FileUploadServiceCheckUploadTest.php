@@ -77,6 +77,7 @@ class FileUploadServiceCheckUploadTest extends TestCase
         $this->assertArrayNotHasKey('reason', $result);
         $this->assertSame(FileStorageService::getMaxFileSize(), $result['max_file_size']);
         $this->assertContains('pdf', $result['allowed_extensions']);
+        $this->assertContains('jar', $result['allowed_extensions']);
     }
 
     public function testBlocksUploadWhenStorageExceeded(): void

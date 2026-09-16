@@ -57,6 +57,15 @@ final class NodeContext
     private array $inlineMediaNodeIds = [];
 
     /**
+     * Node ids whose tool call was approved by the owner. Runners skip the
+     * approval gate for these — the approval IS the policy decision, and
+     * consulting the gate again would open a second approval and pause forever.
+     *
+     * @var array<string, true>
+     */
+    private array $approvedNodeIds = [];
+
+    /**
      * @param array<int, Message|array{role: string, content: string}> $thread
      *                                                                                   Message entities in-process; plain `{role, content}`
      *                                                                                   snapshots inside a media-node subprocess (entities cannot
@@ -154,9 +163,25 @@ final class NodeContext
         return isset($this->inlineMediaNodeIds[$nodeId]);
     }
 
+    /** Record that the owner approved this node's tool call (see {@see $approvedNodeIds}). */
+    public function markApproved(string $nodeId): void
+    {
+        $this->approvedNodeIds[$nodeId] = true;
+    }
+
+    public function isApproved(string $nodeId): bool
+    {
+        return isset($this->approvedNodeIds[$nodeId]);
+    }
+
     public function setResult(string $nodeId, NodeResult $result): void
     {
         $this->results[$nodeId] = $result;
+    }
+
+    public function clearResult(string $nodeId): void
+    {
+        unset($this->results[$nodeId]);
     }
 
     public function getResult(string $nodeId): ?NodeResult

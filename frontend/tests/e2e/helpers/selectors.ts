@@ -51,6 +51,12 @@ export const selectors = {
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
     navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
+    /** Second-level Manage flyout (Assistants / Channels / …) */
+    navSubDropdown: '[data-testid="dropdown-sidebar-v2-nav-sub"]',
+    flyoutGroup: (key: string) => `[data-testid="btn-sidebar-v2-group-${key}"]`,
+    mobileMoreGroup: (key: string) => `[data-testid="btn-mobile-more-group-${key}"]`,
+    /** Full-screen backdrop behind an open rail flyout; click it to dismiss. */
+    navOverlay: '[data-testid="overlay-sidebar-v2-nav"]',
     /** Expand sidebar when collapsed (so chat dropdown is visible) */
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
     /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
@@ -62,15 +68,18 @@ export const selectors = {
     /** Tap-catcher over the peeking content that closes the drawer */
     mobileDrawerScrim: '[data-testid="btn-mobile-drawer-scrim"]',
     mobileNew: '[data-testid="btn-mobile-nav-new"]',
+    mobileHistory: '[data-testid="btn-mobile-nav-history"]',
     mobileFiles: '[data-testid="btn-mobile-nav-files"]',
     mobileMore: '[data-testid="btn-mobile-nav-more"]',
     /** Inline "More" section that expands under the primary buttons */
     mobileMoreSheet: '[data-testid="sheet-mobile-more"]',
     mobileMoreAccountSection: '[data-testid="section-mobile-more-account"]',
-    mobileMoreChannels: '[data-testid="btn-mobile-more-channels"]',
+    mobileMoreChannels: '[data-testid="btn-mobile-more-manage"]',
+    mobileMoreManage: '[data-testid="btn-mobile-more-manage"]',
     mobileMoreInbound: '[data-testid="link-mobile-more-inbound"]',
     mobileMorePreferences: '[data-testid="btn-mobile-more-preferences"]',
     /** In-drawer chat history (paginated, infinite scroll) */
+    mobileHistorySection: '[data-testid="section-mobile-history"]',
     mobileHistoryList: '[data-testid="list-mobile-history"]',
     mobileHistoryRow: '[data-testid="row-mobile-history"]',
     mobileHistorySentinel: '[data-testid="sentinel-mobile-history"]',
@@ -81,13 +90,17 @@ export const selectors = {
      */
     /** V2 sidebar: History nav item opens the chat list modal */
     sidebarV2ChatNav: '[data-testid="btn-sidebar-v2-nav-chat"]',
+    /** History sheet footer — opens All chats (`/chats`) */
+    chatV2ShowAll: '[data-testid="btn-chat-v2-show-all"]',
     /** V2 sidebar: files nav icon */
     sidebarV2Files: '[data-testid="btn-sidebar-v2-nav-files"]',
-    /** V2 sidebar: Channels rail item (locked in easy mode, flyout in advanced) */
-    sidebarV2Channels: '[data-testid="btn-sidebar-v2-nav-channels"]',
-    /** V2 sidebar: AI Setup rail item (locked in easy mode, flyout in advanced) */
-    sidebarV2AiSetup: '[data-testid="btn-sidebar-v2-nav-ai-setup"]',
-    /** V2 sidebar: admin nav icon (admin only) */
+    /** V2 sidebar: Manage rail item (Channels + assistants + automations) */
+    sidebarV2Manage: '[data-testid="btn-sidebar-v2-nav-manage"]',
+    /** Alias kept while specs migrate off the old Channels rail item */
+    sidebarV2Channels: '[data-testid="btn-sidebar-v2-nav-manage"]',
+    /** Alias kept while specs migrate off the old AI Setup rail item */
+    sidebarV2AiSetup: '[data-testid="btn-sidebar-v2-nav-manage"]',
+    /** V2 sidebar: admin / Operate nav icon (admin only) */
     sidebarV2Admin: '[data-testid="btn-sidebar-v2-nav-admin"]',
     /** V2 rail: always-visible label node inside each nav button (§4.1 #3) */
     railLabel: '.v2-rail-label',
@@ -96,7 +109,12 @@ export const selectors = {
     flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-chat-widget"]',
     flyoutLinkMailHandler: '[data-testid="link-sidebar-v2-mail-handler"]',
     flyoutLinkApiDocs: '[data-testid="link-sidebar-v2-api-docs"]',
+    /** Channels flyout children shown only when Saved Tasks is enabled (features.savedTasks) */
+    flyoutLinkConnections: '[data-testid="link-sidebar-v2-connections"]',
+    flyoutLinkSavedTasks: '[data-testid="link-sidebar-v2-saved-tasks"]',
+    flyoutLinkLiveSupport: '[data-testid="link-sidebar-v2-live-support"]',
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
+    flyoutLinkAiAccounts: '[data-testid="link-sidebar-v2-ai-accounts"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
     /** V2 chat list modal */
@@ -121,6 +139,7 @@ export const selectors = {
     capabilityItem: '[data-testid="item-capability"]',
     capabilityDropdown: '[data-testid="btn-model-dropdown"]',
     capabilityOption: '[data-testid="btn-model-option"]',
+    resetDefaults: '[data-testid="btn-reset-defaults"]',
   },
   rag: {
     page: '[data-testid="page-rag-search"]',
@@ -148,8 +167,8 @@ export const selectors = {
     stateEmpty: '[data-testid="state-empty"]',
     /** Terminal: present when streaming finished */
     chatDone: '[data-testid="message-done"]',
-    /** Terminal: present when message ended in error */
-    chatError: '[data-testid="message-topic-error"]',
+    /** Terminal: present when the assistant turn ended in an error notice */
+    chatError: '[data-testid="chat-error-notice"]',
     messageUser: '[data-testid="message-user"]',
     messageAssistant: '[data-testid="message-assistant"]',
     /** Present inside assistant bubble when streaming finished (prefer over loader hidden) */
@@ -162,8 +181,8 @@ export const selectors = {
     messageText: '[data-testid="message-text"]',
     /** Audio player section rendered for an `audio` message part (TTS / voice reply / uploads) */
     messageAudio: '[data-testid="section-message-audio"]',
-    /** Present when message topic is ERROR (backend error path); use to assert no error in bubble */
-    messageTopicError: '[data-testid="message-topic-error"]',
+    /** Present when the assistant turn ended in ChatErrorNotice */
+    messageTopicError: '[data-testid="chat-error-notice"]',
     // The "Again with… ▾" control is a single button that opens the model
     // dropdown; picking a model re-runs the prompt. (Previously a split button +
     // separate toggle — now unified, so both aliases point to the same element.)
@@ -179,7 +198,8 @@ export const selectors = {
     toolVoiceReply: '[data-testid="btn-tool-voice-reply"]',
     toolEnhance: '[data-testid="btn-tool-enhance"]',
     enhanceButton: '[data-testid="btn-chat-enhance"]',
-    toolSummarizerLink: '[data-testid="link-tool-summarizer"]',
+    toolSummarize: '[data-testid="btn-tool-summarize"]',
+    summarizeOptions: '[data-testid="summarize-options"]',
     /** Sources (N) dropdown toggle — appears on messages that used web search */
     sourcesToggle: '[data-testid="btn-message-sources-toggle"]',
     knowledgeFolderBtn: '[data-testid="btn-knowledge-folder"]',
@@ -214,6 +234,9 @@ export const selectors = {
   share: {
     shareButton: '[data-testid="btn-chat-share"]',
     shareModal: '[data-testid="modal-chat-share"]',
+    iamShareModal: '[data-testid="modal-iam-share"]',
+    iamShareClose: '[data-testid="btn-iam-share-close"]',
+    iamPublicLink: '[data-testid="btn-iam-public-link"]',
     modalRoot: '[data-testid="modal-chat-share-root"]',
     shareCreate: '[data-testid="btn-chat-share-make-public"]',
     shareLinkInput: '[data-testid="share-link-input"]',
@@ -271,16 +294,37 @@ export const selectors = {
     folderCard: (name: string) => `[data-testid="folder-card-${name}"]`,
     /** Folder card hover action: open a chat scoped to this folder */
     btnUseInChat: (name: string) => `[data-testid="btn-use-in-chat-${name}"]`,
+    /** Folder card, always visible top-left (IAM sharing on): open the share dialog */
+    btnShareFolder: (name: string) => `[data-testid="btn-share-folder-${name}"]`,
     /** Folder view: back to the root file list */
     btnBackToRoot: '[data-testid="btn-back-to-root"]',
     /** Folder view: shown when the open folder has no files left */
     stateEmptyFolder: '[data-testid="state-empty-folder"]',
     /** File row action: delete this file (opens ConfirmDialog) */
     btnDeleteFile: '[data-testid="btn-delete"]',
-    /** §4.8: knowledge-base tabs shared by /files and /files/search */
+    /** §4.8: knowledge-base tabs shared by /files and its sub-views */
     tabsBar: '[data-testid="tabs-files"]',
     tabBrowse: '[data-testid="tab-files-browse"]',
     tabSearch: '[data-testid="tab-files-search"]',
+    tabIncoming: '[data-testid="tab-files-incoming"]',
+    tabGenerated: '[data-testid="tab-files-generated"]',
+    tabWorkspace: '[data-testid="tab-files-workspace"]',
+    tabVectors: '[data-testid="tab-files-vectors"]',
+    /** Sub-view page roots reached via the Files tabs */
+    pageIncoming: '[data-testid="page-files-incoming"]',
+    pageGenerated: '[data-testid="page-files-generated"]',
+    pageWorkspace: '[data-testid="page-files-workspace"]',
+    pageVectors: '[data-testid="page-vector-storage"]',
+    /** Workspace tab (COMPUTE.WORKSPACES_ENABLED on): list, preview dialog, delete, states */
+    workspaceFiles: '[data-testid="workspace-files"]',
+    workspaceEmpty: '[data-testid="workspace-empty"]',
+    workspaceError: '[data-testid="workspace-error"]',
+    workspacePreview: '[data-testid="workspace-preview"]',
+    btnWorkspacePreview: '[data-testid="btn-workspace-preview"]',
+    btnWorkspacePreviewClose: '[data-testid="btn-workspace-preview-close"]',
+    btnWorkspaceDelete: '[data-testid="btn-workspace-delete"]',
+    btnWorkspaceRetry: '[data-testid="btn-workspace-retry"]',
+    btnWorkspaceEmptyChat: '[data-testid="btn-workspace-empty-chat"]',
   },
   fileSelection: {
     modal: '[data-testid="modal-file-selection"]',
@@ -309,6 +353,12 @@ export const selectors = {
   loggedOut: {
     page: '[data-testid="page-logged-out"]',
     loginAgainBtn: '[data-testid="btn-login-again"]',
+  },
+  accountDeletion: {
+    /** Public page (Google Play requirement) — reachable without login */
+    page: '[data-testid="page-account-deletion"]',
+    /** CTA linking to the in-app profile where the account is actually deleted */
+    profileLink: '[data-testid="link-profile-delete"]',
   },
   widgets: {
     page: '[data-testid="page-widgets"]',
@@ -431,7 +481,19 @@ export const selectors = {
   inboundConfig: {
     page: '[data-testid="page-config-inbound"]',
     resetDefaults: '[data-testid="btn-reset-defaults"]',
+    whatsappSection: '[data-testid="section-whatsapp"]',
+    whatsappNotice: '[data-testid="notice-feature-not-configured"][data-module="whatsapp"]',
+    emailSection: '[data-testid="section-email"]',
   },
+  assistants: {
+    /** Gallery rendered by /ai/assistants (and by /ai/instructions while AGENTS.ENABLED is on) */
+    gallery: '[data-testid="section-assistant-gallery"]',
+    builder: '[data-testid="section-assistant-builder"]',
+    name: '[data-testid="input-assistant-name"]',
+    nameError: '[data-testid="error-name"]',
+    greeting: '[data-testid="input-assistant-greeting"]',
+  },
+
   taskPrompts: {
     page: '[data-testid="page-config-task-prompts"]',
     overview: '[data-testid="section-task-prompts-overview"]',
@@ -469,13 +531,48 @@ export const selectors = {
     inputNewName: '[data-testid="input-new-name"]',
     inputNewContent: '[data-testid="input-new-content"]',
     btnConfirmCreate: '[data-testid="btn-confirm-create"]',
+    /** Header action on the editor of a custom prompt: turn it into a Saved Task */
+    btnSaveAsTask: '[data-testid="btn-save-as-task"]',
+  },
+  savedTasks: {
+    page: '[data-testid="page-saved-tasks"]',
+    emptyState: '[data-testid="saved-tasks-empty"]',
+    /** One card per task; rendered on /channels/tasks and inline on the prompt editor */
+    card: '[data-testid="saved-task-card"]',
+    runNow: '[data-testid="btn-run-now"]',
+    delete: '[data-testid="btn-delete-saved-task"]',
+    /** Only rendered once the task has a chat (i.e. after it has run at least once) */
+    showResults: '[data-testid="btn-show-results"]',
+    viewRuns: '[data-testid="btn-view-runs"]',
+    /** Run history list, visible after clicking "View runs" */
+    runsList: '[data-testid="saved-task-runs"]',
+    lastRun: '[data-testid="saved-task-last-run"]',
   },
   pages: {
     chat: '[data-testid="page-chat"]',
     profile: '[data-testid="page-profile"]',
     statistics: '[data-testid="page-statistics"]',
+    chats: '[data-testid="page-chats"]',
     admin: '[data-testid="view-admin"]',
+    people: '[data-testid="view-people"]',
     tools: '[data-testid="page-tools"]',
+    featureStatus: '[data-testid="page-feature-status"]',
+  },
+
+  featureStatus: {
+    summary: '[data-testid="section-features-summary"]',
+    modulesSection: '[data-testid="section-modules"]',
+    moduleItem: '[data-testid="item-module"]',
+    moduleStateBadge: '[data-testid="badge-module-state"]',
+    moduleDocsLink: '[data-testid="link-module-docs"]',
+  },
+  people: {
+    backToOperate: '[data-testid="link-people-back-operate"]',
+    tabPolicies: '[data-testid="tab-policies"]',
+    sectionPolicies: '[data-testid="section-policies"]',
+    sectionPolicyDefaults: '[data-testid="section-policy-defaults"]',
+    sectionPolicyLocks: '[data-testid="section-policy-locks"]',
+    selectPolicyGroup: '[data-testid="select-policy-group"]',
   },
   dialog: {
     confirmBtn: '[data-testid="btn-dialog-confirm"]',
@@ -525,6 +622,16 @@ export const selectors = {
     sectionUsers: '[data-testid="section-users"]',
     userSearch: '[data-testid="input-user-search"]',
     impersonateUser: (userId: number) => `[data-testid="btn-impersonate-user-${userId}"]`,
+    /** Per-user level <select> — one row per user; also used as a stable row marker */
+    userLevelSelect: (userId: number) => `[data-testid="select-user-level-${userId}"]`,
+    /** Any user row's level <select> — count these to assert list size / search results */
+    userLevelSelectAny: '[data-testid^="select-user-level-"]',
+    /**
+     * Empty-state copy after a completed users fetch with zero rows. Distinct
+     * from the loading spinner, which unmounts the table (count of level
+     * selects drops to 0 while the request is still in flight).
+     */
+    usersEmpty: '[data-testid="admin-users-empty"]',
   },
   impersonation: {
     banner: '[data-testid="banner-impersonation"]',
@@ -563,6 +670,20 @@ export const selectors = {
     btnPrev: '[data-testid="btn-prev"]',
     btnSave: '[data-testid="btn-save"]',
     btnClose: '[data-testid="btn-close"]',
+  },
+  mcp: {
+    page: '[data-testid="page-config-mcp-servers"]',
+    list: '[data-testid="section-mcp-list"]',
+    addBtn: '[data-testid="btn-mcp-add"]',
+    editor: '[data-testid="section-mcp-editor"]',
+    inputName: '[data-testid="input-mcp-name"]',
+    inputUrl: '[data-testid="input-mcp-url"]',
+    saveBtn: '[data-testid="btn-mcp-save"]',
+    stateEmpty: '[data-testid="mcp-empty"]',
+    /** One list entry per configured server; also a stable presence marker */
+    serverRow: (id: number) => `[data-testid="mcp-server-${id}"]`,
+    serverRowAny: '[data-testid^="mcp-server-"]',
+    deleteServer: (id: number) => `[data-testid="btn-mcp-delete-${id}"]`,
   },
   toast: {},
 } as const

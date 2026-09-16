@@ -35,6 +35,9 @@ content = content.replace(/z\.record\(z\.object/g, 'z.record(z.string(), z.objec
 content = content.replace(/z\.record\((z\.[a-zA-Z]+\(\))\)/g, 'z.record(z.string(), $1)')
 // A value schema built from an OpenAPI oneOf, e.g. z.record(z.union([...]))
 content = content.replace(/z\.record\(z\.union\(/g, 'z.record(z.string(), z.union(')
+// additionalProperties: array or enum — Zod v4 still needs an explicit key type
+content = content.replace(/z\.record\(z\.array\(/g, 'z.record(z.string(), z.array(')
+content = content.replace(/z\.record\(z\.enum\(/g, 'z.record(z.string(), z.enum(')
 
 // Step 4: Add readable aliases
 console.log('✨ Creating readable aliases...')

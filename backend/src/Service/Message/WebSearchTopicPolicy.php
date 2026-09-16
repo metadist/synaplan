@@ -120,6 +120,73 @@ final class WebSearchTopicPolicy
     private const TRIVIAL_MAX_WORDS = 2;
 
     /**
+     * Deictic / referential anchors: pronouns, demonstratives, attachment
+     * nouns, and perception verbs across the supported UI languages. When a
+     * message that CARRIES an attachment contains one of these, the user is
+     * talking about that file ("what is that?", "was ist das?", "how much
+     * does this cost?", "is this contract still valid?") — the referent lives
+     * in the file, not in the text. The web-search query must then be built
+     * WITH the file's content (extracted text, transcript, or a vision
+     * identification — see AttachmentSearchContextResolver), never from the
+     * literal question words alone.
+     *
+     * Bare articles that double as demonstratives (German "das", Spanish
+     * "esta") are kept: with a file attached in the SAME message they are
+     * usually the referent. Bare "it" / German "es" / Spanish "es" ("is")
+     * are NOT listed — they collide with dummy pronouns and the copula
+     * ("is it raining in Berlin today?", "¿cuál es el precio?") and would
+     * pull file content into a self-contained search. Pointing at a file
+     * with those words still matches via a phrase below ("what is it",
+     * "was ist es") or via this/that/das/esto. Turkish bare "o" is
+     * excluded for the same reason (collides with Spanish "o" / "or").
+     *
+     * Matched word-bounded against the punctuation-normalized message.
+     *
+     * @var list<string>
+     */
+    private const ATTACHMENT_REFERENCE_ANCHORS = [
+        // English pronouns/demonstratives (no bare "it" — see above)
+        'this', 'that', 'these', 'those',
+        'what is it',
+        // German (no bare "es" — it is both "it" and the Spanish copula)
+        'das', 'dies', 'diese', 'dieser', 'dieses', 'hier', 'darauf',
+        'was ist es',
+        // Spanish
+        'esto', 'eso', 'esta', 'este', 'esa', 'ese', 'aquí', 'aqui',
+        // French
+        'ceci', 'cela', 'ça', 'ca', 'ici',
+        // Italian
+        'questo', 'questa', 'quello', 'quella', 'qui',
+        // Turkish
+        'bu', 'şu', 'su', 'bunu', 'şunu', 'bunun', 'burada',
+        // Image nouns (all languages) — "what's in the picture?"
+        'image', 'picture', 'photo', 'pic', 'screenshot', 'scan',
+        'bild', 'foto', 'aufnahme', 'imagen', 'imagem', 'immagine',
+        'resim', 'resmin', 'fotoğraf', 'fotograf', 'görsel', 'gorsel',
+        // Document nouns — "is the contract still valid?"
+        'file', 'document', 'doc', 'pdf', 'page', 'contract', 'invoice',
+        'report', 'article', 'attachment',
+        'datei', 'dokument', 'seite', 'vertrag', 'rechnung', 'bericht',
+        'anhang', 'unterlagen',
+        'archivo', 'documento', 'contrato', 'factura', 'informe',
+        'fichier', 'contrat', 'facture', 'rapport',
+        'fattura', 'contratto', 'documento',
+        'dosya', 'belge', 'fatura', 'sözleşme', 'sozlesme', 'rapor',
+        // Audio/video nouns — "who is speaking in the recording?"
+        'audio', 'recording', 'video', 'clip', 'song', 'track', 'podcast',
+        'transcript', 'voicemail',
+        'aufzeichnung', 'lied', 'transkript', 'sprachnachricht',
+        'grabación', 'grabacion', 'canción', 'cancion',
+        'enregistrement', 'chanson', 'registrazione', 'canzone',
+        'kayıt', 'kayit', 'şarkı', 'sarki', 'ses',
+        // Perception verbs — "what do you see?" / "what do you hear?" next
+        // to an attachment asks about the attachment even without a pronoun.
+        'see', 'hear', 'shown', 'siehst', 'sehen', 'erkennst', 'hörst',
+        'hoerst', 'ves', 'oyes', 'vois', 'entends', 'vedi', 'senti',
+        'görüyorsun', 'goruyorsun', 'duyuyorsun',
+    ];
+
+    /**
      * True if the topic is a pure asset/document generation topic and
      * web search should be suppressed regardless of the prompt's
      * `tool_internet` flag.
@@ -193,6 +260,44 @@ final class WebSearchTopicPolicy
     }
 
     /**
+     * True when the message text refers to something the user attached
+     * (image, document, audio, video — uploaded or selected from the library)
+     * rather than to a self-contained, searchable subject.
+     *
+     * "what is that?" with an attached photo, "is this still valid?" with a
+     * contract PDF: the referent lives in the FILE. A search query built from
+     * the text alone ("what is that") is meaningless, so when this predicate
+     * matches, MessageProcessor resolves the attachment's content first
+     * (AttachmentSearchContextResolver) and the query generator builds the
+     * search phrase from it. Blank text next to an attachment is the same
+     * situation — the attachment IS the message.
+     *
+     * Only meaningful for messages that actually carry an attachment; callers
+     * must gate on that.
+     */
+    public static function refersToAttachment(?string $text): bool
+    {
+        if (null === $text || '' === trim($text)) {
+            // Attachment with no text: the attachment IS the message.
+            return true;
+        }
+
+        // Same normalization as the triviality check: collapse every run of
+        // non-letters to a single space so punctuation-hugging tokens match
+        // ("what is that?" → " what is that ").
+        $normalized = preg_replace('/[^\p{L}]+/u', ' ', mb_strtolower($text)) ?? '';
+        $padded = ' '.trim($normalized).' ';
+
+        foreach (self::ATTACHMENT_REFERENCE_ANCHORS as $anchor) {
+            if (str_contains($padded, ' '.$anchor.' ')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Decide whether to run a web search, trusting the model's judgment but
      * vetoing it for obviously trivial chats.
      *
@@ -218,6 +323,13 @@ final class WebSearchTopicPolicy
      *      over-eager sorting model from searching on every "Hey, wie gehts?".
      *      No vote (e.g. the fast-path heuristic, which never calls the model)
      *      means no search, so trivial chats stay fast.
+     *
+     * Attachment-referring questions ("what is that?" + photo) are NOT vetoed
+     * here: when the search runs, MessageProcessor resolves the attachment's
+     * content ({@see refersToAttachment()}, AttachmentSearchContextResolver)
+     * and the query is built from what the file actually shows/says. Only
+     * when that resolution comes back empty does MessageProcessor drop a
+     * purely vote-triggered search (a text-only query would be garbage).
      *
      * Pass `$userRequestedSearch` as the resolved per-message flag (frontend
      * web-search toggle / `/search`). Pass `$promptToolInternet` as the raw

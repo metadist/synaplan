@@ -6,6 +6,8 @@ namespace App\Tests\Unit;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
+use App\AI\Health\FailureKind;
+use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
@@ -451,6 +453,11 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
 
     private function createFacade(string $fallbackProvider): AiFacade
     {
+        // recordFailure() returns an enum, which PHPUnit cannot invent a
+        // default for, so the stub has to name one explicitly.
+        $health = $this->createMock(ModelHealthRecorder::class);
+        $health->method('recordFailure')->willReturn(FailureKind::Transient);
+
         return new AiFacade(
             registry: $this->registry,
             modelConfig: $this->modelConfig,
@@ -463,6 +470,7 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
             cachePool: $this->cachePool,
             higgsfieldCredentials: $this->createMock(HiggsfieldCredentialResolver::class),
             transcriptionUsageRecorder: $this->createMock(TranscriptionUsageRecorder::class),
+            health: $health,
             embeddingFallbackProvider: $fallbackProvider,
         );
     }

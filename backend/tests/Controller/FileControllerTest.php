@@ -2,11 +2,15 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\File;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\MediaAccessTokenService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\Response;
 
 class FileControllerTest extends WebTestCase
 {
@@ -16,6 +20,13 @@ class FileControllerTest extends WebTestCase
     private $em;
     private ?User $testUser = null;
     private string $authToken;
+
+    /**
+     * Files we created on disk during the test, removed in tearDown.
+     *
+     * @var list<string>
+     */
+    private array $diskPaths = [];
 
     protected function setUp(): void
     {
@@ -41,12 +52,21 @@ class FileControllerTest extends WebTestCase
                 $this->em = self::getContainer()->get('doctrine')->getManager();
             }
 
-            $files = $this->em->getRepository(\App\Entity\File::class)
+            $files = $this->em->getRepository(File::class)
                 ->findBy(['userId' => $this->testUser->getId()]);
             foreach ($files as $file) {
                 $this->em->remove($file);
             }
             $this->em->flush();
+        }
+
+        if ([] !== $this->diskPaths) {
+            foreach ($this->diskPaths as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+            $this->diskPaths = [];
         }
 
         static::ensureKernelShutdown();
@@ -370,7 +390,7 @@ class FileControllerTest extends WebTestCase
      */
     public function testDownloadRegeneratesMissingGeneratedBinaryFromText(): void
     {
-        $file = new \App\Entity\File();
+        $file = new File();
         $file->setUserId($this->testUser->getId());
         $file->setFilePath('missing/'.uniqid('regen_', true).'.docx');
         $file->setFileType('docx');
@@ -401,6 +421,110 @@ class FileControllerTest extends WebTestCase
             (string) $response->headers->get('Content-Disposition'),
             'Regenerated download must keep the original filename'
         );
+    }
+
+    public function testIssuesAMediaTokenToTheAuthenticatedCaller(): void
+    {
+        $this->client->request('GET', '/api/v1/files/media-token', [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+
+        $response = $this->client->getResponse();
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $data = json_decode((string) $response->getContent(), true);
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('token', $data);
+        $this->assertIsString($data['token']);
+        $this->assertNotSame('', $data['token']);
+        $this->assertSame(MediaAccessTokenService::TTL, $data['expiresIn']);
+    }
+
+    public function testMediaTokenRequiresAuthentication(): void
+    {
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/media-token');
+
+        $this->assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * A media element cannot send an Authorization header. The download route
+     * is therefore public at the firewall and the controller accepts the
+     * read-only media token in the query string.
+     */
+    public function testDownloadAcceptsAMediaTokenWithoutASession(): void
+    {
+        $this->assertInstanceOf(User::class, $this->testUser);
+        $file = $this->persistDownloadableFile();
+        $token = $this->client->getContainer()->get(MediaAccessTokenService::class)
+            ->generate($this->testUser);
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request(
+            'GET',
+            '/api/v1/files/'.$file->getId().'/download?'.MediaAccessTokenService::QUERY_PARAM.'='.urlencode($token),
+        );
+
+        $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testDownloadRejectsAnInvalidMediaToken(): void
+    {
+        $file = $this->persistDownloadableFile();
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request(
+            'GET',
+            '/api/v1/files/'.$file->getId().'/download?'.MediaAccessTokenService::QUERY_PARAM.'=not-a-token',
+        );
+
+        $this->assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testDownloadStillRequiresACredential(): void
+    {
+        $file = $this->persistDownloadableFile();
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/'.$file->getId().'/download');
+
+        $this->assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+    }
+
+    private function persistDownloadableFile(): File
+    {
+        $this->assertInstanceOf(User::class, $this->testUser);
+        $userId = $this->testUser->getId();
+        $this->assertNotNull($userId);
+
+        $uploadDir = $this->client->getContainer()->getParameter('app.upload_dir');
+        if (!is_string($uploadDir)) {
+            $this->fail('app.upload_dir must be a string.');
+        }
+
+        $pathBuilder = $this->client->getContainer()->get(UserUploadPathBuilder::class);
+        $relativePath = $pathBuilder->buildUserBaseRelativePath($userId)
+            .'/'.date('Y').'/'.date('m').'/media_'.bin2hex(random_bytes(4)).'.png';
+        $absolute = $uploadDir.'/'.$relativePath;
+        if (!is_dir(dirname($absolute))) {
+            mkdir(dirname($absolute), 0o775, true);
+        }
+        file_put_contents($absolute, 'png-bytes');
+        $this->diskPaths[] = $absolute;
+
+        $file = new File();
+        $file->setUserId($userId);
+        $file->setFilePath($relativePath);
+        $file->setFileType('image');
+        $file->setFileName(basename($relativePath));
+        $file->setFileSize((int) filesize($absolute));
+        $file->setFileMime('image/png');
+        $file->setStatus('uploaded');
+        $file->setCreatedAt(time());
+        $this->em->persist($file);
+        $this->em->flush();
+
+        return $file;
     }
 
     private function createTestFile(string $filename, string $content): string

@@ -2,12 +2,16 @@
 
 namespace App\Repository;
 
+use App\Entity\Chat;
 use App\Entity\Message;
+use App\Entity\MessageMeta;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MessageRepository extends ServiceEntityRepository
 {
+    private const DELETE_ID_BATCH = 500;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Message::class);
@@ -91,10 +95,11 @@ class MessageRepository extends ServiceEntityRepository
      * may differ within a chat (e.g. WhatsApp anonymous flow), and all
      * are returned as long as the chat belongs to the given user.
      *
-     * @param int $userId        Owner of the chat (verified via Chat.userId)
-     * @param int $chatId        Chat ID to get messages from
-     * @param int $maxMessages   Maximum number of messages (default: 30)
-     * @param int $maxTotalChars Maximum total characters across all messages (default: 15000)
+     * @param int      $userId           Owner of the chat (verified via Chat.userId)
+     * @param int      $chatId           Chat ID to get messages from
+     * @param int      $maxMessages      Maximum number of messages (default: 30)
+     * @param int      $maxTotalChars    Maximum total characters across all messages (default: 15000)
+     * @param int|null $excludeMessageId Skip this id before applying caps (the just-persisted IN row)
      *
      * @return array Array of Message entities, ordered oldest first
      */
@@ -103,8 +108,9 @@ class MessageRepository extends ServiceEntityRepository
         int $chatId,
         int $maxMessages = 30,
         int $maxTotalChars = 15000,
+        ?int $excludeMessageId = null,
     ): array {
-        $messages = $this->createQueryBuilder('m')
+        $qb = $this->createQueryBuilder('m')
             ->join('m.chat', 'c')
             ->where('m.chatId = :chatId')
             ->andWhere('c.userId = :userId')
@@ -112,19 +118,23 @@ class MessageRepository extends ServiceEntityRepository
             ->setParameter('userId', $userId)
             ->orderBy('m.unixTimestamp', 'DESC')
             ->addOrderBy('m.id', 'DESC')
-            ->setMaxResults($maxMessages)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($maxMessages);
 
-        // Apply character limit: keep newest messages that fit within total char limit
+        if (null !== $excludeMessageId) {
+            $qb->andWhere('m.id != :excludeId')
+                ->setParameter('excludeId', $excludeMessageId);
+        }
+
+        $messages = $qb->getQuery()->getResult();
+
+        // Apply character limit: keep newest messages that fit within total char limit.
+        // Only message text counts — file bodies are clipped later in ChatHandler
+        // and must not evict prior turns from the conversation window.
         $result = [];
         $totalChars = 0;
 
         foreach ($messages as $message) {
             $messageLength = strlen($message->getText());
-            if ($message->getFileText()) {
-                $messageLength += strlen($message->getFileText());
-            }
 
             // Stop if adding this message would exceed char limit
             // (but always include at least 1 message)
@@ -179,14 +189,16 @@ class MessageRepository extends ServiceEntityRepository
      *
      * @return list<Message>
      */
-    public function findMessagesBetween(int $userId, int $chatId, int $afterId, int $upToIdInclusive): array
+    /**
+     * @return list<Message> chronological (oldest first)
+     */
+    public function findMessagesBetween(int $userId, int $chatId, int $afterId, int $upToIdInclusive, ?int $newestLimit = null): array
     {
         if ($afterId >= $upToIdInclusive) {
             return [];
         }
 
-        /** @var list<Message> $rows */
-        $rows = $this->createQueryBuilder('m')
+        $qb = $this->createQueryBuilder('m')
             ->join('m.chat', 'c')
             ->where('m.chatId = :chatId')
             ->andWhere('c.userId = :userId')
@@ -195,11 +207,24 @@ class MessageRepository extends ServiceEntityRepository
             ->setParameter('chatId', $chatId)
             ->setParameter('userId', $userId)
             ->setParameter('afterId', $afterId)
-            ->setParameter('upToId', $upToIdInclusive)
-            ->orderBy('m.unixTimestamp', 'ASC')
-            ->addOrderBy('m.id', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->setParameter('upToId', $upToIdInclusive);
+
+        if (null !== $newestLimit && $newestLimit > 0) {
+            $qb->orderBy('m.unixTimestamp', 'DESC')
+                ->addOrderBy('m.id', 'DESC')
+                ->setMaxResults($newestLimit);
+
+            /** @var list<Message> $rows */
+            $rows = $qb->getQuery()->getResult();
+
+            return array_reverse($rows);
+        }
+
+        $qb->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC');
+
+        /** @var list<Message> $rows */
+        $rows = $qb->getQuery()->getResult();
 
         return $rows;
     }
@@ -339,6 +364,115 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Keyset batch of messages eligible for the message-digest job: owned by
+     * the user, above the digest cursor, older than the quiet period, with
+     * some text to digest, and NOT part of a widget/guest chat (those belong
+     * to anonymous visitors, not the account owner's own history).
+     *
+     * @param int|null $liveChatId When set, the quiet cutoff applies only to this
+     *                             chat; messages in other chats are indexable immediately
+     *
+     * @return Message[] ordered oldest-first
+     */
+    public function findDigestCandidates(
+        int $userId,
+        int $afterId,
+        int $beforeUnix,
+        int $limit,
+        ?int $sinceUnix = null,
+        ?int $liveChatId = null,
+    ): array {
+        $qb = $this->createQueryBuilder('m')
+            ->where('m.userId = :userId')
+            ->andWhere('m.id > :afterId')
+            ->andWhere("(m.text != '' OR m.fileText != '')")
+            ->andWhere(
+                'm.chatId IS NULL OR m.chatId NOT IN (
+                    SELECT c.id FROM App\Entity\Chat c WHERE c.source IN (:excludedSources)
+                )'
+            )
+            ->setParameter('userId', $userId)
+            ->setParameter('afterId', $afterId)
+            ->setParameter('excludedSources', ['widget', 'guest'])
+            ->orderBy('m.id', 'ASC')
+            ->setMaxResults($limit);
+
+        if (null !== $liveChatId && $liveChatId > 0) {
+            // Other chats have already been left — do not wait for QUIET_SECONDS.
+            // The extra outer parens are load-bearing: Doctrine andWhere()
+            // concatenates with AND and does not wrap the expression, so an
+            // ungrouped OR would let `unixTimestamp < :beforeUnix` bypass
+            // the user / cursor / source predicates.
+            $qb->andWhere('((m.chatId IS NOT NULL AND m.chatId != :liveChatId) OR m.unixTimestamp < :beforeUnix)')
+                ->setParameter('liveChatId', $liveChatId)
+                ->setParameter('beforeUnix', $beforeUnix);
+        } else {
+            $qb->andWhere('m.unixTimestamp < :beforeUnix')
+                ->setParameter('beforeUnix', $beforeUnix);
+        }
+
+        if (null !== $sinceUnix) {
+            $qb->andWhere('m.unixTimestamp >= :sinceUnix')
+                ->setParameter('sinceUnix', $sinceUnix);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Verbatim tail of the user's most recently updated other chat (not widget/guest).
+     *
+     * @return list<Message> chronological (oldest first)
+     */
+    public function findRecentOtherChatTail(
+        int $userId,
+        int $excludeChatId,
+        int $maxMessages = 8,
+        int $maxTotalChars = 4000,
+    ): array {
+        $otherChatId = $this->getEntityManager()->createQueryBuilder()
+            ->select('c.id')
+            ->from(Chat::class, 'c')
+            ->where('c.userId = :userId')
+            ->andWhere('c.id != :excludeChatId')
+            ->andWhere('c.source NOT IN (:excludedSources)')
+            ->setParameter('userId', $userId)
+            ->setParameter('excludeChatId', $excludeChatId)
+            ->setParameter('excludedSources', ['widget', 'guest'])
+            ->orderBy('c.updatedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult(\Doctrine\ORM\Query::HYDRATE_SINGLE_SCALAR);
+
+        if (null === $otherChatId) {
+            return [];
+        }
+
+        $chatId = (int) $otherChatId;
+        if ($chatId <= 0) {
+            return [];
+        }
+
+        return $this->findChatHistory($userId, $chatId, $maxMessages, $maxTotalChars);
+    }
+
+    /**
+     * Distinct owners of messages — the candidate set for the digest job.
+     * Cheap (indexed BUSERID) compared to walking the whole users table.
+     *
+     * @return list<int>
+     */
+    public function findDistinctUserIds(): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('DISTINCT m.userId')
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_map(intval(...), $rows);
+    }
+
+    /**
      * Map a set of message ids to their owning chat id (BCHATID), skipping
      * messages that are not attached to a chat. Used by the file manager to
      * deep-link a generated artefact to the exact conversation it came from
@@ -368,6 +502,28 @@ class MessageRepository extends ServiceEntityRepository
         }
 
         return $map;
+    }
+
+    /**
+     * Chats whose messages carry this file through the message↔file link.
+     *
+     * Used by IAM to decide whether a foreign file reaches a user through a
+     * conversation share; the file row alone may not point at a message.
+     *
+     * @return list<int>
+     */
+    public function findChatIdsByFileId(int $fileId): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('DISTINCT m.chatId AS cid')
+            ->innerJoin('m.files', 'f')
+            ->where('f.id = :fileId')
+            ->andWhere('m.chatId IS NOT NULL')
+            ->setParameter('fileId', $fileId)
+            ->getQuery()
+            ->getResult();
+
+        return array_values(array_map(static fn (array $row): int => (int) $row['cid'], $rows));
     }
 
     public function flush(): void
@@ -536,7 +692,10 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Delete all messages for the given chat IDs.
+     * Delete all messages for the given chat IDs, and their BMESSAGEMETA rows.
+     *
+     * Bulk DQL skips Doctrine orphanRemoval, and BMESSAGEMETA has no
+     * ON DELETE CASCADE, so meta must be removed first (#1811).
      *
      * @param array<int> $chatIds
      *
@@ -544,16 +703,58 @@ class MessageRepository extends ServiceEntityRepository
      */
     public function deleteByChatIds(array $chatIds): int
     {
-        if (empty($chatIds)) {
+        if ([] === $chatIds) {
             return 0;
         }
 
-        $qb = $this->getEntityManager()->createQueryBuilder();
+        $deleted = 0;
+        foreach (array_chunk(array_values(array_unique($chatIds)), self::DELETE_ID_BATCH) as $chatBatch) {
+            $ids = $this->createQueryBuilder('m')
+                ->select('m.id')
+                ->where('m.chatId IN (:chatIds)')
+                ->setParameter('chatIds', $chatBatch)
+                ->getQuery()
+                ->getSingleColumnResult();
 
-        return $qb->delete(Message::class, 'm')
-            ->where($qb->expr()->in('m.chatId', ':chatIds'))
-            ->setParameter('chatIds', $chatIds)
+            $messageIds = array_values(array_map(static fn (mixed $id): int => (int) $id, $ids));
+            foreach (array_chunk($messageIds, self::DELETE_ID_BATCH) as $idBatch) {
+                $this->getEntityManager()->createQueryBuilder()
+                    ->delete(MessageMeta::class, 'meta')
+                    ->where('meta.messageId IN (:ids)')
+                    ->setParameter('ids', $idBatch)
+                    ->getQuery()
+                    ->execute();
+            }
+
+            $qb = $this->getEntityManager()->createQueryBuilder();
+            $deleted += $qb->delete(Message::class, 'm')
+                ->where($qb->expr()->in('m.chatId', ':chatIds'))
+                ->setParameter('chatIds', $chatBatch)
+                ->getQuery()
+                ->execute();
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Chat turns that entered processing/queued and never left — the request
+     * that created them is gone (worker restart, lost Messenger message).
+     *
+     * @param list<string> $statuses
+     *
+     * @return Message[]
+     */
+    public function findStaleNonTerminal(int $cutoffUnix, array $statuses, int $limit = 200): array
+    {
+        return $this->createQueryBuilder('m')
+            ->where('m.status IN (:statuses)')
+            ->andWhere('m.unixTimestamp < :cutoff')
+            ->setParameter('statuses', $statuses, \Doctrine\DBAL\ArrayParameterType::STRING)
+            ->setParameter('cutoff', $cutoffUnix)
+            ->orderBy('m.unixTimestamp', 'ASC')
+            ->setMaxResults($limit)
             ->getQuery()
-            ->execute();
+            ->getResult();
     }
 }

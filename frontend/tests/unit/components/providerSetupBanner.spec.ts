@@ -11,7 +11,12 @@ vi.mock('@/stores/config', () => ({ useConfigStore: () => config }))
 
 const mountBanner = () =>
   mount(ProviderSetupBanner, {
-    global: { stubs: { Icon: true, RouterLink: { template: '<a><slot /></a>' } } },
+    global: {
+      stubs: {
+        Icon: true,
+        RouterLink: { template: '<a :href="to"><slot /></a>', props: ['to'] },
+      },
+    },
   })
 
 describe('ProviderSetupBanner', () => {
@@ -22,46 +27,42 @@ describe('ProviderSetupBanner', () => {
     config.setup.chatReady = false
   })
 
-  it('tells a regular user to contact an administrator', () => {
+  it('points a regular user at the public documentation', () => {
     const wrapper = mountBanner()
 
-    expect(wrapper.find('[data-testid="provider-setup-banner"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="provider-setup-banner-cta"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="provider-setup-tombstone"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="provider-setup-tombstone-cta"]').exists()).toBe(false)
+    const docs = wrapper.find('[data-testid="provider-setup-tombstone-docs"]')
+    expect(docs.exists()).toBe(true)
+    expect(docs.attributes('href')).toBe('https://docs.synaplan.com/')
     expect(wrapper.text()).toContain('administrator')
   })
 
-  it('offers admins a shortcut to the setup page', () => {
+  it('sends admins to the AI provider setup page', () => {
     auth.isAdmin = true
     const wrapper = mountBanner()
 
-    expect(wrapper.find('[data-testid="provider-setup-banner-cta"]').exists()).toBe(true)
+    const cta = wrapper.find('[data-testid="provider-setup-tombstone-cta"]')
+    expect(cta.exists()).toBe(true)
+    expect(cta.attributes('href')).toBe('/admin/setup')
+    expect(wrapper.find('[data-testid="provider-setup-tombstone-docs"]').exists()).toBe(false)
   })
 
-  // The blocker this banner exists for is the inverse: it must disappear the
-  // moment chat actually works, otherwise it nags forever.
   it('disappears once chat is ready', () => {
     config.setup.chatReady = true
 
-    expect(mountBanner().find('[data-testid="provider-setup-banner"]').exists()).toBe(false)
+    expect(mountBanner().find('[data-testid="provider-setup-tombstone"]').exists()).toBe(false)
   })
 
   it('stays hidden while readiness is still unknown', () => {
     config.setup.chatReady = null
 
-    expect(mountBanner().find('[data-testid="provider-setup-banner"]').exists()).toBe(false)
+    expect(mountBanner().find('[data-testid="provider-setup-tombstone"]').exists()).toBe(false)
   })
 
   it('stays hidden for anonymous visitors', () => {
     auth.isAuthenticated = false
 
-    expect(mountBanner().find('[data-testid="provider-setup-banner"]').exists()).toBe(false)
-  })
-
-  it('can be dismissed for the session', async () => {
-    const wrapper = mountBanner()
-
-    await wrapper.find('[data-testid="provider-setup-banner-dismiss"]').trigger('click')
-
-    expect(wrapper.find('[data-testid="provider-setup-banner"]').exists()).toBe(false)
+    expect(mountBanner().find('[data-testid="provider-setup-tombstone"]').exists()).toBe(false)
   })
 })

@@ -10,8 +10,10 @@ export type ProviderHelpId =
   | 'google'
   | 'mistral'
   | 'trustedtokens'
+  | 'a2agent'
   | 'huggingface'
   | 'xai'
+  | 'perplexity'
   | 'ollama'
 
 export interface ProviderHelpMeta {
@@ -29,8 +31,10 @@ const BY_PROVIDER: Record<string, ProviderHelpMeta> = {
   google: { id: 'google', url: 'https://aistudio.google.com/apikey' },
   mistral: { id: 'mistral', url: 'https://console.mistral.ai/api-keys' },
   trustedtokens: { id: 'trustedtokens', url: 'https://trustedtokens.eu/' },
+  a2agent: { id: 'a2agent', url: 'https://a2agent.me/' },
   huggingface: { id: 'huggingface', url: 'https://huggingface.co/settings/tokens' },
   xai: { id: 'xai', url: 'https://console.x.ai/' },
+  perplexity: { id: 'perplexity', url: 'https://www.perplexity.ai/account/api' },
   ollama: { id: 'ollama', url: 'https://ollama.com/download', isDownload: true },
 }
 
@@ -42,8 +46,10 @@ const BY_ENV_VAR: Record<string, ProviderHelpMeta> = {
   GOOGLE_GEMINI_API_KEY: BY_PROVIDER.google,
   MISTRAL_API_KEY: BY_PROVIDER.mistral,
   TRUSTEDTOKENS_API_KEY: BY_PROVIDER.trustedtokens,
+  A2AGENT_API_KEY: BY_PROVIDER.a2agent,
   HUGGINGFACE_API_KEY: BY_PROVIDER.huggingface,
   XAI_API_KEY: BY_PROVIDER.xai,
+  PERPLEXITY_API_KEY: BY_PROVIDER.perplexity,
   OLLAMA_BASE_URL: BY_PROVIDER.ollama,
 }
 

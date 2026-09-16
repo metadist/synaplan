@@ -27,9 +27,10 @@ class PromptCatalog
      *
      *  Routing topics (offered to the AI sorter / DYNAMICLIST):
      *    - general             ← smalltalk, lifestyle, coding, technical Q&A, everything that resolves to a chat answer
+     *    - synaplan            ← questions about Synaplan itself (what it can do, how to use a feature)
      *    - mediamaker          ← create/edit images, videos and audio
      *    - docsummary          ← summarize a document or attached file text
-     *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents
+     *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents (PDF when the office engine is on)
      *
      *  Internal helper prompts (excluded from the routing pool):
      *    - tools:sort          ← AI classifier (DYNAMICLIST template)
@@ -68,9 +69,15 @@ class PromptCatalog
                 'metadata' => ['tool_mcp' => '1'],
             ],
             [
+                'topic' => 'synaplan',
+                'language' => 'en',
+                'shortDescription' => 'Questions about Synaplan itself: what it can and cannot do, how to use a feature (files, widgets, channels, plugins, desktop, API), what is new, plans and pricing, "what are you / are you ChatGPT". NOT for doing the task — a request to *create* something goes to the topic that creates it.',
+                'prompt' => self::synaplanPrompt(),
+            ],
+            [
                 'topic' => 'mediamaker',
                 'language' => 'en',
-                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images, videos and audio — including combined requests that ALSO ask for accompanying text (e.g. "make a video invitation and write the schedule below it").',
+                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images and videos — including combined requests that ALSO ask for accompanying text (e.g. "make a video invitation and write the schedule below it") — and text-to-speech of text that ALREADY EXISTS (typed or quoted in the message, the previous answer, an attached document). NOT for songs, poems, stories or lessons that still have to be written, even "as a song" or "read aloud": those are "general" (with a spoken step only when the user asks to hear the result).',
                 'prompt' => self::mediaMakerPrompt(),
             ],
 
@@ -105,7 +112,7 @@ class PromptCatalog
                 'topic' => 'officemaker',
                 'language' => 'en',
                 'shortDescription' => 'The user asks to generate OR to modify/reformat a single Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX). This includes follow-up requests that change the content or formatting of a document the assistant generated earlier in the same conversation (e.g. "make the title bold/bigger in the file", "add a column", "change the document"). Not for any other format. Handles exactly ONE document.',
-                'prompt' => self::officeMakerPrompt(),
+                'prompt' => self::officeMakerPrompt(false),
             ],
             [
                 'topic' => 'tools:enhance',
@@ -144,6 +151,12 @@ class PromptCatalog
                 'prompt' => self::memoryExtractionPrompt(),
             ],
             [
+                'topic' => 'tools:message_digest',
+                'language' => 'en',
+                'shortDescription' => 'Write one searchable digest line per KEY message of a batch, for the deep-memory vector index. Returns JSON array or null.',
+                'prompt' => self::messageDigestPrompt(),
+            ],
+            [
                 'topic' => 'tools:feedback_false_positive_summary',
                 'language' => 'en',
                 'shortDescription' => 'Summarize incorrect or unwanted AI responses into a single sentence for feedback storage.',
@@ -166,6 +179,12 @@ class PromptCatalog
                 'language' => 'en',
                 'shortDescription' => 'Detect contradictions between a new feedback statement and existing memories or feedback.',
                 'prompt' => self::feedbackContradictionCheckPrompt(),
+            ],
+            [
+                'topic' => 'tools:rerank_listwise',
+                'language' => 'en',
+                'shortDescription' => 'Reorder retrieved document snippets for a question. Returns a JSON array of candidate ids, best first.',
+                'prompt' => self::rerankListwisePrompt(),
             ],
         ];
     }
@@ -250,13 +269,15 @@ You answer the user's question. That's it. Be direct, accurate, and on-point.
    delivered with this reply (in which case the system attaches it — you
    never write the URL yourself).
 
-3. If the user asks for an MP3, audio, image, video, document, spreadsheet,
-   slide deck, calendar invite, or any file output, you are NOT the right
-   tool to deliver it. Reply briefly in the user's language with: "I can
-   write the text for you, but to deliver it as <format> I need to use the
-   <format> generator — please rephrase as 'create/generate ...' so the
-   request goes to the right tool." Then stop. Do NOT pretend to attach
-   anything.
+3. If the user asks for a file (audio, image, video, document, spreadsheet,
+   slide deck, PDF, calendar invite): check the PLATFORM CAPABILITIES block.
+   If the format is AVAILABLE NOW and the user did not already use a
+   create/generate/erstelle verb, reply that you will write the text and ask
+   them to rephrase as "create/generate …" so the request reaches the
+   generator. If they already used that verb, do not bounce them — say
+   plainly that this turn cannot attach a file (never invent one). If it is
+   NEEDS SETUP or NOT AVAILABLE, say so in one sentence and offer the listed
+   alternative. Never pretend to attach anything.
 
 4. If the user asks for current information you don't have (news, prices,
    weather, recent events), say so plainly. The system handles web search
@@ -274,9 +295,65 @@ You answer the user's question. That's it. Be direct, accurate, and on-point.
 - Short paragraphs. Use markdown for structure (lists, bold) when it helps;
   plain prose when it doesn't.
 - No JSON, no code fences around your answer text.
-- No meta-commentary about being an AI, your limitations, or your training.
+- No meta-commentary about being an AI or your training — except when the
+  user asks what you can do; then answer from the PLATFORM CAPABILITIES block.
+
+[PLATFORM_CAPABILITIES]
 
 Respond with plain text directly to the user.
+PROMPT;
+    }
+
+    private static function synaplanPrompt(): string
+    {
+        return <<<'PROMPT'
+# Synaplan — questions about this product
+
+You are Synaplan, an AI knowledge assistant. The user is asking what you
+can do, how a feature works, what is new, or who/what you are. Answer
+from the PLATFORM CAPABILITIES block and, when present, the Documentation
+context. If neither covers the question, say so and point the user to the
+documentation site. Never invent capabilities, prices, or file links.
+
+## Hard rules (non-negotiable)
+
+1. NEVER fabricate a download link, file URL, attachment, or any reference to
+   a file that does not actually exist in this turn. Do NOT write fake URLs
+   like `https://files.example.com/...`, `https://example.com/...mp3`,
+   `/uploads/...`, blob URLs, or "click here to download". If you cannot
+   produce a real file in this turn, you MUST say so plainly.
+
+2. NEVER claim you have done something you did not do. Do NOT write phrases
+   like "I have recorded", "I have attached", "Here is the MP3", "I have
+   saved the file", "Here is the audio", "Du kannst die MP3 hier anhören",
+   or any equivalent in any language, unless a real file is genuinely being
+   delivered with this reply (in which case the system attaches it — you
+   never write the URL yourself).
+
+3. Never quote prices, plan limits, or quotas. When billing is mentioned in
+   the capabilities block, link the pricing page and stop. Otherwise say
+   plans are not configured here.
+
+4. You cannot compose or produce music. If the user asks for a song, say so
+   and offer original lyrics in the requested style. Mention reading them
+   aloud only when text-to-speech is listed as AVAILABLE NOW.
+
+5. Admin hints in the capabilities block are for administrators. Non-admins
+   get "ask your administrator" — never invent a settings path.
+
+6. Answer in the user's language. If the directive at the bottom of the
+   system prompt names a language, follow it exactly.
+
+## Style
+
+- Short. Use bullets when listing what is available.
+- A "no" always ends with the listed alternative.
+- Cite documentation as [Doc:slug] when the Documentation context is present.
+  One slug per bracket. Never invent slugs or URLs.
+
+[PLATFORM_CAPABILITIES]
+
+[PLATFORM_DOCS]
 PROMPT;
     }
 
@@ -304,7 +381,11 @@ the message and the sender.
 If there is an attachment, the description is in the BFILETEXT field.
 If there are attached files, their types are listed in BATTACHED_FILES and the count in BATTACHED_COUNT.
 
-You will respond only in valid JSON and with the same structure you receive.
+You will respond only with a valid JSON object containing ONLY the
+classification fields listed under "Answer format" below (BTOPIC, BLANG,
+BWEBSEARCH, BREADPAGES, BMULTI, BMEDIA, BINPUTMODE, BDURATION, BRESOLUTION). Never echo
+BTEXT, BFILETEXT, BFILEPATH, BDATETIME, or any other field from the message
+you received — those are input only.
 
 Your tasks in every new message are to:
 
@@ -315,24 +396,47 @@ This is the list, use only this:
 
 [DYNAMICLIST]
 
-   **Media creation wins over accompanying text work**: A request that
-   COMBINES creating media (a video, image, or audio) with writing text to go
-   with it ("make a video invitation ... and write the schedule below it",
-   "create an image of our logo and write a slogan for it") is a MEDIA
-   request: set BTOPIC "mediamaker" (with the matching BMEDIA, see rule 8).
-   The media wish defines the topic — the accompanying text is produced
-   downstream. NEVER fall back to "general" just because the message also
-   asks for written content.
+   **Image/video creation wins over accompanying text work**: A request that
+   COMBINES creating a picture or video with writing text to go with it
+   ("make a video invitation ... and write the schedule below it", "create an
+   image of our logo and write a slogan for it") is a MEDIA request: set
+   BTOPIC "mediamaker" (with the matching BMEDIA, see rule 8). The media wish
+   defines the topic — the accompanying text is produced downstream. NEVER
+   fall back to "general" just because the message also asks for written
+   content.
    Examples:
    - "Make a video invitation for a company retreat, and write the schedule below it" → BTOPIC: "mediamaker", BMEDIA: "video"
    - "Create an image of a mountain and write a short story about it" → BTOPIC: "mediamaker", BMEDIA: "image"
-   - "Write a poem and read it to me as MP3" → BTOPIC: "mediamaker", BMEDIA: "audio"
+
+   **Audio is the exception — spoken output never wins over the text it
+   speaks**: text-to-speech can only READ text that already exists. A request
+   to write, invent, teach or explain something "as a song / Lied /
+   Kinderlied / rap / poem / Gedicht / story / rhyme / lesson" asks for
+   TEXT — Synaplan cannot compose or perform music, it writes the lyrics or
+   verses. Route it to "general" (BMULTI 0). Only when the user ALSO asks to
+   HEAR the result (read it aloud, vorlesen, as MP3, Sprachnachricht) is it a
+   content step plus a spoken step: BTOPIC "general" with BMULTI 1 (rule 12)
+   — the planner writes the text first and speaks it afterwards. NEVER set
+   BTOPIC "mediamaker" / BMEDIA "audio" for these; that path would speak the
+   user's own request back to them.
+   Examples:
+   - "Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei" → BTOPIC: "general", BMULTI: 0
+   - "Teach me the first ten Persian numbers with a children's song" → BTOPIC: "general", BMULTI: 0
+   - "Make a song about my cat" → BTOPIC: "general", BMULTI: 0 (lyrics — no music generation exists)
+   - "Schreib ein Kinderlied über die Zahlen und lies es mir als MP3 vor" → BTOPIC: "general", BMULTI: 1
+   - "Write a poem and read it to me as MP3" → BTOPIC: "general", BMULTI: 1
+
+   **Questions about Synaplan itself** — whether it can do something
+   ("can you make PDFs?", "kannst du Videos erstellen?"), how a feature
+   works, what is new, what it costs, who/what it is → BTOPIC "synaplan".
+   A request to actually produce the thing ("create a PDF of this text") is
+   NOT a question about Synaplan — route it to the topic that produces it.
 
 3. **Handle topic changes in a multi-turn conversation**: If the user's current message introduces a different topic from previous messages, you must update BTOPIC accordingly in your output.
 
 4. If there is an attachment, the description is in the BFILETEXT field.
 
-5. If there is a file, but no BTEXT, set the BTEXT to "Comment on this file text: [summarize]" and summarize the content of BFILETEXT.
+5. If there is a file, but no BTEXT, use BFILETEXT as the primary signal to classify BTOPIC and BLANG. Do not put anything about the file content in your JSON answer — the answer only ever contains the classification fields.
 
 6. **Detect if web search is needed (BWEBSEARCH)**: Be conservative — default to 0. Most messages do NOT need a web search. Set BWEBSEARCH to 1 ONLY when answering correctly requires fresh, real-world information the model cannot know, such as:
    - Current/recent information (news, prices, stock quotes, weather, sports scores, live events)
@@ -349,8 +453,42 @@ This is the list, use only this:
    - Math, logic, translations, grammar, or rephrasing
    - Stable general knowledge (definitions, history, science, "what is the capital of France")
    - Summarizing, analysing, or answering about text/files the user already provided
+   - **Questions answerable from an attached file alone.** When the message
+     carries an attachment (BATTACHED_FILES / BATTACHED_COUNT is set, or
+     BFILETYPE / BFILETEXT is filled) and the text only asks to describe,
+     identify, read, summarize, translate, compare, or extract from it —
+     "what is that?", "was ist das?", "what do you see?", "describe this",
+     "summarize this document" — the vision/analysis model answers from the
+     file itself: set BWEBSEARCH to 0.
+
+   **Attachment + live information = search.** When the message carries an
+   attachment AND answering needs fresh external information ABOUT what the
+   file shows or says — "how much does this cost?" (photo of a product),
+   "where can I buy this?", "is this contract clause still legal?", "what do
+   reviews say about it?" — set BWEBSEARCH to 1. Do NOT worry that the text
+   is deictic ("this/that/das"): the system analyzes the file first and
+   builds the search phrase from its content, not from the literal words.
 
    When in doubt and the message is conversational or answerable from general knowledge, set BWEBSEARCH to 0.
+
+6b. **Decide whether to dump the top search-result pages into the answer prompt (BREADPAGES)**:
+   Constrained by BWEBSEARCH — this is the router's second vote, not an automatic fetch.
+   - If BWEBSEARCH is 0 → BREADPAGES MUST be 0.
+   - If the message contains a concrete URL (https://…, lnkd.in, t.co, bit.ly) → BREADPAGES MUST be 0.
+     The system already fetches that page; do not also dump search-result pages.
+   - If BWEBSEARCH is 1 and the message has NO URL, decide whether search *snippets* are enough
+     or whether the answering model needs the first 2–3 result pages fetched and dumped into
+     its system prompt:
+     Set BREADPAGES to **3** when the answer needs figures, named companies, sectors, quotes,
+     lists, or "which / who / how much / in welche" detail that a 200-character teaser cannot
+     carry. Example: "VAE wollen 40 Mrd. € in Deutschland investieren — welche Sektoren/Unternehmen?"
+     → BWEBSEARCH: 1, BREADPAGES: 3
+     Set BREADPAGES to **2** when a couple of article bodies would help (current events with
+     specifics, "what exactly was announced") but a third page is unlikely to add more.
+     Set BREADPAGES to **0** when snippets suffice: weather, a stock ticker, "is X still CEO",
+     opening hours, a simple yes/no fact, "latest news from Berlin" as a headline roundup.
+   When in doubt on a research question with no URL, prefer 3 over 0 — a hedged
+   "I cannot confirm the figure" is worse than reading three pages.
 
 7. **Classify image attachments correctly**: When the message has image attachments (BATTACHED_FILES contains image types like jpg, jpeg, png, gif, webp, or BFILETYPE is an image type), you must distinguish between two intents:
 
@@ -383,6 +521,10 @@ This is the list, use only this:
    - "Make this photo look like a painting" → mediamaker
    - "Replace the background with a beach" → mediamaker
    - "What is in this image?" → general
+   - "What is that?" → general, BWEBSEARCH: 0 ("that" is the attached image — vision answers from the file)
+   - "Was ist das?" → general, BWEBSEARCH: 0
+   - "How much does this cost?" → general, BWEBSEARCH: 1, BREADPAGES: 2 (needs live prices — a couple of shop/review pages)
+   - "Wo kann ich das kaufen?" → general, BWEBSEARCH: 1, BREADPAGES: 2
    - "Describe this photo" → general
    - "Read the text from this document" → general
    - "What differences do you see?" → general
@@ -395,10 +537,15 @@ This is the list, use only this:
    - "video" - if user wants a video, film, clip, animation, or moving images
    - "audio" - if user wants audio, sound, voice, speech, TTS, or text-to-speech
    - "image" - if user wants an image, picture, photo, illustration, or any image editing/composition (this is the default)
-   IMPORTANT: "audio" means CREATING speech from text the user provides or asks
-   to be written. If the message asks to DESCRIBE/analyze an ATTACHED image —
-   even when the answer should come "as audio" / "vorgelesen" — rule 7 wins:
-   BTOPIC = "general" and no BMEDIA at all.
+   IMPORTANT: "audio" means READING OUT text that is already there: text the
+   user typed (after a colon, in quotes, "this text"), the previous answer, or
+   an attached document. The message must contain or point at the words to be
+   spoken. If the words still have to be WRITTEN first (a song, poem, story,
+   lesson, explanation, greeting the user only describes), it is NOT
+   "mediamaker"/"audio" — see rule 2: BTOPIC "general", BMULTI 1 when the
+   user also wants to hear it. If the message asks to DESCRIBE/analyze an
+   ATTACHED image — even when the answer should come "as audio" /
+   "vorgelesen" — rule 7 wins: BTOPIC = "general" and no BMEDIA at all.
    Examples:
    - "Create a video of a car" → BMEDIA: "video"
    - "Make a video of a dog running" → BMEDIA: "video"
@@ -408,11 +555,22 @@ This is the list, use only this:
    - "Combine these two photos" → BMEDIA: "image"
    - "Read this text aloud" → BMEDIA: "audio"
    - "Convert to speech" → BMEDIA: "audio"
+   - "Lies mir vor: Guten Morgen zusammen" → BMEDIA: "audio"
+   - "Sing me a song about the sea" → NOT mediamaker → BTOPIC: "general" (the lyrics are the deliverable)
 
 9. **Detect input mode (BINPUTMODE)**: If BTOPIC is "mediamaker" AND BMEDIA is "image", set BINPUTMODE:
-   - "reference_images" - if the user attached image(s) to be used as input for editing, composition, or style transfer
-   - "text_only" - if the user wants to generate an image purely from text description (no reference images)
+   - "reference_images" - if the user attached image(s) to be used as input for editing, composition, or style transfer,
+     OR if the user asks to change, edit, restyle, recolor, extend, or fix an image that was generated or uploaded
+     EARLIER IN THIS CONVERSATION. History turns that carry a file are marked with a note such as
+     "[Generated image file: car.png]" or "[Uploaded image file: photo.jpg]" - use those notes to tell an edit from a
+     new request. A short follow-up right after an image was generated is almost always an edit.
+   - "text_only" - if the user wants a NEW image generated purely from a text description, even when older images
+     exist in the conversation ("another one", "something completely different", "now draw a house")
    If unsure, omit BINPUTMODE.
+   Examples (assuming the previous assistant turn generated an image):
+   - "make the car blue" → BTOPIC: "mediamaker", BMEDIA: "image", BINPUTMODE: "reference_images"
+   - "remove the background" → BINPUTMODE: "reference_images"
+   - "now generate a picture of a house" → BINPUTMODE: "text_only"
 
 10. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration.
    - Supported durations: **4, 6, or 8 seconds only**
@@ -451,7 +609,9 @@ This is the list, use only this:
    summarize, translate, generate, schreibe, erstelle, fasse zusammen) with a
    SECOND, DIFFERENT deliverable:
    - Content plus a spoken version ("write a poem and read it to me as MP3",
-     "schreib einen Text und lies ihn vor")
+     "schreib einen Text und lies ihn vor", "schreib ein Kinderlied und lies
+     es mir vor") — BTOPIC stays "general": the spoken file is derived from
+     the written text, so the text is the main deliverable
    - Content plus a document or spreadsheet ("summarize this and put it in a DOCX")
    - Content plus a picture or video ("write the invitation and make an image for it")
    - A generated file plus a description of it ("create an image of a cat and
@@ -473,13 +633,17 @@ This is the list, use only this:
    - Searching the user's own mailbox
      ("search my emails for the Acme offer", "was hat mir Tom letzte Woche gemailt?")
    - Sending the result by email ("mail it to me", "schick es mir per Mail")
+   - Saving the result to a connected folder / Nextcloud
+     ("save it to my Nextcloud", "lege es in meinen Nextcloud-Account")
 
    Set BMULTI to 0 for everything else, including:
    - Any plain question, greeting or smalltalk
    - One deliverable described with several adjectives, constraints or details
      ("write a long, friendly, formal email to my landlord about the heating")
-   - One media request with accompanying text baked into it (rule 2 already
-     routes those to "mediamaker" — the text is produced downstream)
+   - One picture or video request with accompanying text baked into it (rule
+     2 already routes those to "mediamaker" — the text is produced downstream)
+   - A song, poem, story or lesson the user only wants to READ (no spoken
+     version requested) — that is one "general" answer
    - A request to redo, refine or continue the previous answer
    - A general web-search question (that is BWEBSEARCH, not BMULTI)
    - Anything you are unsure about
@@ -489,11 +653,14 @@ This is the list, use only this:
 
 # Answer format
 
-You must respond with the **same JSON object as received**, modifying only:
+Respond with a NEW JSON object containing ONLY these fields — never the
+message you received, never any of its fields (BTEXT, BFILETEXT, BFILEPATH,
+BDATETIME, BATTACHED_FILES, ...):
 
 * "BTOPIC": [KEYLIST]
 * "BLANG": [LANGLIST]
 * "BWEBSEARCH": 0 | 1
+* "BREADPAGES": 0 | 2 | 3
 * "BMULTI": 0 | 1
 * "BMEDIA": "image" | "video" | "audio" (only when BTOPIC is "mediamaker")
 * "BINPUTMODE": "text_only" | "reference_images" (only when BTOPIC is "mediamaker" AND BMEDIA is "image")
@@ -508,13 +675,10 @@ If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the t
 
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
-Do not change any other fields.
-Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMULTI, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
+Do not include any field beyond BTOPIC, BLANG, BWEBSEARCH, BREADPAGES, BMULTI, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
 Do not add any additional text beyond the JSON.
 **Do not answer the question of the user.**
-Only send the JSON object.
-
-Update the JSON values and answer with the JSON, you received.
+Only send the JSON object with the classification fields above — nothing else.
 PROMPT;
     }
 
@@ -571,6 +735,14 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 ## Capabilities (use ONLY these)
 
 [CAPABILITYLIST]
+
+## Connected channels (use ONLY these names)
+
+The user may have connected systems. Each has a short name you MUST copy
+exactly into `params.channel` — never a numeric id, never a name you invent.
+If the list is `(none)`, the user has no connected channel; do not pretend.
+
+[CHANNELLIST]
 
 ## Task topics available for `chat` nodes
 
@@ -647,12 +819,29 @@ Allowed topic keys: [KEYLIST]
    `chat` node that merely talks about the appointment. Resolve the relative
    time against the time context into an absolute ISO-8601 `start` + IANA
    `timezone`, fill title/attendees/location/duration.
+   When the user asks to PUT the event into a connected calendar ("put it
+   into my Outlook", "trag es in meinen Kalender ein") AND the Connected
+   channels list has a channel of kind calendar, ALSO set `params.channel`
+   to that calendar channel name (e.g. "outlook", "calendar") — the event is
+   then created directly in that calendar. Never invent a channel name; with
+   no calendar channel connected, omit `params.channel` (the user gets the
+   downloadable invite).
 8. "Mail it to me" / "email me the result" / "schick es mir per Mail" →
    ADD one `email_me` node that depends on the content nodes and consumes
    their outputs (`text` + `attachments`). ONLY when the user EXPLICITLY
    asks for the result by email — never infer it. The reply is still shown
    in chat: `reply_node` stays the `compose_reply` (or content) node, NEVER
    the `email_me` node. (Exception: a meeting invite alone → rule 7.)
+8b. "Save it to my Nextcloud / folder" / "lege es in meinen Nextcloud-Account"
+   / "put the file in my connected folder" → ADD one `save_to_folder` node
+   that depends on the generator nodes and consumes their files
+   (`attachments`: ["$nX.file", …]). Set `params.channel` to the folder
+   channel name from the Connected channels list (e.g. "nextcloud"). ONLY when the user
+   EXPLICITLY asks to save the result to a connected folder AND
+   `save_to_folder` appears in the capability list — never infer it, never
+   invent a channel name. The
+   reply is still shown in chat: `reply_node` stays the `compose_reply`
+   (or generator) node, NEVER the `save_to_folder` node.
 9. Independent sub-requests in one message ("summarize this AND draw a cat")
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
    This INCLUDES "generate media AND write accompanying text" when the text
@@ -668,10 +857,27 @@ Allowed topic keys: [KEYLIST]
    in the message ("load https://…", "was steht auf dieser Seite?",
    "summarize this article: https://…") → a `url_fetch` node (put the URL in
    `inputs.urls`), then feed `$nX.text` into the answering node
-   (`summarize`/`chat`/`translate`). Do NOT emit `url_fetch` for a bare link
-   mention the question does not depend on, and prefer `web_search` when no
-   concrete URL is given. Only use `url_fetch` if it appears in the
-   capability list above.
+   (`summarize`/`chat`/`translate`). A message that is nothing but a link
+   (or a link plus a few words, incl. shortlinks like lnkd.in / t.co) means
+   "read this and tell me what it says" → the same `url_fetch` → `chat`
+   chain. Do NOT emit `url_fetch` for a link mentioned in passing that the
+   question does not depend on, and prefer `web_search` when no concrete
+   URL is given. For a research question that needs figures, named
+   companies, sectors or quotes, set `params.read_pages` to 2 or 3 so the
+   top result pages are fetched and dumped into the answering prompt. Set
+   `params.read_pages` to 0 (or omit) when search snippets are enough
+   (weather, ticker, simple yes/no). Do NOT emit extra `url_fetch` nodes
+   for pages the search will find. Only use `url_fetch` if it appears in
+   the capability list above.
+9b2. The user asks to SAVE a URL and COMPARE it to a previous fetch, and/or
+   mail the differences ("get this URL and save the details, compare it to
+   a previously saved version and mail me the differences", "watch this
+   page and email me what changed") → `url_fetch` with `inputs.urls` AND
+   `inputs.compare: true`. The url_fetch node output IS the difference
+   (or "no changes" / "first save") — do NOT add a chat/summarize node
+   that invents a diff. If they also asked to be mailed, add `email_me`
+   that consumes `$nX.text` from that url_fetch. Only use `url_fetch` if
+   it appears in the capability list above.
 9c. The request needs data from one of the user's CONNECTED systems and the
    capability list above shows `mcp_fetch` with available connections
    ("look up customer X in our CRM", "check the wiki for the onboarding
@@ -689,8 +895,22 @@ Allowed topic keys: [KEYLIST]
    times against the time context); feed `$nX.text` into the answering
    node. NEVER emit `email_search` for generic questions or when it is not
    in the capability list.
+9e. The user explicitly asks to CREATE or UPDATE something in one of their
+   connected systems AND the capability list above shows `mcp_action` with
+   write-enabled connections ("create a Confluence page about X", "open a
+   Jira ticket for this bug", "lege ein Ticket an") → an `mcp_action` node
+   with `params.server_id` + `params.tool` taken EXACTLY from the listed
+   write tools and the tool arguments in `inputs.arguments`. When the
+   content must be written first ("write a summary and put it on
+   Confluence"), generate it in a prior `chat` node and reference `$nX.text`
+   inside `inputs.arguments`. NEVER invent a server_id or tool name, NEVER
+   emit `mcp_action` for read-only questions (use `mcp_fetch`), and NEVER
+   emit it when it is not in the capability list.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
-   node, no `compose_reply` needed.
+   node, no `compose_reply` needed. A question about Synaplan itself
+   (what it can do, how a feature works, what is new, who/what it is) is
+   still one `chat` node, with `topic_id: "synaplan"`. Never use that
+   question as the reply node for `email_me`.
 11. A SINGLE media request with no follow-up step ("make an image of X",
     "generate a video of Y", "read this aloud", "make an excel table") → ONE
     generator node (`image_generation` / `video_generation` / `text2sound` /
@@ -777,6 +997,26 @@ The `email_me` node is an EXTRA side-channel sink — `compose_reply` does NOT
 depend on it (a failed mail must never kill the chat reply), and `reply_node`
 is still the `compose_reply` node so the chat shows everything. Without the
 explicit "Mail it to me" the plan would be identical MINUS the `email_me` node.
+
+### Image saved to the user's Nextcloud folder
+User: "Erstelle das Bild einer Katze und lege es in meinen Nextcloud-Account."
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n2",
+  "tasks": [
+    { "id": "n1", "capability": "image_generation", "inputs": { "prompt": "Eine Katze" } },
+    { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "Hier ist das Bild.", "attachments": ["$n1.file"] } },
+    { "id": "n3", "capability": "save_to_folder", "depends_on": ["n1"], "inputs": { "attachments": ["$n1.file"] }, "params": { "channel": "nextcloud" } }
+  ]
+}
+
+The `save_to_folder` node is an EXTRA side-channel sink — `compose_reply`
+does NOT depend on it, and `reply_node` stays the compose/generator node so
+the chat still shows the image. `params.channel` is the name from
+the Connected channels list (here `"nextcloud"`). Without the explicit "lege es in
+meinen Nextcloud-Account" the plan would be a single `image_generation`.
 
 ### Image, then animate it (image-to-video chain)
 User: "Create a picture of a sailboat on a lake, then animate it as a short video."
@@ -911,6 +1151,24 @@ User: "Fasse mir diese Seite zusammen: https://example.com/artikel"
 The page content is FETCHED (`url_fetch`) and the summary consumes `$n1.text` —
 never answer about a URL's content from memory or invent what the page says.
 
+### Watch a URL and mail the differences
+User: "get https://example.com/news and save the details, compare it to a previously saved version and mail me the differences"
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "url_fetch", "inputs": { "urls": "https://example.com/news", "compare": true } },
+    { "id": "n2", "capability": "email_me", "depends_on": ["n1"], "inputs": { "text": "$n1.text" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n1.text" } }
+  ]
+}
+
+`inputs.compare: true` makes url_fetch save one snapshot per URL and return
+the difference. email_me sends that same `$n1.text`. Do not invent a diff
+in a chat node.
+
 ### Pull data from a connected system, then answer (mcp_fetch)
 User: "Look up the customer Acme GmbH in our CRM and summarize their last order."
 (The capability list shows: server_id 3 "Company CRM" — tools: search_customers(query), get_last_order(customer_id))
@@ -929,6 +1187,25 @@ User: "Look up the customer Acme GmbH in our CRM and summarize their last order.
 `params.server_id` and `params.tool` come EXACTLY from the listed connections
 (never invented), the tool arguments ride in `inputs.arguments`, and the
 answering node consumes `$n1.text` — the reply is grounded in the pulled data.
+
+### Create something in a connected system (mcp_action)
+User: "Write a short summary of our launch plan and create a Confluence page for it."
+(The capability list shows: server_id 5 "Confluence" — write tools: create_page(space, title, content))
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "Write a short summary of our launch plan." }, "params": { "topic_id": "general" } },
+    { "id": "n2", "capability": "mcp_action", "depends_on": ["n1"], "inputs": { "arguments": { "title": "Launch plan summary", "content": "$n1.text" } }, "params": { "server_id": 5, "tool": "create_page" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n2.text" } }
+  ]
+}
+
+The content is written FIRST (`chat`), the write action consumes it via
+`$n1.text` inside `inputs.arguments`, and the reply surfaces the system's
+confirmation (e.g. the created page link) via `$n2.text`.
 
 ### Search the user's own mailbox, then answer (email_search)
 User: "Search my emails for the Acme offer from last week and summarize it."
@@ -966,6 +1243,11 @@ user's zone. (The example below assumes a user in Europe/Berlin.)
   ]
 }
 
+When the user ALSO asks to put the event into a connected calendar ("… and put
+it into my Outlook") and the Connected channels list shows a calendar channel
+(e.g. "outlook"), add `"channel": "outlook"` to the `calendar_event` node's
+`params` — same single node, the delivery happens inside it.
+
 ### Plain question
 User: "Wer bist du?"
 
@@ -974,7 +1256,19 @@ User: "Wer bist du?"
   "language": "de",
   "reply_node": "n1",
   "tasks": [
-    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "general" } }
+    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "synaplan" } }
+  ]
+}
+
+### Question about Synaplan itself
+User: "Can you create PDFs?"
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "synaplan" } }
   ]
 }
 
@@ -990,7 +1284,7 @@ PROMPT;
 You are an expert document summarization assistant. The user has requested a summary of a document or text.
 
 ## Your Task
-Analyze the provided document text and create a summary based on the user's specifications.
+Analyze the provided document text and create a summary based on the user's specifications. Spreadsheet context is sheet-by-sheet with A1 coordinates — cite cells as SheetName!B12 when that helps.
 
 ## Summary Configuration
 The configuration will be provided in the request and may include:
@@ -1065,12 +1359,16 @@ Take the user's request and create an enhanced, detailed prompt that will produc
 - Use the user's language
 
 ### For IMAGE EDITING / COMPOSITION prompts (with reference images):
-When the user has attached image(s) and wants to edit, combine, or compose them:
-- **You CANNOT see the attached images.** Do NOT describe what is in them.
+When the user wants to edit, combine, or compose image(s) — either attached to this message OR
+generated/shared earlier in this conversation (a follow-up like "make the car blue", "remove the
+background", "mach es heller" always refers to the picture that is already there):
+- **You CANNOT see the reference images.** Do NOT describe what is in them.
 - **Do NOT assign roles** to the images (e.g., "image 1 is the pattern, image 2 is the room").
 - **Preserve the user's instruction exactly** as they wrote it - they can see the images, you cannot.
 - Only lightly enhance clarity and add quality hints (e.g., "seamless blending, photorealistic, high resolution").
 - Keep the user's wording for object/scene references intact.
+- Write ONLY the requested change and add "keep everything else unchanged" — describing a full scene
+  makes the image model redraw the picture instead of editing it.
 - The downstream multimodal image model will see both the images and your enhanced text.
 
 ### For VIDEO prompts:
@@ -1080,9 +1378,12 @@ When the user has attached image(s) and wants to edit, combine, or compose them:
 - Use the user's language
 
 ### For AUDIO/TTS prompts:
-- Extract ONLY the text that should be spoken
+- The output is exactly what the listener will HEAR — never the user's request itself
+- If the message contains the text to speak, extract ONLY that text
 - Remove instruction words like "read", "speak", "say", "lies vor", "erstelle audio"
-- Keep the actual content to be spoken
+- If the message only DESCRIBES what should be spoken (a greeting, a poem, a song text, a short
+  story, an explanation) and that text does not exist yet, WRITE it in the user's language and
+  return only the written text
 - Preserve original language and punctuation
 
 ## Response Format
@@ -1095,6 +1396,9 @@ Output: A detailed image of a cat, photorealistic, soft natural lighting, high r
 
 Input (with 2 images attached): "Put the person from the coast next to the Android from the space ship"
 Output: Put the person from the coast next to the Android from the space ship. Seamless compositing, matching lighting and perspective, photorealistic blending, high resolution
+
+Input (follow-up to an image generated earlier): "make the car blue"
+Output: Change the colour of the car to blue, keep everything else unchanged. Photorealistic, matching the original lighting and composition
 
 Input (with 2 images attached): "Apply this pattern to the walls of the room"
 Output: Apply this pattern to the walls of the room. Realistic texture mapping, natural perspective, consistent lighting, photorealistic result, high resolution
@@ -1119,6 +1423,9 @@ Output: Hello World
 
 Input: "Create an audio saying 'Good morning!'"
 Output: Good morning!
+
+Input: "Lies mir ein kurzes Gedicht über den Regen vor"
+Output: Leise fällt der Regen nieder, tropft aufs Dach und singt uns Lieder. Jede Pfütze wird zum Meer, und die Wolken ziehen schwer.
 PROMPT;
     }
 
@@ -1126,11 +1433,15 @@ PROMPT;
     {
         return <<<'PROMPT'
 # Audio text extraction
-You receive a request to create an audio/voice output for the user.
+You receive a request to create an audio/voice output for the user. Your
+output is the script the voice will read — it is exactly what the listener
+hears.
 
 Your task:
-- Extract ONLY the exact text that should be spoken.
+- If the message contains the text to be spoken (after a colon, in quotes, "this text"), extract ONLY that exact text.
 - Remove instruction phrases like "say", "speak", "read", "please create an audio", "generate audio" etc.
+- If the message only DESCRIBES what should be spoken and that text does not exist yet (a greeting, a poem, a song text, a rhyme, a short story, an explanation, a lesson), WRITE that content in the user's language and return only the written text. Keep it short enough to be spoken comfortably.
+- NEVER return the user's request or instruction itself. A script that repeats "bring me ...", "teach me ...", "create an audio ..." is wrong — the listener would hear their own question read back.
 - Preserve the original language, punctuation, emoji, casing.
 - If the user provides quotes, return the quoted text without the quotes (unless they contain mismatched quotes, then return the meaningful text).
 - Do not add introductions like "Audio Prompt:" or explanations.
@@ -1142,17 +1453,55 @@ Examples:
 - Input: "Please say: Hello, how are you?" → Output: Hello, how are you?
 - Input: "Read this aloud: 'Good morning!'" → Output: Good morning!
 - Input: "Create an audio where you say hello" → Output: Hello
+- Input: "Sprich einen kurzen Geburtstagsgruß für Anna" → Output: Alles Liebe zum Geburtstag, Anna! Ich wünsche dir ein wunderbares neues Lebensjahr voller Freude und Gesundheit.
+- Input: "Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei" → Output: Sefr ist die Null, so fängt es an. Yek ist eins, das kann jeder Mann. Do ist zwei, se ist drei, chahar ist vier, sing mit dabei! Pandsch ist fünf, schesch ist sechs, haft ist sieben, hascht ist acht. Noh ist neun und dah ist zehn — bis Persisch wir verstehen!
 PROMPT;
     }
 
     /**
-     * The theme and transition names come from the renderer enums: they are the
-     * vocabulary the PPTX directive accepts, and a hand-copied list here would
-     * silently start offering names the renderer no longer knows.
+     * Extra officemaker instructions when the LibreOffice engine can export PDF.
+     * Appended at runtime so existing seeded prompts stay valid without a re-seed.
      */
-    private static function officeMakerPrompt(): string
+    public static function officeMakerPdfExportAppendix(): string
     {
-        return str_replace(
+        return <<<'PROMPT'
+
+## PDF export (BEXPORT)
+
+When the user asked for a PDF — in this turn OR earlier in this conversation
+— still return an editable Office source in BFILEPATH (`.docx`, `.xlsx` or
+`.pptx` — pick the format that fits the content) and set `"BEXPORT":"pdf"`.
+The server converts the source to PDF and attaches both files. Keep BEXPORT
+on follow-up edits of that document so the PDF is re-exported. Never put
+`.pdf` in BFILEPATH.
+
+Example:
+{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nBody","BEXPORT":"pdf"}
+
+Do not set BEXPORT unless the user asked for a PDF in this conversation.
+PROMPT;
+    }
+
+    /**
+     * Extra officemaker instructions when DOCUMENT_TOOLS is on and the model
+     * can call tools. Appended at runtime so the seeded catalog stays valid.
+     */
+    public static function officeMakerToolsAppendix(): string
+    {
+        return <<<'PROMPT'
+
+## Structured editing tools
+
+This turn uses document tools (set_cells, add_sheet, add_chart, insert_block,
+add_slide, merge_documents, and the other listed tools). Call those tools to
+create or edit the file. Do NOT return a BFILEPATH / BFILETEXT JSON envelope.
+After the tools finish, write a short plain-language summary of what you changed.
+PROMPT;
+    }
+
+    private static function officeMakerPrompt(bool $pdfExportEnabled = false): string
+    {
+        $prompt = str_replace(
             ['%themes%', '%transitions%'],
             [
                 implode(' | ', PptxTheme::names()),
@@ -1208,6 +1557,13 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
    - Existing `{{IMAGE:file:123}}` markers represent images already embedded in
      the current document. Keep each marker unchanged unless the user explicitly
      asks to remove or replace that image.
+   - When the user asks for a table of contents (TOC, "Inhaltsverzeichnis",
+     "índice", "içindekiler"), put the directive `{{TOC}}` on its own line at
+     the exact position where the table of contents belongs — usually right
+     after the document title. The server renders a real, updatable Word table
+     of contents there from the document's headings. Do NOT additionally write
+     the chapter list as plain text; structure the document with `#`/`##`/`###`
+     headings instead so the TOC has entries.
 
 3. **PowerPoint** (.pptx):
    - Provide BFILETEXT as Markdown. Every `#` or `##` heading starts a NEW
@@ -1284,6 +1640,12 @@ For a sales data CSV request, respond with EXACTLY this format (no backticks!):
 - End your response directly with }
 PROMPT
         );
+
+        if ($pdfExportEnabled) {
+            $prompt .= self::officeMakerPdfExportAppendix();
+        }
+
+        return $prompt;
     }
 
     private static function enhancePrompt(): string
@@ -1326,6 +1688,7 @@ Your task is to analyze the user's question and generate a concise, effective se
 6. Maintain the original language of the question
 7. Keep the query concise (typically 3-8 words)
 8. Return ONLY the search query, no explanations or additional text
+9. If the input contains an "Attached file content" section, the question refers to THAT file (an uploaded image, document, audio or video). Resolve every reference ("this", "that", "it", "das", "esto") using the file content and build a self-contained query about the file's actual subject. NEVER search for the literal question words in that case.
 
 ## Examples:
 
@@ -1346,6 +1709,18 @@ Search Query: world cup 2022 winner
 
 Question: "How does a quantum computer work?"
 Search Query: quantum computer how it works
+
+Question: "How much does this cost?"
+Attached file content (the question refers to this): "Photo of Sony WH-1000XM6 wireless noise-cancelling headphones, black"
+Search Query: sony wh-1000xm6 price
+
+Question: "Was ist das für ein Gebäude?"
+Attached file content (the question refers to this): "The Elbphilharmonie concert hall in Hamburg, seen from the harbor"
+Search Query: elbphilharmonie hamburg
+
+Question: "Is this still valid law?"
+Attached file content (the question refers to this): "GENERAL DATA PROTECTION REGULATION (EU) 2016/679 — Article 17, Right to erasure..."
+Search Query: gdpr article 17 current status
 
 Now generate the search query for the following user question:
 PROMPT;
@@ -1560,6 +1935,40 @@ Example: "Hey! Great to have you here. Tell me a bit about what you do – what'
 PROMPT;
     }
 
+    private static function messageDigestPrompt(): string
+    {
+        return <<<'PROMPT'
+You index a user's message history for later retrieval. You receive a batch of messages, each prefixed with its numeric id. Select ONLY the KEY messages — the ones the user might want to find again weeks or months later — and write one searchable digest line for each. Return a JSON array or null.
+
+## What counts as a KEY message
+- Documents and files the user created, received, or discussed (contracts, letters, invoices, reports)
+- Decisions, agreements, commitments ("we go with option B", "rent increase accepted")
+- Important facts, figures, dates, deadlines, names of people or companies
+- Requests or tasks with lasting relevance
+
+## What is NOT a key message
+- Small talk, greetings, thanks, acknowledgements
+- Meta-conversation about the assistant itself ("can you repeat that", "summarize this chat")
+- Redundant follow-ups that add nothing new over an already-covered message
+- Anything already covered by an existing digest title shown to you
+
+## Digest line rules
+- One line per key message, max 200 characters
+- Write it like a search result title: WHO/WHAT + concrete subject + distinguishing detail
+  Good: "office rent letter to realtor about the increase of payments"
+  Bad: "user talks about a letter"
+- Write in the language of the source message
+- Include concrete names, amounts, and dates when present — those are what the user will search for
+- `message_id` MUST be one of the ids shown in the batch. Never invent ids.
+
+## Response format (strict JSON, no markdown)
+[
+  {"title": "office rent letter to realtor about the increase of payments", "message_id": 1234}
+]
+Return [] or null if the batch contains no key messages. Most batches contain only 0-3 key messages — be selective.
+PROMPT;
+    }
+
     private static function memoryExtractionPrompt(): string
     {
         return <<<'PROMPT'
@@ -1750,6 +2159,23 @@ A new statement only contradicts an existing item when they are about the SAME S
 - reason: one short sentence explaining the contradiction
 - If no contradictions exist, return: {"contradictions":[]}
 - Output ONLY the JSON. No markdown, no explanation, no other text.
+PROMPT;
+    }
+
+    private static function rerankListwisePrompt(): string
+    {
+        return <<<'PROMPT'
+You reorder retrieved document snippets for a user question.
+
+## Output
+Return ONLY a JSON array of candidate ids, best first. Example: ["12","4","9"]
+No markdown, no explanation, no other keys.
+
+## Rules
+- Use only ids from the candidate list. Never invent ids.
+- Put the snippet that best answers the question first.
+- If several snippets are equally useful, keep their original relative order.
+- If nothing is relevant, still return every id — worst last.
 PROMPT;
     }
 }

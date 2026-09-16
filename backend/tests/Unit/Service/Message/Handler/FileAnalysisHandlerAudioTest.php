@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Service\Message\Handler;
 
+use App\AI\Exception\ChatFailureClassifier;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
@@ -11,6 +12,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Issue #955 — when the user sends a voice message, the assistant
@@ -247,22 +249,91 @@ class FileAnalysisHandlerAudioTest extends TestCase
 
         $result = $this->handler->handle($message, [], []);
 
-        $this->assertStringContainsString('Audio transcription failed', $result['content']);
-        $this->assertSame('audio_not_transcribed', $result['metadata']['error']);
+        $this->assertStringContainsString('could not be transcribed', $result['content']);
+        $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
+    }
+
+    /**
+     * Issue #1908: a recording that is still being transcribed must ask the
+     * user to wait, not claim the server cannot transcribe at all.
+     */
+    public function testAudioStillPreparingReturnsPendingMessage(): void
+    {
+        $message = $this->buildAudioMessage(
+            text: 'was ist der inhalt',
+            transcript: '',
+            status: 'extracting',
+        );
+
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade->expects($this->never())->method('chatStream');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertStringContainsString('still being prepared', $result['content']);
+        $this->assertStringNotContainsString('try again in a moment', $result['content']);
+        $this->assertSame('audio_transcription_in_progress', $result['metadata']['error']);
+    }
+
+    /**
+     * Issue #1908: German UI must not receive untranslated English copy.
+     */
+    public function testAudioFailedCopyIsTranslatedForMessageLocale(): void
+    {
+        $translator = $this->createMock(TranslatorInterface::class);
+        $translator->expects($this->once())
+            ->method('trans')
+            ->with(
+                'file_analysis.audio_failed',
+                [],
+                'ai_errors',
+                'de',
+            )
+            ->willReturn('Diese Aufnahme konnte nicht transkribiert werden. Richte unter Einstellungen einen Sprache-zu-Text-Dienst ein.');
+
+        $this->handler = new FileAnalysisHandler(
+            $this->aiFacade,
+            $this->modelConfigService,
+            $this->logger,
+            '/var/www/backend/var/uploads',
+            null,
+            null,
+            new ChatFailureClassifier(),
+            null,
+            $translator,
+        );
+
+        $message = $this->buildAudioMessage(
+            text: 'was ist der inhalt',
+            transcript: '',
+            status: 'error',
+            language: 'de',
+        );
+
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertStringContainsString('Sprache-zu-Text', $result['content']);
+        $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
     }
 
     /**
      * Build a Message mock that exposes a single transcribed audio File entity.
      */
-    private function buildAudioMessage(string $text, string $transcript): Message&MockObject
-    {
+    private function buildAudioMessage(
+        string $text,
+        string $transcript,
+        string $status = 'processed',
+        string $language = 'en',
+    ): Message&MockObject {
         $file = $this->createMock(File::class);
         $file->method('getId')->willReturn(99);
         $file->method('getFileName')->willReturn('voice.ogg');
         $file->method('getFileType')->willReturn('ogg');
         $file->method('getFilePath')->willReturn('13/000/voice.ogg');
         $file->method('getFileText')->willReturn($transcript);
-        $file->method('getStatus')->willReturn('processed');
+        $file->method('getStatus')->willReturn($status);
 
         $files = new ArrayCollection([$file]);
 
@@ -271,6 +342,7 @@ class FileAnalysisHandlerAudioTest extends TestCase
         $message->method('getUserId')->willReturn(7);
         $message->method('getFiles')->willReturn($files);
         $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn($language);
 
         return $message;
     }

@@ -1,7 +1,7 @@
 {
-    // PHP Version for Intelephense (must match Docker container PHP 8.3)
+    // PHP Version for Intelephense (must match Docker container PHP 8.4)
     // Note: Reload Cursor window after changing this setting
-    "intelephense.environment.phpVersion": "8.3.0",
+    "intelephense.environment.phpVersion": "8.4.0",
 
     // PHP CS Fixer
     "php-cs-fixer.executablePath": "${workspaceFolder}/backend/vendor/bin/php-cs-fixer",

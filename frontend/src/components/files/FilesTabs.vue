@@ -1,19 +1,17 @@
 <template>
   <div data-testid="tabs-files">
-    <TabNav
-      :model-value="active"
-      :tabs="tabNavItems"
-      :aria-label="$t('nav.files')"
-      mobile-trigger-testid="tab-files-mobile-trigger"
-      mobile-menu-testid="tab-files-mobile-menu"
-      @update:model-value="onTabChange"
-    />
-
-    <!-- §4.8 #1: one vocabulary — say what the chat input already implies. -->
-    <div class="mt-3">
-      <h2 class="text-lg font-semibold txt-primary">{{ $t('files.intro') }}</h2>
-      <p class="text-sm txt-secondary mt-1">{{ $t('files.introCta') }}</p>
-    </div>
+    <PageHeader :title="$t('nav.files')" icon="heroicons:folder-open">
+      <!-- §4.8 #1: one vocabulary — say what the chat input already implies. -->
+      <template #subtitle>{{ $t('files.intro') }} {{ $t('files.introCta') }}</template>
+      <TabNav
+        :model-value="active"
+        :tabs="tabNavItems"
+        :aria-label="$t('nav.files')"
+        mobile-trigger-testid="tab-files-mobile-trigger"
+        mobile-menu-testid="tab-files-mobile-menu"
+        @update:model-value="onTabChange"
+      />
+    </PageHeader>
   </div>
 </template>
 
@@ -21,10 +19,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import filesService from '@/services/filesService'
+import { useAuthStore } from '@/stores/auth'
+import { getConfigSync } from '@/services/api/httpClient'
 
-type FilesTab = 'files' | 'search' | 'vectors' | 'incoming' | 'generated'
+type FilesTab = 'files' | 'search' | 'vectors' | 'incoming' | 'generated' | 'workspace'
 
 defineProps<{
   active: FilesTab
@@ -32,11 +33,13 @@ defineProps<{
 
 const { t } = useI18n()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const pathById: Record<FilesTab, string> = {
   files: '/files',
   incoming: '/files/incoming',
   generated: '/files/generated',
+  workspace: '/files/workspace',
   search: '/files/search',
   vectors: '/files/vectors',
 }
@@ -68,6 +71,17 @@ const tabNavItems = computed<TabNavItem[]>(() => [
     testid: 'tab-files-generated',
     to: pathById.generated,
   },
+  ...(getConfigSync().features?.computeWorkspacesEnabled === true
+    ? [
+        {
+          id: 'workspace',
+          label: t('files.tabWorkspace'),
+          icon: 'heroicons:folder-plus',
+          testid: 'tab-files-workspace',
+          to: pathById.workspace,
+        } satisfies TabNavItem,
+      ]
+    : []),
   {
     id: 'search',
     label: t('files.tabSearch'),
@@ -75,13 +89,17 @@ const tabNavItems = computed<TabNavItem[]>(() => [
     testid: 'tab-files-search',
     to: pathById.search,
   },
-  {
-    id: 'vectors',
-    label: t('files.tabVectors'),
-    icon: 'heroicons:circle-stack',
-    testid: 'tab-files-vectors',
-    to: pathById.vectors,
-  },
+  ...(authStore.isAdmin
+    ? [
+        {
+          id: 'vectors',
+          label: t('files.tabVectors'),
+          icon: 'heroicons:circle-stack',
+          testid: 'tab-files-vectors',
+          to: pathById.vectors,
+        } satisfies TabNavItem,
+      ]
+    : []),
 ])
 
 function onTabChange(id: string) {

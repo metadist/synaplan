@@ -8,7 +8,7 @@ namespace App\AI\Stream;
  * Helper for interpreting provider stream chunks.
  *
  * Providers emit either plain strings or structured arrays
- * (['type' => 'content'|'reasoning'|'finish', ...]) — see
+ * (['type' => 'content'|'reasoning'|'finish'|'tool_call_delta', ...]) — see
  * {@see \App\AI\Interface\ChatProviderInterface}. Consumers that accumulate
  * user-visible text MUST go through visibleText() so internal
  * chain-of-thought ('reasoning') and control signals ('finish') never leak

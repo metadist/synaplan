@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\Entity\Message;
 use App\Service\Message\Handler\ChatHandler;
 use Psr\Log\LoggerInterface;
@@ -19,6 +20,7 @@ final readonly class MediaPromptExtractor
     public function __construct(
         private ChatHandler $chatHandler,
         private LoggerInterface $logger,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -26,6 +28,9 @@ final readonly class MediaPromptExtractor
      * @param Message $message        Current user message
      * @param array   $thread         Conversation history
      * @param array   $classification Classification result (topic, language, etc.)
+     * @param array   $options        forwarded to the prompt run; carries
+     *                                `media_edit_source_name` when this turn
+     *                                edits a picture from the conversation
      *
      * @return array{
      *     prompt: string,
@@ -33,7 +38,7 @@ final readonly class MediaPromptExtractor
      *     raw: string
      * }
      */
-    public function extract(Message $message, array $thread, array $classification): array
+    public function extract(Message $message, array $thread, array $classification, array $options = []): array
     {
         $overridePrompt = $message->getMeta('media_prompt_override');
         if ($overridePrompt) {
@@ -53,7 +58,7 @@ final readonly class MediaPromptExtractor
         $rawContent = '';
 
         try {
-            $rawContent = $this->runPrompt($message, $thread, $classification, 'mediamaker');
+            $rawContent = $this->runPrompt($message, $thread, $classification, 'mediamaker', $options);
         } catch (\Throwable $e) {
             $this->logger->warning('MediaPromptExtractor: ChatHandler extraction failed, using fallback', [
                 'error' => $e->getMessage(),
@@ -158,19 +163,12 @@ final readonly class MediaPromptExtractor
         return $content;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function decodeJson(string $content): ?array
     {
-        if ('' === $content || (!str_starts_with($content, '{') && !str_starts_with($content, '['))) {
-            return null;
-        }
-
-        try {
-            $decoded = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-
-            return is_array($decoded) ? $decoded : null;
-        } catch (\JsonException) {
-            return null;
-        }
+        return $this->jsonDecoder->decode($content)->data;
     }
 
     private function normalizeMediaType(mixed $value): ?string
@@ -189,7 +187,7 @@ final readonly class MediaPromptExtractor
         };
     }
 
-    private function runPrompt(Message $message, array $thread, array $classification, string $topic): string
+    private function runPrompt(Message $message, array $thread, array $classification, string $topic, array $options = []): string
     {
         $promptClassification = $classification;
         $promptClassification['topic'] = $topic;
@@ -205,7 +203,7 @@ final readonly class MediaPromptExtractor
             $promptClassification['model_name']
         );
 
-        $response = $this->chatHandler->handle($message, $thread, $promptClassification);
+        $response = $this->chatHandler->handle($message, $thread, $promptClassification, null, $options);
 
         return (string) ($response['content'] ?? '');
     }

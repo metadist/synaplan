@@ -20,6 +20,7 @@ use App\Service\ModelConfigService;
 use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -160,8 +161,11 @@ class MessageController extends AbstractController
                 foreach ($fileIds as $fileId) {
                     $messageFile = $messageFileRepo->find($fileId);
                     if ($messageFile && $messageFile->getUserId() === $user->getId()) {
-                        // Set message ID to link file to this message
                         $messageFile->setMessageId($incomingMessage->getId());
+                        // Upload-file marks chat_attachment rows ephemeral until send
+                        // (issue #1911). StreamController already calls this; the
+                        // JSON send path must too or the attachment is reaped.
+                        $messageFile->keepAfterChatSend(false);
                         $this->em->persist($messageFile);
                     }
                 }
@@ -423,6 +427,9 @@ class MessageController extends AbstractController
                                 new OA\Property(property: 'topic', type: 'string', nullable: true),
                                 new OA\Property(property: 'originalTopic', type: 'string', nullable: true),
                                 new OA\Property(property: 'originalMediaType', type: 'string', nullable: true),
+                                new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
+                                new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
+                                new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
                                 new OA\Property(property: 'language', type: 'string', nullable: true),
                                 new OA\Property(property: 'createdAt', type: 'string', nullable: true),
                                 new OA\Property(
@@ -462,6 +469,7 @@ class MessageController extends AbstractController
                                                     new OA\Property(property: 'capability', type: 'string'),
                                                     new OA\Property(property: 'kind', type: 'string'),
                                                     new OA\Property(property: 'state', type: 'string'),
+                                                    new OA\Property(property: 'depends_on', type: 'array', items: new OA\Items(type: 'string'), description: 'Upstream step ids this step waited on (empty for roots)'),
                                                     new OA\Property(property: 'text', type: 'string', nullable: true),
                                                     new OA\Property(property: 'url', type: 'string', nullable: true),
                                                     new OA\Property(property: 'type', type: 'string', nullable: true),
@@ -682,22 +690,43 @@ class MessageController extends AbstractController
             return $this->json(['error' => 'No file uploaded'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Incognito-session uploads are ephemeral: hidden from file listings,
-        // never vectorized, deleted on session end (+ reaper safety net).
-        $incognito = '1' === $request->request->get('incognito');
+        // Chat attachments are ephemeral until the message that references
+        // them is sent (issue #1911): hidden from the Files list, skipped by
+        // vectorization listings, deleted if the user removes the chip or
+        // never sends (frontend DELETE + reaper). Incognito used the same
+        // flag; StreamController keeps the row when the turn is persisted.
+        // Microphone dictation reuses this endpoint only as STT transport.
+        // The recording is not a Source the user chose to keep (issue #1909).
+        // purpose=dictation is ignored unless the upload is actually audio —
+        // otherwise a PDF/text file would skip FILE_ANALYSIS and be deleted.
+        $wantsDictation = 'dictation' === (string) $request->request->get('purpose');
+        $clientExtension = strtolower($uploadedFile->getClientOriginalExtension());
+        $clientMime = strtolower((string) $uploadedFile->getClientMimeType());
+        $isDictation = $wantsDictation && $this->isAudioDictationUpload($clientExtension, $clientMime);
+        if ($wantsDictation && !$isDictation) {
+            return $this->json([
+                'error' => 'Microphone dictation only accepts audio recordings. Nothing was stored.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
 
-        // Check rate limit for FILE_ANALYSIS BEFORE uploading
-        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        // Dictation is speech-to-text, not document analysis: gate on
+        // TRANSCRIPTION so it does not consume a FILE_ANALYSIS slot.
+        // Other chat uploads still gate on FILE_ANALYSIS before staging
+        // (billing itself stays deferred until send — issue #887 / #1911).
+        $gateAction = $isDictation ? TranscriptionUsageRecorder::ACTION : 'FILE_ANALYSIS';
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, $gateAction);
         if (!$rateLimitCheck['allowed']) {
             return $this->json([
-                'error' => 'Rate limit exceeded for FILE_ANALYSIS',
+                'error' => 'Rate limit exceeded for '.$gateAction,
                 'rate_limit_exceeded' => true,
-                'action' => 'FILE_ANALYSIS',
+                'action' => $gateAction,
                 'used' => $rateLimitCheck['used'],
                 'limit' => $rateLimitCheck['limit'],
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
+        /** @var File|null $messageFile */
+        $messageFile = null;
         try {
             // Store file using FileStorageService
             $storageResult = $this->fileStorageService->storeUploadedFile($uploadedFile, $user->getId());
@@ -716,6 +745,14 @@ class MessageController extends AbstractController
             // A HEIC upload is stored as JPEG; use the final stored extension so
             // the chat pipeline treats it as an image, not an unsupported HEIC.
             $fileExtension = strtolower($storageResult['extension'] ?? $uploadedFile->getClientOriginalExtension());
+            $storedMime = strtolower((string) $storageResult['mime']);
+            if ($isDictation && !$this->isAudioDictationUpload($fileExtension, $storedMime)) {
+                $this->fileStorageService->deleteFile($relativePath);
+
+                return $this->json([
+                    'error' => 'Microphone dictation only accepts audio recordings. Nothing was stored.',
+                ], Response::HTTP_BAD_REQUEST);
+            }
 
             // Create File entity (NEW: separate entity for files)
             $messageFile = new File();
@@ -726,26 +763,24 @@ class MessageController extends AbstractController
             $messageFile->setFileSize($storageResult['size']);
             $messageFile->setFileMime($storageResult['mime']);
             $messageFile->setStatus('uploaded');
-            $messageFile->setEphemeral($incognito);
+            $messageFile->setSource('chat_attachment');
+            $messageFile->setEphemeral(true);
 
             $this->em->persist($messageFile);
             $this->em->flush();
 
             // Extract text synchronously for files the chat handler will analyze
-            // immediately (audio, documents). Image extraction is left to the
-            // vision-model pipeline, which reads the file directly at analyze
-            // time. Doing extraction here closes the race documented in
-            // issue #729: the stream used to run FileAnalysisHandler before
-            // the async/deferred extraction had populated BFILETEXT, yielding
-            // a false "Document text extraction failed" error on the user's
-            // first send. By the time uploadFileForChat returns, the file is
-            // either `extracted` (text available) or `error` (extraction
-            // failed) — never `uploaded` with empty text.
+            // immediately (audio, documents, images). Images used to skip this
+            // and go through MessagePreProcessor::processImageWithVision(), which
+            // ignored the extraction chain (issue #1792). Empty OCR on a photo
+            // is legitimate — only audio/documents treat empty text as failure.
             $extractMeta = [];
             $isAudio = in_array($fileExtension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
             $isDocument = in_array($fileExtension, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
+            $isImage = in_array($fileExtension, MessagePreProcessor::IMAGE_EXTENSIONS, true);
 
-            if ($isAudio || $isDocument) {
+            if ($isAudio || $isDocument || $isImage) {
+                $kind = $isAudio ? 'audio' : ($isImage ? 'image' : 'document');
                 $messageFile->setStatus('extracting');
                 $this->em->flush();
 
@@ -757,13 +792,14 @@ class MessageController extends AbstractController
                     );
 
                     $messageFile->setFileText($extractedText);
-                    $messageFile->setStatus(empty(trim($extractedText)) ? 'error' : 'extracted');
+                    $emptyIsFailure = !$isImage;
+                    $messageFile->setStatus($emptyIsFailure && empty(trim($extractedText)) ? 'error' : 'extracted');
                     $this->em->flush();
 
                     $this->logger->info('Chat file extracted', [
                         'user_id' => $user->getId(),
                         'file_id' => $messageFile->getId(),
-                        'kind' => $isAudio ? 'audio' : 'document',
+                        'kind' => $kind,
                         'text_length' => strlen($extractedText),
                         'strategy' => $extractMeta['strategy'] ?? 'unknown',
                     ]);
@@ -771,7 +807,7 @@ class MessageController extends AbstractController
                     $this->logger->error('Chat file extraction failed', [
                         'user_id' => $user->getId(),
                         'file_id' => $messageFile->getId(),
-                        'kind' => $isAudio ? 'audio' : 'document',
+                        'kind' => $kind,
                         'error' => $e->getMessage(),
                     ]);
 
@@ -840,8 +876,17 @@ class MessageController extends AbstractController
                 }
             }
 
+            if ($isDictation) {
+                $this->discardDictationUpload($messageFile);
+                unset($response['file_id']);
+            }
+
             return $this->json($response, Response::HTTP_CREATED);
         } catch (\Exception $e) {
+            if ($isDictation) {
+                $this->discardDictationUpload($messageFile);
+            }
+
             $this->logger->error('Chat file upload failed', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
@@ -850,6 +895,41 @@ class MessageController extends AbstractController
             return $this->json([
                 'error' => 'File upload failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * True when a dictation upload is supported audio (extension or MIME).
+     * Browser MediaRecorder often labels webm as video/webm; the extension
+     * still matches {@see MessagePreProcessor::AUDIO_EXTENSIONS}.
+     */
+    private function isAudioDictationUpload(string $extension, ?string $mime): bool
+    {
+        if (in_array($extension, MessagePreProcessor::AUDIO_EXTENSIONS, true)) {
+            return true;
+        }
+
+        return str_starts_with(strtolower((string) $mime), 'audio/');
+    }
+
+    /**
+     * Dictation recordings are STT transport, not a Source. Delete the blob
+     * and the File row so they never appear in Files/Sources or consume quota.
+     */
+    private function discardDictationUpload(?File $file): void
+    {
+        if (null === $file) {
+            return;
+        }
+
+        $path = $file->getFilePath();
+        if ('' !== $path) {
+            $this->fileStorageService->deleteFile($path);
+        }
+
+        if ($this->em->contains($file)) {
+            $this->em->remove($file);
+            $this->em->flush();
         }
     }
 

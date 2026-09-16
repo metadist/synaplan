@@ -21,6 +21,147 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `FRONTEND_URL` | `http://localhost:5173` | Frontend URL for email links |
 | `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
+| `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
+| `REGISTRATION_ENABLED` | *unset* | Pins local email/password self-registration; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial chat; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `FEATURE_<GROUP>_<SETTING>` | *unset* | Pins one wave feature flag (`FEATURE_IAM_SHARING_ENABLED=false`, `FEATURE_DESKTOP_AGENT_ENABLED=false`, …); **overrides** the toggle on Admin → System Configuration → Features. All flags default **on**. Full list: [FEATURE_FLAGS.md](FEATURE_FLAGS.md) |
+| `WEB_SPEECH_ENABLED` | `true` | Browser Web Speech API (cloud-backed) for chat speech-to-text; set `false` on air-gapped instances so the input records for the server-side transcription path instead |
+
+---
+
+## First-Run Setup
+
+An installation that has no administrator — `APP_ENV=prod` without
+`BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`, which is what Umbrel,
+Elestio, AWS and a hand-rolled `deploy/` produce — serves a short wizard at
+`/setup`:
+
+1. **Create the administrator.** Email and password, signed in immediately. The
+   address counts as verified, so a missing mailer cannot lock you out.
+2. **Connect an AI provider** (skippable). The same provider cards as
+   **Admin → AI Providers**, narrowed to the recommended ones.
+3. **Decide who may in.** Self-registration and guest chat, both explained in
+   plain words. A switch that an environment variable pins is shown as pinned
+   rather than as an editable value that would do nothing.
+
+While the wizard is pending, every other API route answers
+`503 SETUP_REQUIRED`; only `/api/v1/setup/*`, the health probe and the runtime
+config stay open. The frontend follows that and sends every route to `/setup`, so
+there is no half-configured state to stumble into.
+
+> **The window between the first start and the first administrator is open.** The
+> account belongs to whoever fills in that form first, as in Open WebUI, Immich
+> or n8n. Complete the wizard right after deploying a publicly reachable host, or
+> create the administrator through `BOOTSTRAP_ADMIN_*` so the window never
+> exists.
+
+`SETUP_WIZARD_ENABLED=false` switches the wizard off. An installation without an
+administrator then has no browser route in at all, which is the right choice when
+the account only ever comes from automation or from an identity provider — see
+[SSO-only instances](#sso-only-instances-no-local-accounts).
+
+Once an administrator exists the wizard is closed for good, and it does **not**
+reopen if every administrator is later deleted or demoted — a wizard that
+reappears on a running instance would let the next visitor claim it. Use
+`app:admin:reset-password --promote` for that case, see
+[Lost Administrator Password](ADMIN.md#lost-administrator-password).
+
+**Dev and test installations never see the wizard**, because their fixtures seed
+a demo account. To reopen it on a running dev stack, without touching the volume:
+
+```bash
+make -C backend setup-reset
+```
+
+That is `app:setup:reset`, which deletes every account and the completion flag,
+then the next page load lands on `/setup` again. It refuses to run outside
+`APP_ENV=dev` or `test`. Add `--keep-policy` to leave the registration and
+guest-chat switches at the values the previous run stored.
+
+The reset only holds until the backend container restarts: the entrypoint sees an
+empty `BUSER` table and loads the demo fixtures again, and any account closes the
+wizard. Start the stack with `SEED_DEMO_DATA=false` to keep it open across
+restarts:
+
+```bash
+docker compose down -v
+SEED_DEMO_DATA=false docker compose up -d
+```
+
+---
+
+## SSO-Only Instances (No Local Accounts)
+
+An instance whose users all come from an identity provider does not need the
+wizard: there is no local administrator to create, and everything the wizard
+writes can come from the environment instead. Switch it off and let the IdP
+decide who is an administrator:
+
+```dotenv
+SETUP_WIZARD_ENABLED=false
+REGISTRATION_ENABLED=false
+GUEST_CHAT_ENABLED=false
+
+OIDC_DISCOVERY_URL=https://idp.example.com/realms/main/.well-known/openid-configuration
+OIDC_CLIENT_ID=synaplan
+OIDC_CLIENT_SECRET=…
+OIDC_AUTO_REDIRECT=true
+```
+
+The database then stays empty until the first person signs in, and that is a
+normal steady state rather than a pending setup: the API serves requests as
+usual, and the login page offers the identity provider instead of the wizard.
+
+**Administrators come from claims.** On sign-in, the roles found at
+`OIDC_ROLE_CLAIMS` are matched case-insensitively against `OIDC_ADMIN_ROLES`; a
+match sets `BUSERLEVEL=ADMIN`, and losing the role sets the account back to
+`NEW`. Both variables have Keycloak-shaped defaults and only need changing for a
+different provider:
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `OIDC_ADMIN_ROLES` | `admin,realm-admin,synaplan-admin,administrator` | Claim values that grant admin |
+| `OIDC_ROLE_CLAIMS` | `realm_access.roles,resource_access.{client_id}.roles,groups` | Dot-notation paths; `{client_id}` expands to `OIDC_CLIENT_ID`. Azure AD: `roles`. Auth0: `https://myapp\.com/roles` |
+
+Two properties of that mapping are worth knowing before you rely on it:
+
+- **A role change takes effect on the next sign-in.** The claims are read during
+  the login callback and on every OIDC Bearer request, not on cookie-backed
+  session requests or token refresh. Revoking admin in the IdP does not end a
+  session that is already open.
+- **A token that carries no role claim at all changes nothing.** An empty result
+  is treated as "no information", so a misconfigured claim path cannot silently
+  demote every administrator. Verify the path once against a real token rather
+  than assuming the default fits your provider.
+
+**No AI provider step either.** The wizard's provider page is a convenience, not
+the only way in: a key in the environment (for example `GROQ_API_KEY`,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) is picked up on start, so a fully
+configured instance needs no browser step at all. See
+[AI Providers](#ai-providers).
+
+Recovery does not depend on the IdP. `php bin/console app:admin:reset-password
+--promote` still creates or promotes a local administrator if the identity
+provider becomes unavailable, see
+[Lost Administrator Password](ADMIN.md#lost-administrator-password).
+
+---
+
+## Access Policy
+
+Self-registration and guest chat are switches in **Admin → System
+Configuration**, stored in `BCONFIG` and effective without a restart. The setup
+wizard writes the same two rows.
+
+`REGISTRATION_ENABLED` and `GUEST_CHAT_ENABLED` used to be the only place these
+lived. They still work and now act as a **pin**: when either is set in the
+environment, it wins over the database and the admin UI marks the field as
+overridden instead of showing a value that has no effect. Leave them unset unless
+a deployment has to guarantee the setting — an SSO-only instance, for example,
+where nobody may ever register locally.
+
+Both accept `true`/`false`. Unsetting the variable and restarting hands control
+back to the database value.
 
 ---
 
@@ -73,6 +214,14 @@ Get a free key at [console.groq.com](https://console.groq.com)
 OPENAI_API_KEY=sk-your_key_here
 ```
 
+Unlocks chat/vision (GPT-5.x / GPT-6) plus image generation. The catalog ships
+[`gpt-image-2.5-flare`](https://developers.openai.com/api/docs/models/gpt-image-2.5-flare)
+(everyday, lower latency) and
+[`gpt-image-2.5-sunburst`](https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst)
+(editing precision). Both bill the same token rates; Synaplan stores a
+per-image estimate by quality × size because the generation path does not
+capture usage tokens. Older `gpt-image-1` / `gpt-image-1.5` rows stay selectable.
+
 ### Anthropic (Claude)
 
 ```bash
@@ -115,10 +264,24 @@ does not speak. The realtime Speech-to-Speech API is not supported. Get a key at
 TRUSTEDTOKENS_API_KEY=your_key_here
 ```
 
-Open-weight models (GLM 5.2, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
+Open-weight models (GLM 5.2 / 5.3, DeepSeek V4 / Chimera, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
 Technology Consulting, under German jurisdiction with zero data retention. Synaplan talks to
 its OpenAI-compatible API at `https://api.trustedtokens.eu/v1`. Get a key at
 [trustedtokens.eu](https://trustedtokens.eu/) under **Account → API Access**.
+
+### A2Agent (Chinese frontier models, gateway)
+
+```bash
+A2AGENT_API_KEY=your_key_here
+```
+
+Qwen, DeepSeek and MiniMax through the A2Agent gateway (`https://a2agent.me/v1`).
+Prompts are processed by mainland-China model vendors; A2Agent serves users
+outside mainland China. Operators handling EU personal data decide per their DPA.
+Model ids are case-sensitive (MiniMax is `MiniMax-M3`). Use a pay-as-you-go key — daily-capped
+subscription plans are unsuitable for a production platform key. Get a key at
+[a2agent.me](https://a2agent.me/) under **dashboard → API keys**. Integration
+guides: [a2agent.me/integrations](https://a2agent.me/integrations).
 
 ### HuggingFace
 
@@ -157,6 +320,23 @@ Every catalog entry carries the provider's own in/out rate, which drives the cos
 the model selector, the Statistics page, and the per-tier budgets. Adding a model, retiring
 one, or changing a price is a catalog + migration job — see
 [PRICING_MAINTENANCE.md](PRICING_MAINTENANCE.md).
+
+### Importing models from an endpoint
+
+An admin can import the models an OpenAI-compatible endpoint (vLLM, LiteLLM, TGI, …) or the
+local Ollama already offers instead of adding each by hand — see
+[ADMIN.md — AI plugs](ADMIN.md#ai-plugs-s1s5). Notes that affect configuration:
+
+- **No flag, no new env var.** Import is an admin action; new rows are created selectable and
+  active with no default binding, so nothing routes to them until you pick them.
+- **Idempotent.** Re-importing only refreshes a `lastSeenAt` timestamp; operator toggles
+  (selectable / active / default) and prices are never overwritten.
+- **Capability probe cost.** The opt-in probe sends two tiny requests per model (one
+  `chat/completions` with `max_tokens: 1`, one `embeddings` with a one-word input), capped at
+  50 models per preview. It is off by default and never runs for native Ollama.
+- **Scheduled re-check.** `app:model:health-check` re-lists each import source. A model missing
+  from a **successful** listing is recorded offline (`not offered by endpoint`) and soft-disabled
+  only when `MODELHEALTH.AUTO_DISABLE_ENABLED=1`; an **unreachable** endpoint changes nothing.
 
 ---
 
@@ -213,10 +393,91 @@ group in the `BCONFIG` table.
 | `MULTITASK / PARALLEL_ENABLED` | `false` | Execute independent media nodes concurrently (subprocess offload) |
 | `MULTITASK / MAX_PARALLEL` | `3` | Concurrency cap for parallel media nodes |
 | `MULTITASK / NODE_TIMEOUT` | `120` | Per-node subprocess timeout (seconds) |
+| `MULTITASK / EMAIL_SEARCH_ENABLED` | `true` (seeded)² | `email_search` DAG node: live read-only search over the user's IMAP accounts and Microsoft 365 connections |
 | `CLASSIFIER / FAST_PATH_ENABLED` | `false` | Skip the AI sorter for trivial chat messages (heuristic) |
 
 ¹ Existing installations are grandfathered to `0` by migration so behavior
 doesn't change on upgrade — enable it per user or globally when ready.
+
+² Seeded `1` insert-if-missing by `MultitaskConfigSeeder` (runs in `app:seed`
+on container start); an operator's explicit `0` row survives every deploy.
+The built-in code default stays `false` when no row exists. The capability is
+only offered to the planner when the user has a connected mail source.
+
+## Saved Tasks (BCONFIG)
+
+Pin a Task Prompt and run it on demand or on a schedule. Configured via
+**BCONFIG**, not environment variables. Admins manage the master switch in
+**Settings → Routing → Saved Tasks**. Resolution is per-user row → global row
+(`BOWNERID=0`) → built-in code default (`false`). The seeder inserts a global
+`1` for new and local-dev installs (insert-if-missing).
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `SAVEDTASKS / ENABLED` | `true` (new / local-dev installs); code default `false` | Master switch: Saved Task APIs, AI Instructions chrome, and the Connections page. Widget chat never runs Saved Tasks. When the flag is off, `app:saved-tasks:tick` is a no-op. |
+
+---
+
+## Microsoft 365 connector (BCONFIG)
+
+Lets a user connect their Microsoft 365 account (currently delegated
+`Mail.Read`) from **Channels → Connections**. The app registration is
+**operator-owned and install-wide**: rows live under `BOWNERID=0` only, so a
+user can never point the consent flow at an app registration the operator does
+not control. Admins manage it in **Settings → Inbound Channels → Microsoft 365
+(Graph)**; no restart is required.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `M365 / ENABLED` | `false` | Offer Microsoft 365 as a connection. The connect action stays hidden until client ID **and** secret are also set. |
+| `M365 / CLIENT_ID` | — | Application (client) ID of the Azure app registration. |
+| `M365 / CLIENT_SECRET` | — | Client secret, **stored AES-encrypted** (`APP_SECRET` derived) and masked in every API response. |
+| `M365 / TENANT` | `common` | `common`, `organizations`, or a single tenant GUID. |
+| `M365 / REDIRECT_URI` | `APP_URL` + `/api/v1/connections/m365/callback` | Override only when a proxy changes the public URL. Must match Azure exactly. |
+
+**Azure app registration** — register a *Web* platform (not SPA) with the
+redirect URI above, add the delegated permissions `offline_access`, `openid`,
+`email`, `profile`, `User.Read`, `Mail.Read`, and create a client secret.
+`offline_access` is not optional: without it Microsoft issues no refresh token
+and every scheduled run stops working after an hour.
+
+The same steps are shown inside the admin UI above the fields, with the
+resolved redirect URI and the scope list as copyable values, so nobody has to
+read this file to set the connector up.
+
+Tokens are stored per user as one encrypted JSON blob in the credential vault
+(`BCREDENTIALS`), never in `BCONNECTIONS`, and are refreshed automatically —
+including from cron, with no user session. When Microsoft finally rejects the
+grant (consent revoked, refresh token expired), the connection flips to
+`reauth_required` instead of failing silently.
+
+---
+
+## Dropbox connector (BCONFIG)
+
+Lets a user connect their Dropbox account as a file destination
+(`save_to_folder`, channel `dropbox`) from **Channels → Connections**. Same
+model as Microsoft 365: the Dropbox app is **operator-owned and install-wide**
+(`BOWNERID=0`), tokens live per user in the encrypted credential vault, and a
+rejected refresh flips the connection to `reauth_required`. Admins manage it
+in **Settings → Inbound Channels → Dropbox**; no restart is required.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `DROPBOX / ENABLED` | `false` | Offer Dropbox as a connection. The connect action stays hidden until app key **and** secret are also set. |
+| `DROPBOX / APP_KEY` | — | App key from the Dropbox App Console. |
+| `DROPBOX / APP_SECRET` | — | App secret, **stored AES-encrypted** (`APP_SECRET` derived) and masked in every API response. |
+| `DROPBOX / REDIRECT_URI` | `APP_URL` + `/api/v1/connections/dropbox/callback` | Override only when a proxy changes the public URL. Must match the App Console exactly. |
+
+**Dropbox app** — create a *Scoped access* / *Full Dropbox* app at
+[dropbox.com/developers/apps](https://www.dropbox.com/developers/apps), enable
+the permissions `account_info.read` and `files.content.write`, and register
+the redirect URI above. The consent flow requests
+`token_access_type=offline` — without it Dropbox issues no refresh token and
+every scheduled run stops working after four hours.
+
+The same steps are shown inside the admin UI above the fields, with the
+resolved redirect URI and the permission list as copyable values.
 
 ---
 
@@ -262,6 +523,76 @@ FFMPEG_BINARY=/usr/bin/ffmpeg
 ```
 
 Supported formats: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
+
+---
+
+## Text-to-Speech (optional Piper)
+
+Speech **output** is a separate companion: [synaplan-tts](https://github.com/metadist/synaplan-tts)
+(`ghcr.io/metadist/synaplan-tts`). The published image ships four voices that
+match the UI locales — English, German, Spanish, Turkish. It is not started
+with the default stack.
+
+```bash
+docker compose --profile tts up -d
+```
+
+```bash
+# backend/.env — only needed if TTS is not on localhost:10200
+SYNAPLAN_TTS_URL=http://host.docker.internal:10200
+```
+
+**Frontend language selects the voice.** `ChatView` sends the active vue-i18n
+locale with the chat request and later with each `/api/v1/tts/stream` call.
+`PiperProvider` maps `en` / `de` / `es` / `fr` / `tr` to the baked voices
+(`en_US-lessac-medium`, `de_DE-kerstin-low`, `es_ES-davefx-medium`,
+`fr_FR-siwis-medium`, `tr_TR-dfki-medium`). If the backend detects a different reply language
+(`meta.language`), that short code wins over the UI locale. An explicit
+`voice=` query still overrides both. There is no separate voice dropdown.
+
+Add further Piper models by mounting `.onnx` + `.onnx.json` files into
+`EXTRA_VOICES_DIR` (`/voices-extra` on the container). Do not remount over
+`/voices` — that hides the five baked models. Details:
+[Adding more voices](https://github.com/metadist/synaplan-tts#adding-more-voices).
+
+Prefer a cloud voice? Set `ELEVENLABS_API_KEY` instead (or use Gemini / Mistral /
+xAI TTS models from the catalog). Whisper above is **input** only and does not
+need this service.
+
+---
+
+## Office conversion (optional Collabora CODE)
+
+Office thumbnails, PDF export, inline preview, officemaker PDF output, and
+combine-as-PDF need Collabora CODE (`collabora/code`), reached over HTTP.
+Local compose defaults `OFFICE_CONVERT_URL` to `http://collabora:9980`.
+Self-host / Umbrel / AWS leave it empty unless you opt in. Set the env on
+the host or in the deployment compose — not in `backend/.env` (Compose
+already injects the variable, so the file cannot override it).
+
+```bash
+# Dev — sidecar still needs the office profile
+docker compose --profile office up -d
+
+# Self-host
+COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
+
+# External CODE already running (reachable from backend + worker)
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 docker compose up -d
+```
+
+```bash
+# Deployment env (compose / platform), not backend/.env
+OFFICE_CONVERT_URL=http://collabora:9980
+OFFICE_CONVERT_TIMEOUT_MS=60000
+# Turn the engine off even when the compose default would enable it:
+# OFFICE_CONVERT_URL=disabled
+```
+
+Do **not** bind-mount host `/usr/bin/soffice` into the PHP container. The app
+never execs LibreOffice; it only calls `OFFICE_CONVERT_URL`. Host
+`apt install libreoffice` is unused by the containers. Desktop’s local
+LibreOffice (Agent Skills) is a different binary on the user’s PC.
 
 ---
 
@@ -334,6 +665,154 @@ or carries no scheme, production falls back to `Secure` cookies.
 ```bash
 AUTH_COOKIE_SECURE=
 ```
+
+---
+
+## People, sharing and directory (`IAM`)
+
+The four feature switches live in **Operate → System configuration → Features
+→ People & sharing**, the remaining settings under **Access → Sharing**
+(`BCONFIG` group `IAM`, owner 0). They take effect immediately — no restart.
+The switches are **on by default**; pin one off for an automated deployment
+with its `FEATURE_*` environment variable (see
+[Feature flags](FEATURE_FLAGS.md)).
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `IAM.GROUPS_ENABLED` | `1` | People page, groups, audit tab (`FEATURE_IAM_GROUPS_ENABLED`) |
+| `IAM.SHARING_ENABLED` | `1` | Share dialog and “Shared with me” (requires groups; `FEATURE_IAM_SHARING_ENABLED`) |
+| `IAM.GROUP_POLICIES_ENABLED` | `1` | People → Policies and group-layer defaults (requires groups; `FEATURE_IAM_GROUP_POLICIES_ENABLED`) |
+| `IAM.EVERYONE_SHARES` | `any_owner` | Who may share with everyone (`any_owner` / `admins_only`) |
+| `IAM.DIRECTORY_SYNC_ENABLED` | `1` | Put people into groups from the OIDC groups claim at sign-in (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`) |
+| `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path for directory groups |
+| `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |
+| `IAM.ADMIN_IMPERSONATION` | `audited` | `audited` writes an audit row; `disabled` blocks “View as user” |
+| `IAM.AUDIT_RETENTION_DAYS` | `365` | Days to keep People audit rows; `0` keeps them forever |
+
+Group policy rows live in `BGROUPCONFIG`. Only this allow-list is read from
+the group layer (`IAM.GROUP_POLICIES_ENABLED` must be on):
+
+| Key | Type | Merge across a person's groups |
+| --- | ---- | ------------------------------ |
+| `DEFAULTMODEL.{CHAT,VECTORIZE,PIC2TEXT,SOUND2TEXT,MEM,TOOLS}` | catalog key | First group by `BGROUPS.BID` |
+| `MODELS.ALLOWED` | JSON list of catalog keys | Union; empty = no restriction |
+| `SAVEDTASKS.ENABLED`, `DESKTOP_AGENT.ENABLED`, `DOCUMENT_TOOLS.ENABLED`, `MULTITASK.*_ENABLED` | bool | OR among group rows (`1` wins). A group `0` is not inherit: the merged group value sits ahead of the instance default, so members are forced off even when the global row is `1`. Delete the group row (`null` from the Policies tab) to inherit again |
+| `RATELIMITS.TIER` | `NEW` / `PRO` / `TEAM` / `BUSINESS` | Highest |
+
+A locked global row (`BCONFIG.BLOCKED = 1`) wins alone and is instance-wide —
+the People → Policies lock panel is not scoped to the selected group. Keys
+outside this list never consult `BGROUPCONFIG`. See
+[Group policies and locked defaults](ADMIN.md#group-policies-and-locked-defaults).
+
+See [People and groups](ADMIN.md#people-and-groups) in the admin guide.
+
+---
+
+## Linked platforms (`PLATFORM_LINKS`)
+
+Lets users of a registered Nextcloud / ownCloud / OpenCloud instance link the
+Synaplan account they already have instead of getting a provisioned one
+(`BCONFIG` group `PLATFORM_LINKS`, owner 0). On by default (**Features →
+Platforms & desktop**, `FEATURE_PLATFORM_LINKS_ENABLED`); toggling needs no
+restart. The Outlook add-in bridge is not affected by this flag.
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `PLATFORM_LINKS.ENABLED` | `1` | `/api/v1/platform-links/*`, `/api/v1/me/platform-links*`, the **Linked platforms** page and the admin tab. Off = those routes return 404 |
+
+Fixed limits (constants, not settings): link codes expire after 300 s and are
+single-use; 20 codes per user per hour; 10 anonymous instance registrations
+per IP per hour. See [Linked platforms](ADMIN.md#linked-platforms).
+
+---
+
+## AI plugs (`PLUGS`)
+
+Instance-wide extraction, web-search and rerank settings (`BCONFIG` group
+`PLUGS`, owner 0). Seeded to reproduce today's FileProcessor order and
+Brave-only search. Changing a seeder value does **not** propagate — ship a
+migration to roll out a new default.
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `EXTRACTION.CHAIN.text` | `native` | Plain-text / markdown / csv / html |
+| `EXTRACTION.CHAIN.document` | `structured_office,office_convert,tika,pdf_vision` | Office + PDF path |
+| `EXTRACTION.CHAIN.image` | `vision` | Vision describe / OCR |
+| `EXTRACTION.CHAIN.audio` | `stt_cloud,whisper_local` | When a cloud STT provider is configured |
+| `EXTRACTION.CHAIN.audio_no_cloud` | `whisper_local,stt_cloud` | Local Whisper first |
+| `EXTRACTION.CHAIN.video` | `video_analysis` | Transcript + key-frame describe |
+| `EXTRACTION.QUALITY.min_length` | `10` | PDF quality gate (bootstrap from `TIKA_MIN_LENGTH`) |
+| `EXTRACTION.QUALITY.min_entropy` | `3.0` | PDF quality gate (bootstrap from `TIKA_MIN_ENTROPY`) |
+| `EXTRACTION.QUALITY.apply_to` | `pdf` | Families / extensions the quality gate runs on |
+| `WEB_SEARCH.PROVIDER` | `brave` | Active search adapter (`brave`, `searxng`, `tavily`, `exa`, `firecrawl`, `perplexity`) |
+| `WEB_SEARCH.FALLBACK` | _(empty)_ | One-shot fallback when the active provider is down or errors |
+| `WEB_SEARCH.USER_OVERRIDE_ALLOWED` | `0` | When `1`, Settings shows **Use my own search** |
+| `WEB_SEARCH.TIMEOUT_MS` | `8000` | Per-provider HTTP timeout |
+| `WEB_SEARCH.MAX_CONTENT_CHARS` | `4000` | Truncate full-page text (`tavily`, `exa`, `firecrawl`) |
+| `RERANK.ENABLED` | `0` | Off until a live eval wins; chat search is unchanged while off |
+| `RERANK.CANDIDATES_MULTIPLIER` | `4` | Fetch `topK × multiplier` (capped at 100) before rerank |
+| `RERANK.LATENCY_BUDGET_MS` | `800` | Skip rerank if the adapter exceeds this; keep embedding order |
+| `RERANK.LLM_FALLBACK` | `0` | When `1` and no rerank model is bound, listwise-rank with the summary model |
+| `RERANK.MAX_CANDIDATE_CHARS` | `2000` | Truncate each candidate before the rerank call |
+
+Unknown chain keys are skipped. Keys that FileProcessor does not already
+implement (today: `docling`) run first, then the built-in strategies. A
+down extra adapter never fails an upload. Fresh installs do **not** put
+`docling` on the document chain — an admin adds it under **Operate →
+AI infrastructure → Extraction**.
+
+`DOCLING_BASE_URL` (empty = off) points at the optional `docling`
+Compose profile (`docker compose --profile docling up -d`). The CPU
+image needs about 4 GB during OCR; there is no `mem_limit` in dev.
+`DOCLING_TIMEOUT_MS` defaults to `120000`; `DOCLING_MAX_BYTES` defaults
+to 50 MB. Admins edit those the same way as Tika: **System
+configuration → Processing → Docling** (URL, timeout, max bytes, then
+**Test connection**). Markdown from Docling is chunked heading-aware
+(tables stay together; oversized tables repeat the header row).
+
+Web search providers (admin picker on **Operate → AI infrastructure →
+Web search**):
+
+| Key | Sovereignty | Capabilities | Key / URL |
+| --- | ----------- | ------------ | --------- |
+| `brave` | US cloud | freshness, country, language | `BRAVE_SEARCH_API_KEY` (existing) |
+| `searxng` | self-hosted | freshness, language, site filter | `SEARXNG_BASE_URL` (empty = off) |
+| `tavily` | US cloud | freshness, full content, answer | `TAVILY_API_KEY` or **plug_keys** |
+| `exa` | US cloud | freshness, site filter, full content | `EXA_API_KEY` or **plug_keys** |
+| `firecrawl` | US cloud | full content | `FIRECRAWL_API_KEY` or **plug_keys** |
+| `perplexity` | US cloud | freshness, answer | `PERPLEXITY_API_KEY` (shared with chat) |
+
+`SEARXNG_BASE_URL` empty = off. Compose injects `http://searxng:8080`
+when the backend starts; enable the sidecar with
+`docker compose --profile searxng up -d` (no host port). Cloud keys
+saved in the UI win over the env bootstrap. Health is “URL or key
+present”, not a live probe — **Test query** is the live call.
+
+Rerank models are catalog rows with tag `rerank` (TEI
+`openaicompatible`, Jina, Cohere, Voyage). Bind one on
+**Operate → AI infrastructure → Reranking** (`DEFAULTMODEL.RERANK`).
+Jina / Cohere / Voyage keys use `JINA_API_KEY`, `COHERE_API_KEY`,
+`VOYAGE_API_KEY` or **plug_keys**. A TEI `/rerank` endpoint is an
+OpenAI-compatible endpoint with the `rerank` capability. With rerank
+off, storage `limit` stays exactly `k`. See [RAG.md](RAG.md#reranking)
+and [AI plugs](ADMIN.md#ai-plugs-s1-s4).
+
+---
+
+## Feature flags (`FEATURE_*`)
+
+Every feature from the September 2026 waves — people & sharing, AI assistants,
+tool registry and approvals, saved-task steps, watched pages, linked
+platforms, desktop client, office document tools, optional module gates — is a
+`BCONFIG` flag that is **on by default** and editable under **Operate → System
+configuration → Features**. Automated deployments pin a flag with
+`FEATURE_<GROUP>_<SETTING>=false` (or `true`); the toggle then shows as locked.
+The complete table with keys, defaults and shipping PRs is in
+[FEATURE_FLAGS.md](FEATURE_FLAGS.md). For flags that resolve the per-user row
+first (assistants, bundle export, workflow builder, Saved Tasks, MCP client,
+multitask routing, async media), a global write from the admin page also drops
+the acting administrator's own row, otherwise they would not see their own
+change.
 
 ---
 

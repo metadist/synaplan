@@ -37,6 +37,136 @@ The worker **MUST run in the same `APP_ENV` as the backend container**. The `Red
 
 After switching branches a `docker compose restart worker` is enough to pick up code changes (the entrypoint clears and re-warms the cache).
 
+### Optional feature modules
+
+Everything below this heading that is marked *optional* (Collabora, Docling,
+SearXNG, the local TTS service, Ollama, the Higgsfield / Google AI / TheHive
+providers, Stripe billing, mobile IAP, the WhatsApp channel) is a **feature
+module**: a declared, self-describing part of the platform that the core must
+run without. Each module declares the environment variables that configure it
+(`backend/src/Module/**`), and the platform reports it in three places from
+that one declaration — the admin feature-status page, the self-aware
+capability inventory, and this command:
+
+```bash
+docker compose exec backend php bin/console app:modules:list           # table
+docker compose exec backend php bin/console app:modules:list --json    # same shape as /api/v1/config/features → modules
+docker compose exec backend php bin/console app:modules:list --assert-none-configured   # exit 1 if any module is configured
+```
+
+*configured* means the module's declaration is satisfied (e.g. `OFFICE_CONVERT_URL`
+is set and not `disabled`); *healthy* means the configured service also
+answered its health endpoint. Absent modules are never probed, so the command
+is safe on a minimal stack — the `--assert-none-configured` flag is what the
+minimal CI lane uses to prove the core carries no optional feature.
+
+The CI overlay `docker-compose.minimal.yml` (on top of `docker-compose.test.yml`)
+and `backend/.env.minimal` empty every decisive module env and pin
+`FEATURE_MODULES_GATE_<ID>=true` so an absent module's routes answer the
+uniform `404 feature_not_configured`. Apply the env as a **real process
+environment** (`source scripts/minimal-module-env.sh`); Symfony dotenv will
+not override keys already set by `.env.test`. Do not confuse this overlay
+with `docker-compose-minimal.yml`, which is the product "cloud AI only"
+install file.
+
+To add a module: one descriptor in `backend/src/Module/`, the decisive env
+keys in both overlay files (the architecture test fails if either is
+missing), and never a second hand-written `isEnabled()` + feature-status
+block.
+
+### Secure compute (optional)
+
+Short Python or Node file work for the assistant. Off by default. The sidecar
+is a Compose profile; PHP never talks to Docker.
+
+```bash
+make -C sidecars/synaplan-compute images
+COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
+  COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
+  docker compose --profile compute up -d
+```
+
+The sidecar process is distroless `nonroot`. Set `COMPUTE_DOCKER_GID` to the
+host docker socket group so it can talk to dockerd. The runner never pulls:
+build the Python/Node images (`make -C sidecars/synaplan-compute images`) and
+pin those digests in `sidecars/synaplan-compute/internal/images/map.go` or the
+first run fails with image-not-found.
+
+Then set **COMPUTE.ENABLED** under Operate → System config (or
+`FEATURE_COMPUTE_ENABLED=true`). Feature Status → *Secure compute* must show
+Available. Never publish port 8080. Persistent folders and website fetches
+are extra switches (`COMPUTE.WORKSPACES_ENABLED`, `COMPUTE.EGRESS_ENABLED`),
+also off. See [COMPUTE.md](./COMPUTE.md) and
+[docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
+
+### Office conversion (optional)
+
+Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
+legacy-format analysis, and “Combine as PDF” need a **Collabora CODE** sidecar
+(`collabora/code`). The sidecar is **off by default** (`profiles: [office]`), so
+`docker compose up -d` does not pull the image or spend the extra ~2 GB RAM.
+The compose file defaults `OFFICE_CONVERT_URL` to `http://collabora:9980`;
+override that env for an external CODE, or set `OFFICE_CONVERT_URL=disabled`.
+
+```bash
+# Dev / minimal: start the sidecar (URL default is already collabora:9980)
+docker compose --profile office up -d
+
+# Self-host (`deploy/compose.yaml`): the entrypoint sets the URL when the
+# profile is listed
+COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
+```
+
+`GET /api/v1/config/runtime` then reports `features.officeConvertEnabled: true`.
+Admin **Settings → Features** (`/api/v1/config/features`) pings
+`/hosting/capabilities`. Umbrel / AWS Marketplace / Elestio stay off unless
+the operator opts in the same way.
+
+If convert-to answers **HTTP 403**, the compose subnet is outside CODE’s
+default `net.post_allow.host` list. Add
+`--o:net.post_allow.host[0]=<compose subnet regex>` to the service
+`extra_params` (do not publish port 9980).
+
+This is **not** host `apt install libreoffice` and **not** the LibreOffice
+binary Desktop looks for on the user’s PC. The PHP app talks only to
+`OFFICE_CONVERT_URL` over HTTP.
+
+### Docling extraction (optional)
+
+PDFs with tables and two-column layouts extract more cleanly when the
+**Docling** sidecar is running. It is **off by default**
+(`profiles: [docling]`). Compose sets `DOCLING_BASE_URL=http://docling:5001`;
+leave that empty in `.env` to keep Docling off. A down sidecar never fails
+an upload — Tika stays the fallback. Enable Docling in
+**Operate → AI infrastructure → Extraction** (add `docling` to the
+document chain). URL, timeout and **Test connection** match Tika under
+**System configuration → Processing → Docling**. Then:
+
+```bash
+docker compose --profile docling up -d
+```
+
+The CPU image is about 4.4 GB and needs a few GB of RAM during OCR. There
+is no `mem_limit` in this compose file (cgroup limits break some
+sandboxes). GPU variants belong in `synaplan-platform`.
+
+### SearXNG web search (optional)
+
+Chat can use a **self-hosted SearXNG** instead of Brave. It is **off by
+default** (`profiles: [searxng]`). Compose sets
+`SEARXNG_BASE_URL=http://searxng:8080`; leave that empty in `.env` to
+keep SearXNG off. Health is “URL set”, not a live probe — a down
+sidecar fails that provider and the configured fallback (or an empty
+result set) is used. Enable SearXNG in
+**Operate → AI infrastructure → Web search**. Then:
+
+```bash
+docker compose --profile searxng up -d
+```
+
+There is no published host port. JSON search is on in the tracked
+`_devextras/searxng/settings.yml` (upstream defaults it off).
+
 #### Troubleshooting stuck media jobs
 
 The chat bubble for an async video shows `Auftrag läuft noch / Job still running` indefinitely:
@@ -46,7 +176,8 @@ The chat bubble for an async video shows `Auftrag läuft noch / Job still runnin
 3. **Is the job actually in Redis?** `docker compose exec -T redis redis-cli --raw KEYS 'synaplan:*:mediajob:*'` lists every active job and tells you which environment prefix is being used. A backend/worker env mismatch is visible here as two different prefixes.
 4. **Re-arm a stuck job** without waiting for the reaper:
    `docker compose exec -T backend php bin/console app:media:advance-jobs <job_id>` (or `--all` for every active job).
-5. **The reaper backstop** (`app:media:reap-jobs`) drives every stale / past-deadline job to `timed_out` with a localized error so no bubble hangs forever. Run it from cron (every minute) or manually.
+5. **The reaper backstop** (`app:media:reap-jobs`) drives every stale / past-deadline job to `timed_out` with a localized error so no bubble hangs forever. The local `scheduler` service runs it every tick; `docker compose exec -T backend php bin/console app:media:reap-jobs` still works if you need it immediately.
+6. **Saved Task schedules** (`app:saved-tasks:tick`) claim due tasks with a compare-and-set and a cross-node Redis lock (`saved-tasks-tick`). The local `docker-compose.yml` `scheduler` service runs this every tick after the media reaper (`SYNAPLAN_ROLE=scheduler`), same as self-host / prod. Fire a due task by hand with `docker compose exec -T backend php bin/console app:saved-tasks:tick` if you do not want to wait for the next cycle. It is a no-op while `SAVEDTASKS / ENABLED` is globally off. Production host-cron (`cron-saved-tasks.sh` in `synaplan-platform`) is a separate PR. Overview UI: **Channels → Saved Tasks**.
 
 ### Redis (cache, sessions, locks, messenger, realtime)
 
@@ -226,6 +357,9 @@ make test    # Run tests
 | phpMyAdmin | http://localhost:8082 |
 | MailHog | http://localhost:8025 |
 | Ollama | http://localhost:11435 |
+| Collabora CODE (profile `office`, no published port) | `http://collabora:9980` on the compose network |
+| Docling (profile `docling`, no published port) | `http://docling:5001` on the compose network |
+| SearXNG (profile `searxng`, no published port) | `http://searxng:8080` on the compose network |
 
 ### GPU Support for Local AI Models
 

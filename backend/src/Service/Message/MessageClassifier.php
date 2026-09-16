@@ -2,12 +2,35 @@
 
 namespace App\Service\Message;
 
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\Entity\Agent;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Repository\UserRepository;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentPinResolver;
+use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Agent\AgentService;
+use App\Service\Context\AttachmentDigest;
+use App\Service\Context\TokenEstimator;
+use App\Service\Document\DocumentKind;
+use App\Service\Document\DocumentToolsConfig;
+use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
+use App\Service\File\Office\DocumentThumbnailGenerator;
+use App\Service\File\Office\OfficeConverterClient;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterService;
+use App\Service\Message\Routing\NativeToolRoutingConfig;
+use App\Service\Message\Routing\RoutingDecision;
+use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -18,7 +41,11 @@ use Psr\Log\LoggerInterface;
  * 1. Check for "Again" function (user-selected AI/prompt via BMESSAGEMETA)
  * 2. Check for tool commands (e.g., /pic, /vid, /search)
  * 3. Document or audio attachment → analyzefile / file_analysis (skip sorting, #595)
- * 4. Use MessageSorter for AI-based classification
+ * 4. Embedding-router cascade match against the four SYSTEM topics (Phase 8,
+ *    skip sorting when confident — see {@see EmbeddingRouterService})
+ * 5. Defer the decision to the answering call itself (Phase 9, default OFF —
+ *    see {@see NativeToolRoutingConfig} and {@see Routing\RoutingToolset})
+ * 6. Use MessageSorter for AI-based classification
  *
  * Workflow from legacy:
  * - If BMESSAGEMETA has PROMPTID set → use that directly (skip sorting)
@@ -37,7 +64,18 @@ final readonly class MessageClassifier
         '/web' => 'tools:web',
         '/list' => 'tools:list',
         '/docs' => 'tools:filesort',
+        '/help' => 'synaplan',
     ];
+
+    /**
+     * Meta-questions about this product (EN/DE/ES/FR/TR). A match only
+     * defers to the AI sorter — it never routes by itself.
+     *
+     * Languages: can you / what can you (en), kannst du / was kannst (de),
+     * puedes / qué puedes (es), peux-tu / que peux (fr), yapabilir misin /
+     * ne yapabilirsin (tr), plus the word "synaplan".
+     */
+    private const SELF_AWARE_GUARD_PATTERN = '/(?:can you|what can you|kannst du|was kannst|puedes|qu[eé] puedes|peux-tu|que peux|yapabilir misin|ne yapabilirsin|synaplan)/iu';
 
     public function __construct(
         private MessageSorter $messageSorter,
@@ -46,22 +84,48 @@ final readonly class MessageClassifier
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private SystemCapabilityRegistry $capabilityRegistry,
+        private EmbeddingRouterService $embeddingRouter,
+        private EmbeddingRouterConfig $embeddingRouterConfig,
+        private NativeToolRoutingConfig $nativeToolRoutingConfig,
+        private ToolCallingCapability $toolCallingCapability,
+        private AgentPinResolver $agentPin,
+        private ?SelfAwareConfig $selfAwareConfig = null,
+        private ?OfficeConverterClient $officeConverter = null,
+        private ?DocumentToolsConfig $documentToolsConfig = null,
+        private ?MultitaskRoutingConfig $multitaskConfig = null,
+        private ?AgentConfig $agentConfig = null,
+        private ?AgentService $agentService = null,
+        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
+        private ?UserRepository $users = null,
+        private ?AttachmentDigest $attachmentDigest = null,
     ) {
     }
 
     /**
      * Classify message and determine routing.
      *
-     * @param Message $message             Message entity
-     * @param array   $conversationHistory Previous messages
+     * @param Message $message              Message entity
+     * @param array   $conversationHistory  Previous messages
+     * @param bool    $allowRoutingDeferral whether the Phase 9 native tool-calling layer may
+     *                                      defer the decision to the answering call. Set to
+     *                                      false by {@see InferenceRouter} when a deferral came
+     *                                      back unhonoured, so the second pass takes the AI
+     *                                      sorter instead of deferring again
+     * @param array   $options              Optional pin (`agentId`) and other classifier hints
      *
      * @return array ['topic' => string, 'language' => string, 'source' => string, 'skip_sorting' => bool]
      */
-    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null): array
+    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null, bool $allowRoutingDeferral = true, array $options = []): array
     {
         $userId = $message->getUserId();
         $messageId = $message->getId();
         $text = $message->getText();
+
+        $pinned = $this->tryPinAgent($message, $options);
+        if (null !== $pinned) {
+            return $pinned;
+        }
 
         $this->logger->info('MessageClassifier: Starting classification', [
             'message_id' => $messageId,
@@ -94,14 +158,7 @@ final readonly class MessageClassifier
             // "wer bist du?" got an English answer: the directive built
             // downstream from this value told the chat model to reply in
             // English.
-            $confidentLanguage = $this->detectLanguageConfident($text);
-
-            if (null === $confidentLanguage) {
-                $existingLanguage = strtolower(trim($message->getLanguage()));
-                if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
-                    $confidentLanguage = $existingLanguage;
-                }
-            }
+            $confidentLanguage = $this->resolveConfidentLanguage($message, $text);
 
             if (null !== $confidentLanguage) {
                 $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
@@ -116,17 +173,19 @@ final readonly class MessageClassifier
                 // these trivial chats answer immediately without a web round-trip.
                 // An explicit prompt `tool_internet=true` still forces search
                 // later in `MessageProcessor` via `WebSearchTopicPolicy`.
-                return [
+                $fastPathDecision = RoutingDecision::deterministic(RoutingLayer::FastPathHeuristic, 'general');
+
+                return array_merge([
                     'topic' => 'general',
                     'language' => $confidentLanguage,
                     'web_search' => null,
-                    'source' => 'fast_path_heuristic',
+                    'source' => $fastPathDecision->toClassificationSource(),
                     'skip_sorting' => true,
                     'intent' => 'chat',
                     'model_id' => null,
                     'provider' => null,
                     'model_name' => null,
-                ];
+                ], $fastPathDecision->toClassificationFields());
             }
 
             $this->logger->info('MessageClassifier: Fast-path declined (language ambiguous) — deferring to AI sorter', [
@@ -154,14 +213,16 @@ final readonly class MessageClassifier
                 'intent' => $intent,
             ]);
 
-            return [
+            $modelOverrideDecision = RoutingDecision::deterministic(RoutingLayer::ModelOverride, $topic);
+
+            return array_merge([
                 'topic' => $topic,
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => $intent,
-                'source' => 'model_override_auto',
+                'source' => $modelOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
                 'model_id' => $modelOverride,
-            ];
+            ], $modelOverrideDecision->toClassificationFields());
         }
 
         if ($promptOverride) {
@@ -171,13 +232,15 @@ final readonly class MessageClassifier
                 'model_id' => $modelOverride,
             ]);
 
-            $result = [
+            $promptOverrideDecision = RoutingDecision::deterministic(RoutingLayer::PromptOverride, $promptOverride);
+
+            $result = array_merge([
                 'topic' => $promptOverride,
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => $this->mapTopicToIntent($promptOverride),
-                'source' => 'prompt_override',
+                'source' => $promptOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
-            ];
+            ], $promptOverrideDecision->toClassificationFields());
 
             // Add model_id if user explicitly selected a model (Again)
             if ($modelOverride) {
@@ -196,29 +259,211 @@ final readonly class MessageClassifier
                     'tool' => $toolTopic,
                 ]);
 
-                return [
+                $toolCommandDecision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, $toolTopic);
+
+                return array_merge([
                     'topic' => $toolTopic,
                     'language' => $message->getLanguage() ?: 'en',
                     'intent' => $this->mapTopicToIntent($toolTopic),
-                    'source' => 'tool_command',
+                    'source' => $toolCommandDecision->toClassificationSource(),
                     'skip_sorting' => true,
-                ];
+                ], $toolCommandDecision->toClassificationFields());
             }
         }
 
         // 3. Document / audio / video attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595, #722)
         if ($this->messageHasAnalyzableNonImageAttachment($message)) {
+            if ($this->shouldRouteOfficeEditToOfficemaker($message)) {
+                $this->logger->info('MessageClassifier: Routing office edit to officemaker', [
+                    'message_id' => $messageId,
+                ]);
+
+                return [
+                    'topic' => 'officemaker',
+                    'language' => $message->getLanguage() ?: 'en',
+                    'intent' => 'document_generation',
+                    'source' => 'attachment_office_edit',
+                    'skip_sorting' => true,
+                ];
+            }
+            $combineRoute = $this->attachmentDocumentFileIntent($message);
+            if (null !== $combineRoute) {
+                $this->logger->info('MessageClassifier: Routing attachment merge/export to '.$combineRoute, [
+                    'message_id' => $messageId,
+                ]);
+
+                // BTOPIC stays inside the prompt-topic namespace: `officemaker`
+                // is the topic OFFICE_PDF_ROUTING already assigns to produce-a-PDF
+                // turns, it has a seeded BPROMPTS row, and the chat info popover
+                // links it to a real /ai/instructions entry. The capability is
+                // selected from `intent` + `source`, not from the topic
+                // ({@see TaskPlanExecutor::isDeterministicDocumentFileIntent()}).
+                return [
+                    'topic' => 'officemaker',
+                    'language' => $message->getLanguage() ?: 'en',
+                    'intent' => $combineRoute,
+                    'source' => 'attachment_'.$combineRoute,
+                    'skip_sorting' => true,
+                ];
+            }
             $this->logger->info('MessageClassifier: Forcing analyzefile route (document, audio, or video attachment)', [
                 'message_id' => $messageId,
             ]);
 
-            return [
+            $attachmentDecision = RoutingDecision::deterministic(RoutingLayer::AttachmentRule, 'analyzefile');
+
+            return array_merge([
                 'topic' => 'analyzefile',
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => 'file_analysis',
-                'source' => 'attachment_document_or_audio',
+                'source' => $attachmentDecision->toClassificationSource(),
                 'skip_sorting' => true,
-            ];
+            ], $attachmentDecision->toClassificationFields());
+        }
+
+        // Phase 8: embedding-router cascade layer. Sits after every
+        // deterministic layer above (overrides, tool commands, attachments)
+        // and before the AI sorter below. Embeds the message with the same
+        // bge-m3 model used for RAG and matches it via cosine similarity
+        // against pre-computed example-utterance anchors for the four
+        // SYSTEM topics (general, mediamaker, officemaker, docsummary)
+        // stored in Qdrant — see EmbeddingRouterService and the
+        // `app:routing:sync-anchors` command that (re)populates the anchors
+        // from SystemCapabilityRegistry::exampleUtterances. User-defined
+        // topics have no curated anchors, so a confident match is always one
+        // of the four system topics; anything else escalates to the AI
+        // sorter below exactly like today.
+        //
+        // Like the fast-path, a confident match short-circuits the sorter
+        // round-trip entirely — unlike the fast-path this is not restricted
+        // to `general`. Extraction of the sorter's topic-specific votes
+        // (BMEDIA, BRESOLUTION, BINPUTMODE) is intentionally NOT attempted
+        // here: MediaPromptExtractor already re-derives BMEDIA from the
+        // message text via its own dedicated AI call whenever the
+        // classification omits it, so a mediamaker match degrades
+        // gracefully instead of needing those votes up front.
+        // Set when Phase 8 found a confident topic but refused to commit
+        // because the language was ambiguous. That refusal is a request for
+        // the AI sorter specifically (it resolves BLANG), so Phase 9 — which
+        // would answer with `language: 'en'` — must not intercept it.
+        $embeddingDeclinedForLanguage = false;
+
+        if (null === $overrideModelId
+            && !empty($text)
+            && $this->embeddingRouterConfig->isEnabled($userId)
+            && !$this->isSelfAwareQuestion($text, $userId)
+        ) {
+            $embeddingMatch = $this->embeddingRouter->findClosestAnchor($text, $userId);
+
+            if (null !== $embeddingMatch && $embeddingMatch->score >= $this->embeddingRouterConfig->getConfidenceThreshold()) {
+                $confidentLanguage = $this->resolveConfidentLanguage($message, $text);
+
+                if (null !== $confidentLanguage) {
+                    $this->logger->info('MessageClassifier: Embedding-router match (skipped AI sorter)', [
+                        'message_id' => $messageId,
+                        'topic' => $embeddingMatch->topic,
+                        'confidence' => $embeddingMatch->score,
+                        'language' => $confidentLanguage,
+                    ]);
+
+                    $embeddingDecision = new RoutingDecision(
+                        RoutingLayer::EmbeddingRouter,
+                        $embeddingMatch->topic,
+                        confidence: $embeddingMatch->score,
+                        discardedAlternatives: array_map(
+                            static fn (array $alternative): string => sprintf('%s (%.3f)', $alternative['topic'], $alternative['score']),
+                            $embeddingMatch->discardedAlternatives
+                        ),
+                    );
+
+                    // `web_search` is intentionally null here for the same
+                    // reason as the fast-path: no AI-sorter round-trip means
+                    // no BWEBSEARCH vote, and under the "trust the model"
+                    // policy a missing vote means no search.
+                    return array_merge([
+                        'topic' => $embeddingMatch->topic,
+                        'language' => $confidentLanguage,
+                        'web_search' => null,
+                        'source' => $embeddingDecision->toClassificationSource(),
+                        'skip_sorting' => true,
+                        'intent' => $this->mapTopicToIntent($embeddingMatch->topic),
+                        'model_id' => null,
+                        'provider' => null,
+                        'model_name' => null,
+                    ], $embeddingDecision->toClassificationFields());
+                }
+
+                $embeddingDeclinedForLanguage = true;
+
+                $this->logger->info('MessageClassifier: Embedding-router match declined (language ambiguous) — deferring to AI sorter', [
+                    'message_id' => $messageId,
+                    'topic' => $embeddingMatch->topic,
+                    'confidence' => $embeddingMatch->score,
+                ]);
+            }
+        }
+
+        // Phase 9: hand the routing decision to the answering call itself.
+        //
+        // Everything above this point is a layer that must decide BEFORE any
+        // model runs — an override, a slash command, an attachment rule, a
+        // cheap embedding match. What is left over is exactly the population
+        // that costs a full AI-sorter round-trip today, and for the most
+        // common member of that population (an ordinary chat turn) the sorter
+        // answers a question the chat model was about to answer anyway.
+        //
+        // So instead of classifying here, emit a deferred classification:
+        // route to `chat`, and let ChatHandler attach the RoutingToolset
+        // hand-off tools to the answering call. No tool call means it really
+        // was a chat turn — one LLM call for the whole turn instead of two.
+        // A hand-off tool call means ChatHandler discards its own answer and
+        // InferenceRouter re-routes to the media/office/summary handler.
+        //
+        // ChatHandler owns the fallback: if the resolved chat provider cannot
+        // do native tool calling ({@see \App\AI\ToolCalling\ToolCallingCapability}),
+        // it asks the sorter after all, so an unsupported provider behaves
+        // exactly as it does today.
+        if ($allowRoutingDeferral
+            && null === $overrideModelId
+            && !empty($text)
+            && !$embeddingDeclinedForLanguage
+            && $this->nativeToolRoutingConfig->isEnabled($userId)
+            && !$this->isSelfAwareQuestion($text, $userId)
+            && $this->accountChatModelCanRouteNatively($userId)
+        ) {
+            $deferredLanguage = $this->resolveConfidentLanguage($message, $text) ?? 'en';
+
+            $this->logger->info('MessageClassifier: Deferring routing to the answering call (native tool calling)', [
+                'message_id' => $messageId,
+                'language' => $deferredLanguage,
+            ]);
+
+            $deferredDecision = RoutingDecision::deterministic(RoutingLayer::NativeToolCalling, 'general');
+
+            return array_merge([
+                'topic' => 'general',
+                // Unlike the fast-path and the embedding router, an ambiguous
+                // language does NOT force an escalation here: those layers
+                // commit to a final topic, whereas this one only defers, and
+                // the answering model replies in the user's language whatever
+                // this field says.
+                'language' => $deferredLanguage,
+                // `web_search` is null for the same reason as on every other
+                // sorter-skipping layer: no sorter, no BWEBSEARCH vote. An
+                // explicit prompt `tool_internet=true` still forces a search
+                // in MessageProcessor via WebSearchTopicPolicy.
+                'web_search' => null,
+                'source' => $deferredDecision->toClassificationSource(),
+                'skip_sorting' => true,
+                'intent' => 'chat',
+                'model_id' => null,
+                'provider' => null,
+                'model_name' => null,
+                // The flag ChatHandler keys on to attach the hand-off tools.
+                // Absent (not false) on every other path, so no existing
+                // caller changes behaviour.
+                'defer_routing_to_chat' => true,
+            ], $deferredDecision->toClassificationFields());
         }
 
         // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
@@ -232,23 +477,54 @@ final readonly class MessageClassifier
         // handler resolution, BFILEPATH keys) understands directly.
         $canonicalTopic = (string) ($result['topic'] ?? 'general');
 
+        // The sorter already built its own RoutingDecision (rule-based match,
+        // genuine classification, or a fallback — see
+        // MessageSorter::buildRoutingDecision()) and flattened it into
+        // $result via RoutingDecision::toClassificationFields(). A mocked
+        // sorter (tests) or a source outside the AI-sorting layer may omit
+        // these keys entirely, so default to "full confidence, no fallback"
+        // rather than treating an absent key as a low-confidence result.
+        $aiSortingDecision = new RoutingDecision(
+            RoutingLayer::AiSorting,
+            $canonicalTopic,
+            confidence: (float) ($result['routing_confidence'] ?? 1.0),
+            discardedAlternatives: $result['routing_discarded_alternatives'] ?? [],
+            fallbackReason: $result['routing_fallback_reason'] ?? null,
+        );
+
+        if ($aiSortingDecision->isFallback()) {
+            $this->logger->warning('MessageClassifier: ⚠️ AI-sorting result is a fallback, not a confident decision', [
+                'message_id' => $messageId,
+                'topic' => $canonicalTopic,
+                'confidence' => $aiSortingDecision->confidence,
+                'fallback_reason' => $aiSortingDecision->fallbackReason,
+                'discarded_alternatives' => $aiSortingDecision->discardedAlternatives,
+            ]);
+        }
+
         $this->logger->info('MessageClassifier: Classification complete', [
             'message_id' => $messageId,
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
+            'read_pages' => $result['read_pages'] ?? null,
             'multi_step' => $result['multi_step'] ?? null,
             'media_type' => $result['media_type'] ?? null,
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
             'source' => $source,
+            'confidence' => $aiSortingDecision->confidence,
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
-        $classification = [
+        $classification = $this->attachRoutableAgent(array_merge([
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
+            // Sorter's BREADPAGES vote: 0 = snippets only, 2 or 3 = dump
+            // that many result pages into the answer prompt. Null = no vote
+            // (fast-path / older prompt). ReadPagesPolicy fills the gap.
+            'read_pages' => $result['read_pages'] ?? null,
             // Sorter's BMULTI vote: true = needs several steps, false = one
             // step, null = no vote (older prompt row / model dropped the
             // field). TaskPlanExecutor uses it to skip the planner round-trip
@@ -263,7 +539,7 @@ final readonly class MessageClassifier
             // Usage taximeter: tokens/charged cost of the sorting call (null
             // when the fast path skipped the AI sorter or recording failed).
             'sorting_usage' => $result['sorting_usage'] ?? null,
-        ];
+        ], $aiSortingDecision->toClassificationFields()), $message);
 
         if ($overrideModelId) {
             $classification['override_model_id'] = $overrideModelId;
@@ -314,6 +590,128 @@ final readonly class MessageClassifier
         $resolution = $result['resolution'] ?? null;
         if (is_string($resolution) && '' !== $resolution) {
             $classification['resolution'] = $resolution;
+        }
+
+        // Pass through the sorter's BINPUTMODE vote. `reference_images` is how
+        // MediaGenerationHandler learns that an image request edits an existing
+        // picture instead of drawing a new one — without this the vote was
+        // parsed, logged and then dropped here, so every attachment-less
+        // follow-up ("make the car blue") fell back to a fresh generation.
+        $inputMode = $result['input_mode'] ?? null;
+        if (is_string($inputMode) && '' !== $inputMode) {
+            $classification['input_mode'] = $inputMode;
+        }
+
+        return $classification;
+    }
+
+    /**
+     * Pin the turn to an assistant when `agentId` is present and the flag is on.
+     * Runs before the fast-path and before PROMPTID so a pinned chat never
+     * becomes `general`. MessageSorter is never invoked on this path.
+     *
+     * The RuntimeProfile travels as `runtime_profile`; RAG scope, limit and
+     * score are read from it downstream and never copied into scalar keys.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>|null
+     */
+    private function tryPinAgent(Message $message, array $options): ?array
+    {
+        $profile = $this->agentPin->resolve($message, $options);
+        if (null === $profile) {
+            return null;
+        }
+
+        $decision = RoutingDecision::deterministic(RoutingLayer::AgentPin, $profile->promptTopic);
+        $language = $message->getLanguage();
+        if (!$language || 'NN' === $language) {
+            $language = 'en';
+        }
+
+        $this->logger->info('MessageClassifier: Using agent pin (skipped AI sorter)', [
+            'message_id' => $message->getId(),
+            'agent_id' => $profile->agentId,
+            'topic' => $profile->promptTopic,
+        ]);
+
+        return array_merge([
+            'topic' => $profile->promptTopic,
+            'language' => $language,
+            'web_search' => null,
+            'source' => $decision->toClassificationSource(),
+            'skip_sorting' => true,
+            'intent' => 'chat',
+            'prompt_id' => $profile->promptId,
+            'agent_id' => $profile->agentId,
+            'agent_version_id' => $profile->agentVersionId,
+            'model_id' => $profile->modelIds['chat'] ?? null,
+            'runtime_profile' => $profile,
+        ], $decision->toClassificationFields());
+    }
+
+    /**
+     * When the sorter returns `agent:{slug}` and the routable flag is on,
+     * attach the published assistant's RuntimeProfile. Flag off ⇒ no-op.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function attachRoutableAgent(array $classification, Message $message): array
+    {
+        if (null === $this->agentConfig || null === $this->agentService || null === $this->agentRuntimeResolver || null === $this->users) {
+            return $classification;
+        }
+
+        $userId = $message->getUserId();
+        if (!$this->agentConfig->isEnabled($userId) || !$this->agentConfig->isRoutableEnabled($userId)) {
+            return $classification;
+        }
+
+        $topic = (string) ($classification['topic'] ?? '');
+        if (!str_starts_with($topic, Agent::TOPIC_PREFIX)) {
+            return $classification;
+        }
+
+        $user = $this->users->find($userId);
+        if (!$user instanceof User) {
+            return $classification;
+        }
+
+        $slug = substr($topic, strlen(Agent::TOPIC_PREFIX));
+        foreach ($this->agentService->routableForUser($user) as $agent) {
+            if ($agent->getSlug() !== $slug || null === $agent->getId()) {
+                continue;
+            }
+            $chatId = $message->getChatId();
+            try {
+                $profile = $this->agentRuntimeResolver->resolve(
+                    $agent->getId(),
+                    $user,
+                    false,
+                    null !== $chatId && $chatId > 0 ? $chatId : null,
+                );
+            } catch (\Throwable $e) {
+                $this->logger->warning('MessageClassifier: routable assistant could not be resolved, keeping sorter topic', [
+                    'message_id' => $message->getId(),
+                    'agent_id' => $agent->getId(),
+                    'topic' => $topic,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return $classification;
+            }
+            $classification['runtime_profile'] = $profile;
+            $classification['agent_id'] = $profile->agentId;
+            $classification['agent_version_id'] = $profile->agentVersionId;
+            $classification['prompt_id'] = $profile->promptId;
+            if (isset($profile->modelIds['chat']) && $profile->modelIds['chat']) {
+                $classification['model_id'] = $profile->modelIds['chat'];
+            }
+
+            return $classification;
         }
 
         return $classification;
@@ -383,16 +781,28 @@ final readonly class MessageClassifier
 
     /**
      * Build message data array for sorter.
+     *
+     * BFILETEXT is the ROUTING view of the attachment: verbatim for ordinary
+     * files, a structural digest for large ones. The sorter only decides
+     * what to do with the file; a 250 kB spreadsheet as JSON overflows the
+     * (small) routing model and turns every such upload into the fallback
+     * topic. The answering handler still receives the full text.
      */
     private function buildMessageData(Message $message): array
     {
+        $fileText = $message->getFileText() ?: '';
+        if ('' !== $fileText) {
+            $digest = $this->attachmentDigest ?? new AttachmentDigest(new TokenEstimator());
+            $fileText = $digest->forRoutingWithConfig($fileText, $message->getUserId(), $message->getFileType());
+        }
+
         $data = [
             'BDATETIME' => $message->getDateTime(),
             'BFILEPATH' => $message->getFilePath(),
             'BTOPIC' => $message->getTopic() ?: '',
             'BLANG' => $message->getLanguage() ?: 'en',
             'BTEXT' => $message->getText(),
-            'BFILETEXT' => $message->getFileText() ?: '',
+            'BFILETEXT' => $fileText,
             'BFILE' => $message->getFile(),
             'BWEBSEARCH' => 0,
             // Intentionally omit BMULTI. The sorter prompt asks the model to
@@ -422,13 +832,25 @@ final readonly class MessageClassifier
 
     /**
      * Map topic to intent for handler routing.
+     *
+     * The four SYSTEM topics (general, mediamaker, officemaker, docsummary)
+     * are looked up from {@see SystemCapabilityRegistry} — the single source
+     * of truth shared with {@see InferenceRouter::getHandler()} and
+     * {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema}.
+     * Everything else here is a deterministic ROUTING ALIAS (tool commands,
+     * "again" model-tag topics, legacy single-model topics): these are not
+     * product capabilities in their own right, just other spellings that
+     * resolve to the same handler, so they stay a local map.
      */
     private function mapTopicToIntent(string $topic): string
     {
-        // Map BPROMPTS topics to InferenceRouter intents
-        $topicToIntent = [
-            // Media generation
-            'mediamaker' => 'image_generation', // Handles images, videos, and audio
+        $systemIntent = $this->capabilityRegistry->topicToIntentMap()[$topic] ?? null;
+        if (null !== $systemIntent) {
+            return $systemIntent;
+        }
+
+        $aliasToIntent = [
+            // Media-generation aliases (tool commands, legacy single-model topics)
             'text2pic' => 'image_generation',
             'text2vid' => 'image_generation',
             'text2sound' => 'image_generation',
@@ -436,22 +858,18 @@ final readonly class MessageClassifier
             'tools:vid' => 'image_generation', // /vid command
             'tools:tts' => 'image_generation', // /tts command (audio via MediaGenerationHandler)
 
-            // Document/Office generation
-            'officemaker' => 'document_generation',
-
-            // Analysis
+            // File-analysis aliases
             'pic2text' => 'file_analysis',
             'analyze' => 'file_analysis',
             'analyzefile' => 'file_analysis',
 
-            // Chat/General
-            'general' => 'chat',
+            // Chat alias
             'chat' => 'chat',
 
             // Add more mappings as needed
         ];
 
-        return $topicToIntent[$topic] ?? 'chat'; // Default to chat
+        return $aliasToIntent[$topic] ?? 'chat'; // Default to chat
     }
 
     /**
@@ -486,14 +904,198 @@ final readonly class MessageClassifier
     }
 
     /**
-     * True if the message has at least one attached document, audio, or video
-     * file (i.e. an analyzable non-image attachment). Routes to
-     * FileAnalysisHandler so the ANALYZE default model is used (#595, video
-     * added in #983). Video is included because its audio track is transcribed
-     * to text the chat model can reason about (#722); without this gate a
-     * video-only message fell through to the AI sorter and was answered as a
-     * plain (text-less) chat.
+     * Explicit merge lexicon. Only verbs that mean "make ONE file out of
+     * several" — a bare "speichern"/"save" is NOT one of them (see
+     * {@see EXPORT_INTENT_PATTERN}).
      */
+    private const MERGE_INTENT_PATTERN = '/(?:'
+        .'\b(?:merge|combine|concatenate|zusammenführen|zusammenfügen|zusammenlegen|fusionner|combiner|combinar|fusionar|birleştir\w*)\b'
+        .'|'
+        .'\b(?:führe?|füge?|fügen)\b.{0,80}\bzusammen\b'
+        .')/iu';
+
+    /**
+     * Explicit "turn this INTO a PDF" lexicon. Every alternative pairs a
+     * conversion verb with the target format, so "speichere die PDFs im Ordner
+     * X" (a save_to_folder request) no longer reads as an export.
+     */
+    private const EXPORT_INTENT_PATTERN = '/(?:'
+        .'\b(?:export\w*|exportier\w*|convert\w*|konvertier\w*|umwandel\w*|wandle|exportar|convertir|convierte|enregistrer|dönüştür\w*)\b[^.!?]{0,40}\bpdfs?\b'
+        .'|'
+        .'\b(?:speicher\w*|save|guardar|guarda)\b\s*(?:\w+\s+){0,3}?\b(?:als|as|como|en|comme|olarak)\s+(?:eine[nmr]?\s+)?pdfs?\b'
+        .'|'
+        .'\b(?:als|as|hieraus|daraus)\s+(?:eine[nmr]?\s+)?pdfs?\b'
+        .')/iu';
+
+    /**
+     * "…into ONE pdf". Turns an otherwise ambiguous export phrasing ("mach aus
+     * beiden eine PDF") into a merge when several files are attached, while
+     * "convert both files to PDF" (two separate PDFs) stays with the planner.
+     */
+    private const SINGLE_PDF_TARGET_PATTERN = '/\b(?:one|single|a\s+single|eine[nmr]?|un|una|seule|tek|einzige[nsr]?)\s+(?:\w+\s+){0,2}?pdfs?\b/iu';
+
+    /**
+     * Capabilities that only the planner can deliver alongside a merge. When a
+     * message asks for one of them too ("merge both AND read it aloud"), the
+     * deterministic single-node route would silently drop it (#1192), so we let
+     * the planner see the whole turn instead.
+     */
+    private const COMPETING_INTENT_PATTERN = '/(?:'
+        .'\b(?:aloud|audio|mp3|podcast|voice|vorlesen|vorlies\w*|sprich|audiodatei|sprachnachricht|voz|voix|sesli)\b'
+        .'|\b(?:lies|liest)\b.{0,20}\bvor\b'
+        .'|\bread\b.{0,20}\b(?:aloud|out\s+loud)\b'
+        .'|\b(?:image|picture|photo|illustration|bild|grafik|imagen|foto|resim|görsel)\b'
+        .'|\b(?:e-?mail|mail\s+it|maile?|verschick\w*|correo|courriel|posta)\b'
+        .'|\b(?:folder|ordner|nextcloud|dropbox|carpeta|dossier|klasör)\b'
+        .'|\b(?:translate|translation|übersetz\w*|traduc\w*|traduir\w*|çevir\w*)\b'
+        .'|\b(?:summarize|summary|summarise|zusammenfassung|resum\w*|résum\w*|özetle\w*)\b'
+        .'|\bfasse?\b.{0,40}\bzusammen\b'
+        .')/iu';
+
+    /**
+     * Merge/export-as-PDF of attached office/PDF files must not be forced onto
+     * analyzefile (#1694). Two or more combine-eligible files plus an explicit
+     * merge prompt maps to `document_combine`. A single office file plus an
+     * export-as-PDF prompt maps to `document_export` (the #1691 conversion).
+     * Read or summarize prompts still return null and take analyzefile.
+     *
+     * Deliberately narrow: this route SKIPS the planner, so anything it claims
+     * is delivered by exactly one server-side node and every other intent in
+     * the same turn would be lost. Whenever the request is ambiguous or
+     * compound we return null and let the planner decide — it knows
+     * `document_combine` too (see {@see OfficePdfRoutingDecorator}).
+     */
+    private function attachmentDocumentFileIntent(Message $message): ?string
+    {
+        $text = trim((string) $message->getText());
+        if ('' === $text) {
+            return null;
+        }
+
+        $eligible = $this->combineEligibleAttachments($message);
+        if ([] === $eligible) {
+            return null;
+        }
+
+        // Neither capability exists without the multi-task engine: the legacy
+        // InferenceRouter has no handler for these intents and would answer
+        // with a plain chat turn that merely CLAIMS a PDF was produced.
+        if (null === $this->multitaskConfig || !$this->multitaskConfig->isRoutingEnabled($message->getUserId())) {
+            return null;
+        }
+
+        if (1 === preg_match(self::COMPETING_INTENT_PATTERN, $text)) {
+            return null;
+        }
+
+        $wantsMerge = 1 === preg_match(self::MERGE_INTENT_PATTERN, $text);
+        $wantsExport = 1 === preg_match(self::EXPORT_INTENT_PATTERN, $text);
+
+        if (count($eligible) >= 2) {
+            $wantsOnePdf = 1 === preg_match(self::SINGLE_PDF_TARGET_PATTERN, $text);
+
+            return ($wantsMerge || ($wantsExport && $wantsOnePdf)) && $this->officeEngineReadyFor($eligible)
+                ? 'document_combine'
+                : null;
+        }
+
+        if ($wantsExport && !$wantsMerge && DocumentThumbnailGenerator::isOffice(DocumentThumbnailGenerator::extensionOf($eligible[0]))) {
+            // Every single-file export runs through the converter, so without
+            // an office engine the node can only fail.
+            return $this->officeEngineReadyFor($eligible) ? 'document_export' : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether the office engine is available for the conversions these sources
+     * need. PDF-only merges never touch the converter; a single office source
+     * makes it mandatory ({@see DocumentCombineService} throws
+     * `engine_required` otherwise, and {@see DocumentExportRunner} hides its
+     * capability from the planner for the same reason).
+     *
+     * @param list<File> $sources
+     */
+    private function officeEngineReadyFor(array $sources): bool
+    {
+        $needsEngine = false;
+        foreach ($sources as $source) {
+            if (DocumentThumbnailGenerator::isOffice(DocumentThumbnailGenerator::extensionOf($source))) {
+                $needsEngine = true;
+                break;
+            }
+        }
+
+        return !$needsEngine || true === $this->officeConverter?->isEnabled();
+    }
+
+    /**
+     * @return list<File>
+     */
+    private function combineEligibleAttachments(Message $message): array
+    {
+        $eligible = [];
+        foreach ($message->getFiles() as $file) {
+            $ext = DocumentThumbnailGenerator::extensionOf($file);
+            if (DocumentThumbnailGenerator::isOffice($ext) || DocumentThumbnailGenerator::isPdf($ext)) {
+                $eligible[] = $file;
+            }
+        }
+
+        return $eligible;
+    }
+
+    /**
+     * When DOCUMENT_TOOLS.ALLOW_UPLOAD_EDIT is on, an office attachment plus
+     * an edit-intent prompt goes to officemaker instead of analyzefile.
+     * Default-off so characterization snapshots stay unchanged.
+     */
+    private function shouldRouteOfficeEditToOfficemaker(Message $message): bool
+    {
+        if (null === $this->documentToolsConfig || !$this->documentToolsConfig->allowUploadEdit($message->getUserId())) {
+            return false;
+        }
+        $text = trim((string) $message->getText());
+        if ('' === $text) {
+            return false;
+        }
+        if (!$this->messageHasOfficeDocumentAttachment($message)) {
+            return false;
+        }
+
+        return 1 === preg_match(
+            '/\b(edit|change|update|format|sort|insert|replace|merge|restyle|currency|conditional|'
+            .'add (?:a |the )?(?:chart|sheet|column|row|slide|heading)|'
+            .'bearbeiten|ändern|formatieren|einfügen|'
+            .'editar|cambiar|modificar|'
+            .'modifier|ajouter|'
+            .'düzenle|değiştir|ekle)\b/iu',
+            $text,
+        );
+    }
+
+    private function messageHasOfficeDocumentAttachment(Message $message): bool
+    {
+        foreach ($message->getFiles() as $file) {
+            $ext = $file->getFileType() ?: pathinfo($file->getFileName(), PATHINFO_EXTENSION);
+            if (null !== DocumentKind::fromExtension((string) $ext)) {
+                return true;
+            }
+        }
+        if ($message->getFile() > 0) {
+            $file = $this->em->getRepository(File::class)->find($message->getFile());
+            if (null !== $file) {
+                $ext = $file->getFileType() ?: pathinfo($file->getFileName(), PATHINFO_EXTENSION);
+                if (null !== DocumentKind::fromExtension((string) $ext)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private function messageHasAnalyzableNonImageAttachment(Message $message): bool
     {
         $files = $message->getFiles();
@@ -618,6 +1220,10 @@ final readonly class MessageClassifier
             return false;
         }
 
+        if ($this->isSelfAwareQuestion($trimmed, $message->getUserId() > 0 ? $message->getUserId() : null)) {
+            return false;
+        }
+
         // Long messages can hide intent — keep the full sorter for anything
         // over ~280 characters (Twitter limit feels right for a chat one-liner).
         if (mb_strlen($trimmed) > 280) {
@@ -628,9 +1234,13 @@ final readonly class MessageClassifier
         // otherwise be shortcut to `general` ("schreibe es als docx",
         // "mach eine excel tabelle", #1042 review). If the message names a
         // supported office format/extension, defer to the AI sorter so it can
-        // pick `officemaker`. PDF is intentionally excluded: we cannot produce
-        // real PDFs, so we must not route PDF requests to the office maker.
-        if (preg_match('/\b(docx|xlsx|pptx|csv|word|excel|powerpoint|spreadsheet|tabellenkalkulation|praesentation|präsentation)\b/iu', $trimmed)) {
+        // pick `officemaker`. PDF is included only when the LibreOffice
+        // engine is on — without it we still cannot produce real PDFs.
+        $officeFormats = 'docx|xlsx|pptx|csv|word|excel|powerpoint|spreadsheet|tabellenkalkulation|praesentation|präsentation';
+        if ($this->officePdfGenerationEnabled()) {
+            $officeFormats .= '|pdf';
+        }
+        if (preg_match('/\b(?:'.$officeFormats.')\b/iu', $trimmed)) {
             return false;
         }
 
@@ -652,6 +1262,21 @@ final readonly class MessageClassifier
 
         if ($this->threadHasGeneratedFile($conversationHistory)
             && $this->mentionsDocumentReference($trimmed)) {
+            return false;
+        }
+
+        // The same two cases for generated MEDIA. Pictures and videos never
+        // carry the `__FILE_GENERATED__:` marker the document guards key on —
+        // they ride the message's file path — so "mach es blau" right after an
+        // image generation missed every trigger below and was shortcut to
+        // `general`, where the chat model can only talk about the picture
+        // instead of editing it.
+        if ($this->lastAssistantGeneratedMedia($conversationHistory)) {
+            return false;
+        }
+
+        if ($this->threadHasGeneratedMedia($conversationHistory)
+            && $this->mentionsMediaReference($trimmed)) {
             return false;
         }
 
@@ -827,6 +1452,77 @@ final readonly class MessageClassifier
     }
 
     /**
+     * Whether the most recent assistant turn produced a picture or a video.
+     *
+     * Generated media is stored on the message itself (BFILEPATH/BFILETYPE),
+     * not behind the `__FILE_GENERATED__:` marker used for office documents,
+     * so it needs its own probe. Only the latest assistant message counts, for
+     * the same reason as {@see lastAssistantGeneratedFile()}.
+     *
+     * @param array<int, Message> $conversationHistory oldest-first thread
+     */
+    private function lastAssistantGeneratedMedia(array $conversationHistory): bool
+    {
+        for ($i = count($conversationHistory) - 1; $i >= 0; --$i) {
+            $msg = $conversationHistory[$i];
+            if ('OUT' !== $msg->getDirection()) {
+                continue;
+            }
+
+            return $this->isGeneratedMediaMessage($msg);
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether any assistant turn in the thread produced a picture or a video.
+     *
+     * @param array<int, Message> $conversationHistory
+     */
+    private function threadHasGeneratedMedia(array $conversationHistory): bool
+    {
+        foreach ($conversationHistory as $msg) {
+            if ('OUT' === $msg->getDirection() && $this->isGeneratedMediaMessage($msg)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isGeneratedMediaMessage(Message $message): bool
+    {
+        $path = $message->getFilePath();
+        if ('' === $path) {
+            return false;
+        }
+
+        $category = ConversationFile::categoryForPath($path);
+
+        return ConversationFile::CATEGORY_IMAGE === $category
+            || ConversationFile::CATEGORY_VIDEO === $category;
+    }
+
+    /**
+     * Whether the message refers to a picture or one of its visual properties.
+     *
+     * The media sibling of {@see mentionsDocumentReference()}, used together
+     * with {@see threadHasGeneratedMedia()} to catch edits that span several
+     * turns ("und jetzt die Farbe ändern"). Kept deliberately visual so normal
+     * chat rarely matches; a false positive costs one extra AI-sorter call.
+     */
+    private function mentionsMediaReference(string $text): bool
+    {
+        return 1 === preg_match(
+            '/\b(bild|bildes|bilder|foto|fotos|grafik|logo|image|picture|photo|imagen|imagem|immagine|resim|görsel|'
+            .'farbe|farben|color|colour|colore|renk|hintergrund|background|fondo|stil|style|estilo|'
+            .'auflösung|aufloesung|resolution|zuschneiden|crop|retusch\w*|retouch\w*)\b/iu',
+            $text
+        );
+    }
+
+    /**
      * Whether the message refers to a document or one of its structural parts.
      *
      * Used together with {@see threadHasGeneratedFile()} to detect document
@@ -841,6 +1537,76 @@ final readonly class MessageClassifier
             .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
             $text
         );
+    }
+
+    /**
+     * Is this a meta-question about the product that must reach the AI sorter?
+     *
+     * Self-awareness works by the sorter picking the `synaplan` topic, whose
+     * prompt carries the product knowledge. Every layer that skips the sorter
+     * therefore has to step aside for these messages, or the question gets
+     * answered by a plain chat turn that knows nothing about Synaplan — the
+     * exact failure the self-awareness feature exists to prevent.
+     *
+     * Applies to all three skipping layers (fast path, embedding router,
+     * native tool-calling deferral) rather than just the fast path, because
+     * none of them can produce the `synaplan` topic: the embedding anchors and
+     * the hand-off toolset both come from {@see SystemCapabilityRegistry},
+     * which covers the four system capabilities only.
+     */
+    private function isSelfAwareQuestion(string $text, ?int $userId): bool
+    {
+        return null !== $this->selfAwareConfig
+            && $this->selfAwareConfig->isEnabled($userId)
+            && 1 === preg_match(self::SELF_AWARE_GUARD_PATTERN, $text);
+    }
+
+    /**
+     * Cheap pre-gate for the Phase 9 deferral: can the account's default chat
+     * provider do native tool calling at all?
+     *
+     * NOT the authoritative check — the model that ends up answering can be a
+     * different one (widget override, prompt binding, "Again" replay), which
+     * is why {@see Handler\ChatHandler} re-checks and can still send the turn
+     * back. This only avoids deferring on installs where the answer is a
+     * foregone "no", where every message would otherwise pay for a pointless
+     * re-route.
+     */
+    private function accountChatModelCanRouteNatively(?int $userId): bool
+    {
+        $provider = $this->modelConfigService->getDefaultProvider($userId, 'chat');
+
+        return '' !== $provider && $this->toolCallingCapability->supports($provider, null, false);
+    }
+
+    /**
+     * Resolve a confident 2-letter language code for a deterministic
+     * short-circuit (fast-path heuristic or embedding-router match) that
+     * skips the AI sorter entirely.
+     *
+     * Tries, in order:
+     *   1. {@see detectLanguageConfident()} — a local text heuristic.
+     *   2. A language already pinned on the message (frontend UI locale or a
+     *      previously detected turn; 'NN' is the entity default = unknown).
+     *
+     * Returns null when neither is available. Callers MUST treat null as "do
+     * not shortcut, fall through to the AI sorter" rather than defaulting to
+     * 'en' — see {@see detectLanguageConfident()}'s docblock for the
+     * incident this guards against (a German "wer bist du?" answered in
+     * English because an undetectable language silently defaulted).
+     */
+    private function resolveConfidentLanguage(Message $message, string $text): ?string
+    {
+        $confidentLanguage = $this->detectLanguageConfident($text);
+
+        if (null === $confidentLanguage) {
+            $existingLanguage = strtolower(trim($message->getLanguage()));
+            if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
+                $confidentLanguage = $existingLanguage;
+            }
+        }
+
+        return $confidentLanguage;
     }
 
     /**
@@ -945,5 +1711,10 @@ final readonly class MessageClassifier
         // persists $classification['language'] to BLANG (email webhook reply,
         // queue-mode chat persistence, ...).
         return $bestScore >= 2 ? $best : null;
+    }
+
+    private function officePdfGenerationEnabled(): bool
+    {
+        return null !== $this->officeConverter && $this->officeConverter->isEnabled();
     }
 }

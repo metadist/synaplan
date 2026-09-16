@@ -6,13 +6,12 @@
     >
       <div class="max-w-6xl mx-auto space-y-6">
         <!-- Header -->
-        <div class="surface-card p-6" data-testid="section-header">
-          <div class="flex items-center gap-3 mb-2">
-            <Icon icon="mdi:server-network" class="w-8 h-8 text-[var(--brand)]" />
-            <h1 class="text-3xl font-bold txt-primary">{{ $t('settings.features.title') }}</h1>
-          </div>
-          <p class="txt-secondary">{{ $t('settings.features.subtitle') }}</p>
-        </div>
+        <PageHeader
+          :title="$t('settings.features.title')"
+          :subtitle="$t('settings.features.subtitle')"
+          icon="mdi:server-network"
+          data-testid="section-header"
+        />
 
         <!-- Loading State -->
         <div
@@ -105,6 +104,12 @@
               </div>
             </div>
           </div>
+
+          <!-- Declared feature modules (absent on a backend without the module registry) -->
+          <FeatureModulesSection
+            v-if="featuresStatus.modules && featuresStatus.modules.length > 0"
+            :modules="featuresStatus.modules"
+          />
 
           <!-- Group features by category -->
           <div
@@ -221,6 +226,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
 import {
   getFeaturesStatus,
   FeatureStatusForbiddenError,

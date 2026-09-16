@@ -5,9 +5,18 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
+use App\AI\StructuredOutput\Schema\TaskPlanSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\Agent\Policy\AssistantSkillGate;
+use App\Service\Agent\Policy\SkillPolicy;
+use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\Context\AttachmentDigest;
+use App\Service\Context\TokenEstimator;
+use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Plan\TaskPlanValidator;
@@ -15,6 +24,8 @@ use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
+use App\Service\SelfAware\SelfAwareConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -56,6 +67,12 @@ final readonly class TaskPlanner
         private SkillCatalog $skillCatalog,
         private PromptService $promptService,
         private RateLimitService $rateLimitService,
+        private StructuredOutputConfig $structuredOutputConfig,
+        private ?PlannerChannelCatalog $channelCatalog = null,
+        private ?SelfAwareConfig $selfAwareConfig = null,
+        private ?OfficePdfRoutingDecorator $officePdfRouting = null,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
+        private ?AttachmentDigest $attachmentDigest = null,
     ) {
     }
 
@@ -86,12 +103,18 @@ final readonly class TaskPlanner
         $messages = $this->buildMessages($systemPrompt, $message, $conversationHistory);
 
         try {
-            $response = $this->aiFacade->chat($messages, $userId, [
+            $aiOptions = [
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1,
                 'max_tokens' => self::PLANNING_MAX_TOKENS,
-            ]);
+            ];
+
+            if ($this->structuredOutputConfig->isEnabled($userId)) {
+                $aiOptions['structured_output'] = TaskPlanSchema::build();
+            }
+
+            $response = $this->aiFacade->chat($messages, $userId, $aiOptions);
             $raw = (string) ($response['content'] ?? '');
 
             // The planner call is a billable LLM request like the sorter's —
@@ -111,7 +134,8 @@ final readonly class TaskPlanner
             return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage);
         }
 
-        $errors = $this->validator->validate($decoded);
+        $allowed = $this->allowedCapabilitiesFromOptions($options);
+        $errors = $this->validator->validate($decoded, $allowed);
         if ([] !== $errors) {
             $this->logger->info('TaskPlanner: plan failed validation, falling back', [
                 'errors' => $errors,
@@ -122,7 +146,7 @@ final readonly class TaskPlanner
 
         try {
             /** @var array<string, mixed> $decoded */
-            $plan = TaskPlan::fromArray($decoded, $this->validator);
+            $plan = TaskPlan::fromArray($decoded, $this->validator, $allowed);
         } catch (\Throwable $e) {
             return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage);
         }
@@ -205,7 +229,7 @@ final readonly class TaskPlanner
 
     /**
      * Render a planner prompt template the same way the live planner does
-     * ([CAPABILITYLIST]/[DYNAMICLIST]/[KEYLIST] substitution). Exposed so the
+     * ([CAPABILITYLIST]/[CHANNELLIST]/[DYNAMICLIST]/[KEYLIST] substitution). Exposed so the
      * admin config UI can show an accurate preview of what the model receives.
      */
     public function renderSystemPrompt(string $template, ?int $userId): string
@@ -220,6 +244,16 @@ final readonly class TaskPlanner
     {
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+        if (null !== $this->selfAwareConfig && !$this->selfAwareConfig->isEnabled($userId)) {
+            $topics = array_values(array_filter(
+                $topics,
+                static fn (string $topic): bool => SelfAwareConfig::ROUTABLE_TOPIC !== $topic,
+            ));
+            $topicsWithDesc = array_values(array_filter(
+                $topicsWithDesc,
+                static fn (array $item): bool => SelfAwareConfig::ROUTABLE_TOPIC !== ($item['topic'] ?? ''),
+            ));
+        }
 
         // Catalog-lite (release 4.0): the capability list is assembled from the
         // SkillDescriptors the runners declare — one source of truth per block.
@@ -228,6 +262,10 @@ final readonly class TaskPlanner
         // their sub-catalog is injected at all (plan 09 §3.2).
         $capabilityList = $this->skillCatalog->renderCapabilityList($userId, $this->catalogContext($userId, $options));
 
+        if (null !== $this->officePdfRouting) {
+            $topicsWithDesc = $this->officePdfRouting->decorateTopics($topicsWithDesc);
+        }
+
         $dynamicList = [];
         foreach ($topicsWithDesc as $item) {
             $dynamicList[] = "- \"{$item['topic']}\": {$item['description']}";
@@ -235,9 +273,17 @@ final readonly class TaskPlanner
 
         $keyList = implode(' | ', array_map(static fn (string $t): string => '"'.$t.'"', $topics));
 
+        $channelList = null !== $this->channelCatalog
+            ? $this->channelCatalog->renderForPlanner($userId)
+            : '(none)';
+
         $text = str_replace('[CAPABILITYLIST]', $capabilityList, $template);
+        $text = str_replace('[CHANNELLIST]', $channelList, $text);
         $text = str_replace('[DYNAMICLIST]', implode("\n", $dynamicList), $text);
         $text = str_replace('[KEYLIST]', $keyList, $text);
+        if (null !== $this->officePdfRouting) {
+            $text = $this->officePdfRouting->decoratePrompt($text);
+        }
 
         return $text."\n\n".$this->timeContextBlock($message, $options);
     }
@@ -257,7 +303,9 @@ final readonly class TaskPlanner
         $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
         $topic = is_string($classification['topic'] ?? null) ? $classification['topic'] : '';
         if ('' === $topic) {
-            return [];
+            $allowed = $this->allowedCapabilitiesFromOptions($options);
+
+            return null !== $allowed ? ['allowedCapabilities' => $allowed] : [];
         }
 
         $topicMetadata = [];
@@ -273,7 +321,40 @@ final readonly class TaskPlanner
             ]);
         }
 
-        return ['topic' => $topic, 'topic_metadata' => $topicMetadata];
+        $context = ['topic' => $topic, 'topic_metadata' => $topicMetadata];
+        $profile = $options['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+            $profile = $classification['runtime_profile'] ?? null;
+        }
+        if ($profile instanceof RuntimeProfile) {
+            $context['runtime_profile'] = $profile;
+        }
+        $allowed = $this->allowedCapabilitiesFromOptions($options);
+        if (null !== $allowed) {
+            $context['allowedCapabilities'] = $allowed;
+        }
+
+        return $context;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return list<string>|null
+     */
+    private function allowedCapabilitiesFromOptions(array $options): ?array
+    {
+        $profile = $options['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+            $profile = $classification['runtime_profile'] ?? null;
+        }
+        if (!$profile instanceof RuntimeProfile) {
+            return null;
+        }
+
+        return AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile);
     }
 
     /**
@@ -359,12 +440,25 @@ final readonly class TaskPlanner
         return $messages;
     }
 
+    /**
+     * BFILETEXT is the ROUTING view of the attachment (verbatim for ordinary
+     * files, a structural digest for large ones — see AttachmentDigest). The
+     * planner only needs to know what the file is to pick capabilities; the
+     * full text overflowed the PLAN/SORT model on large spreadsheets and
+     * degraded every such turn to the single-`chat` fallback plan.
+     */
     private function buildCurrentMessageJson(Message $message): string
     {
+        $fileText = $message->getFileText() ?: '';
+        if ('' !== $fileText) {
+            $digest = $this->attachmentDigest ?? new AttachmentDigest(new TokenEstimator());
+            $fileText = $digest->forRoutingWithConfig($fileText, $message->getUserId(), $message->getFileType());
+        }
+
         $data = [
             'BTEXT' => $message->getText(),
             'BLANG' => $message->getLanguage() ?: 'en',
-            'BFILETEXT' => $message->getFileText() ?: '',
+            'BFILETEXT' => $fileText,
         ];
 
         $attached = [];
@@ -383,34 +477,10 @@ final readonly class TaskPlanner
     }
 
     /**
-     * Decode the model's JSON, tolerating markdown code fences and surrounding prose.
-     *
      * @return array<string, mixed>|null
      */
     private function decodeJson(string $raw): ?array
     {
-        $text = trim($raw);
-        if (str_starts_with($text, '```')) {
-            $text = (string) preg_replace('/^```(?:json)?\s*/', '', $text);
-            $text = (string) preg_replace('/\s*```$/', '', $text);
-            $text = trim($text);
-        }
-
-        // If the model wrapped the JSON in prose, grab the outermost object.
-        if (!str_starts_with($text, '{')) {
-            $start = strpos($text, '{');
-            $end = strrpos($text, '}');
-            if (false !== $start && false !== $end && $end > $start) {
-                $text = substr($text, $start, $end - $start + 1);
-            }
-        }
-
-        try {
-            $decoded = json_decode($text, true, 512, \JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
-        }
-
-        return is_array($decoded) ? $decoded : null;
+        return $this->jsonDecoder->decode($raw)->data;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\AI\Provider\OpenAIProvider;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -351,9 +352,9 @@ class OpenAIProviderResponsesApiTest extends TestCase
     }
 
     /**
-     * gpt-5.5+ exposes an `'xhigh'` tier above `'high'`. Older families don't
-     * accept it — make sure we pass it through on gpt-5.5 and clamp to
-     * `'high'` everywhere else.
+     * Everything from gpt-5.4 up exposes an `'xhigh'` tier above `'high'`. The
+     * original gpt-5 line and the o-series don't accept it — make sure we pass
+     * it through on gpt-5.5 and clamp to `'high'` on gpt-5.
      */
     public function testBuildResponsesRequestXHighEffortPassesThroughOnGpt55(): void
     {
@@ -384,11 +385,85 @@ class OpenAIProviderResponsesApiTest extends TestCase
     }
 
     /**
-     * Per-family lowest-tier mapping. The catalog ships `gpt-5.4` (BIDs 180,
-     * 181) and `gpt-5.5` / `gpt-5.5-pro` (BIDs 204-207); both must continue
-     * to work with default chat (Thinking toggle off). Lock the mapping
-     * down so a future refactor of `lowestEffortTier()` can't silently
-     * regress existing users.
+     * gpt-6-astra publishes `xhigh` and `max`. Pass both through, and clamp
+     * `max` down to `xhigh` on gpt-5.5 (highest that family accepts) and to
+     * `high` on original gpt-5.
+     */
+    public function testBuildResponsesRequestMaxEffortPassesThroughOnGpt6Astra(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
+        $options = ['reasoning_effort' => 'max'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-6-astra', true, $options);
+
+        $this->assertSame('max', $result['reasoning']['effort']);
+        $this->assertSame('auto', $result['reasoning']['summary']);
+    }
+
+    public function testBuildResponsesRequestXHighEffortPassesThroughOnGpt6Astra(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
+        $options = ['reasoning_effort' => 'xhigh'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-6-astra', true, $options);
+
+        $this->assertSame('xhigh', $result['reasoning']['effort']);
+        $this->assertSame('auto', $result['reasoning']['summary']);
+    }
+
+    public function testBuildResponsesRequestMaxEffortClampsToXHighOnGpt55(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
+        $options = ['reasoning_effort' => 'max'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+
+        $this->assertSame('xhigh', $result['reasoning']['effort']);
+    }
+
+    public function testBuildResponsesRequestMaxEffortClampsToHighOnGpt5(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
+        $options = ['reasoning_effort' => 'max'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5', true, $options);
+
+        $this->assertSame('high', $result['reasoning']['effort']);
+    }
+
+    public function testBuildResponsesRequestDefaultChatUsesLowEffortOnGpt6Astra(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => false];
+
+        $result = $method->invoke($provider, $messages, 'gpt-6-astra', true, $options);
+
+        $this->assertSame('low', $result['reasoning']['effort']);
+        $this->assertArrayNotHasKey('summary', $result['reasoning']);
+    }
+
+    /**
+     * Per-family lowest-tier mapping, verified against the OpenAI model
+     * reference on 2026-09-04. Every family the catalog ships must work with
+     * default chat (Thinking toggle off), and the tier names differ per family:
+     * sending one the model rejects costs an HTTP 400 round trip and then drops
+     * reasoning entirely. Lock the mapping down so a future refactor of
+     * `lowestEffortTier()` can't silently regress existing users.
      *
      * @param string $model expected lowest-tier output for this model
      */
@@ -407,37 +482,46 @@ class OpenAIProviderResponsesApiTest extends TestCase
     public static function lowestEffortTierProvider(): array
     {
         return [
-            // gpt-5.5+ family — accepts 'none', rejects 'minimal'
+            // gpt-5.4 / 5.5 / 5.6 — accept 'none', reject 'minimal'
+            'gpt-5.4 (in catalog)' => ['gpt-5.4',                  'none'],
+            'gpt-5.4 with date' => ['gpt-5.4-2025-12-01',       'none'],
+            'gpt-5.4-mini' => ['gpt-5.4-mini',             'none'],
+            'gpt-5.4-nano' => ['gpt-5.4-nano',             'none'],
             'gpt-5.5' => ['gpt-5.5',                  'none'],
-            'gpt-5.5-pro' => ['gpt-5.5-pro',              'none'],
             'gpt-5.5 with date suffix' => ['gpt-5.5-2026-01-15',       'none'],
-            'gpt-5.5-pro with date' => ['gpt-5.5-pro-2026-01-15',   'none'],
-            // gpt-5.x where x < 5 — original 'minimal' tier
+            'gpt-5.6-sol' => ['gpt-5.6-sol',              'none'],
+            'gpt-5.6-terra' => ['gpt-5.6-terra',            'none'],
+            'gpt-5.6-luna' => ['gpt-5.6-luna',             'none'],
+            // gpt-5.5-pro reasons hard by design: no 'none', no 'low'
+            'gpt-5.5-pro' => ['gpt-5.5-pro',              'medium'],
+            'gpt-5.5-pro with date' => ['gpt-5.5-pro-2026-01-15',   'medium'],
+            // gpt-5.x where x < 4 — original 'minimal' tier
             'gpt-5' => ['gpt-5',                    'minimal'],
             'gpt-5.0' => ['gpt-5.0',                  'minimal'],
             'gpt-5.1' => ['gpt-5.1',                  'minimal'],
             'gpt-5.2' => ['gpt-5.2',                  'minimal'],
             'gpt-5.3' => ['gpt-5.3',                  'minimal'],
-            'gpt-5.4 (in catalog)' => ['gpt-5.4',                  'minimal'],
             'gpt-5 with date suffix' => ['gpt-5-2025-08-06',         'minimal'],
-            'gpt-5.4 with date' => ['gpt-5.4-2025-12-01',       'minimal'],
             // o-series — rejects both 'minimal' and 'none'
             'o1' => ['o1',                       'low'],
             'o1-mini' => ['o1-mini',                  'low'],
             'o3' => ['o3',                       'low'],
             'o3-mini' => ['o3-mini',                  'low'],
             'o4-mini' => ['o4-mini',                  'low'],
+            // gpt-6 — no none/minimal skip tier; lowest published is 'low'
+            'gpt-6-astra' => ['gpt-6-astra',              'low'],
+            'gpt-6 with date suffix' => ['gpt-6-astra-2026-09-04',   'low'],
         ];
     }
 
     /**
-     * Regression test for the 5.4-and-lower concern: a user whose default
-     * chat model is gpt-5.4 must keep getting a working request. The
-     * previous behaviour (no reasoning block, server default = `medium`)
-     * is upgraded to `effort='minimal'`, which the gpt-5.x line accepts —
-     * not `'none'`, which only gpt-5.5+ accepts.
+     * A user whose default chat model is gpt-5.4 must get a request the model
+     * accepts. Its published vocabulary is `none (default), low, medium, high,
+     * xhigh` — so the skip tier is `'none'`, and the `'minimal'` we used to send
+     * came back as HTTP 400, costing a round trip before the rejection cache
+     * dropped reasoning altogether.
      */
-    public function testGpt54DefaultChatSendsMinimalNotNone(): void
+    public function testGpt54DefaultChatSendsNoneNotMinimal(): void
     {
         $provider = $this->createProvider();
         $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
@@ -447,8 +531,87 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
         $result = $method->invoke($provider, $messages, 'gpt-5.4', true, $options);
 
-        $this->assertSame('minimal', $result['reasoning']['effort']);
-        $this->assertNotSame('none', $result['reasoning']['effort']);
+        $this->assertSame('none', $result['reasoning']['effort']);
+        $this->assertNotSame('minimal', $result['reasoning']['effort']);
+    }
+
+    /**
+     * The GPT-5.6 family matched the bare `gpt-5` prefix before the per-family
+     * table existed, so default chat sent `'minimal'` — a tier Sol, Terra and
+     * Luna all reject. Their published skip tier is `'none'`.
+     */
+    #[DataProvider('gpt56ModelProvider')]
+    public function testGpt56DefaultChatSendsNone(string $model): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $result = $method->invoke(
+            $provider,
+            [['role' => 'user', 'content' => 'Hi']],
+            $model,
+            true,
+            ['reasoning' => false],
+        );
+
+        $this->assertSame('none', $result['reasoning']['effort']);
+    }
+
+    /**
+     * Sol, Terra and Luna publish `max` as their top tier, so a request for it
+     * must pass through rather than clamp down to `xhigh`/`high`.
+     */
+    #[DataProvider('gpt56ModelProvider')]
+    public function testGpt56MaxEffortPassesThrough(string $model): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $result = $method->invoke(
+            $provider,
+            [['role' => 'user', 'content' => 'Solve this']],
+            $model,
+            true,
+            ['reasoning_effort' => 'max'],
+        );
+
+        $this->assertSame('max', $result['reasoning']['effort']);
+        $this->assertSame('auto', $result['reasoning']['summary']);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function gpt56ModelProvider(): array
+    {
+        return [
+            'sol' => ['gpt-5.6-sol'],
+            'terra' => ['gpt-5.6-terra'],
+            'luna' => ['gpt-5.6-luna'],
+        ];
+    }
+
+    /**
+     * gpt-5.5-pro accepts only `medium`, `high` and `xhigh`. A request for a
+     * cheaper tier — including the default-chat skip path — must clamp UP to
+     * `medium` instead of sending a `none`/`low` the model rejects.
+     */
+    public function testGpt55ProClampsCheapTiersUpToMedium(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        foreach ([['reasoning' => false], ['reasoning_effort' => 'low']] as $options) {
+            $result = $method->invoke(
+                $provider,
+                [['role' => 'user', 'content' => 'Hi']],
+                'gpt-5.5-pro',
+                true,
+                $options,
+            );
+
+            $this->assertSame('medium', $result['reasoning']['effort']);
+        }
     }
 
     /**
@@ -592,6 +755,40 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $this->assertSame('concise', $result['reasoning']['summary']);
     }
 
+    /**
+     * The Responses API nests structured output under `text.format`, NOT
+     * Chat Completions' top-level `response_format` — verify the schema
+     * lands where the API actually expects it.
+     */
+    public function testBuildResponsesRequestMergesStructuredOutputAsTextFormat(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Classify this']];
+        $schema = new StructuredOutputSchema('sort_classification', ['type' => 'object']);
+        $options = ['structured_output' => $schema];
+
+        $result = $method->invoke($provider, $messages, 'gpt-4o', false, $options);
+
+        $this->assertSame('json_schema', $result['text']['format']['type']);
+        $this->assertSame('sort_classification', $result['text']['format']['name']);
+        $this->assertSame(['type' => 'object'], $result['text']['format']['schema']);
+        $this->assertArrayNotHasKey('response_format', $result);
+    }
+
+    public function testBuildResponsesRequestWithoutStructuredOutputOmitsTextFormat(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hello']];
+
+        $result = $method->invoke($provider, $messages, 'gpt-4o', false, []);
+
+        $this->assertArrayNotHasKey('text', $result);
+    }
+
     public function testReduceToLastUserMessageViaReflection(): void
     {
         $provider = $this->createProvider();
@@ -663,6 +860,37 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $this->assertTrue($method->invoke($provider, 'gpt-image-1'));
         $this->assertTrue($method->invoke($provider, 'gpt-image-1.5'));
         $this->assertTrue($method->invoke($provider, 'gpt-image-2'));
+        $this->assertTrue($method->invoke($provider, 'gpt-image-2.5-flare'));
+        $this->assertTrue($method->invoke($provider, 'gpt-image-2.5-sunburst'));
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    #[DataProvider('gptImageQualityAllowListProvider')]
+    public function testGptImageQualityAllowListIsGatedByFamily(string $model, array $expected): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'allowedGptImageQualities');
+
+        $this->assertSame($expected, $method->invoke($provider, $model));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: list<string>}>
+     */
+    public static function gptImageQualityAllowListProvider(): array
+    {
+        $legacy = ['low', 'medium', 'high', 'auto'];
+        $image25 = ['low', 'medium', 'high', 'xhigh', 'max', 'auto'];
+
+        return [
+            'gpt-image-1' => ['gpt-image-1', $legacy],
+            'gpt-image-1.5' => ['gpt-image-1.5', $legacy],
+            'gpt-image-2' => ['gpt-image-2', $legacy],
+            'gpt-image-2.5-flare' => ['gpt-image-2.5-flare', $image25],
+            'gpt-image-2.5-sunburst' => ['gpt-image-2.5-sunburst', $image25],
+        ];
     }
 
     /**
@@ -696,10 +924,14 @@ class OpenAIProviderResponsesApiTest extends TestCase
             'gpt-image-1 text2pic' => ['gpt-image-1',   [],                  'gpt_image'],
             'gpt-image-1.5 text2pic' => ['gpt-image-1.5', [],                  'gpt_image'],
             'gpt-image-2 text2pic' => ['gpt-image-2',   [],                  'gpt_image'],
+            'gpt-image-2.5-flare text2pic' => ['gpt-image-2.5-flare', [],           'gpt_image'],
+            'gpt-image-2.5-sunburst text2pic' => ['gpt-image-2.5-sunburst', [],     'gpt_image'],
             // Pic2pic: gpt-image-* with reference images must use the Responses API
             'gpt-image-1 pic2pic' => ['gpt-image-1',   ['/tmp/ref1.png'],   'responses'],
             'gpt-image-1.5 pic2pic' => ['gpt-image-1.5', ['/tmp/ref1.png'],   'responses'],
             'gpt-image-2 pic2pic' => ['gpt-image-2',   ['/tmp/ref1.png'],   'responses'],
+            'gpt-image-2.5-flare pic2pic' => ['gpt-image-2.5-flare', ['/tmp/ref1.png'], 'responses'],
+            'gpt-image-2.5-sunburst pic2pic' => ['gpt-image-2.5-sunburst', ['/tmp/ref1.png'], 'responses'],
             // DALL-E stays on the legacy Images API client path
             'dall-e-3 text2pic' => ['dall-e-3',      [],                  'dalle'],
             'dall-e-2 text2pic' => ['dall-e-2',      [],                  'dalle'],

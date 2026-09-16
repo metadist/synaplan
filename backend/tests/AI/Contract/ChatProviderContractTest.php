@@ -3,6 +3,7 @@
 namespace App\Tests\AI\Contract;
 
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -85,5 +86,35 @@ abstract class ChatProviderContractTest extends TestCase
 
         $this->assertNotEmpty($chunks);
         $this->assertIsArray($chunks);
+    }
+
+    /**
+     * Tools are additive. Non-tool providers must ignore the option and still
+     * answer with text. Tool-calling providers must not throw.
+     */
+    public function testToolsOptionIsIgnoredGracefullyByNonToolProviders(): void
+    {
+        $provider = $this->getProvider();
+        $result = $provider->chat(
+            [['role' => 'user', 'content' => 'Hello, how are you?']],
+            [
+                'model' => 'test-model',
+                'tools' => [[
+                    'type' => 'function',
+                    'function' => [
+                        'name' => 'noop',
+                        'description' => 'do nothing',
+                        'parameters' => ['type' => 'object', 'properties' => []],
+                    ],
+                ]],
+            ]
+        );
+
+        $this->assertArrayHasKey('content', $result);
+        $this->assertIsString($result['content']);
+        if (!$provider instanceof ToolCallingChatProviderInterface) {
+            $this->assertArrayNotHasKey('tool_calls', $result);
+            $this->assertNotEmpty($result['content']);
+        }
     }
 }

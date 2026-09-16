@@ -36,6 +36,17 @@ final class StreamChunkTest extends TestCase
         self::assertSame('', StreamChunk::visibleText(['type' => 'finish', 'finish_reason' => 'stop']));
     }
 
+    public function testToolCallDeltaChunkIsDropped(): void
+    {
+        self::assertSame('', StreamChunk::visibleText([
+            'type' => 'tool_call_delta',
+            'index' => 0,
+            'id' => 'call_1',
+            'name' => 'web_search',
+            'arguments' => '{"q":"x"}',
+        ]));
+    }
+
     public function testUntypedArrayWithContentIsVisibleForBackwardCompatibility(): void
     {
         self::assertSame('legacy', StreamChunk::visibleText(['content' => 'legacy']));

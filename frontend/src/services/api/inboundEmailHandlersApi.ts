@@ -45,6 +45,7 @@ export interface Department {
   email: string
   rules: string
   isDefault: boolean
+  agentId?: number | null
 }
 
 export interface MailConfig {
@@ -198,6 +199,7 @@ function convertBackendToFrontend(backend: BackendMailHandler): SavedMailHandler
       email: dept.email,
       rules: dept.rules,
       isDefault: dept.isDefault,
+      agentId: typeof dept.agentId === 'number' && dept.agentId > 0 ? dept.agentId : null,
     })),
     status: backend.status,
     smtpConfig: backend.smtpConfig

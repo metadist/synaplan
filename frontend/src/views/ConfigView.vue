@@ -36,8 +36,29 @@
           <McpServersConfiguration />
         </div>
 
+        <div v-else-if="currentPage === 'connections'" data-testid="section-connections">
+          <ConnectionsConfiguration />
+          <CustomToolsConfiguration class="mt-8" />
+        </div>
+
+        <div v-else-if="currentPage === 'saved-tasks'" data-testid="section-saved-tasks">
+          <SavedTasksOverview />
+        </div>
+
+        <div v-else-if="currentPage === 'approvals'" data-testid="section-approvals">
+          <ApprovalsInbox />
+        </div>
+
         <div v-else-if="currentPage === 'ai-agents'" data-testid="section-ai-agents">
           <MessagesGatewayConfiguration />
+        </div>
+
+        <div v-else-if="currentPage === 'desktop'" data-testid="section-desktop">
+          <DesktopConfiguration />
+        </div>
+
+        <div v-else-if="currentPage === 'platform-links'" data-testid="section-platform-links">
+          <LinkedPlatformsConfiguration />
         </div>
 
         <div
@@ -63,7 +84,13 @@ import SortingPromptConfiguration from '@/components/config/SortingPromptConfigu
 import APIKeysConfiguration from '@/components/config/APIKeysConfiguration.vue'
 import ApiDocumentation from '@/components/config/ApiDocumentation.vue'
 import McpServersConfiguration from '@/components/config/McpServersConfiguration.vue'
+import ConnectionsConfiguration from '@/components/config/ConnectionsConfiguration.vue'
+import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
+import ApprovalsInbox from '@/components/config/ApprovalsInbox.vue'
+import CustomToolsConfiguration from '@/components/config/CustomToolsConfiguration.vue'
 import MessagesGatewayConfiguration from '@/components/config/MessagesGatewayConfiguration.vue'
+import DesktopConfiguration from '@/components/config/DesktopConfiguration.vue'
+import LinkedPlatformsConfiguration from '@/components/config/LinkedPlatformsConfiguration.vue'
 
 const route = useRoute()
 
@@ -75,6 +102,11 @@ const currentPage = computed(() => {
   if (path.startsWith('/channels/api')) return 'api-keys'
   if (path.startsWith('/channels/agents')) return 'ai-agents'
   if (path.startsWith('/channels/mcp')) return 'mcp-servers'
+  if (path.startsWith('/channels/connections')) return 'connections'
+  if (path.startsWith('/channels/tasks')) return 'saved-tasks'
+  if (path.startsWith('/channels/approvals')) return 'approvals'
+  if (path.startsWith('/channels/desktop')) return 'desktop'
+  if (path.startsWith('/channels/platform-links')) return 'platform-links'
   if (path.startsWith('/channels')) return 'inbound'
   if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
   if (path.startsWith('/ai/models')) return 'ai-models'

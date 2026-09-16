@@ -3,7 +3,7 @@
 /.env.local
 /.env.local.php
 /.env.*.local
-# Note: .env.test is NOT ignored (committed for CI/CD)
+# Note: .env.test and .env.minimal are NOT ignored (committed for CI)
 /config/secrets/prod/prod.decrypt.private.php
 /config/jwt/
 /public/bundles/

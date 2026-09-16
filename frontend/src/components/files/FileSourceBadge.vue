@@ -1,7 +1,9 @@
 <template>
   <!-- Same as FileVectorPill: nowrap on the outer element defeats the inner
-       truncate, so the badge could grow past its column. -->
+       truncate, so the badge could grow past its column. Default web uploads
+       are omitted — labelling every row "Upload" does not distinguish anything. -->
   <span
+    v-if="visible"
     class="inline-flex items-center gap-1 text-[11px] txt-secondary min-w-0 max-w-full overflow-hidden"
     :title="t('files.help.source')"
     data-testid="file-source-badge"
@@ -28,6 +30,8 @@ const props = withDefaults(
 
 const { t } = useI18n()
 
+const visible = computed(() => props.source !== 'web_upload')
+
 const icon = computed(() => {
   const map: Record<FileSource, string> = {
     web_upload: 'mdi:tray-arrow-up',
@@ -39,6 +43,7 @@ const icon = computed(() => {
     widget: 'mdi:puzzle-outline',
     api: 'mdi:api',
     generated: 'mdi:auto-fix',
+    compute: 'mdi:file-cog-outline',
   }
   return map[props.source] ?? 'mdi:tray-arrow-up'
 })

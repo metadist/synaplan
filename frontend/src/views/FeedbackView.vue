@@ -3,37 +3,33 @@
     <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
       <div class="max-w-4xl mx-auto space-y-5">
         <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 class="text-2xl font-semibold txt-primary flex items-center gap-2">
-              <Icon icon="mdi:alert-circle-check-outline" class="w-7 h-7 text-brand" />
-              {{ $t('feedback.list.title') }}
-            </h1>
-            <p class="txt-secondary text-sm mt-1">
-              {{ $t('feedback.list.subtitle') }}
-            </p>
-          </div>
-
-          <!-- Type Filter -->
-          <div class="flex items-center gap-1 p-1 surface-chip rounded-xl shrink-0">
-            <button
-              v-for="ft in filterTypes"
-              :key="ft.value"
-              type="button"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-              :class="
-                selectedType === ft.value
-                  ? 'mode-toggle-active'
-                  : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10'
-              "
-              @click="selectType(ft.value)"
-            >
-              <Icon :icon="ft.icon" class="w-3.5 h-3.5" />
-              {{ ft.label }}
-              <span class="text-[10px] opacity-70">({{ ft.count }})</span>
-            </button>
-          </div>
-        </div>
+        <PageHeader
+          :title="$t('feedback.list.title')"
+          :subtitle="$t('feedback.list.subtitle')"
+          icon="mdi:alert-circle-check-outline"
+        >
+          <template #actions>
+            <!-- Type Filter -->
+            <div class="flex items-center gap-1 p-1 surface-chip rounded-xl shrink-0">
+              <button
+                v-for="ft in filterTypes"
+                :key="ft.value"
+                type="button"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                :class="
+                  selectedType === ft.value
+                    ? 'mode-toggle-active'
+                    : 'txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10'
+                "
+                @click="selectType(ft.value)"
+              >
+                <Icon :icon="ft.icon" class="w-3.5 h-3.5" />
+                {{ ft.label }}
+                <span class="text-[10px] opacity-70">({{ ft.count }})</span>
+              </button>
+            </div>
+          </template>
+        </PageHeader>
 
         <!-- Search + Toolbar -->
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -400,6 +396,7 @@ import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import type { Feedback } from '@/services/api/userFeedbackApi'
 

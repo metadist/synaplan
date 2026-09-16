@@ -1,0 +1,168 @@
+[
+  {
+    "id": "en_rent_letter_bootstrap",
+    "mode": "bootstrap",
+    "expect_language": "en",
+    "notes": "Long-running office-rent thread with an attached letter. Durable facts: landlord name, old/new rent, effective date.",
+    "probes": {
+      "required": ["Meridian", "re:1[^0-9]{0,2}450", "re:1[^0-9]{0,2}620", "re:Sept|0?1[./-]0?9|0?9[./-]0?1"],
+      "forbidden": ["lawsuit", "termination notice"]
+    },
+    "messages": [
+      { "role": "user", "text": "I received a letter from our landlord about the office rent. Can you help me understand it?" },
+      { "role": "assistant", "text": "Of course. Please share the letter or its key points and I'll walk you through it." },
+      { "role": "user", "text": "Here is the letter as a scan.", "file_type": "document", "file_text": "Meridian Properties GmbH — Notice of rent adjustment. Dear tenant, pursuant to clause 4.2 of your lease for the office unit at Dockside Park 12, the monthly base rent will increase from EUR 1450 to EUR 1620 effective 1 September. Ancillary cost prepayments remain unchanged at EUR 310 per month." },
+      { "role": "assistant", "text": "Summary of the letter: Meridian Properties raises your base rent from EUR 1450 to EUR 1620 (an 11.7% increase) effective 1 September, citing clause 4.2 of the lease. Ancillary prepayments stay at EUR 310." },
+      { "role": "user", "text": "Is an 11.7% increase even allowed under a standard commercial lease?" },
+      { "role": "assistant", "text": "Commercial leases are not subject to residential rent caps. What matters is what clause 4.2 says — typically an indexation clause tied to the consumer price index. If the CPI rose accordingly, the increase is likely valid." },
+      { "role": "user", "text": "Clause 4.2 is indeed a CPI indexation clause. The letter references the official index." },
+      { "role": "assistant", "text": "Then the adjustment is most likely enforceable. You can still verify the arithmetic: base rent at signing, index value then, index value now. If you want, draft a short reply asking Meridian for the exact index values used." },
+      { "role": "user", "text": "Yes, draft that reply to the realtor please. Polite but firm, asking for the calculation details." },
+      { "role": "assistant", "text": "Draft: 'Dear Meridian Properties team, thank you for your notice regarding the rent adjustment for Dockside Park 12. Before we confirm, please provide the exact index values and calculation used to derive the new base rent of EUR 1620. Kind regards.' Shall I finalize it?" },
+      { "role": "user", "text": "Perfect, that's the letter I'll send. Please remember we sent this to the realtor today." },
+      { "role": "assistant", "text": "Noted — the verification request was sent to Meridian Properties today. I'll treat the increase as pending their reply with the index calculation." },
+      { "role": "user", "text": "While we wait: our budget. The office costs will rise by EUR 170 per month, so about EUR 2040 per year. Where should we absorb that?" },
+      { "role": "assistant", "text": "Options: reduce the coworking day-pass budget (currently EUR 250/month, underused), renegotiate the cleaning contract, or cut the beverage subscription. The day-pass budget alone would cover the increase." },
+      { "role": "user", "text": "Good, let's cut the day-pass budget to EUR 80 and keep everything else. Decision made." },
+      { "role": "assistant", "text": "Decision recorded: day-pass budget reduced from EUR 250 to EUR 80 per month, which more than covers the EUR 170 rent increase. Cleaning and beverages unchanged." },
+      { "role": "user", "text": "One more thing — when does our lease actually expire? I think we signed for five years." },
+      { "role": "assistant", "text": "Based on what you told me earlier in this thread, the lease for Dockside Park 12 runs five years from signing; you should confirm the exact expiry date from the contract PDF. That is still an open point." }
+    ]
+  },
+  {
+    "id": "de_buero_umbau_bootstrap",
+    "mode": "bootstrap",
+    "expect_language": "de",
+    "notes": "German thread about an office refurbishment. The summary must stay in German and keep contractor name and budget.",
+    "probes": {
+      "required": ["re:Tischler(ei)? Brandt|Brandt", "re:18[.,\\s]?000", "re:Bauamt|Genehmigung"],
+      "forbidden": ["Meridian", "Insolvenz"]
+    },
+    "messages": [
+      { "role": "user", "text": "Wir wollen unser Büro im Erdgeschoss umbauen: zwei Besprechungsräume und eine kleine Teeküche." },
+      { "role": "assistant", "text": "Gern. Wichtige Punkte: Budget, Zeitplan, und ob tragende Wände betroffen sind. Gibt es dazu schon Informationen?" },
+      { "role": "user", "text": "Budget maximal 18000 Euro. Keine tragenden Wände, nur Leichtbauwände. Fertig sein soll alles bis Ende November." },
+      { "role": "assistant", "text": "Verstanden: Budget 18000 Euro, Leichtbauwände, Deadline Ende November. Für Leichtbauwände ist in der Regel keine Baugenehmigung nötig, die Teeküche mit Wasseranschluss sollte aber mit dem Vermieter abgestimmt werden." },
+      { "role": "user", "text": "Der Vermieter hat schriftlich zugestimmt. Welche Handwerker brauchen wir?" },
+      { "role": "assistant", "text": "Trockenbauer für die Wände, Elektriker für Steckdosen und Beleuchtung, Installateur für die Teeküche. Optional ein Tischler für Einbaumöbel." },
+      { "role": "user", "text": "Wir haben drei Angebote eingeholt. Die Tischlerei Brandt war mit 4200 Euro für die Einbaumöbel am günstigsten und hat gute Referenzen." },
+      { "role": "assistant", "text": "Dann ist die Tischlerei Brandt eine solide Wahl. Damit wären rund 4200 Euro des Budgets für Möbel gebunden, es blieben etwa 13800 Euro für Trockenbau, Elektrik und Sanitär." },
+      { "role": "user", "text": "Entschieden: Brandt bekommt den Zuschlag für die Möbel. Der Trockenbauer beginnt am 6. Oktober." },
+      { "role": "assistant", "text": "Festgehalten: Auftrag für Einbaumöbel an Tischlerei Brandt (4200 Euro), Trockenbau-Start am 6. Oktober, Gesamtbudget 18000 Euro, Deadline Ende November." },
+      { "role": "user", "text": "Offen ist noch, ob wir für das neue Außenschild eine Genehmigung vom Bauamt brauchen. Kannst du das im Blick behalten?" },
+      { "role": "assistant", "text": "Notiert als offener Punkt: Klärung mit dem Bauamt, ob das Außenschild genehmigungspflichtig ist. Alles andere ist entschieden." }
+    ]
+  },
+  {
+    "id": "en_whatsapp_style_bootstrap",
+    "mode": "bootstrap",
+    "expect_language": "en",
+    "notes": "Short colloquial WhatsApp-style planning thread. Facts: venue, date, headcount.",
+    "probes": {
+      "required": ["re:Caf[eé] Lumen|Lumen", "re:Nov(ember)?\\W{0,3}14|14\\W{0,3}Nov|14[./]11|11[./]14", "re:35|thirty-?five"],
+      "forbidden": ["re:cancel(l)?ed"]
+    },
+    "messages": [
+      { "role": "user", "text": "hey, team offsite planning. got a sec?" },
+      { "role": "assistant", "text": "Sure! What do you need?" },
+      { "role": "user", "text": "need a venue for ~35 ppl, relaxed vibe, mid november" },
+      { "role": "assistant", "text": "Options: Café Lumen (private back room, fits 40), The Boilerhouse (industrial, fits 60), Harbor Loft (fits 30, tight). Café Lumen is usually the best value." },
+      { "role": "user", "text": "lumen looks great. is nov 14 free?" },
+      { "role": "assistant", "text": "Café Lumen's back room is available on November 14, both afternoon and evening. They ask for a EUR 300 deposit." },
+      { "role": "user", "text": "book it. afternoon + evening. i'll wire the deposit today" },
+      { "role": "assistant", "text": "Booked: Café Lumen back room, November 14, afternoon and evening, 35 people, EUR 300 deposit to be wired today." },
+      { "role": "user", "text": "catering? nothing fancy, maybe tapas" },
+      { "role": "assistant", "text": "Café Lumen offers an in-house tapas buffet at EUR 24 per person, or we can bring an external caterer for a EUR 150 corkage-style fee. In-house is simpler." },
+      { "role": "user", "text": "in-house tapas then. still need to check dietary stuff with the team, don't let me forget" },
+      { "role": "assistant", "text": "Noted: in-house tapas buffet chosen (EUR 24 pp). Open point: collect dietary requirements from the team." }
+    ]
+  },
+  {
+    "id": "de_email_style_bootstrap",
+    "mode": "bootstrap",
+    "expect_language": "de",
+    "notes": "Formal email-style German thread: supplier contract negotiation. Long turns, gradient compression must keep the oldest tier tiny but retain supplier and delivery date.",
+    "probes": {
+      "required": ["re:Nordfeld", "re:15\\.?\\s?(März|03)|März", "re:Rahmenvertrag|Vertrag"],
+      "forbidden": ["Vertragsbruch", "Insolvenz"]
+    },
+    "messages": [
+      { "role": "user", "text": "Sehr geehrte Damen und Herren, wir prüfen derzeit den Abschluss eines Rahmenvertrags mit der Nordfeld Logistik GmbH über die Belieferung unserer drei Standorte. Bitte fassen Sie die wichtigsten vertraglichen Punkte zusammen, die wir vor der Unterzeichnung klären sollten. Mit freundlichen Grüßen" },
+      { "role": "assistant", "text": "Sehr gerne. Vor Unterzeichnung eines Rahmenvertrags mit der Nordfeld Logistik GmbH sollten insbesondere geklärt werden: Laufzeit und Verlängerungsklauseln, Service-Level (Lieferzeiten, Fehlmengenquote), Preisgleitklauseln in Abhängigkeit von Treibstoffkosten, Haftungsgrenzen bei Transportschäden sowie Sonderkündigungsrechte bei wiederholten Schlechtleistungen." },
+      { "role": "user", "text": "Nordfeld hat uns einen Entwurf zugesandt. Die Laufzeit beträgt 24 Monate mit automatischer Verlängerung um jeweils 12 Monate. Die Lieferfrist ist mit 48 Stunden ab Bestellung angegeben. Erscheint Ihnen das marktüblich?" },
+      { "role": "assistant", "text": "Eine Laufzeit von 24 Monaten mit 12-monatiger Verlängerung ist marktüblich, allerdings empfehle ich eine Kündigungsfrist von höchstens drei Monaten zum Laufzeitende. Die Lieferfrist von 48 Stunden ist für regionale Logistik gut; wichtig ist, dass sie als verbindliches Service-Level mit Vertragsstrafe und nicht nur als Zielwert formuliert ist." },
+      { "role": "user", "text": "Wir haben mit Nordfeld nachverhandelt: Vertragsstrafe von 2 Prozent des Monatsvolumens je verspäteter Lieferung, gedeckelt auf 10 Prozent. Der Vertragsbeginn soll der 15. März sein. Einverstanden?" },
+      { "role": "assistant", "text": "Die nachverhandelten Konditionen sind solide: 2 Prozent Vertragsstrafe je Verspätung mit einer Obergrenze von 10 Prozent des Monatsvolumens ist ein übliches und faires Modell. Dem Vertragsbeginn zum 15. März steht aus meiner Sicht nichts entgegen, sofern die Anlage zu den Standortadressen aktualisiert wurde." },
+      { "role": "user", "text": "Die Anlage wurde aktualisiert. Offen ist nur noch die Frage der Versicherungssumme für Transportschäden — Nordfeld bietet 250000 Euro pro Schadensfall. Reicht das?" },
+      { "role": "assistant", "text": "Für Ihre Warenwerte je Lieferung (nach früherer Angabe maximal rund 180000 Euro) ist eine Deckung von 250000 Euro pro Schadensfall ausreichend bemessen. Damit wären alle wesentlichen Punkte geklärt; einzig die finale Freigabe durch Ihre Geschäftsführung steht noch aus." }
+    ]
+  },
+  {
+    "id": "ru_support_bootstrap",
+    "mode": "bootstrap",
+    "expect_language": "ru",
+    "notes": "Non-Latin-script case: Russian support thread. The summary must be written in Russian (Cyrillic).",
+    "probes": {
+      "required": ["re:сервер|облак", "re:резервн|копир"],
+      "forbidden": []
+    },
+    "messages": [
+      { "role": "user", "text": "Здравствуйте! Наш сервер перестал делать резервные копии по ночам. Что проверить?" },
+      { "role": "assistant", "text": "Здравствуйте! Проверьте: расписание задач cron, свободное место на диске назначения и журнал ошибок службы резервного копирования." },
+      { "role": "user", "text": "Место закончилось на сетевом диске. Мы удалили старые архивы, теперь копирование работает." },
+      { "role": "assistant", "text": "Отлично. Рекомендую настроить ротацию архивов: хранить 14 ежедневных и 6 ежемесячных копий, а также добавить оповещение при заполнении диска свыше 80 процентов." },
+      { "role": "user", "text": "Сделали ротацию, как вы посоветовали. Ещё думаем перенести резервные копии в облако." },
+      { "role": "assistant", "text": "Перенос в облако — хорошая идея: настройте шифрование архивов до загрузки и проверяйте восстановление раз в квартал. Вопрос о выборе облачного провайдера остаётся открытым." }
+    ]
+  },
+  {
+    "id": "en_fold_keeps_durable_facts",
+    "mode": "incremental",
+    "expect_language": "en",
+    "notes": "Folding new messages must not drop durable facts from the previous summary (project name, launch date).",
+    "previous_summary": "## Topic\nRelaunch of the company website (project 'Beacon').\n## User position / goal\nLaunch on March 3 with a migrated blog and new pricing page.\n## Decisions & constraints\n- Hosting stays on the current provider.\n- Budget capped at EUR 9000.\n## Open questions\n- Who writes the new pricing copy?\n## Already covered / answered\n- Sitemap agreed (12 pages).",
+    "probes": {
+      "required": ["Beacon", "re:March\\s*3|03-03|3rd of March", "re:9[.,\\s]?000", "re:Anna"],
+      "forbidden": ["re:hosting (provider )?chang"]
+    },
+    "messages": [
+      { "role": "user", "text": "Update on the pricing copy: Anna from marketing will write it, draft due next Friday." },
+      { "role": "assistant", "text": "Noted — Anna owns the pricing copy with a draft due next Friday. That resolves the open question about copy ownership." },
+      { "role": "user", "text": "Also, the staging environment is now live and the blog import ran without errors." },
+      { "role": "assistant", "text": "Great: staging is live and the blog migration is verified. Remaining before the March 3 launch: pricing copy review and the final DNS switch plan." }
+    ]
+  },
+  {
+    "id": "en_fold_resolves_open_question",
+    "mode": "incremental",
+    "expect_language": "en",
+    "notes": "The new messages resolve the previously open budget question; the folded summary must reflect the approval instead of keeping it open verbatim.",
+    "previous_summary": "## Topic\nProcurement of 20 new developer laptops.\n## User position / goal\nOrder before the fiscal year ends.\n## Decisions & constraints\n- Model shortlist: Model X14 and Model P1.\n## Open questions\n- Budget approval by finance is still pending (requested: EUR 38,000).\n## Already covered / answered\n- Comparison table of both models was produced.",
+    "probes": {
+      "required": ["re:38[.,\\s]?000", "re:approv", "re:X14"],
+      "forbidden": ["re:budget[^.\\n]{0,40}(still )?pending"]
+    },
+    "messages": [
+      { "role": "user", "text": "Finance just approved the full EUR 38,000 budget for the laptops." },
+      { "role": "assistant", "text": "Excellent — the budget is approved. Shall I prepare the order for the preferred Model X14 configuration?" },
+      { "role": "user", "text": "Yes, go with the X14 for all 20 devices. Decision final." },
+      { "role": "assistant", "text": "Decision recorded: 20 units of Model X14, funded by the approved EUR 38,000 budget. Next step is sending the purchase order to the supplier." }
+    ]
+  },
+  {
+    "id": "en_hallucination_trap_bootstrap",
+    "mode": "bootstrap",
+    "expect_language": "en",
+    "notes": "Sparse conversation; the forbidden probes are plausible-sounding facts that were never said.",
+    "probes": {
+      "required": ["re:newsletter", "re:Tuesday"],
+      "forbidden": ["GDPR", "re:unsubscrib", "re:Mailchimp|SendGrid|Brevo"]
+    },
+    "messages": [
+      { "role": "user", "text": "We want to start a customer newsletter. Nothing decided yet except that it should go out on Tuesdays." },
+      { "role": "assistant", "text": "A Tuesday cadence is a good start. Open decisions: tool selection, content owner, and target segment." },
+      { "role": "user", "text": "Content will be written by the product team. Tool is completely undecided." },
+      { "role": "assistant", "text": "Understood: product team writes the content, the sending tool is still open, and the newsletter ships on Tuesdays." }
+    ]
+  }
+]

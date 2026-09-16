@@ -5,23 +5,29 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Execution\Runner;
 
 use App\Service\Calendar\CalendarEventService;
+use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\FileStorageService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Tool\Source\SkillToolSource;
 use Psr\Log\LoggerInterface;
 
 /**
  * `calendar_event` runner — turns planner-resolved event params into a .ics
- * meeting file attached to the reply.
+ * meeting file attached to the reply, and (when the planner names a calendar
+ * channel) creates the event directly in that connected calendar — CalDAV or
+ * Outlook (Phase M step M6).
  *
  * The planner resolves relative phrases ("tomorrow at 15:00") into an absolute
  * local datetime + IANA timezone using the time context injected into its system
  * prompt (server now + message receipt time). This runner just renders + stores
- * the calendar file; it picks no model.
+ * the calendar file; it picks no model. A failed calendar delivery degrades to
+ * the .ics download with an honest note — it never sinks the node.
  *
  * Expected node params:
  *   - title            string
@@ -33,6 +39,9 @@ use Psr\Log\LoggerInterface;
  *   - description      string (optional)
  *   - attendees        list<string>|string (optional; emails become ATTENDEEs)
  *   - organizer_email  string (optional)
+ *   - channel          calendar channel name from [CHANNELLIST] (optional;
+ *                      e.g. "outlook", "calendar" — delivers the event into
+ *                      that connected calendar)
  */
 final readonly class CalendarEventRunner implements TaskRunner
 {
@@ -51,7 +60,10 @@ final readonly class CalendarEventRunner implements TaskRunner
     public function __construct(
         private CalendarEventService $calendarService,
         private FileStorageService $fileStorage,
+        private RequestedCalendarDelivery $calendarDelivery,
         private LoggerInterface $logger,
+        private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?StepApprovalGate $approvalGate = null,
     ) {
     }
 
@@ -66,7 +78,7 @@ final readonly class CalendarEventRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::CalendarEvent, 'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below.'),
+            new SkillDescriptor(Capability::CalendarEvent, 'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below. When the user asks to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one.'),
         ];
     }
 
@@ -104,6 +116,28 @@ final readonly class CalendarEventRunner implements TaskRunner
 
         $end = $this->resolveEnd($params, $start, $tz);
 
+        $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
+        $ownerId = (int) ($context->userId ?? $context->message->getUserId());
+        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar((string) $context->message->getText());
+        if ('' === $channel && $userAsked) {
+            $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
+        }
+
+        $gated = $this->approvalGate?->consult($context, $node, SkillToolSource::nameFor(Capability::CalendarEvent), [
+            'title' => $title,
+            'start' => $start->format(\DateTimeInterface::ATOM),
+            'end' => $end->format(\DateTimeInterface::ATOM),
+            'timezone' => $tzName,
+            'channel' => $channel,
+            'location' => is_string($params['location'] ?? null) ? $params['location'] : null,
+            'description' => is_string($params['description'] ?? null) ? $params['description'] : null,
+            'attendees' => $this->normalizeAttendees($params['attendees'] ?? null),
+            'organizer_email' => is_string($params['organizer_email'] ?? null) ? $params['organizer_email'] : null,
+        ]);
+        if (null !== $gated) {
+            return $gated;
+        }
+
         $ics = $this->calendarService->buildIcs(
             title: $title,
             start: $start,
@@ -135,7 +169,7 @@ final readonly class CalendarEventRunner implements TaskRunner
         $template = self::INVITE_TEXT[$language] ?? self::INVITE_TEXT['en'];
         $text = sprintf($template, $title, $start->format('Y-m-d H:i'), $tzName);
 
-        return NodeResult::ok($text, [$file], [
+        $metadata = [
             'media_type' => 'document',
             'calendar_event' => [
                 'title' => $title,
@@ -143,7 +177,42 @@ final readonly class CalendarEventRunner implements TaskRunner
                 'end' => $end->format(\DateTimeInterface::ATOM),
                 'timezone' => $tzName,
             ],
-        ]);
+        ];
+
+        if ('' !== $channel) {
+            $delivery = $this->calendarDelivery->send(
+                $ownerId,
+                rtrim($this->uploadDir, '/').'/'.ltrim($stored['path'], '/'),
+                $filename,
+                (int) ($context->message->getId() ?? 0),
+                $channel,
+            );
+            $text .= ' '.$delivery['message'];
+            if (null !== $delivery['webLink']) {
+                $text .= ' '.$delivery['webLink'];
+            }
+            $metadata['calendar_delivery'] = [
+                'ok' => $delivery['ok'],
+                'channel' => $delivery['channel'],
+                'connection' => $delivery['connection'],
+                'created' => $delivery['created'],
+                'skipped' => $delivery['skipped'],
+            ];
+            $context->streamChunk($delivery['message']);
+        } elseif ($userAsked) {
+            $note = 'The event was not added to a calendar — the .ics is attached. Connect a calendar under Settings → Connections.';
+            $text .= ' '.$note;
+            $metadata['calendar_delivery'] = [
+                'ok' => false,
+                'channel' => null,
+                'connection' => null,
+                'created' => 0,
+                'skipped' => 0,
+            ];
+            $context->streamChunk($note);
+        }
+
+        return NodeResult::ok($text, [$file], $metadata);
     }
 
     /**

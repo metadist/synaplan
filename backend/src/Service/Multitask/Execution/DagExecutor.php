@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution;
 
+use App\Service\Exception\StreamCancelledException;
 use App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher;
 use App\Service\Multitask\Execution\Parallel\MediaNodeRequest;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -92,7 +93,7 @@ final readonly class DagExecutor
             });
         }
 
-        if ($this->config->isParallelEnabled()) {
+        if ($this->config->isParallelEnabled($context->userId)) {
             $this->executeParallel($plan, $context, $progressCallback);
         } else {
             $this->executeSequential($plan, $context, $progressCallback);
@@ -229,6 +230,17 @@ final readonly class DagExecutor
 
         try {
             $result = $runner->run($node, $context);
+        } catch (StreamCancelledException $e) {
+            // Pressing Stop ends the whole turn, not one node. Demoting it to a
+            // failed node result would strip the `cancelled` marker the caller
+            // needs, and the failure path then persists a second assistant card
+            // for the same Stop click (#1501).
+            $this->logger->info('DagExecutor: turn cancelled by user', [
+                'node' => $node->id,
+                'capability' => $node->capability->value,
+            ]);
+
+            throw $e;
         } catch (\Throwable $e) {
             $result = NodeResult::failed($e->getMessage());
             $this->logger->warning('DagExecutor: runner threw', [
@@ -251,6 +263,12 @@ final readonly class DagExecutor
     {
         if ($result->isRunning()) {
             $this->emitState($progressCallback, $node, 'running', $this->runningMetadata($node, $result));
+
+            return;
+        }
+
+        if ($result->isWaitingApproval()) {
+            $this->emitState($progressCallback, $node, 'waiting_approval', $result->metadata);
 
             return;
         }
@@ -279,6 +297,61 @@ final readonly class DagExecutor
             ? $this->successMetadata($node, $result)
             : $this->failureMetadata($node, $result, $context);
         $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $extra);
+    }
+
+    /**
+     * Continue a paused plan from an approved node, then the remaining pending
+     * nodes. Policy is not consulted again — the approval is the decision.
+     *
+     * @param array<string, mixed>                      $approvedArgs
+     * @param callable(array<string, mixed>): void|null $progressCallback
+     *
+     * @return array{
+     *     content: string,
+     *     files: list<array<string, mixed>>,
+     *     metadata: array<string, mixed>,
+     *     node_statuses: array<string, string>,
+     *     node_job_keys: array<string, string>,
+     *     partial_failure: bool,
+     *     all_failed: bool
+     * }
+     */
+    public function resume(TaskPlan $plan, NodeContext $context, string $nodeId, array $approvedArgs, ?callable $progressCallback = null): array
+    {
+        $node = null;
+        foreach ($plan->nodes as $candidate) {
+            if ($candidate->id === $nodeId) {
+                $node = $candidate;
+                break;
+            }
+        }
+        if (null === $node) {
+            throw new \InvalidArgumentException('This step is not in the plan');
+        }
+
+        $existing = $context->getResult($nodeId);
+        if (null !== $existing && !$existing->isWaitingApproval()) {
+            throw new \InvalidArgumentException('This step is not waiting for approval');
+        }
+
+        $context->clearResult($nodeId);
+        $context->markApproved($nodeId);
+        $merged = $node->params;
+        foreach ($approvedArgs as $key => $value) {
+            $merged[$key] = $value;
+        }
+        $resumed = new TaskNode(
+            $node->id,
+            $node->capability,
+            $node->dependsOn,
+            $node->inputs,
+            $merged,
+        );
+
+        $this->runNodeInline($context, $resumed, $progressCallback);
+        $this->executeSequential($plan, $context, $progressCallback);
+
+        return $this->assembler->assemble($plan, $context);
     }
 
     /**
@@ -547,6 +620,9 @@ final readonly class DagExecutor
                 $extra['prompt'] = $prompt;
             }
         }
+        if (true === ($result->metadata['used_workspace'] ?? false)) {
+            $extra['used_workspace'] = true;
+        }
 
         return $extra;
     }
@@ -592,6 +668,9 @@ final readonly class DagExecutor
             if (isset($firstFile['type']) && is_string($firstFile['type']) && '' !== $firstFile['type']) {
                 $extra['type'] = $firstFile['type'];
             }
+        }
+        if (true === ($result->metadata['used_workspace'] ?? false)) {
+            $extra['used_workspace'] = true;
         }
 
         return $extra;

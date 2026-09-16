@@ -9,10 +9,11 @@ Everything Synaplan can do.
 Multi-provider AI conversations:
 
 - **Local**: Ollama (gpt-oss, llama, mistral, etc.)
-- **Cloud**: OpenAI, Anthropic, Groq, Google Gemini
+- **Cloud**: OpenAI, Anthropic, Groq, Google Gemini, Perplexity
 - **Switching**: Change models per conversation
 - **Context**: Maintains conversation history
 - **Streaming**: Token-by-token responses over SSE
+- **Web search**: Admin picks Brave, SearXNG (self-hosted), Tavily, Exa, Firecrawl or Perplexity; optional fallback; users may pick their own provider when allowed. Next chat search uses the new provider with no restart.
 
 ## Multi-Task Routing
 
@@ -20,11 +21,19 @@ Complex requests are decomposed into a plan instead of a single AI call:
 
 - **AI planner** — splits a message into capability nodes (extract → summarize → generate media → compose reply) as a small task DAG
 - **Live task cards** — each step streams its progress into the chat UI while it runs
+- **Step graph** — a completed multi-step plan can be viewed as a simple step list in chat
 - **Smart classification** — rule-based routing (per-topic task prompts) plus an AI sorter for topic + language detection
 - **Multi-file delivery** — a single request can return several generated files, across chat, WhatsApp, email, and webhooks
 - **Safe rollout** — shadow mode plans without executing; existing installs keep the classic single-handler path until enabled
+- **Step graph** — completed multi-task turns can show the executed plan as a read-only step graph in chat (disclosure next to the task cards)
 
 Configuration: [CONFIGURATION.md → Multi-Task Routing](CONFIGURATION.md#multi-task-routing-bconfig)
+
+## Saved Tasks
+
+Pin a Task Prompt as a **Saved Task** and run it on demand or on a weekday / daily / hourly schedule. Overview: **Channels → Saved Tasks**. After a multi-step chat plan finishes, a clock on the plan saves it there. You can also pin a custom instruction on **AI Instructions**. Behind `SAVEDTASKS / ENABLED` (off when no BCONFIG row exists; seeded on for new/local installs). Three consecutive failures auto-pause the task. The chat widget never runs Saved Tasks. Connections (mailboxes, MCP, folders) are listed under **Channels → Connections**.
+
+Configuration: [CONFIGURATION.md → Saved Tasks](CONFIGURATION.md#saved-tasks-bconfig)
 
 ## RAG System
 
@@ -92,9 +101,18 @@ Extract content from:
 
 | Format | Engine |
 |--------|--------|
-| PDF, Word, Excel, PowerPoint | Apache Tika |
+| PDF, Word, Excel, PowerPoint | Apache Tika (optional Docling for tables and headings) |
 | Images (PNG, JPEG, etc.) | Tesseract OCR |
 | Audio (MP3, WAV, etc.) | Whisper.cpp |
+
+## External speech-to-text API
+
+Local programs can transcribe against any configured SOUND2TEXT model (whisper.cpp, Groq, OpenAI, Mistral, …) with a Synaplan API key:
+
+- **One-shot** — OpenAI-compatible `POST /v1/audio/transcriptions`
+- **Streaming sessions** — `client_id` + `api_key_id` so client 123 and client 321 on the same key stay isolated; audio chunks in, SSE or poll for transcripts
+
+→ [OpenAI-compatible API](OPENAI_COMPATIBLE_API.md)
 
 ## File Management
 
@@ -112,10 +130,11 @@ Extract content from:
 - Rate limiting
 - API keys for integrations
 
-## App Modes
+## Navigation
 
-- **Easy Mode**: Simplified interface for casual users
-- **Advanced Mode**: Full features for power users
+Everyday work lives on the rail (New, History, Sources). Assistants, channels
+and automations sit under **Manage**. Installation administration sits under
+**Operate** (administrators only). There is no Easy / Advanced mode toggle.
 
 ## AI Memories & Qdrant
 

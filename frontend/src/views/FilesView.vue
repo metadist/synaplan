@@ -66,7 +66,7 @@
             ref="fileInputRef"
             type="file"
             multiple
-            accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.odt,.ods,.odp,.odg,.odf,.ics,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp3,.mp4,.wav,.ogg,.m4a,.webm,.mov,.avi,.mkv"
+            accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.odt,.ods,.odp,.odg,.odf,.rtf,.pages,.numbers,.key,.ics,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp3,.mp4,.wav,.ogg,.m4a,.webm,.mov,.avi,.mkv,.jar"
             class="hidden"
             data-testid="input-files"
             @change="handleFileSelect"
@@ -416,6 +416,26 @@
                 <!-- §4.5: Incoming inbox quick-toggle with a count badge so the
                      user notices when integrations have pushed new files. -->
                 <button
+                  v-if="iamSharingEnabled && (sharedFolders.length > 0 || filterSharedWithMe)"
+                  class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-all shrink-0"
+                  :class="
+                    filterSharedWithMe
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                      : 'border-black/[0.06] dark:border-white/[0.06] txt-secondary hover:border-[var(--brand)]/50 hover:text-[var(--brand)]'
+                  "
+                  data-testid="btn-shared-with-me"
+                  @click="filterSharedWithMe = !filterSharedWithMe"
+                >
+                  <Icon icon="heroicons:user-group" class="w-4 h-4" />
+                  <span class="hidden sm:inline">{{ $t('iam.sharedWithMe') }}</span>
+                  <span
+                    v-if="sharedFolders.length > 0"
+                    class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold bg-[var(--brand)] text-white"
+                  >
+                    {{ sharedFolders.length }}
+                  </span>
+                </button>
+                <button
                   v-if="incomingCount > 0 || filterIncoming"
                   class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-all shrink-0"
                   :class="
@@ -493,6 +513,7 @@
                       <option value="widget">{{ $t('files.sourceLabel.widget') }}</option>
                       <option value="api">{{ $t('files.sourceLabel.api') }}</option>
                       <option value="generated">{{ $t('files.sourceLabel.generated') }}</option>
+                      <option value="compute">{{ $t('files.sourceLabel.compute') }}</option>
                     </select>
                   </div>
                   <div>
@@ -654,11 +675,16 @@
                 data-testid="section-folder-grid"
               >
                 <div
-                  class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3"
+                  class="grid gap-2 sm:gap-3"
+                  :class="
+                    filterSharedWithMe
+                      ? 'grid-cols-1 sm:grid-cols-2'
+                      : 'grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+                  "
                 >
                   <div
-                    v-for="folder in displayedFolders"
-                    :key="folder.name"
+                    v-for="folder in visibleFolders"
+                    :key="folder.shared ? `shared-${folder.resourceId}` : folder.name"
                     class="group/f relative"
                   >
                     <button
@@ -671,8 +697,12 @@
                             ? 'border-dashed border-[var(--brand)]/40 hover:border-[var(--brand)]/60 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                             : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                       "
-                      :data-testid="`folder-card-${folder.name}`"
-                      @click="enterFolder(folder.name)"
+                      :data-testid="
+                        folder.shared && folder.resourceId
+                          ? `folder-card-shared-${folder.resourceId}`
+                          : `folder-card-${folder.name}`
+                      "
+                      @click="onFolderCardClick(folder)"
                       @dragenter.prevent="onFolderDragEnter(folder.name)"
                       @dragover.prevent
                       @dragleave="onFolderDragLeave(folder.name)"
@@ -726,6 +756,7 @@
                       </span>
                     </button>
                     <button
+                      v-if="!folder.shared"
                       type="button"
                       class="absolute top-1 right-1 p-1.5 rounded-lg text-red-500 bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-red-500/15 transition-all"
                       :title="$t('files.deleteFolder')"
@@ -735,25 +766,78 @@
                     >
                       <TrashIcon class="w-3.5 h-3.5" />
                     </button>
+                    <!-- Share is the one action people look for on a tile, so it
+                         stays visible in the top-left corner; "use in chat"
+                         sits next to it and appears on hover like delete. -->
+                    <button
+                      v-if="iamSharingEnabled && !folder.pending && !folder.shared"
+                      type="button"
+                      class="absolute top-1 left-1 p-1.5 icon-contrast"
+                      :title="$t('iam.share')"
+                      :aria-label="$t('iam.share')"
+                      :data-testid="`btn-share-folder-${folder.name}`"
+                      @click.stop="openFolderShare(folder.name)"
+                    >
+                      <ShareIcon class="w-4 h-4" />
+                    </button>
                     <!-- §4.8 #2: close the loop with chat — open a chat with
                          this knowledge folder preselected in the picker. -->
                     <button
                       v-if="!folder.pending"
                       type="button"
-                      class="absolute top-1 left-1 p-1.5 rounded-lg text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      class="absolute top-1 p-1.5 rounded-lg text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      :class="iamSharingEnabled && !folder.shared ? 'left-9' : 'left-1'"
                       :title="$t('files.useInChat')"
                       :aria-label="$t('files.useInChat')"
                       :data-testid="`btn-use-in-chat-${folder.name}`"
-                      @click.stop="useFolderInChat(folder.name)"
+                      @click.stop="useFolderInChat(folder)"
                     >
                       <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
                     </button>
+                    <span
+                      v-if="folder.shared && !filterSharedWithMe"
+                      class="absolute bottom-1 right-1 max-w-[90%]"
+                    >
+                      <ChatKindPill
+                        :kind="sharedFolderPill(folder).kind"
+                        :label="sharedFolderPill(folder).label"
+                        size="xs"
+                      />
+                    </span>
+                    <SharedResourceBanner
+                      v-if="folder.shared && filterSharedWithMe"
+                      class="mt-2"
+                      compact
+                      kind="knowledge_folder"
+                      :owner-name="folder.ownerName ?? null"
+                      :shared-via="folder.sharedVia"
+                      :permission="folder.permission"
+                    />
                   </div>
                 </div>
               </div>
 
               <!-- Bulk actions -->
-              <div v-if="selectedFileIds.length > 0" class="mb-4">
+              <div v-if="selectedFileIds.length > 0" class="mb-4 flex flex-wrap items-center gap-3">
+                <button
+                  v-if="canCombineSelected"
+                  type="button"
+                  class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
+                  data-testid="btn-combine-selected"
+                  @click="combineSelected"
+                >
+                  {{ $t('files.combinePdf') }} ({{ combinableSelectedIds.length }})
+                </button>
+                <button
+                  v-if="canCombineOfficeSelected"
+                  type="button"
+                  class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
+                  data-testid="btn-combine-office-selected"
+                  @click="combineOfficeSelected"
+                >
+                  {{ $t('files.combineOffice', { format: officeCombineFormatLabel }) }}
+                  ({{ combinableOfficeSelectedIds.length }})
+                </button>
                 <button
                   class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
                   data-testid="btn-delete-selected"
@@ -810,7 +894,7 @@
                     />
                     <div
                       class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
-                      :class="getFileColorClass(file.filename)"
+                      :class="getFileColorClass()"
                     >
                       <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                     </div>
@@ -846,36 +930,11 @@
                         @move="moveFileToFolder(file.id, $event)"
                         @remove="removeFileFromFolder(file.id)"
                       />
-                      <button
-                        v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
-                        class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                        :title="$t('files.describeSortAction')"
-                        :disabled="isDescribing(file.id)"
-                        data-testid="btn-describe"
-                        @click="describeAndSort(file)"
-                      >
-                        <Icon
-                          :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
-                          class="w-4 h-4"
-                          :class="isDescribing(file.id) && 'animate-spin'"
-                        />
-                      </button>
-                      <button
-                        v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
-                        class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                        :title="$t('files.indexPromptAction')"
-                        :disabled="isDescribing(file.id)"
-                        data-testid="btn-index-prompt"
-                        @click="describeAndSort(file)"
-                      >
-                        <Icon
-                          :icon="
-                            isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
-                          "
-                          class="w-4 h-4"
-                          :class="isDescribing(file.id) && 'animate-spin'"
-                        />
-                      </button>
+                      <FileMakeSearchableButton
+                        :file="file"
+                        :busy="isDescribing(file.id)"
+                        @activate="describeAndSort(file)"
+                      />
                       <button
                         class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                         :title="$t('common.view')"
@@ -948,7 +1007,7 @@
                         <div class="flex items-center gap-3 min-w-0">
                           <div
                             class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            :class="getFileColorClass(file.filename)"
+                            :class="getFileColorClass()"
                           >
                             <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                           </div>
@@ -997,40 +1056,11 @@
                             @move="moveFileToFolder(file.id, $event)"
                             @remove="removeFileFromFolder(file.id)"
                           />
-                          <button
-                            v-if="
-                              vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'
-                            "
-                            class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                            :title="$t('files.describeSortAction')"
-                            :disabled="isDescribing(file.id)"
-                            data-testid="btn-describe"
-                            @click="describeAndSort(file)"
-                          >
-                            <Icon
-                              :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
-                              class="w-4 h-4"
-                              :class="isDescribing(file.id) && 'animate-spin'"
-                            />
-                          </button>
-                          <button
-                            v-if="
-                              vectorStateOf(file) !== 'vectorized' && file.source === 'generated'
-                            "
-                            class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                            :title="$t('files.indexPromptAction')"
-                            :disabled="isDescribing(file.id)"
-                            data-testid="btn-index-prompt"
-                            @click="describeAndSort(file)"
-                          >
-                            <Icon
-                              :icon="
-                                isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
-                              "
-                              class="w-4 h-4"
-                              :class="isDescribing(file.id) && 'animate-spin'"
-                            />
-                          </button>
+                          <FileMakeSearchableButton
+                            :file="file"
+                            :busy="isDescribing(file.id)"
+                            @activate="describeAndSort(file)"
+                          />
                           <button
                             class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                             :title="$t('files.download')"
@@ -1127,7 +1157,26 @@
             </div>
 
             <!-- Bulk actions -->
-            <div v-if="selectedFileIds.length > 0" class="mb-4 flex items-center gap-3">
+            <div v-if="selectedFileIds.length > 0" class="mb-4 flex flex-wrap items-center gap-3">
+              <button
+                v-if="canCombineSelected"
+                type="button"
+                class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
+                data-testid="btn-combine-selected"
+                @click="combineSelected"
+              >
+                {{ $t('files.combinePdf') }} ({{ combinableSelectedIds.length }})
+              </button>
+              <button
+                v-if="canCombineOfficeSelected"
+                type="button"
+                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
+                data-testid="btn-combine-office-selected"
+                @click="combineOfficeSelected"
+              >
+                {{ $t('files.combineOffice', { format: officeCombineFormatLabel }) }}
+                ({{ combinableOfficeSelectedIds.length }})
+              </button>
               <button
                 class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
                 data-testid="btn-delete-selected"
@@ -1215,7 +1264,7 @@
                   />
                   <div
                     class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
-                    :class="getFileColorClass(file.filename)"
+                    :class="getFileColorClass()"
                   >
                     <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                   </div>
@@ -1244,34 +1293,11 @@
                       @move="moveFileToFolder(file.id, $event)"
                       @remove="removeFileFromFolder(file.id)"
                     />
-                    <button
-                      v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
-                      class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                      :title="$t('files.describeSortAction')"
-                      :disabled="isDescribing(file.id)"
-                      data-testid="btn-describe"
-                      @click="describeAndSort(file)"
-                    >
-                      <Icon
-                        :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
-                        class="w-4 h-4"
-                        :class="isDescribing(file.id) && 'animate-spin'"
-                      />
-                    </button>
-                    <button
-                      v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
-                      class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                      :title="$t('files.indexPromptAction')"
-                      :disabled="isDescribing(file.id)"
-                      data-testid="btn-index-prompt"
-                      @click="describeAndSort(file)"
-                    >
-                      <Icon
-                        :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'"
-                        class="w-4 h-4"
-                        :class="isDescribing(file.id) && 'animate-spin'"
-                      />
-                    </button>
+                    <FileMakeSearchableButton
+                      :file="file"
+                      :busy="isDescribing(file.id)"
+                      @activate="describeAndSort(file)"
+                    />
                     <button
                       class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                       :title="$t('common.view')"
@@ -1347,7 +1373,7 @@
                       <div class="flex items-center gap-3 min-w-0">
                         <div
                           class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          :class="getFileColorClass(file.filename)"
+                          :class="getFileColorClass()"
                         >
                           <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                         </div>
@@ -1389,36 +1415,11 @@
                           @move="moveFileToFolder(file.id, $event)"
                           @remove="removeFileFromFolder(file.id)"
                         />
-                        <button
-                          v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
-                          class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                          :title="$t('files.describeSortAction')"
-                          :disabled="isDescribing(file.id)"
-                          data-testid="btn-describe"
-                          @click="describeAndSort(file)"
-                        >
-                          <Icon
-                            :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
-                            class="w-4 h-4"
-                            :class="isDescribing(file.id) && 'animate-spin'"
-                          />
-                        </button>
-                        <button
-                          v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
-                          class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                          :title="$t('files.indexPromptAction')"
-                          :disabled="isDescribing(file.id)"
-                          data-testid="btn-index-prompt"
-                          @click="describeAndSort(file)"
-                        >
-                          <Icon
-                            :icon="
-                              isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
-                            "
-                            class="w-4 h-4"
-                            :class="isDescribing(file.id) && 'animate-spin'"
-                          />
-                        </button>
+                        <FileMakeSearchableButton
+                          :file="file"
+                          :busy="isDescribing(file.id)"
+                          @activate="describeAndSort(file)"
+                        />
                         <button
                           class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                           :title="$t('files.download')"
@@ -1495,6 +1496,14 @@
       @close="closeShareModal"
       @shared="handleShared"
       @unshared="handleUnshared"
+    />
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="knowledge_folder"
+      :resource-id="iamShareResourceId"
+      :resource-name="iamShareName"
+      :owner-name="authStore.user?.firstName || authStore.user?.email || ''"
+      @close="iamShareOpen = false"
     />
 
     <!-- Confirm Delete Dialog (Single File) -->
@@ -1588,6 +1597,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
+import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
@@ -1599,11 +1609,13 @@ import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
 import FilesTabs from '@/components/files/FilesTabs.vue'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
+import FileMakeSearchableButton from '@/components/files/FileMakeSearchableButton.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
   ChatBubbleLeftRightIcon,
   CloudArrowUpIcon,
+  ShareIcon,
   TrashIcon,
   ArrowDownTrayIcon,
   XMarkIcon,
@@ -1614,19 +1626,65 @@ import filesService, {
   type UploadProgress,
   UploadBlockedError,
 } from '@/services/filesService'
+import {
+  extensionOf,
+  kindFromExtension,
+  previewBadgeClass,
+  previewIconForName,
+} from '@/services/filePreview'
+import { isDocumentToolsEnabled } from '@/composables/useDocumentToolsFeature'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
+import { ApiError } from '@/services/api/httpClient'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 import { useRouter, useRoute } from 'vue-router'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { useAuthStore } from '@/stores/auth'
+import { iamApi } from '@/services/api/iamApi'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
+import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
+import ChatKindPill from '@/components/iam/ChatKindPill.vue'
+import { kindOfSharedVia } from '@/utils/chatKind'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
 
+type DisplayedFolder = {
+  name: string
+  count: number
+  pending: boolean
+  shared?: boolean
+  ownerName?: string
+  resourceId?: string
+  sharedVia?: { type: string; name: string } | null
+  permission?: string
+}
+
 /** §4.8 #2: open a chat with this knowledge folder preselected (chat-input picker). */
-function useFolderInChat(folderName: string): void {
-  router.push({ path: '/', query: { folder: folderName } })
+function useFolderInChat(folder: DisplayedFolder | string): void {
+  const key =
+    typeof folder === 'string'
+      ? folder
+      : folder.shared && folder.resourceId
+        ? `shared:${folder.resourceId}`
+        : folder.name
+  router.push({ path: '/', query: { folder: key } })
+}
+
+function sharedFolderPill(folder: DisplayedFolder) {
+  return kindOfSharedVia(folder.sharedVia, folder.ownerName)
+}
+
+function onFolderCardClick(folder: DisplayedFolder): void {
+  if (folder.shared) {
+    useFolderInChat(folder)
+    return
+  }
+  enterFolder(folder.name)
 }
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
+const { confirm } = useDialog()
 
 // File persistence - save selected files metadata
 const { saveFileMetadata, loadFileMetadata, clearFiles } = useFilePersistence('files_upload')
@@ -1645,6 +1703,51 @@ const openFolder = ref<string | null>(null)
 const folderMenuOpen = ref<number | null>(null)
 const files = ref<FileItem[]>([])
 const fileGroups = ref<Array<{ name: string; count: number }>>([])
+const sharedFolders = ref<
+  Array<{
+    name: string
+    count: number
+    shared: true
+    ownerName: string
+    resourceId: string
+    sharedVia: { type: string; name: string } | null
+    permission: string
+  }>
+>([])
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
+const iamShareName = ref('')
+const authStore = useAuthStore()
+
+const openFolderShare = (folderName: string) => {
+  const ownerId = authStore.user?.id
+  if (!ownerId) return
+  iamShareResourceId.value = `${ownerId}:${folderName}`
+  iamShareName.value = folderName
+  iamShareOpen.value = true
+}
+
+const loadSharedFolders = async () => {
+  if (!isIamSharingEnabled()) {
+    sharedFolders.value = []
+    return
+  }
+  try {
+    const items = await iamApi.listSharedWithMe('knowledge_folder')
+    sharedFolders.value = items.map((item) => ({
+      name: item.name,
+      count: Number(item.meta?.fileCount ?? 0),
+      shared: true as const,
+      ownerName: item.ownerName ?? '',
+      resourceId: item.id,
+      sharedVia: item.sharedVia ?? null,
+      permission: item.permission,
+    }))
+  } catch {
+    sharedFolders.value = []
+  }
+}
 const selectedFileIds = ref<number[]>([])
 const currentPage = ref(1)
 const itemsPerPage = 10
@@ -1662,6 +1765,7 @@ const filterDateTo = ref('')
 const filterSource = ref('')
 const filterVectorized = ref('')
 const filterIncoming = ref(false)
+const filterSharedWithMe = ref(false)
 const incomingCount = ref(0)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -1739,16 +1843,30 @@ const savePendingFolders = (folders: string[]): void => {
 
 const pendingFolders = ref<string[]>(loadPendingFolders())
 
-type DisplayedFolder = { name: string; count: number; pending: boolean }
-
 const displayedFolders = computed<DisplayedFolder[]>(() => {
   const realNames = new Set(fileGroups.value.map((f) => f.name))
   const real: DisplayedFolder[] = fileGroups.value.map((f) => ({ ...f, pending: false }))
   const pending: DisplayedFolder[] = pendingFolders.value
     .filter((name) => !realNames.has(name))
     .map((name) => ({ name, count: 0, pending: true }))
-  return [...real, ...pending]
+  const shared: DisplayedFolder[] = sharedFolders.value.map((folder) => ({
+    name: folder.name,
+    count: folder.count,
+    pending: false,
+    shared: true,
+    ownerName: folder.ownerName,
+    resourceId: folder.resourceId,
+    sharedVia: folder.sharedVia,
+    permission: folder.permission,
+  }))
+  return [...real, ...pending, ...shared]
 })
+
+const visibleFolders = computed(() =>
+  filterSharedWithMe.value
+    ? displayedFolders.value.filter((folder) => folder.shared)
+    : displayedFolders.value
+)
 
 watch(
   () => fileGroups.value.map((f) => f.name),
@@ -1947,10 +2065,9 @@ const describingIds = ref<number[]>([])
 const isDescribing = (id: number): boolean => describingIds.value.includes(id)
 
 /**
- * Make a file RAG-ready. For AI-generated files this indexes their generation
- * prompt; for everything else it describes, vectorizes & AI-sorts the file into
- * a knowledge group. Same trigger, different per-file action (decided in UI by
- * the file's source).
+ * Make a file searchable by AI. Generated artefacts use /index-prompt so a
+ * missing description can fall back to the stored generation prompt; uploads
+ * use /describe. The buttons look the same — only the endpoint differs.
  */
 const describeAndSort = async (file: FileItem) => {
   if (isDescribing(file.id)) return
@@ -1962,11 +2079,7 @@ const describeAndSort = async (file: FileItem) => {
       : await filesService.describeVectorizeSortFile(file.id)
     if (res.success) {
       if (res.groupKey) {
-        // Sorted into a knowledge group (describe path, or index-prompt that
-        // also picked a group). Show the group-aware confirmation either way.
         showSuccess(t('files.describeSortDoneGroup', { group: res.groupKey }))
-      } else if (isGenerated) {
-        showSuccess(t('files.indexPromptDone'))
       } else {
         showSuccess(t('files.describeSortDone'))
       }
@@ -2004,23 +2117,10 @@ const closeFolderMenu = (e: MouseEvent) => {
   }
 }
 
-const getFileColorClass = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toLowerCase() || ''
-  const colorMap: Record<string, string> = {
-    pdf: 'bg-red-500/10 text-red-500',
-    docx: 'bg-blue-500/10 text-blue-500',
-    doc: 'bg-blue-500/10 text-blue-500',
-    txt: 'bg-gray-500/10 text-gray-500',
-    jpg: 'bg-purple-500/10 text-purple-500',
-    jpeg: 'bg-purple-500/10 text-purple-500',
-    png: 'bg-purple-500/10 text-purple-500',
-    mp3: 'bg-pink-500/10 text-pink-500',
-    mp4: 'bg-pink-500/10 text-pink-500',
-    xlsx: 'bg-emerald-500/10 text-emerald-500',
-    csv: 'bg-emerald-500/10 text-emerald-500',
-  }
-  return colorMap[ext] || 'bg-[var(--brand)]/10 text-[var(--brand)]'
-}
+// Neutral, token-based badge shared with the Generated grid (#1499). Replaces
+// the previous per-extension Tailwind rainbow (bg-red-500/10, bg-purple-500/10,
+// …), which was visually noisy and off-token.
+const getFileColorClass = (): string => previewBadgeClass()
 
 // Drag & Drop handlers
 const handleDragEnter = (event: DragEvent) => {
@@ -2111,27 +2211,9 @@ const onFolderDrop = async (event: DragEvent, folderName: string) => {
   }
 }
 
-const getFileIcon = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toLowerCase() || ''
-
-  const iconMap: Record<string, string> = {
-    pdf: 'heroicons:document-text',
-    docx: 'heroicons:document-text',
-    doc: 'heroicons:document-text',
-    txt: 'heroicons:document-text',
-    jpg: 'heroicons:photo',
-    jpeg: 'heroicons:photo',
-    png: 'heroicons:photo',
-    gif: 'heroicons:photo',
-    webp: 'heroicons:photo',
-    mp3: 'heroicons:musical-note',
-    mp4: 'heroicons:film',
-    xlsx: 'heroicons:table-cells',
-    csv: 'heroicons:table-cells',
-  }
-
-  return iconMap[ext] || 'heroicons:document'
-}
+// Icon set shared with the Generated grid via the common preview helper (#1499)
+// so both surfaces stay consistent (no divergent second icon map).
+const getFileIcon = (filename: string): string => previewIconForName(filename)
 
 const uploadFiles = async () => {
   if (selectedFiles.value.length === 0) {
@@ -2291,6 +2373,7 @@ const resetFilters = () => {
   filterSource.value = ''
   filterVectorized.value = ''
   filterIncoming.value = false
+  filterSharedWithMe.value = false
   currentPage.value = 1
   loadFiles(1)
 }
@@ -2355,6 +2438,112 @@ const toggleSelectAll = async () => {
         }
       })
     }
+  }
+}
+
+const combinableSelectedIds = computed(() =>
+  selectedFileIds.value.filter((id) => {
+    const file = files.value.find((item) => item.id === id)
+    if (!file) return false
+    const kind = kindFromExtension(extensionOf(file.filename) || file.file_type)
+    return 'document' === kind || 'pdf' === kind
+  })
+)
+const canCombineSelected = computed(() => combinableSelectedIds.value.length >= 2)
+
+const officeCombineFormatOf = (name: string, type: string): 'docx' | 'xlsx' | 'pptx' | null => {
+  const ext = (extensionOf(name) || type).toLowerCase()
+  if (['doc', 'docx', 'odt', 'rtf', 'pages'].includes(ext)) return 'docx'
+  if (['xls', 'xlsx', 'ods', 'csv', 'numbers'].includes(ext)) return 'xlsx'
+  if (['ppt', 'pptx', 'odp', 'key'].includes(ext)) return 'pptx'
+  return null
+}
+
+const combinableOfficeSelectedIds = computed(() => {
+  if (!isDocumentToolsEnabled()) return []
+  const rows = selectedFileIds.value
+    .map((id) => files.value.find((item) => item.id === id))
+    .filter((file): file is NonNullable<typeof file> => Boolean(file))
+    .map((file) => ({
+      id: file.id,
+      format: officeCombineFormatOf(file.filename, file.file_type),
+    }))
+  const formats = new Set(
+    rows
+      .map((row) => row.format)
+      .filter((format): format is 'docx' | 'xlsx' | 'pptx' => format !== null)
+  )
+  if (1 !== formats.size) return []
+  return rows.filter((row) => null !== row.format).map((row) => row.id)
+})
+const officeCombineFormat = computed((): 'docx' | 'xlsx' | 'pptx' | null => {
+  const first = files.value.find((item) => combinableOfficeSelectedIds.value.includes(item.id))
+  return first ? officeCombineFormatOf(first.filename, first.file_type) : null
+})
+const officeCombineFormatLabel = computed(() => (officeCombineFormat.value ?? 'docx').toUpperCase())
+const canCombineOfficeSelected = computed(() => combinableOfficeSelectedIds.value.length >= 2)
+
+const combineSelected = async () => {
+  if (!canCombineSelected.value) return
+  if (combinableSelectedIds.value.length > 20) {
+    showError(t('files.combineTooMany', { count: 20 }))
+    return
+  }
+  const names = combinableSelectedIds.value
+    .map(
+      (id) =>
+        files.value.find((item) => item.id === id)?.display_name ||
+        files.value.find((item) => item.id === id)?.filename
+    )
+    .filter((name): name is string => Boolean(name))
+    .join(', ')
+  const ok = await confirm({
+    title: t('files.combinePdf'),
+    message: `${t('files.combineOrderHint')}\n\n${names}`,
+  })
+  if (!ok) return
+  try {
+    await filesService.combineFiles(combinableSelectedIds.value)
+    showSuccess(t('files.combined'))
+    selectedFileIds.value = []
+    await loadFiles()
+  } catch (err) {
+    const reason = err instanceof ApiError ? err.details?.reason : undefined
+    if ('engine_required' === reason) {
+      showError(t('files.combineEngineRequired'))
+      return
+    }
+    showError(t('files.combineFailed'))
+  }
+}
+
+const combineOfficeSelected = async () => {
+  const format = officeCombineFormat.value
+  if (!canCombineOfficeSelected.value || !format) return
+  if (combinableOfficeSelectedIds.value.length > 20) {
+    showError(t('files.combineTooMany', { count: 20 }))
+    return
+  }
+  const names = combinableOfficeSelectedIds.value
+    .map(
+      (id) =>
+        files.value.find((item) => item.id === id)?.display_name ||
+        files.value.find((item) => item.id === id)?.filename
+    )
+    .filter((name): name is string => Boolean(name))
+    .join(', ')
+  const ok = await confirm({
+    title: t('files.combineOffice', { format: format.toUpperCase() }),
+    message: `${t('files.combineOrderHint')}\n\n${names}`,
+  })
+  if (!ok) return
+  try {
+    await filesService.combineFiles(combinableOfficeSelectedIds.value, undefined, format)
+    showSuccess(t('files.combinedOffice'))
+    selectedFileIds.value = []
+    await loadFiles()
+  } catch {
+    showError(t('files.combineFailed'))
   }
 }
 
@@ -2594,18 +2783,14 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
-/** §4.4: show the original (source) name when present, else the stored name. */
+/** Prefer a human title; generic chat voice notes become "Voice memo · time". */
 const displayName = (file: FileItem): string =>
-  file.display_name || file.original_name || file.filename
-
-/** Derive the pill state, falling back to chunk count for legacy rows. */
-const vectorStateOf = (file: FileItem) =>
-  file.vector_state ?? (file.is_vectorized ? 'vectorized' : 'none')
+  fileDisplayName(file, (key, values) => t(key, values as never), locale.value)
 
 // Load initial data
 onMounted(async () => {
   document.addEventListener('click', closeFolderMenu)
-  await Promise.all([loadFileGroups(), loadFiles(), loadFacets()])
+  await Promise.all([loadFileGroups(), loadFiles(), loadFacets(), loadSharedFolders()])
 
   // #1268: deep-link from /files/search "View file" (?file=<id>).
   const fileQuery = route.query.file

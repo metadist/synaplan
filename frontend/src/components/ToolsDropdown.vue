@@ -151,25 +151,43 @@
         </Transition>
       </button>
 
-      <!-- Q3: the pre-configured Summarizer stays reachable from chat; this is
-           a clearly marked link row (same pattern as "Manage folders…"). -->
+      <!-- Summarize a document stays in chat: attach a file and send. -->
       <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
 
       <button
         ref="itemRefs"
         class="dropdown-item"
         type="button"
-        data-testid="link-tool-summarizer"
-        @click="goToSummarizer"
+        data-testid="btn-tool-summarize"
+        @click="handleSummarize"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
       >
         <Icon icon="mdi:file-document-outline" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <span class="text-sm font-medium">{{ $t('chatInput.tools.summarizer') }}</span>
-          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.summarizerDesc') }}</div>
+          <span class="text-sm font-medium">{{ $t('chatInput.tools.summarize') }}</span>
+          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.summarizeDesc') }}</div>
         </div>
-        <ArrowTopRightOnSquareIcon class="w-4 h-4 flex-shrink-0 txt-secondary" />
+      </button>
+
+      <!-- DS16: dispatch the typed instruction to a paired computer. Only shown
+           when the flag is on AND the user has ≥1 active device — otherwise the
+           row is meaningless (nothing could answer). -->
+      <button
+        v-if="showRunOnDevice"
+        ref="itemRefs"
+        class="dropdown-item"
+        type="button"
+        data-testid="btn-tool-run-on-device"
+        @click="handleRunOnDevice"
+        @keydown.down.prevent="focusNext"
+        @keydown.up.prevent="focusPrevious"
+      >
+        <Icon icon="mdi:monitor-arrow-down" class="w-5 h-5 flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <span class="text-sm font-medium">{{ $t('config.desktop.run.action') }}</span>
+          <div class="text-xs txt-secondary truncate">{{ runOnDeviceSubtext }}</div>
+        </div>
       </button>
     </div>
   </div>
@@ -177,18 +195,17 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
-import {
-  ArrowTopRightOnSquareIcon,
-  WrenchScrewdriverIcon,
-  ChevronUpIcon,
-  CheckIcon,
-} from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAuthStore } from '@/stores/auth'
 import { getFeaturesStatus, type Feature } from '@/services/featuresService'
 import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
+import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
+import { useDesktopDevices } from '@/composables/useDesktopDevices'
+import { useConfigStore } from '@/stores/config'
 
 interface Props {
   activeCommand?: string | null
@@ -208,36 +225,79 @@ const emit = defineEmits<{
   toggleThinking: []
   toggleVoiceReply: []
   toggleEnhance: []
+  summarizeDocument: []
+  runOnDevice: [device: { id: number; name: string }]
 }>()
 
+const configStore = useConfigStore()
+
 /** Feature-gated tools that toggle a removable badge in the chat input. */
-const commandTools = [
-  {
-    id: 'web-search',
-    command: 'search',
-    icon: 'mdi:web',
-    labelKey: 'chatInput.tools.webSearch',
-    descKey: 'chatInput.tools.webSearchDesc',
-  },
-  {
-    id: 'image-gen',
-    command: 'pic',
-    icon: 'mdi:image',
-    labelKey: 'chatInput.tools.imageGen',
-    descKey: 'chatInput.tools.imageGenDesc',
-  },
-  {
-    id: 'video-gen',
-    command: 'vid',
-    icon: 'mdi:video',
-    labelKey: 'chatInput.tools.videoGen',
-    descKey: 'chatInput.tools.videoGenDesc',
-  },
-] as const
+const commandTools = computed(() => {
+  const tools: Array<{
+    id: string
+    command: string
+    icon: string
+    labelKey: string
+    descKey: string
+  }> = [
+    {
+      id: 'web-search',
+      command: 'search',
+      icon: 'mdi:web',
+      labelKey: 'chatInput.tools.webSearch',
+      descKey: 'chatInput.tools.webSearchDesc',
+    },
+    {
+      id: 'image-gen',
+      command: 'pic',
+      icon: 'mdi:image',
+      labelKey: 'chatInput.tools.imageGen',
+      descKey: 'chatInput.tools.imageGenDesc',
+    },
+    {
+      id: 'video-gen',
+      command: 'vid',
+      icon: 'mdi:video',
+      labelKey: 'chatInput.tools.videoGen',
+      descKey: 'chatInput.tools.videoGenDesc',
+    },
+  ]
+
+  if (configStore.features.selfAware) {
+    tools.push({
+      id: 'help',
+      command: 'help',
+      icon: 'mdi:help-circle-outline',
+      labelKey: 'selfAware.helpCommand.label',
+      descKey: 'selfAware.helpCommand.description',
+    })
+  }
+
+  return tools
+})
 
 const router = useRouter()
+const { t } = useI18n()
 const authStore = useAuthStore()
 const commandsStore = useCommandsStore()
+const { activeDevices, hasActiveDevices, ensureLoaded } = useDesktopDevices()
+
+// DS16: the composer action is only meaningful with a live target. Gated on the
+// feature flag AND at least one active device (revoking the last one hides it).
+const showRunOnDevice = computed(() => isDesktopAgentEnabled() && hasActiveDevices.value)
+
+const runOnDeviceSubtext = computed(() => {
+  const list = activeDevices.value
+  if (list.length === 1) return list[0].name
+  return t('config.desktop.run.multiple', { count: list.length })
+})
+
+const handleRunOnDevice = () => {
+  const device = activeDevices.value[0]
+  if (!device) return
+  emit('runOnDevice', { id: device.id, name: device.name })
+  closeDropdown()
+}
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -305,10 +365,7 @@ const selectToolCommand = (toolId: string, commandName: string) => {
 
   // If feature is disabled, navigate to setup instructions instead
   if (feature && !feature.enabled && feature.setup_required) {
-    router.push({
-      path: '/settings',
-      query: { tab: 'features', feature: toolId },
-    })
+    router.push(authStore.isAdmin ? '/admin/features' : '/ai/models')
     closeDropdown()
     return
   }
@@ -323,9 +380,9 @@ const selectToolCommand = (toolId: string, commandName: string) => {
   closeDropdown()
 }
 
-const goToSummarizer = () => {
+const handleSummarize = () => {
+  emit('summarizeDocument')
   closeDropdown()
-  router.push('/ai/summarizer')
 }
 
 // Close after triggering so the rewritten text in the input is visible.
@@ -371,6 +428,9 @@ const handleClickOutside = (e: MouseEvent) => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   mobileMq.addEventListener('change', onMobileMqChange)
+  // Know whether to offer "Run on this computer" without waiting for the menu to
+  // open. No-op (and no request) when the Desktop flag is off.
+  if (isDesktopAgentEnabled()) ensureLoaded()
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)

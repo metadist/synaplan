@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\Repository\ConfigRepository;
+use App\Service\Config\LayeredConfigResolver;
+use App\Service\Feature\FeatureFlagEnv;
 
 /**
  * Feature-flag resolver for the multi-task routing engine.
@@ -49,6 +51,7 @@ final readonly class MultitaskRoutingConfig
     public const KEY_NODE_TIMEOUT = 'NODE_TIMEOUT';
     public const KEY_URL_FETCH_ENABLED = 'URL_FETCH_ENABLED';
     public const KEY_MCP_FETCH_ENABLED = 'MCP_FETCH_ENABLED';
+    public const KEY_MCP_ACTION_ENABLED = 'MCP_ACTION_ENABLED';
     public const KEY_EMAIL_SEARCH_ENABLED = 'EMAIL_SEARCH_ENABLED';
 
     private const DEFAULT_ROUTING_ENABLED = true;
@@ -60,6 +63,8 @@ final readonly class MultitaskRoutingConfig
 
     public function __construct(
         private ConfigRepository $configRepository,
+        private ?LayeredConfigResolver $layeredConfigResolver = null,
+        private ?FeatureFlagEnv $featureFlagEnv = null,
     ) {
     }
 
@@ -104,12 +109,16 @@ final readonly class MultitaskRoutingConfig
     }
 
     /**
-     * Parallel execution of independent nodes (Phase 4). Global-only switch;
-     * when off the executor runs the DAG sequentially.
+     * Parallel execution of independent nodes (Phase 4). When off the executor
+     * runs the DAG sequentially.
+     *
+     * Pass the EFFECTIVE user id (see ModelConfigService::getEffectiveUserIdForMessage)
+     * so a group policy for MULTITASK.PARALLEL_ENABLED is applied the same way
+     * as ROUTING_ENABLED. A null id skips the group layer (global only).
      */
-    public function isParallelEnabled(): bool
+    public function isParallelEnabled(?int $userId): bool
     {
-        return $this->resolveFlag(self::KEY_PARALLEL_ENABLED, null, self::DEFAULT_PARALLEL_ENABLED);
+        return $this->resolveFlag(self::KEY_PARALLEL_ENABLED, $userId, self::DEFAULT_PARALLEL_ENABLED);
     }
 
     /**
@@ -150,6 +159,13 @@ final readonly class MultitaskRoutingConfig
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool
     {
+        $pinned = $this->featureFlagEnv?->forced(self::CONFIG_GROUP, $setting);
+        if (null !== $pinned) {
+            return $pinned;
+        }
+        if (null !== $this->layeredConfigResolver) {
+            return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, $setting, $default);
+        }
         if (null !== $userId && $userId > 0) {
             $perUser = $this->configRepository->getValue($userId, self::CONFIG_GROUP, $setting);
             if (null !== $perUser) {

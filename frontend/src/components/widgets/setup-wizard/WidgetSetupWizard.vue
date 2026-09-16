@@ -105,6 +105,7 @@
             v-model:auto-message="autoMessage"
             v-model:auto-open="autoOpen"
             v-model:allow-file-upload="allowFileUpload"
+            v-model:agent-id="agentId"
           />
 
           <!-- Error message -->
@@ -220,6 +221,7 @@ const linkedFiles = ref<LinkedFileRef[]>([])
 const autoMessage = ref('')
 const autoOpen = ref(false)
 const allowFileUpload = ref(false)
+const agentId = ref<number | null>(null)
 
 const currentStep = ref(0)
 const creating = ref(false)
@@ -289,8 +291,12 @@ const handleCreate = async () => {
     if (autoMessage.value.trim()) {
       config.autoMessage = autoMessage.value.trim()
     }
-    await widgetsApi.updateWidget(widget.widgetId, { config })
+    await widgetsApi.updateWidget(widget.widgetId, {
+      config,
+      agentId: agentId.value,
+    })
     widget.config = config
+    widget.agentId = agentId.value
 
     if (uploads.value.length > 0 || linkedFiles.value.length > 0) {
       creationStage.value = 'files'

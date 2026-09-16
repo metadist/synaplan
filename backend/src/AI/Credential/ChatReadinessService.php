@@ -6,6 +6,7 @@ namespace App\AI\Credential;
 
 use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
+use App\Model\ModelCatalog;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
 use Psr\Cache\CacheItemPoolInterface;
@@ -90,13 +91,18 @@ final class ChatReadinessService
     }
 
     /**
-     * Whether a plain chat message can be answered right now: the provider
+     * Whether a real AI provider can answer chat right now: the provider
      * behind the effective default chat model must be usable. Pass the user id
      * so a per-user model override is honoured — the chat pipeline resolves
      * the model per user, and readiness must measure the same thing, or a user
      * whose chat works fine is shown a "no AI provider connected" banner.
      * Falls back to "any chat-capable provider is usable" only when the
      * binding does not resolve.
+     *
+     * The built-in TestProvider never counts. It is always "available" in
+     * dev/test and is what a fresh install actually answers with, but it is
+     * canned demo text — treating it as ready made the setup page claim
+     * "Your AI is ready" with no key behind the default chat model.
      *
      * @param array<string, bool>|null $availability defaults to the cached snapshot
      */
@@ -105,7 +111,9 @@ final class ChatReadinessService
         $availability ??= $this->providerAvailability();
         $defaultChatService ??= $this->defaultChatService($userId);
 
-        if (null !== $defaultChatService && isset($availability[$defaultChatService])) {
+        // TestProvider is an internal fixture, not a connected AI. Skip it so
+        // a fresh install (default chat falls through to 'test') is not ready.
+        if (null !== $defaultChatService && 'test' !== $defaultChatService && isset($availability[$defaultChatService])) {
             return $availability[$defaultChatService];
         }
 
@@ -124,6 +132,39 @@ final class ChatReadinessService
     public function isOllamaModelPulled(string $model): bool
     {
         return $this->ollamaModelInventory->isPulled($model);
+    }
+
+    /**
+     * Availability of one concrete model row on this installation.
+     *
+     * Ollama rows are judged per model (the server answers even with nothing
+     * pulled), every other service by its provider's key/URL. A service name
+     * the registry does not know cannot be judged and counts as available —
+     * hiding an operator's custom row on a guess would be worse.
+     *
+     * @param array<string, bool>|null $availability lowercase provider => usable;
+     *                                               defaults to the cached snapshot
+     *
+     * @return array{available: bool, reason: ?string} reason is 'not_pulled' or
+     *                                                 'provider_unavailable' when unavailable
+     */
+    public function modelAvailability(string $service, string $providerId, ?array $availability = null): array
+    {
+        $provider = ModelCatalog::normalizeProvider($service);
+
+        if ('ollama' === $provider) {
+            return $this->ollamaModelInventory->isPulled($providerId)
+                ? ['available' => true, 'reason' => null]
+                : ['available' => false, 'reason' => 'not_pulled'];
+        }
+
+        $availability ??= $this->providerAvailability();
+
+        if (!array_key_exists($provider, $availability) || $availability[$provider]) {
+            return ['available' => true, 'reason' => null];
+        }
+
+        return ['available' => false, 'reason' => 'provider_unavailable'];
     }
 
     /**

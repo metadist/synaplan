@@ -173,6 +173,31 @@ final class RedisService
         }
     }
 
+    /**
+     * Atomically read and delete a key (GETDEL, Redis >= 6.2). Exactly one
+     * concurrent caller receives the value; everyone else gets null. Use this
+     * for one-time tokens where a GET followed by a DEL would leave a window
+     * in which two callers both see the value.
+     */
+    public function getAndDelete(string $key): ?string
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return null;
+        }
+
+        try {
+            /** @var mixed $value predis' stub says string, but a missing key yields null */
+            $value = $client->getdel($this->prefix($key));
+
+            return \is_string($value) ? $value : null;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('GETDEL', $key, $e);
+
+            return null;
+        }
+    }
+
     public function exists(string $key): bool
     {
         $client = $this->client();
@@ -335,6 +360,73 @@ final class RedisService
             return array_values(array_map(static fn ($m): string => (string) $m, $members));
         } catch (\Throwable $e) {
             $this->logCommandFailure('ZRANGEBYSCORE', $key, $e);
+
+            return [];
+        }
+    }
+
+    /**
+     * Number of members in a sorted set (0 when missing or unavailable).
+     */
+    public function zCard(string $key): int
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return 0;
+        }
+
+        try {
+            return (int) $client->zcard($this->prefix($key));
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZCARD', $key, $e);
+
+            return 0;
+        }
+    }
+
+    /**
+     * Remove members by rank range (0 = lowest score). Used to trim a ring
+     * buffer to a fixed size by dropping the oldest entries.
+     */
+    public function zRemRangeByRank(string $key, int $start, int $stop): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $client->zremrangebyrank($this->prefix($key), $start, $stop);
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZREMRANGEBYRANK', $key, $e);
+
+            return false;
+        }
+    }
+
+    /**
+     * Range query by score in descending order (highest score first). `$max`/
+     * `$min` accept Redis range syntax ('+inf', '-inf', '(123' for exclusive).
+     *
+     * @return list<string>
+     */
+    public function zRevRangeByScore(string $key, string $max, string $min, ?int $limit = null): array
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return [];
+        }
+
+        try {
+            $options = null === $limit ? [] : ['limit' => [0, $limit]];
+            /** @var array<int, mixed> $members */
+            $members = $client->zrevrangebyscore($this->prefix($key), $max, $min, $options);
+
+            return array_values(array_map(static fn ($m): string => (string) $m, $members));
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZREVRANGEBYSCORE', $key, $e);
 
             return [];
         }

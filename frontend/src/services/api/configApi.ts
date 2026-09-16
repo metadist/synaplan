@@ -1,15 +1,19 @@
-import type { AIModel, Capability } from '@/types/ai-models'
+import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import { httpClient } from './httpClient'
 import { z } from 'zod'
 
 export interface ModelsResponse {
   success: boolean
   models: Partial<Record<Capability, AIModel[]>>
+  /** Provider-level availability of this installation (key/URL configured). */
+  providers: ProviderAvailability[]
 }
 
 export interface DefaultsResponse {
   success: boolean
   defaults: Record<Capability, number | null>
+  locked?: Partial<Record<Capability, boolean>>
+  sources?: Partial<Record<Capability, 'admin' | 'group' | 'user'>>
 }
 
 export interface SaveDefaultsRequest {
@@ -97,8 +101,8 @@ export const savePlannerModel = async (
 }
 
 /**
- * Get the platform-wide summary model (DEFAULTMODEL.SUMMARIZE) that condenses
- * long conversations, plus the Sorting model it falls back to. Admin only.
+ * Legacy admin endpoint for the leftover DEFAULTMODEL.SUMMARIZE slot.
+ * Runtime no longer reads that slot — summaries use Text Analytics (ANALYZE).
  */
 export const getSummaryModel = async (): Promise<PlannerModelResponse> => {
   return httpClient<PlannerModelResponse>('/api/v1/config/routing/summary-model')

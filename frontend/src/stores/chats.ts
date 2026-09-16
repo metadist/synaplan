@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
-import { useConfigStore } from '@/stores/config'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
+import { useIncomingStore } from '@/stores/incoming'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
+import { isSessionTerminating } from '@/services/sessionTeardown'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { buildChatShareUrl } from '@/utils/urlHelper'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
@@ -20,6 +23,10 @@ const HISTORY_PAGE_SIZE = 20
 // successful login (session hint) — a never-logged-in guest gets the neutral
 // `auth_required`, so they never see the misleading "session expired" message.
 function checkAuthOrRedirect(): boolean {
+  // A logout in progress owns the next navigation: redirecting here would
+  // cancel it (see sessionTeardown). Bail out silently instead.
+  if (isSessionTerminating()) return false
+
   if (!authService.isAuthenticated()) {
     console.warn('🔒 Not authenticated - redirecting to login')
     const reason = hasSessionHint() ? 'session_expired' : 'auth_required'
@@ -39,6 +46,7 @@ export interface Chat {
   source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api'
   widgetSession?: WidgetSessionInfo | null
   firstMessagePreview?: string | null
+  access?: 'owner' | 'read' | 'use'
 }
 
 export interface WidgetSessionInfo {
@@ -60,9 +68,19 @@ export function isDefaultChatTitle(title: string, localizedNewChat?: string): bo
   )
 }
 
+export type ConversationSharedVia = { type: 'user' | 'group' | 'everyone'; name: string }
+
+export type ConversationSource = {
+  owner: { id: number; name: string } | null
+  sharedVia: ConversationSharedVia | null
+}
+
 export const useChatsStore = defineStore('chats', () => {
   const chats = ref<Chat[]>([])
   const activeChatId = ref<number | null>(readActiveChatId())
+  const conversationAccess = ref<'owner' | 'read' | 'use' | null>(null)
+  const conversationSource = ref<ConversationSource | null>(null)
+  let conversationAccessSeq = 0
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -75,6 +93,13 @@ export const useChatsStore = defineStore('chats', () => {
   const historyLoading = ref(false)
   const historyHasMore = ref(true)
   const historyOffset = ref(0)
+
+  /**
+   * Chats whose answer is still being written on the server. A turn survives
+   * the client disconnect it was started from, so this marks the chats a user
+   * can return to and keep watching.
+   */
+  const activeRunChatIds = ref<Set<number>>(new Set())
 
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
@@ -133,9 +158,25 @@ export const useChatsStore = defineStore('chats', () => {
       return
     }
 
+    // An incoming (shared-with-me) chat is not in my own list but is a valid
+    // thing to have open. Keep it while the incoming list confirms it.
+    if (candidateId && !candidate && useIncomingStore().isOpenable(candidateId)) {
+      updateActiveChatSelection(candidateId)
+      return
+    }
+
     const firstRegularChat = chats.value.find((chat) => !chat.widgetSession)
     updateActiveChatSelection(firstRegularChat ? firstRegularChat.id : null)
   }
+
+  // Once the incoming list has arrived, an active chat that is neither mine nor
+  // shared with me (revoked share, stale storage) falls back like before.
+  watch(
+    () => useIncomingStore().loaded,
+    (incomingLoaded) => {
+      if (incomingLoaded && chats.value.length > 0) ensureValidActiveChat()
+    }
+  )
 
   async function loadChats() {
     if (!checkAuthOrRedirect()) return
@@ -144,8 +185,11 @@ export const useChatsStore = defineStore('chats', () => {
     error.value = null
 
     try {
-      const data = await httpClient<{ chats: unknown[] }>('/api/v1/chats')
+      const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
+        '/api/v1/chats'
+      )
       chats.value = (data.chats || []).map((chat) => normalizeChat(chat))
+      activeRunChatIds.value = new Set(data.activeRunChatIds ?? [])
       ensureValidActiveChat()
     } catch (err: unknown) {
       error.value = getErrorMessage(err) || 'Failed to load chats'
@@ -153,6 +197,28 @@ export const useChatsStore = defineStore('chats', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * Flag a chat as generating (or no longer generating) without waiting for the
+   * next chat-list fetch.
+   *
+   * `loadChats()` is the server's word on this, but it only runs on entry, so on
+   * its own the marker would be a snapshot from app start: it would never light
+   * up when the user walks away from a running turn, and never go out when that
+   * turn finishes. The chat view drives it live from the stream's own
+   * `run_started` and terminal events instead.
+   */
+  function markChatGenerating(chatId: number, generating: boolean) {
+    // Replaced rather than mutated: a Set is not deeply reactive, so template
+    // reads of activeRunChatIds would not re-render on add/delete alone.
+    const next = new Set(activeRunChatIds.value)
+    if (generating) {
+      next.add(chatId)
+    } else {
+      next.delete(chatId)
+    }
+    activeRunChatIds.value = next
   }
 
   /**
@@ -326,6 +392,17 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  /**
+   * Reflect a title the server generated for a chat (#1500). Local-only: the
+   * value is already persisted, so re-sending it would be a redundant PATCH.
+   */
+  function applyChatTitle(chatId: number, title: string) {
+    const chat = chats.value.find((c) => c.id === chatId)
+    if (chat) {
+      chat.title = title
+    }
+  }
+
   async function deleteChat(chatId: number, silent: boolean = false) {
     if (!checkAuthOrRedirect()) return
 
@@ -385,14 +462,84 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  function parseSharedVia(value: unknown): ConversationSharedVia | null {
+    if (!value || typeof value !== 'object') return null
+    const type = 'type' in value ? String(value.type) : ''
+    if (type !== 'user' && type !== 'group' && type !== 'everyone') return null
+    const name = 'name' in value && typeof value.name === 'string' ? value.name : ''
+    return { type, name }
+  }
+
+  function parseOwner(value: unknown): ConversationSource['owner'] {
+    if (!value || typeof value !== 'object') return null
+    const id = 'id' in value ? Number(value.id) : 0
+    const name = 'name' in value && typeof value.name === 'string' ? value.name : ''
+    if (!id) return null
+    return { id, name }
+  }
+
+  /**
+   * Settle the access question without asking the server, for the cases where
+   * the answer can only be "the viewer's own": nothing is open at all, or the
+   * conversation sits in the viewer's own list. Deliberately distinct from the
+   * `null` "probe still running" state, which withholds the composer on
+   * purpose — leaving an unanswerable question at `null` kept the composer
+   * hidden, and on a brand-new account (no chat to open) it never came back.
+   */
+  function resolveConversationAccessAsOwn() {
+    ++conversationAccessSeq
+    conversationAccess.value = 'owner'
+    conversationSource.value = null
+  }
+
+  async function loadConversationAccess(chatId: number) {
+    if (!isIamSharingEnabled()) {
+      resolveConversationAccessAsOwn()
+      return
+    }
+    // A chat in the viewer's own list can only come back as "owner":
+    // conversations other people shared arrive through the incoming store and
+    // are never part of this list (see ensureValidActiveChat). Asking anyway
+    // unmounted the composer for the length of a foregone request on every
+    // single chat switch.
+    if (chats.value.some((chat) => chat.id === chatId)) {
+      resolveConversationAccessAsOwn()
+      return
+    }
+    const seq = ++conversationAccessSeq
+    conversationAccess.value = null
+    conversationSource.value = null
+    try {
+      const data = await httpClient<{
+        chat: {
+          access?: string
+          owner?: { id: number; name: string }
+          sharedVia?: ConversationSharedVia | null
+        }
+      }>(`/api/v1/chats/${chatId}`)
+      if (seq !== conversationAccessSeq) {
+        return
+      }
+      const access = data.chat.access
+      conversationAccess.value = access === 'read' || access === 'use' ? access : 'owner'
+      conversationSource.value = {
+        owner: parseOwner(data.chat.owner),
+        sharedVia: parseSharedVia(data.chat.sharedVia),
+      }
+    } catch {
+      if (seq !== conversationAccessSeq) {
+        return
+      }
+      conversationAccess.value = null
+      conversationSource.value = null
+    }
+  }
+
   async function getShareInfo(chatId: number) {
     if (!checkAuthOrRedirect()) return null
 
     try {
       const data = await httpClient<{ chat: Record<string, unknown> }>(`/api/v1/chats/${chatId}`)
-
-      // Import config store for building share URL
-      const config = useConfigStore()
 
       const chat = data.chat
       const shareTok = typeof chat.shareToken === 'string' ? chat.shareToken : null
@@ -401,7 +548,7 @@ export const useChatsStore = defineStore('chats', () => {
       return {
         isShared,
         shareToken: shareTok,
-        shareUrl: shareTok ? `${config.appBaseUrl}/shared/${shareTok}` : null,
+        shareUrl: shareTok ? buildChatShareUrl(shareTok) : null,
       }
     } catch (err: unknown) {
       error.value = getErrorMessage(err) || 'Failed to get share info'
@@ -478,6 +625,10 @@ export const useChatsStore = defineStore('chats', () => {
 
   function $reset() {
     chats.value = []
+    conversationAccess.value = null
+    conversationSource.value = null
+    conversationAccessSeq = 0
+    activeRunChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
     historyHasMore.value = true
@@ -490,17 +641,24 @@ export const useChatsStore = defineStore('chats', () => {
   return {
     chats,
     activeChatId,
+    conversationAccess,
+    conversationSource,
+    loadConversationAccess,
+    resolveConversationAccessAsOwn,
     activeChat,
     loading,
     error,
     historyChats,
     historyLoading,
     historyHasMore,
+    activeRunChatIds,
+    markChatGenerating,
     loadChats,
     loadChatHistory,
     createChat,
     findOrCreateEmptyChat,
     updateChatTitle,
+    applyChatTitle,
     deleteChat,
     shareChat,
     getShareInfo,

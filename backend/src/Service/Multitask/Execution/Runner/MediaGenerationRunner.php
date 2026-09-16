@@ -107,6 +107,9 @@ final readonly class MediaGenerationRunner implements TaskRunner
         // (on success AND on cancel) so multitask media spend counts against the
         // user's budget like single-chat media does.
         $handlerOptions = ['disable_memories' => true, 'record_media_usage' => true];
+        if (in_array(Capability::SaveToFolder->value, $context->planCapabilities, true)) {
+            $handlerOptions['skip_folder_delivery'] = true;
+        }
         $trackId = $context->options['track_id'] ?? null;
         if (is_scalar($trackId) && '' !== (string) $trackId) {
             $handlerOptions['track_id'] = (string) $trackId;

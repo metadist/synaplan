@@ -196,6 +196,7 @@
             />
             <div class="flex gap-2">
               <textarea
+                ref="replyInputRef"
                 v-model="replyText"
                 :placeholder="$t('liveSupport.typePlaceholder')"
                 rows="2"
@@ -267,6 +268,7 @@ const loading = ref(false)
 const loadingMessages = ref(false)
 const activeTab = ref<'waiting' | 'active'>('waiting')
 const replyText = ref('')
+const replyInputRef = ref<HTMLTextAreaElement | null>(null)
 const sending = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 const quoting = useMessageQuoting(messagesContainer)
@@ -392,6 +394,11 @@ const sendReply = async () => {
     error(getErrorMessage(err) || 'Failed to send message')
   } finally {
     sending.value = false
+
+    // Clicking the send button takes focus out of the composer, so keep the
+    // agent's cursor in the reply box instead of making them click back in.
+    await nextTick()
+    replyInputRef.value?.focus()
   }
 }
 

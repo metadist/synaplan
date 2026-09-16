@@ -9,6 +9,8 @@ other development services.
 - Docker Engine with Docker Compose v2
 - Cloud-AI profile: at least 4 vCPU, 8 GB RAM, and 30 GB free disk
 - Optional `local-ai` profile: at least 16 GB RAM and substantially more disk
+- Optional `office` profile (Collabora CODE sidecar): about +2 GB RAM; off by
+  default so the 8 GB Cloud-AI floor stays valid
 - A reverse proxy terminating HTTPS in front of `127.0.0.1:8000`
 
 All database, cache, vector, upload, model, and backup data lives below
@@ -91,8 +93,16 @@ passes in as environment variables are used exactly as given.
 The bootstrap administrator is created only when no administrator exists. A
 restart must not rotate this account. `BOOTSTRAP_ADMIN_EMAIL` and
 `BOOTSTRAP_ADMIN_PASSWORD` must be set together or left empty together; leaving
-both empty is valid and simply skips the bootstrap, so an administrator can be
-promoted later. The email must be a valid address of at most 128 characters. The
+both empty is valid and skips the bootstrap, in which case the stack serves the
+first-run setup wizard at `/setup` and the first visitor creates the
+administrator there. On a publicly reachable host, either finish that wizard
+right after deploying or set the bootstrap pair, so the claim window never
+exists; `SETUP_WIZARD_ENABLED=false` closes the browser route entirely. See
+[First-Run Setup](../docs/CONFIGURATION.md#first-run-setup), and
+[SSO-only instances](../docs/CONFIGURATION.md#sso-only-instances-no-local-accounts)
+for a deployment whose administrator comes from an identity provider instead.
+
+The email must be a valid address of at most 128 characters. The
 password must be 8 to 64 characters, and below 16 characters it must also contain
 an uppercase letter, a lowercase letter, and a number; from 16 characters there is
 no character requirement. `validate-release.sh` checks both values before the
@@ -134,10 +144,33 @@ off unless `ENABLE_LOCAL_GPT_OSS=true`. To return to Cloud AI, empty
 `COMPOSE_PROFILES`, set the desired cloud provider in the UI, and redeploy. Model
 files remain in `deploy/data/` until deliberately removed.
 
+## Office profile (Collabora CODE)
+
+Office thumbnails, PDF export, inline preview, and combine need Collabora CODE.
+The profile is **off by default**. Set it in `deploy/.env` (Compose env — not
+`backend/.env`):
+
+```dotenv
+COMPOSE_PROFILES=office
+```
+
+The entrypoint then sets `OFFICE_CONVERT_URL=http://collabora:9980`. Combine
+profiles with a comma (`local-ai,office`). To use an **existing** CODE instance
+instead, leave the `office` profile off and set:
+
+```dotenv
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980
+```
+
+Convert-to is server-to-server: Collabora never sees Synaplan users. Identity
+stays in the app (login + file ownership). `OFFICE_CONVERT_URL=disabled` turns
+the engine off. Details:
+[Office documents](https://docs.synaplan.com/index.php/office-documents).
+
 ## Network and persistence
 
 Only the web service binds a host port. MariaDB, Redis, Centrifugo, Tika, Qdrant,
-Ollama, and Whisper remain on the Compose network. The default bind is
+Ollama, Whisper, and Collabora (when the `office` profile is on) remain on the Compose network. The default bind is
 `127.0.0.1:8000`. A managed platform whose HTTPS proxy runs in its own container
 cannot reach that address and needs `SYNAPLAN_HTTP_BIND` set to the host
 interface the proxy connects to — the Docker bridge gateway, usually
@@ -250,21 +283,26 @@ reimplementing operations. `deploy/elestio/` is the first thin adapter. Future
 Coolify, CapRover, or Railway definitions should preserve the same role,
 persistence, backup, restore, and health contracts.
 
-`deploy/aws/` and `deploy/azure/` are the two marketplace image adapters and
-follow the same rule one layer further out: there is no managed platform on a
-virtual machine, so systemd and the `synaplan-update` / `synaplan-snapshot`
-commands call these scripts directly. Their additions are the parts only a cloud
-has — a Packer build, a first boot that configures itself from instance
-metadata, and the delivery templates (CloudFormation on AWS, ARM on Azure).
-Details in [`aws/README.md`](aws/README.md) and
+`deploy/aws/` is the AWS Marketplace AMI adapter and follows the same rule one
+layer further out: there is no managed platform on an EC2 instance, so systemd
+and the `synaplan-update` / `synaplan-snapshot` commands call these scripts
+directly. Its additions are the parts only AWS has — a Packer build, a first boot
+that configures itself from instance metadata, Caddy as a host TLS terminator,
+and CloudFormation templates. Those helpers live in
+[`aws/scripts/`](aws/scripts). Details in [`aws/README.md`](aws/README.md).
+
+`deploy/azure/` is the Azure Marketplace VM adapter. It has the same shape: a
+Packer build, a first boot that configures itself from instance metadata, and
+ARM templates. Azure first-boot lives in [`azure/scripts/`](azure/scripts);
+the host TLS terminator, `synaplan-update` sequencer, `ExecStop` wrapper,
+snapshot hook, and image-bake pull live in [`host/`](host) so they stay a
+property of the host rather than of a second cloud copy. Details in
 [`azure/README.md`](azure/README.md).
 
-`deploy/host/` is what those two adapters share: the Caddyfiles for the host TLS
-terminator, `configure-tls.sh`, the `synaplan-update` sequencer, the `ExecStop`
-wrapper, and the image-bake pull. It is a property of the host, not of a cloud,
-so duplicating it per cloud would only create two copies that drift.
-[`scripts/tests/test-lifecycle.sh`](scripts/tests/test-lifecycle.sh) enforces the
-contract for every adapter.
+[`scripts/tests/test-lifecycle.sh`](scripts/tests/test-lifecycle.sh) enforces
+the contract for every adapter. Both layouts coexist: AWS under
+`deploy/aws/scripts/`, Azure first-boot under `deploy/azure/scripts/`, and the
+shared Azure host path under `deploy/host/`.
 
 `deploy/umbrel/` is the Umbrel App Store package and the one adapter that cannot
 call these scripts: umbrelOS installs an app from a self-contained directory and
@@ -278,5 +316,26 @@ absent local-AI services and the missing consistent-backup hook, are listed in
 The release pin for that package (store `version`, `APP_VERSION`, and the
 `tag@sha256:…` image) is raised automatically together with `elestio.yml` and
 `deploy/selfhost.env.example` by `scripts/set-release-version.mjs` after every
-published release. Submitting the raised package to the Umbrel App Store remains
-a separate, manual pull request against `getumbrel/umbrel-apps`.
+published release. `.github/workflows/umbrel-store-sync.yml` then carries the
+raised package into `getumbrel/umbrel-apps`; Umbrel reviews and merges it.
+
+## What "automatically updated" covers, and what it does not
+
+Every release raises the version pins in this directory, and
+`.github/workflows/release-rollout.yml` merges that change as soon as the
+proposal's checks are green. The effect is precise and worth stating plainly:
+
+- **New deployments** install the current release. Whoever clicks the Elestio
+  template, copies `selfhost.env.example`, installs from the Umbrel App Store, or
+  launches the AWS AMI after that merge gets what was just released.
+- **Existing installations are never touched.** They keep the version their
+  operator pinned. Nothing here reaches into a running deployment, and nothing
+  here should: an update runs database migrations, and the backup that makes those
+  survivable is the operator's to take. `validate_release_pin()` in
+  `scripts/lib.sh` rejects a mutable tag for the same reason.
+
+Updating a running installation is the operator's decision, documented per
+platform in [`../docs/UPDATE_ELESTIO.md`](../docs/UPDATE_ELESTIO.md) and
+[`../docs/UPDATE_SELFHOST.md`](../docs/UPDATE_SELFHOST.md). The application says
+the same thing in the admin area: it reports a newer version and never installs
+one.

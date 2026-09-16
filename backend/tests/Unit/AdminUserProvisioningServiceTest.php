@@ -7,10 +7,13 @@ namespace App\Tests\Unit;
 use App\Entity\ApiKey;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\AdminUserProvisioningService;
 use App\Service\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -31,12 +34,23 @@ final class AdminUserProvisioningServiceTest extends TestCase
         $this->em = $this->createStub(EntityManagerInterface::class);
         $this->userLifecycle = $this->createStub(UserLifecycleService::class);
 
+        $qb = $this->createStub(QueryBuilder::class);
+        $qb->method('where')->willReturnSelf();
+        $qb->method('andWhere')->willReturnSelf();
+        $qb->method('setParameter')->willReturnSelf();
+        $qb->method('setMaxResults')->willReturnSelf();
+        $query = $this->createStub(Query::class);
+        $query->method('getOneOrNullResult')->willReturn(null);
+        $qb->method('getQuery')->willReturn($query);
+        $this->userRepository->method('createQueryBuilder')->willReturn($qb);
+
         $this->service = new AdminUserProvisioningService(
             $this->userRepository,
             $this->apiKeyRepository,
             $this->em,
             $this->userLifecycle,
             new NullLogger(),
+            $this->createStub(ExternalIdentityRepository::class),
         );
     }
 
@@ -86,6 +100,7 @@ final class AdminUserProvisioningServiceTest extends TestCase
             $this->em,
             $lifecycle,
             new NullLogger(),
+            $this->createStub(ExternalIdentityRepository::class),
         );
 
         $result = $service->provision('e2e', 'ext-1', 'a@b.test', null, 'NEW', 'SecurePass123!');
@@ -107,6 +122,36 @@ final class AdminUserProvisioningServiceTest extends TestCase
         $this->assertSame(['chat', 'files'], $result['entity']->getScopes());
         $this->assertSame('nc-alice', $result['entity']->getName());
         $this->assertSame('active', $result['entity']->getStatus());
+    }
+
+    public function testFindByExternalIdentityStillReadsUserDetails(): void
+    {
+        $user = $this->userWithId(42);
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('findOneByTriple')->willReturn(null);
+
+        $qb = $this->createStub(QueryBuilder::class);
+        $qb->method('where')->willReturnSelf();
+        $qb->method('andWhere')->willReturnSelf();
+        $qb->method('setParameter')->willReturnSelf();
+        $qb->method('setMaxResults')->willReturnSelf();
+        $query = $this->createStub(Query::class);
+        $query->method('getOneOrNullResult')->willReturn($user);
+        $qb->method('getQuery')->willReturn($query);
+
+        $users = $this->createStub(UserRepository::class);
+        $users->method('createQueryBuilder')->willReturn($qb);
+
+        $service = new AdminUserProvisioningService(
+            $users,
+            $this->apiKeyRepository,
+            $this->em,
+            $this->userLifecycle,
+            new NullLogger(),
+            $identities,
+        );
+
+        self::assertSame($user, $service->findByExternalIdentity('nextcloud', 'alice'));
     }
 
     public function testMintApiKeyDefaultsToWildcardScope(): void

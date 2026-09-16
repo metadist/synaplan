@@ -167,6 +167,13 @@ final readonly class WidgetService
         $this->em->flush();
     }
 
+    public function bindAgent(Widget $widget, ?int $agentId): void
+    {
+        $widget->setAgentId($agentId);
+        $widget->touch();
+        $this->em->flush();
+    }
+
     /**
      * Delete widget.
      */

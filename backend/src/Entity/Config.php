@@ -33,6 +33,9 @@ class Config
     #[ORM\Column(name: 'BVALUE', type: Types::TEXT)]
     private string $value = '';
 
+    #[ORM\Column(name: 'BLOCKED', type: Types::BOOLEAN, options: ['default' => false])]
+    private bool $blocked = false;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -82,6 +85,18 @@ class Config
     public function setValue(string $value): self
     {
         $this->value = $value;
+
+        return $this;
+    }
+
+    public function isBlocked(): bool
+    {
+        return $this->blocked;
+    }
+
+    public function setBlocked(bool $blocked): self
+    {
+        $this->blocked = $blocked;
 
         return $this;
     }

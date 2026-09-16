@@ -45,7 +45,7 @@ class ModelSetDefaultCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->connection->expects($this->exactly(4))->method('executeStatement');
 
-        $this->commandTester->execute(['model' => 'groq:llama-3.3-70b-versatile', 'capabilities' => ['chat', 'sort']]);
+        $this->commandTester->execute(['model' => 'groq:qwen/qwen3.6-27b:chat', 'capabilities' => ['chat', 'sort']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $output = $this->commandTester->getDisplay();

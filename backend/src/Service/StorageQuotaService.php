@@ -2,8 +2,6 @@
 
 namespace App\Service;
 
-use App\Entity\Config;
-use App\Entity\File;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
@@ -18,13 +16,28 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class StorageQuotaService
 {
+    /**
+     * Practical "unlimited" cap (100 TB) used when billing is off or the user is ADMIN.
+     * Mirrors RateLimitService: admins have no usage limits.
+     */
+    public const UNLIMITED_BYTES = 100 * 1024 * 1024 * 1024 * 1024;
+
     public function __construct(
         private FileRepository $fileRepository,
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private BillingService $billingService,
+        private RateLimitService $rateLimitService,
     ) {
+    }
+
+    /**
+     * Whether this user is exempt from storage quota (open-source mode or admin).
+     */
+    public function isUnlimited(User $user): bool
+    {
+        return !$this->billingService->isEnabled() || 'ADMIN' === $user->getRateLimitLevel();
     }
 
     /**
@@ -32,12 +45,12 @@ final readonly class StorageQuotaService
      */
     public function getStorageLimit(User $user): int
     {
-        // If billing is disabled (Open Source Mode), unlimited storage (100 TB)
-        if (!$this->billingService->isEnabled()) {
-            return 100 * 1024 * 1024 * 1024 * 1024;
+        // Open Source Mode and admins have no storage quota
+        if ($this->isUnlimited($user)) {
+            return self::UNLIMITED_BYTES;
         }
 
-        $level = $user->getRateLimitLevel();
+        $level = $this->rateLimitService->resolveRateLimitLevel($user);
 
         // Get limit from config (in MB or GB depending on plan)
         $limitConfig = $this->configRepository->findOneBy([
@@ -109,6 +122,10 @@ final readonly class StorageQuotaService
      */
     public function checkStorageLimit(User $user, int $fileSize): void
     {
+        if ($this->isUnlimited($user)) {
+            return;
+        }
+
         $limit = $this->getStorageLimit($user);
         $usage = $this->getStorageUsage($user);
         $remaining = $limit - $usage;
@@ -116,7 +133,7 @@ final readonly class StorageQuotaService
         if ($fileSize > $remaining) {
             $this->logger->warning('Storage limit exceeded', [
                 'user_id' => $user->getId(),
-                'user_level' => $user->getRateLimitLevel(),
+                'user_level' => $this->rateLimitService->resolveRateLimitLevel($user),
                 'limit' => $limit,
                 'usage' => $usage,
                 'remaining' => $remaining,
@@ -128,7 +145,7 @@ final readonly class StorageQuotaService
 
         $this->logger->debug('Storage check passed', [
             'user_id' => $user->getId(),
-            'user_level' => $user->getRateLimitLevel(),
+            'user_level' => $this->rateLimitService->resolveRateLimitLevel($user),
             'usage' => $usage,
             'limit' => $limit,
             'remaining' => $remaining,
@@ -148,15 +165,17 @@ final readonly class StorageQuotaService
      *   usage_formatted: string,
      *   remaining_formatted: string,
      *   max_file_size: int,
-     *   max_file_size_formatted: string
+     *   max_file_size_formatted: string,
+     *   unlimited: bool
      * }
      */
     public function getStorageStats(User $user): array
     {
+        $unlimited = $this->isUnlimited($user);
         $limit = $this->getStorageLimit($user);
         $usage = $this->getStorageUsage($user);
         $remaining = max(0, $limit - $usage);
-        $percentage = $limit > 0 ? ($usage / $limit) * 100 : 0;
+        $percentage = $unlimited || $limit <= 0 ? 0.0 : ($usage / $limit) * 100;
         $maxFileSize = FileStorageService::getMaxFileSize();
 
         return [
@@ -169,6 +188,7 @@ final readonly class StorageQuotaService
             'remaining_formatted' => $this->formatBytes($remaining),
             'max_file_size' => $maxFileSize,
             'max_file_size_formatted' => $this->formatBytes($maxFileSize),
+            'unlimited' => $unlimited,
         ];
     }
 
@@ -189,6 +209,10 @@ final readonly class StorageQuotaService
             return round($bytes / (1024 * 1024), 2).' MB';
         }
 
-        return round($bytes / (1024 * 1024 * 1024), 2).' GB';
+        if ($bytes < 1024 * 1024 * 1024 * 1024) {
+            return round($bytes / (1024 * 1024 * 1024), 2).' GB';
+        }
+
+        return round($bytes / (1024 * 1024 * 1024 * 1024), 2).' TB';
     }
 }

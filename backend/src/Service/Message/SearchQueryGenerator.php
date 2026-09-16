@@ -36,16 +36,26 @@ final readonly class SearchQueryGenerator
     /**
      * Generate optimized search query from user question.
      *
-     * @param string   $userQuestion The original user question
-     * @param int|null $userId       User ID for model config
+     * @param string      $userQuestion      The original user question
+     * @param int|null    $userId            User ID for model config
+     * @param string|null $attachmentContext Content of the file(s) the question
+     *                                       refers to (extracted text or a vision
+     *                                       identification — see
+     *                                       {@see AttachmentSearchContextResolver}).
+     *                                       When set, the query is ALWAYS built by
+     *                                       the model so deictic references
+     *                                       ("what is that", "how much does this
+     *                                       cost") resolve against the attachment
+     *                                       instead of being searched literally.
      *
      * @return string Optimized search query (or original if generation fails)
      */
-    public function generate(string $userQuestion, ?int $userId = null): string
+    public function generate(string $userQuestion, ?int $userId = null, ?string $attachmentContext = null): string
     {
         $this->logger->info('SearchQueryGenerator: Starting query generation', [
             'user_id' => $userId,
             'question_length' => strlen($userQuestion),
+            'has_attachment_context' => null !== $attachmentContext,
         ]);
 
         // Phase 1c: skip the LLM round-trip when the user's message is already
@@ -55,7 +65,11 @@ final readonly class SearchQueryGenerator
         // search. We only invoke the model when the message is long *and*
         // contains pronouns / context references that need conversation
         // resolution ("what about it", "explain that").
-        if (!$this->messageNeedsLlmRewrite($userQuestion)) {
+        //
+        // With attachment context the short-circuit never applies: the whole
+        // point is resolving the question's referent against the file content,
+        // which only the model can do.
+        if (null === $attachmentContext && !$this->messageNeedsLlmRewrite($userQuestion)) {
             $cleaned = $this->fallbackExtraction($userQuestion);
 
             $this->logger->info('SearchQueryGenerator: Skipped LLM rewrite (heuristic short-circuit)', [
@@ -72,7 +86,7 @@ final readonly class SearchQueryGenerator
         if (!$searchPrompt) {
             $this->logger->error('SearchQueryGenerator: Search prompt not found, using original question');
 
-            return $this->fallbackExtraction($userQuestion);
+            return $this->fallbackQuery($userQuestion, $attachmentContext);
         }
 
         // Get sorting model (reuse sorting model for search query generation)
@@ -81,7 +95,7 @@ final readonly class SearchQueryGenerator
         if (!$modelId) {
             $this->logger->warning('SearchQueryGenerator: No sorting model configured, using fallback');
 
-            return $this->fallbackExtraction($userQuestion);
+            return $this->fallbackQuery($userQuestion, $attachmentContext);
         }
 
         $provider = $this->modelConfigService->getProviderForModel($modelId);
@@ -90,13 +104,24 @@ final readonly class SearchQueryGenerator
         if (!$provider || !$modelName) {
             $this->logger->warning('SearchQueryGenerator: Model configuration invalid, using fallback');
 
-            return $this->fallbackExtraction($userQuestion);
+            return $this->fallbackQuery($userQuestion, $attachmentContext);
         }
 
         // Build messages array for AI
+        $userContent = $userQuestion;
+        if (null !== $attachmentContext) {
+            // Structured shape the tools:search prompt is trained on (see
+            // PromptCatalog::searchQueryPrompt guideline 9): the model must
+            // name the file's subject, not echo the question words.
+            $question = '' !== trim($userQuestion)
+                ? $userQuestion
+                : '(no question — search for the subject of the attached file)';
+            $userContent = "Question: {$question}\n\nAttached file content (the question refers to this):\n{$attachmentContext}";
+        }
+
         $messages = [
             ['role' => 'system', 'content' => $searchPrompt->getPrompt()],
-            ['role' => 'user', 'content' => $userQuestion],
+            ['role' => 'user', 'content' => $userContent],
         ];
 
         try {
@@ -122,7 +147,7 @@ final readonly class SearchQueryGenerator
             if (strlen($searchQuery) > 200 || str_contains($searchQuery, "\n\n")) {
                 $this->logger->warning('SearchQueryGenerator: Generated query too long or malformed, using fallback');
 
-                return $this->fallbackExtraction($userQuestion);
+                return $this->fallbackQuery($userQuestion, $attachmentContext);
             }
 
             // Remove any surrounding quotes
@@ -135,13 +160,13 @@ final readonly class SearchQueryGenerator
                 'provider' => $e->getProviderName(),
             ]);
 
-            return $this->fallbackExtraction($userQuestion);
+            return $this->fallbackQuery($userQuestion, $attachmentContext);
         } catch (\Throwable $e) {
             $this->logger->error('SearchQueryGenerator: Query generation failed', [
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->fallbackExtraction($userQuestion);
+            return $this->fallbackQuery($userQuestion, $attachmentContext);
         }
     }
 
@@ -221,6 +246,27 @@ final readonly class SearchQueryGenerator
         }
 
         return false;
+    }
+
+    /**
+     * Fallback when the model rewrite is unavailable or failed.
+     *
+     * Without attachment context the question itself is the best we have.
+     * WITH context the question is deictic ("what is that") and searching it
+     * literally is the exact bug this pipeline exists to prevent — the first
+     * line of the file content (extracted text or vision identification)
+     * names the subject and makes a far better keyword query.
+     */
+    private function fallbackQuery(string $userQuestion, ?string $attachmentContext): string
+    {
+        if (null !== $attachmentContext && '' !== trim($attachmentContext)) {
+            $firstLine = strtok(trim($attachmentContext), "\n") ?: trim($attachmentContext);
+            $words = preg_split('/\s+/u', trim($firstLine)) ?: [];
+
+            return implode(' ', array_slice($words, 0, 12));
+        }
+
+        return $this->fallbackExtraction($userQuestion);
     }
 
     /**

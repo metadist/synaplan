@@ -10,15 +10,20 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Install-wide store for cloud AI provider API keys (Groq, OpenAI, Anthropic,
- * Gemini, Mistral, TrustedTokens, HuggingFace, xAI).
+ * Gemini, Mistral, TrustedTokens, A2Agent, HuggingFace, xAI).
  *
  * Keys live in BCONFIG (ownerId = 0, group {@see self::CONFIG_GROUP}, one row
  * per provider) as an AES-256-CBC encrypted JSON payload
- * `{"key": "...", "origin": "env"|"ui"}` via {@see EncryptionService} — the
- * same at-rest pattern as OpenAiCompatibleEndpointRegistry and the Higgsfield
- * credentials. Keys therefore NEVER appear in migrations, seeders, fixtures,
- * or any file tracked by git; they enter the database exclusively at runtime
- * inside the operator's own installation.
+ * `{"key": "...", "origin": "env"|"ui", "secret"?: "..."}` via
+ * {@see EncryptionService} — the same at-rest pattern as
+ * OpenAiCompatibleEndpointRegistry and the per-user Higgsfield credentials.
+ * Keys therefore NEVER appear in migrations, seeders, fixtures, or any file
+ * tracked by git; they enter the database exclusively at runtime inside the
+ * operator's own installation.
+ *
+ * Providers that authenticate with a key + secret pair (Higgsfield, see
+ * {@see ProviderKeyCatalog::requiresSecret()}) keep both halves in the same
+ * row; a half pair is treated as not configured, exactly like a missing key.
  *
  * Resolution order for {@see self::getKey()}:
  *   1. A stored DB row wins. A row saved through the admin UI/wizard
@@ -55,30 +60,40 @@ final class ProviderKeyStore
         'google',
         'mistral',
         'trustedtokens',
+        'a2agent',
         'huggingface',
         'xai',
+        'perplexity',
+        'thehive',
+        'higgsfield',
+        'elevenlabs',
     ];
 
     private const MEMO_TTL_SECONDS = 15;
 
-    /** @var array<string, array{key: ?string, at: int}> */
+    /** @var array<string, array{creds: array{key: string, secret: ?string}|null, at: int}> */
     private array $memo = [];
 
     /**
-     * @param array<string, string|list<string|null>|null> $envKeys provider name => key from
-     *                                                              the environment ('' — or null
-     *                                                              for a `default::` alias — when
-     *                                                              unset). A list holds accepted
-     *                                                              alternatives (Google reads
-     *                                                              GEMINI_API_KEY / GOOGLE_API_KEY
-     *                                                              too) and the first usable one
-     *                                                              wins; wired in services.yaml
+     * @param array<string, string|list<string|null>|null> $envKeys    provider name => key from
+     *                                                                 the environment ('' — or null
+     *                                                                 for a `default::` alias — when
+     *                                                                 unset). A list holds accepted
+     *                                                                 alternatives (Google reads
+     *                                                                 GEMINI_API_KEY / GOOGLE_API_KEY
+     *                                                                 too) and the first usable one
+     *                                                                 wins; wired in services.yaml
+     * @param array<string, string|null>                   $envSecrets provider name => the secret
+     *                                                                 half from the environment, for
+     *                                                                 providers whose catalog entry
+     *                                                                 names a `secretEnvVar`
      */
     public function __construct(
         private readonly ConfigRepository $configRepository,
         private readonly EncryptionService $encryption,
         private readonly LoggerInterface $logger,
         private readonly array $envKeys = [],
+        private readonly array $envSecrets = [],
     ) {
     }
 
@@ -93,6 +108,24 @@ final class ProviderKeyStore
      */
     public function getKey(string $provider): ?string
     {
+        return $this->getCredentials($provider)['key'] ?? null;
+    }
+
+    /**
+     * The secret half for a key + secret provider. Null when the provider has
+     * no secret ({@see ProviderKeyCatalog::requiresSecret()}) or is not
+     * configured.
+     */
+    public function getSecret(string $provider): ?string
+    {
+        return $this->getCredentials($provider)['secret'] ?? null;
+    }
+
+    /**
+     * @return array{key: string, secret: ?string}|null
+     */
+    private function getCredentials(string $provider): ?array
+    {
         $provider = strtolower(trim($provider));
         if (!self::isSupported($provider)) {
             return null;
@@ -100,19 +133,21 @@ final class ProviderKeyStore
 
         $memo = $this->memo[$provider] ?? null;
         if (null !== $memo && time() - $memo['at'] < self::MEMO_TTL_SECONDS) {
-            return $memo['key'];
+            return $memo['creds'];
         }
 
-        $key = $this->resolveKey($provider);
-        $this->memo[$provider] = ['key' => $key, 'at' => time()];
+        $creds = $this->resolveCredentials($provider);
+        $this->memo[$provider] = ['creds' => $creds, 'at' => time()];
 
-        return $key;
+        return $creds;
     }
 
     /**
-     * Store (or replace) a provider key, encrypted at rest.
+     * Store (or replace) a provider key, encrypted at rest. Providers with a
+     * secret half ({@see ProviderKeyCatalog::requiresSecret()}) must pass it;
+     * a key alone would authenticate nothing and is refused.
      */
-    public function saveKey(string $provider, string $key, string $origin = self::ORIGIN_UI): void
+    public function saveKey(string $provider, string $key, string $origin = self::ORIGIN_UI, ?string $secret = null): void
     {
         $provider = strtolower(trim($provider));
         if (!self::isSupported($provider)) {
@@ -130,8 +165,26 @@ final class ProviderKeyStore
             throw new \InvalidArgumentException(sprintf('"%s" is a placeholder, not an API key. Paste the real key from the provider console.', $key));
         }
 
-        $payload = json_encode(['key' => $key, 'origin' => $origin], JSON_THROW_ON_ERROR);
-        $this->configRepository->setValue(0, self::CONFIG_GROUP, $provider, $this->encryption->encrypt($payload));
+        $secret = null === $secret ? null : trim($secret);
+        if (ProviderKeyCatalog::has($provider) && ProviderKeyCatalog::requiresSecret($provider)) {
+            if (null === $secret || '' === $secret) {
+                throw new \InvalidArgumentException(sprintf('%s needs the API key and the API secret together — the key alone will not authenticate. Paste both from the provider console.', ProviderKeyCatalog::get($provider)['displayName']));
+            }
+            if (SecretValueGuard::isMasked($secret)) {
+                throw new \InvalidArgumentException('That is the masked display value, not an API secret. Leave the field untouched to keep the stored secret, or paste a new one.');
+            }
+            if (SecretValueGuard::isPlaceholder($secret)) {
+                throw new \InvalidArgumentException(sprintf('"%s" is a placeholder, not an API secret. Paste the real secret from the provider console.', $secret));
+            }
+        } else {
+            $secret = null;
+        }
+
+        $payload = ['key' => $key, 'origin' => $origin];
+        if (null !== $secret) {
+            $payload['secret'] = $secret;
+        }
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, $provider, $this->encryption->encrypt(json_encode($payload, JSON_THROW_ON_ERROR)));
         unset($this->memo[$provider]);
 
         // Never log the key itself — only that one was stored.
@@ -161,32 +214,43 @@ final class ProviderKeyStore
     /**
      * Configuration status for the admin UI. Never exposes the key itself.
      *
-     * @return array{configured: bool, source: 'db'|'env'|'none', origin: ?string, maskedKey: string}
+     * @return array{configured: bool, source: 'db'|'env'|'none', origin: ?string, maskedKey: string, hasSecret: bool}
      */
     public function getStatus(string $provider): array
     {
         $provider = strtolower(trim($provider));
+        $needsSecret = ProviderKeyCatalog::has($provider) && ProviderKeyCatalog::requiresSecret($provider);
         $row = $this->loadRow($provider);
         if (null !== $row) {
+            $hasSecret = null !== $row['secret'] && '' !== $row['secret'];
+
             return [
-                'configured' => true,
+                // A key + secret provider is not connected until both halves
+                // are present — otherwise the card would say Connected and
+                // offer Test on a pair that cannot authenticate.
+                'configured' => '' !== $row['key'] && (!$needsSecret || $hasSecret),
                 'source' => 'db',
                 'origin' => $row['origin'],
-                'maskedKey' => self::mask($row['key']),
+                'maskedKey' => '' !== $row['key'] ? self::mask($row['key']) : '',
+                'hasSecret' => $hasSecret,
             ];
         }
 
         $envKey = $this->envKey($provider);
-        if ('' !== $envKey) {
+        $envSecret = $this->envSecret($provider);
+        if ('' !== $envKey || ($needsSecret && '' !== $envSecret)) {
+            $hasSecret = '' !== $envSecret;
+
             return [
-                'configured' => true,
+                'configured' => '' !== $envKey && (!$needsSecret || $hasSecret),
                 'source' => 'env',
                 'origin' => null,
-                'maskedKey' => self::mask($envKey),
+                'maskedKey' => '' !== $envKey ? self::mask($envKey) : '',
+                'hasSecret' => $hasSecret,
             ];
         }
 
-        return ['configured' => false, 'source' => 'none', 'origin' => null, 'maskedKey' => ''];
+        return ['configured' => false, 'source' => 'none', 'origin' => null, 'maskedKey' => '', 'hasSecret' => false];
     }
 
     /**
@@ -213,13 +277,21 @@ final class ProviderKeyStore
         return substr($key, 0, 4).str_repeat('•', min(12, $length - 8)).substr($key, -4);
     }
 
-    private function resolveKey(string $provider): ?string
+    /**
+     * @return array{key: string, secret: ?string}|null
+     */
+    private function resolveCredentials(string $provider): ?array
     {
         $envKey = $this->envKey($provider);
+        $envSecret = $this->envSecret($provider);
+        $needsSecret = ProviderKeyCatalog::has($provider) && ProviderKeyCatalog::requiresSecret($provider);
+        // A key + secret provider is only "set in the environment" when both
+        // halves are: half a pair authenticates nothing.
+        $envConfigured = '' !== $envKey && (!$needsSecret || '' !== $envSecret);
         $row = $this->loadRow($provider);
 
         if (null === $row) {
-            if ('' === $envKey) {
+            if (!$envConfigured) {
                 return null;
             }
 
@@ -227,7 +299,7 @@ final class ProviderKeyStore
             // an early boot phase) must never break the request: fall back to
             // the env key and let a later resolution retry the import.
             try {
-                $this->saveKey($provider, $envKey, self::ORIGIN_ENV);
+                $this->saveKey($provider, $envKey, self::ORIGIN_ENV, $needsSecret ? $envSecret : null);
             } catch (\Throwable $e) {
                 $this->logger->warning('AI provider key env import failed, using env key directly', [
                     'provider' => $provider,
@@ -235,14 +307,15 @@ final class ProviderKeyStore
                 ]);
             }
 
-            return $envKey;
+            return ['key' => $envKey, 'secret' => $needsSecret ? $envSecret : null];
         }
 
         // Env rotation: a row imported from env follows the env var when the
         // operator ships a new non-empty value. A UI-saved key never does.
-        if (self::ORIGIN_ENV === $row['origin'] && '' !== $envKey && $envKey !== $row['key']) {
+        $rotated = $envKey !== $row['key'] || ($needsSecret && $envSecret !== $row['secret']);
+        if (self::ORIGIN_ENV === $row['origin'] && $envConfigured && $rotated) {
             try {
-                $this->saveKey($provider, $envKey, self::ORIGIN_ENV);
+                $this->saveKey($provider, $envKey, self::ORIGIN_ENV, $needsSecret ? $envSecret : null);
             } catch (\Throwable $e) {
                 $this->logger->warning('AI provider key env rotation update failed', [
                     'provider' => $provider,
@@ -250,10 +323,14 @@ final class ProviderKeyStore
                 ]);
             }
 
-            return $envKey;
+            return ['key' => $envKey, 'secret' => $needsSecret ? $envSecret : null];
         }
 
-        return '' !== $row['key'] ? $row['key'] : null;
+        if ('' === $row['key'] || ($needsSecret && null === $row['secret'])) {
+            return null;
+        }
+
+        return ['key' => $row['key'], 'secret' => $row['secret']];
     }
 
     /**
@@ -284,7 +361,17 @@ final class ProviderKeyStore
     }
 
     /**
-     * @return array{key: string, origin: string}|null
+     * The secret half from the environment, '' when unset or a placeholder.
+     */
+    private function envSecret(string $provider): string
+    {
+        $candidate = trim((string) ($this->envSecrets[$provider] ?? ''));
+
+        return SecretValueGuard::isUsable($candidate) ? $candidate : '';
+    }
+
+    /**
+     * @return array{key: string, origin: string, secret: ?string}|null
      */
     private function loadRow(string $provider): ?array
     {
@@ -311,10 +398,12 @@ final class ProviderKeyStore
         }
 
         $origin = $decoded['origin'] ?? self::ORIGIN_UI;
+        $secret = $decoded['secret'] ?? null;
 
         return [
             'key' => $decoded['key'],
             'origin' => is_string($origin) ? $origin : self::ORIGIN_UI,
+            'secret' => is_string($secret) && '' !== $secret ? $secret : null,
         ];
     }
 }

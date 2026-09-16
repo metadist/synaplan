@@ -90,6 +90,85 @@ final class WebSearchTopicPolicyTest extends TestCase
         );
     }
 
+    /**
+     * Attachment-referring questions are NOT vetoed by the policy: the vote
+     * is honoured, and MessageProcessor resolves the file's content so the
+     * search query names the actual subject ("sony wh-1000xm6 price" instead
+     * of "how much does this cost"). Only an unresolvable referent drops a
+     * vote-only search — and that fallback lives in MessageProcessor, not
+     * here. This test pins that shouldSearch() stays attachment-agnostic.
+     */
+    public function testShouldSearchHonoursVoteForAttachmentQuestions(): void
+    {
+        self::assertTrue(
+            WebSearchTopicPolicy::shouldSearch('general', false, null, true, 'how much does this cost?'),
+            'deictic question + yes-vote must search — the query is built from the attachment content',
+        );
+        self::assertTrue(
+            WebSearchTopicPolicy::shouldSearch('general', false, null, true, 'what is that'),
+            'even a pure deictic question searches when the model voted yes',
+        );
+        self::assertFalse(
+            WebSearchTopicPolicy::shouldSearch('general', false, null, null, 'what is that'),
+            'no vote still means no search',
+        );
+    }
+
+    /**
+     * @return iterable<string, array{0: ?string, 1: bool}>
+     */
+    public static function refersToAttachmentProvider(): iterable
+    {
+        // Deictic pronouns / demonstratives.
+        yield 'what_is_that' => ['what is that?', true];
+        yield 'what_is_it' => ['what is it?', true];
+        yield 'german_was_ist_das' => ['Was ist das?', true];
+        yield 'german_was_ist_es' => ['was ist es?', true];
+        yield 'this_cost' => ['How much does this cost?', true];
+        yield 'spanish_que_es_esto' => ['¿Qué es esto?', true];
+        yield 'turkish_bu_ne' => ['bu ne?', true];
+        yield 'french_cest_quoi_ca' => ["c'est quoi ça", true];
+
+        // Image nouns and perception verbs.
+        yield 'picture_noun' => ['what is in the picture', true];
+        yield 'german_bild' => ['erkläre mir das Bild', true];
+        yield 'perception_see' => ['what do you see here', true];
+
+        // Document nouns — a contract PDF, an invoice, a report.
+        yield 'contract_validity' => ['is the contract still valid', true];
+        yield 'german_rechnung' => ['stimmt die Rechnung so', true];
+        yield 'document_noun' => ['check the document for errors', true];
+
+        // Audio/video nouns.
+        yield 'recording_speaker' => ['who is speaking in the recording', true];
+        yield 'german_lied' => ['wie heißt das Lied', true];
+        yield 'video_noun' => ['where was the video filmed', true];
+
+        // Attachment-only message: the attachment IS the message.
+        yield 'empty' => ['', true];
+        yield 'null' => [null, true];
+        yield 'whitespace' => ['   ', true];
+
+        // Self-contained subjects do NOT refer to the attachment — including
+        // questions that happen to contain dummy "it" or the Spanish copula
+        // "es". Those must not pull file content into the search query.
+        yield 'self_contained_release' => ['GTA 6 release date', false];
+        yield 'self_contained_price' => ['bitcoin price today', false];
+        yield 'self_contained_weather' => ['weather tomorrow in Berlin', false];
+        yield 'dummy_it_weather' => ['Is it raining in Berlin today?', false];
+        yield 'spanish_copula_price' => ['¿Cuál es el precio del Bitcoin hoy?', false];
+    }
+
+    #[DataProvider('refersToAttachmentProvider')]
+    public function testRefersToAttachment(?string $text, bool $expected): void
+    {
+        self::assertSame(
+            $expected,
+            WebSearchTopicPolicy::refersToAttachment($text),
+            sprintf('text=%s', var_export($text, true)),
+        );
+    }
+
     public function testIsNonWebSearchTopicCoversMediaAndDocumentTopics(): void
     {
         self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('mediamaker'));

@@ -9,15 +9,19 @@ use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
+use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
 use App\Repository\ModelRepository;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentRuntimeResolver;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Vision\VisionModelResolver;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -98,8 +102,14 @@ final readonly class MessagesGateway
      */
     public const BYO_ALLOWED_LEVELS = PremiumFeatureGate::PAID_LEVELS;
 
-    /** Providers the Messages gateway can translate to. */
-    private const GATEWAY_PROVIDERS = ['anthropic', 'openai', 'google', 'gemini'];
+    /**
+     * PIC2TEXT rewrite hosts. Claude Code image turns must stay on Anthropic
+     * (or the original OpenAI / Gemini alias) — never be stolen onto Groq /
+     * Ollama / other Chat Completions hosts that Desktop may use for chat.
+     *
+     * @var list<string>
+     */
+    private const VISION_REWRITE_PROVIDERS = ['anthropic', 'openai', 'google', 'gemini'];
 
     /**
      * @param iterable<MessagesTranslatorInterface> $translators
@@ -123,6 +133,8 @@ final readonly class MessagesGateway
         private LoggerInterface $logger,
         #[AutowireIterator('app.messages.translator')]
         private iterable $translators = [],
+        private ?AgentConfig $agentConfig = null,
+        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
     ) {
     }
 
@@ -200,7 +212,7 @@ final readonly class MessagesGateway
         }
 
         $allowOperator = $this->config->allowOperatorKey($user->getId());
-        $credential = $this->keyResolver->resolve($resolved['provider'], $user->getId(), $allowOperator);
+        $credential = $this->resolveCredential($resolved['provider'], $user->getId(), $allowOperator);
         if (null === $credential) {
             return $this->err(
                 401,
@@ -244,7 +256,7 @@ final readonly class MessagesGateway
                 400,
                 'invalid_request_error',
                 sprintf(
-                    'Provider `%s` is not supported by the Messages gateway. Use Anthropic, OpenAI, or Google (Gemini), or add a MODEL_ALIASES entry.',
+                    'Provider `%s` cannot be used through the Messages gateway. Use a catalog chat model on Anthropic, Gemini, or an OpenAI-compatible API (OpenAI, Groq, Mistral, xAI, HuggingFace, TrustedTokens, A2Agent, Perplexity, Ollama, or an admin-registered endpoint), or add a MODEL_ALIASES entry.',
                     $resolved['provider'],
                 ),
             );
@@ -275,7 +287,10 @@ final readonly class MessagesGateway
         $sessionId = $request->headers->get('x-claude-code-session-id');
         $sessionKey = $this->sessionKey($sessionId, $user, $requestBody);
 
-        $toolCatalog = $this->toolCatalog->build($user, $sessionKey, $requestBody);
+        $desktop = DesktopTurnOptions::fromRequest($request);
+        $profile = $this->resolveDesktopProfile($user, $desktop);
+
+        $toolCatalog = $this->toolCatalog->build($user, $sessionKey, $requestBody, $profile);
         $webSearch = $toolCatalog['web_search'];
         $toolLoop = [] !== $toolCatalog['tools'];
         $replacedServerTools = $this->toolCatalog->replacedServerTools($toolCatalog);
@@ -301,12 +316,25 @@ final readonly class MessagesGateway
         if ('on' === strtolower((string) $contextOverride)) {
             $injectContext = true;
         }
-        if ($injectContext) {
+        // Desktop headers are an explicit per-request pin, not a bypass of
+        // CONTEXT_INJECTION_ENABLED. Ambient memories stay behind that flag.
+        // An explicit knowledge folder (or recipe folders) still searches RAG
+        // when the flag is off — otherwise x-synaplan-rag-group-key is a no-op.
+        $explicitFolder = null !== $desktop->ragGroupKey
+            || (null !== $profile && [] !== $profile->ragScopes);
+        $wantSessionBlock = $injectContext || $explicitFolder;
+        if ('off' === strtolower((string) $contextOverride)) {
+            $wantSessionBlock = false;
+        }
+        if ($injectContext || !$desktop->isEmpty()) {
             $injected = $this->contextInjector->inject(
                 $requestBody,
                 $user,
                 $sessionKey,
-                $contextOverride,
+                $wantSessionBlock ? $contextOverride : 'off',
+                $desktop,
+                $profile,
+                $injectContext,
             );
             $requestBody = $injected['body'];
             if ($injected['injected']) {
@@ -318,11 +346,14 @@ final readonly class MessagesGateway
         $translatorContext = [
             'api_key' => $credential['key'],
             'upstream_url' => $this->config->upstreamUrl(),
+            'provider' => $resolved['provider'],
+            'provider_model_id' => $resolved['providerModelId'],
             'anthropic_version' => $request->headers->get('anthropic-version'),
             'anthropic_beta' => $webFetch['anthropic_beta'],
             'x_fixture' => $request->headers->get('x-fixture'),
             'raw_body' => $bodyMutated ? null : $rawBody,
             'image_detail' => $imagePolicy['detail'],
+            'runtime_profile' => $profile,
         ];
 
         $headers = array_merge(
@@ -616,7 +647,7 @@ final readonly class MessagesGateway
         }
 
         $provider = strtolower($visionModel->getService());
-        if (!\in_array($provider, self::GATEWAY_PROVIDERS, true)) {
+        if (!\in_array($provider, self::VISION_REWRITE_PROVIDERS, true)) {
             $this->logger->info('MessagesGateway: vision model provider not supported by gateway, funneling images upstream', [
                 'user_id' => $user->getId(),
                 'provider' => $provider,
@@ -689,19 +720,38 @@ final readonly class MessagesGateway
         return false;
     }
 
+    /**
+     * @return array{key: string, source: 'user'|'operator'}|null
+     */
+    private function resolveCredential(string $provider, ?int $userId, bool $allowOperator): ?array
+    {
+        if (ChatCompletionsUpstreams::isLocal($provider)) {
+            // Ollama and admin-registered OpenAI-compatible endpoints do not
+            // use ProviderKeyStore. The translator attaches a real endpoint
+            // key when one exists; a placeholder is enough to pass this gate.
+            return ['key' => 'local', 'source' => 'operator'];
+        }
+
+        return $this->keyResolver->resolve($provider, $userId, $allowOperator);
+    }
+
     private function pickTranslator(string $provider): ?MessagesTranslatorInterface
     {
         $provider = strtolower($provider);
+
+        // Claude Code / Anthropic must never be captured by a Chat Completions
+        // translator, regardless of AutowireIterator order.
+        if ($this->anthropicPassthrough->supports($provider)) {
+            return $this->anthropicPassthrough;
+        }
+
         foreach ($this->translators as $translator) {
+            if ($translator === $this->anthropicPassthrough) {
+                continue;
+            }
             if ($translator->supports($provider)) {
                 return $translator;
             }
-        }
-
-        // Fallback: Anthropic passthrough is always registered even if the
-        // iterator tag is missing during early boot/tests.
-        if ($this->anthropicPassthrough->supports($provider)) {
-            return $this->anthropicPassthrough;
         }
 
         return null;
@@ -733,7 +783,7 @@ final readonly class MessagesGateway
         }
 
         try {
-            $this->rateLimitService->recordUsage($user, 'API_CHAT', $metadata);
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', $metadata);
         } catch (\Throwable $e) {
             $this->logger->error('MessagesGateway: recordUsage failed', [
                 'error' => $e->getMessage(),
@@ -771,6 +821,33 @@ final readonly class MessagesGateway
                 'error' => $e->getMessage(),
                 'user_id' => $user->getId(),
             ]);
+        }
+    }
+
+    /**
+     * Pin an Assistant recipe from `x-synaplan-agent-id`. Invalid / flag-off
+     * pins are ignored (same as the web stream). The body `model` stays as
+     * already resolved — recipe chat keys never replace it (C15).
+     */
+    private function resolveDesktopProfile(User $user, DesktopTurnOptions $desktop): ?RuntimeProfile
+    {
+        if (null === $desktop->agentId || null === $this->agentRuntimeResolver || null === $this->agentConfig) {
+            return null;
+        }
+        if (!$this->agentConfig->isEnabled((int) $user->getId())) {
+            return null;
+        }
+
+        try {
+            return $this->agentRuntimeResolver->resolve($desktop->agentId, $user, false, null);
+        } catch (\Throwable $e) {
+            $this->logger->info('MessagesGateway: desktop agent pin ignored', [
+                'agent_id' => $desktop->agentId,
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 

@@ -7,7 +7,9 @@ namespace App\Tests\Controller;
 use App\Entity\Token;
 use App\Entity\User;
 use App\Entity\VerificationToken;
+use App\Service\GuestSessionService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -123,6 +125,29 @@ class AuthControllerTest extends WebTestCase
         $this->em->flush();
     }
 
+    public function testRegisterDoesNotCreateTheReservedGuestProcessorEmail(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/register',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => GuestSessionService::PROCESSING_USER_EMAIL,
+                'password' => 'SecurePass123!',
+            ])
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_OK);
+        $responseData = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($responseData['success']);
+
+        $user = $this->em->getRepository(User::class)
+            ->findOneBy(['mail' => GuestSessionService::PROCESSING_USER_EMAIL]);
+        $this->assertNull($user);
+    }
+
     public function testRegisterWithInvalidEmail(): void
     {
         $this->client->request(
@@ -182,6 +207,12 @@ class AuthControllerTest extends WebTestCase
         $cookieNames = array_map(fn ($cookie) => $cookie->getName(), $cookies);
         $this->assertContains('access_token', $cookieNames);
         $this->assertContains('refresh_token', $cookieNames);
+
+        $refreshCookie = $this->cookieNamed('refresh_token');
+        $this->assertNotNull($refreshCookie);
+        $ttl = $refreshCookie->getExpiresTime() - time();
+        $this->assertGreaterThan(29 * 86400, $ttl);
+        $this->assertLessThanOrEqual(30 * 86400 + 5, $ttl);
     }
 
     /**
@@ -227,6 +258,12 @@ class AuthControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $refreshData = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertSame('Cristian', $refreshData['user']['firstName']);
+
+        $refreshCookie = $this->cookieNamed('refresh_token');
+        $this->assertNotNull($refreshCookie, 'refresh must rewrite the sliding refresh cookie');
+        $ttl = $refreshCookie->getExpiresTime() - time();
+        $this->assertGreaterThan(29 * 86400, $ttl);
+        $this->assertLessThanOrEqual(30 * 86400 + 5, $ttl);
 
         // Cleanup relies on tearDown()'s email lookup: the kernel reboots
         // between requests above, so the original `$user` reference is
@@ -351,5 +388,16 @@ class AuthControllerTest extends WebTestCase
         );
 
         $this->assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    private function cookieNamed(string $name): ?Cookie
+    {
+        foreach ($this->client->getResponse()->headers->getCookies() as $cookie) {
+            if ($cookie->getName() === $name) {
+                return $cookie;
+            }
+        }
+
+        return null;
     }
 }

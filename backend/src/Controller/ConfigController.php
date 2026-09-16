@@ -3,31 +3,55 @@
 namespace App\Controller;
 
 use App\AI\Credential\ChatReadinessService;
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
+use App\Bundle\BundleConfig;
 use App\Entity\Config;
 use App\Entity\User;
+use App\Model\ModelCatalog;
+use App\Module\Gate\ModuleGateConfig;
+use App\Module\ModuleRegistry;
+use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Service\Agent\AgentConfig;
+use App\Service\Auth\DemoLoginHint;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
+use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
+use App\Service\Compute\ComputeConfig;
+use App\Service\Config\FeatureStatusReporter;
+use App\Service\Config\LayeredConfigResolver;
+use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Document\DocumentToolsConfig;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
-use App\Service\Infrastructure\RedisService;
+use App\Service\GuestChatConfig;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
+use App\Service\MailerConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
+use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
-use App\Service\Search\BraveSearchService;
+use App\Service\SavedTask\SavedTaskConfig;
+use App\Service\SavedTask\WorkflowsConfig;
+use App\Service\SelfAware\CapabilityInventory;
+use App\Service\SelfAware\SelfAwareConfig;
+use App\Service\Setup\SetupStateService;
+use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
+use App\Service\WebSpeechConfig;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -48,7 +72,6 @@ class ConfigController extends AbstractController
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
         private ProviderRegistry $providerRegistry,
-        private BraveSearchService $braveSearchService,
         private WhisperService $whisperService,
         private PluginManager $pluginManager,
         private BillingService $billingService,
@@ -56,19 +79,41 @@ class ConfigController extends AbstractController
         private EmbeddingModelChangeGuard $embeddingChangeGuard,
         private EmbeddingMetadataService $embeddingMetadata,
         private ModelConfigService $modelConfigService,
-        private RedisService $redisService,
         private ClientContextResolver $clientContextResolver,
         private BrandingService $brandingService,
         private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
+        private ProgressNarrationConfig $progressNarrationConfig,
         private RegistrationConfig $registrationConfig,
+        private GuestChatConfig $guestChatConfig,
+        private WebSpeechConfig $webSpeechConfig,
+        private SavedTaskConfig $savedTaskConfig,
+        private DesktopAgentConfig $desktopAgentConfig,
+        private AgentConfig $agentConfig,
+        private PlatformLinksConfig $platformLinksConfig,
+        private IamConfig $iamConfig,
         private ChatReadinessService $chatReadiness,
+        private DemoLoginHint $demoLoginHint,
+        private SetupStateService $setupState,
         private AiProviderDisclosure $aiProviderDisclosure,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
+        private MailerConfig $mailerConfig,
         private CapabilityService $capabilityService,
+        private FeatureStatusReporter $featureStatusReporter,
+        private ModuleRegistry $modules,
+        private ModuleGateConfig $moduleGate,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
+        private readonly ?SelfAwareConfig $selfAwareConfig = null,
+        private readonly ?CapabilityInventory $capabilityInventory = null,
+        private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
+        private readonly ?GroupPolicyService $groupPolicyService = null,
+        private readonly ?BundleConfig $bundleConfig = null,
+        private readonly ?ToolsConfig $toolsConfig = null,
+        private readonly ?WorkflowsConfig $workflowsConfig = null,
+        private readonly ?DocumentToolsConfig $documentToolsConfig = null,
+        private readonly ?ComputeConfig $computeConfig = null,
     ) {
     }
 
@@ -134,6 +179,8 @@ class ConfigController extends AbstractController
                     description: 'Authentication surface flags. Lets the frontend hide sign-up affordances when the operator runs an SSO-/OIDC-only instance.',
                     properties: [
                         new OA\Property(property: 'registrationEnabled', type: 'boolean', example: true, description: 'When false, local email/password self-registration is disabled (set REGISTRATION_ENABLED=false, e.g. for OIDC-only deployments). The /register endpoint is also refused server-side.'),
+                        new OA\Property(property: 'guestChatEnabled', type: 'boolean', example: true, description: 'When false, the anonymous guest trial chat is disabled (set GUEST_CHAT_ENABLED=false, e.g. for OIDC-only deployments): the frontend sends unauthenticated visitors to /login and every /api/v1/guest endpoint is refused server-side.'),
+                        new OA\Property(property: 'mailerConfigured', type: 'boolean', example: true, description: 'False when MAILER_DSN is unset or the null transport. The forgot-password page then shows the CLI reset instead of pretending an email will arrive.'),
                     ]
                 ),
                 new OA\Property(
@@ -150,6 +197,24 @@ class ConfigController extends AbstractController
                     properties: [
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                         new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
+                        new OA\Property(property: 'savedTasks', type: 'boolean', example: false, description: 'When true, AI Instructions shows Saved Task chrome. Widget chat never runs Saved Tasks.'),
+                        new OA\Property(property: 'selfAware', type: 'boolean', example: true, description: 'When true, the web chat can answer what this installation can do and cite official documentation. Off restores the previous chat behaviour.'),
+                        new OA\Property(property: 'desktopAgentEnabled', type: 'boolean', example: false, description: 'When true, the Synaplan Desktop pairing surface (Channels → Desktop) and desktop job APIs are exposed. On by default; pin with FEATURE_DESKTOP_AGENT_ENABLED or the Admin Features tab.'),
+                        new OA\Property(property: 'platformLinksEnabled', type: 'boolean', example: false, description: 'When true, partner instances can register and exchange a link code for a per-user API key. On by default; pin with FEATURE_PLATFORM_LINKS_ENABLED. The Outlook add-in connect path is not gated by this flag.'),
+                        new OA\Property(property: 'agentsEnabled', type: 'boolean', example: false, description: 'When true, the Assistants CRUD API and stream agentId pin are available. On by default; pin with FEATURE_AGENTS_ENABLED.'),
+                        new OA\Property(property: 'bundleEnabled', type: 'boolean', example: false, description: 'When true, Settings shows Export & import. On by default; pin with FEATURE_BUNDLE_ENABLED.'),
+                        new OA\Property(property: 'iamGroups', type: 'boolean', example: false, description: 'When true, Operate shows People and the group API is available. On by default; pin with FEATURE_IAM_GROUPS_ENABLED.'),
+                        new OA\Property(property: 'iamSharing', type: 'boolean', example: false, description: 'When true, owners can share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Requires iamGroups. On by default; pin with FEATURE_IAM_SHARING_ENABLED.'),
+                        new OA\Property(property: 'iamImpersonationDisabled', type: 'boolean', example: false, description: 'When true, administrators cannot start an impersonation session (IAM.ADMIN_IMPERSONATION=disabled).'),
+                        new OA\Property(property: 'iamPolicies', type: 'boolean', example: false, description: 'When true, People shows Policies and group defaults / allowed models apply. Requires iamGroups. On by default; pin with FEATURE_IAM_GROUP_POLICIES_ENABLED.'),
+                        new OA\Property(property: 'officeConvertEnabled', type: 'boolean', example: false, description: 'When true, Collabora CODE convert-to is configured (OFFICE_CONVERT_URL). Office thumbnails, PDF export, inline preview and combine stay off while this is false.'),
+                        new OA\Property(property: 'computeEnabled', type: 'boolean', example: false, description: 'When true, file work is on (sidecar URL + token and COMPUTE.ENABLED). The API-key create form then offers the compute:run grant.'),
+                        new OA\Property(property: 'computeWorkspacesEnabled', type: 'boolean', example: false, description: 'When true, file-work runs may keep a folder between runs and Files shows Workspace. Off by default; needs computeEnabled.'),
+                        new OA\Property(property: 'documentToolsEnabled', type: 'boolean', example: false, description: 'When true, structured office editing (document tools, version history, combine as DOCX/XLSX/PPTX) is available. On by default; pin with FEATURE_DOCUMENT_TOOLS_ENABLED.'),
+                        new OA\Property(property: 'toolsRegistryEnabled', type: 'boolean', example: true, description: 'When true, GET /api/v1/tools lists the tool registry. Kill switch after the Wave 4 registry refactor.'),
+                        new OA\Property(property: 'toolsApprovalsEnabled', type: 'boolean', example: false, description: 'When true, write-class tools ask for approval and Manage → Automations → Approvals is shown. On by default; pin with FEATURE_TOOLS_APPROVALS_ENABLED.'),
+                        new OA\Property(property: 'toolsCustomHttpEnabled', type: 'boolean', example: false, description: 'When true, Connections shows Custom tools for HTTP/OpenAPI tools. On by default; pin with FEATURE_TOOLS_CUSTOM_HTTP_ENABLED.'),
+                        new OA\Property(property: 'workflowsBuilderEnabled', type: 'boolean', example: false, description: 'When true, Saved Tasks show a Steps editor and can start from another system. On by default; pin with FEATURE_WORKFLOWS_BUILDER_ENABLED.'),
                     ]
                 ),
                 new OA\Property(
@@ -192,6 +257,12 @@ class ConfigController extends AbstractController
                             type: 'boolean',
                             example: true,
                             description: 'When true, local Whisper.cpp is available for record-then-transcribe mode.'
+                        ),
+                        new OA\Property(
+                            property: 'webSpeechEnabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'When false, the frontend never uses the browser\'s cloud-backed Web Speech API for speech-to-text (set WEB_SPEECH_ENABLED=false on air-gapped instances) and records for the server-side transcription path instead, or hides the microphone when speechToTextAvailable is false too.'
                         ),
                         new OA\Property(
                             property: 'speechToTextAvailable',
@@ -375,6 +446,16 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'progressNarration',
+                    type: 'object',
+                    description: 'Admin-controlled switches for how much the chat narrates while an answer is prepared (all default true). Affects the web chat display only; the SSE stream always carries the full metadata.',
+                    properties: [
+                        new OA\Property(property: 'steps', type: 'boolean', example: true, description: 'Show the ordered step list with finished phases (false: only the current phase).'),
+                        new OA\Property(property: 'models', type: 'boolean', example: true, description: 'Name the model and provider doing the work (false: generic wording).'),
+                        new OA\Property(property: 'timings', type: 'boolean', example: true, description: 'Show step durations and the live elapsed counter.'),
+                    ]
+                ),
+                new OA\Property(
                     property: 'aiProviders',
                     type: 'array',
                     description: 'Display names of the AI providers a user\'s input can reach on this instance, for the disclosure App Store Review Guideline 5.1.2(i) requires. Empty when none are configured.',
@@ -390,16 +471,47 @@ class ConfigController extends AbstractController
                 new OA\Property(
                     property: 'setup',
                     type: 'object',
-                    description: 'First-run setup status (only for authenticated users). Drives the "connect an AI provider" banner and the admin setup wizard.',
+                    description: 'First-run setup status. wizardRequired, wizardEnabled and demoLoginHint are public so the SPA can route a virgin install into the setup wizard; chatReady is only set for authenticated users.',
                     nullable: true,
                     properties: [
+                        new OA\Property(
+                            property: 'wizardRequired',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True only on a virgin installation that still needs its first administrator: no BCONFIG SETUP.COMPLETED flag, not a single BUSER row, and SETUP_WIZARD_ENABLED not disabled. The SPA then redirects every route to the setup wizard, and the rest of the API answers 503 SETUP_REQUIRED. False on every existing installation.'
+                        ),
+                        new OA\Property(
+                            property: 'wizardEnabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'False only when the operator set SETUP_WIZARD_ENABLED=false. The wizard then never applies on this installation, no matter how empty it is — the intended setup for SSO/OIDC deployments where the administrator arrives through IdP roles and no local account is ever created. The SPA uses this to stop re-checking the setup state at all. True by default.'
+                        ),
                         new OA\Property(
                             property: 'chatReady',
                             type: 'boolean',
                             example: true,
-                            description: 'True when the provider serving the requesting user\'s effective default chat model (per-user override, then global default) is available (key configured / local AI reachable), i.e. sending a chat message can work for this user.'
+                            description: 'True when a real AI provider (cloud key or a pulled local Ollama model) can serve the requesting user\'s effective default chat model. The built-in TestProvider demo responder does not count. Omitted for anonymous clients.'
+                        ),
+                        new OA\Property(
+                            property: 'demoLoginHint',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True only on a fresh dev/test install whose seeded admin@synaplan.com password is still the fixture default. The login page may then show that account. Always false in production.'
                         ),
                     ]
+                ),
+                new OA\Property(
+                    property: 'modules',
+                    type: 'object',
+                    description: 'Declared feature modules keyed by module id (tika, docling, office_convert, searxng, piper_tts, local_ai, higgsfield, google_ai, thehive, stripe_billing, mobile_iap, whatsapp, compute). `configured` is whether the installation provides the module; `gated` is whether an absent module answers 404 feature_not_configured on its routes (MODULES.GATE_<ID>). New installs seed every gate on; existing BCONFIG rows are never overwritten. Older clients ignore this key; a client that does not receive it treats every module as configured.',
+                    additionalProperties: new OA\AdditionalProperties(
+                        type: 'object',
+                        required: ['configured', 'gated'],
+                        properties: [
+                            new OA\Property(property: 'configured', type: 'boolean', example: true),
+                            new OA\Property(property: 'gated', type: 'boolean', example: false),
+                        ]
+                    )
                 ),
             ]
         )
@@ -421,6 +533,24 @@ class ConfigController extends AbstractController
         $features = [
             'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
             'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
+            'savedTasks' => $this->savedTaskConfig->isEnabled($user?->getId()),
+            'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
+            'platformLinksEnabled' => $this->platformLinksConfig->isEnabled($user?->getId()),
+            'agentsEnabled' => $this->agentConfig->isEnabled($user?->getId()),
+            'bundleEnabled' => null !== $this->bundleConfig && $this->bundleConfig->isEnabled($user?->getId()),
+            'iamGroups' => $this->iamConfig->isGroupsEnabled($user?->getId()),
+            'iamSharing' => $this->iamConfig->isSharingEnabled($user?->getId()),
+            'iamImpersonationDisabled' => $this->iamConfig->isImpersonationDisabled($user?->getId()),
+            'iamPolicies' => $this->iamConfig->isGroupPoliciesEnabled($user?->getId()),
+            'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
+            'officeConvertEnabled' => $this->modules->get(OfficeConvertModule::ID)->isConfigured(),
+            'computeEnabled' => null !== $this->computeConfig && $this->computeConfig->isEnabled($user?->getId()),
+            'computeWorkspacesEnabled' => null !== $this->computeConfig && $this->computeConfig->workspacesEnabled($user?->getId()),
+            'documentToolsEnabled' => null !== $this->documentToolsConfig && $this->documentToolsConfig->isEnabled($user?->getId()),
+            'toolsRegistryEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($user?->getId()),
+            'toolsApprovalsEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($user?->getId()),
+            'toolsCustomHttpEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isCustomHttpEnabled($user?->getId()),
+            'workflowsBuilderEnabled' => null !== $this->workflowsConfig && $this->workflowsConfig->isBuilderEnabled($user?->getId()),
         ];
 
         // Speech-to-text configuration
@@ -438,6 +568,7 @@ class ConfigController extends AbstractController
 
         $speech = [
             'whisperEnabled' => $whisperLocalAvailable,
+            'webSpeechEnabled' => $this->webSpeechConfig->isEnabled(),
             'speechToTextAvailable' => $whisperLocalAvailable || $apiProvidersAvailable,
         ];
 
@@ -484,20 +615,32 @@ class ConfigController extends AbstractController
         ];
 
         $unavailableProviders = [];
-        $setup = null;
+        $setup = [
+            // Public on purpose: this is the ONLY signal the SPA has to route a
+            // virgin install into the wizard, and it is the one route the setup
+            // lockdown lets through. It leaks nothing — on every installation
+            // that has ever had a user it is simply false.
+            'wizardRequired' => $this->setupState->isSetupRequired(),
+            // Distinguishes "already set up" from "the operator switched the
+            // wizard off". Both leave wizardRequired false, but only the second
+            // one is permanent, which is what lets an SSO/OIDC deployment stop
+            // asking about the setup state altogether.
+            'wizardEnabled' => $this->setupState->isWizardEnabled(),
+            'demoLoginHint' => $this->demoLoginHint->isVisible(),
+        ];
         if ($user) {
             // READ ONLY. Repairing a broken default is an explicit action
             // (`app:provider:auto-default` at container start, or an admin
             // saving a key) — never a side effect of this GET.
             $unavailableProviders = $this->chatReadiness->unavailableProviderNames();
 
-            // First-run signal: can a plain chat message work right now for
-            // THIS user? The frontend shows a "connect an AI provider" banner
-            // (admins get a wizard CTA) while this is false — e.g. a fresh
-            // install whose default chat model points at a provider without a
-            // key. Evaluated per user so a working per-user model override is
-            // honoured, exactly like the chat pipeline resolves it.
-            $setup = ['chatReady' => $this->chatReadiness->isChatReady(userId: $user->getId())];
+            // First-run signal: can a REAL AI provider answer chat for THIS
+            // user? The built-in TestProvider does not count — it is canned
+            // demo text. The frontend replaces chat with a setup tombstone
+            // (admins go to /admin/setup; others to the public docs) while
+            // this is false. Evaluated per user so a working per-user model
+            // override is honoured, exactly like the chat pipeline resolves it.
+            $setup['chatReady'] = $this->chatReadiness->isChatReady(userId: $user->getId());
         }
 
         // Realtime / WebSocket gateway settings.
@@ -552,6 +695,11 @@ class ConfigController extends AbstractController
                 // Default ON; operators set REGISTRATION_ENABLED=false for
                 // SSO-/OIDC-only instances so no local sign-up is offered.
                 'registrationEnabled' => $this->registrationConfig->isEnabled(),
+                // Default ON; operators set GUEST_CHAT_ENABLED=false so
+                // unauthenticated visitors are sent to /login instead of the
+                // anonymous guest trial (issue #1517).
+                'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
+                'mailerConfigured' => $this->mailerConfig->isConfigured(),
             ],
             'recaptcha' => $recaptchaConfig,
             'branding' => $this->brandingService->getBranding(),
@@ -575,16 +723,32 @@ class ConfigController extends AbstractController
             'usageTaximeter' => [
                 'enabled' => $this->usageTaximeterConfig->isEnabled(),
             ],
+            'progressNarration' => $this->progressNarrationConfig->toRuntimeConfig(),
+            'modules' => $this->moduleStates(),
         ];
 
         if ($user && !empty($unavailableProviders)) {
             $response['unavailableProviders'] = $unavailableProviders;
         }
-        if (null !== $setup) {
-            $response['setup'] = $setup;
-        }
+        $response['setup'] = $setup;
 
         return $this->json($response);
+    }
+
+    /**
+     * @return array<string, array{configured: bool, gated: bool}>
+     */
+    private function moduleStates(): array
+    {
+        $states = [];
+        foreach ($this->modules->all() as $id => $module) {
+            $states[$id] = [
+                'configured' => $module->isConfigured(),
+                'gated' => $this->moduleGate->isGated($id),
+            ];
+        }
+
+        return $states;
     }
 
     /**
@@ -711,9 +875,16 @@ class ConfigController extends AbstractController
     #[OA\Get(
         path: '/api/v1/config/models',
         summary: 'Get all available AI models',
-        description: 'Returns list of all active models grouped by capability (CHAT, IMAGE, SORT, etc.)',
+        description: 'Returns active models grouped by capability (CHAT, IMAGE, SORT, etc.), restricted to models whose provider is available on this installation (API key / URL configured; Ollama models must be pulled). Admins can pass includeUnavailable=1 to also receive models of unconfigured providers, flagged via available/unavailableReason, e.g. to grey them out.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
+    )]
+    #[OA\Parameter(
+        name: 'includeUnavailable',
+        description: 'Admin only (silently ignored otherwise): also return models whose provider is not configured, flagged with available=false.',
+        in: 'query',
+        required: false,
+        schema: new OA\Schema(type: 'boolean', default: false)
     )]
     #[OA\Response(
         response: 200,
@@ -730,25 +901,47 @@ class ConfigController extends AbstractController
                             type: 'array',
                             items: new OA\Items(
                                 properties: [
-                                    new OA\Property(property: 'id', type: 'integer', example: 53),
+                                    new OA\Property(property: 'id', type: 'integer', example: 324),
                                     new OA\Property(property: 'service', type: 'string', example: 'Groq'),
-                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen3 32B (Reasoning)'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen 3.6 27B'),
                                     new OA\Property(property: 'quality', type: 'integer', example: 9),
                                     new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
+                                    new OA\Property(property: 'available', type: 'boolean', example: true, description: 'False only in the admin includeUnavailable view: the provider has no key/URL, or the Ollama model is not pulled.'),
+                                    new OA\Property(property: 'unavailableReason', type: 'string', nullable: true, enum: ['provider_unavailable', 'not_pulled'], example: null),
                                 ]
                             )
                         ),
                     ]
                 ),
+                new OA\Property(
+                    property: 'providers',
+                    type: 'array',
+                    description: 'Availability of every registered AI provider on this installation (internal test provider excluded).',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'name', type: 'string', example: 'groq'),
+                            new OA\Property(property: 'displayName', type: 'string', example: 'Groq'),
+                            new OA\Property(property: 'available', type: 'boolean', example: true),
+                            new OA\Property(property: 'requiresKey', type: 'boolean', description: 'True for cloud providers configured via a platform API key (the key wizard set); false for URL/local providers like Ollama or custom OpenAI-compatible endpoints.', example: true),
+                        ]
+                    )
+                ),
             ]
         )
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    public function getModels(#[CurrentUser] ?User $user): JsonResponse
+    public function getModels(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
+
+        // Unavailable models are HIDDEN from regular users — they could not be
+        // used anyway. Admin views request them explicitly to grey them out.
+        $includeUnavailable = $request->query->getBoolean('includeUnavailable')
+            && $this->isGranted('ROLE_ADMIN');
+
+        $availability = $this->chatReadiness->providerAvailability();
 
         $models = $this->modelRepository->findBy(
             ['active' => 1],
@@ -761,6 +954,25 @@ class ConfigController extends AbstractController
             if ($model->isHiddenBecauseFree()) {
                 continue;
             }
+
+            // Rerank models are configured exclusively on the Reranking admin
+            // tab (ProviderSetupView -> RerankPlugTab), never chosen from a
+            // per-capability model picker. They carry no picker capability, so
+            // without this guard the `default` switch arm below would scatter
+            // them across every dropdown (chat, embedding, ...). They are also
+            // seeded BSELECTABLE=0, and their cloud providers (Jina/Cohere/Voyage)
+            // are unknown to the AI provider registry, so modelAvailability()
+            // reports them available even when no API key is set. The Reranking
+            // tab computes their real availability from the plug key store.
+            if ('rerank' === strtolower($model->getTag())) {
+                continue;
+            }
+
+            ['available' => $available, 'reason' => $unavailableReason] = $this->chatReadiness->modelAvailability($model->getService(), $model->getProviderId(), $availability);
+            if (!$available && !$includeUnavailable) {
+                continue;
+            }
+
             $modelList[] = [
                 'id' => $model->getId(),
                 'service' => $model->getService(),
@@ -774,6 +986,8 @@ class ConfigController extends AbstractController
                 'features' => $model->getFeatures(),
                 'priceIn' => $model->getPriceIn(),
                 'priceOut' => $model->getPriceOut(),
+                'available' => $available,
+                'unavailableReason' => $unavailableReason,
             ];
         }
 
@@ -864,9 +1078,31 @@ class ConfigController extends AbstractController
             }
         }
 
+        $providers = [];
+        foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
+            $key = ModelCatalog::normalizeProvider((string) $name);
+            if ('test' === $key) {
+                continue;
+            }
+            $providers[] = [
+                'name' => $key,
+                'displayName' => $provider->getDisplayName(),
+                'available' => $availability[$key] ?? false,
+                'requiresKey' => ProviderKeyStore::isSupported($key),
+            ];
+        }
+        usort($providers, static fn (array $a, array $b): int => strcasecmp($a['displayName'], $b['displayName']));
+
+        if (null !== $this->groupPolicyService && !$this->isGranted('ROLE_ADMIN')) {
+            foreach ($grouped as $capability => $rows) {
+                $grouped[$capability] = $this->groupPolicyService->filterModelsByAllowList($user->getId(), $rows);
+            }
+        }
+
         return $this->json([
             'success' => true,
             'models' => $grouped,
+            'providers' => $providers,
         ]);
     }
 
@@ -906,6 +1142,18 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'ANALYZE', type: 'integer', nullable: true, example: 53),
                     ]
                 ),
+                new OA\Property(
+                    property: 'locked',
+                    type: 'object',
+                    description: 'Per-capability lock from the administrator (users cannot change these)',
+                    additionalProperties: new OA\AdditionalProperties(type: 'boolean')
+                ),
+                new OA\Property(
+                    property: 'sources',
+                    type: 'object',
+                    description: 'Where each default comes from: admin, group, or user',
+                    additionalProperties: new OA\AdditionalProperties(type: 'string', enum: ['admin', 'group', 'user'])
+                ),
             ]
         )
     )]
@@ -920,6 +1168,8 @@ class ConfigController extends AbstractController
         $capabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
+        $locked = [];
+        $sources = [];
 
         foreach ($capabilities as $capability) {
             // VECTORIZE is system-wide (single Qdrant collection,
@@ -933,6 +1183,17 @@ class ConfigController extends AbstractController
                     'group' => 'DEFAULTMODEL',
                     'setting' => 'VECTORIZE',
                 ]);
+                $source = null !== $config ? 'admin' : null;
+            } elseif (null !== $this->layeredConfigResolver && $this->iamConfig->isGroupPoliciesEnabled($userId)) {
+                $raw = $this->layeredConfigResolver->resolve($userId, 'DEFAULTMODEL', $capability);
+                $modelId = null !== $raw && null !== $this->groupPolicyService
+                    ? $this->groupPolicyService->modelIdFromStored($raw)
+                    : (is_numeric((string) $raw) ? (int) $raw : null);
+                $model = null !== $modelId ? $this->modelRepository->find($modelId) : null;
+                $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
+                $locked[$capability] = $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
+                $sources[$capability] = $this->layeredConfigResolver->source($userId, 'DEFAULTMODEL', $capability);
+                continue;
             } else {
                 // Try user-specific config first
                 $config = $this->configRepository->findOneBy([
@@ -940,6 +1201,7 @@ class ConfigController extends AbstractController
                     'group' => 'DEFAULTMODEL',
                     'setting' => $capability,
                 ]);
+                $source = 'user';
 
                 // Fall back to global config
                 if (!$config) {
@@ -948,6 +1210,7 @@ class ConfigController extends AbstractController
                         'group' => 'DEFAULTMODEL',
                         'setting' => $capability,
                     ]);
+                    $source = null !== $config ? 'admin' : null;
                 }
             }
 
@@ -956,14 +1219,20 @@ class ConfigController extends AbstractController
                 $model = $this->modelRepository->find($modelId);
                 // Only return model ID if the model still exists and is active
                 $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
+                $sources[$capability] = $source;
             } else {
                 $defaults[$capability] = null;
+                $sources[$capability] = $source;
             }
+            $locked[$capability] = null !== $this->layeredConfigResolver
+                && $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
         }
 
         return $this->json([
             'success' => true,
             'defaults' => $defaults,
+            'locked' => $locked,
+            'sources' => $sources,
         ]);
     }
 
@@ -1019,6 +1288,17 @@ class ConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid request body')]
+    #[OA\Response(
+        response: 409,
+        description: 'A locked default cannot be overridden',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'This setting is set by your administrator'),
+                new OA\Property(property: 'code', type: 'string', example: 'iam.settingLocked'),
+                new OA\Property(property: 'capability', type: 'string', example: 'CHAT'),
+            ]
+        )
+    )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
     #[OA\Response(
         response: 403,
@@ -1101,6 +1381,26 @@ class ConfigController extends AbstractController
             }
         }
 
+        if (!$global && null !== $this->layeredConfigResolver
+            && $this->iamConfig->isGroupPoliciesEnabled((int) $user->getId())
+        ) {
+            foreach ($data['defaults'] as $capability => $modelId) {
+                if (!is_string($capability)) {
+                    continue;
+                }
+                if ('VECTORIZE' === $capability && !$vectorizeChanged) {
+                    continue;
+                }
+                if ($this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, (int) $user->getId())) {
+                    return $this->json([
+                        'error' => 'This setting is set by your administrator',
+                        'code' => 'iam.settingLocked',
+                        'capability' => $capability,
+                    ], Response::HTTP_CONFLICT);
+                }
+            }
+        }
+
         $skipped = [];
 
         foreach ($data['defaults'] as $capability => $modelId) {
@@ -1162,6 +1462,8 @@ class ConfigController extends AbstractController
             $this->embeddingMetadata->invalidate();
         }
 
+        $this->capabilityInventory?->forget($global ? null : $user->getId());
+
         $response = [
             'success' => true,
             'message' => $global ? 'Global default models saved successfully' : 'Default models saved successfully',
@@ -1179,15 +1481,15 @@ class ConfigController extends AbstractController
      * Replace the calling user's model configuration with the
      * code-recommended defaults from DefaultModelConfigSeeder.
      *
-     * Removes stale per-user overrides and writes fresh ones that
-     * match the catalog-recommended models. Other users and the
-     * global (ownerId=0) row are unaffected.
+     * Removes stale per-user overrides and writes fresh ones that match the
+     * catalog-recommended models, skipping any whose provider is not usable
+     * here. Other users and the global (ownerId=0) row are unaffected.
      */
     #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/config/models/defaults/reset',
         summary: 'Apply recommended model defaults to own configuration',
-        description: 'Replaces all per-user DEFAULTMODEL overrides with the code-recommended defaults (from DefaultModelConfigSeeder). Does NOT modify global defaults — other users are unaffected. Returns the newly written defaults.',
+        description: 'Replaces all per-user DEFAULTMODEL overrides with the recommended defaults (from DefaultModelConfigSeeder) that are usable on this installation: a recommended model whose provider has no key is replaced by the first usable model for that capability, and nothing is written when no provider is usable at all. Does NOT modify global defaults — other users are unaffected. Returns the newly written defaults.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]
@@ -1875,6 +2177,35 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'all_ready', type: 'boolean', example: false),
                     ]
                 ),
+                new OA\Property(
+                    property: 'modules',
+                    type: 'array',
+                    description: 'Optional feature modules (sidecars, providers, commerce, channels) as declared by the module registry. Additive to `features`; absent modules are never probed.',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', example: 'office_convert'),
+                            new OA\Property(property: 'label_key', type: 'string', example: 'modules.office_convert.label'),
+                            new OA\Property(property: 'state', type: 'string', enum: ['absent', 'available', 'needs_setup'], example: 'available'),
+                            new OA\Property(property: 'configured', type: 'boolean', example: true),
+                            new OA\Property(property: 'healthy', type: 'boolean', example: true),
+                            new OA\Property(property: 'message', type: 'string', example: 'Office converter is running'),
+                            new OA\Property(property: 'details', type: 'object', description: 'Module-specific, never contains secrets', additionalProperties: true),
+                            new OA\Property(
+                                property: 'configured_by',
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'env', type: 'array', items: new OA\Items(type: 'string'), example: ['OFFICE_CONVERT_URL']),
+                                    new OA\Property(property: 'bconfig', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'providers', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'plugs', type: 'array', items: new OA\Items(type: 'string')),
+                                ],
+                            ),
+                            new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['pdf_export']),
+                            new OA\Property(property: 'docs_anchor', type: 'string', example: 'modules/office-convert'),
+                            new OA\Property(property: 'mobile_class', type: 'string', enum: ['backend-only', 'ota-candidate'], example: 'ota-candidate'),
+                        ],
+                    ),
+                ),
             ]
         )
     )]
@@ -1890,392 +2221,6 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
-        $features = [];
-
-        // ========== AI Features ==========
-
-        // Web Search (Brave API)
-        $braveEnabled = $this->braveSearchService->isEnabled();
-        $features['web-search'] = [
-            'id' => 'web-search',
-            'category' => 'AI Features',
-            'name' => 'Web Search',
-            'enabled' => $braveEnabled,
-            'status' => $braveEnabled ? 'active' : 'disabled',
-            'message' => $braveEnabled
-                ? 'Web search is active and ready to use'
-                : 'Web search requires Brave Search API configuration',
-            'setup_required' => !$braveEnabled,
-            'env_vars' => [
-                'BRAVE_SEARCH_API_KEY' => [
-                    'required' => true,
-                    'set' => !empty($_ENV['BRAVE_SEARCH_API_KEY'] ?? ''),
-                    'hint' => 'Get your API key from https://api.search.brave.com/',
-                ],
-                'BRAVE_SEARCH_ENABLED' => [
-                    'required' => true,
-                    'set' => ($_ENV['BRAVE_SEARCH_ENABLED'] ?? 'false') === 'true',
-                    'hint' => 'Set to "true" to enable web search',
-                ],
-            ],
-        ];
-
-        // Image Generation
-        $imageModels = $this->modelRepository->findBy(['active' => 1, 'tag' => 'TEXT2PIC']);
-        $hasImageModels = count($imageModels) > 0;
-        $features['image-gen'] = [
-            'id' => 'image-gen',
-            'category' => 'AI Features',
-            'name' => 'Image Generation',
-            'enabled' => $hasImageModels,
-            'status' => $hasImageModels ? 'active' : 'disabled',
-            'message' => $hasImageModels
-                ? count($imageModels).' image generation model(s) available'
-                : 'No image generation models configured',
-            'setup_required' => !$hasImageModels,
-            'models_available' => count($imageModels),
-        ];
-
-        // ========== AI Providers (Dynamic from ProviderRegistry) ==========
-
-        $providersMetadata = $this->providerRegistry->getProvidersMetadata();
-
-        foreach ($providersMetadata as $providerName => $providerData) {
-            // Skip the synthetic test provider outside local APP_ENV=dev.
-            if ('test' === $providerName && 'dev' !== ($_ENV['APP_ENV'] ?? 'prod')) {
-                continue;
-            }
-
-            // Get model count from database for this provider
-            $modelsCount = 0;
-            try {
-                $models = $this->modelRepository->findBy([
-                    'provider' => $providerName,
-                    'active' => true,
-                ]);
-                $modelsCount = count($models);
-            } catch (\Exception $e) {
-                // Ignore
-            }
-
-            // Get URL for services that have one
-            $url = null;
-            if ('ollama' === $providerName) {
-                $url = $_ENV['OLLAMA_BASE_URL'] ?? null;
-            }
-
-            // Convert env_vars format (check if actually set in environment)
-            $envVars = [];
-            foreach ($providerData['env_vars'] ?? [] as $varName => $varConfig) {
-                $envVars[$varName] = [
-                    'required' => $varConfig['required'],
-                    'set' => !empty($_ENV[$varName] ?? ''),
-                    'hint' => $varConfig['hint'],
-                ];
-            }
-
-            // Determine status: active if enabled and healthy, unhealthy if enabled but not healthy, disabled otherwise
-            $status = 'disabled';
-            if ($providerData['enabled']) {
-                $status = ('healthy' === $providerData['status']) ? 'active' : 'unhealthy';
-            }
-
-            $features[$providerName] = [
-                'id' => $providerName,
-                'category' => 'AI Providers',
-                'name' => $providerData['name'],
-                'enabled' => $providerData['enabled'],
-                'status' => $status,
-                'message' => $providerData['enabled']
-                    ? $providerData['description']
-                    : ($providerData['status_message'] ?? 'API key not configured'),
-                'setup_required' => $providerData['setup_required'],
-                'env_vars' => $envVars,
-                'models_available' => $modelsCount,
-                'url' => $url,
-            ];
-        }
-
-        // ========== Processing Services ==========
-
-        // Whisper.cpp (Speech-to-Text) - runs in backend container
-        $whisperHealthy = $this->whisperService->isAvailable();
-        $availableModels = $whisperHealthy ? $this->whisperService->getAvailableModels() : [];
-        $features['whisper'] = [
-            'id' => 'whisper',
-            'category' => 'Processing Services',
-            'name' => 'Whisper.cpp',
-            'enabled' => $whisperHealthy,
-            'status' => $whisperHealthy ? 'healthy' : 'unhealthy',
-            'message' => $whisperHealthy
-                ? 'Speech-to-text transcription is ready'
-                : 'Whisper.cpp binary or models not found',
-            'setup_required' => !$whisperHealthy,
-            'models_available' => count($availableModels),
-        ];
-
-        // Apache Tika (Document Processing)
-        $tikaUrl = $_ENV['TIKA_BASE_URL'] ?? 'http://tika:9998';
-        $tikaHttpUser = $_ENV['TIKA_HTTP_USER'] ?? null;
-        $tikaHttpPass = $_ENV['TIKA_HTTP_PASS'] ?? null;
-        $tikaHealthy = $this->checkServiceHealth($tikaUrl.'/tika', $tikaHttpUser, $tikaHttpPass);
-
-        // Try to get Tika version
-        $tikaVersion = '';
-        if ($tikaHealthy) {
-            try {
-                $versionHttpOptions = ['timeout' => 2];
-                if (!empty($tikaHttpUser)) {
-                    $versionHttpOptions['header'] = 'Authorization: Basic '.base64_encode($tikaHttpUser.':'.($tikaHttpPass ?? ''));
-                }
-                $versionResponse = @file_get_contents($tikaUrl.'/version', false, stream_context_create([
-                    'http' => $versionHttpOptions,
-                ]));
-                if ($versionResponse) {
-                    $tikaVersion = trim($versionResponse);
-                }
-            } catch (\Exception $e) {
-                // Ignore
-            }
-        }
-
-        $features['tika'] = [
-            'id' => 'tika',
-            'category' => 'Processing Services',
-            'name' => 'Apache Tika',
-            'enabled' => true,
-            'status' => $tikaHealthy ? 'healthy' : 'unhealthy',
-            'message' => $tikaHealthy
-                ? 'Document processing service is running'
-                : 'Tika service is not responding',
-            'setup_required' => false,
-            'url' => $tikaUrl,
-            'version' => $tikaVersion,
-        ];
-
-        // Qdrant - User memories with vector search
-        $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
-        $memoryServiceAvailable = $this->memoryService->isAvailable();
-
-        // Build status message and get service info
-        $memoryMessage = '';
-        $memoryWarnings = [];
-        $memoryVersion = 'unknown';
-        $memoryStats = [];
-
-        if ($memoryServiceAvailable) {
-            try {
-                $healthDetails = $this->memoryService->getQdrantClient()->getHealthDetails();
-                $memoryVersion = $healthDetails['version'] ?? 'unknown';
-                $memoryStats = $healthDetails['qdrant'] ?? [];
-
-                $memoryMessage = 'Qdrant is connected and ready';
-            } catch (\Throwable $e) {
-                $memoryMessage = 'Qdrant available but health check failed';
-                $memoryWarnings[] = $e->getMessage();
-            }
-        } else {
-            if (empty($qdrantUrl) || 'http://' === $qdrantUrl || 'https://' === $qdrantUrl) {
-                $memoryMessage = 'Qdrant URL not configured';
-            } else {
-                $memoryMessage = 'Qdrant not reachable at configured URL';
-            }
-        }
-
-        $features['memory-service'] = [
-            'id' => 'memory-service',
-            'category' => 'Processing Services',
-            'name' => 'Qdrant Vector Database',
-            'enabled' => $memoryServiceAvailable,
-            'status' => $memoryServiceAvailable ? 'healthy' : 'unhealthy',
-            'message' => $memoryMessage,
-            'warnings' => $memoryWarnings,
-            'setup_required' => !$memoryServiceAvailable,
-            'url' => $qdrantUrl ?: 'not configured',
-            'version' => $memoryVersion,
-            'stats' => $memoryStats,
-            'env_vars' => [
-                'QDRANT_URL' => [
-                    'required' => true,
-                    'set' => !empty($qdrantUrl) && 'http://' !== $qdrantUrl && 'https://' !== $qdrantUrl,
-                    'hint' => 'Internal Docker service URL',
-                    'example' => 'http://qdrant:6333',
-                ],
-            ],
-        ];
-
-        // ========== Infrastructure Services ==========
-
-        // Database (MariaDB)
-        $dbHealthy = false;
-        $dbVersion = '';
-        try {
-            $this->em->getConnection()->executeQuery('SELECT 1');
-            $dbHealthy = true;
-
-            // Get DB version
-            $versionResult = $this->em->getConnection()->executeQuery('SELECT VERSION()')->fetchOne();
-            if ($versionResult) {
-                $dbVersion = explode('-', $versionResult)[0];
-            }
-        } catch (\Exception $e) {
-            $dbHealthy = false;
-        }
-
-        $features['database'] = [
-            'id' => 'database',
-            'category' => 'Infrastructure',
-            'name' => 'MariaDB',
-            'enabled' => true,
-            'status' => $dbHealthy ? 'healthy' : 'unhealthy',
-            'message' => $dbHealthy
-                ? 'Database connection is active and responding'
-                : 'Database connection failed',
-            'setup_required' => false,
-            'version' => $dbVersion,
-        ];
-
-        // Redis (cache, locks, rate-limiter, sessions, realtime fan-out)
-        $redisHealthy = $this->redisService->ping();
-        $redisError = $this->redisService->getLastConnectionError();
-        $redisDsn = (string) ($_ENV['REDIS_DSN'] ?? '');
-
-        $features['redis'] = [
-            'id' => 'redis',
-            'category' => 'Infrastructure',
-            'name' => 'Redis',
-            'enabled' => true,
-            'status' => $redisHealthy ? 'healthy' : 'unhealthy',
-            'message' => $redisHealthy
-                ? 'Cache, locks, rate-limiter, sessions and realtime fan-out are operational'
-                // Dev-only endpoint (403 in prod), so the raw connection
-                // error is safe and far more useful than a generic message.
-                : 'Redis unreachable'.(null !== $redisError ? ': '.$redisError->getMessage() : ''),
-            'setup_required' => !$redisHealthy,
-            'url' => '' !== $redisDsn ? $this->redactDsn($redisDsn) : 'not configured',
-            'version' => $redisHealthy ? ($this->redisService->serverVersion() ?? '') : '',
-            'env_vars' => [
-                'REDIS_DSN' => [
-                    'required' => true,
-                    'set' => '' !== $redisDsn,
-                    'hint' => 'Redis connection DSN shared by cache, locks, rate-limiter and Messenger (e.g. redis://redis:6379)',
-                ],
-            ],
-        ];
-
-        // Centrifugo (realtime WebSocket gateway)
-        $realtimeEnabled = 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false');
-        $realtimeApiUrl = (string) ($_ENV['REALTIME_API_URL'] ?? '');
-        // REALTIME_API_URL points at the server API (…/api); the health
-        // endpoint lives at the server root (health.enabled in config.json).
-        $centrifugoBaseUrl = '' !== $realtimeApiUrl
-            ? (string) preg_replace('#/api/?$#', '', $realtimeApiUrl)
-            : '';
-        $centrifugoHealthy = $realtimeEnabled
-            && '' !== $centrifugoBaseUrl
-            && $this->checkServiceHealth($centrifugoBaseUrl.'/health');
-
-        if (!$realtimeEnabled) {
-            $centrifugoStatus = 'disabled';
-            $centrifugoMessage = 'Realtime is disabled (REALTIME_ENABLED=false) — clients see fresh data via REST only, without push updates';
-        } elseif ($centrifugoHealthy) {
-            $centrifugoStatus = 'healthy';
-            $centrifugoMessage = 'Realtime WebSocket gateway is running (chat streaming, widget events, presence)';
-        } else {
-            $centrifugoStatus = 'unhealthy';
-            $centrifugoMessage = '' === $centrifugoBaseUrl
-                ? 'REALTIME_API_URL not configured'
-                : 'Centrifugo is not responding';
-        }
-
-        $features['centrifugo'] = [
-            'id' => 'centrifugo',
-            'category' => 'Infrastructure',
-            'name' => 'Centrifugo',
-            'enabled' => $realtimeEnabled,
-            'status' => $centrifugoStatus,
-            'message' => $centrifugoMessage,
-            'setup_required' => !$centrifugoHealthy,
-            'url' => '' !== $centrifugoBaseUrl ? $centrifugoBaseUrl : 'not configured',
-            'env_vars' => [
-                'REALTIME_ENABLED' => [
-                    'required' => true,
-                    'set' => $realtimeEnabled,
-                    'hint' => 'Master switch for WebSocket publishing (no SSE fallback)',
-                ],
-                'REALTIME_API_URL' => [
-                    'required' => true,
-                    'set' => '' !== $realtimeApiUrl,
-                    'hint' => 'Centrifugo server API endpoint, e.g. http://centrifugo:8000/api',
-                ],
-            ],
-        ];
-
-        // Count ready services
-        $totalServices = count($features);
-        $healthyServices = count(array_filter($features, fn ($f) => in_array($f['status'], ['active', 'healthy'])
-        ));
-
-        return $this->json([
-            'features' => $features,
-            'summary' => [
-                'total' => $totalServices,
-                'healthy' => $healthyServices,
-                'unhealthy' => $totalServices - $healthyServices,
-                'all_ready' => $healthyServices === $totalServices,
-            ],
-        ]);
-    }
-
-    /**
-     * Strip credentials from a DSN before exposing it (`redis://user:pass@host` → `redis://***@host`).
-     */
-    private function redactDsn(string $dsn): string
-    {
-        return (string) preg_replace('#://[^@/]*@#', '://***@', $dsn);
-    }
-
-    /**
-     * Check if a service is healthy by making a simple HTTP request.
-     */
-    private function checkServiceHealth(string $url, ?string $httpUser = null, ?string $httpPass = null): bool
-    {
-        try {
-            $httpOptions = [
-                'timeout' => 2,
-                'ignore_errors' => true,
-            ];
-
-            // Send HTTP Basic Auth when the service is protected (e.g. Tika)
-            if (!empty($httpUser)) {
-                $credentials = base64_encode($httpUser.':'.($httpPass ?? ''));
-                $httpOptions['header'] = 'Authorization: Basic '.$credentials;
-            }
-
-            $context = stream_context_create(['http' => $httpOptions]);
-
-            $response = @file_get_contents($url, false, $context);
-
-            if (false === $response) {
-                return false;
-            }
-
-            // Check HTTP response code
-            if (isset($http_response_header[0])) {
-                preg_match('/\d{3}/', $http_response_header[0], $matches);
-                $statusCode = isset($matches[0]) ? (int) $matches[0] : 0;
-
-                // Auth failures mean the service is misconfigured/unreachable for us
-                if (401 === $statusCode || 403 === $statusCode) {
-                    return false;
-                }
-
-                return $statusCode >= 200 && $statusCode < 500; // Accept 2xx, 3xx, other 4xx (not 5xx)
-            }
-
-            return true;
-        } catch (\Exception $e) {
-            return false;
-        }
+        return $this->json($this->featureStatusReporter->build($user));
     }
 }

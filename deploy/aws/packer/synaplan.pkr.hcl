@@ -23,7 +23,7 @@ variable "synaplan_version" {
   # Raised by scripts/set-release-version.mjs after every published release, so
   # a build with no arguments produces the AMI for the release this branch
   # ships. The release workflow still passes it explicitly.
-  default     = "4.0.16"
+  default     = "4.8.2"
   description = "Released SemVer version to bake in, without a leading v. Never a mutable tag: the first boot pins deploy/.env to exactly this value."
 
   validation {
@@ -71,6 +71,12 @@ locals {
   instance_type = var.instance_type != "" ? var.instance_type : (var.architecture == "arm64" ? "c7g.large" : "c7i.large")
   ssh_username  = "ec2-user"
   repo_root     = "${path.root}/../../.."
+
+  build_tags = {
+    SynaplanVersion = var.synaplan_version
+    Architecture    = var.architecture
+    BuiltBy         = "packer"
+  }
 }
 
 # Amazon Linux 2023: AWS maintains it, it is free of licence cost for the
@@ -90,15 +96,23 @@ source "amazon-ebs" "synaplan" {
     most_recent = true
   }
 
+  # Both ASCII only. EC2 rejects anything beyond it in the description, and it
+  # does so in ModifyImageAttribute, which runs after the image and its
+  # snapshots already exist: an em dash here failed a ten-minute build at its
+  # very last call. test-firstboot.sh guards the two lines.
   ami_name        = "${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}-{{timestamp}}"
-  ami_description = "Synaplan ${var.synaplan_version} — AI knowledge management, all-in-one on a single instance"
+  ami_description = "Synaplan ${var.synaplan_version} - AI knowledge management, all-in-one on a single instance"
 
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     volume_size           = var.root_volume_size
     volume_type           = "gp3"
     delete_on_termination = true
-    encrypted             = true
+    # AWS Marketplace cannot ingest or scan an AMI backed by an encrypted
+    # snapshot. The workflow verifies this after the build and Marketplace
+    # encrypts its own copy during ingestion. Buyer launches are encrypted
+    # separately by the CloudFormation templates.
+    encrypted = false
   }
 
   # The published AMI's own root device. Marketplace re-encrypts on ingestion,
@@ -118,12 +132,25 @@ source "amazon-ebs" "synaplan" {
     http_put_response_hop_limit = 2
   }
 
-  tags = {
-    Name            = "${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}"
-    SynaplanVersion = var.synaplan_version
-    Architecture    = var.architecture
-    BuiltBy         = "packer"
-  }
+  tags = merge(local.build_tags, {
+    Name = "${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}"
+  })
+
+  # The temporary instance Packer provisions on, and its volumes. Packer
+  # terminates them itself; these tags are for when it does not, because a
+  # cancelled workflow run kills Packer before it can clean up. Two such
+  # builders once sat stopped and completely untagged on 60 GB of gp3 for eleven
+  # days, which nobody could attribute to anything until the bill arrived.
+  # aws-cleanup.yml finds them by PackerBuilder and terminates them.
+  run_tags = merge(local.build_tags, {
+    Name          = "packer-${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}"
+    PackerBuilder = "synaplan"
+  })
+
+  run_volume_tags = merge(local.build_tags, {
+    Name          = "packer-${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}"
+    PackerBuilder = "synaplan"
+  })
 }
 
 build {
@@ -132,7 +159,7 @@ build {
 
   # The file provisioner does not create parent directories.
   provisioner "shell" {
-    inline = ["mkdir -p /tmp/synaplan/deploy"]
+    inline = ["mkdir -p /tmp/synaplan/deploy /tmp/synaplan/_docker"]
   }
 
   # The portable deployment contract, unmodified. The AWS adapter calls these
@@ -147,16 +174,18 @@ build {
     destination = "/tmp/synaplan/deploy"
   }
 
-  # The host layer every cloud image shares: TLS terminator configuration, the
-  # update sequencer, the stop command and the image-bake pull.
-  provisioner "file" {
-    source      = "${local.repo_root}/deploy/host"
-    destination = "/tmp/synaplan/deploy"
-  }
-
   provisioner "file" {
     source      = "${local.repo_root}/deploy/aws"
     destination = "/tmp/synaplan/deploy"
+  }
+
+  # compose.yaml bind-mounts ../_docker/centrifugo/config.json relative to
+  # deploy/, which on the instance is /opt/synaplan/_docker/.... Without this
+  # file Docker creates a directory at the mount point, Centrifugo never
+  # becomes healthy, and synaplan.service waits out its 30-minute start budget.
+  provisioner "file" {
+    source      = "${local.repo_root}/_docker/centrifugo"
+    destination = "/tmp/synaplan/_docker/centrifugo"
   }
 
   provisioner "shell" {

@@ -3,6 +3,10 @@
 namespace App\Tests\Unit\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
@@ -12,7 +16,9 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\Prompt\TimeContextBuilder;
@@ -66,6 +72,14 @@ class ChatHandlerVisionImageTest extends TestCase
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->createMock(\App\Service\Digest\DigestSearchService::class),
+            $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(StructuredOutputConfig::class),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
         );
     }
 
@@ -111,15 +125,15 @@ class ChatHandlerVisionImageTest extends TestCase
         $originalBase64Length = intdiv(strlen($bigPng) + 2, 3) * 4;
 
         // The fixture must land in the testable window: large enough to exceed
-        // the inline budget (so the downscale path runs), but under the 10 MB
-        // file-size guard that short-circuits before downscaling. ImageMagick
-        // builds compress plasma differently, so skip rather than fail if this
-        // particular environment produced an out-of-range fixture.
+        // the inline budget (so the downscale path runs), but under the 50 MB
+        // file-size sanity cap that short-circuits before downscaling.
+        // ImageMagick builds compress plasma differently, so skip rather than
+        // fail if this environment produced an out-of-range fixture.
         if ($originalBase64Length <= self::MAX_VISION_BASE64_LENGTH) {
             $this->markTestSkipped('Generated fixture compressed below the inline budget on this ImageMagick build');
         }
-        if (strlen($bigPng) > 10 * 1024 * 1024) {
-            $this->markTestSkipped('Generated fixture exceeded the 10 MB pre-downscale size guard on this ImageMagick build');
+        if (strlen($bigPng) > 50 * 1024 * 1024) {
+            $this->markTestSkipped('Generated fixture exceeded the 50 MB pre-downscale size cap on this ImageMagick build');
         }
 
         file_put_contents($this->uploadDir.'/big.png', $bigPng);
@@ -151,6 +165,66 @@ class ChatHandlerVisionImageTest extends TestCase
         $result = $this->invokeImageToBase64DataUrl('broken.png');
 
         $this->assertNull($result);
+    }
+
+    /**
+     * The stored path is normalized (serve URL → upload-dir-relative) before
+     * the upload dir is prefixed, so it must resolve either way (#1596).
+     */
+    public function testServePrefixResolvesToTheSameFileAsTheRelativePath(): void
+    {
+        $png = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        );
+        file_put_contents($this->uploadDir.'/tiny.png', $png);
+
+        $this->assertSame(
+            $this->invokeImageToBase64DataUrl('tiny.png'),
+            $this->invokeImageToBase64DataUrl('/api/v1/files/uploads/tiny.png'),
+        );
+    }
+
+    /**
+     * Normalization strips the serve prefix but deliberately leaves `..` in
+     * place; the upload-root check must still refuse to read outside the dir.
+     * BFILEPATH is DB content, and generated-image vision now reads it by
+     * default, so this stays pinned.
+     */
+    public function testTraversalOutsideTheUploadDirIsRefused(): void
+    {
+        file_put_contents(dirname($this->uploadDir).'/outside.png', 'secret');
+
+        try {
+            $this->assertNull($this->invokeImageToBase64DataUrl('../outside.png'));
+            $this->assertNull($this->invokeImageToBase64DataUrl('/api/v1/files/uploads/../outside.png'));
+            $this->assertNull($this->invokeImageToBase64DataUrl('https://evil.example.com/api/v1/files/uploads/../outside.png'));
+        } finally {
+            @unlink(dirname($this->uploadDir).'/outside.png');
+        }
+    }
+
+    /**
+     * When the CURRENT message carries images but none survives conversion,
+     * the handler must fail loudly instead of sending a text-only request the
+     * model would answer with "I don't see an image".
+     */
+    public function testThrowsWhenAllCurrentMessageImagesFailConversion(): void
+    {
+        // Over-budget bytes that are not a decodable image → conversion fails.
+        $garbage = str_repeat("\x00\x11\x22\x33", 400000);
+        file_put_contents($this->uploadDir.'/photo.jpg', $garbage);
+
+        $message = (new \App\Entity\Message())
+            ->setUserId(7)
+            ->setText('what is this?')
+            ->setFilePath('photo.jpg');
+
+        $method = new \ReflectionMethod(ChatHandler::class, 'buildCurrentMessageContent');
+        $method->setAccessible(true);
+
+        $this->expectException(\App\Service\Exception\VisionImageUnprocessableException::class);
+
+        $method->invoke($this->handler, $message, true, []);
     }
 
     private function invokeImageToBase64DataUrl(string $relativePath): ?string

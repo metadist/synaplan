@@ -3,7 +3,7 @@
  * an OAuth provider redirect that destroys all SPA state (and therefore the
  * `?redirect=…` query param on `/login`).
  *
- * Set by `LoginView.handleSocialLogin` and `AddinConnectView.bootstrap` just
+ * Set by `LoginView.handleSocialLogin` and `PlatformConnectView.bootstrap` just
  * before they trigger a navigation that may bounce through a third-party
  * provider. Consumed by `OAuthCallback` (and as a fallback by
  * `LoginView.handleLogin`) once the user lands back on Synaplan.

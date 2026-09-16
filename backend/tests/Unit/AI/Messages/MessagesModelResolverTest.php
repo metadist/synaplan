@@ -75,6 +75,29 @@ final class MessagesModelResolverTest extends TestCase
         $this->assertSame('claude-sonnet-4-6', $resolved['aliased_from']);
     }
 
+    public function testResolveAppliesAliasToOpenAiCatalogModel(): void
+    {
+        $this->config = $this->createMock(MessagesGatewayConfig::class);
+        $this->config->method('modelAliases')->willReturn([
+            'claude-sonnet-4-6' => 'gpt-4o',
+        ]);
+        $this->resolver = new MessagesModelResolver(
+            $this->modelRepository,
+            $this->config,
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $model = $this->makeModel(11, 'OpenAI', 'gpt-4o', 'GPT-4o');
+        $this->expectLookupSequence([$model, null]);
+
+        $resolved = $this->resolver->resolve('claude-sonnet-4-6');
+
+        $this->assertNotNull($resolved);
+        $this->assertSame('openai', $resolved['provider']);
+        $this->assertSame('gpt-4o', $resolved['providerModelId']);
+        $this->assertSame('claude-sonnet-4-6', $resolved['aliased_from']);
+    }
+
     public function testResolveStripsDatedSuffix(): void
     {
         // First lookup (dated id) misses both providerId and name;
@@ -86,6 +109,26 @@ final class MessagesModelResolverTest extends TestCase
 
         $this->assertNotNull($resolved);
         $this->assertSame('claude-haiku-4-5', $resolved['providerModelId']);
+    }
+
+    public function testResolveByCatalogKey(): void
+    {
+        $key = 'ollama:bge-m3:vectorize';
+        $bid = \App\Model\ModelCatalog::findBidByKey($key);
+        if (null === $bid) {
+            $this->markTestSkipped('Catalog key '.$key.' is not in ModelCatalog on this install.');
+        }
+
+        $model = $this->makeModel($bid, 'Ollama', 'bge-m3', 'bge-m3');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository->expects($this->once())->method('find')->with($bid)->willReturn($model);
+
+        $resolved = $this->resolver->resolve($key);
+
+        $this->assertNotNull($resolved);
+        $this->assertSame($bid, $resolved['model_id']);
+        $this->assertSame('bge-m3', $resolved['providerModelId']);
+        $this->assertSame($key, $resolved['requested']);
     }
 
     public function testResolveFailsClosedWhenUnknown(): void

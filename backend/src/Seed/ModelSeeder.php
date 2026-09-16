@@ -45,7 +45,7 @@ final readonly class ModelSeeder
      * Routed through TestProvider/OllamaProvider stubs.
      */
     public const TEST_MODELS = [
-        ['id' => -1, 'service' => 'test', 'name' => 'test-model',      'tag' => 'chat',       'providerId' => 'test-model'],
+        ['id' => -1, 'service' => 'test', 'name' => 'test-model',      'tag' => 'chat',       'providerId' => 'test-model', 'features' => ['tool_use']],
         ['id' => -2, 'service' => 'test', 'name' => 'test-vectorize',  'tag' => 'vectorize',  'providerId' => 'test-vectorize'],
         ['id' => -3, 'service' => 'test', 'name' => 'test-pic2text',   'tag' => 'pic2text',   'providerId' => 'test-pic2text'],
         ['id' => -4, 'service' => 'test', 'name' => 'test-text2pic',   'tag' => 'text2pic',   'providerId' => 'test-text2pic'],
@@ -79,6 +79,10 @@ final readonly class ModelSeeder
 
         if (in_array($this->environment, ['dev', 'test'], true)) {
             foreach (self::TEST_MODELS as $base) {
+                $json = ['description' => 'Mock model for E2E/CI. No API key required.'];
+                if (isset($base['features'])) {
+                    $json['features'] = $base['features'];
+                }
                 $row = array_merge($base, [
                     'selectable' => 0,
                     'active' => 1,
@@ -88,8 +92,9 @@ final readonly class ModelSeeder
                     'outUnit' => '-',
                     'quality' => 1,
                     'rating' => 0,
-                    'json' => ['description' => 'Mock model for E2E/CI. No API key required.'],
+                    'json' => $json,
                 ]);
+                unset($row['features']);
                 $action = $this->processRow($row, $existing[$row['id']] ?? null);
                 ++$counters[$action];
             }

@@ -209,8 +209,9 @@ The `synaplan-tts` service (separate repo) runs [Piper TTS](https://github.com/r
 | Language | Voice Key | Speaker |
 |----------|-----------|---------|
 | English (US) | `en_US-lessac-medium` | lessac |
-| German | `de_DE-thorsten-medium` | thorsten |
+| German | `de_DE-kerstin-low` | kerstin |
 | Spanish | `es_ES-davefx-medium` | davefx |
+| French | `fr_FR-siwis-medium` | siwis |
 | Turkish | `tr_TR-dfki-medium` | dfki |
 | Russian | `ru_RU-irina-medium` | irina |
 | Persian | `fa_IR-reza_ibrahim-medium` | reza_ibrahim |

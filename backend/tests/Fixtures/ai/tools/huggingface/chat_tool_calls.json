@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-hf-tools",
+  "object": "chat.completion",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_hf_1",
+            "type": "function",
+            "function": {
+              "name": "lookup",
+              "arguments": "{\"id\":12}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 20,
+    "completion_tokens": 8,
+    "total_tokens": 28
+  }
+}

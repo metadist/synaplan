@@ -41,6 +41,86 @@ if grep -q 'ggml-${WHISPER_DEFAULT_MODEL' "$COMPOSE_FILE"; then
     exit 1
 fi
 
+# Every check above reads the file as text, and Compose never parses it in this
+# suite because `docker` is stubbed further down so the tests run without it. A
+# structural YAML defect therefore survives the whole suite and surfaces where
+# it is most expensive: a merge once left REGISTRATION_ENABLED defined twice,
+# which Compose rejects outright, and it was only caught on a Packer-built AMI
+# in the middle of a release build.
+#
+# Duplicate keys are the case worth spelling out, because a lenient parser
+# keeps the last one without complaining. This loader refuses instead.
+#
+# A missing interpreter or PyYAML fails the suite rather than skipping the
+# check. A guard that quietly turns itself off in an environment nobody
+# inspected is the same silence this test exists to end.
+command -v python3 > /dev/null || {
+    echo "python3 is required to parse compose.yaml in this suite" >&2
+    exit 1
+}
+python3 - "$COMPOSE_FILE" <<'PARSE' || exit 1
+import sys
+
+try:
+    import yaml
+except ImportError:
+    sys.exit(
+        'PyYAML is required to parse compose.yaml. Install it with '
+        '"python3 -m pip install pyyaml", or "apt-get install python3-yaml" '
+        'on Debian and Ubuntu.'
+    )
+
+
+class StrictLoader(yaml.SafeLoader):
+    pass
+
+
+MERGE_TAG = 'tag:yaml.org,2002:merge'
+
+
+def reject_duplicate_keys(loader, node, deep=False):
+    # Only the keys actually written at this level, which is what a merge
+    # conflict duplicates. A `<<: *anchor` is skipped and left to the parent
+    # constructor: it flattens the anchor into this mapping, where a key the
+    # anchor already carries is a legitimate override rather than a duplicate.
+    seen = set()
+    for key_node, _ in node.value:
+        if key_node.tag == MERGE_TAG:
+            continue
+
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            sys.exit('compose.yaml defines "%s" twice in the same mapping' % key)
+        seen.add(key)
+
+    return yaml.SafeLoader.construct_mapping(loader, node, deep)
+
+
+StrictLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, reject_duplicate_keys
+)
+
+with open(sys.argv[1], encoding='utf-8') as handle:
+    try:
+        yaml.load(handle, StrictLoader)
+    except yaml.YAMLError as error:
+        sys.exit('compose.yaml is not valid YAML: %s' % error)
+PARSE
+
+# The same defect in the file operators actually copy. A repeated key is legal
+# in a .env, which is what makes it worse than in compose.yaml: the last
+# occurrence silently wins, so the comment above the first one documents a
+# default that never takes effect.
+duplicate_env_keys="$(
+    awk -F= '/^[A-Z_][A-Z0-9_]*=/ { print $1 }' "$SCRIPT_DIR/../selfhost.env.example" |
+        sort | uniq -d | tr '\n' ' '
+)"
+if [[ -n "${duplicate_env_keys// /}" ]]; then
+    printf 'selfhost.env.example defines these keys more than once, and the last one silently wins: %s\n' \
+        "$duplicate_env_keys" >&2
+    exit 1
+fi
+
 # Where the deployment reads its configuration from, for each layout that has to
 # work. A managed platform may materialise the configured environment as a .env
 # at the CHECKOUT ROOT, which Compose ignores for `-f deploy/compose.yaml`,
@@ -222,8 +302,12 @@ done
 # The marketplace image adapters are the same kind of wrapper, one layer further
 # out: a virtual machine runs these from systemd and from `synaplan-update` /
 # `synaplan-snapshot`, with no platform in between to resolve anything for them.
-# deploy/host/ is the part both of them share.
+# AWS keeps first-boot and lifecycle helpers in deploy/aws/scripts/. Azure first
+# boot lives in deploy/azure/scripts/; the shared host TLS, update, stop and
+# snapshot-hook path lives in deploy/host/.
 HOST_DIR="$SCRIPT_DIR/../host"
+AWS_DIR="$SCRIPT_DIR/../aws"
+AZURE_DIR="$SCRIPT_DIR/../azure"
 CLOUD_ADAPTERS=(aws azure)
 
 for wrapper in "$HOST_DIR"/*.sh; do
@@ -255,19 +339,25 @@ assert_systemd_runs() {
 }
 
 # Starting the stack is the portable script's job on every cloud too, so an
-# instance comes up exactly the way a self-hosted install does — and stopping it
-# goes through the one shared wrapper rather than through a per-cloud copy.
-for adapter in "${CLOUD_ADAPTERS[@]}"; do
-    assert_systemd_runs "$adapter" synaplan.service ExecStart deploy/scripts/run.sh
-    assert_systemd_runs "$adapter" synaplan.service ExecStop deploy/host/stop.sh
-    assert_systemd_runs "$adapter" synaplan-firstboot.service ExecStart "deploy/$adapter/scripts/firstboot.sh"
-done
+# instance comes up exactly the way a self-hosted install does. AWS and Azure
+# keep their own stop wrappers: AWS under deploy/aws/scripts/, Azure under
+# deploy/host/.
+assert_systemd_runs aws synaplan.service ExecStart deploy/scripts/run.sh
+assert_systemd_runs aws synaplan.service ExecStop deploy/aws/scripts/stop.sh
+assert_systemd_runs aws synaplan-firstboot.service ExecStart deploy/aws/scripts/firstboot.sh
+assert_systemd_runs azure synaplan.service ExecStart deploy/scripts/run.sh
+assert_systemd_runs azure synaplan.service ExecStop deploy/host/stop.sh
+assert_systemd_runs azure synaplan-firstboot.service ExecStart deploy/azure/scripts/firstboot.sh
 
 # The update path owns no logic of its own: it is the portable backup gate, a
 # version bump, and the portable start. Dropping either half would turn
-# `synaplan-update` into an unguarded restart on a new image. There is one copy
-# of it, in deploy/host/, precisely so no cloud can grow its own.
+# `synaplan-update` into an unguarded restart on a new image. AWS keeps its
+# sequencer in deploy/aws/scripts/; Azure uses the shared copy in deploy/host/.
 for portable in pre-update.sh post-update.sh; do
+    grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$AWS_DIR/scripts/update.sh" || {
+        printf 'deploy/aws/scripts/update.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
+        exit 1
+    }
     grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$HOST_DIR/update.sh" || {
         printf 'deploy/host/update.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
         exit 1
@@ -276,18 +366,21 @@ done
 
 # The backup gate an external snapshot mechanism reaches the installation
 # through: the SSM document on AWS, the Azure Backup script framework on Azure.
-# Both name the same file, and both expect it to do nothing of its own.
 for portable in pre-backup.sh post-backup.sh; do
     grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$HOST_DIR/snapshot-hook.sh" || {
         printf 'deploy/host/snapshot-hook.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
         exit 1
     }
+    grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$AWS_DIR/scripts/snapshot-hook.sh" || {
+        printf 'deploy/aws/scripts/snapshot-hook.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
+        exit 1
+    }
 done
 
-# systemd, the symlinks in /usr/local/bin, the SSM document and the Azure Backup
+# systemd, the wrappers in /usr/local/bin, the SSM document and the Azure Backup
 # configuration all invoke these by path. A file that lost its executable bit
 # fails at boot, not at build.
-for directory in "$HOST_DIR" "${CLOUD_ADAPTERS[@]/#/$SCRIPT_DIR/../}"; do
+for directory in "$HOST_DIR" "$AWS_DIR" "$AZURE_DIR"; do
     for script in "$directory"/*.sh "$directory"/scripts/*.sh; do
         [[ -f "$script" ]] || continue
         [[ -x "$script" ]] || {
@@ -1566,7 +1659,7 @@ for script in "$SCRIPT_DIR"/*.sh; do
     assert_resolves_secrets_before_compose "$script"
 done
 
-for directory in "$HOST_DIR" "${CLOUD_ADAPTERS[@]/#/$SCRIPT_DIR/../}"; do
+for directory in "$HOST_DIR" "$AWS_DIR" "$AZURE_DIR"; do
     for script in "$directory"/*.sh "$directory"/scripts/*.sh; do
         [[ -f "$script" ]] || continue
         assert_resolves_secrets_before_compose "$script" only-when-it-does

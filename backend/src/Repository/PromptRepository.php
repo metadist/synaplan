@@ -2,8 +2,13 @@
 
 namespace App\Repository;
 
+use App\Entity\Agent;
 use App\Entity\Prompt;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AssistantKind;
+use App\Service\Iam\SharedResourceIds;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -11,8 +16,10 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class PromptRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private SharedResourceIds $sharedResourceIds,
+    ) {
         parent::__construct($registry, Prompt::class);
     }
 
@@ -64,10 +71,24 @@ class PromptRepository extends ServiceEntityRepository
             $qb->andWhere('p.topic NOT LIKE :toolsPrefix')
                 ->setParameter('toolsPrefix', 'tools:%');
         }
+        $this->excludeUnroutableAgentTopics($qb, $userId ?? 0);
 
         $results = $qb->getQuery()->getScalarResult();
+        $topics = array_map(fn ($r) => $r['topic'], $results);
 
-        return array_map(fn ($r) => $r['topic'], $results);
+        if (null !== $userId && $userId > 0) {
+            foreach ($this->findSharedPrompts($userId) as $prompt) {
+                $topic = $prompt->getTopic();
+                if ($excludeTools && str_starts_with($topic, 'tools:')) {
+                    continue;
+                }
+                if (!in_array($topic, $topics, true)) {
+                    $topics[] = $topic;
+                }
+            }
+        }
+
+        return $topics;
     }
 
     /**
@@ -107,6 +128,7 @@ class PromptRepository extends ServiceEntityRepository
                 $userQb->andWhere('p.topic NOT LIKE :toolsPrefix')
                     ->setParameter('toolsPrefix', 'tools:%');
             }
+            $this->excludeUnroutableAgentTopics($userQb, $userId);
 
             $userPrompts = $userQb->getQuery()->getResult();
         }
@@ -137,6 +159,24 @@ class PromptRepository extends ServiceEntityRepository
             }
         }
 
+        if (null !== $userId && $userId > 0) {
+            foreach ($this->findSharedPrompts($userId) as $prompt) {
+                $topic = $prompt->getTopic();
+                if ($excludeTools && str_starts_with($topic, 'tools:')) {
+                    continue;
+                }
+                if (isset($seen[$topic])) {
+                    continue;
+                }
+                $result[] = [
+                    'topic' => $topic,
+                    'description' => $prompt->getShortDescription(),
+                    'ownerId' => $prompt->getOwnerId(),
+                ];
+                $seen[$topic] = true;
+            }
+        }
+
         return $result;
     }
 
@@ -158,8 +198,22 @@ class PromptRepository extends ServiceEntityRepository
             }
         }
 
-        // Fallback to global (ownerId = 0)
-        return $this->findByTopic($topic, 0);
+        // Global (ownerId = 0) wins over anything another user shared: a share
+        // adds topics, it never replaces a system prompt for the recipient.
+        $global = $this->findByTopic($topic, 0);
+        if ($global instanceof Prompt) {
+            return $global;
+        }
+
+        if ($userId > 0) {
+            foreach ($this->findSharedPrompts($userId) as $shared) {
+                if ($shared->getTopic() === $topic) {
+                    return $shared;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -183,14 +237,7 @@ class PromptRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
-        $userPrompts = $this->createQueryBuilder('p')
-            ->where('p.ownerId = :userId')
-            ->andWhere('p.topic NOT LIKE :toolsPrefix')
-            ->setParameter('userId', $userId)
-            ->setParameter('toolsPrefix', 'tools:%')
-            ->orderBy('p.topic', 'ASC')
-            ->getQuery()
-            ->getResult();
+        $userPrompts = $this->findOwnedForListing($userId);
 
         // Merge: user prompts override system prompts for the same topic
         $map = [];
@@ -200,8 +247,65 @@ class PromptRepository extends ServiceEntityRepository
         foreach ($userPrompts as $p) {
             $map[$p->getTopic()] = $p;
         }
+        foreach ($this->findSharedPrompts($userId) as $prompt) {
+            if (!isset($map[$prompt->getTopic()])) {
+                $map[$prompt->getTopic()] = $prompt;
+            }
+        }
 
         return array_values($map);
+    }
+
+    /**
+     * A user's own instruction prompts as the UI, MCP and share pickers list
+     * them: without internal `tools:*` rows and without the `agent:*` rows an
+     * assistant owns (those are edited and shared through the assistant).
+     *
+     * @return list<Prompt>
+     */
+    public function findOwnedForListing(int $userId): array
+    {
+        /** @var list<Prompt> $rows */
+        $rows = $this->createQueryBuilder('p')
+            ->where('p.ownerId = :userId')
+            ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->andWhere('p.topic NOT LIKE :agentPrefix')
+            ->setParameter('userId', $userId)
+            ->setParameter('toolsPrefix', 'tools:%')
+            ->setParameter('agentPrefix', Agent::TOPIC_PREFIX.'%')
+            ->orderBy('p.topic', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    /**
+     * First instruction the user can actually run: one of theirs, otherwise
+     * a system prompt. Used when a copied / imported task's assistant is not
+     * readable so the row still has a prompt id (BPROMPTID is required).
+     */
+    public function findFirstUsableForUser(int $userId): ?Prompt
+    {
+        foreach ($this->findOwnedForListing($userId) as $prompt) {
+            if ($prompt->isEnabled()) {
+                return $prompt;
+            }
+        }
+
+        /** @var list<Prompt> $system */
+        $system = $this->createQueryBuilder('p')
+            ->where('p.ownerId = 0')
+            ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->andWhere('p.enabled = :on')
+            ->setParameter('toolsPrefix', 'tools:%')
+            ->setParameter('on', true)
+            ->orderBy('p.topic', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getResult();
+
+        return $system[0] ?? null;
     }
 
     /**
@@ -226,16 +330,16 @@ class PromptRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
-        $userPrompts = $this->createQueryBuilder('p')
+        $userQb = $this->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->andWhere('p.selectionRules IS NOT NULL')
             ->andWhere('p.selectionRules != :empty')
             ->setParameter('userId', $userId)
             ->setParameter('toolsPrefix', 'tools:%')
-            ->setParameter('empty', '')
-            ->getQuery()
-            ->getResult();
+            ->setParameter('empty', '');
+        $this->excludeUnroutableAgentTopics($userQb, $userId);
+        $userPrompts = $userQb->getQuery()->getResult();
 
         // Merge: user prompts override system prompts for the same topic
         $map = [];
@@ -245,7 +349,64 @@ class PromptRepository extends ServiceEntityRepository
         foreach ($userPrompts as $p) {
             $map[$p->getTopic()] = $p;
         }
+        foreach ($this->findSharedPrompts($userId) as $prompt) {
+            if (null === $prompt->getSelectionRules() || '' === $prompt->getSelectionRules()) {
+                continue;
+            }
+            if (!isset($map[$prompt->getTopic()])) {
+                $map[$prompt->getTopic()] = $prompt;
+            }
+        }
 
         return array_values($map);
+    }
+
+    /**
+     * Keep assistant instruction prompts (`agent:*`) out of the classifier
+     * unless their assistant is published and marked routable. A pinned chat
+     * resolves the assistant directly and never goes through these lists, so
+     * an unrouted assistant stays invisible to the unpinned sorter path.
+     */
+    private function excludeUnroutableAgentTopics(QueryBuilder $qb, int $userId): void
+    {
+        $qb->andWhere(
+            'p.topic NOT LIKE :agentPrefix OR p.id IN ('
+            .'SELECT a.promptId FROM App\Entity\Agent a '
+            .'WHERE a.ownerId = :agentOwner AND a.routable = true AND a.status = :agentPublished)'
+        )
+            ->setParameter('agentPrefix', Agent::TOPIC_PREFIX.'%')
+            ->setParameter('agentOwner', $userId)
+            ->setParameter('agentPublished', Agent::STATUS_PUBLISHED);
+    }
+
+    /**
+     * Prompts other users shared with this one at `use` or higher.
+     *
+     * A share can only add topics the recipient does not already get from
+     * the system: `tools:*` topics and topics that exist as a system prompt
+     * are dropped here, so a shared prompt can never stand in for the
+     * classifier, memory or default-chat prompt of the person it was shared
+     * with.
+     *
+     * @return list<Prompt>
+     */
+    private function findSharedPrompts(int $userId): array
+    {
+        $ids = $this->sharedResourceIds->forUser($userId, AssistantKind::KEY, Permission::Use);
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<Prompt> $rows */
+        $rows = $this->createQueryBuilder('p')
+            ->where('p.id IN (:ids)')
+            ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->andWhere('p.topic NOT IN (SELECT s.topic FROM App\Entity\Prompt s WHERE s.ownerId = 0)')
+            ->setParameter('ids', $ids)
+            ->setParameter('toolsPrefix', 'tools:%')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
     }
 }

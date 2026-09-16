@@ -6,7 +6,6 @@ namespace App\Service\File;
 
 use App\Entity\File;
 use App\Entity\Message;
-use App\Repository\FileRepository;
 
 /**
  * Collects the images a document-generation turn may embed and renders them for
@@ -18,6 +17,10 @@ use App\Repository\FileRepository;
  * catalog is the single source of truth — every entry it advertises is one
  * {@see DocumentImageReferenceResolver} accepts back, and nothing else is
  * offered.
+ *
+ * Which files exist in the conversation is answered by
+ * {@see ConversationFileCatalog}; this class only decides how a document turn
+ * may name and place them.
  */
 final readonly class DocumentImageCatalog
 {
@@ -26,12 +29,8 @@ final readonly class DocumentImageCatalog
     /** Keep the prompt block short — the newest images are the relevant ones. */
     private const MAX_IMAGES = 8;
 
-    /** Upper bound for the thread lookup before validation and capping. */
-    private const THREAD_LOOKUP_LIMIT = 30;
-
     public function __construct(
-        private FileRepository $fileRepository,
-        private string $uploadDir,
+        private ConversationFileCatalog $conversationFiles,
     ) {
     }
 
@@ -49,27 +48,29 @@ final readonly class DocumentImageCatalog
      */
     public function build(Message $message, array $thread = [], array $extraPaths = []): array
     {
-        $userId = (int) $message->getUserId();
         $images = [];
-        $seenIds = [];
-        $seenPaths = [];
 
-        foreach ($this->attachments($message) as $index => $file) {
-            $this->collect($images, $seenIds, $seenPaths, $file, DocumentImage::ORIGIN_ATTACHED, $index + 1);
-        }
+        foreach ($this->conversationFiles->build($message, $thread, $extraPaths, ConversationFile::CATEGORY_IMAGE) as $file) {
+            // Path-only entries (legacy generated media with no BFILES row)
+            // cannot be named in a marker the resolver accepts, and offering an
+            // unresolvable marker is the #1382 failure this catalog prevents.
+            if (null === $file->fileId && !str_starts_with($file->reference, 'attached:')) {
+                continue;
+            }
 
-        foreach ($this->filesForPaths($userId, $extraPaths) as $file) {
-            $this->collect($images, $seenIds, $seenPaths, $file, DocumentImage::ORIGIN_GENERATED);
-        }
+            $images[] = new DocumentImage(
+                $file->reference,
+                $file->displayName,
+                $file->origin,
+                $file->absolutePath,
+            );
 
-        foreach ($this->threadImages($userId, $thread) as $file) {
             if (count($images) >= self::MAX_IMAGES) {
                 break;
             }
-            $this->collect($images, $seenIds, $seenPaths, $file, $this->originOf($file));
         }
 
-        return array_slice($images, 0, self::MAX_IMAGES);
+        return $images;
     }
 
     /**
@@ -109,14 +110,10 @@ final readonly class DocumentImageCatalog
      */
     public function attachments(Message $message): array
     {
-        $files = [];
-        foreach ($message->getFiles() as $file) {
-            if ($this->isSupportedImage($file)) {
-                $files[] = $file;
-            }
-        }
-
-        return $files;
+        return array_values(array_filter(
+            $this->conversationFiles->attachments($message),
+            fn (File $file): bool => $this->isSupportedImage($file),
+        ));
     }
 
     /**
@@ -125,29 +122,12 @@ final readonly class DocumentImageCatalog
      */
     public function absolutePath(File $file): ?string
     {
-        if (!$this->isSupportedImage($file)) {
-            return null;
-        }
-
-        $uploadRoot = realpath($this->uploadDir);
-        $path = realpath($this->uploadDir.'/'.ltrim($file->getFilePath(), '/'));
-        if (false === $uploadRoot || false === $path || !is_file($path)) {
-            return null;
-        }
-
-        $rootPrefix = rtrim($uploadRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
-        if (!str_starts_with($path, $rootPrefix)) {
-            return null;
-        }
-
-        return $path;
+        return $this->isSupportedImage($file) ? $this->conversationFiles->absolutePath($file) : null;
     }
 
     public function isSupportedImage(File $file): bool
     {
-        $extension = strtolower(pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
-
-        return in_array($extension, self::SUPPORTED_EXTENSIONS, true);
+        return ConversationFile::CATEGORY_IMAGE === ConversationFile::categoryForPath($file->getFilePath());
     }
 
     /**
@@ -156,119 +136,7 @@ final readonly class DocumentImageCatalog
      */
     public function normalizeRelativePath(string $path): string
     {
-        if (1 === preg_match('#^https?://[^/]+(/.*)$#i', $path, $matches)) {
-            $path = $matches[1];
-        }
-
-        $stripped = preg_replace('#^/?api/v1/files/uploads/#', '', $path);
-
-        return ltrim(null === $stripped ? $path : $stripped, '/');
-    }
-
-    /**
-     * @param list<DocumentImage> $images
-     * @param array<int, true>    $seenIds
-     * @param array<string, true> $seenPaths
-     */
-    private function collect(array &$images, array &$seenIds, array &$seenPaths, File $file, string $origin, ?int $attachmentIndex = null): void
-    {
-        $id = $file->getId();
-        if (null !== $id && isset($seenIds[$id])) {
-            return;
-        }
-
-        $path = $this->absolutePath($file);
-        if (null === $path || isset($seenPaths[$path])) {
-            return;
-        }
-
-        if (null === $id && null === $attachmentIndex) {
-            return; // no stable reference the model could use
-        }
-
-        if (null !== $id) {
-            $seenIds[$id] = true;
-        }
-        $seenPaths[$path] = true;
-
-        $images[] = new DocumentImage(
-            null !== $id ? 'file:'.$id : 'attached:'.$attachmentIndex,
-            $this->displayName($file),
-            $origin,
-            $path,
-        );
-    }
-
-    /**
-     * Images of the conversation: attachments carried by the thread messages
-     * plus the BFILES rows generated media links to its originating message
-     * (a generated picture rides the legacy path channel, not the relation).
-     *
-     * @param array<int, Message|array{role: string, content: string}> $thread
-     *
-     * @return list<File>
-     */
-    private function threadImages(int $userId, array $thread): array
-    {
-        $attached = [];
-        $messageIds = [];
-
-        foreach ($thread as $entry) {
-            if (!$entry instanceof Message) {
-                continue; // {role, content} snapshot inside a media subprocess
-            }
-
-            $id = $entry->getId();
-            if (null !== $id) {
-                $messageIds[] = $id;
-            }
-
-            foreach ($entry->getFiles() as $file) {
-                if ($this->isSupportedImage($file)) {
-                    $attached[] = $file;
-                }
-            }
-        }
-
-        $linked = [] === $messageIds
-            ? []
-            : $this->fileRepository->findImagesByMessageIds($userId, $messageIds, self::THREAD_LOOKUP_LIMIT);
-
-        // Newest first: the image the user just talked about wins the cap.
-        $all = array_merge($attached, $linked);
-        usort($all, static fn (File $a, File $b): int => ($b->getId() ?? 0) <=> ($a->getId() ?? 0));
-
-        return $all;
-    }
-
-    /**
-     * @param list<string> $paths
-     *
-     * @return list<File>
-     */
-    private function filesForPaths(int $userId, array $paths): array
-    {
-        $files = [];
-        foreach ($paths as $path) {
-            $relative = $this->normalizeRelativePath($path);
-            if ('' === $relative) {
-                continue;
-            }
-
-            $file = $this->fileRepository->findOneBy(['userId' => $userId, 'filePath' => $relative]);
-            if ($file instanceof File) {
-                $files[] = $file;
-            }
-        }
-
-        return $files;
-    }
-
-    private function originOf(File $file): string
-    {
-        return 'generated' === $file->getSource()
-            ? DocumentImage::ORIGIN_GENERATED
-            : DocumentImage::ORIGIN_UPLOADED;
+        return $this->conversationFiles->normalizeRelativePath($path);
     }
 
     private function describeOrigin(string $origin): string
@@ -278,22 +146,5 @@ final readonly class DocumentImageCatalog
             DocumentImage::ORIGIN_GENERATED => 'generated earlier in this conversation',
             default => 'shared earlier in this conversation',
         };
-    }
-
-    /**
-     * Quotes and line breaks would break the single-line list entry the model
-     * reads, so the name is reduced to a harmless label.
-     */
-    private function displayName(File $file): string
-    {
-        $name = $file->getOriginalName() ?? $file->getFileName();
-        if ('' === trim($name)) {
-            $name = basename($file->getFilePath());
-        }
-
-        $clean = preg_replace('/[\p{C}"`]+/u', '', $name) ?? $name;
-        $clean = trim($clean);
-
-        return '' === $clean ? 'image' : mb_substr($clean, 0, 80);
     }
 }

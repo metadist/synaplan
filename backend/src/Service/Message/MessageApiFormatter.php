@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Service\Message;
 
+use App\AI\Exception\ChatFailureReason;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\File\DataUrlFixer;
+use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Serializes a persisted Message entity into the canonical API row shape.
@@ -25,6 +27,7 @@ final readonly class MessageApiFormatter
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
         private DataUrlFixer $dataUrlFixer,
+        private Security $security,
     ) {
     }
 
@@ -114,6 +117,10 @@ final readonly class MessageApiFormatter
                     'query' => $searchQuery,
                     'resultsCount' => $searchResultsCount ? (int) $searchResultsCount : 0,
                 ];
+                $pagesRead = (int) ($m->getMeta('web_search_pages_read') ?? 0);
+                if ($pagesRead > 0) {
+                    $webSearchData['pagesRead'] = $pagesRead;
+                }
 
                 // Load actual search results from DB.
                 // Search results are stored on the INCOMING (user) message, but we need to display them
@@ -162,6 +169,7 @@ final readonly class MessageApiFormatter
 
         $originalTopic = $m->getMeta('original_topic');
         $originalMediaType = $m->getMeta('original_media_type');
+        $errorFields = $this->buildErrorFields($m);
 
         // Quoted reference the user attached when composing this message
         // ("Mention in chat"). Stored as message meta so it survives reload.
@@ -204,12 +212,33 @@ final readonly class MessageApiFormatter
             // Background media job (Release 4.0 async video) — lets the UI show
             // a persistent "generating in background" banner after reload.
             'mediaJob' => $mediaJob,
+            'errorReason' => $errorFields['errorReason'],
+            'canRetryModel' => $errorFields['canRetryModel'],
+            'errorDebug' => $errorFields['errorDebug'],
+            'agentId' => $this->agentIdFromMeta($m),
+            'agentVersionId' => $this->intMeta($m, 'AGENTVERSIONID'),
             // Generated content (images, videos, audio from AI)
             'file' => ($m->getFile() && $filePath) ? [
                 'path' => $filePath,
                 'type' => $m->getFileType(),
             ] : null,
         ];
+    }
+
+    private function agentIdFromMeta(Message $m): ?int
+    {
+        return $this->intMeta($m, 'AGENTID');
+    }
+
+    private function intMeta(Message $m, string $key): ?int
+    {
+        $raw = $m->getMeta($key);
+        if (null === $raw || !is_numeric($raw)) {
+            return null;
+        }
+        $id = (int) $raw;
+
+        return $id > 0 ? $id : null;
     }
 
     /**
@@ -343,5 +372,41 @@ final readonly class MessageApiFormatter
         }
 
         return $decoded;
+    }
+
+    /**
+     * @return array{errorReason: ?string, canRetryModel: ?bool, errorDebug: ?string}
+     */
+    private function buildErrorFields(Message $m): array
+    {
+        if ('IN' === $m->getDirection()) {
+            return [
+                'errorReason' => null,
+                'canRetryModel' => null,
+                'errorDebug' => null,
+            ];
+        }
+
+        $reasonRaw = $m->getMeta('error_reason') ?? $m->getMeta('error_type');
+        $reason = is_string($reasonRaw) && '' !== $reasonRaw
+            ? ChatFailureReason::tryFrom($reasonRaw)
+            : null;
+
+        if (null === $reason && 'ERROR' !== $m->getTopic()) {
+            return [
+                'errorReason' => null,
+                'canRetryModel' => null,
+                'errorDebug' => null,
+            ];
+        }
+
+        $resolved = $reason ?? ChatFailureReason::Unknown;
+        $debug = $this->security->isGranted('ROLE_ADMIN') ? ($m->getMeta('error_debug') ?: null) : null;
+
+        return [
+            'errorReason' => $resolved->value,
+            'canRetryModel' => $resolved->suggestsOtherModel(),
+            'errorDebug' => is_string($debug) ? $debug : null,
+        ];
     }
 }

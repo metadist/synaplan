@@ -1,0 +1,17 @@
+{
+    "id": "serper_search",
+    "name": "serper_search",
+    "namespace": "Plugin\\SerperSearch",
+    "version": "1.0.0",
+    "description": "Google web search via the Serper API, contributed as a web_search plug adapter.",
+    "provides": {
+        "plugs": [
+            {
+                "port": "web_search",
+                "class": "Plugin\\SerperSearch\\Plug\\SerperSearchAdapter",
+                "key": "serper"
+            }
+        ]
+    },
+    "permissions": ["network:google.serper.dev", "plug_keys"]
+}

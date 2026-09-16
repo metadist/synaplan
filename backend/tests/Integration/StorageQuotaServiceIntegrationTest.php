@@ -165,9 +165,16 @@ class StorageQuotaServiceIntegrationTest extends KernelTestCase
         $newLimit = $this->service->getStorageLimit($newUser);
         $this->assertEquals(100 * 1024 * 1024, $newLimit);
 
+        // ADMIN: no storage quota (same as RateLimitService)
+        $adminUser = $this->createUserWithLevel('ADMIN', 'admin-storage@example.com');
+        $this->assertTrue($this->service->isUnlimited($adminUser));
+        $this->assertEquals(StorageQuotaService::UNLIMITED_BYTES, $this->service->getStorageLimit($adminUser));
+        $this->service->checkStorageLimit($adminUser, 6 * 1024 * 1024 * 1024);
+
         // Clean up
         $this->em->remove($businessUser);
         $this->em->remove($newUser);
+        $this->em->remove($adminUser);
         $this->em->flush();
     }
 

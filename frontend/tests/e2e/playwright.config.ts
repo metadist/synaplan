@@ -11,6 +11,10 @@ dotenv.config({ path: path.join(__dirname, '.env.local') })
 const n = process.env.E2E_WORKERS ? parseInt(process.env.E2E_WORKERS, 10) : 4
 export const WORKER_COUNT = Number.isInteger(n) && n >= 1 ? n : 4
 
+// Always headless unless someone opts in. Local default used to be headed,
+// which opened one Chromium window per worker (dozens on `make test-e2e`).
+const headed = ['1', 'true', 'yes'].includes((process.env.HEADED ?? '').toLowerCase())
+
 export default defineConfig({
   globalSetup: './global-setup.ts',
   testDir: 'tests',
@@ -20,7 +24,7 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
-    headless: process.env.CI ? true : false,
+    headless: !headed,
     ignoreHTTPSErrors: true, // Keycloak uses self-signed cert in dev/test
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -45,17 +49,17 @@ export default defineConfig({
         launchOptions: {
           args: [
             '--disable-features=LocalNetworkAccessChecks',
-            ...(process.env.CI ? [] : ['--start-maximized']),
+            ...(headed ? ['--start-maximized'] : []),
           ],
         },
       },
-      grepInvert: /@oidc-redirect|@noci|@visual/,
+      grepInvert: /@oidc-redirect|@noci|@visual|@ollama|@minimal/,
     },
     {
       name: 'firefox',
       use: {
         ...devices['Desktop Firefox'],
-        ...(process.env.CI ? {} : { launchOptions: { args: ['--start-maximized'] } }),
+        ...(headed ? { launchOptions: { args: ['--start-maximized'] } } : {}),
       },
       // Firefox is a focused cross-browser SMOKE, not a second full suite.
       // Only tests tagged @crossbrowser run here — the engine-divergent flows
@@ -70,6 +74,39 @@ export default defineConfig({
       name: 'chromium-oidc-redirect',
       use: { ...devices['Desktop Chrome'] },
       grep: /@oidc-redirect/,
+    },
+    {
+      // Intermezzo S4: the core stack with every optional feature module
+      // emptied. Own compose overlay + CI job so the sharded chromium run
+      // keeps talking to Tika / WhatsApp / Stripe as today.
+      name: 'chromium-minimal',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@minimal/,
+    },
+    {
+      // ollama-integration.spec.ts repoints the CHAT default model at the
+      // Ollama stub for the WHOLE installation (`global: true`) and restores it
+      // afterwards. Any chat test running in that window talks to the stub
+      // instead of its expected model and fails. It therefore gets its own
+      // project so CI can give it its own job — and with it its own test stack,
+      // which is the only thing that actually makes the mutation safe.
+      //
+      // It is excluded from the `chromium` project above; keeping it there was
+      // safe only by accident of how Playwright happened to distribute spec
+      // files across shards, and that broke the moment the shard count changed.
+      name: 'chromium-ollama',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@ollama/,
     },
     {
       // Mobile viewport for the layout UI guard only — functional specs are

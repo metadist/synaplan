@@ -82,16 +82,17 @@ Tests run with 4 parallel workers by default. Each worker dynamically creates a 
 
 From the **frontend** directory:
 
-| What                               | Command                                                                    |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| **Dev stack**: E2E tests           | `npm run test:e2e`                                                         |
-| **Dev stack**: single test         | `npm run test:e2e -- -g "standard model"`                                  |
-| **Test stack**: E2E tests          | `BASE_URL=http://localhost:8001 npm run test:e2e`                          |
-| **Test stack**: full CI-like       | `make test-e2e-full` (builds test stack + runs all E2E)                    |
-| **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"` |
-| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "embedded chat"`    |
-| **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
-| **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
+| What                               | Command                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| **Dev stack**: E2E tests           | `npm run test:e2e`                                                             |
+| **Dev stack**: single test         | `npm run test:e2e -- -g "standard model"`                                      |
+| **Test stack**: E2E tests          | `BASE_URL=http://localhost:8001 npm run test:e2e`                              |
+| **Test stack**: full CI-like       | `make test-e2e-full` (builds test stack + runs all E2E)                        |
+| **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"`     |
+| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "embedded chat"`        |
+| **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                     |
+| **Minimal stack (`@minimal`)**     | Overlay `docker-compose.minimal.yml`, then `make -C frontend test-e2e-minimal` |
+| **Playwright UI**                  | `npm run test:e2e:ui`                                                          |
 
 Everything after `--` is passed through to Playwright.
 
@@ -105,6 +106,22 @@ External services (WhatsApp, Ollama) are replaced by deterministic Node.js stub 
 | `ollama-stub`   | 11434 | Ollama AI server        |
 
 **Note:** The `ollama-stub` binds host port 11434 — the same default port as a real Ollama installation. Stop any local Ollama before starting the test stack, or adjust the port mapping in `docker-compose.test.yml`.
+
+### Minimal stack (`@minimal`)
+
+Intermezzo S4: the same test stack with every optional feature module emptied
+(`docker-compose.minimal.yml` on top of `docker-compose.test.yml`). Chat and
+plain-text upload stay up (TestProvider); WhatsApp, Tika, Stripe, Ollama, …
+report `configured: false` and gated routes answer `404 feature_not_configured`.
+
+```bash
+docker compose -f docker-compose.test.yml -f docker-compose.minimal.yml up -d --wait
+cd frontend
+BASE_URL=http://localhost:8001 make test-e2e-minimal
+```
+
+The `@minimal` tag is excluded from the default chromium project. Do not add
+`@minimal` to a spec that must also run on the full stack.
 
 ### WhatsApp tests (`@whatsapp`)
 

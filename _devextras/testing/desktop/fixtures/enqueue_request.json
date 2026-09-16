@@ -1,0 +1,10 @@
+{
+  "deviceId": 1,
+  "type": "skill.run",
+  "input": {
+    "skill": "hello-files",
+    "prompt": "List the files in my Documents folder",
+    "fileIds": []
+  },
+  "chatId": 99
+}

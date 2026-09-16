@@ -117,6 +117,51 @@ describe('installGlobalErrorHandlers', () => {
     expect(store.hasError).toBe(false)
   })
 
+  // Safari / Mac: password-managers and similar content scripts reject into
+  // our page. Production Safari consoles have shown these exact messages,
+  // after which ErrorView replaced a healthy session. None of these strings
+  // exist in our own codebase.
+  const extensionNoiseCases: Array<{ label: string; message: string }> = [
+    {
+      label: 'MutationObserver target is not a Node',
+      message:
+        "TypeError: Argument 1 ('target') to MutationObserver.observe must be an instance of Node",
+    },
+    {
+      label: 'extension tab message bus',
+      message: 'No Listener: tabs:outgoing.message.ready',
+    },
+    {
+      label: 'extension context invalidated after reload',
+      message: 'Extension context invalidated.',
+    },
+  ]
+
+  it.each(extensionNoiseCases)(
+    'ignores browser-extension noise ($label) instead of raising ErrorView',
+    ({ message }) => {
+      installGlobalErrorHandlers(app)
+      const store = useGlobalErrorStore()
+      const { notifications } = useNotification()
+
+      const reason = new Error(message)
+      const event = new Event('unhandledrejection') as Event & {
+        reason: unknown
+        promise: Promise<unknown>
+      }
+      event.reason = reason
+      event.promise = Promise.reject(reason)
+      event.promise.catch(() => {})
+      const preventDefault = vi.spyOn(event, 'preventDefault')
+
+      window.dispatchEvent(event)
+
+      expect(store.hasError).toBe(false)
+      expect(notifications.value).toHaveLength(0)
+      expect(preventDefault).toHaveBeenCalledOnce()
+    }
+  )
+
   // -----------------------------------------------------------------------
   // Issue #897 — transient (chunk-load / network) errors must NOT replace
   // the entire UI with the full-screen ErrorView. They should fire a

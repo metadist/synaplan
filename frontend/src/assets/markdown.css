@@ -215,12 +215,12 @@
 }
 
 /* Links */
-.markdown-content a {
+.markdown-content a:not(.pill) {
   color: var(--brand, #3b82f6);
   text-decoration: underline;
 }
 
-.markdown-content a:hover {
+.markdown-content a:not(.pill):hover {
   color: var(--brand-hover, #2563eb);
 }
 
@@ -409,7 +409,7 @@
   border-color: #4b5563;
 }
 
-.dark .markdown-content a {
+.dark .markdown-content a:not(.pill) {
   color: var(--brand-light, #60a5fa);
 }
 

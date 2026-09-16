@@ -38,6 +38,7 @@
             </p>
 
             <router-link
+              v-if="config.auth.registrationEnabled"
               to="/register"
               data-testid="guest-hint-register"
               class="block w-full py-2.5 rounded-xl bg-[var(--brand)] text-white text-center font-semibold text-sm hover:brightness-110 transition-all"
@@ -63,6 +64,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useConfigStore } from '@/stores/config'
+
+const config = useConfigStore()
 
 const props = defineProps<{
   isOpen: boolean

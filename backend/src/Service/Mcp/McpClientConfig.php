@@ -12,6 +12,8 @@ use App\Repository\ConfigRepository;
  * BCONFIG group `MCP`:
  *   - CLIENT_ENABLED — master switch for any outbound MCP traffic
  *     (per-user row overrides global row overrides built-in default OFF).
+ *   - OAUTH_CONNECTORS_ENABLED — admin gate for OAuth consent (Notion,
+ *     Higgsfield, any RFC-9728 remote MCP). Seeded OFF.
  *   - NODE_TIMEOUT   — per-call hard timeout in seconds (global only,
  *     clamped; a slow server degrades one call, never the turn).
  */
@@ -20,9 +22,11 @@ final readonly class McpClientConfig
     public const CONFIG_GROUP = 'MCP';
 
     public const KEY_CLIENT_ENABLED = 'CLIENT_ENABLED';
+    public const KEY_OAUTH_CONNECTORS_ENABLED = 'OAUTH_CONNECTORS_ENABLED';
     public const KEY_NODE_TIMEOUT = 'NODE_TIMEOUT';
 
     private const DEFAULT_CLIENT_ENABLED = false;
+    private const DEFAULT_OAUTH_CONNECTORS_ENABLED = false;
     private const DEFAULT_NODE_TIMEOUT = 15;
 
     public function __construct(
@@ -45,6 +49,20 @@ final readonly class McpClientConfig
         }
 
         return self::DEFAULT_CLIENT_ENABLED;
+    }
+
+    /**
+     * Install-wide only (no per-user override): may users start an OAuth
+     * consent flow against a remote MCP server. The operator kill switch.
+     */
+    public function isOAuthConnectorsEnabled(): bool
+    {
+        $global = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_OAUTH_CONNECTORS_ENABLED);
+        if (null !== $global) {
+            return filter_var($global, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? self::DEFAULT_OAUTH_CONNECTORS_ENABLED;
+        }
+
+        return self::DEFAULT_OAUTH_CONNECTORS_ENABLED;
     }
 
     public function nodeTimeoutSeconds(): int

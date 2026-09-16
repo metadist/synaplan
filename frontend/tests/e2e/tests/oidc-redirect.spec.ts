@@ -13,7 +13,27 @@ test.describe('@ci @oidc @oidc-redirect OIDC Auto-Redirect', () => {
     })
   })
 
-  test('@auth should not redirect on session_expired', async ({ page }) => {
+  test('@auth should auto-redirect once on session_expired', async ({ page }) => {
+    await test.step('Act: navigate to login with session_expired reason', async () => {
+      await page.goto('/login?reason=session_expired')
+    })
+
+    await test.step('Assert: redirected to Keycloak (live SSO sessions re-login silently)', async () => {
+      await page.waitForURL(/realms\//, { timeout: 10_000 })
+    })
+  })
+
+  test('@auth should fall back to manual sign-in when session_expired bounces within the guard window', async ({
+    page,
+  }) => {
+    await test.step('Arrange: mark a just-happened expired auto-redirect', async () => {
+      // The rate-limit guard lives in sessionStorage; seed it as if the
+      // browser just came back from an auto-redirect that did not stick.
+      await page.addInitScript(() => {
+        sessionStorage.setItem('synaplan_expired_autoredirect_at', String(Date.now()))
+      })
+    })
+
     await test.step('Act: navigate to login with session_expired reason', async () => {
       await page.goto('/login?reason=session_expired')
     })

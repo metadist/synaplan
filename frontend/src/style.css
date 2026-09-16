@@ -35,9 +35,40 @@
   --color-success: var(--status-success);
 }
 
+/*
+ * Phone chrome vs desktop rail — keep in lockstep with
+ * `PHONE_CHROME_MQ` / `DESKTOP_CHROME_MQ` in usePhoneChrome.ts.
+ *
+ * A landscape phone is wider than Tailwind `md` (768px) but only ~390px
+ * tall. Showing the 80px desktop rail there clips the icons behind the
+ * chat card once the notch safe-area eats the fixed width. Keep the
+ * hamburger + push-drawer whenever the viewport is narrow OR short.
+ */
+.v2-desktop-chrome {
+  display: none !important;
+}
+@media (min-width: 768px) and (min-height: 520px) {
+  .v2-desktop-chrome {
+    display: flex !important;
+  }
+}
+@media (min-width: 768px) and (min-height: 520px) {
+  .v2-phone-chrome {
+    display: none !important;
+  }
+}
+
+/* Rail width includes the landscape notch so icons are never clipped when
+   the desktop chrome is showing (iPad landscape, notched desktops). */
+.v2-sidebar-rail {
+  box-sizing: border-box;
+  width: calc(80px + env(safe-area-inset-left, 0px));
+  min-width: calc(80px + env(safe-area-inset-left, 0px));
+}
+
 /* Mobile floating header button clearance — pushes titles below the button.
    Excluded: ChatView (page-chat) where messages scroll behind the button. */
-@media (max-width: 767px) {
+@media (max-width: 767px), (max-height: 519px) {
   [data-testid='section-primary-content'] > :first-child:not([data-testid='page-chat']) {
     padding-top: calc(env(safe-area-inset-top, 0px) + 62px);
   }
@@ -1012,6 +1043,35 @@
     opacity: 1;
   }
 
+  /* Icon contrast: an always-visible white icon button for actions that must
+     be found on a tile (folder share). White in both themes on purpose — the
+     hairline ring and shadow lift it off a light card, the white face off a
+     dark one. Hover/focus swap to the brand fill, like .btn-primary. */
+  .icon-contrast {
+    color: #1f2937;
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.08),
+      0 1px 3px rgba(0, 0, 0, 0.18);
+    transition:
+      background 0.15s,
+      color 0.15s,
+      box-shadow 0.15s;
+  }
+  .icon-contrast:hover,
+  .icon-contrast:focus-visible {
+    background: var(--brand);
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    outline: none;
+  }
+  .dark .icon-contrast {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.12),
+      0 1px 3px rgba(0, 0, 0, 0.45);
+  }
+
   /* Icon ghost danger variant */
   .icon-ghost--danger {
     color: #dc2626;
@@ -1116,6 +1176,47 @@
     background: rgba(107, 143, 214, 0.12);
     color: var(--brand-light);
     box-shadow: inset 0 0 0 2px rgba(107, 143, 214, 0.35);
+  }
+
+  /* Static sovereignty badges (not clickable — do not use .pill) */
+  .sovereignty-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+  .sovereignty-badge--self-hosted {
+    color: #166534;
+    background: rgba(22, 101, 52, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(22, 101, 52, 0.25);
+  }
+  .dark .sovereignty-badge--self-hosted {
+    color: #86efac;
+    background: rgba(22, 101, 52, 0.25);
+    box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.3);
+  }
+  .sovereignty-badge--eu {
+    color: #1e3a8a;
+    background: rgba(30, 58, 138, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(30, 58, 138, 0.25);
+  }
+  .dark .sovereignty-badge--eu {
+    color: #93c5fd;
+    background: rgba(30, 58, 138, 0.3);
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.3);
+  }
+  .sovereignty-badge--us-cloud {
+    color: #9a3412;
+    background: rgba(154, 52, 18, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(154, 52, 18, 0.25);
+  }
+  .dark .sovereignty-badge--us-cloud {
+    color: #fdba74;
+    background: rgba(154, 52, 18, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(253, 186, 116, 0.3);
   }
 
   .pill--loading {
@@ -1455,6 +1556,114 @@
     background: rgba(251, 191, 36, 0.16);
     color: #fcd34d;
     border-color: rgba(251, 191, 36, 0.3);
+  }
+
+  /* Large pasted-text cards in the composer and sent user bubble. */
+  .pasted-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 6rem;
+    min-height: 5.5rem;
+    padding: 0.5rem 0.5rem 0.4rem;
+    border-radius: 0.75rem;
+    background: var(--bg-chip);
+    box-shadow: inset 0 0 0 1px var(--border-light);
+    cursor: pointer;
+    text-align: left;
+  }
+  .pasted-card:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .pasted-card__preview {
+    margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--txt-secondary);
+    word-break: break-word;
+  }
+  .pasted-card__label {
+    display: inline-flex;
+    align-self: flex-start;
+    margin-top: 0.35rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--txt-secondary);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+  .dark .pasted-card__label {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .pasted-card__remove {
+    position: absolute;
+    top: 0.15rem;
+    right: 0.15rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    min-width: 0;
+    border-radius: 999px;
+    background: var(--bg-card);
+    opacity: 1;
+  }
+  .pasted-card__remove::before {
+    content: '';
+    position: absolute;
+    inset: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  @media (hover: hover) {
+    .pasted-card__remove {
+      opacity: 0;
+    }
+    .pasted-card:hover .pasted-card__remove,
+    .pasted-card:focus-visible .pasted-card__remove,
+    .pasted-card__remove:focus-visible {
+      opacity: 1;
+    }
+  }
+  @media (min-width: 640px) {
+    .pasted-card {
+      width: 7rem;
+    }
+    .pasted-card__preview {
+      -webkit-line-clamp: 5;
+    }
+  }
+
+  .bubble-user .pasted-card {
+    width: 100%;
+    max-width: 100%;
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  }
+  .bubble-user .pasted-card__preview,
+  .bubble-user .pasted-card__label {
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .bubble-user .pasted-card__label {
+    background: rgba(255, 255, 255, 0.16);
+  }
+  @media (min-width: 640px) {
+    .bubble-user .pasted-card {
+      max-width: 20rem;
+    }
   }
 
   /* Alert/Message Boxes - Compact versions with high contrast */

@@ -25,6 +25,10 @@ final readonly class VisionModelResolver
      * Order of preference:
      *   1. The account's configured image-recognition model
      *      (DEFAULTMODEL.PIC2TEXT), when it exists and is vision-capable.
+     *      A `pic2text`-tagged model accepts image input by definition, so the
+     *      tag counts even when the row's JSON lacks the `vision` feature —
+     *      long-lived installs carry admin-edited catalog rows the seeder
+     *      preserves, and those never receive newly-shipped feature flags.
      *   2. The global catalog fallback (highest-quality selectable vision chat
      *      model) — used only when the account has no usable configured model.
      */
@@ -33,7 +37,7 @@ final readonly class VisionModelResolver
         $configuredId = $this->modelConfigService->getDefaultModel('PIC2TEXT', $userId);
         if ($configuredId) {
             $configured = $this->modelRepository->find($configuredId);
-            if ($configured instanceof Model && $configured->hasFeature('vision')) {
+            if ($configured instanceof Model && ($configured->hasFeature('vision') || 'pic2text' === $configured->getTag())) {
                 return $configured;
             }
         }

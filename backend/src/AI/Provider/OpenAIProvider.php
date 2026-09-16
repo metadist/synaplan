@@ -4,20 +4,56 @@ namespace App\AI\Provider;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Tool\CatalogToolUse;
+use App\AI\Tool\OpenAiToolShapes;
 use App\Service\File\FileHelper;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
+class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
 {
     private const DEFAULT_MAX_TOKENS = 4096;
+
+    /**
+     * Accepted `reasoning.effort` tiers per model family, cheapest tier first.
+     *
+     * OpenAI renames and extends this vocabulary with almost every family and
+     * answers an unknown tier with HTTP 400 ("Unsupported value: 'X' is not
+     * supported with the 'Y' model"), so it has to be looked up per model
+     * rather than guessed. Verified against the model reference on 2026-09-04
+     * (https://developers.openai.com/api/docs/models).
+     *
+     * The first match wins, so more specific prefixes must come first —
+     * `gpt-5.5-pro` accepts a narrower set than `gpt-5.5`, and every `gpt-5.x`
+     * entry must precede the bare `gpt-5` fallback.
+     *
+     * @var array<string, list<string>>
+     */
+    private const REASONING_EFFORT_TIERS = [
+        'gpt-6' => ['low', 'medium', 'high', 'xhigh', 'max'],
+        'gpt-5.6' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+        // Pro reasons hard by design: no skip tier, default 'high'.
+        'gpt-5.5-pro' => ['medium', 'high', 'xhigh'],
+        'gpt-5.5' => ['none', 'low', 'medium', 'high', 'xhigh'],
+        'gpt-5.4' => ['none', 'low', 'medium', 'high', 'xhigh'],
+        // gpt-5 … gpt-5.3 still use the original 'minimal' skip tier.
+        'gpt-5' => ['minimal', 'low', 'medium', 'high'],
+    ];
+
+    /** o-series (o1/o3/o4) and anything unknown: no skip tier, no xhigh. */
+    private const REASONING_EFFORT_TIERS_FALLBACK = ['low', 'medium', 'high'];
 
     private ?OpenAI\Client $client = null;
 
@@ -50,6 +86,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         private string $uploadDir = '/var/www/backend/var/uploads',
         private bool $storeResponses = false,
         private ?ProviderKeyStore $keyStore = null,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -131,6 +168,15 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         return null !== $this->client();
     }
 
+    public function supportsToolCalling(string $model): bool
+    {
+        if (CatalogToolUse::hasChatRow($this->getName(), $model)) {
+            return CatalogToolUse::supports($this->getName(), $model);
+        }
+
+        return true;
+    }
+
     public function getRequiredEnvVars(): array
     {
         return [
@@ -165,12 +211,12 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $modelData = $modelInfo->toArray();
             $capabilities = is_array($modelData['capabilities'] ?? null) ? $modelData['capabilities'] : [];
 
-            // Check if model has reasoning capabilities or is o-series/gpt-5
-            // Reasoning models (o1, o3, gpt-5) use max_completion_tokens
+            // Check if model has reasoning capabilities or is o-series/gpt-5+
+            // Reasoning models (o1, o3, gpt-5, gpt-6) use max_completion_tokens
             $isReasoningModel = isset($capabilities['reasoning'])
                                || str_starts_with($model, 'o1')
                                || str_starts_with($model, 'o3')
-                               || str_starts_with($model, 'gpt-5');
+                               || $this->isGptReasoningFamily($model);
 
             $this->modelCapabilities[$model] = $isReasoningModel;
 
@@ -182,10 +228,10 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'error' => $e->getMessage(),
             ]);
 
-            // Heuristic: o-series and gpt-5 models use max_completion_tokens
+            // Heuristic: o-series and gpt-5+ models use max_completion_tokens
             $usesCompletionTokens = str_starts_with($model, 'o1')
                                    || str_starts_with($model, 'o3')
-                                   || str_starts_with($model, 'gpt-5');
+                                   || $this->isGptReasoningFamily($model);
 
             $this->modelCapabilities[$model] = $usesCompletionTokens;
 
@@ -215,6 +261,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $responseArray = $response->toArray();
 
             $usage = $this->normalizeResponsesUsage($responseArray);
+            $toolCalls = $this->extractResponsesToolCalls($responseArray);
 
             $this->logger->info('OpenAI: Chat completed via Responses API', [
                 'model' => $model,
@@ -222,15 +269,21 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'usage' => $usage,
             ]);
 
-            return [
+            $result = [
                 'content' => $response->outputText ?? '',
                 'response_id' => $this->storeResponses ? $response->id : null,
                 'usage' => $usage,
             ];
+            if ([] !== $toolCalls) {
+                $result['tool_calls'] = $toolCalls;
+                $result['finish_reason'] = 'tool_calls';
+            }
+
+            return $result;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new ProviderException('OpenAI chat error: '.$e->getMessage(), 'openai');
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'openai', 'chat');
         }
     }
 
@@ -248,7 +301,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $model = $options['model'];
             $isReasoningModel = $this->usesCompletionTokens($model);
 
-            $requestOptions = $this->buildResponsesRequest($messages, $model, $isReasoningModel, $options);
+            $requestOptions = $this->buildResponsesRequest($messages, $model, $isReasoningModel, $options, true);
 
             $stream = $this->executeResponsesCreateStreamed($requestOptions);
 
@@ -262,6 +315,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             $responseId = null;
             $finishReason = null;
+            $sawFunctionCall = false;
 
             foreach ($stream as $event) {
                 $eventType = $event->event;
@@ -293,11 +347,38 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                         }
                         break;
 
+                    case 'response.output_item.added':
+                        if ($this->emitResponsesFunctionCallStart($eventData, $callback)) {
+                            $sawFunctionCall = true;
+                        }
+                        break;
+
+                    case 'response.function_call_arguments.delta':
+                        $sawFunctionCall = true;
+                        $callback([
+                            'type' => 'tool_call_delta',
+                            'index' => (int) ($eventData['output_index'] ?? 0),
+                            'id' => null,
+                            'name' => null,
+                            'arguments' => is_string($eventData['delta'] ?? null) ? $eventData['delta'] : '',
+                        ]);
+                        break;
+
+                    case 'response.output_item.done':
+                        $item = is_array($eventData['item'] ?? null) ? $eventData['item'] : [];
+                        if ('function_call' === ($item['type'] ?? '')) {
+                            $sawFunctionCall = true;
+                        }
+                        break;
+
                     case 'response.completed':
                         $usage = $this->normalizeResponsesUsage($eventData['response'] ?? []);
                         $responseId = $eventData['response']['id'] ?? $responseId;
                         $status = $eventData['response']['status'] ?? 'completed';
                         $finishReason = ('completed' === $status) ? 'stop' : 'length';
+                        if ($sawFunctionCall || $this->responsesOutputHasFunctionCall($eventData['response']['output'] ?? [])) {
+                            $finishReason = 'tool_calls';
+                        }
                         break;
 
                     case 'response.failed':
@@ -306,7 +387,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     case 'response.incomplete':
                         $usage = $this->normalizeResponsesUsage($eventData['response'] ?? []);
                         $responseId = $eventData['response']['id'] ?? $responseId;
-                        $finishReason = 'length';
+                        $finishReason = $sawFunctionCall ? 'tool_calls' : 'length';
                         break;
                 }
             }
@@ -322,7 +403,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new ProviderException('OpenAI streaming error: '.$e->getMessage(), 'openai');
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'openai', 'chat_stream', 'OpenAI streaming error');
         }
     }
 
@@ -332,7 +413,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      * Extracts the system message into `instructions` and converts
      * user/assistant messages into the `input` field.
      */
-    private function buildResponsesRequest(array $messages, string $model, bool $isReasoningModel, array $options): array
+    private function buildResponsesRequest(array $messages, string $model, bool $isReasoningModel, array $options, bool $stream = false): array
     {
         $systemMessage = $this->extractSystemMessage($messages);
         $input = $this->convertToResponsesFormat($this->removeSystemMessages($messages));
@@ -367,6 +448,24 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $requestOptions['previous_response_id'] = $options['previous_response_id'];
         }
 
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $requestOptions = array_merge($requestOptions, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
+        }
+
+        if (isset($options['tools']) && is_array($options['tools']) && [] !== $options['tools']) {
+            $requestOptions['tools'] = OpenAiToolShapes::toResponsesTools($options['tools']);
+        }
+        if (array_key_exists('tool_choice', $options)) {
+            $mappedChoice = OpenAiToolShapes::toResponsesToolChoice($options['tool_choice']);
+            if (null !== $mappedChoice) {
+                $requestOptions['tool_choice'] = $mappedChoice;
+            }
+        }
+        if (array_key_exists('parallel_tool_calls', $options)) {
+            $requestOptions['parallel_tool_calls'] = (bool) $options['parallel_tool_calls'];
+        }
+
         return $requestOptions;
     }
 
@@ -378,12 +477,11 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      * "default chat = no thinking, near-instant TTFT" behaviour is identical
      * across providers. The headline Phase 1e win on Gemini Pro
      * (`thinkingBudget=0` for default chat) translates to OpenAI as the
-     * model family's lowest reasoning tier — `'none'` on gpt-5.5+, `'minimal'`
-     * on the original gpt-5, `'low'` on the o-series. Without this, the model
-     * falls back to OpenAI's server-side default of `medium` and burns 1-3 s
-     * of chain-of-thought before emitting the first visible token, even on a
-     * "Hi, how are you?" style chat where the user did not enable the
-     * Thinking toggle.
+     * model family's lowest reasoning tier (see self::REASONING_EFFORT_TIERS).
+     * Without this, the model falls back to OpenAI's server-side default of `medium` and
+     * burns 1-3 s of chain-of-thought before emitting the first visible token,
+     * even on a "Hi, how are you?" style chat where the user did not enable
+     * the Thinking toggle.
      *
      * Resolution order:
      *
@@ -400,8 +498,8 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      *    callers that pass empty options, e.g. unit tests).
      *
      * `summary => 'auto'` is included only when the resolved effort is
-     * `medium`, `high` or `xhigh` — that's where chain-of-thought is long
-     * enough for the SSE reasoning-summary stream to be useful.
+     * `medium`, `high`, `xhigh` or `max` — that's where chain-of-thought is
+     * long enough for the SSE reasoning-summary stream to be useful.
      *
      * @param array<string, mixed> $options
      *
@@ -430,20 +528,20 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             return null;
         }
 
-        $lowestTier = $this->lowestEffortTier($model);
-        $supportsXHigh = $this->modelSupportsXHighEffort($model);
-
         $resolvedEffort = match ($effort) {
             // 'lowest' is our internal sentinel for "lowest tier this model
             // accepts" (= the Phase 1e fast-default path). 'minimal' / 'none'
             // / 'off' / 'disabled' all map to the same intent: skip reasoning.
-            'lowest', 'off', 'none', 'disabled', 'minimal' => $lowestTier,
-            'low' => 'low',
+            'lowest', 'off', 'none', 'disabled', 'minimal' => $this->lowestEffortTier($model),
+            // 'low' is absent on gpt-5.5-pro, so even this needs clamping.
+            'low' => $this->clampEffort($model, ['low', 'medium']),
             'medium' => 'medium',
             'high' => 'high',
-            // gpt-5.5+ exposes an 'xhigh' tier above 'high'. On older models
-            // it isn't accepted — clamp down to 'high' to avoid an HTTP 400.
-            'xhigh', 'extra-high', 'extreme' => $supportsXHigh ? 'xhigh' : 'high',
+            // Most of the gpt-5.x line and gpt-6 expose 'xhigh' above 'high';
+            // the original gpt-5 and the o-series cap at 'high'.
+            'xhigh', 'extra-high', 'extreme' => $this->clampEffort($model, ['xhigh', 'high']),
+            // gpt-5.6 and gpt-6 add 'max' above 'xhigh'.
+            'max', 'maximum' => $this->clampEffort($model, ['max', 'xhigh', 'high']),
             default => null,
         };
 
@@ -453,7 +551,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         $config = ['effort' => $resolvedEffort];
 
-        if (in_array($resolvedEffort, ['medium', 'high', 'xhigh'], true)) {
+        if (in_array($resolvedEffort, ['medium', 'high', 'xhigh', 'max'], true)) {
             $config['summary'] = 'auto';
         }
 
@@ -461,40 +559,61 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
-     * Lowest `reasoning.effort` tier the given model accepts.
+     * Tiers the given model accepts, cheapest first.
      *
-     * The Responses-API vocabulary is per family:
-     *
-     * - `gpt-5.5*` (gpt-5.5, gpt-5.5-pro, …): `none`, `low`, `medium`, `high`,
-     *   `xhigh`. Skip-reasoning tier is `none`. (Sending `minimal` here
-     *   returns HTTP 400 with "Unsupported value: 'minimal' is not supported
-     *   with the 'gpt-5.5' model".)
-     * - `gpt-5` (original): `minimal`, `low`, `medium`, `high`. Skip tier is
-     *   `minimal`.
-     * - o-series (`o1`, `o3`, `o4`): `low`, `medium`, `high`. Skip tier is
-     *   `low` — these models don't accept `minimal`/`none`.
+     * @return list<string>
      */
-    private function lowestEffortTier(string $model): string
+    private function reasoningEffortTiers(string $model): array
     {
-        if (str_starts_with($model, 'gpt-5.5')) {
-            return 'none';
-        }
-        if (str_starts_with($model, 'gpt-5')) {
-            return 'minimal';
+        foreach (self::REASONING_EFFORT_TIERS as $prefix => $tiers) {
+            if (str_starts_with($model, $prefix)) {
+                return $tiers;
+            }
         }
 
-        return 'low';
+        return self::REASONING_EFFORT_TIERS_FALLBACK;
     }
 
     /**
-     * Whether the model accepts `reasoning.effort = 'xhigh'`.
-     *
-     * Currently only the `gpt-5.5` family. Original gpt-5 + o-series cap at
-     * `'high'` and reject `xhigh` with HTTP 400.
+     * Cheapest `reasoning.effort` tier the given model accepts — `'none'` on
+     * most of the gpt-5.x line, `'minimal'` on the original gpt-5, `'low'` on
+     * gpt-6 and the o-series, `'medium'` on gpt-5.5-pro.
      */
-    private function modelSupportsXHighEffort(string $model): bool
+    private function lowestEffortTier(string $model): string
     {
-        return str_starts_with($model, 'gpt-5.5');
+        return $this->reasoningEffortTiers($model)[0];
+    }
+
+    /**
+     * First tier from $preferences that the model accepts.
+     *
+     * Callers pass the requested tier followed by its cheaper fallbacks, so a
+     * cross-provider `'max'` clamps down on a family that caps lower instead of
+     * returning HTTP 400.
+     *
+     * @param list<string> $preferences requested tier first, then fallbacks
+     */
+    private function clampEffort(string $model, array $preferences): string
+    {
+        $supported = $this->reasoningEffortTiers($model);
+
+        foreach ($preferences as $tier) {
+            if (in_array($tier, $supported, true)) {
+                return $tier;
+            }
+        }
+
+        // Every family accepts 'high'.
+        return 'high';
+    }
+
+    /**
+     * GPT reasoning families that use the Responses API and
+     * `max_completion_tokens` (gpt-5, gpt-6, and later dated snapshots).
+     */
+    private function isGptReasoningFamily(string $model): bool
+    {
+        return str_starts_with($model, 'gpt-5') || str_starts_with($model, 'gpt-6');
     }
 
     /**
@@ -647,7 +766,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             return false;
         }
 
-        foreach (['minimal', 'none', 'low', 'medium', 'high', 'xhigh'] as $tier) {
+        foreach (['minimal', 'none', 'low', 'medium', 'high', 'xhigh', 'max'] as $tier) {
             if (str_contains($message, "'".$tier."'")) {
                 return true;
             }
@@ -711,51 +830,167 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
-     * Convert Chat Completions message format to Responses API format.
+     * Convert Chat Completions message format to Responses API input items.
      *
      * Chat Completions uses: {type: "text", text: "..."} and {type: "image_url", image_url: {url: "..."}}
      * Responses API uses:    {type: "input_text"/"output_text", text: "..."} and {type: "input_image", image_url: "..."}
+     * Tool history becomes `function_call` / `function_call_output` items.
      */
     private function convertToResponsesFormat(array $messages): array
     {
-        foreach ($messages as &$message) {
-            $role = $message['role'] ?? 'user';
-            $isAssistant = 'assistant' === $role;
-            $textType = $isAssistant ? 'output_text' : 'input_text';
+        $items = [];
 
-            if (!is_array($message['content'] ?? null)) {
-                $text = $message['content'] ?? '';
-                $message['content'] = [
-                    [
-                        'type' => $textType,
-                        'text' => $text,
-                    ],
+        foreach ($messages as $message) {
+            $role = $message['role'] ?? 'user';
+
+            if ('tool' === $role) {
+                $output = $message['content'] ?? '';
+                if (!is_string($output)) {
+                    $output = json_encode($output, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+                }
+                $items[] = [
+                    'type' => 'function_call_output',
+                    'call_id' => (string) ($message['tool_call_id'] ?? ''),
+                    'output' => $output,
                 ];
                 continue;
             }
 
-            $converted = [];
-            foreach ($message['content'] as $part) {
-                $type = $part['type'] ?? '';
-                if ('text' === $type) {
-                    $converted[] = [
-                        'type' => $textType,
-                        'text' => $part['text'] ?? '',
-                    ];
-                } elseif ('image_url' === $type) {
-                    $url = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
-                    $converted[] = [
-                        'type' => 'input_image',
-                        'image_url' => $url,
-                    ];
-                } else {
-                    $converted[] = $part;
-                }
+            $isAssistant = 'assistant' === $role;
+            $textType = $isAssistant ? 'output_text' : 'input_text';
+            $toolCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+            $contentParts = $this->convertResponsesContentParts($message['content'] ?? '', $textType, [] !== $toolCalls);
+
+            if ([] !== $contentParts) {
+                $items[] = [
+                    'role' => $role,
+                    'content' => $contentParts,
+                ];
             }
-            $message['content'] = $converted;
+
+            foreach ($toolCalls as $call) {
+                if (!is_array($call)) {
+                    continue;
+                }
+                $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
+                $args = $fn['arguments'] ?? '{}';
+                if (!is_string($args) || '' === $args) {
+                    $args = '{}';
+                }
+                $items[] = [
+                    'type' => 'function_call',
+                    'call_id' => (string) ($call['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                    'name' => (string) ($fn['name'] ?? 'tool'),
+                    'arguments' => $args,
+                ];
+            }
         }
 
-        return $messages;
+        return $items;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function convertResponsesContentParts(mixed $content, string $textType, bool $hasToolCalls): array
+    {
+        if (!is_array($content)) {
+            $text = is_string($content) ? $content : '';
+            if ('' === $text && $hasToolCalls) {
+                return [];
+            }
+
+            return [[
+                'type' => $textType,
+                'text' => $text,
+            ]];
+        }
+
+        $converted = [];
+        foreach ($content as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+            $type = $part['type'] ?? '';
+            if ('text' === $type) {
+                $converted[] = [
+                    'type' => $textType,
+                    'text' => $part['text'] ?? '',
+                ];
+            } elseif ('image_url' === $type) {
+                $url = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
+                $converted[] = [
+                    'type' => 'input_image',
+                    'image_url' => $url,
+                ];
+            } else {
+                $converted[] = $part;
+            }
+        }
+
+        return $converted;
+    }
+
+    /**
+     * @return list<array{id: string, type: 'function', function: array{name: string, arguments: string}}>
+     */
+    private function extractResponsesToolCalls(array $responseArray): array
+    {
+        $calls = [];
+        foreach ($responseArray['output'] ?? [] as $item) {
+            if (!is_array($item) || 'function_call' !== ($item['type'] ?? '')) {
+                continue;
+            }
+            $args = $item['arguments'] ?? '{}';
+            if (!is_string($args) || '' === $args) {
+                $args = '{}';
+            }
+            $calls[] = [
+                'id' => (string) ($item['call_id'] ?? $item['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                'type' => 'function',
+                'function' => [
+                    'name' => (string) ($item['name'] ?? 'tool'),
+                    'arguments' => $args,
+                ],
+            ];
+        }
+
+        return $calls;
+    }
+
+    /**
+     * @param array<string, mixed> $eventData
+     */
+    private function emitResponsesFunctionCallStart(array $eventData, callable $callback): bool
+    {
+        $item = is_array($eventData['item'] ?? null) ? $eventData['item'] : [];
+        if ('function_call' !== ($item['type'] ?? '')) {
+            return false;
+        }
+
+        $callback([
+            'type' => 'tool_call_delta',
+            'index' => (int) ($eventData['output_index'] ?? 0),
+            'id' => isset($item['call_id']) && is_string($item['call_id']) && '' !== $item['call_id'] ? $item['call_id'] : null,
+            'name' => isset($item['name']) && is_string($item['name']) && '' !== $item['name'] ? $item['name'] : null,
+            'arguments' => is_string($item['arguments'] ?? null) ? $item['arguments'] : '',
+        ]);
+
+        return true;
+    }
+
+    private function responsesOutputHasFunctionCall(mixed $output): bool
+    {
+        if (!is_array($output)) {
+            return false;
+        }
+        foreach ($output as $item) {
+            if (is_array($item) && 'function_call' === ($item['type'] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -772,7 +1007,10 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             'completion_tokens' => $usage['output_tokens'] ?? 0,
             'total_tokens' => $usage['total_tokens'] ?? 0,
             'cached_tokens' => $usage['input_tokens_details']['cached_tokens'] ?? 0,
-            'cache_creation_tokens' => $usage['input_tokens_details']['cache_creation_tokens'] ?? 0,
+            // OpenAI reports cache writes as `cache_write_tokens`; the internal
+            // key keeps Anthropic's name. Reading the wrong key silently billed
+            // written tokens as ordinary input (1.0x instead of 1.25x).
+            'cache_creation_tokens' => $usage['input_tokens_details']['cache_write_tokens'] ?? 0,
         ];
     }
 
@@ -979,7 +1217,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 }
 
                 $quality = strtolower((string) $quality);
-                $allowedQualities = ['low', 'medium', 'high', 'auto'];
+                $allowedQualities = $this->allowedGptImageQualities($model);
                 if (!in_array($quality, $allowedQualities, true)) {
                     $this->logger->warning('OpenAI '.$model.': Unsupported quality value, defaulting to high', [
                         'provided' => $options['quality'],
@@ -1136,7 +1374,10 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $requestBody = [
                 'model' => $responsesModel,
                 'input' => [['role' => 'user', 'content' => $contentParts]],
-                'tools' => [['type' => 'image_generation']],
+                // GPT Image 2.5 must be named on the tool; omitting `model`
+                // lets the Responses API pick a default that is not the
+                // catalog row the user selected.
+                'tools' => [['type' => 'image_generation', 'model' => $model]],
             ];
 
             $key = $this->resolveApiKey();
@@ -1199,6 +1440,23 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI Responses API pic2pic error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    /**
+     * Quality values the Images API accepts for this gpt-image model.
+     * GPT Image 2.5 adds `xhigh` / `max`; earlier rows only accept
+     * low / medium / high / auto. Sending a 2.5-only tier to gpt-image-1
+     * is a provider 400, so those stay off the older allow-list.
+     *
+     * @return list<string>
+     */
+    private function allowedGptImageQualities(string $model): array
+    {
+        if (str_starts_with($model, 'gpt-image-2.5')) {
+            return ['low', 'medium', 'high', 'xhigh', 'max', 'auto'];
+        }
+
+        return ['low', 'medium', 'high', 'auto'];
     }
 
     /**

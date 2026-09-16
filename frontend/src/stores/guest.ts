@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getApiBaseUrl } from '@/services/api/httpClient'
-import type { ApiLoadedMessageRow } from '@/utils/messageMapper'
+import { getApiBaseUrl, redirectToSetupWizard } from '@/services/api/httpClient'
+import type { ApiActiveRun, ApiLoadedMessageRow } from '@/utils/messageMapper'
 
 export const GUEST_STORAGE_KEY = 'synaplan_guest_session'
 export const GUEST_BANNER_DISMISSED_KEY = 'synaplan_guest_banner_dismissed'
@@ -24,9 +24,13 @@ export const useGuestStore = defineStore('guest', () => {
   const initFailed = ref(false)
   const rateLimited = ref(false)
   const sessionExpired = ref(false)
+  // GUEST_CHAT_ENABLED=false on the backend: the trial does not exist here.
+  const guestChatDisabled = ref(false)
   // Persisted so a dismissed banner stays gone across app restarts / reloads
   // for the same browser profile (cleared only on logout / session reset).
   const bannerDismissed = ref(loadBannerDismissed())
+  /** A turn of this session that is still generating on the server. */
+  const activeRun = ref<ApiActiveRun | null>(null)
 
   const remainingMessages = computed(() => Math.max(0, maxMessages.value - messageCount.value))
   const isGuestMode = computed(() => !!sessionId.value)
@@ -78,6 +82,37 @@ export const useGuestStore = defineStore('guest', () => {
         initFailed.value = true
         initialized.value = true
         return
+      }
+
+      // A virgin installation answers 503 SETUP_REQUIRED everywhere. Rendering
+      // the "trial unavailable" card here would strand the visitor: nothing on
+      // that screen leads anywhere, because every other endpoint is shut too.
+      // The router's setup gate normally catches this earlier, but it depends on
+      // a runtime config that may not have loaded yet.
+      if (response.status === 503) {
+        const body = await response.json().catch(() => null)
+        if (body?.code === 'SETUP_REQUIRED') {
+          clearExpiredStorage()
+          initialized.value = true
+          await redirectToSetupWizard()
+          return
+        }
+        throw new Error('Failed to init guest session')
+      }
+
+      if (response.status === 403) {
+        const body = await response.json().catch(() => null)
+        if (body?.code === 'GUEST_CHAT_DISABLED') {
+          // Guest chat disabled on this instance (GUEST_CHAT_ENABLED=false):
+          // drop the stored key so future navigations route to login instead
+          // of retrying a trial that no longer exists.
+          clearExpiredStorage()
+          guestChatDisabled.value = true
+          initFailed.value = true
+          initialized.value = true
+          return
+        }
+        throw new Error('Failed to init guest session')
       }
 
       if (!response.ok) throw new Error('Failed to init guest session')
@@ -151,6 +186,10 @@ export const useGuestStore = defineStore('guest', () => {
       if (!response.ok) return []
 
       const data = await response.json()
+      // A turn still generating for this session: reloading the page detached
+      // the client, but the backend kept the turn alive and buffered its
+      // events, so the chat view can re-attach and keep rendering it.
+      activeRun.value = (data.activeRun as ApiActiveRun | undefined) ?? null
       return data.messages ?? []
     } catch {
       return []
@@ -191,6 +230,7 @@ export const useGuestStore = defineStore('guest', () => {
     initFailed.value = false
     rateLimited.value = false
     sessionExpired.value = false
+    guestChatDisabled.value = false
     bannerDismissed.value = false
     try {
       localStorage.removeItem(GUEST_STORAGE_KEY)
@@ -211,9 +251,11 @@ export const useGuestStore = defineStore('guest', () => {
     rateLimited,
     sessionExpired,
     bannerDismissed,
+    activeRun,
     remainingMessages,
     isGuestMode,
     shouldShowBanner,
+    guestChatDisabled,
     initSession,
     retryInit,
     ensureChat,

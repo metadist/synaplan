@@ -1,0 +1,59 @@
+Third-party review of the 2026-09-03 roadmap (received 2026-09-10).
+Answered in 20260910_roadmap_update.md: two production bugfixes first,
+then Wave 4, then Intermezzo, then Wave 5. Text below is the reviewer's.
+
+---
+
+I would insert a focused reliability release between Waves 3 and 4, then build three outstanding workflows around the capabilities you already have. Synaplan has enough breadth to do impressive things. The next improvement should be how confidently and easily people can put it to work.
+
+I checked the roadmap, all six track plans, and selected current code. One update: Agent Builder S4–S6 already merged through #1769, although parts of the planning still say “on branch.” Approvals and secure compute remain upcoming. Several capabilities also remain disabled by default, so release readiness deserves its own explicit status. Roadmap
+
+For stability, these would be my priorities:
+
+Make every job recoverable—and precise about what happened.
+
+Extend the existing task persistence with durable checkpoints, safe retries, duplicate prevention for external actions, and clear states for partial completion. A browser disconnect, worker restart, or provider timeout should leave a recoverable job.
+
+One concrete issue: the current runner’s catch-all failure message says “Nothing was sent or saved”, although the protected operation includes processing tools and subsequently persisting the reply. A late failure could therefore give misleading reassurance. Record individual outcomes: “Report saved; email delivery unconfirmed.” An uncertain delivery needs checking before retrying. Current runner
+
+My acceptance test: interrupt a workflow around each external action and verify that recovery neither loses work nor blindly repeats it. Add per-run spending and tool-call limits before expanding unattended execution.
+
+Turn assistant publishing into a tested deployment.
+
+Draft testing and immutable versions are already good foundations. I would add a small regression suite per assistant: representative questions, expected sources, forbidden actions, and acceptable cost. Before publishing, compare the draft against the current version and show what changed.
+
+Also distinguish published from successfully activated everywhere. The trigger materializer currently catches and logs activation failures while publication remains committed. Give the owner a visible result such as: “Published: website active, Monday schedule needs attention,” with a targeted retry. Trigger implementation
+
+Pin the assistant version throughout an individual run, including its approval pause. New runs can use the next published version.
+
+Tighten approvals before implementing them.
+
+The unattended-approval sprint explicitly says that policy is not consulted again when resuming. I would amend that: preserve consent for the exact approved action, but recheck current permissions and hard blocks immediately before execution. Someone might have lost access while the job waited overnight.
+
+Bind approval to the actual recipient, destination, arguments, and relevant tool version. If those change, the old approval no longer covers the action. Approval sprint
+
+Make sovereignty an enforceable setting across the whole job.
+
+Offer clear policies such as “Local only” and “Approved providers only,” covering chat, embeddings, extraction, reranking, search, tools, and fallback.
+
+This matters because the assistant resolver can fall back to a user’s default model. For a strict local assistant, every fallback must stay within that policy; otherwise pause with an understandable explanation. Show where processing actually happened in the result details. Model resolution
+
+Alongside this, extend your existing health and backup work with a synthetic “upload → retrieve → answer → generate file” check and a verified restore exercise for releases. These build on infrastructure already documented. Health checks, deployment lifecycle
+
+For coolness, I would concentrate on these four experiences:
+
+Improvement	What the user experiences	How it extends your roadmap
+“Turn this into an assistant”	After a successful conversation: save the instructions, required knowledge, tools, and a sample test; optionally add a schedule.	Builds on Saved Tasks and Agent Builder. Promote the currently deferred builder helper into a complete journey.
+Three excellent assistant packs	Install a useful assistant, run its included sample, then connect your own sources.	Turns the planned packs and portability into an immediate result. Include prerequisites and tests with each pack.
+A “For you” landing view	“Two reports finished. One action needs approval. One connection needs reconnecting.” Each item opens the relevant work.	Brings existing run history, shared items, and planned approvals together in an everyday entry point.
+Continue the same job across channels	Start by email, review on the phone, approve in the web app, receive the result in Nextcloud—with one consistent history.	Adds continuity to your existing channel coverage, using explicitly linked identities.
+
+My first three packs would be:
+
+Supplier comparison: upload three quotations; receive a calculated Excel comparison, differences, and links back to the supporting passages.
+Service desk assistant: read an incoming request, find relevant knowledge, draft a response, and prepare a ticket for approval.
+Weekly project brief: collect changes from connected sources, explain what changed, and deliver a concise report with evidence.
+
+The supplier comparison would be my flagship for secure compute. It demonstrates document extraction, grounded answers, real calculations, file generation, and controlled delivery in one useful experience. Keep the first compute experience tightly scoped to those outcomes; your planned isolation requirements remain essential. Compute plan
+
+For the next development cycle, I would allocate roughly 60% to reliability and activation, 30% to these complete workflows, and 10% to customer-requested integrations. Keep the form-first assistant builder and step-list workflow editor. Measure success by whether a new user can complete a useful task within five minutes—and confidently let it run again tomorrow.

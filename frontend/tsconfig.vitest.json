@@ -2,8 +2,7 @@
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
     "composite": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vitest/globals"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": ["tests/**/*.ts", "tests/**/*.tsx", "src/**/*.ts", "src/**/*.vue"]
 }

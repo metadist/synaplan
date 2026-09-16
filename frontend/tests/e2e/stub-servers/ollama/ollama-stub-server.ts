@@ -321,6 +321,13 @@ const server = http.createServer((req, res) => {
   })
 })
 
+// Playwright APIRequestContext reuses HTTP keep-alive sockets. Node's default
+// keepAliveTimeout (5s) closes an idle connection opened in beforeAll; the
+// next GET /__requests then fails with "socket hang up". Keep the socket
+// alive past the longest E2E chat wait. headersTimeout must stay larger.
+server.keepAliveTimeout = 65_000
+server.headersTimeout = 70_000
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Ollama stub listening on ${PORT}`)
 })

@@ -16,6 +16,14 @@ set -euo pipefail
 
 echo "🔧 [dev] Checking Composer dependencies..."
 
+# The backend source tree (incl. vendor/) is bind-mounted from the host, so its
+# files are owned by the host user's UID, not root. Composer runs here as root,
+# and packages installed from source carry a .git dir; git 2.35+ then refuses
+# any operation on a repo it does not own ("detected dubious ownership"), which
+# aborts `composer install` when a package needs updating and crash-loops the
+# container. Trust the bind-mounted vendor tree so composer's git operations work.
+git config --global --add safe.directory '*' 2>/dev/null || true
+
 if [ -f composer.lock ]; then
     LOCK_HASH=$(md5sum composer.lock | cut -d' ' -f1)
 else

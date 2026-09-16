@@ -15,6 +15,7 @@
 
         <!-- Dialog -->
         <div
+          ref="panelRef"
           class="relative surface-card rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-scale-in"
           role="dialog"
           aria-modal="true"
@@ -102,18 +103,37 @@ const { dialog, close } = useDialog()
 const { teleportTarget } = useFullscreenTeleportTarget()
 const inputValue = ref('')
 const inputRef = ref<HTMLInputElement>()
+const panelRef = ref<HTMLElement>()
+let previouslyFocused: HTMLElement | null = null
 
-// Reset input value when dialog opens
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+function focusableInPanel(): HTMLElement[] {
+  if (!panelRef.value) return []
+  return Array.from(panelRef.value.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1
+  )
+}
+
+// Reset input value when dialog opens; trap focus inside the panel.
 watch(
   () => dialog.value.isOpen,
   async (isOpen) => {
     if (isOpen) {
+      previouslyFocused =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null
       inputValue.value = dialog.value.defaultValue || ''
+      await nextTick()
       if (dialog.value.type === 'prompt') {
-        await nextTick()
         inputRef.value?.focus()
+      } else {
+        focusableInPanel()[0]?.focus()
       }
+      return
     }
+    previouslyFocused?.focus()
+    previouslyFocused = null
   }
 )
 
@@ -143,6 +163,25 @@ const handleBackdropClick = () => {
 
 const handleGlobalKeydown = (event: KeyboardEvent) => {
   if (!dialog.value.isOpen) return
+
+  if (event.key === 'Tab') {
+    const nodes = focusableInPanel()
+    if (nodes.length === 0) {
+      event.preventDefault()
+      return
+    }
+    const first = nodes[0]
+    const last = nodes[nodes.length - 1]
+    const active = document.activeElement
+    if (event.shiftKey && active === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault()
+      first.focus()
+    }
+    return
+  }
 
   if (event.key === 'Enter' && dialog.value.type === 'confirm') {
     event.preventDefault()

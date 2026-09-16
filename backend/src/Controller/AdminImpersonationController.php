@@ -106,7 +106,13 @@ final class AdminImpersonationController extends AbstractController
         try {
             $this->impersonationService->startImpersonation($admin, $target, $request, $response);
         } catch (AccessDeniedException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_FORBIDDEN);
+            $message = $e->getMessage();
+            $payload = ['error' => $message];
+            if ('iam.impersonationDisabled' === $message) {
+                $payload['code'] = 'iam.impersonationDisabled';
+            }
+
+            return $this->json($payload, Response::HTTP_FORBIDDEN);
         }
 
         return $response;

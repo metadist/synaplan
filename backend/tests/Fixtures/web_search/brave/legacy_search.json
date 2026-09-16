@@ -1,0 +1,25 @@
+{
+    "query": "synaplan open source",
+    "results": [
+        {
+            "title": "Synaplan",
+            "url": "https://www.synaplan.com/",
+            "description": "Open-source AI knowledge platform.",
+            "age": "2 days ago",
+            "language": "en",
+            "profile": {},
+            "thumbnail": null,
+            "extra_snippets": ["RAG with MariaDB VECTOR"]
+        }
+    ],
+    "query_metadata": {
+        "total": 1,
+        "altered": null,
+        "original": "synaplan open source"
+    },
+    "mixed_results": [],
+    "news": [],
+    "videos": [],
+    "faq": [],
+    "timestamp": 1757280000
+}

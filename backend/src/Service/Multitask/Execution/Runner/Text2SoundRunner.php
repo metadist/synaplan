@@ -52,9 +52,10 @@ final readonly class Text2SoundRunner implements TaskRunner
         $text = is_string($text) ? $text : (string) $context->message->getText();
 
         // Strip markdown, <think> blocks, [Memory:ID] badges and other
-        // non-speakable artifacts before TTS (issue #1164) — same treatment
-        // TtsController and StreamController already apply before synthesis.
-        $text = TtsTextSanitizer::sanitize($text);
+        // non-speakable artifacts, then cap at the shared TTS input limit
+        // (issues #1164, #1665). StreamController / WhatsAppService use the
+        // same helper so a long essay does not trip OpenAI's 4096-char max.
+        $text = TtsTextSanitizer::prepareForSynthesis($text);
 
         if ('' === trim($text)) {
             return NodeResult::failed('no text to synthesize');

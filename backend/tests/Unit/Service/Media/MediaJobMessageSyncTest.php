@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Media;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
+use App\Service\File\ThumbnailService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobMessageSync;
@@ -34,6 +35,7 @@ final class MediaJobMessageSyncTest extends TestCase
     private MediaJobRealtimeNotifier&MockObject $realtimeNotifier;
     private MediaJobUsageRecorder&MockObject $usageRecorder;
     private TaskPlanStore&MockObject $taskPlanStore;
+    private ThumbnailService&MockObject $thumbnailService;
     private EntityManagerInterface&MockObject $em;
     private MediaJobMessageSync $sync;
 
@@ -45,6 +47,7 @@ final class MediaJobMessageSyncTest extends TestCase
         $this->realtimeNotifier = $this->createMock(MediaJobRealtimeNotifier::class);
         $this->usageRecorder = $this->createMock(MediaJobUsageRecorder::class);
         $this->taskPlanStore = $this->createMock(TaskPlanStore::class);
+        $this->thumbnailService = $this->createMock(ThumbnailService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
 
         $this->sync = new MediaJobMessageSync(
@@ -54,6 +57,7 @@ final class MediaJobMessageSyncTest extends TestCase
             $this->realtimeNotifier,
             $this->usageRecorder,
             $this->taskPlanStore,
+            $this->thumbnailService,
             $this->em,
             new NullLogger(),
         );
@@ -106,6 +110,44 @@ final class MediaJobMessageSyncTest extends TestCase
     }
 
     /**
+     * #1499: async-generated videos are the common case for video; without a
+     * poster generated + persisted here, BTHUMBPATH stays null forever and the
+     * Generated grid never shows a video frame. Mirror the inline path.
+     */
+    public function testCompletedVideoJobGeneratesAndPersistsPoster(): void
+    {
+        $registered = new File();
+        $this->fileRegistrar->method('register')->willReturn($registered);
+
+        $this->thumbnailService->expects(self::once())
+            ->method('generateThumbnail')
+            ->with('7/2026/07/clip.mp4')
+            ->willReturn('7/2026/07/clip_thumb.jpg');
+
+        $this->sync->syncTerminalState($this->completedJob(
+            MediaJob::TYPE_VIDEO,
+            'a timelapse of a city at night',
+            '/api/v1/files/uploads/7/2026/07/clip.mp4',
+        ));
+
+        self::assertSame('7/2026/07/clip_thumb.jpg', $registered->getThumbPath());
+    }
+
+    /**
+     * Non-video jobs must never trigger ffmpeg poster extraction.
+     */
+    public function testCompletedAudioJobDoesNotGeneratePoster(): void
+    {
+        $this->fileRegistrar->method('register')->willReturn(new File());
+        $this->thumbnailService->expects(self::never())->method('generateThumbnail');
+
+        $this->sync->syncTerminalState($this->completedJob(
+            MediaJob::TYPE_AUDIO,
+            'Hello from Synaplan.',
+        ));
+    }
+
+    /**
      * @param array<string, mixed> $captured
      */
     private function captureRegisterArgs(array &$captured): callable
@@ -125,8 +167,11 @@ final class MediaJobMessageSyncTest extends TestCase
         };
     }
 
-    private function completedJob(string $type, string $prompt): MediaJob
-    {
+    private function completedJob(
+        string $type,
+        string $prompt,
+        string $url = '/api/v1/files/uploads/7/2026/07/voice.mp3',
+    ): MediaJob {
         $job = (new MediaJob('job-key-1'))
             ->setUserId(7)
             ->setType($type)
@@ -134,7 +179,7 @@ final class MediaJobMessageSyncTest extends TestCase
             ->setPrompt($prompt)
             ->setStatus(MediaJob::STATUS_COMPLETED)
             ->setResult([
-                'file' => ['url' => '/api/v1/files/uploads/7/2026/07/voice.mp3', 'type' => $type],
+                'file' => ['url' => $url, 'type' => $type],
             ]);
 
         $message = new Message();

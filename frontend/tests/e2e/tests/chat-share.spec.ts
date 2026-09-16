@@ -61,9 +61,13 @@ test.describe('@ci @smoke Chat Share', () => {
         await topChatRow.locator(selectors.share.chatMenuButton).click()
         await topChatRow.locator(selectors.share.chatShareButton).click()
       }
-      await page
-        .locator(selectors.share.shareModal)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      const iamModal = page.locator(selectors.share.iamShareModal)
+      const publicModal = page.locator(selectors.share.shareModal)
+      await iamModal.or(publicModal).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      if (await iamModal.isVisible()) {
+        await page.locator(selectors.share.iamPublicLink).click()
+      }
+      await publicModal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     })
 
     await test.step('Create share link and wait for share terminal state', async () => {

@@ -4,15 +4,23 @@ declare(strict_types=1);
 
 namespace App\Tests\Characterization;
 
+use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\Agent\AgentPinResolver;
+use App\Service\File\Office\OfficeConverterClient;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
+use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterService;
+use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Tests\Characterization\Support\RoutingSnapshot;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -120,6 +128,7 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'cmd_web', 'text' => '/web example.com', 'language' => 'en'],
             ['id' => 'cmd_list', 'text' => '/list', 'language' => 'en'],
             ['id' => 'cmd_docs', 'text' => '/docs sort my files', 'language' => 'en'],
+            ['id' => 'cmd_help', 'text' => '/help', 'language' => 'en'],
 
             // ---- Again overrides (fast-path off, like the existing override tests) ----
             ['id' => 'again_prompt_override', 'text' => 'redo that', 'language' => 'en', 'fastPath' => false, 'meta' => ['PROMPTID' => 'tools:pic']],
@@ -130,6 +139,24 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'attach_pdf', 'text' => 'Summarize this', 'language' => 'en', 'files' => [['type' => 'pdf', 'name' => 'report.pdf']]],
             ['id' => 'attach_docx', 'text' => 'What is in here?', 'language' => 'en', 'files' => [['type' => 'docx', 'name' => 'contract.docx']]],
             ['id' => 'attach_audio_mp3', 'text' => 'Transcribe', 'language' => 'de', 'files' => [['type' => 'mp3', 'name' => 'voice.mp3']]],
+            ['id' => 'attach_merge_pdf', 'text' => 'führe beide dateien in eine pdf zusammen', 'language' => 'de', 'files' => [
+                ['type' => 'xlsx', 'name' => 'Finanzmodell.xlsx'],
+                ['type' => 'pdf', 'name' => 'Finanzmodell.pdf'],
+            ]],
+            ['id' => 'attach_export_pdf', 'text' => 'hieraus eine pdf', 'language' => 'de', 'files' => [
+                ['type' => 'xlsx', 'name' => 'Finanzmodell.xlsx'],
+            ]],
+            // Neither of these is a merge: the first is a save_to_folder
+            // request, the second plausibly wants one PDF per file. Both stay
+            // on analyzefile so the planner can decide.
+            ['id' => 'attach_save_pdfs_to_folder', 'text' => 'Speichere die PDFs im Ordner Projekte', 'language' => 'de', 'files' => [
+                ['type' => 'pdf', 'name' => 'a.pdf'],
+                ['type' => 'pdf', 'name' => 'b.pdf'],
+            ]],
+            ['id' => 'attach_convert_both_to_pdf', 'text' => 'convert both files to PDF', 'language' => 'en', 'files' => [
+                ['type' => 'xlsx', 'name' => 'sheet.xlsx'],
+                ['type' => 'docx', 'name' => 'text.docx'],
+            ]],
 
             // ---- Sorter-driven: media generation params — migration-risk #3 ----
             ['id' => 'sort_image', 'text' => 'make an image of a cat', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image']],
@@ -170,6 +197,17 @@ final class RoutingCharacterizationTest extends TestCase
             // A sorter that never voted (older seeded prompt) stays null so the
             // planner keeps deciding — this is the safe fallback.
             ['id' => 'sort_no_step_vote', 'text' => 'tell me about the weather on mars', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en']],
+
+            // ---- Phase M acceptance utterances (plan 10 §1) — VERBATIM ----
+            // These four sentences are the product acceptance bar for the
+            // chat-actions phase. They are quoted word for word so any change
+            // to how the classifier treats them is an explicit, reviewed diff.
+            // All four are multi-deliverable requests: the sorter votes
+            // multi_step=true and the planner builds the DAG.
+            ['id' => 'u1_outlook_calendar_write', 'text' => "Create a meeting reminder for tomorrow at 10am for 'Marketing Strategy' and put it into my Outlook", 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => true]],
+            ['id' => 'u2_mail_me_the_invite', 'text' => "Create a meeting reminder for tomorrow at 10am for 'Marketing Strategy' and mail the calendar entry to me", 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => true]],
+            ['id' => 'u3_mail_search_summarize', 'text' => 'What is the latest mail of Oliver Braun regarding FPSenergy, summarize that for me', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => true]],
+            ['id' => 'u4_document_to_target', 'text' => 'Create a marketing plan document with a solid TOC for my company and put it into: Nextcloud', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'officemaker', 'language' => 'en', 'multi_step' => true]],
 
             // ---- Sorter-driven: CUSTOM user topic — migration-risk #1 ----
             // A user-authored BPROMPTS topic (BOWNERID>0) is NOT in the canonical
@@ -236,6 +274,13 @@ final class RoutingCharacterizationTest extends TestCase
             }
         );
 
+        // The attachment merge/export layer only routes when the multi-task
+        // engine can execute it and the office engine can convert (#1694), so
+        // both are on here — otherwise those corpus cases would lock the
+        // fallback instead of the contract.
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(true);
+
         $classifier = new MessageClassifier(
             $sorter,
             $metaRepo,
@@ -243,11 +288,32 @@ final class RoutingCharacterizationTest extends TestCase
             $configRepo,
             $em,
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
+            officeConverter: $converter,
+            multitaskConfig: new MultitaskRoutingConfig($configRepo),
         );
 
         $message = $this->buildMessage($case);
 
         return $classifier->classify($message);
+    }
+
+    /**
+     * The Phase 9 deferral switched off: this snapshot locks the routing
+     * contract of the SORTER-based cascade, and a deferred turn deliberately
+     * has no classification to lock (the answering call decides).
+     */
+    private function disabledNativeToolRouting(): NativeToolRoutingConfig
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn(null);
+
+        return new NativeToolRoutingConfig($configRepo);
     }
 
     /**

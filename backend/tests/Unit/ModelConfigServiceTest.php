@@ -6,15 +6,25 @@ use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
+use App\Entity\GroupConfig;
+use App\Entity\GroupMember;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
+use App\Repository\GroupConfigRepository;
+use App\Repository\GroupMemberRepository;
+use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
+use App\Service\Config\LayeredConfigResolver;
+use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\ModelConfigService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
+use Psr\Log\NullLogger;
 
 class ModelConfigServiceTest extends TestCase
 {
@@ -28,6 +38,7 @@ class ModelConfigServiceTest extends TestCase
     private CacheItemPoolInterface&MockObject $cache;
     private ProviderRegistry&MockObject $providerRegistry;
     private OllamaModelInventory&MockObject $ollamaModelInventory;
+    private ModelHealthRepository&MockObject $modelHealthRepository;
     private ModelConfigService $service;
     private CacheItemInterface&MockObject $cacheItem;
 
@@ -46,13 +57,18 @@ class ModelConfigServiceTest extends TestCase
 
         $this->ollamaModelInventory = $this->createMock(OllamaModelInventory::class);
 
+        $this->modelHealthRepository = $this->createMock(ModelHealthRepository::class);
+        $this->modelHealthRepository->method('findOfflineModelIds')->willReturn([]);
+
         $this->service = new ModelConfigService(
             $this->configRepository,
             $this->modelRepository,
             $this->userRepository,
             $this->cache,
             $this->providerRegistry,
-            $this->ollamaModelInventory
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
         );
     }
 
@@ -156,6 +172,8 @@ class ModelConfigServiceTest extends TestCase
         $capability = 'CHAT';
         $userId = 1;
         $expectedModelId = 42;
+
+        $this->givenModels([$expectedModelId => 'Ollama']);
 
         // Mock user-specific config
         $config = $this->createMock(Config::class);
@@ -272,14 +290,75 @@ class ModelConfigServiceTest extends TestCase
 
     /**
      * The test catalog binds capabilities to negative placeholder BIDs that
-     * have no BMODELS row. Those must resolve unchanged.
+     * have no BMODELS row. Those mean "let the provider registry decide" and
+     * must resolve unchanged.
      */
-    public function testGetDefaultModelKeepsAnOverridePointingAtAnUnknownModel(): void
+    public function testGetDefaultModelKeepsAnOverridePointingAtAPlaceholderId(): void
     {
         $this->givenModels([]);
         $this->givenDefaultModelRows([1 => -1, 0 => 9]);
 
         self::assertSame(-1, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * S5 wires LayeredConfigResolver + GroupPolicyService into getDefaultModel.
+     * The policy parser must still accept TestProvider placeholder BIDs (-1…-7)
+     * or CI/E2E silently route at a cloud model (HuggingFace 401 on #1719).
+     */
+    public function testGetDefaultModelKeepsPlaceholderIdThroughGroupPolicyParser(): void
+    {
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('chain')->with(1, 'DEFAULTMODEL', 'CHAT')->willReturn(['-1']);
+        $resolver->method('allowedCatalogKeys')->willReturn([]);
+
+        $policy = new GroupPolicyService(
+            $resolver,
+            $this->createMock(GroupConfigRepository::class),
+            $this->configRepository,
+            $this->modelRepository,
+            $this->createMock(AuditLogWriter::class),
+        );
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+            $policy,
+        );
+        $this->givenModels([]);
+
+        self::assertSame(-1, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * A positive BID with no row is a deleted model, not a placeholder. Passing
+     * it on leaves the caller with a model id but no provider and no model
+     * name, so the registry quietly answers from its own default — the user
+     * gets a different model than the one configured and nothing says so.
+     */
+    public function testGetDefaultModelSkipsABindingWhoseModelRowIsGone(): void
+    {
+        $this->givenModels([255 => 'OpenAI']);
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([1 => 9, 0 => 255]);
+
+        self::assertSame(255, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    public function testResolveUsableModelIdSwapsAnOverrideWhoseModelRowIsGone(): void
+    {
+        $this->givenModels([255 => 'OpenAI']);
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([0 => 255]);
+
+        self::assertSame(255, $this->service->resolveUsableModelId(9, 'CHAT', 1));
     }
 
     /**
@@ -326,14 +405,107 @@ class ModelConfigServiceTest extends TestCase
     }
 
     /**
+     * The production failure this guards against: Groq shut down
+     * llama-3.3-70b-versatile (BID 9), Version20260819080000 deactivated the
+     * row, and every account still bound to it kept sending the dead upstream
+     * id — one hard "model_not_found" per message, including for anonymous
+     * visitors on the guest path.
+     */
+    public function testGetDefaultModelSkipsADeactivatedUserOverride(): void
+    {
+        $this->givenModels([9 => 'Groq', 255 => 'OpenAI'], [], inactiveModelIds: [9]);
+        $this->givenUsableProviders(['groq', 'openai']);
+        $this->givenDefaultModelRows([1 => 9, 0 => 255]);
+
+        self::assertSame(255, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * The global row used to be returned unchecked, so a whole install could
+     * sit on a retired model with no per-user binding to save it.
+     */
+    public function testGetDefaultModelSkipsADeactivatedGlobalBinding(): void
+    {
+        $this->givenModels([9 => 'Groq', 324 => 'Groq'], [], inactiveModelIds: [9]);
+        $this->givenUsableProviders(['groq']);
+        $this->givenDefaultModelRows([0 => 9]);
+        $this->givenCapabilityCatalog('chat', [324 => 'Groq']);
+
+        self::assertSame(324, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * Both bindings dead: rather than fail the request, pick a live model of
+     * the same capability.
+     */
+    public function testGetDefaultModelFallsBackToALiveModelWhenEveryBindingIsDeactivated(): void
+    {
+        $this->givenModels([9 => 'Groq', 17 => 'Groq', 324 => 'Groq'], [], inactiveModelIds: [9, 17]);
+        $this->givenUsableProviders(['groq']);
+        $this->givenDefaultModelRows([1 => 9, 0 => 17]);
+        $this->givenCapabilityCatalog('chat', [324 => 'Groq']);
+
+        self::assertSame(324, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * No live candidate either — keep reporting the configured binding instead
+     * of returning null, so callers can still name the model they meant to use.
+     */
+    public function testGetDefaultModelKeepsTheDeadBindingWhenNoLiveModelExists(): void
+    {
+        $this->givenModels([9 => 'Groq'], [], inactiveModelIds: [9]);
+        $this->givenUsableProviders(['groq']);
+        $this->givenDefaultModelRows([1 => 9]);
+
+        self::assertSame(9, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * A widget's aiModelId or a prompt's aiModel override is read AHEAD of the
+     * default, so it has to be revalidated on its own.
+     */
+    public function testResolveUsableModelIdSwapsADeactivatedOverrideForTheDefault(): void
+    {
+        $this->givenModels([9 => 'Groq', 255 => 'OpenAI'], [], inactiveModelIds: [9]);
+        $this->givenUsableProviders(['groq', 'openai']);
+        $this->givenDefaultModelRows([0 => 255]);
+
+        self::assertSame(255, $this->service->resolveUsableModelId(9, 'CHAT', 1));
+    }
+
+    public function testResolveUsableModelIdKeepsAnOverrideThatStillWorks(): void
+    {
+        $this->givenModels([255 => 'OpenAI']);
+        $this->givenUsableProviders(['openai']);
+
+        self::assertSame(255, $this->service->resolveUsableModelId(255, 'CHAT', 1));
+    }
+
+    /**
+     * Nothing to validate — a caller that never picked a model must not be
+     * handed one behind its back.
+     */
+    public function testResolveUsableModelIdPassesNullThrough(): void
+    {
+        $this->givenModels([]);
+
+        self::assertNull($this->service->resolveUsableModelId(null, 'CHAT', 1));
+    }
+
+    /**
      * @param array<int, string> $servicesByModelId
      * @param array<int, string> $providerIdsByModelId
+     * @param list<int>          $inactiveModelIds     BIDs to hand back with BACTIVE = 0
      */
-    private function givenModels(array $servicesByModelId, array $providerIdsByModelId = []): void
-    {
+    private function givenModels(
+        array $servicesByModelId,
+        array $providerIdsByModelId = [],
+        array $inactiveModelIds = [],
+    ): void {
         $this->modelRepository
             ->method('find')
-            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId): ?Model {
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds): ?Model {
                 if (!isset($servicesByModelId[$modelId])) {
                     return null;
                 }
@@ -341,21 +513,53 @@ class ModelConfigServiceTest extends TestCase
                 $model = $this->createMock(Model::class);
                 $model->method('getService')->willReturn($servicesByModelId[$modelId]);
                 $model->method('getProviderId')->willReturn($providerIdsByModelId[$modelId] ?? '');
+                $model->method('getActive')->willReturn(in_array($modelId, $inactiveModelIds, true) ? 0 : 1);
 
                 return $model;
             });
     }
 
     /**
-     * @param list<string> $names
+     * Catalog rows the last-resort capability pick can choose from. Without
+     * this, findByTag() returns an empty list and getDefaultModel() falls
+     * through to the configured binding.
+     *
+     * @param array<int, string> $servicesByModelId
      */
-    private function givenUsableProviders(array $names): void
+    private function givenCapabilityCatalog(string $tag, array $servicesByModelId): void
+    {
+        $models = [];
+        foreach ($servicesByModelId as $modelId => $service) {
+            $model = $this->createMock(Model::class);
+            $model->method('getId')->willReturn($modelId);
+            $model->method('getService')->willReturn($service);
+            $model->method('getProviderId')->willReturn('');
+            $model->method('getActive')->willReturn(1);
+            $models[] = $model;
+        }
+
+        $this->modelRepository
+            ->method('findByTag')
+            ->willReturnCallback(static fn (string $requested): array => $requested === $tag ? $models : []);
+    }
+
+    /**
+     * @param list<string> $names
+     * @param list<string> $unavailable registered providers that currently have no credentials
+     */
+    private function givenUsableProviders(array $names, array $unavailable = []): void
     {
         $providers = [];
         foreach ($names as $name) {
             $provider = $this->createMock(ProviderMetadataInterface::class);
             $provider->method('getName')->willReturn($name);
             $provider->method('isAvailable')->willReturn(true);
+            $providers[$name] = $provider;
+        }
+        foreach ($unavailable as $name) {
+            $provider = $this->createMock(ProviderMetadataInterface::class);
+            $provider->method('getName')->willReturn($name);
+            $provider->method('isAvailable')->willReturn(false);
             $providers[$name] = $provider;
         }
 
@@ -820,6 +1024,7 @@ class ModelConfigServiceTest extends TestCase
         $model = $this->createMock(Model::class);
         $model->method('getService')->willReturn('Groq');
         $model->method('getProviderId')->willReturn('gpt-oss-120b');
+        $model->method('getActive')->willReturn(1);
 
         $this->modelRepository
             ->expects(self::any())
@@ -834,6 +1039,220 @@ class ModelConfigServiceTest extends TestCase
             'provider' => 'groq',
             'model_id' => $userMemModelId,
         ], $result);
+    }
+
+    public function testGetToolsModelConfigPrefersUserToolsOverGlobal(): void
+    {
+        $userId = 42;
+        $userToolsModelId = 221;
+
+        $userToolsConfig = $this->createMock(Config::class);
+        $userToolsConfig->method('getValue')->willReturn((string) $userToolsModelId);
+
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => $userId,
+                'group' => 'DEFAULTMODEL',
+                'setting' => 'TOOLS',
+            ])
+            ->willReturn($userToolsConfig);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($userToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig($userId);
+
+        $this->assertSame([
+            'provider' => 'groq',
+            'model' => 'llama-3.3-70b-versatile',
+            'model_id' => $userToolsModelId,
+        ], $result);
+    }
+
+    public function testGetToolsModelConfigWithoutAUserLooksUpGlobalOnly(): void
+    {
+        $globalToolsModelId = 99;
+
+        $globalToolsConfig = $this->createMock(Config::class);
+        $globalToolsConfig->method('getValue')->willReturn((string) $globalToolsModelId);
+
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => 0,
+                'group' => 'DEFAULTMODEL',
+                'setting' => 'TOOLS',
+            ])
+            ->willReturn($globalToolsConfig);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($globalToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig();
+
+        $this->assertSame($globalToolsModelId, $result['model_id']);
+    }
+
+    public function testGetToolsModelConfigForwardsUserIdToLayeredResolver(): void
+    {
+        $userId = 9;
+        $groupToolsModelId = 331;
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->expects(self::once())
+            ->method('chain')
+            ->with($userId, 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn([(string) $groupToolsModelId]);
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+        );
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($groupToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig($userId);
+
+        $this->assertSame($groupToolsModelId, $result['model_id']);
+    }
+
+    public function testGetToolsModelConfigWithoutAUserAsksTheResolverWithNull(): void
+    {
+        $globalToolsModelId = 99;
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->expects(self::once())
+            ->method('chain')
+            ->with(null, 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn([(string) $globalToolsModelId]);
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+        );
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($globalToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig();
+
+        $this->assertSame($globalToolsModelId, $result['model_id']);
+    }
+
+    /**
+     * Issue #1874: DEFAULTMODEL.TOOLS is on the group-policy allow-list.
+     * Mocking LayeredConfigResolver::chain() would still pass if the group
+     * layer never read BGROUPCONFIG. Wire a real resolver so a member's group
+     * TOOLS id wins over the global row, and a null user stays global-only.
+     */
+    public function testGetToolsModelConfigHonoursGroupPolicyOverGlobal(): void
+    {
+        $userId = 9;
+        $groupToolsModelId = 331;
+        $globalToolsModelId = 99;
+
+        $groupConfig = $this->createMock(GroupConfigRepository::class);
+        $members = $this->createMock(GroupMemberRepository::class);
+        $iam = $this->createMock(IamConfig::class);
+        $iam->method('isGroupPoliciesEnabled')->willReturn(true);
+
+        $this->configRepository->method('getValue')->willReturn(null);
+        $global = new Config();
+        $global->setOwnerId(0);
+        $global->setGroup('DEFAULTMODEL');
+        $global->setSetting('TOOLS');
+        $global->setValue((string) $globalToolsModelId);
+        $this->configRepository->expects(self::atLeastOnce())
+            ->method('findByOwnerGroupAndSetting')
+            ->with(0, 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn($global);
+
+        $members->expects(self::once())
+            ->method('findByUserId')
+            ->with($userId)
+            ->willReturn([new GroupMember(4, $userId)]);
+        $groupRow = new GroupConfig();
+        $groupRow->setGroupId(4);
+        $groupRow->setGroup('DEFAULTMODEL');
+        $groupRow->setSetting('TOOLS');
+        $groupRow->setValue((string) $groupToolsModelId);
+        $groupConfig->expects(self::once())
+            ->method('getForGroups')
+            ->with([4], 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn([$groupRow]);
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            new LayeredConfigResolver($this->configRepository, $groupConfig, $members, $iam),
+        );
+
+        $this->givenModels([
+            $groupToolsModelId => 'Groq',
+            $globalToolsModelId => 'Groq',
+        ], [
+            $groupToolsModelId => 'llama-3.3-70b-versatile',
+            $globalToolsModelId => 'llama-3.3-70b-versatile',
+        ]);
+
+        $forMember = $this->service->getToolsModelConfig($userId);
+        $withoutUser = $this->service->getToolsModelConfig();
+
+        $this->assertSame($groupToolsModelId, $forMember['model_id']);
+        $this->assertSame($globalToolsModelId, $withoutUser['model_id']);
     }
 
     public function testGetMemoryModelConfigFallsThroughGlobalMemUserChatToGlobalChat(): void
@@ -907,92 +1326,93 @@ class ModelConfigServiceTest extends TestCase
     }
 
     /**
-     * The rolling conversation summarizer must honour an explicit
-     * DEFAULTMODEL.SUMMARIZE override before anything else — this is how an
-     * operator points the condensing step at e.g. a GPT-OSS-120B model.
-     * (#1320: key is SUMMARIZE end to end — seeder, reader, ChatRunner.).
+     * Document summaries and rolling condensation use Text Analytics
+     * (DEFAULTMODEL.ANALYZE). The leftover SUMMARIZE slot is never read —
+     * even when a Groq row is still stored there.
      */
-    public function testGetSummaryModelConfigPrefersExplicitSummaryModel(): void
+    public function testGetSummaryModelConfigPrefersTextAnalyticsModel(): void
     {
         $userId = 5;
-        $summaryModelId = 300;
+        $analyzeModelId = 300;
 
-        $summaryConfig = $this->createMock(Config::class);
-        $summaryConfig->method('getValue')->willReturn((string) $summaryModelId);
+        $analyzeConfig = $this->createMock(Config::class);
+        $analyzeConfig->method('getValue')->willReturn((string) $analyzeModelId);
 
-        // First lookup (user SUMMARIZE) wins — no fallback lookups happen.
+        // First lookup (user ANALYZE) wins — SUMMARIZE is never consulted.
         $this->configRepository
             ->expects($this->once())
             ->method('findOneBy')
             ->with([
                 'ownerId' => $userId,
                 'group' => 'DEFAULTMODEL',
-                'setting' => 'SUMMARIZE',
+                'setting' => 'ANALYZE',
             ])
-            ->willReturn($summaryConfig);
+            ->willReturn($analyzeConfig);
 
         $model = $this->createMock(Model::class);
-        $model->method('getService')->willReturn('Groq');
-        $model->method('getProviderId')->willReturn('gpt-oss-120b');
+        $model->method('getService')->willReturn('Anthropic');
+        $model->method('getProviderId')->willReturn('claude-sonnet-5');
+        $model->method('getActive')->willReturn(1);
 
         $this->modelRepository
             ->expects(self::any())
             ->method('find')
-            ->with($summaryModelId)
+            ->with($analyzeModelId)
             ->willReturn($model);
 
         $this->assertSame([
-            'model' => 'gpt-oss-120b',
-            'provider' => 'groq',
-            'model_id' => $summaryModelId,
+            'model' => 'claude-sonnet-5',
+            'provider' => 'anthropic',
+            'model_id' => $analyzeModelId,
         ], $this->service->getSummaryModelConfig($userId));
     }
 
     /**
-     * With no SUMMARIZE override the summarizer defaults to the sorting (SORT)
-     * model — the cheap/fast model requested for condensing by default.
+     * With no ANALYZE binding the summarizer falls back to CHAT — never the
+     * leftover SUMMARIZE slot or the Sorting model.
      */
-    public function testGetSummaryModelConfigFallsBackToSortModel(): void
+    public function testGetSummaryModelConfigFallsBackToChatModel(): void
     {
         $userId = 9;
-        $sortModelId = 73;
+        $chatModelId = 73;
 
-        $sortConfig = $this->createMock(Config::class);
-        $sortConfig->method('getValue')->willReturn((string) $sortModelId);
+        $chatConfig = $this->createMock(Config::class);
+        $chatConfig->method('getValue')->willReturn((string) $chatModelId);
 
-        // Chain: user SUMMARIZE → global SUMMARIZE → user SORT (returns here).
+        // Chain: user ANALYZE → global ANALYZE → user CHAT (returns here).
         $this->configRepository
             ->expects($this->exactly(3))
             ->method('findOneBy')
-            ->willReturnCallback(function (array $criteria) use ($userId, $sortConfig) {
+            ->willReturnCallback(function (array $criteria) use ($userId, $chatConfig) {
                 static $calls = 0;
                 ++$calls;
 
                 $expected = [
-                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE'],
-                    ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE'],
-                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT'],
+                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE'],
+                    ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE'],
+                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT'],
                 ];
 
                 self::assertSame($expected[$calls - 1], $criteria, "Summary fallback step {$calls}");
 
-                return 3 === $calls ? $sortConfig : null;
+                return 3 === $calls ? $chatConfig : null;
             });
 
         $model = $this->createMock(Model::class);
-        $model->method('getService')->willReturn('Groq');
-        $model->method('getProviderId')->willReturn('llama-3.3-70b');
+        $model->method('getService')->willReturn('Anthropic');
+        $model->method('getProviderId')->willReturn('claude-sonnet-5');
+        $model->method('getActive')->willReturn(1);
 
         $this->modelRepository
             ->expects(self::any())
             ->method('find')
-            ->with($sortModelId)
+            ->with($chatModelId)
             ->willReturn($model);
 
         $this->assertSame([
-            'model' => 'llama-3.3-70b',
-            'provider' => 'groq',
-            'model_id' => $sortModelId,
+            'model' => 'claude-sonnet-5',
+            'provider' => 'anthropic',
+            'model_id' => $chatModelId,
         ], $this->service->getSummaryModelConfig($userId));
     }
 
@@ -1033,5 +1453,92 @@ class ModelConfigServiceTest extends TestCase
             $result,
             'Web channel should return userId regardless of phone verification status'
         );
+    }
+
+    public function testInitializeNewUserDefaultsDoesNotWritePerUserRows(): void
+    {
+        $this->configRepository->expects($this->never())->method('findBy');
+        $this->configRepository->expects($this->never())->method('setValue');
+        $this->configRepository->expects($this->never())->method('removeAll');
+
+        $this->service->initializeNewUserDefaults(42);
+    }
+
+    public function testResetUserDefaultsWritesOnlyUsableRecommendedModels(): void
+    {
+        $recommended = \App\Seed\DefaultModelConfigSeeder::getRecommendedDefaults();
+        $servicesById = [];
+        $keyToService = [
+            'anthropic:claude-sonnet-5:chat' => 'Anthropic',
+            'groq:openai/gpt-oss-120b:chat' => 'Groq',
+            'groq:openai/gpt-oss-120b:mem' => 'Groq',
+            'google:gemini-3.1-flash-image-preview:text2pic' => 'Google',
+            'google:veo-3.1-generate-preview:text2vid' => 'Google',
+            'higgsfield:higgsfield-ai/dop/standard:text2vid' => 'Higgsfield',
+            'google:gemini-2.5-flash-preview-tts:text2sound' => 'Google',
+            'groq:qwen/qwen3.6-27b:pic2text' => 'Groq',
+            'groq:whisper-large-v3:sound2text' => 'Groq',
+            'ollama:bge-m3:vectorize' => 'Ollama',
+        ];
+        foreach ($keyToService as $key => $service) {
+            $bid = \App\Model\ModelCatalog::findBidByKey($key);
+            $this->assertNotNull($bid, "catalog key $key must resolve");
+            $servicesById[$bid] = $service;
+        }
+
+        $this->givenModels($servicesById);
+        $this->givenUsableProviders(['groq']);
+        $this->modelRepository->method('findByTag')->willReturn([]);
+
+        $this->configRepository->method('findBy')->willReturn([]);
+        $this->configRepository->expects($this->once())->method('removeAll')->with([]);
+
+        $written = [];
+        $this->configRepository
+            ->expects($this->atLeastOnce())
+            ->method('setValue')
+            ->willReturnCallback(function (int $ownerId, string $group, string $setting, string $value) use (&$written): Config {
+                $this->assertSame(7, $ownerId);
+                $this->assertSame('DEFAULTMODEL', $group);
+                $written[$setting] = (int) $value;
+
+                return $this->createMock(Config::class);
+            });
+
+        $result = $this->service->resetUserDefaults(7);
+
+        $this->assertSame($written, $result['defaults']);
+        $this->assertArrayNotHasKey('VECTORIZE', $written);
+        $this->assertArrayNotHasKey('CHAT', $written, 'Anthropic CHAT must not be frozen when the provider has no key');
+        $this->assertArrayNotHasKey('TEXT2PIC', $written, 'Google image models must not be written without a key');
+        $this->assertArrayHasKey('SORT', $written);
+        $this->assertSame($recommended['SORT'], $written['SORT']);
+        $this->assertArrayHasKey('SOUND2TEXT', $written);
+        $this->assertSame($recommended['SOUND2TEXT'], $written['SOUND2TEXT']);
+        foreach ($written as $capability => $modelId) {
+            $this->assertSame('Groq', $servicesById[$modelId], "$capability must resolve to a Groq model");
+        }
+    }
+
+    /**
+     * isModelUsable() treats an empty usable list as "cannot tell". On a
+     * real install the registry is populated and [] means every provider
+     * lacks credentials — writing the seed catalog would re-freeze dead
+     * Claude/Gemini rows. Clear overrides and write nothing instead.
+     */
+    public function testResetUserDefaultsWritesNothingWhenRegisteredProvidersAreAllUnavailable(): void
+    {
+        $existing = [$this->createMock(Config::class)];
+        $this->configRepository->method('findBy')->willReturn($existing);
+        $this->configRepository->expects($this->once())->method('removeAll')->with($existing);
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $this->givenUsableProviders([], ['anthropic', 'groq', 'google', 'openai']);
+
+        $result = $this->service->resetUserDefaults(7);
+
+        $this->assertSame(1, $result['removed']);
+        $this->assertSame(0, $result['written']);
+        $this->assertSame([], $result['defaults']);
     }
 }

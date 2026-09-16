@@ -79,6 +79,46 @@ final class ProviderKeyValidatorTest extends TestCase
         self::assertFalse($validator->validate('not-a-provider', 'some-key')['ok']);
     }
 
+    /**
+     * TheHive has no free authenticated endpoint: the key is accepted as-is,
+     * but the result must say so — "valid" would be a lie.
+     */
+    public function testUntestableProviderIsAcceptedWithoutHttpAndFlaggedUntested(): void
+    {
+        $client = new MockHttpClient(function (): MockResponse {
+            self::fail('no HTTP request may be sent for a provider without a validation endpoint');
+        });
+
+        $result = $this->makeValidator($client)->validate('thehive', 'hive-key');
+
+        self::assertTrue($result['ok']);
+        self::assertFalse($result['tested']);
+    }
+
+    public function testSecretProviderInterpolatesBothHalvesAndRefusesAHalfPair(): void
+    {
+        $seenAuth = null;
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$seenAuth): MockResponse {
+            foreach ($options['headers'] as $header) {
+                if (str_starts_with(strtolower($header), 'authorization:')) {
+                    $seenAuth = $header;
+                }
+            }
+
+            return new MockResponse('', ['http_code' => 200]);
+        });
+        $validator = $this->makeValidator($client);
+
+        $result = $validator->validate('higgsfield', 'hf-key', 'hf-secret');
+        self::assertTrue($result['ok']);
+        self::assertTrue($result['tested']);
+        self::assertSame('Authorization: Key hf-key:hf-secret', $seenAuth);
+
+        $half = $validator->validate('higgsfield', 'hf-key');
+        self::assertFalse($half['ok']);
+        self::assertStringContainsString('secret', $half['error'] ?? '');
+    }
+
     public function testTransportErrorIsReportedNotThrown(): void
     {
         $client = new MockHttpClient(function (): MockResponse {

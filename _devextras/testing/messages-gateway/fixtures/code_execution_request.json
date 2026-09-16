@@ -1,0 +1,16 @@
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 256,
+  "messages": [
+    {
+      "role": "user",
+      "content": "Turn this CSV into a chart."
+    }
+  ],
+  "tools": [
+    {
+      "type": "code_execution_20250522",
+      "name": "code_execution"
+    }
+  ]
+}

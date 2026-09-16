@@ -32,11 +32,21 @@ final readonly class DefaultModelConfigSeeder
     private const PROD_MODEL_DEFAULTS = [
         ['group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'modelKey' => 'anthropic:claude-sonnet-5:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'modelKey' => 'anthropic:claude-sonnet-5:chat'],
+        // The routing prompts in PromptCatalog (tools:sort and the multitask
+        // planner) are written and regression-tested against gpt-oss-120b: it
+        // returns the strict JSON contract reliably and fast. Heavier chat
+        // models reason past the format and degrade routing install-wide, so
+        // this binding is a tuned pair with the prompt, not a taste. Changing
+        // it needs the prompts re-validated AND a migration — an existing
+        // install keeps its stored row (see Version20260828120000).
         ['group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         // Multi-task routing planner. Same fast/cheap tier as SORT but a
         // dedicated binding so it can be tuned without touching the legacy
         // sorter. TaskPlanner falls back to SORT if this row is absent.
         ['group' => 'DEFAULTMODEL', 'setting' => 'PLAN',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
+        // Leftover slot: not on the AI Models purpose list and unread at
+        // runtime (summaries use ANALYZE). Kept insert-if-missing so existing
+        // installs are not rewritten.
         ['group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE',  'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         // Phase 2d: dedicated MEM tag so memory extraction never inherits the
         // user's heavy chat model (Gemini Pro etc.). Resolves to the new
@@ -54,7 +64,7 @@ final readonly class DefaultModelConfigSeeder
         // Applied via "select suggested models" / new-user defaults; existing
         // installs are not silently rewritten (seeder is insert-if-missing).
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'modelKey' => 'google:gemini-2.5-flash-preview-tts:text2sound'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'modelKey' => 'groq:meta-llama/llama-4-scout-17b-16e-instruct:pic2text'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'modelKey' => 'groq:qwen/qwen3.6-27b:pic2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'modelKey' => 'groq:whisper-large-v3:sound2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'modelKey' => 'anthropic:claude-sonnet-5:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',  'modelKey' => 'ollama:bge-m3:vectorize'],

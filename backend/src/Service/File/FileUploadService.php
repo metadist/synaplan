@@ -7,6 +7,7 @@ namespace App\Service\File;
 use App\Entity\File;
 use App\Entity\User;
 use App\Repository\FileRepository;
+use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
@@ -28,6 +29,7 @@ final readonly class FileUploadService
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
     ) {
     }
 
@@ -282,6 +284,13 @@ final readonly class FileUploadService
             return $result;
         }
 
+        // Archives such as .jar may be stored and attached to a chat, but
+        // Tika would unzip them. Never extract or vectorize. Mark extracted
+        // so the file picker's post-upload poll treats the upload as finished.
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            return array_merge($result, $this->completeStoreOnly($file));
+        }
+
         $result = $this->extractText($file, $storageResult['path'], $fileExtension, $user, $processLevel, $result);
         if (!$result['success'] || 'extract' === $processLevel) {
             return $result;
@@ -289,7 +298,16 @@ final readonly class FileUploadService
 
         $extractedText = $file->getFileText();
         if (in_array($processLevel, ['vectorize', 'full'], true) && '' !== trim($extractedText)) {
-            $result = $this->vectorize($file, $extractedText, $user, $groupKey, $fileExtension, $result);
+            $result = $this->vectorize(
+                $file,
+                $extractedText,
+                $user,
+                $groupKey,
+                $fileExtension,
+                $result,
+                is_string($result['extraction_markdown'] ?? null) ? $result['extraction_markdown'] : null,
+                $options->vectorizeModelId,
+            );
 
             // Delete-after-embed (CORE-4): when the caller does not want the
             // binary retained, drop it once vectors exist. We keep the row, the
@@ -316,6 +334,48 @@ final readonly class FileUploadService
         ]);
 
         return $result;
+    }
+
+    private const EMPTY_DOCUMENT_EXTRACT = 'Unable to extract information from this file.';
+
+    /**
+     * Empty extract is a terminal failure: never mark the file vectorized with
+     * 0 chunks (that showed as "Ready for chat" with nothing to find).
+     *
+     * @return array{success: false, status: 'error', error: string}
+     */
+    private function failEmptyExtract(File $file, string $fileExtension): array
+    {
+        $file->setStatus('error');
+        $file->setVectorState(File::VECTOR_STATE_FAILED);
+        $this->em->flush();
+
+        $error = FileProcessor::isTranscribableMediaExtension($fileExtension)
+            ? 'Transcription produced no text — the file may be silent or in an unsupported codec.'
+            : self::EMPTY_DOCUMENT_EXTRACT;
+
+        return ['success' => false, 'status' => 'error', 'error' => $error];
+    }
+
+    /**
+     * Store-only types never get text or vectors. Persist a terminal status so
+     * FileSelectionModal's poll (vectorized / processed / extracted / error)
+     * can stop instead of spinning on `uploaded`.
+     *
+     * @return array{success: true, status: 'extracted', extraction_skipped: true}
+     */
+    private function completeStoreOnly(File $file): array
+    {
+        if ('extracted' !== $file->getStatus()) {
+            $file->setStatus('extracted');
+            $this->em->flush();
+        }
+
+        return [
+            'success' => true,
+            'status' => 'extracted',
+            'extraction_skipped' => true,
+        ];
     }
 
     private function createFileEntity(
@@ -349,6 +409,7 @@ final readonly class FileUploadService
 
         $this->em->persist($file);
         $this->em->flush();
+        $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
         return $file;
     }
@@ -396,8 +457,10 @@ final readonly class FileUploadService
         // Fresh content supersedes any prior "source changed" marker.
         $file->setStale(false);
         $file->setVectorState(File::VECTOR_STATE_PENDING);
+        $file->setThumbPath(null);
 
         $this->em->flush();
+        $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
         return $file;
     }
@@ -443,15 +506,19 @@ final readonly class FileUploadService
 
             $file->setFileText($extractedText);
 
-            // For audio/video files an empty transcript means transcription
-            // failed — the file may be silent, in an unsupported codec, or the
-            // STT provider rejected it.  Signal this clearly so the UI can show
-            // a distinct error badge instead of "Extracted (0 chars)".
-            if ('' === trim($extractedText) && FileProcessor::isTranscribableMediaExtension($fileExtension)) {
-                $file->setStatus('error');
-                $this->em->flush();
+            // Empty extract is never "ready". Audio/video: STT produced nothing.
+            // Documents (including scanned PDFs): Tika + vision produced nothing.
+            // Keep success=true so the stored row (and its id) is returned to
+            // the client — desktop can remember the local source and show the
+            // failure on the file instead of treating the upload as rejected.
+            if ('' === trim($extractedText)) {
+                $failed = $this->failEmptyExtract($file, $fileExtension);
 
-                return ['success' => false, 'error' => 'Transcription produced no text — the file may be silent or in an unsupported codec.'];
+                return array_merge($result, $failed, [
+                    'success' => true,
+                    'status' => 'error',
+                    'extracted_text_length' => 0,
+                ]);
             }
 
             $file->setStatus('extracted');
@@ -459,6 +526,7 @@ final readonly class FileUploadService
 
             $result['extracted_text_length'] = strlen($extractedText);
             $result['extraction_strategy'] = $extractMeta['strategy'] ?? 'unknown';
+            $result['extraction_markdown'] = $this->markdownFromMeta($extractMeta);
 
             if ('extract' === $processLevel) {
                 return $result;
@@ -469,7 +537,10 @@ final readonly class FileUploadService
                 'error' => $e->getMessage(),
             ]);
 
-            return ['success' => false, 'error' => 'Text extraction failed: '.$e->getMessage()];
+            $file->setStatus('error');
+            $this->em->flush();
+
+            return ['success' => false, 'error' => 'Text extraction failed: '.$e->getMessage(), 'status' => 'error'];
         }
 
         return $result;
@@ -485,6 +556,8 @@ final readonly class FileUploadService
         ?string $groupKey,
         string $fileExtension,
         array $result,
+        ?string $markdown = null,
+        ?int $embeddingModelId = null,
     ): array {
         try {
             $vectorResult = $this->vectorizationService->vectorizeAndStore(
@@ -493,6 +566,8 @@ final readonly class FileUploadService
                 $file->getId(),
                 $groupKey ?? '',
                 FileHelper::getFileTypeCode($fileExtension),
+                $markdown,
+                $embeddingModelId,
             );
 
             if ($vectorResult['success']) {
@@ -523,9 +598,9 @@ final readonly class FileUploadService
     /**
      * Run extraction + vectorization for a stored file (used for async processing after fast upload).
      *
-     * @return array{success: bool, status: string, error?: string, extracted_text_length?: int, chunks_created?: int}
+     * @return array{success: bool, status: string, error?: string, extracted_text_length?: int, chunks_created?: int, extraction_skipped?: bool, message?: string}
      */
-    public function processFile(File $file, User $user): array
+    public function processFile(File $file, User $user, ?ProcessModelHints $hints = null): array
     {
         if (in_array($file->getStatus(), ['extracting', 'vectorizing'], true)) {
             return ['success' => true, 'status' => $file->getStatus(), 'message' => 'File is already being processed'];
@@ -533,6 +608,11 @@ final readonly class FileUploadService
 
         if ('error' === $file->getStatus()) {
             return ['success' => false, 'status' => 'error', 'error' => 'File is in error state'];
+        }
+
+        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            return $this->completeStoreOnly($file);
         }
 
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
@@ -544,9 +624,14 @@ final readonly class FileUploadService
             ];
         }
 
-        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+        $asyncMarkdown = null;
 
-        if ('uploaded' === $file->getStatus()) {
+        // Re-extract when there is no text yet — includes the empty
+        // "extracted" rows the old pipeline left behind (image-only PDFs).
+        $needsExtract = 'uploaded' === $file->getStatus()
+            || ('' === trim($file->getFileText()) && in_array($file->getStatus(), ['extracted', 'error'], true));
+
+        if ($needsExtract) {
             $file->setStatus('extracting');
             $this->em->flush();
 
@@ -556,6 +641,7 @@ final readonly class FileUploadService
                     $fileExtension,
                     $user->getId(),
                 );
+                $asyncMarkdown = $this->markdownFromMeta($extractMeta);
 
                 $file->setFileText($extractedText);
                 $file->setStatus('extracted');
@@ -574,30 +660,7 @@ final readonly class FileUploadService
 
         $extractedText = $file->getFileText();
         if ('' === trim($extractedText)) {
-            // Audio/video with no transcript: the STT pipeline returned nothing
-            // (provider rejection, silent file, unsupported codec).  Mark as
-            // error so the UI shows a clear status instead of silently treating
-            // the file as "ready".  Non-media files (blank PDFs, etc.) follow
-            // the old path — a zero-length extraction is legitimate for them.
-            if (FileProcessor::isTranscribableMediaExtension($fileExtension)) {
-                $file->setStatus('error');
-                $this->em->flush();
-
-                return ['success' => false, 'status' => 'error', 'error' => 'Transcription produced no text — the file may be silent or in an unsupported codec.'];
-            }
-
-            $file->setStatus('vectorized');
-            $this->em->flush();
-
-            // Dedup on (user_id, file_id) — see issue #887. If the
-            // earlier processSingleUpload() (or a previous /process retry)
-            // already wrote a BUSELOG row for this file, this is a no-op.
-            $this->rateLimitService->recordFileAnalysisOnce($user, (int) $file->getId(), [
-                'filename' => $file->getFileName(),
-                'source' => 'WEB_ASYNC',
-            ]);
-
-            return ['success' => true, 'status' => 'vectorized', 'extracted_text_length' => 0, 'chunks_created' => 0];
+            return $this->failEmptyExtract($file, $fileExtension);
         }
 
         $file->setStatus('vectorizing');
@@ -612,6 +675,8 @@ final readonly class FileUploadService
                 $file->getId(),
                 $groupKey,
                 FileHelper::getFileTypeCode($fileExtension),
+                $asyncMarkdown,
+                $hints?->vectorizeModelId,
             );
 
             if ($vectorResult['success']) {
@@ -668,6 +733,15 @@ final readonly class FileUploadService
             $file->getFileName() ?: '',
             $file->getFilePath() ?: '',
         );
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            return [
+                'success' => false,
+                'error' => 'This file type is stored as-is and cannot be extracted.',
+                'errorType' => 'not_extractable',
+            ];
+        }
+
+        $markdown = null;
 
         if ('' === trim($extractedText)) {
             $absolutePath = $this->uploadDir.'/'.ltrim($file->getFilePath(), '/');
@@ -676,7 +750,8 @@ final readonly class FileUploadService
             }
 
             try {
-                [$extractedText] = $this->fileProcessor->extractText($file->getFilePath(), $fileExtension, $user->getId());
+                [$extractedText, $extractMeta] = $this->fileProcessor->extractText($file->getFilePath(), $fileExtension, $user->getId());
+                $markdown = $this->markdownFromMeta($extractMeta);
                 $file->setFileText($extractedText);
                 $file->setStatus('extracted');
                 $this->em->flush();
@@ -696,6 +771,7 @@ final readonly class FileUploadService
                 $file->getId(),
                 $groupKey,
                 FileHelper::getFileTypeCode($fileExtension),
+                $markdown,
             );
 
             if ($vectorResult['success']) {
@@ -753,6 +829,14 @@ final readonly class FileUploadService
             $file->getFileName() ?: '',
             $file->getFilePath() ?: '',
         );
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            return [
+                'success' => false,
+                'error' => 'This file type is stored as-is and cannot be extracted.',
+                'errorType' => 'not_extractable',
+            ];
+        }
+
         $category = FileTypeResolver::resolveCategory(
             $file->getFileType() ?: '',
             $file->getFileName() ?: '',
@@ -766,16 +850,18 @@ final readonly class FileUploadService
         // synthesized script into BFILETEXT). Re-running Whisper/Tika would
         // either fail or overwrite that with duration metadata.
         $existingText = trim($file->getFileText());
+        $markdown = null;
         if ('audio' === $category && '' !== $existingText) {
             $extractedText = $file->getFileText();
         } else {
             try {
-                [$extractedText] = $this->fileProcessor->extractText(
+                [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
                     $file->getFilePath(),
                     $fileExtension,
                     $user->getId(),
                     $file->isMedia(),
                 );
+                $markdown = $this->markdownFromMeta($extractMeta);
             } catch (\Throwable $e) {
                 $file->setStatus('error');
                 $this->em->flush();
@@ -818,6 +904,7 @@ final readonly class FileUploadService
                 (int) $file->getId(),
                 $groupKey,
                 FileHelper::getFileTypeCode($fileExtension),
+                $markdown,
             );
         } catch (\Throwable $e) {
             $file->setStatus('extracted');
@@ -909,5 +996,15 @@ final readonly class FileUploadService
             'chunksCreated' => $vectorResult['chunks_created'],
             'groupKey' => $groupKey,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function markdownFromMeta(array $meta): ?string
+    {
+        $markdown = $meta['markdown'] ?? null;
+
+        return \is_string($markdown) && '' !== $markdown ? $markdown : null;
     }
 }

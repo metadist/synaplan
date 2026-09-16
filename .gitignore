@@ -31,9 +31,14 @@ volumes/
 # But allow frontend source data
 !frontend/src/data/
 
-# Logs
+# Logs. logs/ has no slash, so it excludes runtime log directories at every
+# depth — which is what we want for output, but it also swallowed
+# sidecars/synaplan-compute/internal/logs, which is source. Keep the broad
+# rule and allow exactly that one path: any other directory named logs stays
+# ignored, wherever it appears. See #1862 / #1865.
 *.log
 logs/
+!sidecars/synaplan-compute/internal/logs/
 
 # Backend cache & build
 backend/var/cache/
@@ -80,6 +85,14 @@ plugins/synaform/
 plugins/synasort/
 plugins/synaads/
 plugins/synafastbill/
+plugins/synamail/
 
 #local development stuff
 _devextras/local-ignore/
+
+# Local output of scripts/mobile-impact.mjs. Anchored to the repo root on
+# purpose: every workflow passes an explicit --output elsewhere
+# (mobile-impact/manifest.json, mobile-release/mobile-release-manifest.json),
+# and those must stay visible to git. Only a run without --output lands here.
+/mobile-release-manifest.json
+/mobile-impact-manifest.json

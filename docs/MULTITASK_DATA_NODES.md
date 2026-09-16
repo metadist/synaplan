@@ -33,10 +33,45 @@ Every data node obeys the same rules (plan 09 §2):
 | Capability | Runner | Source | Flag (`BCONFIG`) | Default |
 | ---------- | ------ | ------ | ---------------- | ------- |
 | `web_search` | `WebSearchRunner` | Brave web search | – (provider config) | on |
-| `url_fetch` | `UrlFetchRunner` | A specific URL named in the message (`UrlContentService`: robots.txt/noindex compliant) | `MULTITASK.URL_FETCH_ENABLED` | **on** |
+| `url_fetch` | `UrlFetchRunner` | A specific URL named in the message (`UrlContentService`: robots.txt/noindex compliant). With `inputs.compare: true` (or a compare/difference request), one snapshot per owner+URL is saved in `BURLWATCHES` and `$nX.text` is the diff (or first-save / no-changes). CRUD: Saved Tasks → Watched pages. | `MULTITASK.URL_FETCH_ENABLED` | **on** |
 | `mcp_fetch` | `McpFetchRunner` | The user's connected external MCP servers (`McpClient`, Streamable HTTP) | `MCP.CLIENT_ENABLED` + `MULTITASK.MCP_FETCH_ENABLED` + per-topic `tool_mcp` prompt metadata (optional `mcp_servers` id allowlist) | **on** (seeded) |
-| `email_search` | `EmailSearchRunner` | Live read-only IMAP search over the user's `InboundEmailHandler` accounts | `MULTITASK.EMAIL_SEARCH_ENABLED` | off |
+| `mcp_action` | `McpActionRunner` | WRITE actions (create/update — e.g. Confluence pages, Jira tickets) on connected MCP servers whose owner enabled **allow write actions** (`BMCPSERVERS.BALLOWWRITE`); destructive tools always refused | `MCP.CLIENT_ENABLED` + `MULTITASK.MCP_ACTION_ENABLED` + per-topic `tool_mcp` + per-server `allow_write` | **on** (seeded), write opt-in per server **off** |
+| `email_search` | `EmailSearchRunner` | Live read-only search over the user's IMAP accounts (`InboundEmailHandler`) **and** Microsoft 365 connections (`GraphMailboxSearcher`, delegated `Mail.Read`) | `MULTITASK.EMAIL_SEARCH_ENABLED` | **on** (seeded) |
 | `rag_query` | `ChatRunner` | User knowledge base (Qdrant) | – | on |
+| `tool_call` | `ToolCallRunner` | A registered custom or MCP tool from an authored Saved Task. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **on** (seeded; `FEATURE_WORKFLOWS_BUILDER_ENABLED`) |
+| `outbound_webhook` | `OutboundWebhookRunner` | HMAC-signed HTTPS POST of a step result. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **on** (seeded; `FEATURE_WORKFLOWS_BUILDER_ENABLED`) |
+| `condition` | `ConditionRunner` | Gate: on false the node stops and later steps skip; the run completes. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **on** (seeded; `FEATURE_WORKFLOWS_BUILDER_ENABLED`) |
+
+Authored step inputs (`params.inputs`) are `{ "literal": "…" }`,
+`{ "from": "step_2", "field": "summary" }`, or
+`{ "from": "trigger", "field": "body.title" }`. Every `from` other than
+`trigger` must be listed in that step’s `depends_on`. `params.approval` may
+only tighten policy (`approve` or `block`).
+
+## Webhook trigger, templates, and export
+
+An inbound **webhook** Saved Task (`BTRIGGERTYPE = webhook`) is started by
+`POST /api/v1/webhooks/saved-tasks/{token}`. The token lives in
+`BTRIGGERCONFIG` and is minted on the server; optional HMAC uses
+`X-Synaplan-Signature: sha256=<hex>` over the raw body. The JSON body
+(≤ 64 KiB) is the run’s starting event (`from: trigger`). Unknown and
+disabled tokens return the same 404. See `docs/N8N.md`.
+
+**Save as template** is an IAM share of kind `saved_task` with permission
+`use` — not a second object. **Use template**
+(`POST /api/v1/saved-tasks/{id}/copy`) creates a copy owned by the caller:
+the graph and trigger type are kept, the copy is **paused** (`enabled=false`,
+`allowUnattended=false`), a webhook token is regenerated, outbound `secret`
+and HMAC are stripped. If the caller cannot use the source assistant, the
+copy points at a fallback prompt they can use and the response `checklist`
+lists `needsAssistant` (and `needsTool` for tools they cannot run). 409 only
+when there is no fallback prompt at all.
+
+The `saved_tasks` bundle section exports name, trigger, graph and settings.
+Tokens, HMAC secrets and outbound secrets are never written. Prompts are
+rewritten by topic; MCP tools by server name. Import creates paused rows, mints
+a new webhook token, and rejects unknown item keys. Checklist codes:
+`needsAssistant`, `needsTool`, `needsConnection`, `unknownKey`, `schedulesOff`.
 
 Flags resolve per-user row → global row → built-in default (see
 `MultitaskRoutingConfig::isFeatureEnabled`).
@@ -50,6 +85,28 @@ every deploy (the kill switch). The built-in code default stays OFF as the
 safety net when no row exists and the seeder has not run. Calls still
 require a connected server (Channels → MCP Servers) and the per-topic
 "MCP Data Sources" opt-in.
+
+`email_search` rolls out the same way (Phase M step M3d):
+`MultitaskConfigSeeder` seeds `MULTITASK.EMAIL_SEARCH_ENABLED = 1`
+insert-if-missing, so mail search works out of the box on new installs while
+an operator's explicit `0` survives every deploy. The built-in code default
+stays OFF as the no-row safety net. The capability remains invisible to the
+planner until the user connects at least one mail source (IMAP account or
+Microsoft 365 connection).
+
+### `email_search` details (two backends, one contract)
+
+- **IMAP** (`ImapMailboxSearcher`): stateless search over every active
+  `InboundEmailHandler` account; peek fetches only, up to 2000 chars of body
+  per hit.
+- **Microsoft 365** (`GraphMailboxSearcher`): Graph `$search` (KQL:
+  free-text + `from:` + `received>=`) over every m365 connection that is not
+  disconnected/reauth-required; results re-sorted newest-first. Graph search
+  returns ~255-char previews, so the FULL body is fetched for the TOP hit
+  only (one extra request, never bulk) — that is what a downstream
+  `summarize`/`chat` node consumes. Read-only; nothing is persisted.
+- Hits from all sources are merged newest-first and capped at 10; a failing
+  source degrades only itself (per-source error, the rest still answer).
 
 **Release defaults for the `general` topic** (`PromptCatalog`, bootstrap-only
 — written once when the prompt row is first created, never resurrected over
@@ -74,8 +131,12 @@ when its per-user note expands to something.
 - `mcp_fetch` renders the per-user tool sub-catalog (server ids, read-safe
   tools, argument hints) — only when the matched routing topic has
   `tool_mcp = true` ("MCP Data Sources" toggle in AI Instructions).
+- `mcp_action` renders the write-tool sub-catalog — only for servers whose
+  owner enabled **allow write actions**, only tools that DECLARE themselves
+  mutating (`readOnlyHint: false`), and never tools marked destructive
+  (`destructiveHint: true`). Same topic gate as `mcp_fetch`.
 - `email_search` renders the connected-mailbox note — only when the user has
-  an active email account.
+  an active mail source (IMAP account or Microsoft 365 connection).
 
 No note ⇒ no capability line ⇒ the planner cannot emit (or hallucinate) the
 node. The runner re-checks every gate at run time (defense in depth).
@@ -92,6 +153,8 @@ node. The runner re-checks every gate at run time (defense in depth).
   closing the "I connected a server but nothing happens" onboarding gap.
 - **Channels → Email Automation**: the existing IMAP accounts double as the
   `email_search` corpus.
+- **Connections → Microsoft 365**: a connected M365 account is the second
+  `email_search` source (delegated `Mail.Read`, live search, read-only).
 - **AI Instructions → prompt → Available tools → MCP Data Sources**: the
   per-topic opt-in for `mcp_fetch` (same flag as the usage panel, with the
   full editor around it).
