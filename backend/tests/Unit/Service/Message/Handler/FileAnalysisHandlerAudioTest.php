@@ -299,6 +299,7 @@ class FileAnalysisHandlerAudioTest extends TestCase
             null,
             null,
             new ChatFailureClassifier(),
+            null,
             $translator,
         );
 

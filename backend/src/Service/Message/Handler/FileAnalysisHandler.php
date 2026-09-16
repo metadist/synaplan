@@ -10,6 +10,7 @@ use App\Entity\Message;
 use App\Service\Context\ContextCondenser;
 use App\Service\Context\ModelContextWindow;
 use App\Service\File\FileTypeResolver;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
@@ -58,6 +59,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         private ?ContextCondenser $contextCondenser = null,
         private ?ModelContextWindow $modelContextWindow = null,
         private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
+        private ?ChatErrorPresenter $chatErrorPresenter = null,
         private ?TranslatorInterface $translator = null,
     ) {
     }
@@ -471,19 +473,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Voice message reply failed', [
-                'error' => $e->getMessage(),
+            $this->logAndRethrow('FileAnalysisHandler: Voice message reply failed', [
                 'files' => $this->describeFileList($audioFiles),
-            ]);
-
-            return [
-                'content' => 'Voice message reply failed: '.$e->getMessage(),
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            ], $e);
         }
     }
 
@@ -558,20 +550,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Streaming voice message reply failed', [
-                'error' => $e->getMessage(),
+            $this->logAndRethrow('FileAnalysisHandler: Streaming voice message reply failed', [
                 'files' => $this->describeFileList($audioFiles),
-            ]);
-
-            $streamCallback('Voice message reply failed: '.$e->getMessage());
-
-            return [
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            ], $e);
         }
     }
 
@@ -648,19 +629,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Chat analysis failed', [
-                'error' => $e->getMessage(),
+            $this->logAndRethrow('FileAnalysisHandler: Chat analysis failed', [
                 'files' => $this->describeFileList($documents),
-            ]);
-
-            return [
-                'content' => 'Document analysis failed: '.$e->getMessage(),
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            ], $e);
         }
     }
 
@@ -735,20 +706,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ],
             ];
         } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Chat streaming analysis failed', [
-                'error' => $e->getMessage(),
+            $this->logAndRethrow('FileAnalysisHandler: Chat streaming analysis failed', [
                 'files' => $this->describeFileList($documents),
-            ]);
-
-            $streamCallback('Document analysis failed: '.$e->getMessage());
-
-            return [
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+            ], $e);
         }
     }
 
@@ -976,7 +936,8 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'image_count' => count($images),
         ]);
 
-        $perImage = $this->analyzeImageBatch($message, $images, $userPrompt, $provider, $modelName, $progressCallback, $this->buildLanguageDirective($classification));
+        $perImage = $this->analyzeImageBatch($message, $images, $userPrompt, $provider, $modelName, $progressCallback, $this->buildLanguageDirective($classification), $classification);
+        $this->throwIfImageBatchFullyFailed($perImage);
         $content = $this->combineImageAnalyses($perImage, $images);
 
         $this->notify($progressCallback, 'complete', 'Analysis complete.');
@@ -1040,6 +1001,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      * aggregator can render a partial response without throwing.
      *
      * @param list<array<string, mixed>> $images
+     * @param array<string, mixed>       $classification
      *
      * @return list<array<string, mixed>>
      */
@@ -1051,6 +1013,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ?string $modelName,
         ?callable $progressCallback,
         string $languageDirective = '',
+        array $classification = [],
     ): array {
         $perImagePrompt = !empty($userPrompt)
             ? $userPrompt
@@ -1077,10 +1040,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'full_path' => $fullPath,
                     'image_index' => $index,
                 ]);
+                $missing = new \RuntimeException('File not found: '.$image['name']);
                 $results[] = [
                     'name' => $image['name'],
                     'error' => 'file_not_found',
-                    'message' => "File not found: {$image['name']}",
+                    'message' => $this->userFacingAnalysisError($missing, $classification),
+                    'exception' => $missing,
                 ];
 
                 continue;
@@ -1114,7 +1079,8 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 $results[] = [
                     'name' => $image['name'],
                     'error' => 'analysis_failed',
-                    'message' => 'Image analysis failed: '.$e->getMessage(),
+                    'message' => $this->userFacingAnalysisError($e, $classification),
+                    'exception' => $e,
                 ];
             }
         }
@@ -1135,18 +1101,69 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         if (1 === count($results)) {
             $only = $results[0];
 
-            return $only['content'] ?? $only['message'] ?? 'Image analysis failed.';
+            return $only['content'] ?? $only['message'] ?? $this->fallbackImageFailureCopy();
         }
 
         $parts = [];
         foreach ($results as $index => $entry) {
             $position = $index + 1;
             $name = $entry['name'] ?? ($images[$index]['name'] ?? 'image '.$position);
-            $body = $entry['content'] ?? $entry['message'] ?? 'Image analysis failed.';
+            $body = $entry['content'] ?? $entry['message'] ?? $this->fallbackImageFailureCopy();
             $parts[] = "### Image {$position}: {$name}\n\n{$body}";
         }
 
         return implode("\n\n---\n\n", $parts);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     *
+     * @throws \Exception
+     */
+    private function logAndRethrow(string $log, array $context, \Exception $e): never
+    {
+        $this->logger->error($log, $context + ['error' => $e->getMessage()]);
+
+        throw $e;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $results
+     */
+    private function throwIfImageBatchFullyFailed(array $results): void
+    {
+        foreach ($results as $entry) {
+            if (isset($entry['content'])) {
+                return;
+            }
+        }
+        foreach ($results as $entry) {
+            $exception = $entry['exception'] ?? null;
+            if ($exception instanceof \Throwable) {
+                throw $exception;
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     */
+    private function userFacingAnalysisError(\Throwable $e, array $classification): string
+    {
+        $lang = 'en';
+        if (isset($classification['language']) && is_string($classification['language']) && '' !== trim($classification['language'])) {
+            $lang = $classification['language'];
+        }
+        if ($this->chatErrorPresenter instanceof ChatErrorPresenter) {
+            return $this->chatErrorPresenter->present($e, $lang)->userText;
+        }
+
+        return 'Something went wrong while answering this request. Please try again.';
+    }
+
+    private function fallbackImageFailureCopy(): string
+    {
+        return $this->userFacingAnalysisError(new \RuntimeException('Image analysis failed'), []);
     }
 
     /**

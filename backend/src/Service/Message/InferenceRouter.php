@@ -81,8 +81,7 @@ final class InferenceRouter
         } catch (\Exception $e) {
             $this->logger->error("Handler failed: {$e->getMessage()}");
 
-            // Fallback zu Chat Handler
-            if ('chat' !== $intent) {
+            if ($this->shouldFallbackToChat($intent)) {
                 $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
 
                 return $this->handlers['chat']->handle($message, $thread, $classification, $progressCallback, $options);
@@ -140,8 +139,7 @@ final class InferenceRouter
         } catch (\Exception $e) {
             $this->logger->error("Handler streaming failed: {$e->getMessage()}");
 
-            // Fallback zu Chat Handler
-            if ('chat' !== $intent) {
+            if ($this->shouldFallbackToChat($intent)) {
                 $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
 
                 return $this->handlers['chat']->handleStream($message, $thread, $classification, $streamCallback, $progressCallback, $options);
@@ -218,6 +216,16 @@ final class InferenceRouter
             $directive->fields,
             $decision->toClassificationFields(),
         );
+    }
+
+    /**
+     * Chat is the generic fallback when a dedicated handler is missing or
+     * throws. File analysis must not take that path: a provider/disk failure
+     * would otherwise become a second successful chat turn (issue #1914).
+     */
+    private function shouldFallbackToChat(string $intent): bool
+    {
+        return 'chat' !== $intent && 'file_analysis' !== $intent;
     }
 
     private function getHandler(string $intent): object

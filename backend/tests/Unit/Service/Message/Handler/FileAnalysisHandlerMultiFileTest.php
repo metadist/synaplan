@@ -2,15 +2,18 @@
 
 namespace App\Tests\Unit\Service\Message\Handler;
 
+use App\AI\Exception\ChatFailureClassifier;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\ModelConfigService;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Translation\IdentityTranslator;
 
 /**
  * Issue #978 — when the user attaches multiple documents (or voice
@@ -46,6 +49,10 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
             $this->modelConfigService,
             $this->logger,
             $this->uploadDir,
+            null,
+            null,
+            new ChatFailureClassifier(),
+            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier()),
         );
 
         $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
@@ -492,7 +499,64 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
         $this->assertStringContainsString('### Image 1: ok.png', $result['content']);
         $this->assertStringContainsString('ok description', $result['content']);
         $this->assertStringContainsString('### Image 2: bad.png', $result['content']);
-        $this->assertStringContainsString('Image analysis failed: boom', $result['content']);
+        $this->assertStringNotContainsString('boom', $result['content']);
+        $this->assertStringNotContainsString('Image analysis failed:', $result['content']);
+    }
+
+    public function testMissingImagesOnDiskAreThrownInsteadOfSuccessfulReply(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'gone.png', type: 'png', path: 'missing/gone.png'),
+        ], text: '');
+
+        $this->aiFacade->expects($this->never())->method('analyzeImage');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('File not found: gone.png');
+
+        $this->handler->handle($message, [], []);
+    }
+
+    public function testDocumentAnalysisExceptionIsNotReturnedAsChatContent(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'spec.md', type: 'md', path: '13/000/spec.md', text: 'Ship small PRs.'),
+        ], text: 'Summarize.');
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willThrowException(new \RuntimeException('provider exploded: SAFETY'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('provider exploded: SAFETY');
+
+        $this->handler->handle($message, [], []);
+    }
+
+    public function testStreamingDocumentAnalysisDoesNotEmitExceptionText(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'spec.md', type: 'md', path: '13/000/spec.md', text: 'Ship small PRs.'),
+        ], text: 'Summarize.');
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willThrowException(new \RuntimeException('provider exploded: SAFETY'));
+
+        $chunks = [];
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('provider exploded: SAFETY');
+
+        try {
+            $this->handler->handleStream($message, [], [], static function (string $chunk) use (&$chunks): void {
+                $chunks[] = $chunk;
+            });
+        } catch (\RuntimeException $e) {
+            $this->assertSame([], $chunks);
+            throw $e;
+        }
     }
 
     /**
