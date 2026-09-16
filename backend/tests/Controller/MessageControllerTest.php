@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\TokenService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -654,5 +656,32 @@ class MessageControllerTest extends WebTestCase
         $this->assertArrayHasKey('tracking_id', $response);
         $this->assertArrayHasKey('status', $response);
         $this->assertEquals('queued', $response['status']);
+    }
+
+    public function testDictationUploadDoesNotLeaveASourceFile(): void
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'dict');
+        self::assertNotFalse($tmp);
+        file_put_contents($tmp, "hello from dictation\n");
+        $uploaded = new UploadedFile($tmp, 'recording.txt', 'text/plain', null, true);
+
+        $fileRepo = $this->em->getRepository(File::class);
+        $before = $fileRepo->count(['userId' => $this->user->getId()]);
+
+        $this->client->request(
+            'POST',
+            '/api/v1/messages/upload-file',
+            ['purpose' => 'dictation'],
+            ['file' => $uploaded],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token],
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertIsArray($payload);
+        self::assertSame('Microphone dictation only accepts audio recordings. Nothing was stored.', $payload['error']);
+
+        $this->em->clear();
+        self::assertSame($before, $fileRepo->count(['userId' => $this->user->getId()]));
     }
 }
