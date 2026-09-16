@@ -302,6 +302,56 @@ final class ApiKeyScopeTest extends TestCase
         self::assertSame(['chat', 'files', 'rag', 'memories'], ApiKeyScope::platformLinkScopes(true));
     }
 
+    /**
+     * @param list<string> $scopes
+     */
+    #[DataProvider('platformLinkProductPaths')]
+    public function testPlatformLinkKeyReachesEachGrantedSurface(array $scopes, string $path): void
+    {
+        self::assertTrue(ApiKeyScope::allows($scopes, $path));
+    }
+
+    /**
+     * @return iterable<string, array{0: list<string>, 1: string}>
+     */
+    public static function platformLinkProductPaths(): iterable
+    {
+        $scopes = ApiKeyScope::platformLinkScopes();
+        yield 'files list' => [$scopes, '/api/v1/files'];
+        yield 'file upload' => [$scopes, '/api/v1/files/upload'];
+        yield 'chats' => [$scopes, '/api/v1/chats'];
+        yield 'chat history' => [$scopes, '/api/v1/chats/42/messages'];
+        yield 'messages send' => [$scopes, '/api/v1/messages/send'];
+        yield 'tts' => [$scopes, '/api/v1/tts/stream'];
+        yield 'model catalog' => [$scopes, '/api/v1/config/models'];
+        yield 'rag search' => [$scopes, '/api/v1/rag/search'];
+    }
+
+    public function testPlatformLinkKeyCannotReachAdmin(): void
+    {
+        $scopes = ApiKeyScope::platformLinkScopes();
+
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/users'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/groups'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/config/values'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/user/memories'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/agents'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/mcp'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/messages'));
+    }
+
+    public function testPlatformLinkMemoriesScopeReachesUserMemoriesOnly(): void
+    {
+        $withMemories = ApiKeyScope::platformLinkScopes(true);
+
+        self::assertTrue(ApiKeyScope::allows($withMemories, '/api/v1/user/memories'));
+        self::assertFalse(ApiKeyScope::allows($withMemories, '/api/v1/user/7'));
+        self::assertFalse(ApiKeyScope::allows(['memories'], '/api/v1/files'));
+        self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/chats'));
+        self::assertFalse(ApiKeyScope::allows(['chat'], '/api/v1/files'));
+        self::assertFalse(ApiKeyScope::allows(['rag'], '/api/v1/chats'));
+    }
+
     public function testGrandfatherUnchanged(): void
     {
         self::assertSame([

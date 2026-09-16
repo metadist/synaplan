@@ -79,6 +79,18 @@ final class ApiKeyScope
     public const AGENTS_ALL = 'agents:*';
 
     /**
+     * Platform-link scopes minted for a linked Nextcloud / ownCloud user.
+     * Frozen strings (`POST /api/v1/admin/users/{id}/api-keys`); do not rename.
+     */
+    public const PLATFORM_CHAT = 'chat';
+
+    public const PLATFORM_FILES = 'files';
+
+    public const PLATFORM_RAG = 'rag';
+
+    public const PLATFORM_MEMORIES = 'memories';
+
+    /**
      * Tool grant for `code_execution` / `code_run`. Not a path scope: `/v1/*`
      * stays gated by {@see DESKTOP_MESSAGES}. Empty-scope and webhook-only
      * keys do not receive it; only an explicit `compute:run` or `*` does.
@@ -144,16 +156,16 @@ final class ApiKeyScope
      * Scopes minted for a linked Nextcloud / ownCloud user. Equal to the
      * strings `POST /api/v1/admin/users/{id}/api-keys` receives from the
      * partner apps today (`chat`, `files`, `rag`) plus `memories` when the
-     * partner admin enabled them. Mapping those strings onto paths is a
-     * separate security fix (C4) — this method must not invent new names.
+     * partner admin enabled them. Names are frozen — already-issued keys
+     * carry exactly this list; {@see requiredScopesForPath()} maps them.
      *
      * @return list<string>
      */
     public static function platformLinkScopes(bool $withMemories = false): array
     {
-        $scopes = ['chat', 'files', 'rag'];
+        $scopes = [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG];
         if ($withMemories) {
-            $scopes[] = 'memories';
+            $scopes[] = self::PLATFORM_MEMORIES;
         }
 
         return $scopes;
@@ -161,14 +173,14 @@ final class ApiKeyScope
 
     /**
      * The scope list a provisioned Nextcloud / ownCloud user key carries
-     * when memories are off. Kept next to {@see platformLinkScopes()} so C4
-     * can assert equality without importing the partner app.
+     * when memories are off. Kept next to {@see platformLinkScopes()} so
+     * tests can assert equality without importing the partner app.
      *
      * @return list<string>
      */
     public static function provisionedPlatformScopes(): array
     {
-        return ['chat', 'files', 'rag'];
+        return [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG];
     }
 
     /**
@@ -206,18 +218,16 @@ final class ApiKeyScope
      *   /v1/                     → desktop:messages
      *   /mcp                     → desktop:mcp
      *   /api/v1/desktop/         → desktop:jobs
-     *   /api/v1/files            → desktop:files OR files:* (a paired computer
-     *                              uploads its result artifact through the
-     *                              existing files API before reporting a
-     *                              fileId — sprint A3 §2.4; the add-in uploads
-     *                              mail attachments the same way)
-     *   /api/v1/messages         → messages:*
-     *   /api/v1/tts              → messages:* (read-aloud of an AI answer)
-     *   /api/v1/config/models    → messages:* (read-only model info)
-     *   /api/v1/user/{id}/plugins→ messages:* (plugin AI features, e.g.
+     *   /api/v1/files            → desktop:files OR files:* OR files
+     *                              (platform-link keys mint the bare name)
+     *   /api/v1/messages         → messages:* OR chat
+     *   /api/v1/tts              → messages:* OR chat (read-aloud of an AI answer)
+     *   /api/v1/config/models    → messages:* OR chat (read-only model info)
+     *   /api/v1/user/{id}/plugins→ messages:* OR chat (plugin AI features, e.g.
      *                              Synamail contact profiling)
-     *   /api/v1/chats            → chats:*
-     *   /api/v1/rag              → rag:*
+     *   /api/v1/chats            → chats:* OR chat
+     *   /api/v1/rag              → rag:* OR rag
+     *   /api/v1/user/memories    → memories (platform-link optional grant)
      *   /api/v1/groups           → iam:read
      *   /api/v1/iam              → iam:read
      *   /api/v1/me/shared        → iam:read
@@ -286,7 +296,7 @@ final class ApiKeyScope
         }
 
         if (self::matchesPrefix($path, '/api/v1/files')) {
-            return [self::DESKTOP_FILES, self::ADDIN_FILES];
+            return [self::DESKTOP_FILES, self::ADDIN_FILES, self::PLATFORM_FILES];
         }
 
         if (self::matchesPrefix($path, '/api/v1/messages')
@@ -294,15 +304,19 @@ final class ApiKeyScope
             || self::matchesPrefix($path, '/api/v1/config/models')
             || 1 === preg_match('#^/api/v1/user/\d+/plugins(/|$)#', $path)
         ) {
-            return [self::ADDIN_MESSAGES];
+            return [self::ADDIN_MESSAGES, self::PLATFORM_CHAT];
         }
 
         if (self::matchesPrefix($path, '/api/v1/chats')) {
-            return [self::ADDIN_CHATS];
+            return [self::ADDIN_CHATS, self::PLATFORM_CHAT];
         }
 
         if (self::matchesPrefix($path, '/api/v1/rag')) {
-            return [self::ADDIN_RAG];
+            return [self::ADDIN_RAG, self::PLATFORM_RAG];
+        }
+
+        if (self::matchesPrefix($path, '/api/v1/user/memories')) {
+            return [self::PLATFORM_MEMORIES];
         }
 
         if (self::matchesPrefix($path, '/api/v1/groups')
