@@ -766,7 +766,7 @@ services:
   # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
     profiles: [local-ai]
-    image: ollama/ollama:latest@sha256:684d8674b4315fa18f4f0e973a118ec2652ed96f67563277839985175858e0ba
+    image: ollama/ollama:latest@sha256:0c0a83210471fb50226bcdc2d6611d20ab13ae87e024cc304c94a6a5765c5e65
     container_name: synaplan-ollama
     ports:
       - "11435:11434"
