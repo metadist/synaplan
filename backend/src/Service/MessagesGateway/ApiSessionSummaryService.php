@@ -288,8 +288,9 @@ final readonly class ApiSessionSummaryService
 
         arsort($hits);
         $best = array_key_first($hits);
+        $scores = array_values($hits);
         $bestScore = $hits[$best];
-        $runnerUp = array_values($hits)[1] ?? 0;
+        $runnerUp = $scores[1];
 
         // One distinctive anchor is enough on a short request, but a tie
         // (qué vs is) must not pick English just because it is listed first.
