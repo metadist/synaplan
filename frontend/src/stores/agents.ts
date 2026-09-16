@@ -1,8 +1,27 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { agentFieldPath, agentsApi, type Agent, type GalleryCard } from '@/services/api/agentsApi'
+import { i18n } from '@/i18n'
+import { useNotification } from '@/composables/useNotification'
+import {
+  agentFieldPath,
+  agentsApi,
+  type Agent,
+  type AgentWritePayload,
+  type GalleryCard,
+} from '@/services/api/agentsApi'
 
 const SAVE_DEBOUNCE_MS = 600
+const NAME_MAX_LENGTH = 128
+
+const t = (key: string) => i18n.global.t(key)
+
+function notifyError(message: string): void {
+  try {
+    useNotification().error(message)
+  } catch {
+    // Pinia can construct the store outside of a Vue setup context in tests.
+  }
+}
 
 export const useAgentsStore = defineStore('agents', () => {
   const gallery = ref<GalleryCard[]>([])
@@ -14,6 +33,44 @@ export const useAgentsStore = defineStore('agents', () => {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   const currentId = computed(() => current.value?.id ?? null)
+
+  function nameValidationError(value: string): string | null {
+    const trimmed = value.trim()
+    if (trimmed === '') {
+      return String(t('assistants.nameRequired'))
+    }
+    if ([...trimmed].length > NAME_MAX_LENGTH) {
+      return String(t('assistants.nameTooLong'))
+    }
+    return null
+  }
+
+  const hasUnsavedWork = computed(() => dirty.value || saving.value)
+
+  function setFieldError(path: string, message: string | null): void {
+    if (message) {
+      fieldErrors.value = { ...fieldErrors.value, [path]: message }
+      return
+    }
+    if (!(path in fieldErrors.value)) {
+      return
+    }
+    const next = { ...fieldErrors.value }
+    delete next[path]
+    fieldErrors.value = next
+  }
+
+  function messageForPath(path: string, fallback: string): string {
+    if (path === 'name') {
+      if (/empty|required/i.test(fallback)) {
+        return String(t('assistants.nameRequired'))
+      }
+      if (/128|at most|too long/i.test(fallback)) {
+        return String(t('assistants.nameTooLong'))
+      }
+    }
+    return fallback
+  }
 
   async function loadGallery(): Promise<void> {
     loading.value = true
@@ -54,6 +111,12 @@ export const useAgentsStore = defineStore('agents', () => {
     await agentsApi.remove(id)
     if (current.value?.id === id) {
       current.value = null
+      dirty.value = false
+      fieldErrors.value = {}
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+        debounceTimer = null
+      }
     }
     gallery.value = gallery.value.filter((card) => card.id !== id)
   }
@@ -69,13 +132,17 @@ export const useAgentsStore = defineStore('agents', () => {
     }
     debounceTimer = setTimeout(() => {
       // A failed background save leaves `dirty` set and fieldErrors filled;
-      // the builder shows "unsaved" and the explicit Save button reports it.
+      // nameless failures also toast so the builder is never silent.
       saveDraft().catch(() => undefined)
     }, SAVE_DEBOUNCE_MS)
   }
 
   /**
    * Persist the current editable fields.
+   *
+   * An invalid name is omitted so description, greeting and the rest of the
+   * draft can still save. The empty (or over-long) name stays local, dirty,
+   * and marked on the field.
    *
    * Edits that arrive while a request is in flight are not lost: `dirty` is
    * cleared when the request starts, so any later `markDirty()` flags them
@@ -91,19 +158,31 @@ export const useAgentsStore = defineStore('agents', () => {
       // The running request will re-schedule once it sees `dirty` again.
       return
     }
+    const nameError = nameValidationError(agent.name ?? '')
     saving.value = true
     dirty.value = false
-    fieldErrors.value = {}
+    fieldErrors.value = nameError ? { name: nameError } : {}
+    const payload: AgentWritePayload = {
+      description: agent.description ?? null,
+      icon: agent.icon,
+      draft: agent.draft,
+      routable: agent.routable,
+    }
+    if (!nameError) {
+      payload.name = (agent.name ?? '').trim()
+    }
     try {
-      const saved = await agentsApi.update(agent.id, {
-        name: agent.name,
-        description: agent.description ?? null,
-        icon: agent.icon,
-        draft: agent.draft,
-        routable: agent.routable,
-      })
+      const savedId = agent.id
+      const saved = await agentsApi.update(savedId, payload)
       const local = current.value
-      if (local && local.id === saved.id && dirty.value) {
+      if (!local || local.id !== saved.id) {
+        // The open assistant changed while this request was in flight.
+        if (local?.id != null && dirty.value) {
+          scheduleSave()
+        }
+        return
+      }
+      if (dirty.value) {
         // Newer keystrokes exist: take server metadata, keep what the user typed.
         current.value = {
           ...saved,
@@ -113,14 +192,23 @@ export const useAgentsStore = defineStore('agents', () => {
           draft: local.draft,
         }
         scheduleSave()
-      } else if (!local || local.id === saved.id) {
-        current.value = saved
+        return
       }
+      if (nameError) {
+        current.value = { ...saved, name: local.name }
+        dirty.value = true
+        fieldErrors.value = { name: nameError }
+        return
+      }
+      current.value = saved
     } catch (error) {
       dirty.value = true
       const path = agentFieldPath(error)
+      const fallback = error instanceof Error ? error.message : String(error)
       if (path) {
-        fieldErrors.value = { [path]: error instanceof Error ? error.message : String(error) }
+        setFieldError(path, messageForPath(path, fallback))
+      } else {
+        notifyError(String(t('assistants.saveFailed')))
       }
       throw error
     } finally {
@@ -146,6 +234,10 @@ export const useAgentsStore = defineStore('agents', () => {
     saving,
     loading,
     fieldErrors,
+    hasUnsavedWork,
+    NAME_MAX_LENGTH,
+    nameValidationError,
+    setFieldError,
     loadGallery,
     load,
     create,

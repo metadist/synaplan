@@ -734,7 +734,7 @@ final readonly class CodeRunRunner implements TaskRunner
 
     private function defaultConcurrentCap(User $user): int
     {
-        return match (strtoupper($user->getRateLimitLevel())) {
+        return match (strtoupper($this->rateLimits->resolveRateLimitLevel($user))) {
             'PRO' => 2,
             'TEAM', 'BUSINESS', 'ADMIN' => 4,
             default => 1,
@@ -743,7 +743,7 @@ final readonly class CodeRunRunner implements TaskRunner
 
     private function defaultCpuCap(User $user): int
     {
-        return match (strtoupper($user->getRateLimitLevel())) {
+        return match (strtoupper($this->rateLimits->resolveRateLimitLevel($user))) {
             'PRO' => 300,
             'TEAM' => 900,
             'BUSINESS', 'ADMIN' => 3600,

@@ -27,6 +27,7 @@ final readonly class TaskPlanResult
         public string $rawResponse = '',
         public array $errors = [],
         public ?array $planningUsage = null,
+        public bool $authored = false,
     ) {
     }
 }

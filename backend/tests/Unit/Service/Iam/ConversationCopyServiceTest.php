@@ -59,4 +59,41 @@ final class ConversationCopyServiceTest extends TestCase
         self::assertSame('hello', $copied->getText());
         self::assertNull($copied->getMeta(RagScopeResolver::SHARED_FILE_REF));
     }
+
+    public function testCopyStripsOwnerMemoryReferencesFromMessageText(): void
+    {
+        $em = $this->createMock(EntityManagerInterface::class);
+        $messages = $this->createMock(MessageRepository::class);
+        $files = $this->createMock(FileRepository::class);
+
+        $source = new Chat();
+        $source->setUserId(1);
+        $source->setTitle('Shared');
+
+        $original = new Message();
+        $original->setUserId(1);
+        $original->setTrackingId(10);
+        $original->setText('after work [Memory:1785496054423666] keep this');
+        $original->setFile(0);
+
+        $messages->method('findBy')->willReturn([$original]);
+        $files->method('findBy')->willReturn([]);
+
+        $persisted = [];
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            $persisted[] = $entity;
+        });
+        $em->method('flush');
+
+        $service = new ConversationCopyService($em, $messages, $files);
+        $member = $this->createMock(User::class);
+        $member->method('getId')->willReturn(7);
+
+        $service->copyForUser($source, $member);
+
+        $copiedMessages = array_values(array_filter($persisted, static fn (object $e): bool => $e instanceof Message));
+        self::assertCount(1, $copiedMessages);
+        self::assertSame('after work keep this', $copiedMessages[0]->getText());
+        self::assertStringNotContainsString('[Memory:', $copiedMessages[0]->getText());
+    }
 }

@@ -10,6 +10,7 @@ use App\Service\Exception\RateLimitExceededException;
 use App\Service\RateLimitService;
 use App\Service\Stt\Exception\SttSessionClosedException;
 use App\Service\Stt\Exception\SttSessionNotFoundException;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -229,6 +230,7 @@ final readonly class SttSessionService
                 $options = [
                     'provider' => $session->provider,
                     'model' => $session->model,
+                    'model_id' => $session->modelId,
                 ];
                 if (null !== $session->language) {
                     $options['language'] = $session->language;
@@ -338,6 +340,7 @@ final readonly class SttSessionService
         $transcribeOptions = [
             'provider' => $resolved['provider'],
             'model' => $resolved['providerModelId'],
+            'model_id' => $resolved['model_id'],
         ];
         $language = $this->optionalString($options['language'] ?? null);
         $prompt = $this->optionalString($options['prompt'] ?? null);
@@ -395,9 +398,9 @@ final readonly class SttSessionService
 
     private function assertRateLimit(User $user): void
     {
-        $check = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        $check = $this->rateLimitService->checkLimit($user, TranscriptionUsageRecorder::ACTION);
         if (!($check['allowed'] ?? false)) {
-            throw new RateLimitExceededException('FILE_ANALYSIS', (int) ($check['used'] ?? 0), (int) ($check['limit'] ?? 0));
+            throw new RateLimitExceededException(TranscriptionUsageRecorder::ACTION, (int) ($check['used'] ?? 0), (int) ($check['limit'] ?? 0));
         }
     }
 

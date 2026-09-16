@@ -5138,6 +5138,10 @@
     },
     "loginToView": "Anmelden, um Erinnerungsdetails zu sehen",
     "memoryUsed": "Erinnerung verwendet",
+    "foreign": {
+      "badge": "Private Erinnerung",
+      "tooltip": "Diese Erinnerung gehört der Person, die den Chat geteilt hat. Sie ist für Sie nicht sichtbar."
+    },
     "toast": {
       "title": "Neue Erinnerung erkannt",
       "titleCompact": "Erinnerung",
@@ -6237,6 +6241,9 @@
     "basics": "Grundlagen",
     "name": "Name",
     "namePlaceholder": "z. B. Vertragsprüfung",
+    "nameRequired": "Geben Sie einen Namen ein, damit der Assistent gespeichert werden kann.",
+    "nameTooLong": "Der Name darf höchstens 128 Zeichen lang sein.",
+    "couldNotSaveField": "Dieser Teil konnte nicht gespeichert werden.",
     "description": "Beschreibung",
     "descriptionPlaceholder": "Wobei dieser Assistent hilft",
     "icon": "Symbol",

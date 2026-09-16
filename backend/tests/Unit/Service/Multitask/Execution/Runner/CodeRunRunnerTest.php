@@ -369,6 +369,35 @@ final class CodeRunRunnerTest extends TestCase
         $this->assertStringNotContainsString('Nothing new was saved', (string) $result->error);
     }
 
+    /**
+     * Issue #1875 / PR #1949: missing COMPUTE_CONCURRENT / COMPUTE_CPU_SECONDS_DAILY
+     * rows must fall back using the resolved group tier, not the billing level.
+     */
+    public function testMissingComputeCapsUseResolvedGroupTier(): void
+    {
+        $limits = $this->createStub(RateLimitService::class);
+        $limits->method('resolveRateLimitLevel')->willReturn('BUSINESS');
+        $limits->method('checkLimit')->willReturn(['allowed' => true]);
+        $limits->method('computeIntSetting')->willReturnCallback(
+            static fn (User $_user, string $_setting, int $fallback): int => $fallback,
+        );
+
+        $runner = $this->runner(
+            $this->createStub(ComputeClient::class),
+            $this->createStub(FileRepository::class),
+            limits: $limits,
+        );
+
+        $user = $this->createStub(User::class);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+
+        $concurrent = (new \ReflectionMethod(CodeRunRunner::class, 'defaultConcurrentCap'))->invoke($runner, $user);
+        $cpu = (new \ReflectionMethod(CodeRunRunner::class, 'defaultCpuCap'))->invoke($runner, $user);
+
+        self::assertSame(4, $concurrent);
+        self::assertSame(3600, $cpu);
+    }
+
     private function file(int $userId, string $name, string $path): File
     {
         $file = $this->createStub(File::class);
@@ -386,6 +415,7 @@ final class CodeRunRunnerTest extends TestCase
         bool $workspacesOn = false,
         ?ComputeWorkspaceService $workspaces = null,
         bool $egressOn = false,
+        ?RateLimitService $limits = null,
     ): CodeRunRunner {
         $repo = $this->createStub(\App\Repository\ConfigRepository::class);
         $repo->method('getValue')->willReturnCallback(
@@ -406,15 +436,17 @@ final class CodeRunRunnerTest extends TestCase
         $users = $this->createStub(UserRepository::class);
         $users->method('find')->willReturn($user);
 
-        $limits = $this->createStub(RateLimitService::class);
-        $limits->method('checkLimit')->willReturn(['allowed' => true]);
-        $limits->method('computeIntSetting')->willReturnCallback(
-            static fn (User $_user, string $setting, int $fallback): int => match ($setting) {
-                'COMPUTE_CONCURRENT' => 2,
-                'COMPUTE_CPU_SECONDS_DAILY' => 60,
-                default => $fallback,
-            },
-        );
+        if (null === $limits) {
+            $limits = $this->createStub(RateLimitService::class);
+            $limits->method('checkLimit')->willReturn(['allowed' => true]);
+            $limits->method('computeIntSetting')->willReturnCallback(
+                static fn (User $_user, string $setting, int $fallback): int => match ($setting) {
+                    'COMPUTE_CONCURRENT' => 2,
+                    'COMPUTE_CPU_SECONDS_DAILY' => 60,
+                    default => $fallback,
+                },
+            );
+        }
 
         $runs = $this->createStub(ComputeRunRepository::class);
         $runs->method('countActiveForUser')->willReturn(0);

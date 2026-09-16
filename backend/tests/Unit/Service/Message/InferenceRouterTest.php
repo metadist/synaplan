@@ -72,10 +72,11 @@ final class InferenceRouterTest extends TestCase
     }
 
     /**
-     * Issue #1910 / #1908: MessageClassifier emits intent file_analysis, but
-     * SystemCapabilityRegistry has no such capability, so the local map must
-     * send attachment turns to FileAnalysisHandler — otherwise pending/failed
-     * STT copy never runs.
+     * Issue #1910 / #1908: MessageClassifier emits intent file_analysis / topic
+     * analyzefile, and FileAnalysisHandler is registered under that name, but
+     * SystemCapabilityRegistry has no such capability. The local map must send
+     * attachment turns there — otherwise pending/failed STT copy never runs
+     * and every attachment fell through `?? 'chat'` to ChatHandler.
      */
     public function testFileAnalysisIntentRoutesToTheFileAnalysisHandler(): void
     {

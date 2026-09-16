@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ChatInput from '@/components/ChatInput.vue'
+import { chatApi } from '@/services/api/chatApi'
+import { deleteFile } from '@/services/filesService'
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {}, fullPath: '/chat' }),
@@ -66,6 +68,11 @@ vi.mock('@/composables/useNotification', () => ({
     warning: vi.fn(),
     info: vi.fn(),
   }),
+}))
+
+vi.mock('@/services/filesService', () => ({
+  getFileGroups: vi.fn().mockResolvedValue([]),
+  deleteFile: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
 }))
 
 const TextareaStub = {
@@ -245,5 +252,59 @@ describe('ChatInput summarize tool', () => {
 
     expect(wrapper.find('[data-testid="summarize-options"]').exists()).toBe(false)
     expect(wrapper.emitted('guestFeatureGate')).toEqual([['attach']])
+  })
+})
+
+describe('ChatInput staged attachments', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+    vi.mocked(deleteFile).mockClear()
+    vi.mocked(chatApi.uploadChatFile).mockReset()
+    vi.mocked(chatApi.uploadChatFile).mockResolvedValue({
+      success: true,
+      file_id: 1,
+      filename: 'doc.pdf',
+      size: 3,
+      mime: 'application/pdf',
+      file_type: 'pdf',
+      status: 'ready',
+      extracted_text_length: 10,
+    })
+  })
+
+  it('deletes a staged upload when the chip is removed', async () => {
+    const wrapper = mountInput()
+    await attachPdf(wrapper)
+
+    await wrapper.get('[data-testid="btn-remove-chat-file"]').trigger('click')
+    await flushPromises()
+
+    expect(deleteFile).toHaveBeenCalledWith(1)
+    expect(wrapper.find('[data-testid="btn-remove-chat-file"]').exists()).toBe(false)
+  })
+
+  it('deletes the staged row when extraction fails', async () => {
+    vi.mocked(chatApi.uploadChatFile).mockResolvedValueOnce({
+      success: true,
+      file_id: 9,
+      filename: 'bad.pdf',
+      size: 3,
+      mime: 'application/pdf',
+      file_type: 'pdf',
+      status: 'error',
+      extracted_text_length: 0,
+      extraction_error: 'document_extraction_failed',
+    })
+
+    const wrapper = mountInput()
+    await (wrapper.vm as unknown as ChatInputExposed).uploadFiles([
+      new File(['x'], 'bad.pdf', { type: 'application/pdf' }),
+    ])
+    await flushPromises()
+
+    expect(deleteFile).toHaveBeenCalledWith(9)
+    expect(wrapper.find('[data-testid="btn-remove-chat-file"]').exists()).toBe(false)
   })
 })

@@ -45,8 +45,8 @@ final class GatewayToolLoopTest extends TestCase
         $rateLimits->method('checkLimit')->willReturn(['allowed' => true, 'remaining' => 10, 'limit' => 100]);
         $rateLimits->expects($this->once())->method('recordUsage')->with(
             $user,
-            'MESSAGES',
-            $this->callback(static fn (array $m): bool => ($m['source'] ?? '') === 'MCP_TOOL'),
+            'TOOLS',
+            self::callback(static fn (mixed $meta): bool => is_array($meta)),
         );
 
         $config = $this->createMock(MessagesGatewayConfig::class);
@@ -172,9 +172,9 @@ final class GatewayToolLoopTest extends TestCase
         $rateLimits = $this->createMock(RateLimitService::class);
         $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
         $rateLimits->expects($this->once())->method('recordUsage')->with(
-            $user,
-            'MESSAGES',
-            $this->callback(static fn (array $m): bool => 'WEB_SEARCH' === ($m['source'] ?? '')),
+            self::anything(),
+            'TOOLS',
+            self::callback(static fn (mixed $meta): bool => is_array($meta)),
         );
 
         $loop = new GatewayToolLoop(

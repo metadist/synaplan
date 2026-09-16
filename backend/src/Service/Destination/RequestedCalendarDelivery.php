@@ -40,6 +40,54 @@ final readonly class RequestedCalendarDelivery
     }
 
     /**
+     * True when the user explicitly asked to put the event into a connected
+     * calendar — not when they only asked for a downloadable invite.
+     */
+    public function userAskedToPutInCalendar(string $text): bool
+    {
+        $haystack = mb_strtolower($text);
+        if (preg_match('/\b(do not|don\'t|dont|nicht|ne pas|no pongas)\b/u', $haystack)) {
+            return false;
+        }
+
+        // Require a destination phrase ("put/add/save … in/into/to … calendar"),
+        // not a generic save/upload plus a calendar word (e.g. "save the .ics file").
+        return (bool) preg_match(
+            '/\b(put|add|save|store|upload|lege|speicher|ablage|guarda|kaydet|ajoute|mets)\b.{0,48}\b(in|into|to|auf|im|ins|in den|in die)\b.{0,48}\b(calendar|kalender|calendario|takvim|calendrier|caldav|outlook)\b/u',
+            $haystack
+        );
+    }
+
+    /**
+     * Channel key to deliver into when the planner omitted params.channel.
+     * One connected calendar wins; several prefer the slug "calendar".
+     * Disconnected / error / never-tested rows are ignored (PR #1953 review).
+     */
+    public function defaultCalendarChannel(int $ownerId): ?string
+    {
+        $connected = [];
+        foreach ($this->channels->ofKind($ownerId, PlannerChannel::KIND_CALENDAR) as $channel) {
+            $connection = $this->connections->findByIdAndOwner($channel->connectionId, $ownerId);
+            if (null !== $connection && Connection::STATUS_CONNECTED === $connection->getStatus()) {
+                $connected[] = $channel;
+            }
+        }
+        if ([] === $connected) {
+            return null;
+        }
+        if (1 === count($connected)) {
+            return $connected[0]->key;
+        }
+        foreach ($connected as $channel) {
+            if ('calendar' === $channel->key) {
+                return $channel->key;
+            }
+        }
+
+        return $connected[0]->key;
+    }
+
+    /**
      * Deliver one .ics file into the calendar channel named by the planner.
      *
      * @return array{ok: bool, message: string, connection: string|null, channel: string|null, created: int, skipped: int, webLink: string|null}

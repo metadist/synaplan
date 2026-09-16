@@ -48,6 +48,7 @@ final class OpenAICompatibleControllerToolsTest extends TestCase
     private RateLimitService&MockObject $rateLimitService;
     /** @var array<string, mixed>|null */
     private ?array $metered = null;
+    private ?string $meteredAction = null;
 
     protected function setUp(): void
     {
@@ -58,8 +59,10 @@ final class OpenAICompatibleControllerToolsTest extends TestCase
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
         $this->metered = null;
+        $this->meteredAction = null;
         $this->rateLimitService->method('recordUsage')
             ->willReturnCallback(function (User $user, string $action, array $metadata): RecordedUsage {
+                $this->meteredAction = $action;
                 $this->metered = $metadata;
 
                 return new RecordedUsage('0.000000', '0.000000', 0, 0, 0);
@@ -89,6 +92,7 @@ final class OpenAICompatibleControllerToolsTest extends TestCase
         self::assertSame('{"city":"Berlin"}', $data['choices'][0]['message']['tool_calls'][0]['function']['arguments']);
         self::assertSame('call_test_1', $data['choices'][0]['message']['tool_calls'][0]['id']);
         self::assertIsArray($this->metered);
+        self::assertSame('MESSAGES', $this->meteredAction);
         self::assertSame('[tool_call get_weather({"city":"Berlin"})]', $this->metered['response_text']);
     }
 
@@ -151,6 +155,7 @@ final class OpenAICompatibleControllerToolsTest extends TestCase
         self::assertNotFalse($fixture);
         self::assertSame($fixture, $sse);
         self::assertIsArray($this->metered);
+        self::assertSame('MESSAGES', $this->meteredAction);
         self::assertSame('[tool_call get_weather({"city":"Berlin"})]', $this->metered['response_text']);
     }
 
