@@ -157,7 +157,10 @@ test.describe('@ci Navigation journeys', () => {
       await page.locator('[data-testid="input-search-chats"]').fill(title)
       const row = page.locator('[data-testid="chat-item"]').filter({ hasText: title })
       await expect(row).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      await row.locator('[data-testid="btn-chat-open"]').click({ force: true })
+      // The Open control is hover-only on desktop. The title is always
+      // clickable and opens the same chat.
+      await row.locator('h3').click()
+      await expect(page).toHaveURL(/\/$/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
 
