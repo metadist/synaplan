@@ -359,6 +359,7 @@
             :is-streaming="isStreaming"
             :memories="memories"
             :docs="docs"
+            :foreign-memory="foreignMemory"
           />
 
           <ChatErrorNotice
@@ -1162,6 +1163,11 @@ interface Props {
   usageTaximeterActive?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
+  /**
+   * Received (shared) conversation: `[Memory:ID]` belongs to the chat owner.
+   * MessageText renders a terminal badge and never looks the id up.
+   */
+  foreignMemory?: boolean
   /** User text that produced this plan — used to save it as a scheduled task. */
   scheduleSource?: string
   status?: 'sent' | 'failed' | 'rate_limited'

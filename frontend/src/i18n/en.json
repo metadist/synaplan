@@ -5204,6 +5204,10 @@
     },
     "loginToView": "Log in to view memory details",
     "memoryUsed": "Memory used",
+    "foreign": {
+      "badge": "Private memory",
+      "tooltip": "This memory belongs to the person who shared the chat. It is not visible to you."
+    },
     "toast": {
       "title": "New Memory Detected",
       "titleCompact": "Memory",

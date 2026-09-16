@@ -5138,6 +5138,10 @@
     },
     "loginToView": "Anmelden, um Erinnerungsdetails zu sehen",
     "memoryUsed": "Erinnerung verwendet",
+    "foreign": {
+      "badge": "Private Erinnerung",
+      "tooltip": "Diese Erinnerung gehört der Person, die den Chat geteilt hat. Sie ist für Sie nicht sichtbar."
+    },
     "toast": {
       "title": "Neue Erinnerung erkannt",
       "titleCompact": "Erinnerung",

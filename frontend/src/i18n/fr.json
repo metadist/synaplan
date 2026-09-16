@@ -5204,6 +5204,10 @@
     },
     "loginToView": "Connectez-vous pour voir les détails de la mémoire",
     "memoryUsed": "Mémoire utilisée",
+    "foreign": {
+      "badge": "Mémoire privée",
+      "tooltip": "Cette mémoire appartient à la personne qui a partagé la conversation. Elle n’est pas visible pour vous."
+    },
     "toast": {
       "title": "Nouvelle mémoire détectée",
       "titleCompact": "Mémoire",
