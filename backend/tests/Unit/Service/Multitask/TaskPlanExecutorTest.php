@@ -12,6 +12,7 @@ use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\ClassificationPlanMapper;
 use App\Service\Multitask\Execution\DagExecutor;
+use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\TaskPlanExecutor;
@@ -672,6 +673,50 @@ final class TaskPlanExecutorTest extends TestCase
 
         self::assertSame('Combined PDF created: Finanzmodell_combined.pdf', $result['content']);
         self::assertSame('document', $result['metadata']['file']['type']);
+    }
+
+    /**
+     * Issue #1873: deterministic plans have no planner modelId. The DAG
+     * context must still carry the effective identity, not the raw owner —
+     * otherwise an unverified WhatsApp sender would unlock group PARALLEL_ENABLED.
+     */
+    public function testDagContextUsesEffectiveUserIdWhenThePlanHasNoModelId(): void
+    {
+        $this->modelConfigService->expects(self::atLeastOnce())
+            ->method('getEffectiveUserIdForMessage')
+            ->willReturn(9);
+
+        $message = $this->message();
+        $message->method('getUserId')->willReturn(99);
+
+        $capturedUserId = null;
+        $this->planner->expects(self::never())->method('plan');
+        $this->dagExecutor->expects(self::once())
+            ->method('execute')
+            ->willReturnCallback(function (TaskPlan $plan, NodeContext $context) use (&$capturedUserId): array {
+                $capturedUserId = $context->userId;
+
+                return $this->assembled([
+                    'content' => 'Combined PDF created: Finanzmodell_combined.pdf',
+                    'files' => [['path' => '/api/v1/files/uploads/combined.pdf', 'type' => 'document']],
+                ]);
+            });
+        $this->router->expects(self::never())->method('routeStream');
+
+        $this->executor->executeStream(
+            $message,
+            [],
+            [
+                'topic' => 'officemaker',
+                'intent' => 'document_combine',
+                'language' => 'de',
+                'source' => 'attachment_document_combine',
+                'skip_sorting' => true,
+            ],
+            static function (): void {},
+        );
+
+        self::assertSame(9, $capturedUserId);
     }
 
     /**

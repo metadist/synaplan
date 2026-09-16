@@ -93,7 +93,7 @@ final readonly class DagExecutor
             });
         }
 
-        if ($this->config->isParallelEnabled()) {
+        if ($this->config->isParallelEnabled($context->userId)) {
             $this->executeParallel($plan, $context, $progressCallback);
         } else {
             $this->executeSequential($plan, $context, $progressCallback);
