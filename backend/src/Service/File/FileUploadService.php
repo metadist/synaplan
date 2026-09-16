@@ -537,7 +537,10 @@ final readonly class FileUploadService
                 'error' => $e->getMessage(),
             ]);
 
-            return ['success' => false, 'error' => 'Text extraction failed: '.$e->getMessage()];
+            $file->setStatus('error');
+            $this->em->flush();
+
+            return ['success' => false, 'error' => 'Text extraction failed: '.$e->getMessage(), 'status' => 'error'];
         }
 
         return $result;

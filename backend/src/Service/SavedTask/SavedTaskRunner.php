@@ -277,6 +277,14 @@ final readonly class SavedTaskRunner
         $this->runs->save($run);
         $this->tasks->save($task);
 
+        if (null !== $messageId) {
+            $message = $this->em->find(Message::class, $messageId);
+            if ($message instanceof Message && in_array($message->getStatus(), ['processing', 'queued'], true)) {
+                $message->setStatus('error');
+                $this->em->flush();
+            }
+        }
+
         if ($task->isAutoPaused()) {
             $this->notifyPaused($task, $error);
         }

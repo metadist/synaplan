@@ -14,6 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERSESSIONID'], name: 'idx_file_session')]
 #[ORM\Index(columns: ['BFILETYPE'], name: 'idx_file_type')]
 #[ORM\Index(columns: ['BSTATUS'], name: 'idx_file_status')]
+#[ORM\Index(columns: ['BSTATUS', 'BUPDATEDAT'], name: 'idx_file_status_updated')]
 #[ORM\Index(columns: ['BGROUPKEY'], name: 'idx_file_groupkey')]
 #[ORM\Index(columns: ['BUSERID', 'BSOURCE'], name: 'idx_file_user_source')]
 #[ORM\Index(columns: ['BUSERID', 'BSOURCE', 'BSOURCEID'], name: 'idx_file_user_source_sid')]
@@ -257,9 +258,18 @@ class File
     #[ORM\Column(name: 'BCREATEDAT', type: 'bigint')]
     private int $createdAt;
 
+    /**
+     * Last status change. The stuck-file reaper uses this so a re-process of
+     * an old upload is not treated as already expired (issue #1913).
+     */
+    #[ORM\Column(name: 'BUPDATEDAT', type: 'bigint')]
+    private int $updatedAt;
+
     public function __construct()
     {
-        $this->createdAt = time();
+        $now = time();
+        $this->createdAt = $now;
+        $this->updatedAt = $now;
     }
 
     // Getters and Setters
@@ -361,6 +371,7 @@ class File
     public function setStatus(string $status): self
     {
         $this->status = $status;
+        $this->updatedAt = time();
 
         return $this;
     }
@@ -373,6 +384,18 @@ class File
     public function setCreatedAt(int $createdAt): self
     {
         $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): int
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(int $updatedAt): self
+    {
+        $this->updatedAt = $updatedAt;
 
         return $this;
     }
