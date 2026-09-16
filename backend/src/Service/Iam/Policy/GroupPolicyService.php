@@ -110,9 +110,6 @@ final readonly class GroupPolicyService
     {
         $locked = [];
         foreach ($body as $key => $on) {
-            if (!is_string($key)) {
-                throw new \InvalidArgumentException('Unknown policy key.');
-            }
             $parts = PolicyAllowList::split($key);
             if (null === $parts) {
                 throw new \InvalidArgumentException(sprintf('Unknown policy key "%s".', $key));
