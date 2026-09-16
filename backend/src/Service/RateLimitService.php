@@ -132,9 +132,15 @@ final class RateLimitService
     /**
      * Estimate token count from byte length.
      *
-     * Uses a simple heuristic: ~1.3 bytes per token on average for mixed-language text.
+     * Byte-pair tokenizers measure about 4 bytes per token for English, about 3
+     * for German, and 2 to 4.5 for CJK text in UTF-8. The previous 1.3 divisor
+     * overstated every language by 2–3× and that figure was priced into BCOST
+     * whenever a provider returned no usage (issue #1876). 4.0 is the English
+     * BPE baseline used in that report: 1000 bytes → 250 tokens, not 770.
+     *
      * For media content (images/audio/video), the byte count is used as-is.
-     * This provides a rough but useful estimate when providers don't return exact token counts.
+     * This is a fallback only — cloud providers that report usage are billed
+     * from those counts, not this heuristic.
      *
      * @param int $bytes Total bytes of content (text + media)
      *
@@ -146,7 +152,7 @@ final class RateLimitService
             return 0;
         }
 
-        return (int) ceil($bytes / 1.3);
+        return (int) ceil($bytes / 4.0);
     }
 
     /**
