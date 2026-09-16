@@ -238,7 +238,7 @@ final readonly class ComputeWorkspaceService
 
     private function defaultQuotaMb(User $user): int
     {
-        return match (strtoupper($user->getRateLimitLevel())) {
+        return match (strtoupper($this->rateLimits->resolveRateLimitLevel($user))) {
             'PRO' => 512,
             'TEAM' => 1024,
             'BUSINESS', 'ADMIN' => 2048,

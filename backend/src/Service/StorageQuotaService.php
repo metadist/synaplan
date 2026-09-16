@@ -28,6 +28,7 @@ final readonly class StorageQuotaService
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private BillingService $billingService,
+        private RateLimitService $rateLimitService,
     ) {
     }
 
@@ -49,7 +50,7 @@ final readonly class StorageQuotaService
             return self::UNLIMITED_BYTES;
         }
 
-        $level = $user->getRateLimitLevel();
+        $level = $this->rateLimitService->resolveRateLimitLevel($user);
 
         // Get limit from config (in MB or GB depending on plan)
         $limitConfig = $this->configRepository->findOneBy([
@@ -132,7 +133,7 @@ final readonly class StorageQuotaService
         if ($fileSize > $remaining) {
             $this->logger->warning('Storage limit exceeded', [
                 'user_id' => $user->getId(),
-                'user_level' => $user->getRateLimitLevel(),
+                'user_level' => $this->rateLimitService->resolveRateLimitLevel($user),
                 'limit' => $limit,
                 'usage' => $usage,
                 'remaining' => $remaining,
@@ -144,7 +145,7 @@ final readonly class StorageQuotaService
 
         $this->logger->debug('Storage check passed', [
             'user_id' => $user->getId(),
-            'user_level' => $user->getRateLimitLevel(),
+            'user_level' => $this->rateLimitService->resolveRateLimitLevel($user),
             'usage' => $usage,
             'limit' => $limit,
             'remaining' => $remaining,

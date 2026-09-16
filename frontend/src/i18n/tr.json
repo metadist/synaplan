@@ -4316,6 +4316,10 @@
     },
     "loginToView": "Anı detaylarını görmek için giriş yapın",
     "memoryUsed": "Anı kullanıldı",
+    "foreign": {
+      "badge": "Özel anı",
+      "tooltip": "Bu anı, sohbeti paylaşan kişiye aittir. Sizin için görünmez."
+    },
     "toast": {
       "title": "Yeni Anı Algılandı",
       "titleCompact": "Anı",
@@ -5318,6 +5322,9 @@
     "basics": "Temel bilgiler",
     "name": "Ad",
     "namePlaceholder": "örn. Sözleşme inceleme",
+    "nameRequired": "Asistanın kaydedilebilmesi için bir ad girin.",
+    "nameTooLong": "Ad en fazla 128 karakter olabilir.",
+    "couldNotSaveField": "Bu bölüm kaydedilemedi.",
     "description": "Açıklama",
     "descriptionPlaceholder": "Bu asistanın yardım ettiği konu",
     "icon": "Simge",

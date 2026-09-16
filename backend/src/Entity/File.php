@@ -245,10 +245,11 @@ class File
     private ?string $thumbPath = null;
 
     /**
-     * 1 for files created during an incognito chat session: they are excluded
-     * from all file listings, never vectorized, and deleted automatically ?
-     * by the frontend on session end (best effort) and by the
-     * `app:files:reap-ephemeral` command as a safety net.
+     * 1 for files that must not appear in the Files list: incognito-session
+     * media, and chat attachments that have not yet been sent with a message
+     * (issue #1911). They are never vectorized via the library listings and
+     * are deleted by the frontend on remove (best effort) and by
+     * `app:files:reap-ephemeral` as a safety net.
      */
     #[ORM\Column(name: 'BEPHEMERAL', type: 'boolean', options: ['default' => 0])]
     private bool $ephemeral = false;
@@ -579,6 +580,22 @@ class File
     public function setEphemeral(bool $ephemeral): self
     {
         $this->ephemeral = $ephemeral;
+
+        return $this;
+    }
+
+    /**
+     * A staged chat attachment becomes a real library row once the message
+     * that references it is sent. Incognito turns stay ephemeral.
+     */
+    public function keepAfterChatSend(bool $incognito): self
+    {
+        if ($incognito) {
+            return $this;
+        }
+        if ($this->ephemeral && 'chat_attachment' === $this->source) {
+            $this->ephemeral = false;
+        }
 
         return $this;
     }

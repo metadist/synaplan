@@ -5204,6 +5204,10 @@
     },
     "loginToView": "Connectez-vous pour voir les détails de la mémoire",
     "memoryUsed": "Mémoire utilisée",
+    "foreign": {
+      "badge": "Mémoire privée",
+      "tooltip": "Cette mémoire appartient à la personne qui a partagé la conversation. Elle n’est pas visible pour vous."
+    },
     "toast": {
       "title": "Nouvelle mémoire détectée",
       "titleCompact": "Mémoire",
@@ -6303,6 +6307,9 @@
     "basics": "Informations",
     "name": "Nom",
     "namePlaceholder": "ex. Revue de contrats",
+    "nameRequired": "Saisissez un nom pour pouvoir enregistrer l’assistant.",
+    "nameTooLong": "Le nom peut contenir 128 caractères au maximum.",
+    "couldNotSaveField": "Cette partie n’a pas pu être enregistrée.",
     "description": "Description",
     "descriptionPlaceholder": "En quoi cet assistant aide",
     "icon": "Icône",

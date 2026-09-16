@@ -28,6 +28,8 @@ interface Props {
   isStreaming?: boolean
   memories?: UserMemory[] | null // Full memory objects (resolved from IDs)
   docs?: PlatformDocRef[] | null
+  /** Received (shared) conversation: memory IDs belong to the owner. */
+  foreignMemory?: boolean
 }
 
 const props = defineProps<Props>()
@@ -77,6 +79,7 @@ const componentProps = computed(() => {
         isStreaming: props.isStreaming,
         memories: props.memories,
         docs: props.docs,
+        foreignMemory: props.foreignMemory,
       }
     case 'image':
       return { url: props.part.url || '', alt: props.part.alt }

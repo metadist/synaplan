@@ -6,13 +6,17 @@
       <input
         :value="name"
         type="text"
+        maxlength="128"
         class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.namePlaceholder')"
+        :aria-invalid="Boolean(errorFor('name'))"
+        :aria-describedby="errorFor('name') ? 'assistant-name-error' : undefined"
         data-testid="input-assistant-name"
         @input="patchName(($event.target as HTMLInputElement).value)"
       />
       <p
         v-if="errorFor('name')"
+        id="assistant-name-error"
         class="text-sm text-red-600 dark:text-red-400 mt-1"
         data-testid="error-name"
       >
@@ -29,6 +33,13 @@
         data-testid="input-assistant-description"
         @input="patchDescription(($event.target as HTMLTextAreaElement).value)"
       />
+      <p
+        v-if="errorFor('description')"
+        class="text-sm text-red-600 dark:text-red-400 mt-1"
+        data-testid="error-description"
+      >
+        {{ errorFor('description') }}
+      </p>
     </label>
     <label class="block">
       <span class="txt-secondary text-sm">{{ $t('assistants.greeting') }}</span>
@@ -40,6 +51,13 @@
         data-testid="input-assistant-greeting"
         @input="patchGreeting(($event.target as HTMLInputElement).value)"
       />
+      <p
+        v-if="errorFor('behaviour.greeting')"
+        class="text-sm text-red-600 dark:text-red-400 mt-1"
+        data-testid="error-greeting"
+      >
+        {{ errorFor('behaviour.greeting') }}
+      </p>
     </label>
     <div>
       <p class="txt-secondary text-sm mb-2">{{ $t('assistants.starterPrompts') }}</p>
@@ -98,6 +116,7 @@ function patchName(value: string): void {
     return
   }
   store.current.name = value
+  store.setFieldError('name', store.nameValidationError(value))
   store.markDirty()
 }
 

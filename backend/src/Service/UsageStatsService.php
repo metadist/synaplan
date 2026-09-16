@@ -45,7 +45,7 @@ final readonly class UsageStatsService
      */
     public function getUserStats(User $user): array
     {
-        $level = $user->getRateLimitLevel();
+        $level = $this->rateLimitService->resolveRateLimitLevel($user);
         $userId = $user->getId();
 
         // Get usage per action type

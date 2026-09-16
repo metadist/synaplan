@@ -327,7 +327,7 @@ PROMPT;
     private function executeContradictionAiCall(User $user, string $systemPrompt, string $userPrompt, array $related): array
     {
         try {
-            $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+            $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
 
             $aiOptions = array_filter([
                 'provider' => $toolsConfig['provider'],
