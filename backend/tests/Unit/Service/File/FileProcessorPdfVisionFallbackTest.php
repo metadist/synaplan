@@ -75,6 +75,31 @@ final class FileProcessorPdfVisionFallbackTest extends TestCase
         self::assertSame('rasterize_vision_describe', $meta['strategy']);
     }
 
+    public function testVisionThinkBlocksAreStrippedFromSearchableText(): void
+    {
+        $tika = $this->createMock(TikaClient::class);
+        $tika->method('isEnabled')->willReturn(true);
+        $tika->method('extractText')->willReturn(['', []]);
+
+        $rasterizer = $this->createMock(PdfRasterizer::class);
+        $rasterizer->method('pdfToPng')->willReturn([$this->pagePath]);
+        $rasterizer->method('getLastEngine')->willReturn('imagick');
+
+        $this->aiFacade->expects(self::once())
+            ->method('analyzeImage')
+            ->willReturn([
+                'content' => "<think>planning the OCR</think>\n\nDAS TEGERNSEE\nGUTSCHEIN IM WERT\nVON 100,- €",
+                'provider' => 'groq',
+            ]);
+
+        $processor = $this->makeProcessor($tika, $rasterizer);
+        [$text] = $processor->extractText($this->pdfRelative, 'pdf', 1);
+
+        self::assertStringNotContainsString('<think>', $text);
+        self::assertStringContainsString('GUTSCHEIN IM WERT', $text);
+        self::assertStringContainsString('100,-', $text);
+    }
+
     private function makeProcessor(TikaClient $tika, PdfRasterizer $rasterizer): FileProcessor
     {
         return new FileProcessor(

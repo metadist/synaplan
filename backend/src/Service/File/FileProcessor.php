@@ -1042,10 +1042,7 @@ final readonly class FileProcessor
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
 
             $text = $result['content'] ?? '';
-            $text = $this->textCleaner->clean($text);
-            if (0 === stripos($text, 'test image description:')) {
-                $text = preg_replace('/^test image description:\s*/i', '', $text);
-            }
+            $text = $this->textCleaner->clean($this->stripVisionChrome((string) $text));
 
             // OCR-only mode: vision models routinely ignore the "return empty
             // string" instruction for text-less images and reply with prose
@@ -1073,6 +1070,18 @@ final readonly class FileProcessor
                 @unlink($tempJpegAbsolute);
             }
         }
+    }
+
+    /**
+     * Drop model reasoning wrappers and the test-fixture prefix so RAG stores
+     * the page text, not the model's scratchpad.
+     */
+    private function stripVisionChrome(string $text): string
+    {
+        $text = preg_replace('/<think\b[^>]*>[\s\S]*?<\/think>/i', '', $text) ?? $text;
+        $text = preg_replace('/^test image description:\s*/i', '', $text) ?? $text;
+
+        return trim($text);
     }
 
     /**
@@ -1161,9 +1170,7 @@ final readonly class FileProcessor
                         .'Do not provide any descriptions. '
                         .'If no text is present, return an empty string.';
                 $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
-                $text = $result['content'] ?? '';
-                $text = trim((string) $text);
-                $text = preg_replace('/^test image description:\s*/i', '', $text) ?? $text;
+                $text = $this->stripVisionChrome((string) ($result['content'] ?? ''));
                 if (!$describe && $this->isNoTextResponse($text)) {
                     $text = '';
                 }

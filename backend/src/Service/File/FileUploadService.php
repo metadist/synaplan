@@ -623,7 +623,12 @@ final readonly class FileUploadService
 
         $asyncMarkdown = null;
 
-        if ('uploaded' === $file->getStatus()) {
+        // Re-extract when there is no text yet — includes the empty
+        // "extracted" rows the old pipeline left behind (image-only PDFs).
+        $needsExtract = 'uploaded' === $file->getStatus()
+            || ('' === trim($file->getFileText()) && in_array($file->getStatus(), ['extracted', 'error'], true));
+
+        if ($needsExtract) {
             $file->setStatus('extracting');
             $this->em->flush();
 
