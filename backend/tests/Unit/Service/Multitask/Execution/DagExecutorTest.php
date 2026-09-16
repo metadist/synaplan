@@ -79,10 +79,12 @@ final class DagExecutorTest extends TestCase
         };
     }
 
-    private function config(bool $parallel, int $cap = 3, int $timeout = 120): MultitaskRoutingConfig
+    private function config(bool $parallel, int $cap = 3, int $timeout = 120, ?int $expectedUserId = 1): MultitaskRoutingConfig
     {
         $config = $this->createMock(MultitaskRoutingConfig::class);
-        $config->method('isParallelEnabled')->willReturn($parallel);
+        $config->method('isParallelEnabled')
+            ->with($expectedUserId)
+            ->willReturn($parallel);
         $config->method('maxParallel')->willReturn($cap);
         $config->method('nodeTimeoutSeconds')->willReturn($timeout);
 
@@ -255,6 +257,44 @@ final class DagExecutorTest extends TestCase
         $this->executor($runner)->execute($plan, $this->context());
 
         self::assertFalse($inline, 'terminal media node must keep the async detach');
+    }
+
+    /**
+     * Issue #1873: parallel mode is resolved for the context user, not globally.
+     * A lookup that dropped the id (or passed a different one) would still pass
+     * a stub that ignores arguments.
+     */
+    public function testParallelLookupUsesTheContextUserIdAndNotAnotherIdentity(): void
+    {
+        $config = $this->createMock(MultitaskRoutingConfig::class);
+        $config->expects(self::once())
+            ->method('isParallelEnabled')
+            ->with(42)
+            ->willReturn(false);
+        $config->method('maxParallel')->willReturn(3);
+        $config->method('nodeTimeoutSeconds')->willReturn(120);
+
+        $executor = new DagExecutor(
+            new RunnerRegistry([$this->runner(fn (): NodeResult => NodeResult::ok('hi'))]),
+            new ResultAssembler(),
+            $this->dispatcher(),
+            $config,
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getText')->willReturn('hi');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $result = $executor->execute(
+            TaskPlan::singleChatPlan('en'),
+            new NodeContext($message, [], 42, ['language' => 'en']),
+        );
+
+        self::assertSame('hi', $result['content']);
     }
 
     public function testFailureIsolationSkipsDependentsButRunsIndependentBranch(): void

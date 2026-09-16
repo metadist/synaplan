@@ -649,7 +649,11 @@ final readonly class TaskPlanExecutor
         TaskPlanResult $plan,
         ?callable $progressCallback,
     ): array {
-        $userId = $plan->modelId ? $this->modelConfigService->getEffectiveUserIdForMessage($message) : $message->getUserId();
+        // Always the effective identity: an unverified WhatsApp owner must not
+        // unlock allow-listed group flags (PARALLEL_ENABLED) that routing would
+        // keep global-only. Deterministic plans have no modelId; they still
+        // share this context with every other DAG path.
+        $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
         // Sibling awareness: give every runner the full set of capabilities in
         // this plan so a content node (chat/summarize) knows that media/file

@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Multitask;
 
+use App\Entity\Config;
+use App\Entity\GroupConfig;
+use App\Entity\GroupMember;
 use App\Repository\ConfigRepository;
+use App\Repository\GroupConfigRepository;
+use App\Repository\GroupMemberRepository;
 use App\Service\Config\LayeredConfigResolver;
+use App\Service\Iam\IamConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -111,6 +117,54 @@ final class MultitaskRoutingConfigTest extends TestCase
 
         $config = new MultitaskRoutingConfig($this->configRepository, $layered);
 
+        self::assertFalse($config->isParallelEnabled(null));
+    }
+
+    /**
+     * Issue #1873: MULTITASK.PARALLEL_ENABLED is on the group-policy allow-list.
+     * A mocked resolveBool() would still pass if the flag never consulted
+     * BGROUPCONFIG. Wire a real LayeredConfigResolver so a member's group
+     * value 1 wins over the global 0, and a null user stays on the global row.
+     */
+    public function testParallelEnabledHonoursGroupPolicyOverGlobalOff(): void
+    {
+        $configRepository = $this->createMock(ConfigRepository::class);
+        $groupConfig = $this->createMock(GroupConfigRepository::class);
+        $members = $this->createMock(GroupMemberRepository::class);
+        $iam = $this->createMock(IamConfig::class);
+
+        $iam->method('isGroupPoliciesEnabled')->willReturn(true);
+        $configRepository->method('getValue')->willReturn(null);
+        $global = new Config();
+        $global->setOwnerId(0);
+        $global->setGroup(MultitaskRoutingConfig::CONFIG_GROUP);
+        $global->setSetting(MultitaskRoutingConfig::KEY_PARALLEL_ENABLED);
+        $global->setValue('0');
+        $configRepository->expects(self::atLeastOnce())
+            ->method('findByOwnerGroupAndSetting')
+            ->with(0, MultitaskRoutingConfig::CONFIG_GROUP, MultitaskRoutingConfig::KEY_PARALLEL_ENABLED)
+            ->willReturn($global);
+
+        $members->expects(self::once())
+            ->method('findByUserId')
+            ->with(9)
+            ->willReturn([new GroupMember(4, 9)]);
+        $groupRow = new GroupConfig();
+        $groupRow->setGroupId(4);
+        $groupRow->setGroup(MultitaskRoutingConfig::CONFIG_GROUP);
+        $groupRow->setSetting(MultitaskRoutingConfig::KEY_PARALLEL_ENABLED);
+        $groupRow->setValue('1');
+        $groupConfig->expects(self::once())
+            ->method('getForGroups')
+            ->with([4], MultitaskRoutingConfig::CONFIG_GROUP, MultitaskRoutingConfig::KEY_PARALLEL_ENABLED)
+            ->willReturn([$groupRow]);
+
+        $config = new MultitaskRoutingConfig(
+            $configRepository,
+            new LayeredConfigResolver($configRepository, $groupConfig, $members, $iam),
+        );
+
+        self::assertTrue($config->isParallelEnabled(9));
         self::assertFalse($config->isParallelEnabled(null));
     }
 
