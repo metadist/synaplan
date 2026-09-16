@@ -126,8 +126,13 @@ final readonly class CalendarEventRunner implements TaskRunner
         $gated = $this->approvalGate?->consult($context, $node, SkillToolSource::nameFor(Capability::CalendarEvent), [
             'title' => $title,
             'start' => $start->format(\DateTimeInterface::ATOM),
+            'end' => $end->format(\DateTimeInterface::ATOM),
             'timezone' => $tzName,
             'channel' => $channel,
+            'location' => is_string($params['location'] ?? null) ? $params['location'] : null,
+            'description' => is_string($params['description'] ?? null) ? $params['description'] : null,
+            'attendees' => $this->normalizeAttendees($params['attendees'] ?? null),
+            'organizer_email' => is_string($params['organizer_email'] ?? null) ? $params['organizer_email'] : null,
         ]);
         if (null !== $gated) {
             return $gated;

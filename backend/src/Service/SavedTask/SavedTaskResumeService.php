@@ -27,6 +27,7 @@ use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\ApprovalPolicy;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\Policy\PolicyOutcome;
+use App\Service\Tool\Source\SkillToolSource;
 use App\Service\Tool\ToolRegistry;
 use Psr\Log\LoggerInterface;
 
@@ -111,6 +112,10 @@ final readonly class SavedTaskResumeService
             $bound = $this->recheckToolCall($node, $context, $approval, $task);
             if (null !== $bound) {
                 return $this->failResume($run, $task, $approval, $bound);
+            }
+        } elseif (null !== $node && str_starts_with($approval->getTool(), 'skill:')) {
+            if (SkillToolSource::nameFor($node->capability) !== $approval->getTool()) {
+                return $this->failResume($run, $task, $approval, 'This approval no longer matches the step.');
             }
         }
 

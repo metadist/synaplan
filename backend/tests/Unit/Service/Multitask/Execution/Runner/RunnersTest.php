@@ -747,7 +747,21 @@ final class RunnersTest extends TestCase
         $storage->expects(self::never())->method('storeRawContent');
 
         $gate = $this->createMock(StepApprovalGate::class);
-        $gate->method('consult')->willReturn(NodeResult::waitingApproval(5, ['title' => 'Sync']));
+        $gate->expects(self::once())
+            ->method('consult')
+            ->with(
+                self::anything(),
+                self::anything(),
+                'skill:calendar_event',
+                self::callback(static function (array $args): bool {
+                    return isset($args['title'], $args['start'], $args['end'], $args['timezone'], $args['channel'])
+                        && array_key_exists('location', $args)
+                        && array_key_exists('description', $args)
+                        && array_key_exists('attendees', $args)
+                        && array_key_exists('organizer_email', $args);
+                }),
+            )
+            ->willReturn(NodeResult::waitingApproval(5, ['title' => 'Sync']));
 
         $runner = new CalendarEventRunner(
             new CalendarEventService(),

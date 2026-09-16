@@ -45,10 +45,19 @@ final readonly class StepApprovalGate
         }
 
         $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
-        $unattended = true === ($context->options['saved_task'] ?? false);
-        $requestedBy = $runId > 0
-            ? sprintf('task_run:%d:%s', $runId, $node->id)
-            : 'chat:'.(int) $context->message->getId();
+        $unattended = $runId > 0 || true === ($context->options['saved_task'] ?? false);
+        // Interactive chat DAGs record `chat:<message>` approvals, but
+        // ResumeApprovalCommandHandler only re-runs a DAG for `task_run:*`.
+        // Honor a node-level block; do not pause (and drop) a write until
+        // that resume path exists (issue #1883).
+        if (!$unattended) {
+            if (PolicyOutcome::Block === PolicyOutcome::tryFrom((string) $override)) {
+                return NodeResult::failed(ToolExecutionGate::NODE_BLOCK_REFUSAL);
+            }
+
+            return null;
+        }
+        $requestedBy = sprintf('task_run:%d:%s', $runId, $node->id);
 
         try {
             $decision = $this->executionGate->inspect(
@@ -56,7 +65,7 @@ final readonly class StepApprovalGate
                 $toolName,
                 $arguments,
                 $actor,
-                $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,
+                PolicyContext::Unattended,
                 $requestedBy,
                 null,
                 true === ($context->options['allow_unattended'] ?? false),

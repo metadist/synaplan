@@ -41,6 +41,10 @@ final class StepApprovalGateTest extends TestCase
                 self::isInstanceOf(User::class),
                 PolicyContext::Unattended,
                 'task_run:9:n3',
+                null,
+                false,
+                null,
+                null,
             )
             ->willReturn([
                 'outcome' => PolicyOutcome::Approve,
@@ -62,6 +66,51 @@ final class StepApprovalGateTest extends TestCase
         self::assertSame('skill:email_me', $result->metadata['tool']);
     }
 
+    public function testResumeWithOnlyRunIdStaysUnattended(): void
+    {
+        $executionGate = $this->createMock(ToolExecutionGate::class);
+        $executionGate->expects(self::once())
+            ->method('inspect')
+            ->with(
+                7,
+                'skill:email_me',
+                [],
+                self::isInstanceOf(User::class),
+                PolicyContext::Unattended,
+                'task_run:9:n3',
+                null,
+                true,
+                null,
+                null,
+            )
+            ->willReturn([
+                'outcome' => PolicyOutcome::Auto,
+                'descriptor' => $this->descriptor(),
+                'approval' => null,
+                'refusal' => null,
+            ]);
+
+        self::assertNull($this->gate($executionGate)->consult(
+            $this->context(['saved_task_run_id' => 9, 'allow_unattended' => true]),
+            new TaskNode('n3', Capability::EmailMe),
+            'skill:email_me',
+            [],
+        ));
+    }
+
+    public function testInteractiveChatDoesNotCreateASkillApproval(): void
+    {
+        $executionGate = $this->createMock(ToolExecutionGate::class);
+        $executionGate->expects(self::never())->method('inspect');
+
+        self::assertNull($this->gate($executionGate)->consult(
+            $this->context(),
+            new TaskNode('n3', Capability::EmailMe),
+            'skill:email_me',
+            ['to' => 'alice@example.com'],
+        ));
+    }
+
     public function testRunsWhenPolicyIsAuto(): void
     {
         $executionGate = $this->createMock(ToolExecutionGate::class);
@@ -73,11 +122,28 @@ final class StepApprovalGateTest extends TestCase
         ]);
 
         self::assertNull($this->gate($executionGate)->consult(
-            $this->context(),
+            $this->context(['saved_task' => true]),
             new TaskNode('n3', Capability::EmailMe),
             'skill:email_me',
             [],
         ));
+    }
+
+    public function testInteractiveChatHonorsANodeLevelBlock(): void
+    {
+        $executionGate = $this->createMock(ToolExecutionGate::class);
+        $executionGate->expects(self::never())->method('inspect');
+
+        $result = $this->gate($executionGate)->consult(
+            $this->context(),
+            new TaskNode('n3', Capability::EmailMe, [], [], ['approval' => 'block']),
+            'skill:email_me',
+            [],
+        );
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isSuccessful());
+        self::assertSame(ToolExecutionGate::NODE_BLOCK_REFUSAL, $result->error);
     }
 
     public function testFailsWhenPolicyBlocks(): void
@@ -91,7 +157,7 @@ final class StepApprovalGateTest extends TestCase
         ]);
 
         $result = $this->gate($executionGate)->consult(
-            $this->context(),
+            $this->context(['saved_task' => true, 'saved_task_run_id' => 1]),
             new TaskNode('n3', Capability::EmailMe, [], [], ['approval' => 'block']),
             'skill:email_me',
             [],
@@ -124,7 +190,7 @@ final class StepApprovalGateTest extends TestCase
         $executionGate->method('inspect')->willThrowException(new ToolNotRegisteredException('skill:email_me'));
 
         $result = $this->gate($executionGate)->consult(
-            $this->context(),
+            $this->context(['saved_task' => true, 'saved_task_run_id' => 1]),
             new TaskNode('n3', Capability::EmailMe),
             'skill:email_me',
             [],
