@@ -657,9 +657,10 @@ services:
   # runs this role; without it locally a stalled image job never reaches
   # timed_out and the chat bubble stays on __IMAGE_GENERATING__ (issue #1890).
   #
-  # APP_ENV MUST match the backend (default: dev). RedisService namespaces
-  # media jobs as synaplan:{env}:mediajob:*, so a prod scheduler would miss
-  # every local job the same way a mismatched worker does.
+  # APP_ENV is pinned to `dev`, same as the backend service. RedisService
+  # namespaces media jobs as synaplan:{env}:mediajob:*; interpolating the
+  # host APP_ENV would send the scheduler to synaplan:prod while local
+  # jobs stay under synaplan:dev.
   scheduler:
     image: ghcr.io/metadist/synaplan:latest
     pull_policy: build
@@ -679,9 +680,7 @@ services:
       - ./_docker/backend/lib:/usr/local/bin/lib:ro
       - ./_docker/backend/container-healthcheck.sh:/usr/local/bin/container-healthcheck:ro
     environment:
-      APP_ENV: ${APP_ENV:-dev}
-      APP_DEBUG: "0"
-      SYNAPLAN_ROLE: scheduler
+      APP_ENV: dev
       SYNAPLAN_WEB_HEALTH_URL: http://backend/api/health
       DAV_ALLOW_INSECURE_LOCAL: "1"
       APP_URL: http://backend
