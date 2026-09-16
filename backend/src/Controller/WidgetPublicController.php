@@ -1286,11 +1286,13 @@ class WidgetPublicController extends AbstractController
                 // turn also analyses the same row. Authenticated /upload-file
                 // still defers billing because those files are only staged
                 // until send (issue #887 / #1912).
-                if (isset($result['file']['id'])) {
-                    $owner = $widget->getOwner();
-                    if ($owner) {
-                        $this->rateLimitService->recordFileAnalysisOnce($owner, (int) $result['file']['id']);
-                    }
+                if ($owner && isset($result['file']['id'])) {
+                    $this->rateLimitService->recordFileAnalysisOnce($owner, (int) $result['file']['id'], [
+                        'widget_id' => $widgetId,
+                        'session_id' => $sessionId,
+                        'filename' => $uploadedFile->getClientOriginalName(),
+                        'source' => 'WIDGET',
+                    ]);
                 }
 
                 $maxFilesForSession = $fileLimitCheck['max_files'] ?? $fileLimit;

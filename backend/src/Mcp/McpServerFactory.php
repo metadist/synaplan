@@ -995,6 +995,11 @@ final class McpServerFactory
             $file->setStatus('vectorized');
             $this->em->flush();
 
+            $this->rateLimit->recordFileAnalysisOnce($user, (int) $file->getId(), [
+                'source' => 'MCP',
+                'filename' => $title,
+            ]);
+
             return [
                 'success' => true,
                 'file_id' => $file->getId(),
