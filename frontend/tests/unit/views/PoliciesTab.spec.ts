@@ -131,6 +131,39 @@ describe('PoliciesTab', () => {
     )
   })
 
+  it('lists every group-editable feature key including tools and workflows', async () => {
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="select-feature-TOOLS_REGISTRY_ENABLED"]').exists()).toBe(
+      true
+    )
+    expect(wrapper.find('[data-testid="select-feature-TOOLS_APPROVALS_ENABLED"]').exists()).toBe(
+      true
+    )
+    expect(wrapper.find('[data-testid="select-feature-TOOLS_CUSTOM_HTTP_ENABLED"]').exists()).toBe(
+      true
+    )
+    expect(wrapper.find('[data-testid="select-feature-WORKFLOWS_BUILDER_ENABLED"]').exists()).toBe(
+      true
+    )
+  })
+
+  it('uses the built-in ON default when routing has no instance row', async () => {
+    getGroupConfig.mockResolvedValue({ settings: {}, conflicts: {} })
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="hint-feature-MULTITASK_ROUTING_ENABLED"]').text()).toBe(
+      'The instance default is on.'
+    )
+    expect(wrapper.get('[data-testid="hint-feature-SAVEDTASKS_ENABLED"]').text()).toBe(
+      'The instance default is off.'
+    )
+  })
+
   it('sends null to inherit a feature instead of writing a deny row', async () => {
     getGroupConfig.mockResolvedValue({
       settings: {

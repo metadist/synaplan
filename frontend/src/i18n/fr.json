@@ -6141,7 +6141,11 @@
         "MULTITASK_URL_FETCH_ENABLED": "Récupérer des pages web",
         "MULTITASK_MCP_FETCH_ENABLED": "Lire les outils connectés",
         "MULTITASK_MCP_ACTION_ENABLED": "Agir via les outils connectés",
-        "MULTITASK_EMAIL_SEARCH_ENABLED": "Rechercher dans les e-mails"
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Rechercher dans les e-mails",
+        "TOOLS_REGISTRY_ENABLED": "Catalogue d’outils",
+        "TOOLS_APPROVALS_ENABLED": "Approbations d’outils",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Outils HTTP personnalisés",
+        "WORKFLOWS_BUILDER_ENABLED": "Éditeur d’étapes"
       }
     }
   },

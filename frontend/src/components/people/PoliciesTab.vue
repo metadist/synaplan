@@ -204,7 +204,17 @@ const featureKeys = [
   'MULTITASK.MCP_FETCH_ENABLED',
   'MULTITASK.MCP_ACTION_ENABLED',
   'MULTITASK.EMAIL_SEARCH_ENABLED',
+  'TOOLS.REGISTRY_ENABLED',
+  'TOOLS.APPROVALS_ENABLED',
+  'TOOLS.CUSTOM_HTTP_ENABLED',
+  'WORKFLOWS.BUILDER_ENABLED',
 ] as const
+/** Code defaults used when no instance row exists. Matches the PHP resolvers. */
+const featureBuiltinOn = new Set<string>([
+  'MULTITASK.ROUTING_ENABLED',
+  'MULTITASK.URL_FETCH_ENABLED',
+  'TOOLS.REGISTRY_ENABLED',
+])
 const tiers = ['NEW', 'PRO', 'TEAM', 'BUSINESS'] as const
 const lockableKeys = [
   'DEFAULTMODEL.CHAT',
@@ -310,7 +320,9 @@ function featureHint(key: string): string {
   if (current?.source === 'admin' || isFeatureOff(current?.value)) {
     return t('people.policies.inheritedOff')
   }
-  return t('people.policies.inheritedUnset')
+  return featureBuiltinOn.has(key)
+    ? t('people.policies.inheritedOn')
+    : t('people.policies.inheritedOff')
 }
 
 const allowedKeys = computed(() => {

@@ -6041,8 +6041,8 @@
       "featuresHelper": "Lassen Sie die Instanzvorgabe, es sei denn, diese Gruppe muss eine Funktion ein- oder ausschalten.",
       "featureOn": "Für diese Gruppe ein",
       "featureOff": "Für diese Gruppe aus",
-      "inheritedOn": "Die Instanzvorgabe ist ein.",
-      "inheritedOff": "Die Instanzvorgabe ist aus.",
+      "inheritedOn": "Die Instanzvorgabe ist aktiviert.",
+      "inheritedOff": "Die Instanzvorgabe ist deaktiviert.",
       "inheritedUnset": "Es gibt keine Instanzvorgabe, daher ist das aus.",
       "willInherit": "Nach dem Speichern gilt die Instanzvorgabe.",
       "groupForcesOn": "Diese Gruppe schaltet das für ihre Mitglieder ein.",
@@ -6075,7 +6075,11 @@
         "MULTITASK_URL_FETCH_ENABLED": "Webseiten abrufen",
         "MULTITASK_MCP_FETCH_ENABLED": "Verbundene Werkzeuge lesen",
         "MULTITASK_MCP_ACTION_ENABLED": "Über verbundene Werkzeuge handeln",
-        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-Mail durchsuchen"
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-Mail durchsuchen",
+        "TOOLS_REGISTRY_ENABLED": "Werkzeugkatalog",
+        "TOOLS_APPROVALS_ENABLED": "Werkzeug-Freigaben",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Eigene HTTP-Werkzeuge",
+        "WORKFLOWS_BUILDER_ENABLED": "Schritte-Editor"
       }
     }
   },
