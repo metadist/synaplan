@@ -383,50 +383,137 @@ class GuestSessionServiceTest extends TestCase
         $this->assertSame(3, $service->getRemainingMessages($session));
     }
 
-    public function testGetProcessingUserReturnsAdminUser(): void
+    public function testGetProcessingUserReturnsExistingAnonymousUser(): void
     {
-        $adminUser = new User();
-        $reflection = new \ReflectionProperty($adminUser, 'id');
+        $processor = new User();
+        $processor->setMail(GuestSessionService::PROCESSING_USER_EMAIL);
+        $processor->setUserLevel('ANONYMOUS');
+        $reflection = new \ReflectionProperty($processor, 'id');
         $reflection->setAccessible(true);
-        $reflection->setValue($adminUser, 1);
+        $reflection->setValue($processor, 42);
 
         $userRepo = $this->createMock(UserRepository::class);
-        $service = $this->createService(userRepo: $userRepo);
-        $this->mockUserQueryBuilder($userRepo, $adminUser);
+        $userRepo->expects($this->once())
+            ->method('findByEmail')
+            ->with(GuestSessionService::PROCESSING_USER_EMAIL)
+            ->willReturn($processor);
+        $userRepo->expects($this->never())->method('createQueryBuilder');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->never())->method('persist');
+        $em->expects($this->never())->method('flush');
+
+        $service = $this->createService(em: $em, userRepo: $userRepo);
 
         $result = $service->getProcessingUser();
 
-        $this->assertSame($adminUser, $result);
+        $this->assertSame($processor, $result);
+        $this->assertSame('ANONYMOUS', $result->getUserLevel());
+        $this->assertSame('ANONYMOUS', $result->getRateLimitLevel());
     }
 
-    public function testGetProcessingUserReturnsNullAndLogsWhenNoAdmin(): void
+    public function testGetProcessingUserCreatesAnonymousUserWhenMissing(): void
     {
         $userRepo = $this->createMock(UserRepository::class);
+        $userRepo->expects($this->once())
+            ->method('findByEmail')
+            ->with(GuestSessionService::PROCESSING_USER_EMAIL)
+            ->willReturn(null);
+        $userRepo->expects($this->never())->method('createQueryBuilder');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())
+            ->method('persist')
+            ->with($this->callback(function (User $user): bool {
+                $this->assertSame(GuestSessionService::PROCESSING_USER_EMAIL, $user->getMail());
+                $this->assertSame('ANONYMOUS', $user->getUserLevel());
+                $this->assertSame('ANONYMOUS', $user->getRateLimitLevel());
+                $this->assertNull($user->getPw());
+                $this->assertSame('guest', $user->getProviderId());
+
+                return true;
+            }));
+        $em->expects($this->once())->method('flush');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('info')
+            ->with($this->stringContains('Created anonymous guest processing user'));
+
+        $service = $this->createService(em: $em, userRepo: $userRepo, logger: $logger);
+        $result = $service->getProcessingUser();
+
+        $this->assertInstanceOf(User::class, $result);
+        $this->assertSame(GuestSessionService::PROCESSING_USER_EMAIL, $result->getMail());
+        $this->assertSame('ANONYMOUS', $result->getUserLevel());
+        $this->assertSame('ANONYMOUS', $result->getRateLimitLevel());
+    }
+
+    public function testGetProcessingUserCorrectsNonAnonymousLevel(): void
+    {
+        $admin = new User();
+        $admin->setMail(GuestSessionService::PROCESSING_USER_EMAIL);
+        $admin->setUserLevel('ADMIN');
+
+        $userRepo = $this->createMock(UserRepository::class);
+        $userRepo->method('findByEmail')->willReturn($admin);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('flush');
+        $em->expects($this->never())->method('persist');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('warning')
+            ->with($this->stringContains('was not ANONYMOUS'));
+
+        $service = $this->createService(em: $em, userRepo: $userRepo, logger: $logger);
+        $result = $service->getProcessingUser();
+
+        $this->assertSame($admin, $result);
+        $this->assertSame('ANONYMOUS', $result->getUserLevel());
+        $this->assertSame('ANONYMOUS', $result->getRateLimitLevel());
+    }
+
+    public function testGetProcessingUserReturnsNullWhenCreateFails(): void
+    {
+        $userRepo = $this->createMock(UserRepository::class);
+        $userRepo->method('findByEmail')->willReturn(null);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())
+            ->method('flush')
+            ->willThrowException(new \RuntimeException('db down'));
+
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects($this->once())
             ->method('error')
-            ->with($this->stringContains('No admin user found'));
+            ->with($this->stringContains('Failed to create guest processing user'));
 
-        $service = $this->createService(userRepo: $userRepo, logger: $logger);
-        $this->mockUserQueryBuilder($userRepo, null);
+        $service = $this->createService(em: $em, userRepo: $userRepo, logger: $logger);
 
-        $result = $service->getProcessingUser();
-
-        $this->assertNull($result);
+        $this->assertNull($service->getProcessingUser());
     }
 
     public function testGetProcessingUserCachesResult(): void
     {
-        $adminUser = new User();
+        $processor = new User();
+        $processor->setMail(GuestSessionService::PROCESSING_USER_EMAIL);
+        $processor->setUserLevel('ANONYMOUS');
 
         $userRepo = $this->createMock(UserRepository::class);
+        $userRepo->expects($this->once())
+            ->method('findByEmail')
+            ->willReturn($processor);
+
         $service = $this->createService(userRepo: $userRepo);
-        $this->mockUserQueryBuilder($userRepo, $adminUser);
 
         $first = $service->getProcessingUser();
         $second = $service->getProcessingUser();
 
         $this->assertSame($first, $second);
+        $this->assertSame($processor, $first);
     }
 
     public function testAttachChatSetsId(): void
@@ -503,23 +590,5 @@ class GuestSessionServiceTest extends TestCase
         $this->expectException(\OverflowException::class);
 
         $service->createSession('default-cap', $request);
-    }
-
-    private function mockUserQueryBuilder(UserRepository&\PHPUnit\Framework\MockObject\MockObject $userRepo, ?User $result): void
-    {
-        $query = $this->createStub(\Doctrine\ORM\Query::class);
-        $query->method('getOneOrNullResult')->willReturn($result);
-
-        $qb = $this->createStub(\Doctrine\ORM\QueryBuilder::class);
-        $qb->method('where')->willReturnSelf();
-        $qb->method('setParameter')->willReturnSelf();
-        $qb->method('orderBy')->willReturnSelf();
-        $qb->method('setMaxResults')->willReturnSelf();
-        $qb->method('getQuery')->willReturn($query);
-
-        $userRepo->expects($this->once())
-            ->method('createQueryBuilder')
-            ->with('u')
-            ->willReturn($qb);
     }
 }

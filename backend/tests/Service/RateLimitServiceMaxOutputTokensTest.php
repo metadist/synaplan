@@ -76,6 +76,22 @@ final class RateLimitServiceMaxOutputTokensTest extends TestCase
     }
 
     /**
+     * Issue #1879: browser guest chat uses a real ANONYMOUS user (not ADMIN),
+     * so the seeded output cap must apply when billing is on.
+     */
+    public function testGuestProcessorIdentityKeepsAnonymousCap(): void
+    {
+        $user = new User();
+        $user->setMail('guest-processor@synaplan.internal');
+        $user->setUserLevel('ANONYMOUS');
+
+        $service = $this->makeService(true, ['RATELIMITS_ANONYMOUS' => '2048']);
+
+        $this->assertSame('ANONYMOUS', $user->getRateLimitLevel());
+        $this->assertSame(2048, $service->getMaxOutputTokens($user));
+    }
+
+    /**
      * @return list<array{0: string}>
      */
     public static function authenticatedTierProvider(): array
