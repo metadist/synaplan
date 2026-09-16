@@ -589,7 +589,7 @@ final class MessagesGatewayController extends AbstractController
             'updated' => $response,
         ]);
 
-        return $this->json(['success' => true, 'updated' => $response]);
+        return new JsonResponse(['success' => true, 'updated' => (object) $response]);
     }
 
     /**
