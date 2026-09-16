@@ -67,4 +67,26 @@ final class RateLimitConfigSeederTest extends TestCase
 
         $this->fail('Expected a RATELIMITS_ANONYMOUS MAX_OUTPUT_TOKENS default row.');
     }
+
+    public function testTranscriptionLimitsAreSeededForEveryTier(): void
+    {
+        $found = [];
+        foreach ($this->defaults() as $row) {
+            if (str_starts_with($row['setting'], 'TRANSCRIPTION_')) {
+                $found[$row['group']] = $row['setting'].'='.$row['value'];
+            }
+        }
+
+        $this->assertSame(
+            [
+                'RATELIMITS_ANONYMOUS' => 'TRANSCRIPTION_TOTAL=3',
+                'RATELIMITS_NEW' => 'TRANSCRIPTION_TOTAL=10',
+                'RATELIMITS_PRO' => 'TRANSCRIPTION_MONTHLY=200',
+                'RATELIMITS_TEAM' => 'TRANSCRIPTION_MONTHLY=1000',
+                'RATELIMITS_BUSINESS' => 'TRANSCRIPTION_MONTHLY=5000',
+            ],
+            $found,
+            'TRANSCRIPTION must have the same volume as FILE_ANALYSIS so dictation is not unlimited.',
+        );
+    }
 }

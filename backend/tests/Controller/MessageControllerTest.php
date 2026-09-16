@@ -676,11 +676,10 @@ class MessageControllerTest extends WebTestCase
             ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token],
         );
 
-        $this->assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         $payload = json_decode((string) $this->client->getResponse()->getContent(), true);
         self::assertIsArray($payload);
-        self::assertTrue($payload['success']);
-        self::assertArrayNotHasKey('file_id', $payload);
+        self::assertSame('Microphone dictation only accepts audio recordings. Nothing was stored.', $payload['error']);
 
         $this->em->clear();
         self::assertSame($before, $fileRepo->count(['userId' => $this->user->getId()]));

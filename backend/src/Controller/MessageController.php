@@ -692,7 +692,17 @@ class MessageController extends AbstractController
         $incognito = '1' === $request->request->get('incognito');
         // Microphone dictation reuses this endpoint only as STT transport.
         // The recording is not a Source the user chose to keep (issue #1909).
-        $isDictation = 'dictation' === (string) $request->request->get('purpose');
+        // purpose=dictation is ignored unless the upload is actually audio —
+        // otherwise a PDF/text file would skip FILE_ANALYSIS and be deleted.
+        $wantsDictation = 'dictation' === (string) $request->request->get('purpose');
+        $clientExtension = strtolower($uploadedFile->getClientOriginalExtension());
+        $clientMime = strtolower((string) $uploadedFile->getClientMimeType());
+        $isDictation = $wantsDictation && $this->isAudioDictationUpload($clientExtension, $clientMime);
+        if ($wantsDictation && !$isDictation) {
+            return $this->json([
+                'error' => 'Microphone dictation only accepts audio recordings. Nothing was stored.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
 
         // Dictation is speech-to-text, not document analysis: gate on
         // TRANSCRIPTION so it does not consume a FILE_ANALYSIS slot.
@@ -728,6 +738,14 @@ class MessageController extends AbstractController
             // A HEIC upload is stored as JPEG; use the final stored extension so
             // the chat pipeline treats it as an image, not an unsupported HEIC.
             $fileExtension = strtolower($storageResult['extension'] ?? $uploadedFile->getClientOriginalExtension());
+            $storedMime = strtolower((string) $storageResult['mime']);
+            if ($isDictation && !$this->isAudioDictationUpload($fileExtension, $storedMime)) {
+                $this->fileStorageService->deleteFile($relativePath);
+
+                return $this->json([
+                    'error' => 'Microphone dictation only accepts audio recordings. Nothing was stored.',
+                ], Response::HTTP_BAD_REQUEST);
+            }
 
             // Create File entity (NEW: separate entity for files)
             $messageFile = new File();
@@ -870,6 +888,20 @@ class MessageController extends AbstractController
                 'error' => 'File upload failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * True when a dictation upload is supported audio (extension or MIME).
+     * Browser MediaRecorder often labels webm as video/webm; the extension
+     * still matches {@see MessagePreProcessor::AUDIO_EXTENSIONS}.
+     */
+    private function isAudioDictationUpload(string $extension, ?string $mime): bool
+    {
+        if (in_array($extension, MessagePreProcessor::AUDIO_EXTENSIONS, true)) {
+            return true;
+        }
+
+        return str_starts_with(strtolower((string) $mime), 'audio/');
     }
 
     /**

@@ -149,6 +149,27 @@ final class MessageControllerDictationUploadTest extends TestCase
         self::assertArrayHasKey('file_id', $body);
     }
 
+    public function testNonAudioDictationIsRejectedWithoutTranscriptionGate(): void
+    {
+        $user = $this->makeUser(7);
+        $this->rateLimits->expects(self::never())->method('checkLimit');
+        $this->storage->expects(self::never())->method('storeUploadedFile');
+
+        $tmp = tempnam(sys_get_temp_dir(), 'dict');
+        self::assertNotFalse($tmp);
+        file_put_contents($tmp, "hello from dictation\n");
+        $request = new Request(['purpose' => 'dictation'], ['purpose' => 'dictation'], [], [], [
+            'file' => new UploadedFile($tmp, 'recording.txt', 'text/plain', null, true),
+        ]);
+
+        $response = $this->controller->uploadFileForChat($request, $user);
+
+        self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+        $body = json_decode((string) $response->getContent(), true);
+        self::assertIsArray($body);
+        self::assertSame('Microphone dictation only accepts audio recordings. Nothing was stored.', $body['error']);
+    }
+
     private function dictationRequest(): Request
     {
         $tmp = tempnam(sys_get_temp_dir(), 'dict');
