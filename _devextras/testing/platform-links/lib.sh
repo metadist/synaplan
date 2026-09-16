@@ -25,6 +25,13 @@ trap cleanup EXIT
 
 json_get() {
   local file="$1" path="$2"
+  # Callers pass a bare key (`instance_id`) or a jq path (`.instance_id`).
+  # jq requires a path expression; the Python fallback already strips a
+  # leading dot, so normalize here once for both backends.
+  case "$path" in
+    .*) ;;
+    *) path=".$path" ;;
+  esac
   if command -v jq >/dev/null 2>&1; then
     jq -r "$path" "$file"
     return
