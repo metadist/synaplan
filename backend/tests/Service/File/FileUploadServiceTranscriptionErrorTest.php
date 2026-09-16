@@ -19,6 +19,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
  * Verifies that FileUploadService marks files whose extract produced no text
@@ -33,12 +34,14 @@ final class FileUploadServiceTranscriptionErrorTest extends TestCase
     private FileProcessor&MockObject $fileProcessor;
     private EntityManagerInterface&MockObject $em;
     private RateLimitService&MockObject $rateLimitService;
+    private FileStorageService&MockObject $storageService;
 
     protected function setUp(): void
     {
         $this->fileProcessor = $this->createMock(FileProcessor::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->storageService = $this->createMock(FileStorageService::class);
 
         $this->rateLimitService
             ->method('checkLimit')
@@ -48,7 +51,7 @@ final class FileUploadServiceTranscriptionErrorTest extends TestCase
     private function makeService(): FileUploadService
     {
         return new FileUploadService(
-            $this->createStub(FileStorageService::class),
+            $this->storageService,
             $this->fileProcessor,
             $this->createStub(VectorizationService::class),
             $this->createStub(VectorStorageFacade::class),
@@ -156,5 +159,62 @@ final class FileUploadServiceTranscriptionErrorTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertSame('error', $result['status']);
         $this->assertStringContainsString('Unable to extract information', $result['error']);
+    }
+
+    /**
+     * Synchronous upload (process_level=vectorize): an empty extract must NOT
+     * become a batch error — the stored row and its id are returned in `files`
+     * with status=error so the client (Desktop) can keep the local source and
+     * show the failure on the file. The entity itself is left failed, never
+     * vectorized.
+     */
+    public function testUploadBatchKeepsEmptyExtractInFilesWithErrorStatus(): void
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'scan_');
+        self::assertIsString($tmp);
+        file_put_contents($tmp, '%PDF-1.4 scan');
+        $uploaded = new UploadedFile($tmp, 'Gutschein.pdf', 'application/pdf', null, true);
+
+        $this->storageService
+            ->method('storeUploadedFile')
+            ->willReturn([
+                'success' => true,
+                'path' => '01/000/00001/2026/09/Gutschein_1.pdf',
+                'extension' => 'pdf',
+                'size' => 13,
+                'mime' => 'application/pdf',
+            ]);
+
+        $persisted = null;
+        $this->em
+            ->method('persist')
+            ->willReturnCallback(static function (object $entity) use (&$persisted): void {
+                $persisted = $entity;
+            });
+
+        $this->fileProcessor
+            ->expects(self::once())
+            ->method('extractText')
+            ->willReturn(['', ['strategy' => 'vision_failed']]);
+
+        try {
+            $batch = $this->makeService()->uploadBatch([$uploaded], $this->makeUser(), 'DESKTOP:p1', 'vectorize');
+        } finally {
+            @unlink($tmp);
+        }
+
+        $this->assertTrue($batch['success']);
+        $this->assertSame([], $batch['errors']);
+        $this->assertCount(1, $batch['files']);
+
+        $row = $batch['files'][0];
+        $this->assertArrayHasKey('id', $row);
+        $this->assertSame('error', $row['status']);
+        $this->assertSame(0, $row['extracted_text_length']);
+        $this->assertStringContainsString('Unable to extract information', $row['error']);
+
+        $this->assertInstanceOf(File::class, $persisted);
+        $this->assertSame('error', $persisted->getStatus());
+        $this->assertSame(File::VECTOR_STATE_FAILED, $persisted->getVectorState());
     }
 }

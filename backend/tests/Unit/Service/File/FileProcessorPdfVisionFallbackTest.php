@@ -20,6 +20,7 @@ use Psr\Log\NullLogger;
  * Scanned / image-only PDFs: Tika is empty, OCR often replies "no text",
  * then a describe pass must still produce searchable content.
  */
+#[\PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations]
 final class FileProcessorPdfVisionFallbackTest extends TestCase
 {
     private const PNG_1X1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
@@ -73,6 +74,33 @@ final class FileProcessorPdfVisionFallbackTest extends TestCase
 
         self::assertStringContainsString('Gutschein', $text);
         self::assertSame('rasterize_vision_describe', $meta['strategy']);
+    }
+
+    public function testProviderFailureOnEveryPageDoesNotRetryWithDescribe(): void
+    {
+        $tika = $this->createMock(TikaClient::class);
+        $tika->method('isEnabled')->willReturn(true);
+        $tika->method('extractText')->willReturn(['', []]);
+
+        $secondPage = sys_get_temp_dir().'/file_processor_pdf_page2_'.uniqid().'.png';
+        file_put_contents($secondPage, (string) base64_decode(self::PNG_1X1, true));
+        $rasterizer = $this->createMock(PdfRasterizer::class);
+        $rasterizer->method('pdfToPng')->willReturn([$this->pagePath, $secondPage]);
+
+        // Two pages, provider rejects both: exactly two calls, never four.
+        $this->aiFacade->expects(self::exactly(2))
+            ->method('analyzeImage')
+            ->willThrowException(new \RuntimeException('429 rate limited'));
+
+        try {
+            $processor = $this->makeProcessor($tika, $rasterizer);
+            [$text, $meta] = $processor->extractText($this->pdfRelative, 'pdf', 1);
+        } finally {
+            @unlink($secondPage);
+        }
+
+        self::assertSame('', $text);
+        self::assertSame('vision_failed', $meta['strategy']);
     }
 
     public function testVisionThinkBlocksAreStrippedFromSearchableText(): void

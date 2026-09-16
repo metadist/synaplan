@@ -148,7 +148,6 @@ final readonly class FileProcessor
      *                                manager's "Describe, vectorize & sort"
      *                                action. Scanned PDFs also retry describe
      *                                automatically when OCR returns nothing.
-     *                                descriptive content.
      *
      * @return array [extractedText, meta] where meta contains strategy, mime, ext, etc
      */
@@ -975,10 +974,22 @@ final readonly class FileProcessor
         $this->logger->info('FileProcessor: PDF rasterized', ['pages' => count($images)]);
 
         $usedDescribe = $describe;
-        $fullText = $this->textCleaner->clean($this->aggregateVisionResults($images, $userId, $describe));
+        [$fullText, $answeredPages] = $this->aggregateVisionResults($images, $userId, $describe);
+        $fullText = $this->textCleaner->clean($fullText);
+
+        // No page got an answer: the provider is down, has no key, or is rate
+        // limited. A describe retry would only send every page a second time
+        // into the same failure — report it instead of doubling the calls.
+        if (0 === $answeredPages) {
+            $this->logger->warning('FileProcessor: Vision AI answered no PDF page', ['pages' => count($images)]);
+
+            return ['', ['strategy' => 'vision_failed', 'pages' => count($images)] + $baseMeta];
+        }
+
         if ('' === trim($fullText) && !$describe) {
             $this->logger->info('FileProcessor: PDF OCR empty, retrying pages with describe prompt');
-            $fullText = $this->textCleaner->clean($this->aggregateVisionResults($images, $userId, true));
+            [$fullText] = $this->aggregateVisionResults($images, $userId, true);
+            $fullText = $this->textCleaner->clean($fullText);
             $usedDescribe = true;
         }
 
@@ -1149,11 +1160,18 @@ final readonly class FileProcessor
     /**
      * Aggregate Vision AI results from multiple images (PDF pages).
      *
+     * A page whose provider call throws is skipped; the second element counts
+     * the pages that did answer so the caller can tell "no text on the pages"
+     * from "the provider never answered".
+     *
      * @param list<string> $imagePaths
+     *
+     * @return array{0: string, 1: int} [aggregated text, answered page count]
      */
-    private function aggregateVisionResults(array $imagePaths, ?int $userId, bool $describe = false): string
+    private function aggregateVisionResults(array $imagePaths, ?int $userId, bool $describe = false): array
     {
         $fullText = '';
+        $answeredPages = 0;
 
         foreach ($imagePaths as $imgPath) {
             $relativePath = $this->absoluteToRelative($imgPath);
@@ -1170,6 +1188,7 @@ final readonly class FileProcessor
                         .'Do not provide any descriptions. '
                         .'If no text is present, return an empty string.';
                 $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
+                ++$answeredPages;
                 $text = $this->stripVisionChrome((string) ($result['content'] ?? ''));
                 if (!$describe && $this->isNoTextResponse($text)) {
                     $text = '';
@@ -1189,7 +1208,7 @@ final readonly class FileProcessor
             }
         }
 
-        return trim($fullText);
+        return [trim($fullText), $answeredPages];
     }
 
     /**
