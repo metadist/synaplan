@@ -192,7 +192,7 @@
               @pick="handleExamplePick"
             />
             <CompanionLinks v-else-if="showCompanionLinks" />
-            <SelfAwareEmptyHint v-if="showCompanionLinks" @ask="handleExamplePick" />
+            <SelfAwareEmptyHint v-if="showSelfAwareEmptyHint" @ask="handleExamplePick" />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -585,6 +585,7 @@ import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
+import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import {
@@ -896,16 +897,26 @@ const isEmptyLanding = computed(
     !historyStore.isLoadingMessages
 )
 
-// Empty start page for guests and signed-in users: companion product cards
-// plus the "what can you do" prompt. Hidden in incognito and when an
-// assistant owns the empty state with its own starters.
-const showCompanionLinks = computed(() => !incognitoStore.active && !pinnedAgentId.value)
-
 // Runtime-config first-run signal: the default chat model has no usable
 // provider. Replace the composer with a tombstone so a fresh install cannot
 // produce the cryptic HTTP 500 the old banner still allowed.
 const needsProviderSetup = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
+)
+
+// Empty start page: companion cards on the unpinned landing; the self-aware
+// CTA also covers a pinned assistant that has no starters of its own, and
+// only when the composer can actually submit the question.
+const emptyLandingActions = computed(() => ({
+  incognito: incognitoStore.active,
+  hasPinnedAssistant: Boolean(pinnedAgentId.value),
+  starterPromptCount: pinnedStarterPrompts.value.length,
+  canCompose: canComposeSharedChat.value,
+  needsProviderSetup: needsProviderSetup.value,
+}))
+const showCompanionLinks = computed(() => shouldShowCompanionLinks(emptyLandingActions.value))
+const showSelfAwareEmptyHint = computed(() =>
+  shouldShowSelfAwareEmptyHint(emptyLandingActions.value)
 )
 
 // --- Speed config (model mixes) -------------------------------------------

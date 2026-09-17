@@ -168,6 +168,13 @@ export const selectors = {
     aiAnswerBubble: '[data-testid="assistant-message-bubble"]',
     /** Empty-state for a new/empty chat (shown while messages.length === 0 && !isLoadingMessages). Use to assert that a fresh chat is fully committed before counting bubbles. */
     stateEmpty: '[data-testid="state-empty"]',
+    companionLinks: '[data-testid="comp-companion-links"]',
+    companionDesktop: '[data-testid="link-companion-desktop"]',
+    companionMobile: '[data-testid="link-companion-mobile"]',
+    companionOutlook: '[data-testid="link-companion-outlook"]',
+    selfAwareEmptyHint: '[data-testid="self-aware-empty-hint"]',
+    selfAwareEmptyHintBtn: '[data-testid="btn-self-aware-empty-hint"]',
+    userMessageBubble: '[data-testid="user-message-bubble"]',
     /** Terminal: present when streaming finished */
     chatDone: '[data-testid="message-done"]',
     /** Terminal: present when the assistant turn ended in an error notice */

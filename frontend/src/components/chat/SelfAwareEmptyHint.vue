@@ -1,14 +1,14 @@
 <template>
-  <p v-if="visible" class="text-center txt-secondary" data-testid="self-aware-empty-hint">
+  <div v-if="visible" class="flex justify-center" data-testid="self-aware-empty-hint">
     <button
       type="button"
-      class="underline txt-brand"
+      class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
       data-testid="btn-self-aware-empty-hint"
       @click="emit('ask', question)"
     >
       {{ $t('companionLinks.ask') }}
     </button>
-  </p>
+  </div>
 </template>
 
 <script setup lang="ts">

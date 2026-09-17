@@ -22,7 +22,10 @@ describe('SelfAwareEmptyHint', () => {
     const wrapper = mount(SelfAwareEmptyHint)
 
     expect(wrapper.find('[data-testid="self-aware-empty-hint"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('… or tell me what you can do!')
+    expect(wrapper.text()).toContain('Tell me what you can do')
+    expect(wrapper.get('[data-testid="btn-self-aware-empty-hint"]').classes()).toEqual(
+      expect.arrayContaining(['btn-secondary', 'px-4', 'py-2.5', 'rounded-lg', 'text-sm'])
+    )
   })
 
   it('is hidden when the self-aware flag is off', () => {

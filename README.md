@@ -160,7 +160,7 @@ The same assistant, the same knowledge base, the same model policy — on every 
 
 | Surface | What it does | Get it |
 |---------|--------------|--------|
-| **Web app** | Full chat + admin UI, light/dark, four languages | This repo — `docker compose up -d` |
+| **Web app** | Full chat + admin UI, light/dark, five languages | This repo — `docker compose up -d` |
 | **Mobile apps** | Chat, documents and voice on iPhone and Android — pointed at web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
 | **Desktop Client** | Pair a computer, keep research local, run Agents on this machine | [metadist/synaplan-desktop](https://github.com/metadist/synaplan-desktop) |
 | **Outlook add-in** | Bring Synaplan into Outlook (Web, new & classic, Mac) — find and process mail without sending it anywhere | [metadist/Synamail](https://github.com/metadist/Synamail) |
