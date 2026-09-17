@@ -60,7 +60,7 @@ final readonly class GatewayToolLoop
     private const WALL_CLOCK_SECONDS = 240;
     private const PING_INTERVAL_SECONDS = 15;
     private const WEB_SEARCH_WRAP_AFTER = 2;
-    private const WRAP_UP_AFTER_SEARCH = 'You already have the web search results. Answer the user now in one or two sentences. Do not search again.';
+    private const WRAP_UP_AFTER_SEARCH = 'You already have the web search results. Answer the user now in one or two sentences and include the http URL you used. Do not search again.';
     private const EMPTY_SEARCH_RECOVERY = 'I looked this up but could not turn the results into an answer. Please try again, or ask in a different way.';
 
     public function __construct(
@@ -210,6 +210,11 @@ final readonly class GatewayToolLoop
 
             $stopReason = \is_string($lastBody['stop_reason'] ?? null) ? $lastBody['stop_reason'] : null;
             if ('tool_use' !== $stopReason) {
+                if ($this->shouldWrapForMissingUrl($lastBody, $webSearchRounds, $body)) {
+                    $body = $this->forceWrapUp($body);
+                    continue;
+                }
+
                 return [
                     'status' => $lastStatus,
                     'headers' => $lastHeaders,
@@ -321,6 +326,13 @@ final readonly class GatewayToolLoop
             if ('tool_use' !== $turn['stop_reason']) {
                 if ($webSearchRounds > 0 && !$emitter->hasEmittedText()) {
                     $emitter->emitAssistantText(self::EMPTY_SEARCH_RECOVERY);
+                    $this->finishStream($emitter, $turn);
+
+                    return $totalUsage->withStopReason($turn['stop_reason']);
+                }
+                if ($this->shouldWrapForMissingUrlFromTurn($turn, $webSearchRounds, $body)) {
+                    $body = $this->forceWrapUp($body);
+                    continue;
                 }
                 $this->finishStream($emitter, $turn);
 
@@ -891,13 +903,66 @@ final readonly class GatewayToolLoop
     }
 
     /**
+     * Groq (and some others) cite footnotes like `【3†L1】` and never write an
+     * http URL. One more wrap-up turn, without tools, asks for the URL.
+     *
+     * @param array<string, mixed> $lastBody
+     * @param array<string, mixed> $currentBody
+     */
+    private function shouldWrapForMissingUrl(array $lastBody, int $webSearchRounds, array $currentBody): bool
+    {
+        if ($webSearchRounds < 1 || $this->alreadyWrapped($currentBody)) {
+            return false;
+        }
+        $content = $lastBody['content'] ?? [];
+        if (!\is_array($content)) {
+            return false;
+        }
+        $text = $this->assistantText($content);
+
+        return '' !== $text && !str_contains(strtolower($text), 'http');
+    }
+
+    /**
+     * @param array{content: list<array<string, mixed>>} $turn
+     * @param array<string, mixed>                       $currentBody
+     */
+    private function shouldWrapForMissingUrlFromTurn(array $turn, int $webSearchRounds, array $currentBody): bool
+    {
+        return $this->shouldWrapForMissingUrl(
+            ['content' => $turn['content']],
+            $webSearchRounds,
+            $currentBody,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function alreadyWrapped(array $body): bool
+    {
+        $messages = $body['messages'] ?? [];
+        if (!\is_array($messages) || [] === $messages) {
+            return false;
+        }
+        $last = $messages[array_key_last($messages)];
+
+        return \is_array($last)
+            && 'user' === ($last['role'] ?? '')
+            && self::WRAP_UP_AFTER_SEARCH === ($last['content'] ?? null);
+    }
+
+    /**
      * @param array<string, mixed> $requestBody
      *
      * @return array<string, mixed>
      */
     private function forceWrapUp(array $requestBody): array
     {
-        $requestBody['tool_choice'] = ['type' => 'none'];
+        // Drop tools entirely. `tool_choice: none` still leaves the
+        // declarations in the payload; Groq then 400s with "Tool choice is
+        // none, but model called a tool" when the model ignores the hint.
+        unset($requestBody['tools'], $requestBody['tool_choice']);
         $messages = $requestBody['messages'] ?? [];
         if (!\is_array($messages)) {
             $messages = [];

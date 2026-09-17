@@ -133,9 +133,36 @@ final class GeminiMessagesTranslatorTest extends TestCase
             ],
         ]);
 
+        $this->assertArrayNotHasKey(
+            'thoughtSignature',
+            $payload['contents'][1]['parts'][0]['functionCall'],
+        );
         $this->assertSame(
             'sig-abc',
-            $payload['contents'][1]['parts'][0]['functionCall']['thoughtSignature'],
+            $payload['contents'][1]['parts'][0]['thoughtSignature'],
         );
+    }
+
+    public function testThoughtSignatureOnASiblingPartIsAttachedToTheToolUse(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'content' => [
+                    'parts' => [
+                        ['thoughtSignature' => 'sig-sibling'],
+                        [
+                            'functionCall' => [
+                                'name' => 'write_file',
+                                'args' => ['path' => 'hello.md'],
+                            ],
+                        ],
+                    ],
+                ],
+            ]],
+        ], ['model' => 'gemini-3.5-flash']);
+
+        $this->assertSame('sig-sibling', $anthropic['content'][0]['thought_signature']);
     }
 }
