@@ -215,6 +215,39 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame('hit', $payload['input'][2]['output']);
     }
 
+    public function testToResponsesRequestKeepsNonAutoImageDetail(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toResponsesRequest([
+            'model' => 'openai:gpt-6-astra:chat',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => [
+                ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/page.png']],
+            ]]],
+        ], stream: false, imageDetail: 'low');
+
+        $part = $payload['input'][0]['content'][0];
+        $this->assertSame('input_image', $part['type']);
+        $this->assertSame('https://example.test/page.png', $part['image_url']);
+        $this->assertSame('low', $part['detail']);
+    }
+
+    public function testToResponsesRequestDropsAutoImageDetail(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toResponsesRequest([
+            'model' => 'openai:gpt-6-astra:chat',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => [
+                ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/page.png']],
+            ]]],
+        ], stream: false, imageDetail: 'auto');
+
+        $part = $payload['input'][0]['content'][0];
+        $this->assertSame('input_image', $part['type']);
+        $this->assertArrayNotHasKey('detail', $part);
+    }
+
     public function testFromResponsesMapsFunctionCallAndText(): void
     {
         $t = new OpenAiMessagesTranslator(new MockHttpClient());

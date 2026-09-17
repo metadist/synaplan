@@ -188,6 +188,10 @@ final class FailureClassifierTest extends TestCase
         yield 'context length' => ['This model maximum context length is 8192 tokens', FailureKind::UserError];
         yield 'safety ratings' => ['The response was blocked by the safety ratings filter', FailureKind::UserError];
         yield 'unrelated safety outage stays transient' => ['Could not reach the safety endpoint', FailureKind::Transient];
+        yield 'mistral subscription tier is this model, not the whole key' => [
+            'This model is not available in your subscription tier',
+            FailureKind::Permanent,
+        ];
     }
 
     /**

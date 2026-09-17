@@ -21,6 +21,12 @@ final readonly class VectorizationService
 {
     private const VECTOR_DIMENSION = 1024;
 
+    /**
+     * One embedBatch / storeChunkBatch window. A 3 MB handbook can produce
+     * hundreds of chunks; embedding them all in one request OOMs PHP (HTTP 500).
+     */
+    private const EMBED_BATCH_SIZE = 32;
+
     /** Desktop project knowledge folders. Index must use the same VECTORIZE default as search. */
     public const DESKTOP_GROUP_PREFIX = 'DESKTOP:';
 
@@ -163,7 +169,7 @@ final readonly class VectorizationService
                 ]);
             }
 
-            $vectorChunks = [];
+            $pending = [];
             $chunksCreated = 0;
 
             foreach ($chunks as $index => $chunk) {
@@ -192,7 +198,7 @@ final readonly class VectorizationService
                     }
                 }
 
-                $vectorChunks[] = new VectorChunk(
+                $pending[] = new VectorChunk(
                     userId: $userId,
                     fileId: $messageId,
                     groupKey: $groupKey,
@@ -209,11 +215,14 @@ final readonly class VectorizationService
                 );
 
                 ++$chunksCreated;
+                if (\count($pending) >= self::EMBED_BATCH_SIZE) {
+                    $this->vectorStorage->storeChunkBatch($pending);
+                    $pending = [];
+                }
             }
 
-            // Batch store chunks via facade
-            if (!empty($vectorChunks)) {
-                $this->vectorStorage->storeChunkBatch($vectorChunks);
+            if ([] !== $pending) {
+                $this->vectorStorage->storeChunkBatch($pending);
             }
 
             // #1344: every chunk embedding can fail (continue above) while we still
@@ -270,11 +279,12 @@ final readonly class VectorizationService
     /**
      * Embed chunk texts resiliently.
      *
-     * Tries one batch request first (fast path). If that throws (e.g. the
-     * remote Ollama returns HTTP 500 because a chunk produced a NaN embedding)
-     * or returns incomplete/invalid vectors, it falls back to embedding each
-     * chunk individually and skips only the ones that fail — so a single bad
-     * chunk no longer fails the whole file.
+     * Embeds in windows of {@see EMBED_BATCH_SIZE}. Each window tries one
+     * batch request first (fast path). If that throws (e.g. the remote
+     * Ollama returns HTTP 500 because a chunk produced a NaN embedding) or
+     * returns incomplete/invalid vectors, it falls back to embedding each
+     * chunk in that window individually and skips only the ones that fail —
+     * so a single bad chunk no longer fails the whole file.
      *
      * @param array<int, string> $chunkTexts
      *
@@ -282,12 +292,35 @@ final readonly class VectorizationService
      */
     private function embedChunksResilient(array $chunkTexts, int $userId, string $provider, string $modelName): array
     {
+        $embeddings = [];
+        $usage = ['prompt_tokens' => 0, 'total_tokens' => 0];
+        $failed = 0;
+
+        foreach (array_chunk($chunkTexts, self::EMBED_BATCH_SIZE, true) as $window) {
+            $part = $this->embedWindowResilient($window, $userId, $provider, $modelName);
+            foreach ($part['embeddings'] as $i => $vector) {
+                $embeddings[$i] = $vector;
+            }
+            $usage['prompt_tokens'] += $part['usage']['prompt_tokens'];
+            $usage['total_tokens'] += $part['usage']['total_tokens'];
+            $failed += $part['failed'];
+        }
+
+        return ['embeddings' => $embeddings, 'usage' => $usage, 'failed' => $failed];
+    }
+
+    /**
+     * @param array<int, string> $chunkTexts
+     *
+     * @return array{embeddings: array<int, array<float>>, usage: array{prompt_tokens: int, total_tokens: int}, failed: int}
+     */
+    private function embedWindowResilient(array $chunkTexts, int $userId, string $provider, string $modelName): array
+    {
         $options = ['model' => $modelName, 'provider' => $provider];
 
-        // Fast path: a single batch request.
         try {
-            $batch = $this->aiFacade->embedBatch($chunkTexts, $userId, $provider, $options);
-            $embeddings = $batch['embeddings'];
+            $batch = $this->aiFacade->embedBatch(array_values($chunkTexts), $userId, $provider, $options);
+            $embeddings = $this->reindexWindowEmbeddings($chunkTexts, $batch['embeddings']);
 
             if (count($embeddings) === count($chunkTexts) && !$this->hasInvalidVector($embeddings)) {
                 return [
@@ -299,7 +332,7 @@ final readonly class VectorizationService
 
             $this->logger->warning('VectorizationService: batch embedding incomplete/invalid, falling back to per-chunk', [
                 'expected' => count($chunkTexts),
-                'returned' => count($embeddings),
+                'returned' => count($batch['embeddings']),
                 'provider' => $provider,
             ]);
         } catch (\Throwable $e) {
@@ -309,7 +342,6 @@ final readonly class VectorizationService
             ]);
         }
 
-        // Fallback path: embed each chunk on its own, skipping failures.
         $embeddings = [];
         $usage = ['prompt_tokens' => 0, 'total_tokens' => 0];
         $failed = 0;
@@ -345,6 +377,26 @@ final readonly class VectorizationService
         }
 
         return ['embeddings' => $embeddings, 'usage' => $usage, 'failed' => $failed];
+    }
+
+    /**
+     * @param array<int, string>            $chunkTexts
+     * @param array<int, array<float>|mixed> $vectors
+     *
+     * @return array<int, array<float>>
+     */
+    private function reindexWindowEmbeddings(array $chunkTexts, array $vectors): array
+    {
+        $out = [];
+        $values = array_values($vectors);
+        $i = 0;
+        foreach (array_keys($chunkTexts) as $key) {
+            $vector = $values[$i] ?? [];
+            $out[$key] = \is_array($vector) ? $vector : [];
+            ++$i;
+        }
+
+        return $out;
     }
 
     /**

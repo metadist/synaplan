@@ -56,6 +56,11 @@ final readonly class FailureClassifier
         'is sunset',
         'sunsetting',
         'not_found_error',
+        // Provider plan: this one model is off the current key, others still work.
+        'subscription tier',
+        'not available in your subscription',
+        'not included in your plan',
+        'requires a higher plan',
     ];
 
     /** Credential, entitlement and billing problems — every model of the provider is affected. */

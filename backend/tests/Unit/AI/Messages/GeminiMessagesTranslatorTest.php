@@ -165,4 +165,38 @@ final class GeminiMessagesTranslatorTest extends TestCase
 
         $this->assertSame('sig-sibling', $anthropic['content'][0]['thought_signature']);
     }
+
+    public function testTwoFunctionCallsDoNotShareTheFirstSignature(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'thoughtSignature' => 'sig-candidate',
+                'content' => [
+                    'parts' => [
+                        ['thoughtSignature' => 'sig-a'],
+                        [
+                            'functionCall' => [
+                                'name' => 'web_search',
+                                'args' => ['query' => 'node'],
+                            ],
+                        ],
+                        ['thoughtSignature' => 'sig-b'],
+                        [
+                            'functionCall' => [
+                                'name' => 'write_file',
+                                'args' => ['path' => 'hello.md'],
+                            ],
+                        ],
+                    ],
+                ],
+            ]],
+        ], ['model' => 'gemini-3.5-flash']);
+
+        $this->assertSame('sig-a', $anthropic['content'][0]['thought_signature']);
+        $this->assertSame('web_search', $anthropic['content'][0]['name']);
+        $this->assertSame('sig-b', $anthropic['content'][1]['thought_signature']);
+        $this->assertSame('write_file', $anthropic['content'][1]['name']);
+    }
 }
