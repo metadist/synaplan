@@ -608,4 +608,224 @@ final class GatewayToolLoopTest extends TestCase
         $this->assertSame(2, $calls);
         $this->assertSame(200, $result['status']);
     }
+
+    public function testWebSearchWrapsAfterTwoRoundsAndFillsEmptyAnswer(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->exactly(2))
+            ->method('execute')
+            ->willReturn([
+                'text' => 'Node.js LTS is 24.x — https://nodejs.org',
+                'isError' => false,
+                'query' => 'node lts',
+                'resultCount' => 1,
+            ]);
+
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
+        $rateLimits->method('recordUsage');
+
+        $loop = new GatewayToolLoop(
+            new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
+            $webSearch,
+            $this->createMock(AnalyzeImageTool::class),
+            $this->createMock(McpClient::class),
+            $this->createMock(McpServerConfigRepository::class),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $rateLimits,
+            new NullLogger(),
+        );
+
+        $snapshot = [
+            'tools' => [[
+                'name' => 'web_search',
+                'description' => 'Search the live web',
+                'input_schema' => ['type' => 'object'],
+            ]],
+            'dispatch' => [
+                'web_search' => [
+                    'kind' => GatewayToolCatalog::KIND_NATIVE,
+                    'serverId' => 0,
+                    'tool' => 'web_search',
+                    'annotations' => ['readOnlyHint' => true],
+                ],
+            ],
+            'web_search' => GatewayToolCatalog::WEB_SEARCH_SYNAPLAN,
+        ];
+
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if ($calls <= 2) {
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'content' => [[
+                                'type' => 'tool_use',
+                                'id' => 'toolu_search_'.$calls,
+                                'name' => 'web_search',
+                                'input' => ['query' => 'node lts'],
+                            ]],
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 8, 'output_tokens' => 4],
+                        ],
+                        'usage' => new MessagesUsage(8, 4, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $this->assertSame(['type' => 'none'], $body['tool_choice']);
+                $last = $body['messages'][array_key_last($body['messages'])];
+                $this->assertSame('user', $last['role']);
+                $this->assertIsString($last['content']);
+                $this->assertStringContainsString('Do not search again', $last['content']);
+
+                return [
+                    'status' => 200,
+                    'headers' => [],
+                    'body' => [
+                        'content' => [],
+                        'stop_reason' => 'end_turn',
+                        'usage' => ['input_tokens' => 30, 'output_tokens' => 1],
+                    ],
+                    'usage' => new MessagesUsage(30, 1, 0, 0, 'end_turn'),
+                ];
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'groq:openai/gpt-oss-120b:chat',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'What is the current Node LTS?']],
+                'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $snapshot,
+            ['web_search'],
+        );
+
+        $this->assertSame(3, $calls);
+        $this->assertIsArray($result['body']);
+        $this->assertSame(
+            'I looked this up but could not turn the results into an answer. Please try again, or ask in a different way.',
+            $result['body']['content'][0]['text'],
+        );
+    }
+
+    public function testEmptyThinkingBlocksAreDroppedFromToolFollowUp(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->once())
+            ->method('execute')
+            ->willReturn([
+                'text' => 'hit',
+                'isError' => false,
+                'query' => 'q',
+                'resultCount' => 1,
+            ]);
+
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
+        $rateLimits->method('recordUsage');
+
+        $loop = new GatewayToolLoop(
+            new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
+            $webSearch,
+            $this->createMock(AnalyzeImageTool::class),
+            $this->createMock(McpClient::class),
+            $this->createMock(McpServerConfigRepository::class),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $rateLimits,
+            new NullLogger(),
+        );
+
+        $snapshot = [
+            'tools' => [[
+                'name' => 'web_search',
+                'description' => 'Search the live web',
+                'input_schema' => ['type' => 'object'],
+            ]],
+            'dispatch' => [
+                'web_search' => [
+                    'kind' => GatewayToolCatalog::KIND_NATIVE,
+                    'serverId' => 0,
+                    'tool' => 'web_search',
+                    'annotations' => ['readOnlyHint' => true],
+                ],
+            ],
+            'web_search' => GatewayToolCatalog::WEB_SEARCH_SYNAPLAN,
+        ];
+
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if (1 === $calls) {
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'content' => [
+                                ['type' => 'thinking', 'thinking' => ''],
+                                [
+                                    'type' => 'tool_use',
+                                    'id' => 'toolu_search',
+                                    'name' => 'web_search',
+                                    'input' => ['query' => 'q'],
+                                ],
+                            ],
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 8, 'output_tokens' => 4],
+                        ],
+                        'usage' => new MessagesUsage(8, 4, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $assistant = $body['messages'][1];
+                $this->assertSame('assistant', $assistant['role']);
+                foreach ($assistant['content'] as $block) {
+                    $this->assertNotSame('thinking', $block['type'] ?? '');
+                }
+
+                return [
+                    'status' => 200,
+                    'headers' => [],
+                    'body' => [
+                        'content' => [['type' => 'text', 'text' => 'The current rate is …']],
+                        'stop_reason' => 'end_turn',
+                        'usage' => ['input_tokens' => 30, 'output_tokens' => 9],
+                    ],
+                    'usage' => new MessagesUsage(30, 9, 0, 0, 'end_turn'),
+                ];
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'claude-sonnet-4-6',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'search']],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $snapshot,
+            ['web_search'],
+        );
+
+        $this->assertSame(2, $calls);
+        $this->assertSame(200, $result['status']);
+    }
 }

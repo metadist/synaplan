@@ -45,6 +45,8 @@ final class OpenAiMessagesTranslatorTest extends TestCase
 
         $this->assertArrayNotHasKey('thinking', $payload);
         $this->assertSame('gpt-4o', $payload['model']);
+        $this->assertSame(64, $payload['max_tokens']);
+        $this->assertArrayNotHasKey('max_completion_tokens', $payload);
         $this->assertSame('Be brief.', $payload['messages'][0]['content']);
         $this->assertSame('function', $payload['tools'][0]['type']);
         $this->assertSame('mcp__1__rag_search', $payload['tools'][0]['function']['name']);
@@ -119,6 +121,26 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         ], stream: false);
 
         $this->assertSame('hi', $payload['messages'][0]['content']);
+    }
+
+    public function testReasoningModelsSendMaxCompletionTokens(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        foreach (['gpt-6-astra', 'openai:gpt-6-astra:chat', 'gpt-5.4', 'o3-mini'] as $model) {
+            $payload = $t->toOpenAiRequest([
+                'model' => $model,
+                'max_tokens' => 1024,
+                'messages' => [['role' => 'user', 'content' => 'PONG']],
+            ], stream: true);
+
+            $this->assertSame(
+                1024,
+                $payload['max_completion_tokens'],
+                $model.' must remap max_tokens',
+            );
+            $this->assertArrayNotHasKey('max_tokens', $payload, $model.' must not send max_tokens');
+        }
     }
 
     public function testServerToolDeclarationsAreNotMappedToFunctions(): void

@@ -102,4 +102,40 @@ final class GeminiMessagesTranslatorTest extends TestCase
         $this->assertSame('mcp__2__memory_search', $anthropic['content'][0]['name']);
         $this->assertSame(7, $anthropic['usage']['input_tokens']);
     }
+
+    public function testThoughtSignatureRoundTripsOnFunctionCall(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'content' => [
+                    'parts' => [[
+                        'thoughtSignature' => 'sig-from-part',
+                        'functionCall' => [
+                            'name' => 'web_search',
+                            'args' => ['query' => 'x'],
+                            'thoughtSignature' => 'sig-abc',
+                        ],
+                    ]],
+                ],
+            ]],
+        ], ['model' => 'gemini-3-flash']);
+
+        $this->assertSame('sig-abc', $anthropic['content'][0]['thought_signature']);
+
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-3-flash',
+            'max_tokens' => 32,
+            'messages' => [
+                ['role' => 'user', 'content' => 'hi'],
+                ['role' => 'assistant', 'content' => $anthropic['content']],
+            ],
+        ]);
+
+        $this->assertSame(
+            'sig-abc',
+            $payload['contents'][1]['parts'][0]['functionCall']['thoughtSignature'],
+        );
+    }
 }

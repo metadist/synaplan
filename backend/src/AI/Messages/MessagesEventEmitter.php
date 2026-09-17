@@ -19,6 +19,7 @@ final class MessagesEventEmitter
     /** @var array<int, int> upstream index → client index for the current turn */
     private array $indexMap = [];
     private bool $closed = false;
+    private bool $emittedText = false;
 
     /**
      * @param EmitFn $emit
@@ -172,9 +173,60 @@ final class MessagesEventEmitter
         }
 
         $data['index'] = $clientIndex;
+        $delta = $data['delta'] ?? [];
+        if (\is_array($delta) && 'text_delta' === ($delta['type'] ?? '')) {
+            $text = (string) ($delta['text'] ?? '');
+            if ('' !== $text) {
+                $this->emittedText = true;
+            }
+        }
         $this->emitEvent($event, $data);
 
         return true;
+    }
+
+    public function hasEmittedText(): bool
+    {
+        return $this->emittedText;
+    }
+
+    /**
+     * Synthesize a client-visible text block when the upstream finished a
+     * tool loop with nothing the person can read.
+     */
+    public function emitAssistantText(string $text): void
+    {
+        if ($this->closed || '' === $text) {
+            return;
+        }
+        if (!$this->messageStarted) {
+            $this->messageStarted = true;
+            $this->emitEvent('message_start', [
+                'type' => 'message_start',
+                'message' => [
+                    'id' => 'msg_synaplan_empty',
+                    'type' => 'message',
+                    'role' => 'assistant',
+                    'content' => [],
+                ],
+            ]);
+        }
+        $idx = $this->nextBlockIndex++;
+        $this->emitEvent('content_block_start', [
+            'type' => 'content_block_start',
+            'index' => $idx,
+            'content_block' => ['type' => 'text', 'text' => ''],
+        ]);
+        $this->emitEvent('content_block_delta', [
+            'type' => 'content_block_delta',
+            'index' => $idx,
+            'delta' => ['type' => 'text_delta', 'text' => $text],
+        ]);
+        $this->emitEvent('content_block_stop', [
+            'type' => 'content_block_stop',
+            'index' => $idx,
+        ]);
+        $this->emittedText = true;
     }
 
     /**

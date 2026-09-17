@@ -11,6 +11,7 @@ use App\Service\RAG\VectorSearchService;
 use App\Service\RAG\VectorStorage\DTO\RagScope;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\UserMemoryService;
+use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -100,26 +101,36 @@ final readonly class MessagesContextInjector
         bool $includeMemories,
     ): ?string {
         $userId = (int) $user->getId();
-        $cacheKey = self::CACHE_PREFIX.hash('sha256', implode(':', [
-            $sessionKey,
-            (string) $userId,
-            $desktop->ragGroupKey ?? '',
-            null !== $profile ? (string) ($profile->agentId ?? '') : '',
-            $includeMemories ? '1' : '0',
-        ]));
-        $item = $this->cache->getItem($cacheKey);
-        if ($item->isHit()) {
-            $cached = $item->get();
-            if (\is_string($cached)) {
-                return $cached;
+        // Desktop pins a knowledge folder and often asks about a file that was
+        // not Ready on the first turn. Replaying that empty cache for two hours
+        // is the "uploaded a file, asked about it, got nothing" bug.
+        $liveDesktopRag = null !== $desktop->ragGroupKey && '' !== $desktop->ragGroupKey;
+        /** @var CacheItemInterface|null $item */
+        $item = null;
+        if (!$liveDesktopRag) {
+            $cacheKey = self::CACHE_PREFIX.hash('sha256', implode(':', [
+                $sessionKey,
+                (string) $userId,
+                $desktop->ragGroupKey ?? '',
+                null !== $profile ? (string) ($profile->agentId ?? '') : '',
+                $includeMemories ? '1' : '0',
+            ]));
+            $item = $this->cache->getItem($cacheKey);
+            if ($item->isHit()) {
+                $cached = $item->get();
+                if (\is_string($cached)) {
+                    return $cached;
+                }
             }
         }
 
-        $query = $this->firstUserText($requestBody);
+        $query = $this->userQueryText($requestBody, $liveDesktopRag);
         if ('' === trim($query)) {
-            $item->set('');
-            $item->expiresAfter(self::CACHE_TTL);
-            $this->cache->save($item);
+            if (null !== $item) {
+                $item->set('');
+                $item->expiresAfter(self::CACHE_TTL);
+                $this->cache->save($item);
+            }
 
             return null;
         }
@@ -182,9 +193,11 @@ final readonly class MessagesContextInjector
         }
 
         $block = $this->formatter->combineAndClamp($rag, $memories, self::MAX_CHARS);
-        $item->set($block);
-        $item->expiresAfter(self::CACHE_TTL);
-        $this->cache->save($item);
+        if (null !== $item) {
+            $item->set($block);
+            $item->expiresAfter(self::CACHE_TTL);
+            $this->cache->save($item);
+        }
 
         return '' !== $block ? $block : null;
     }
@@ -278,28 +291,76 @@ final readonly class MessagesContextInjector
     /**
      * @param array<string, mixed> $requestBody
      */
+    private function userQueryText(array $requestBody, bool $includeLast): string
+    {
+        $first = $this->firstUserText($requestBody);
+        if (!$includeLast) {
+            return $first;
+        }
+        $last = $this->lastUserText($requestBody);
+        if ('' === trim($last) || $last === $first) {
+            return $first;
+        }
+
+        return trim($first."\n".$last);
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     */
     private function firstUserText(array $requestBody): string
     {
         foreach ($requestBody['messages'] ?? [] as $msg) {
             if (!\is_array($msg) || 'user' !== ($msg['role'] ?? '')) {
                 continue;
             }
-            $content = $msg['content'] ?? '';
-            if (\is_string($content)) {
-                return $content;
-            }
-            if (\is_array($content)) {
-                $parts = [];
-                foreach ($content as $block) {
-                    if (\is_array($block) && 'text' === ($block['type'] ?? '') && isset($block['text'])) {
-                        $parts[] = (string) $block['text'];
-                    }
-                }
-
-                return implode("\n", $parts);
+            $text = $this->messageText($msg);
+            if ('' !== trim($text)) {
+                return $text;
             }
         }
 
         return '';
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     */
+    private function lastUserText(array $requestBody): string
+    {
+        $last = '';
+        foreach ($requestBody['messages'] ?? [] as $msg) {
+            if (!\is_array($msg) || 'user' !== ($msg['role'] ?? '')) {
+                continue;
+            }
+            $text = $this->messageText($msg);
+            if ('' !== trim($text)) {
+                $last = $text;
+            }
+        }
+
+        return $last;
+    }
+
+    /**
+     * @param array<string, mixed> $msg
+     */
+    private function messageText(array $msg): string
+    {
+        $content = $msg['content'] ?? '';
+        if (\is_string($content)) {
+            return $content;
+        }
+        if (!\is_array($content)) {
+            return '';
+        }
+        $parts = [];
+        foreach ($content as $block) {
+            if (\is_array($block) && 'text' === ($block['type'] ?? '') && isset($block['text'])) {
+                $parts[] = (string) $block['text'];
+            }
+        }
+
+        return implode("\n", $parts);
     }
 }
