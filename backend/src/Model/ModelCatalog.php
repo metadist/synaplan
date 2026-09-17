@@ -71,6 +71,11 @@ class ModelCatalog
      * being interesting, and what lets ModelCatalogRetirementTest fail a release
      * that drops a model without recording one.
      *
+     * An entry here is the entire retirement. A row kept in the catalog does not
+     * repeat the fact: {@see rows()} derives its `active`/`selectable` from this
+     * registry, and RetiredModelReferenceTest fails the build if any class still
+     * falls back to the retired id.
+     *
      * Fields:
      *   providerId — the upstream API model id the BID stood for. Required, and
      *                always known: it comes from the catalog entry being
@@ -348,6 +353,13 @@ class ModelCatalog
             'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Pro-0813; migrate to GLM-5.3.',
         ],
     ];
+
+    /**
+     * Memoised {@see rows()} result — MODELS with RETIREMENTS applied.
+     *
+     * @var array[]|null
+     */
+    private static ?array $rows = null;
 
     /**
      * Number of decimals used to normalise float fields before fingerprinting.
@@ -691,7 +703,7 @@ class ModelCatalog
         $key = strtolower($key);
         $results = [];
 
-        foreach (self::MODELS as $model) {
+        foreach (self::rows() as $model) {
             $modelKey = self::modelKey($model);
             $modelKeyWithTag = $modelKey.':'.strtolower($model['tag']);
 
@@ -711,7 +723,7 @@ class ModelCatalog
     public static function keys(): array
     {
         $keys = [];
-        foreach (self::MODELS as $model) {
+        foreach (self::rows() as $model) {
             $key = self::modelKey($model);
             if (!in_array($key, $keys, true)) {
                 $keys[] = $key;
@@ -729,7 +741,53 @@ class ModelCatalog
      */
     public static function all(): array
     {
-        return self::MODELS;
+        return self::rows();
+    }
+
+    /**
+     * The catalog rows with {@see RETIREMENTS} applied.
+     *
+     * A retired model cannot serve a request, so `active` and `selectable` are
+     * derived from the registry instead of being repeated on the row. Recording
+     * the retirement is therefore the whole edit: forgetting the flags used to
+     * ship a fresh install a row it would offer, select and bill for a model the
+     * provider had switched off.
+     *
+     * The values are memoised because both inputs are compile-time constants,
+     * so the derivation can never go stale within a process.
+     *
+     * @return array[]
+     */
+    private static function rows(): array
+    {
+        return self::$rows ??= self::withRetirementsApplied(self::MODELS);
+    }
+
+    /**
+     * Force every retired row off, whatever the catalog row itself says.
+     *
+     * Kept separate from {@see rows()} so the derivation is testable against a
+     * row that still claims to be active — the case the registry exists to make
+     * impossible.
+     *
+     * @param array[] $rows
+     *
+     * @return array[]
+     *
+     * @internal
+     */
+    public static function withRetirementsApplied(array $rows): array
+    {
+        foreach ($rows as $index => $row) {
+            if (!isset(self::RETIREMENTS[(int) ($row['id'] ?? 0)])) {
+                continue;
+            }
+
+            $rows[$index]['active'] = 0;
+            $rows[$index]['selectable'] = 0;
+        }
+
+        return $rows;
     }
 
     /**
@@ -774,6 +832,70 @@ class ModelCatalog
     }
 
     /**
+     * The closest live sibling of a model, as a catalog key a RETIREMENTS entry
+     * can carry — a starting point for a retirement, never a decision.
+     *
+     * "Closest" is the same service and the same capability tag at the nearest
+     * output price, because that is what past retirements actually chose: the
+     * shut-down TrustedTokens DeepSeek V4 Flash went to GLM-5.3-Flash at the
+     * identical $0.15/$0.30, and V4 Pro to the remaining flagship. Price, not
+     * name, is what an operator notices after the substitution.
+     *
+     * Null means the catalog offers no sibling — a real answer for an embedding
+     * model or a provider that shipped no replacement, where `successor => null`
+     * is the correct entry. The suggestion still has to be verified against the
+     * provider: a same-price row can lack a capability the retired one had.
+     */
+    public static function suggestSuccessorKey(int $bid): ?string
+    {
+        $retired = null;
+        foreach (self::rows() as $row) {
+            if ($bid === (int) $row['id']) {
+                $retired = $row;
+                break;
+            }
+        }
+
+        if (null === $retired) {
+            return null;
+        }
+
+        $service = self::normalizeProvider($retired['service']);
+        $best = null;
+
+        foreach (self::rows() as $row) {
+            if ($bid === (int) $row['id'] || 1 !== (int) ($row['active'] ?? 0)) {
+                continue;
+            }
+            if ($row['tag'] !== $retired['tag'] || self::normalizeProvider($row['service']) !== $service) {
+                continue;
+            }
+
+            $distance = abs((float) ($row['priceOut'] ?? 0.0) - (float) ($retired['priceOut'] ?? 0.0));
+            $quality = (float) ($row['quality'] ?? 0.0);
+
+            if (null === $best || $distance < $best['distance'] || ($distance === $best['distance'] && $quality > $best['quality'])) {
+                $best = ['row' => $row, 'distance' => $distance, 'quality' => $quality];
+            }
+        }
+
+        if (null === $best) {
+            return null;
+        }
+
+        $key = sprintf(
+            '%s:%s:%s',
+            strtolower((string) $best['row']['service']),
+            (string) $best['row']['providerId'],
+            (string) $best['row']['tag'],
+        );
+
+        // A key that does not resolve back to exactly one row would fail
+        // ModelCatalogRetirementTest the moment someone pasted it.
+        return null === self::findBidByKey($key) ? null : $key;
+    }
+
+    /**
      * All catalog models of a provider/service, matched via
      * {@see normalizeProvider()} (case-insensitive, aliases collapsed —
      * e.g. "groq", "Ollama", "Hugging Face").
@@ -785,7 +907,7 @@ class ModelCatalog
         $service = self::normalizeProvider($service);
         $results = [];
 
-        foreach (self::MODELS as $model) {
+        foreach (self::rows() as $model) {
             if (self::normalizeProvider($model['service']) === $service) {
                 $results[] = $model;
             }
@@ -804,7 +926,7 @@ class ModelCatalog
     public static function serviceNames(): array
     {
         $names = [];
-        foreach (self::MODELS as $model) {
+        foreach (self::rows() as $model) {
             $names[self::normalizeProvider($model['service'])] ??= $model['service'];
         }
 

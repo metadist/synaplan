@@ -480,9 +480,7 @@ Comparing the production catalog (`GET /api/v1/admin/models`) against `ModelCata
 
 Every retirement above needed its own hand-written migration, and three of them existed *only* to clean up models an earlier release had dropped from the catalog while leaving them live in every install. #1515 replaced that with a registry: `ModelCatalog::RETIREMENTS`, applied by `ModelRetirementSeeder` on every deploy.
 
-**The whole procedure is now:**
-
-1. Add the entry to `ModelCatalog::RETIREMENTS`, keyed by the retired BID:
+**The whole procedure is one entry in `ModelCatalog::RETIREMENTS`, keyed by the retired BID:**
 
 ```php
 321 => [
@@ -493,8 +491,18 @@ Every retirement above needed its own hand-written migration, and three of them 
 ],
 ```
 
-2. Set `active` and `selectable` to `0` on the catalog row if you are keeping it, or remove the row entirely. Either is fine — the registry is what carries the retirement.
-3. Run `make -C backend test`. No migration, no SQL.
+Then `make -C backend test`. No migration, no SQL, and **no second edit on the catalog row**:
+`ModelCatalog::rows()` derives `active`/`selectable` from this registry, so a row you keep is
+switched off by the entry alone (removing the row entirely is still fine). Setting the flags by
+hand used to be a separate step, and forgetting it shipped fresh installs a model they would
+offer, select and bill for after the provider had switched it off.
+
+`app:models:check-availability` writes the entry for you. For every model it confirms Gone it
+prints the block above, keyed by BID, dated today, with the closest live row of the same provider
+and capability as the suggested successor — the same choice the last three retirements made by
+hand. Confirm the successor against the provider's own notice before pasting: a matching price
+does not prove a matching capability, and `null` stays the right answer when there is no
+replacement.
 
 **What the seeder does**, idempotently and on every container start, for each entry whose row exists and still matches `providerId`: stamps `BRETIREDON` and `BSUCCESSORID`, and forces `BACTIVE = BSELECTABLE = BISDEFAULT = 0`. A re-run writes nothing. A BID an operator repurposed is skipped with a warning. Rows are never deleted — `BMESSAGES` has FKs into `BMODELS` and **BIDs must never be reused**.
 
@@ -513,6 +521,22 @@ git diff backend/tests/Unit/Model/__snapshots__/
 ```
 
 It also enforces that a recorded successor resolves to exactly one live catalog entry and is not itself retired, so a chain of retirements can never repoint an install at another dead model.
+
+**The second guard, `RetiredModelReferenceTest`:** a retired id must not be what any class falls
+back to. The registry switches the catalog row off and the seeder switches the database row off,
+but neither can see an id another class spelled out itself — `GoogleProvider::generateImage()` read
+`$options['model'] ?? 'imagen-4.0-generate-001'` for a month after Google shut that endpoint down,
+on the one path where the caller passes no model. The test flags a retired id in a default position
+(`??`, `?:`, `return`) anywhere in `backend/src/`, and nowhere else on purpose: a retired id is
+legitimate in a family check (`str_starts_with($model, 'gpt-5')`), in `AnthropicProvider`'s
+`SUPPORTED_MODELS` (the ids Claude Code sends us), and in an OpenAPI `example`. What none of those
+do is decide which model a request goes to. When it fires, point the default at the successor the
+registry records for that BID.
+
+**What the registry does not reach:** prose. `README.md` and `docs/CONFIGURATION.md` advertise
+models per provider in editorial summaries, so no test can tell that "Imagen 4" became a lie — it
+stayed in both for a month after the shutdown. When a retirement empties a family at a provider
+(no live row of that family left), fix the provider's line in both files in the same PR.
 
 **Still open (follows separately, #1515):** consuming `BSUCCESSORID` at resolution time and surfacing retirement state in the admin UI. Until then, `DEFAULTMODEL` bindings that point at a retired BID are handled as before — repointed or deleted by the migration that accompanied that retirement — and a stale binding degrades through `ModelConfigService`'s logged fallback, since it treats a deactivated row as unusable.
 
