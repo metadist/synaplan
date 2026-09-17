@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\DiscordNotificationService;
+use App\Service\Email\InboundEmailAttachmentStore;
 use App\Service\Email\RawMimeEmailParser;
 use App\Service\EmailChatService;
 use App\Service\EmailWebhookIdempotencyService;
@@ -49,6 +50,7 @@ class WebhookController extends AbstractController
         private ModelConfigService $modelConfigService,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private RawMimeEmailParser $rawMimeEmailParser,
+        private InboundEmailAttachmentStore $inboundEmailAttachmentStore,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatErrorPresenter $chatErrorPresenter,
     ) {
@@ -75,12 +77,13 @@ class WebhookController extends AbstractController
                 new OA\Property(
                     property: 'attachments',
                     type: 'array',
+                    description: 'Optional. Each item\'s url is fetched by the server (http/https only; private addresses are refused, DNS is pinned) and stored as a File on the receiving user, linked to the inbound message. At most 10 attachments and 128 MB total are fetched; unknown types, oversize, quota misses and the rest of an over-budget list are skipped. The email is still accepted. Automatic vectorization is not started.',
                     items: new OA\Items(
                         properties: [
-                            new OA\Property(property: 'filename', type: 'string'),
-                            new OA\Property(property: 'content_type', type: 'string'),
-                            new OA\Property(property: 'size', type: 'integer'),
-                            new OA\Property(property: 'url', type: 'string'),
+                            new OA\Property(property: 'filename', type: 'string', example: 'invoice.pdf'),
+                            new OA\Property(property: 'content_type', type: 'string', example: 'application/pdf'),
+                            new OA\Property(property: 'size', type: 'integer', example: 1024),
+                            new OA\Property(property: 'url', type: 'string', example: 'https://relay.example.com/files/invoice.pdf', description: 'Public http(s) URL the server fetches. Query strings are allowed; the bytes are stored, not the URL.'),
                         ]
                     )
                 ),
@@ -358,13 +361,14 @@ class WebhookController extends AbstractController
                 $message->setMeta('external_id', $normalizedMessageId);
                 // Note: Email threading is handled via Chat titles (Email: keyword or Email Conversation)
             }
-            if (!empty($data['attachments'])) {
+            if (!empty($data['attachments']) && is_array($data['attachments'])) {
                 $message->setMeta('has_attachments', 'true');
+                $this->inboundEmailAttachmentStore->attach($message, $user, $data['attachments']);
 
                 // Check for audio attachments to enable voice reply
                 foreach ($data['attachments'] as $attachment) {
-                    $mime = $attachment['content_type'] ?? '';
-                    if (str_starts_with($mime, 'audio/')) {
+                    $mime = is_array($attachment) ? ($attachment['content_type'] ?? '') : '';
+                    if (is_string($mime) && str_starts_with($mime, 'audio/')) {
                         $message->setMeta('voice_reply', '1');
                         break;
                     }

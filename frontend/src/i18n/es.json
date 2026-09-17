@@ -2819,6 +2819,7 @@
     "intro": "Los archivos que subes se convierten en conocimiento consultable para tus chats.",
     "introCta": "Añade archivos a tus fuentes…",
     "useInChat": "Usar en el chat",
+    "openInChat": "Abrir en el chat",
     "status_error": "Error",
     "terms": {
       "vectorized": "consultable por IA",

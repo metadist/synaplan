@@ -3600,6 +3600,7 @@
     "intro": "Hochgeladene Dateien werden durchsuchbares Wissen für deine Chats.",
     "introCta": "Füge Dateien zu Deinen Quellen hinzu…",
     "useInChat": "Im Chat nutzen",
+    "openInChat": "Im Chat öffnen",
     "terms": {
       "vectorized": "KI-durchsuchbar",
       "knowledgeGroup": "Wissensordner",
