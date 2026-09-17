@@ -319,14 +319,33 @@ class ModelCatalog
 
         // --- 2026-09-08 (TrustedTokens dropped the undated V4 Flash id) ---
         // Confirmed gone against https://trustedtokens.eu/api/billing/models
-        // on 2026-09-08. The dated Flash-0731 snapshot (BID 336) is still
-        // served at the same price and is the same-family successor; V4 Pro
-        // is still live but is a different (and much more expensive) tier.
+        // on 2026-09-08. The dated Flash-0731 snapshot (BID 336) was the
+        // same-family successor at the time; TrustedTokens dropped that id
+        // too on 2026-09-17, so this now points at GLM-5.3-Flash (same
+        // price, same provider) rather than at another dead model.
         335 => [
             'providerId' => 'deepseek-ai/DeepSeek-V4-Flash',
             'retiredOn' => '2026-09-08',
-            'successor' => 'trustedtokens:deepseek-ai/DeepSeek-V4-Flash-0731:chat',
-            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Flash; migrate to DeepSeek V4 Flash 0731.',
+            'successor' => 'trustedtokens:zai-org/GLM-5.3-Flash:chat',
+            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Flash; the dated Flash-0731 successor was itself dropped on 2026-09-17. Migrate to GLM-5.3-Flash.',
+        ],
+
+        // --- 2026-09-17 (TrustedTokens dropped remaining DeepSeek V4 ids) ---
+        // Hourly health check confirmed Gone (provider catalog 404/400) at
+        // 2026-09-17 12:16 UTC for Flash-0731 and V4 Pro. No same-family
+        // DeepSeek V4 replacement remains; GLM-5.3-Flash matches the Flash
+        // price ($0.15/$0.30), GLM-5.3 is the remaining TrustedTokens flagship.
+        336 => [
+            'providerId' => 'deepseek-ai/DeepSeek-V4-Flash-0731',
+            'retiredOn' => '2026-09-17',
+            'successor' => 'trustedtokens:zai-org/GLM-5.3-Flash:chat',
+            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Flash-0731; migrate to GLM-5.3-Flash.',
+        ],
+        337 => [
+            'providerId' => 'deepseek-ai/DeepSeek-V4-Pro-0813',
+            'retiredOn' => '2026-09-17',
+            'successor' => 'trustedtokens:zai-org/GLM-5.3:chat',
+            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Pro-0813; migrate to GLM-5.3.',
         ],
     ];
 
@@ -3942,8 +3961,8 @@ class ModelCatalog
         // Not covered by LiteLLM sync — verify manually against that endpoint.
         // GLM-5.3 / GLM-5.3-Flash / DeepSeek V4 + Chimera added 2026-08-29
         // (BIDs 331–337). Existing 309–312 prices unchanged vs the 07-27 snapshot.
-        // BID 335 (DeepSeek-V4-Flash) dropped by TrustedTokens on 2026-09-08;
-        // see ModelCatalog::RETIREMENTS[335]. Flash-0731 and V4 Pro remain.
+        // BID 335 retired 2026-09-08; BIDs 336 and 337 retired 2026-09-17.
+        // See ModelCatalog::RETIREMENTS[335], [336], [337].
         [
             'id' => 309,
             'service' => 'TrustedTokens',
@@ -4202,8 +4221,11 @@ class ModelCatalog
             'service' => 'TrustedTokens',
             'name' => 'DeepSeek V4 Flash 0731',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: TrustedTokens dropped the dated V4 Flash-0731 id on
+            // 2026-09-17 (hourly health check confirmed Gone). See
+            // ModelCatalog::RETIREMENTS[336].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'deepseek-ai/DeepSeek-V4-Flash-0731',
             'priceIn' => 0.15,
             'inUnit' => 'per1M',
@@ -4230,8 +4252,11 @@ class ModelCatalog
             'service' => 'TrustedTokens',
             'name' => 'DeepSeek V4 Pro',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: TrustedTokens dropped V4 Pro-0813 on 2026-09-17
+            // (hourly health check confirmed Gone). See
+            // ModelCatalog::RETIREMENTS[337].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'deepseek-ai/DeepSeek-V4-Pro-0813',
             'priceIn' => 2.25,
             'inUnit' => 'per1M',

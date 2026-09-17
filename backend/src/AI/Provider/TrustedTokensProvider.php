@@ -10,7 +10,7 @@ namespace App\AI\Provider;
  *
  * Chat and vision share the same `/v1/chat/completions` endpoint. Vision is
  * only offered by models that advertise it (Qwen3.6 and GLM-5.3-Flash);
- * GLM-5.2, GLM-5.3, DeepSeek V4, Chimera and GPT OSS 120B are text-only.
+ * GLM-5.2, GLM-5.3, Chimera and GPT OSS 120B are text-only.
  *
  * @see https://trustedtokens.eu/docs/
  * @see https://api.trustedtokens.eu/v1

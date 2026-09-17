@@ -150,13 +150,24 @@ Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the three 
 
 ### TrustedTokens DeepSeek V4 Flash shutdown (2026-09-08)
 
-TrustedTokens dropped the undated `deepseek-ai/DeepSeek-V4-Flash` id. The hourly health check confirmed the model is gone against `https://trustedtokens.eu/api/billing/models` on 2026-09-08; the dated Flash-0731 snapshot and V4 Pro remain in that catalog.
+TrustedTokens dropped the undated `deepseek-ai/DeepSeek-V4-Flash` id. The hourly health check confirmed the model is gone against `https://trustedtokens.eu/api/billing/models` on 2026-09-08. The dated Flash-0731 snapshot was recorded as the same-family successor; that id was itself dropped on 2026-09-17 (see below), so BID 335 now points at GLM-5.3-Flash.
 
 | BID | Model | `providerId` | Successor |
 | --- | ----- | ------------ | --------- |
-| 335 | DeepSeek V4 Flash | `deepseek-ai/DeepSeek-V4-Flash` | `trustedtokens:deepseek-ai/DeepSeek-V4-Flash-0731:chat` (BID 336) |
+| 335 | DeepSeek V4 Flash | `deepseek-ai/DeepSeek-V4-Flash` | `trustedtokens:zai-org/GLM-5.3-Flash:chat` (BID 332) |
 
-Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog row carries `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 335, so nothing is orphaned. Flash-0731 is the same-family successor at the same price; V4 Pro is still live but is a different (and much more expensive) tier. BID 335 is not a `ProviderDefaultsService` recommendation.
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog row carries `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 335, so nothing is orphaned. BID 335 is not a `ProviderDefaultsService` recommendation.
+
+### TrustedTokens DeepSeek V4 Flash 0731 and V4 Pro shutdown (2026-09-17)
+
+TrustedTokens dropped the remaining DeepSeek V4 ids (`deepseek-ai/DeepSeek-V4-Flash-0731` and `deepseek-ai/DeepSeek-V4-Pro-0813`). The hourly health check confirmed both Gone (provider catalog 404/400) at 2026-09-17 12:16 UTC. No same-family DeepSeek V4 replacement remains on TrustedTokens; GLM-5.3-Flash matches the Flash price ($0.15 / $0.30), GLM-5.3 is the remaining TrustedTokens flagship.
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 336 | DeepSeek V4 Flash 0731 | `deepseek-ai/DeepSeek-V4-Flash-0731` | `trustedtokens:zai-org/GLM-5.3-Flash:chat` (BID 332) |
+| 337 | DeepSeek V4 Pro | `deepseek-ai/DeepSeek-V4-Pro-0813` | `trustedtokens:zai-org/GLM-5.3:chat` (BID 331) |
+
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 336 or 337, so nothing is orphaned. Neither BID is a `ProviderDefaultsService` recommendation. The health monitor skips rows that carry `BRETIREDON`, so this also stops the hourly incident mail for these ids.
 
 ## Maintenance links
 
@@ -196,7 +207,7 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | Higgsfield | ⚠️ NOT publicly verifiable — see below | dashboard only |
 | **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
-| **TrustedTokens** | ✅ verified 2026-09-08 (V4 Flash retired) | https://trustedtokens.eu/api/billing/models |
+| **TrustedTokens** | ✅ verified 2026-09-17 (V4 Flash, Flash-0731 and V4 Pro retired) | https://trustedtokens.eu/api/billing/models |
 | **A2Agent** | ✅ verified 2026-09-14 (public group rate) | https://a2agent.me/models |
 | **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
@@ -237,7 +248,7 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **The realtime Speech-to-Speech API is deliberately not wired up.** It bills per session minute ($0.05/min, plus $0.004 per text input message) over a WebSocket, and this application has no realtime-voice capability to attach it to. Adding it would need a new capability, a new pricing mode, and session-duration metering.
 - **Embeddings and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
 
-### TrustedTokens (verified 2026-09-08)
+### TrustedTokens (verified 2026-09-17)
 
 German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`). Per-token rates come from the public billing catalog (not the JS-rendered marketing page); subscription plans (€50 / €200 / €2,000) are prepaid usage credits that draw down against these rates. Catalog stores **USD per 1M tokens** (same unit as every other cloud provider). Cache-read rates are authored in `json.cache_read_price_per_1M`.
 
@@ -248,8 +259,8 @@ German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`)
 | 332 / 333 | `zai-org/GLM-5.3-Flash` (chat + vision) | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 1M |
 | 334 | `tngtech/DeepSeek-TNG-R1T2-Chimera` | $1.00 / $3.00 | $1.00 / $3.00 (cache $0.20) | 164k |
 | 335 | `deepseek-ai/DeepSeek-V4-Flash` | retired 2026-09-08 — see [TrustedTokens DeepSeek V4 Flash shutdown](#trustedtokens-deepseek-v4-flash-shutdown-2026-09-08) | — | — |
-| 336 | `deepseek-ai/DeepSeek-V4-Flash-0731` | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 400k |
-| 337 | `deepseek-ai/DeepSeek-V4-Pro-0813` | $2.25 / $6.75 | $2.25 / $6.75 (cache $0.45) | 200k |
+| 336 | `deepseek-ai/DeepSeek-V4-Flash-0731` | retired 2026-09-17 — see [TrustedTokens DeepSeek V4 Flash 0731 and V4 Pro shutdown](#trustedtokens-deepseek-v4-flash-0731-and-v4-pro-shutdown-2026-09-17) | — | — |
+| 337 | `deepseek-ai/DeepSeek-V4-Pro-0813` | retired 2026-09-17 — see [TrustedTokens DeepSeek V4 Flash 0731 and V4 Pro shutdown](#trustedtokens-deepseek-v4-flash-0731-and-v4-pro-shutdown-2026-09-17) | — | — |
 | 310 / 311 | `Qwen/Qwen3.6-35B-A3B-FP8` (chat + vision) | $0.25 / $1.50 | $0.25 / $1.50 (cache $0.05) | 262k |
 | 312 | `openai/gpt-oss-120b` | $0.15 / $0.60 | $0.15 / $0.60 (cache $0.05) | 131k |
 
