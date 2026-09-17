@@ -4,11 +4,12 @@
 
 **The open-source AI platform — chat, knowledge, media and agents on infrastructure you control.**
 
-[Website](https://www.synaplan.com) &nbsp;·&nbsp; [Docs](https://docs.synaplan.com/) &nbsp;·&nbsp; [Live instance](https://web.synaplan.com/) &nbsp;·&nbsp; [iPhone App](https://apps.apple.com/app/id6784278288?ct=github-readme) &nbsp;·&nbsp; [Outlook Add-in](https://github.com/metadist/Synamail) &nbsp;·&nbsp; [Discord](https://discord.com/invite/kQB3eDjWfF)
+[Website](https://www.synaplan.com) &nbsp;·&nbsp; [Docs](https://docs.synaplan.com/) &nbsp;·&nbsp; [Live instance](https://web.synaplan.com/) &nbsp;·&nbsp; [iOS](https://apps.apple.com/app/id6784278288?ct=github-readme) &nbsp;·&nbsp; [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) &nbsp;·&nbsp; [Desktop](https://github.com/metadist/synaplan-desktop) &nbsp;·&nbsp; [Outlook Add-in](https://github.com/metadist/Synamail) &nbsp;·&nbsp; [Discord](https://discord.com/invite/kQB3eDjWfF)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-one%20command-2496ED?logo=docker&logoColor=white)](#your-first-answer-in-three-steps)
 [![Download on the App Store](https://img.shields.io/badge/App%20Store-Download-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/id6784278288?ct=github-readme)
+[![Get it on Google Play](https://img.shields.io/badge/Google%20Play-Download-414141?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme)
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/kQB3eDjWfF)
 [![API Docs](https://img.shields.io/badge/API-OpenAPI%20%2F%20Swagger-6BA539?logo=openapiinitiative&logoColor=white)](https://web.synaplan.com/api/doc)
 
@@ -22,7 +23,7 @@
 - **Hundreds of models, one platform.** OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, HuggingFace, sovereign EU providers, and any local model via Ollama — swap providers per task in the UI, without touching a config file. No vendor lock-in, ever.
 - **DAG task routing that saves tokens.** An AI planner decomposes complex requests into a directed task graph (extract → summarize → generate → reply) and routes every step to the model that fits it — a cheap fast model for extraction, a strong one only where reasoning is needed. Live task cards stream while the graph executes, and every answer shows what it cost.
 - **Sovereign by design.** Run on-prem, in the EU cloud, or fully air-gapped: chat, RAG knowledge search, document processing, transcription and speech run with zero internet connection. No training on your data, no forced telemetry — proven in production up to 5,000-workplace offline deployments.
-- **Everywhere you work.** Web app, [iPhone app](https://apps.apple.com/app/id6784278288?ct=github-readme), [Outlook add-in](https://github.com/metadist/Synamail), embeddable chat widget, WhatsApp, email — plus the tools you already run: Microsoft 365, Dropbox, Nextcloud / ownCloud, calendars, Jira and Confluence, and [OpenCloud](https://github.com/metadist/synaplan-opencloud).
+- **Everywhere you work.** Web app, [iPhone](https://apps.apple.com/app/id6784278288?ct=github-readme) and [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) apps, [Desktop](https://github.com/metadist/synaplan-desktop), [Outlook add-in](https://github.com/metadist/Synamail), embeddable chat widget, WhatsApp, email — plus the tools you already run: Microsoft 365, Dropbox, Nextcloud / ownCloud, calendars, Jira and Confluence, and [OpenCloud](https://github.com/metadist/synaplan-opencloud).
 - **Extensible without forking.** A non-invasive plugin system, an OpenAPI-documented REST API, an MCP server *and* client, and an Anthropic-compatible endpoint for Claude Code and friends.
 
 ---
@@ -159,8 +160,9 @@ The same assistant, the same knowledge base, the same model policy — on every 
 
 | Surface | What it does | Get it |
 |---------|--------------|--------|
-| **Web app** | Full chat + admin UI, light/dark, four languages | This repo — `docker compose up -d` |
-| **iPhone app** | Chat, documents and voice on iOS — pointed at web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) |
+| **Web app** | Full chat + admin UI, light/dark, five languages | This repo — `docker compose up -d` |
+| **Mobile apps** | Chat, documents and voice on iPhone and Android — pointed at web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
+| **Desktop Client** | Pair a computer, keep research local, run Agents on this machine | [metadist/synaplan-desktop](https://github.com/metadist/synaplan-desktop) |
 | **Outlook add-in** | Bring Synaplan into Outlook (Web, new & classic, Mac) — find and process mail without sending it anywhere | [metadist/Synamail](https://github.com/metadist/Synamail) |
 | **Chat widget** | Embed your assistant on any website with one snippet — cross-origin ready, human takeover included | [Widget guide](https://docs.synaplan.com/index.php/widget) |
 | **WhatsApp & Email** | The AI answers on the channel the question came in on | [WhatsApp](docs/WHATSAPP.md) · [Email](docs/EMAIL.md) |
@@ -193,7 +195,8 @@ Everything below is the same platform, packaged for different homes. Pick what f
 |---------|------------|
 | **[synaplan](https://github.com/metadist/synaplan)** | The platform itself (this repo): backend, frontend, widget, plugins, dev stack, and the `deploy/` production contract with Elestio, AWS Marketplace, and Umbrel adapters |
 | **[synaplan-charts](https://github.com/metadist/synaplan-charts)** | Helm charts for Kubernetes — for partners and enterprises running K8s clusters |
-| **[iPhone app](https://apps.apple.com/app/id6784278288?ct=github-readme)** | Native iOS app — point it at web.synaplan.com or any server you host |
+| **[Mobile apps](https://github.com/metadist/synaplan-apps)** | Native iOS and Android — [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
+| **[synaplan-desktop](https://github.com/metadist/synaplan-desktop)** | Desktop Client — pair a computer and run Agents locally |
 | **[Synamail](https://github.com/metadist/Synamail)** | Outlook add-in (Web, new & classic, Mac) — Synaplan inside your mailbox |
 | **[synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud)** / **[synaplan-opencloud](https://github.com/metadist/synaplan-opencloud)** | Apps for Nextcloud / OpenCloud — use those files as AI knowledge while the file store stays in charge (ownCloud works via the built-in WebDAV connection) |
 | **[synaplan-tts](https://github.com/metadist/synaplan-tts)** | Optional self-hosted text-to-speech service for voice output |
@@ -263,7 +266,8 @@ docker compose up -d
 - **Multi-Task DAG Routing** — An AI planner decomposes complex requests into a directed task graph (extract → summarize → generate → reply), routes each step to the model that fits it, and streams live task cards while the steps execute — cheaper models for simple steps means fewer wasted tokens
 - **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
 - **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/index.php/widget))
-- **iPhone App** — Chat, documents and voice input on iOS, pointed at web.synaplan.com or at your own server ([App Store](https://apps.apple.com/app/id6784278288?ct=github-readme))
+- **Mobile Apps** — Chat, documents and voice on iPhone and Android, pointed at web.synaplan.com or at your own server ([App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme))
+- **Desktop Client** — Pair a computer and run Agents locally ([synaplan-desktop](https://github.com/metadist/synaplan-desktop))
 - **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md))
 - **WhatsApp** — Meta Business API integration
 - **Email** — AI-powered email responses, plus live mailbox search (IMAP and Microsoft 365)
@@ -454,6 +458,8 @@ In-repo guides (for developers working on this codebase):
 | [synaplan](https://github.com/metadist/synaplan) | Main app (this repo) |
 | [synaplan-docs](https://github.com/metadist/synaplan-docs) | Public docs site (docs.synaplan.com) |
 | [Synamail](https://github.com/metadist/Synamail) | Outlook add-in |
+| [synaplan-desktop](https://github.com/metadist/synaplan-desktop) | Desktop Client (Windows, macOS, Linux) |
+| [synaplan-apps](https://github.com/metadist/synaplan-apps) | iOS and Android apps — [App Store](https://apps.apple.com/app/id6784278288) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app) |
 | [synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud) | Nextcloud integration |
 | [synaplan-opencloud](https://github.com/metadist/synaplan-opencloud) | OpenCloud integration |
 | [synaplan-tts](https://github.com/metadist/synaplan-tts) | Optional Piper TTS — [image](https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts) with 4 baked voices |

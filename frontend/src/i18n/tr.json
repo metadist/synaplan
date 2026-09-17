@@ -283,12 +283,21 @@
       "ariaLabel": "{title} dokümantasyonunda aç"
     }
   },
-  "examplePrompts": {
-    "heading": "Bunlardan birini deneyin",
-    "items": {
-      "poemMp3": "Bir kedi hakkında şiir yaz ve onu MP3'e dönüştür.",
-      "everglades": "Florida Everglades hakkında bir makale yaz ve indirilebilir bir Word belgesine koy.",
-      "cabinImage": "Gün batımında şirin bir dağ kulübesinin resmini oluştur."
+  "companionLinks": {
+    "tagline": "Synaplan — özgür düşün",
+    "ask": "Bana neler yapabildiğini söyle",
+    "opensInNewTab": "Yeni sekmede açılır",
+    "desktop": {
+      "title": "Masaüstü istemcisi",
+      "blurb": "Araştırmanı yerelde tut, ajanları her yerde kullan."
+    },
+    "mobile": {
+      "title": "Mobil uygulamalar",
+      "blurb": "Kullanıcılarını yola çıkar, özgürce yapılandırılabilir."
+    },
+    "outlook": {
+      "title": "Outlook eklentisi",
+      "blurb": "Çünkü kapalı sistemlerin de yerel belgelere ihtiyacı var."
     }
   },
   "marketingNews": {
