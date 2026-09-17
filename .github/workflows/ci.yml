@@ -30,10 +30,14 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Job-level timeout-minutes on every job. GitHub's default is 360; a hung
+# step otherwise occupies a runner until then and still reports success.
+# Caps sit well above observed medians so ordinary variance still passes.
 jobs:
   change-scope:
     name: Classify Change Scope
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
       reason: ${{ steps.classify.outputs.reason }}
@@ -128,6 +132,7 @@ jobs:
   lint:
     name: PHP Code Formatting
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -174,6 +179,7 @@ jobs:
   deployment-templates:
     name: Deployment Templates (AWS)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -214,6 +220,7 @@ jobs:
   mobile-tooling:
     name: Mobile Release Tooling
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -232,6 +239,7 @@ jobs:
   compute-sidecar:
     name: Compute Sidecar (Go)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -256,6 +264,7 @@ jobs:
     # ~minute 7) and PHPUnit is single-process anyway, so more cores would not
     # shorten the run. Revisit if this job ever becomes the longest one.
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [change-scope]
     if: needs.change-scope.outputs.mode == 'heavy'
 
@@ -420,6 +429,7 @@ jobs:
   backend-minimal:
     name: Backend (minimal)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [change-scope]
     if: needs.change-scope.outputs.mode == 'heavy'
 
@@ -557,6 +567,7 @@ jobs:
     # move this back to `ubuntu-latest-m` without re-measuring those three
     # numbers first.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [change-scope]
     if: needs.change-scope.outputs.mode == 'heavy'
 
@@ -708,6 +719,7 @@ jobs:
   openapi-identical:
     name: OpenAPI identical (full vs minimal)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [frontend-build, backend-minimal]
     if: |
       always() &&
@@ -747,6 +759,7 @@ jobs:
     # (plenty of slack before the e2e jobs finish) and vue-tsc is
     # single-threaded anyway, so more cores would not shorten the run.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [frontend-build]
 
     steps:
@@ -841,6 +854,7 @@ jobs:
   docker-build:
     name: Build Docker Image
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [change-scope, frontend-build]
     if: needs.change-scope.outputs.mode == 'heavy'
     outputs:
@@ -938,6 +952,7 @@ jobs:
     # than per file (that changes isolation semantics inside a file, so it needs
     # its own flake review).
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [docker-build]
     strategy:
       fail-fast: false
@@ -1203,6 +1218,7 @@ jobs:
   e2e-flaky-notify:
     name: Notify flaky E2E (Discord)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [e2e]
     if: always() && (needs.e2e.result == 'success' || needs.e2e.result == 'failure')
     steps:
@@ -1282,6 +1298,7 @@ jobs:
     # MUST match the runner used by visual-baselines.yml — snapshots are
     # rendering-environment sensitive.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [docker-build]
     env:
       APP_IMAGE: synaplan-test:ci
@@ -1371,6 +1388,7 @@ jobs:
   docker-push-amd64:
     name: Publish amd64 Image
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # The amd64 tar produced by docker-build is the exact image E2E ran
     # against, so publishing that tar — rather than rebuilding — is what makes
     # the released image the tested one. Nothing is built here, which is why
@@ -1488,6 +1506,7 @@ jobs:
     # publish path. docker-manifest still waits for E2E plus both arches
     # before moving any release tag.
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
     needs: [change-scope, frontend-build]
     if: >-
       always() &&
@@ -1597,6 +1616,7 @@ jobs:
   docker-manifest:
     name: Publish Multi-Arch Manifest
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Joins the tested amd64 image and the native arm64 build under the release
     # tags. This is the only job that moves a release tag, and it is also the
     # one that proves the result: the verification below refuses any tag that
@@ -1773,6 +1793,7 @@ jobs:
   release-manifest:
     name: Publish Release Manifest
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # An instance learns that a newer release exists from versions.json, so the
     # manifest must never exist before the image it names. docker-manifest
     # completes only after the multi-arch manifest was created AND verified to
@@ -1884,6 +1905,7 @@ jobs:
   release-version-pin:
     name: Update the Default Release Version
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # elestio.yml, deploy/selfhost.env.example, deploy/umbrel/synaplan/ and the
     # AWS Packer template decide which version a NEW deployment installs, so
     # they may only ever name a release whose image is published and verified —
@@ -2127,6 +2149,7 @@ jobs:
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Same rationale as the publish jobs: never deploy while tests/checks fail.
     needs: [e2e, backend, frontend-checks]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
@@ -2159,6 +2182,7 @@ jobs:
   cloudflare-check:
     name: Cloudflare Worker Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [change-scope]
     if: github.event_name == 'pull_request' && needs.change-scope.outputs.mode == 'heavy'
 
@@ -2184,6 +2208,7 @@ jobs:
   openapi-promote:
     name: Carry OpenAPI Spec Forward
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [change-scope]
     if: needs.change-scope.outputs.mode == 'promote'
     permissions:
@@ -2212,6 +2237,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
