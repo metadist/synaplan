@@ -15,15 +15,16 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
- * Anthropic Messages ↔ OpenAI Chat Completions translator.
+ * Anthropic Messages ↔ OpenAI Chat Completions / Responses translator.
  *
  * Strips Anthropic-only fields (`thinking`, beta body keys) that Claude Code
  * sends to gateway aliases. Tool schemas map `input_schema` → `parameters`;
- * image blocks map to `image_url` parts so vision survives the alias route.
+ * image blocks map to `image_url` / `input_image` parts so vision survives
+ * the alias route.
  *
- * Hosts: OpenAI plus every other catalog chat provider that already speaks
- * Chat Completions (Groq, Mistral, xAI, HuggingFace, TrustedTokens,
- * A2Agent, Perplexity, Ollama, admin-registered OpenAI-compatible endpoints).
+ * First-party OpenAI reasoning models (o-series, gpt-5+, gpt-6) go to
+ * `/v1/responses` — Chat Completions rejects their function tools. Every
+ * other Chat Completions host (Groq, Mistral, xAI, …) stays on that API.
  */
 #[AutoconfigureTag('app.messages.translator')]
 final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInterface
@@ -209,6 +210,13 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             $tools = OpenAiToolShapes::toChatCompletionsTools($clientTools);
             if ([] !== $tools) {
                 $payload['tools'] = $tools;
+                // GPT-6 Astra (and other reasoning models) reject function
+                // tools on Chat Completions unless reasoning is off. The
+                // catalog marks them `meta.api = responses`; until that
+                // translator exists, disable reasoning so tools still work.
+                if (self::usesCompletionTokens((string) $payload['model'])) {
+                    $payload['reasoning_effort'] = 'none';
+                }
             }
         }
 

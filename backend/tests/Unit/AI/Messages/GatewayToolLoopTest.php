@@ -684,6 +684,7 @@ final class GatewayToolLoopTest extends TestCase
                 $this->assertSame('user', $last['role']);
                 $this->assertIsString($last['content']);
                 $this->assertStringContainsString('Do not search again', $last['content']);
+                $this->assertStringContainsString('http URL', $last['content']);
 
                 return [
                     'status' => 200,

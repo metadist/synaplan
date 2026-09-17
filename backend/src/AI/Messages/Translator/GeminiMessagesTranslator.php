@@ -191,6 +191,10 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         $candidate = $gemini['candidates'][0] ?? [];
         $parts = $candidate['content']['parts'] ?? [];
         $content = [];
+        $carrySig = \is_array($parts) ? self::firstThoughtSignatureInParts($parts) : null;
+        if (\is_array($candidate) && null === $carrySig) {
+            $carrySig = self::thoughtSignatureFromPart($candidate, []);
+        }
         if (\is_array($parts)) {
             foreach ($parts as $i => $part) {
                 if (!\is_array($part)) {
@@ -208,7 +212,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                         'name' => (string) ($fc['name'] ?? 'tool'),
                         'input' => \is_array($args) ? $args : [],
                     ];
-                    $sig = self::thoughtSignatureFromPart($part, $fc);
+                    $sig = self::thoughtSignatureFromPart($part, $fc) ?? $carrySig;
                     if (null !== $sig) {
                         $block['thought_signature'] = $sig;
                     }
@@ -301,15 +305,19 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                         $parts[] = $part;
                     }
                 } elseif ('tool_use' === $type) {
-                    $call = [
-                        'name' => (string) ($block['name'] ?? 'tool'),
-                        'args' => \is_array($block['input'] ?? null) ? $block['input'] : new \stdClass(),
+                    $part = [
+                        'functionCall' => [
+                            'name' => (string) ($block['name'] ?? 'tool'),
+                            'args' => \is_array($block['input'] ?? null) ? $block['input'] : new \stdClass(),
+                        ],
                     ];
                     $sig = $block['thought_signature'] ?? $block['thoughtSignature'] ?? null;
                     if (\is_string($sig) && '' !== $sig) {
-                        $call['thoughtSignature'] = $sig;
+                        // Gemini 3.x requires the signature on the Part, not
+                        // inside functionCall (3.5 Flash 400s on the latter).
+                        $part['thoughtSignature'] = $sig;
                     }
-                    $parts[] = ['functionCall' => $call];
+                    $parts[] = $part;
                     $geminiRole = 'model';
                 } elseif ('tool_result' === $type) {
                     $result = $block['content'] ?? '';
@@ -388,6 +396,25 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
             $part['thought_signature'] ?? null,
         ] as $sig) {
             if (\is_string($sig) && '' !== $sig) {
+                return $sig;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<mixed> $parts
+     */
+    private static function firstThoughtSignatureInParts(array $parts): ?string
+    {
+        foreach ($parts as $part) {
+            if (!\is_array($part)) {
+                continue;
+            }
+            $fc = \is_array($part['functionCall'] ?? null) ? $part['functionCall'] : [];
+            $sig = self::thoughtSignatureFromPart($part, $fc);
+            if (null !== $sig) {
                 return $sig;
             }
         }
@@ -495,6 +522,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         $cacheRead = 0;
         $buffer = '';
         $toolIndex = 0;
+        $carrySig = null;
 
         foreach ($this->httpClient->stream($response) as $chunk) {
             set_time_limit(0);
@@ -521,6 +549,9 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                 }
 
                 $parts = $decoded['candidates'][0]['content']['parts'] ?? [];
+                if (\is_array($parts)) {
+                    $carrySig = self::firstThoughtSignatureInParts($parts) ?? $carrySig;
+                }
                 if (!\is_array($parts)) {
                     continue;
                 }
@@ -562,7 +593,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                             'name' => (string) ($fc['name'] ?? 'tool'),
                             'input' => [],
                         ];
-                        $sig = self::thoughtSignatureFromPart($part, $fc);
+                        $sig = self::thoughtSignatureFromPart($part, $fc) ?? $carrySig;
                         if (null !== $sig) {
                             $contentBlock['thought_signature'] = $sig;
                         }

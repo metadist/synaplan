@@ -143,6 +143,24 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         }
     }
 
+    public function testReasoningModelsDisableEffortWhenToolsArePresent(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toOpenAiRequest([
+            'model' => 'openai:gpt-6-astra:chat',
+            'max_tokens' => 64,
+            'tools' => [[
+                'name' => 'web_search',
+                'description' => 'search',
+                'input_schema' => ['type' => 'object', 'properties' => ['q' => ['type' => 'string']]],
+            ]],
+            'messages' => [['role' => 'user', 'content' => 'hi']],
+        ], stream: false);
+
+        $this->assertSame('none', $payload['reasoning_effort']);
+        $this->assertSame('web_search', $payload['tools'][0]['function']['name']);
+    }
+
     public function testServerToolDeclarationsAreNotMappedToFunctions(): void
     {
         $t = new OpenAiMessagesTranslator(new MockHttpClient());

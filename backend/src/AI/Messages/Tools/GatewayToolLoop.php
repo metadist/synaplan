@@ -60,7 +60,7 @@ final readonly class GatewayToolLoop
     private const WALL_CLOCK_SECONDS = 240;
     private const PING_INTERVAL_SECONDS = 15;
     private const WEB_SEARCH_WRAP_AFTER = 2;
-    private const WRAP_UP_AFTER_SEARCH = 'You already have the web search results. Answer the user now in one or two sentences. Do not search again.';
+    private const WRAP_UP_AFTER_SEARCH = 'You already have the web search results. Answer the user now in one or two sentences and include the http URL you used. Do not search again.';
     private const EMPTY_SEARCH_RECOVERY = 'I looked this up but could not turn the results into an answer. Please try again, or ask in a different way.';
 
     public function __construct(
