@@ -62,15 +62,16 @@ final readonly class ConversationFile
     ];
 
     /**
-     * @param string   $reference    marker payload, e.g. `file:42` or `attached:1`
-     * @param string   $displayName  single-line safe name shown to the model
-     * @param string   $category     one of the CATEGORY_* constants
-     * @param string   $origin       one of the ORIGIN_* constants
-     * @param string   $absolutePath validated path inside the upload dir
-     * @param string   $relativePath upload-dir-relative path as stored in BFILES
-     * @param int|null $fileId       BFILES.BID, null for legacy path-only entries
-     * @param int|null $messageId    message the file belongs to
-     * @param string   $direction    `IN` / `OUT` of that message, empty when unknown
+     * @param string   $reference     marker payload, e.g. `file:42` or `attached:1`
+     * @param string   $displayName   single-line safe name shown to the model
+     * @param string   $category      one of the CATEGORY_* constants
+     * @param string   $origin        one of the ORIGIN_* constants
+     * @param string   $absolutePath  validated path inside the upload dir
+     * @param string   $relativePath  upload-dir-relative path as stored in BFILES
+     * @param int|null $fileId        BFILES.BID, null for legacy path-only entries
+     * @param int|null $messageId     message the file belongs to
+     * @param string   $direction     `IN` / `OUT` of that message, empty when unknown
+     * @param string   $extractedText Tika/Whisper text already stored on BFILES
      */
     public function __construct(
         public string $reference,
@@ -82,6 +83,7 @@ final readonly class ConversationFile
         public ?int $fileId = null,
         public ?int $messageId = null,
         public string $direction = '',
+        public string $extractedText = '',
     ) {
     }
 
@@ -104,5 +106,10 @@ final readonly class ConversationFile
     public function isGenerated(): bool
     {
         return self::ORIGIN_GENERATED === $this->origin;
+    }
+
+    public function isDocument(): bool
+    {
+        return self::CATEGORY_DOCUMENT === $this->category;
     }
 }

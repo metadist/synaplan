@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\Entity\File;
 use App\Entity\Message;
+use App\Repository\FileRepository;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -32,6 +36,8 @@ final readonly class FileAnalysisRunner implements TaskRunner
     public function __construct(
         private FileAnalysisHandler $handler,
         private LoggerInterface $logger,
+        private ?ConversationFileCatalog $conversationFiles = null,
+        private ?FileRepository $fileRepository = null,
     ) {
     }
 
@@ -46,7 +52,7 @@ final readonly class FileAnalysisRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::FileAnalysis, 'Analyze/describe/OCR an image or document — either attached by the user or produced by a prior node ($nX.file) — and answer about it.'),
+            new SkillDescriptor(Capability::FileAnalysis, 'Analyze/describe/OCR an image or document — attached now, already present in this conversation, or produced by a prior node ($nX.file) — and answer about it. Plan this even when the current turn has no new attachment if the user asks about a file listed in the conversation.'),
         ];
     }
 
@@ -67,6 +73,10 @@ final readonly class FileAnalysisRunner implements TaskRunner
         // user's upload wins; otherwise fall back to the upstream-generated file.
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
             $this->attachUpstreamFile($synthetic, $inputs);
+        }
+
+        if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
+            $this->attachConversationFile($synthetic, $context);
         }
 
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
@@ -173,6 +183,63 @@ final readonly class FileAnalysisRunner implements TaskRunner
         $this->logger->info('FileAnalysisRunner: analyzing upstream-generated file', [
             'path' => $path,
         ]);
+    }
+
+    /**
+     * A follow-up ("what does the PDF say?") has no new attachment. The file
+     * is still in the conversation catalog — attach it so the handler can
+     * answer instead of failing with "no file to analyze".
+     */
+    private function attachConversationFile(Message $synthetic, NodeContext $context): void
+    {
+        if (null === $this->conversationFiles || null === $this->fileRepository) {
+            return;
+        }
+
+        $catalog = $this->conversationFiles->build($context->message, $context->thread);
+        $pick = $this->conversationFiles->documentInFocus($catalog) ?? $this->firstAnalyzable($catalog);
+        if (null === $pick) {
+            return;
+        }
+
+        $userId = (int) $synthetic->getUserId();
+
+        if (null !== $pick->fileId) {
+            $file = $this->fileRepository->find($pick->fileId);
+            if ($file instanceof File && $file->getUserId() === $userId) {
+                $synthetic->addFile($file);
+                $this->logger->info('FileAnalysisRunner: analyzing conversation file', [
+                    'file_id' => $pick->fileId,
+                    'reference' => $pick->reference,
+                ]);
+
+                return;
+            }
+        }
+
+        $synthetic->setFile(1);
+        $synthetic->setFilePath($pick->relativePath);
+        $extension = strtolower(pathinfo($pick->relativePath, PATHINFO_EXTENSION));
+        $synthetic->setFileType('' !== $extension ? $extension : $pick->category);
+        $synthetic->setFileText($pick->extractedText);
+
+        $this->logger->info('FileAnalysisRunner: analyzing conversation file by path', [
+            'path' => $pick->relativePath,
+        ]);
+    }
+
+    /**
+     * @param list<ConversationFile> $catalog
+     */
+    private function firstAnalyzable(array $catalog): ?ConversationFile
+    {
+        foreach ($catalog as $file) {
+            if ($file->isDocument()) {
+                return $file;
+            }
+        }
+
+        return $catalog[0] ?? null;
     }
 
     /**

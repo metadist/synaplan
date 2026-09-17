@@ -518,7 +518,7 @@ class ChatHandlerTest extends TestCase
         // the model does not follow the trailing English wrap-up into English.
         $systemContent = $capturedMessages[0]['content'];
         $searchPos = strpos($systemContent, 'Web Search Results');
-        $languagePos = strrpos($systemContent, 'Respond in German');
+        $languagePos = strrpos($systemContent, 'looks like German');
         $this->assertNotFalse($searchPos);
         $this->assertNotFalse($languagePos);
         $this->assertGreaterThan($searchPos, $languagePos);

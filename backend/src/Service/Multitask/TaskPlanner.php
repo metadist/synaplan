@@ -16,6 +16,7 @@ use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Context\AttachmentDigest;
 use App\Service\Context\TokenEstimator;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlan;
@@ -73,6 +74,7 @@ final readonly class TaskPlanner
         private ?OfficePdfRoutingDecorator $officePdfRouting = null,
         private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
         private ?AttachmentDigest $attachmentDigest = null,
+        private ?ConversationFileCatalog $conversationFiles = null,
     ) {
     }
 
@@ -100,6 +102,7 @@ final readonly class TaskPlanner
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
         $systemPrompt = $this->buildSystemPrompt($promptRow->getPrompt(), $userId, $message, $options);
+        $systemPrompt .= $this->conversationFilePlannerHint($message, $conversationHistory);
         $messages = $this->buildMessages($systemPrompt, $message, $conversationHistory);
 
         try {
@@ -286,6 +289,25 @@ final readonly class TaskPlanner
         }
 
         return $text."\n\n".$this->timeContextBlock($message, $options);
+    }
+
+    /**
+     * @param array<int, Message> $conversationHistory
+     */
+    private function conversationFilePlannerHint(Message $message, array $conversationHistory): string
+    {
+        if (null === $this->conversationFiles) {
+            return '';
+        }
+
+        $block = $this->conversationFiles->renderInventoryBlock(
+            $this->conversationFiles->build($message, $conversationHistory),
+        );
+        if ('' === $block) {
+            return '';
+        }
+
+        return $block.'If the user asks about a file listed above, plan a file_analysis or rag_query step even when this turn has no new attachment.'."\n";
     }
 
     /**

@@ -12,6 +12,8 @@ use App\Entity\Prompt;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlanValidator;
@@ -247,6 +249,59 @@ final class TaskPlannerTest extends TestCase
         self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         self::assertSame('task_plan', $options['structured_output']->name);
         self::assertFalse($options['structured_output']->strict);
+    }
+
+    public function testPlannerSystemPromptListsConversationFiles(): void
+    {
+        $catalog = $this->createMock(ConversationFileCatalog::class);
+        $catalog->method('build')->willReturn([
+            new ConversationFile(
+                'file:77',
+                'brief.pdf',
+                ConversationFile::CATEGORY_DOCUMENT,
+                ConversationFile::ORIGIN_UPLOADED,
+                '/tmp/brief.pdf',
+                'brief.pdf',
+                77,
+            ),
+        ]);
+        $catalog->method('renderInventoryBlock')->willReturn(
+            "\n\n## Files available in this conversation\n\n- `file:77` \"brief.pdf\" (document, shared earlier in this conversation)\n",
+        );
+
+        $sentMessages = null;
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages) use (&$sentMessages): array {
+            $sentMessages = $messages;
+
+            return ['content' => '{"version":1,"language":"en","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+        });
+
+        $planner = new TaskPlanner(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->modelConfigService,
+            new TaskPlanValidator(),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(UserRepository::class),
+            new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
+            $this->createMock(RateLimitService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            conversationFiles: $catalog,
+        );
+
+        $planner->plan($this->message('was steht im brief?'), [], 1);
+
+        $system = is_array($sentMessages) ? (string) ($sentMessages[0]['content'] ?? '') : '';
+        self::assertStringContainsString('## Files available in this conversation', $system);
+        self::assertStringContainsString('file:77', $system);
+        self::assertStringContainsString('plan a file_analysis or rag_query', $system);
     }
 
     public function testPlanOmitsTheTaskPlanSchemaWhenTheKillSwitchIsOff(): void
