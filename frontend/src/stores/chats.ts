@@ -94,13 +94,21 @@ export const useChatsStore = defineStore('chats', () => {
    *
    * Creates and activity bumps are merged into the applied snapshot instead
    * of bumping this counter: discarding the boot GET because the user clicked
-   * New Chat mid-load would drop every other chat.
+   * New Chat mid-load would drop every other chat. Only ids recorded in
+   * `locallyCreatedIds` are kept when the snapshot omits them — otherwise a
+   * chat deleted on another device would come back on every refresh.
    */
   let chatsLoadSeq = 0
-  /** Chat ids `markChatGenerating(id, true)` has set in this session. */
-  const liveGeneratingIds = new Set<number>()
-  /** Chat ids `markChatGenerating(id, false)` has cleared in this session. */
-  const liveClearedIds = new Set<number>()
+  /** Ids `createChat()` added that a snapshot started beforehand cannot list. */
+  const locallyCreatedIds = new Set<number>()
+  /**
+   * Live generating marks, keyed by chat id → `chatsLoadSeq` at mark time.
+   * Applied only to loads that were already in flight (`epoch >= loadSeq`) so
+   * a later snapshot can turn the marker off after the user walked away.
+   */
+  const liveGeneratingEpoch = new Map<number, number>()
+  /** Live clears, same generation rule as `liveGeneratingEpoch`. */
+  const liveClearedEpoch = new Map<number, number>()
 
   /**
    * Paginated history for the mobile drawer. Kept separate from `chats` so the
@@ -216,21 +224,37 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
-  function applyChatsFromServer(incoming: Chat[], serverRunIds: number[]) {
+  function applyLiveRunOverlay(serverRunIds: number[], loadSeq: number): Set<number> {
+    const nextRuns = new Set(serverRunIds)
+    for (const [id, epoch] of liveGeneratingEpoch) {
+      if (epoch >= loadSeq) {
+        nextRuns.add(id)
+      } else {
+        liveGeneratingEpoch.delete(id)
+      }
+    }
+    for (const [id, epoch] of liveClearedEpoch) {
+      if (epoch >= loadSeq) {
+        nextRuns.delete(id)
+      } else {
+        liveClearedEpoch.delete(id)
+      }
+    }
+    return nextRuns
+  }
+
+  function applyChatsFromServer(incoming: Chat[], serverRunIds: number[], loadSeq: number) {
     const serverIds = new Set(incoming.map((chat) => chat.id))
     const localById = new Map(chats.value.map((chat) => [chat.id, chat]))
     const merged = incoming.map((server) => mergeLoadedChat(localById.get(server.id), server))
-    const createdLocally = chats.value.filter((chat) => !serverIds.has(chat.id))
+    const createdLocally = chats.value.filter(
+      (chat) => locallyCreatedIds.has(chat.id) && !serverIds.has(chat.id)
+    )
+    for (const id of serverIds) {
+      locallyCreatedIds.delete(id)
+    }
     chats.value = createdLocally.length > 0 ? [...createdLocally, ...merged] : merged
-
-    const nextRuns = new Set(serverRunIds)
-    for (const id of liveGeneratingIds) {
-      nextRuns.add(id)
-    }
-    for (const id of liveClearedIds) {
-      nextRuns.delete(id)
-    }
-    activeRunChatIds.value = nextRuns
+    activeRunChatIds.value = applyLiveRunOverlay(serverRunIds, loadSeq)
   }
 
   async function loadChats() {
@@ -249,7 +273,8 @@ export const useChatsStore = defineStore('chats', () => {
       }
       applyChatsFromServer(
         (data.chats || []).map((chat) => normalizeChat(chat)),
-        data.activeRunChatIds ?? []
+        data.activeRunChatIds ?? [],
+        seq
       )
       ensureValidActiveChat()
     } catch (err: unknown) {
@@ -280,12 +305,12 @@ export const useChatsStore = defineStore('chats', () => {
     // reads of activeRunChatIds would not re-render on add/delete alone.
     const next = new Set(activeRunChatIds.value)
     if (generating) {
-      liveGeneratingIds.add(chatId)
-      liveClearedIds.delete(chatId)
+      liveGeneratingEpoch.set(chatId, chatsLoadSeq)
+      liveClearedEpoch.delete(chatId)
       next.add(chatId)
     } else {
-      liveGeneratingIds.delete(chatId)
-      liveClearedIds.add(chatId)
+      liveClearedEpoch.set(chatId, chatsLoadSeq)
+      liveGeneratingEpoch.delete(chatId)
       next.delete(chatId)
     }
     activeRunChatIds.value = next
@@ -354,6 +379,7 @@ export const useChatsStore = defineStore('chats', () => {
 
       const newChat = normalizeChat(data.chat)
 
+      locallyCreatedIds.add(newChat.id)
       chats.value.unshift(newChat)
       if (activeChatId.value === selectionAtRequest) {
         updateActiveChatSelection(newChat.id)
@@ -490,6 +516,7 @@ export const useChatsStore = defineStore('chats', () => {
       })
 
       const wasActiveChat = activeChatId.value === chatId
+      locallyCreatedIds.delete(chatId)
       chats.value = chats.value.filter((c) => c.id !== chatId)
       invalidateInFlightChatsLoad()
 
@@ -706,10 +733,11 @@ export const useChatsStore = defineStore('chats', () => {
     chats.value = []
     conversationAccess.value = null
     conversationSource.value = null
-    conversationAccessSeq = 0
+    conversationAccessSeq += 1
     invalidateInFlightChatsLoad()
-    liveGeneratingIds.clear()
-    liveClearedIds.clear()
+    locallyCreatedIds.clear()
+    liveGeneratingEpoch.clear()
+    liveClearedEpoch.clear()
     activeRunChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0

@@ -276,6 +276,17 @@ describe('Chats Store', () => {
       expect(store.chats[0].title).toBe('Renamed during refresh')
     })
 
+    it('does not resurrect a chat the server no longer returns', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1), regularChat(2)] })
+      await store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
+      await store.loadChats()
+
+      expect(store.chats.map((c) => c.id)).toEqual([1])
+    })
+
     it('keeps a chat created while a list refresh is in flight', async () => {
       const store = useChatsStore()
       httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
@@ -739,6 +750,49 @@ describe('Chats Store', () => {
       await pending
 
       expect(store.activeRunChatIds.has(1)).toBe(true)
+    })
+
+    it('lets a later list load clear a walked-away generating mark', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat],
+        activeRunChatIds: [],
+      })
+      await store.loadChats()
+
+      store.markChatGenerating(1, true)
+      expect(store.activeRunChatIds.has(1)).toBe(true)
+
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat],
+        activeRunChatIds: [],
+      })
+      await store.loadChats()
+
+      expect(store.activeRunChatIds.has(1)).toBe(false)
+    })
+
+    it('keeps a live clear when a stale in-flight snapshot still lists the run', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat],
+        activeRunChatIds: [1],
+      })
+      await store.loadChats()
+
+      let resolveLoad: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveLoad = resolve
+        })
+      )
+      const pending = store.loadChats()
+
+      store.markChatGenerating(1, false)
+      resolveLoad({ chats: [chatPayload(1).chat], activeRunChatIds: [1] })
+      await pending
+
+      expect(store.activeRunChatIds.has(1)).toBe(false)
     })
 
     it('clears the marker once the turn finished', async () => {
