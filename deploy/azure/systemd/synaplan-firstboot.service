@@ -1,0 +1,24 @@
+[Unit]
+Description=Synaplan first-boot setup (data disk, configuration, TLS)
+Documentation=https://github.com/metadist/synaplan/blob/main/deploy/azure/README.md
+# The script reads instance metadata and may write to Key Vault, so it needs the
+# network; it also mounts the data disk every other unit uses. walinuxagent is
+# what applies the deployment's own configuration, including the SSH key, and
+# what surfaces the provisioning state to Azure.
+After=network-online.target cloud-init.target walinuxagent.service docker.service
+Wants=network-online.target
+Requires=docker.service
+Before=synaplan.service caddy.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/synaplan/deploy/azure/scripts/firstboot.sh
+# Long enough for a cold data disk and the first `compose config`, short enough
+# that a hung boot is visible rather than silent.
+TimeoutStartSec=900
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

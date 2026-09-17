@@ -265,9 +265,11 @@ RESTORE_PORTABLE_BACKUP=true deploy/scripts/post-restore.sh
 ## Update
 
 Step-by-step instructions:
-[Update a Self-Hosted Deployment](../docs/UPDATE_SELFHOST.md), or
-[Update on Elestio](../docs/UPDATE_ELESTIO.md) for a pipeline on that platform.
-Only a tested, concrete `SYNAPLAN_VERSION` may be deployed.
+[Update a Self-Hosted Deployment](../docs/UPDATE_SELFHOST.md),
+[Update on Elestio](../docs/UPDATE_ELESTIO.md) for a pipeline on that platform,
+or [Update on AWS](../docs/UPDATE_AWS.md) and
+[Update on Azure](../docs/UPDATE_AZURE.md) for a marketplace image. Only a
+tested, concrete `SYNAPLAN_VERSION` may be deployed.
 
 The pre hook enforces a successful backup and pulls the pin. The post hook waits
 for every role and dependency, then verifies health and reports the running image
@@ -286,9 +288,21 @@ layer further out: there is no managed platform on an EC2 instance, so systemd
 and the `synaplan-update` / `synaplan-snapshot` commands call these scripts
 directly. Its additions are the parts only AWS has — a Packer build, a first boot
 that configures itself from instance metadata, Caddy as a host TLS terminator,
-and CloudFormation templates.
-[`scripts/tests/test-lifecycle.sh`](scripts/tests/test-lifecycle.sh) enforces the
-contract for both adapters. Details in [`aws/README.md`](aws/README.md).
+and CloudFormation templates. Those helpers live in
+[`aws/scripts/`](aws/scripts). Details in [`aws/README.md`](aws/README.md).
+
+`deploy/azure/` is the Azure Marketplace VM adapter. It has the same shape: a
+Packer build, a first boot that configures itself from instance metadata, and
+ARM templates. Azure first-boot lives in [`azure/scripts/`](azure/scripts);
+the host TLS terminator, `synaplan-update` sequencer, `ExecStop` wrapper,
+snapshot hook, and image-bake pull live in [`host/`](host) so they stay a
+property of the host rather than of a second cloud copy. Details in
+[`azure/README.md`](azure/README.md).
+
+[`scripts/tests/test-lifecycle.sh`](scripts/tests/test-lifecycle.sh) enforces
+the contract for every adapter. Both layouts coexist: AWS under
+`deploy/aws/scripts/`, Azure first-boot under `deploy/azure/scripts/`, and the
+shared Azure host path under `deploy/host/`.
 
 `deploy/umbrel/` is the Umbrel App Store package and the one adapter that cannot
 call these scripts: umbrelOS installs an app from a self-contained directory and
