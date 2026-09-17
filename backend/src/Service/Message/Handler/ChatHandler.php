@@ -2525,21 +2525,23 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Swap a model that can no longer serve for the account default.
+     * Swap a model that can no longer serve for its recorded successor, or the
+     * account default when the retirement recorded none.
      *
      * The three branches above the DB default all read a BID that was stored
      * elsewhere and earlier — a widget's `aiModelId`, a prompt's `aiModel`, the
      * model an older message was answered with when "Again" replays it. None of
-     * them is revalidated when a model is retired, and because they outrank the
-     * default, repointing DEFAULTMODEL in a migration does not save them: the
-     * request still reaches the provider as a dead model id and dies there.
+     * them is rewritten when a model is retired, so the stored copy stays on the
+     * dead BID. {@see ModelConfigService::resolveUsableModelId()} follows
+     * BSUCCESSORID first; the capability default is the fallback for
+     * `successor: null`.
      */
     private function degradeToUsableModel(?int $modelId, ?int $effectiveUserId, Message $message): ?int
     {
         $usableModelId = $this->modelConfigService->resolveUsableModelId($modelId, 'CHAT', $effectiveUserId);
 
         if ($usableModelId !== $modelId) {
-            $this->logger->warning('ChatHandler: Configured model is no longer usable, falling back to default', [
+            $this->logger->warning('ChatHandler: Configured model is no longer usable, falling back', [
                 'configured_model_id' => $modelId,
                 'model_id' => $usableModelId,
                 'user_id' => $message->getUserId(),

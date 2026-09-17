@@ -548,7 +548,10 @@ models per provider in editorial summaries, so no test can tell that "Imagen 4" 
 stayed in both for a month after the shutdown. When a retirement empties a family at a provider
 (no live row of that family left), fix the provider's line in both files in the same PR.
 
-**Still open (follows separately, #1515):** consuming `BSUCCESSORID` at resolution time and surfacing retirement state in the admin UI. Until then, `DEFAULTMODEL` bindings that point at a retired BID are handled as before — repointed or deleted by the migration that accompanied that retirement — and a stale binding degrades through `ModelConfigService`'s logged fallback, since it treats a deactivated row as unusable.
+**Still open (follows separately, #1515):** surfacing retirement state in the admin UI. Stored
+bindings (`DEFAULTMODEL`, a widget's `aiModelId`, a prompt's `aiModel`) are rewritten at
+resolution time: `ModelConfigService` follows `BSUCCESSORID` to the live successor, and only
+falls through to the capability default when the retirement recorded `successor: null`.
 
 ## Related issues
 

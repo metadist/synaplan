@@ -432,6 +432,13 @@ final readonly class ModelConfigService
                 return $modelId;
             }
 
+            $successor = $this->usableSuccessorOf($modelId, $userId);
+            if (null !== $successor) {
+                $this->logSuccessorSwap($modelId, $successor, $setting);
+
+                return $successor;
+            }
+
             $preferred ??= $modelId;
         }
 
@@ -562,8 +569,11 @@ final readonly class ModelConfigService
      * so an unchecked one keeps a retired model in play even after a migration
      * repointed BCONFIG.
      *
-     * Returns the id unchanged when it can still serve, otherwise the capability
-     * default.
+     * Returns the id unchanged when it can still serve. A retired binding is
+     * rewritten to {@see Model::getSuccessorId()} when that row can still serve
+     * — that is the model the retirement recorded, not whichever capability
+     * default happens to be live. Operator-disabled rows and retirements with
+     * no successor still fall through to the capability default.
      */
     public function resolveUsableModelId(?int $modelId, string $capability, ?int $userId = null): ?int
     {
@@ -571,7 +581,18 @@ final readonly class ModelConfigService
             return $modelId;
         }
 
-        if (!$this->isAllowedModel($userId, $modelId) || !$this->isModelProviderUsable($modelId)) {
+        if (!$this->isAllowedModel($userId, $modelId)) {
+            return $this->getDefaultModel($capability, $userId);
+        }
+
+        if (!$this->isModelProviderUsable($modelId)) {
+            $successor = $this->usableSuccessorOf($modelId, $userId);
+            if (null !== $successor) {
+                $this->logSuccessorSwap($modelId, $successor, $capability);
+
+                return $successor;
+            }
+
             return $this->getDefaultModel($capability, $userId);
         }
 
@@ -635,6 +656,46 @@ final readonly class ModelConfigService
         $id = (int) $raw;
 
         return 0 !== $id ? $id : null;
+    }
+
+    /**
+     * Walk {@see Model::getSuccessorId()} until a usable row, or null when the
+     * retirement recorded no replacement (or the replacement cannot serve).
+     *
+     * A cycle is treated as "no successor" rather than looping: the registry
+     * forbids self-successors, but a BID an operator edited in the admin UI is
+     * not under that test.
+     */
+    private function usableSuccessorOf(int $modelId, ?int $userId): ?int
+    {
+        $visited = [$modelId => true];
+        $current = $this->modelRepository->find($modelId);
+
+        while ($current instanceof Model) {
+            $successorId = $current->getSuccessorId();
+            if (null === $successorId || $successorId <= 0 || isset($visited[$successorId])) {
+                return null;
+            }
+
+            $visited[$successorId] = true;
+
+            if ($this->isAllowedModel($userId, $successorId) && $this->isModelProviderUsable($successorId)) {
+                return $successorId;
+            }
+
+            $current = $this->modelRepository->find($successorId);
+        }
+
+        return null;
+    }
+
+    private function logSuccessorSwap(int $fromBid, int $toBid, string $capability): void
+    {
+        $this->logger->info('Routing a retired model to its catalog successor', [
+            'configured_model_id' => $fromBid,
+            'successor_model_id' => $toBid,
+            'capability' => strtoupper($capability),
+        ]);
     }
 
     private function isAllowedModel(?int $userId, int $modelId): bool
