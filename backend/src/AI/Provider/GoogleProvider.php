@@ -677,7 +677,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function generateImage(string $prompt, array $options = []): array
     {
-        $model = $options['model'] ?? 'imagen-4.0-generate-001';
+        // Nano Banana 2, the successor ModelCatalog::RETIREMENTS[115] records for
+        // Imagen 4.0: Google shut the Imagen 4 endpoints down on 2026-08-17, so
+        // the previous default 404'd for every caller that passed no model.
+        $model = $options['model'] ?? 'gemini-3.1-flash-image-preview';
         $inputImages = $options['images'] ?? [];
 
         if (null === $this->resolveApiKey()) {
@@ -921,7 +924,9 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     /**
      * Generate image using Imagen via Gemini API (API key) or Vertex AI (project ID + OAuth).
      *
-     * Gemini API: available for imagen-4.0-generate-001
+     * The catalog carries no Imagen row any more — Google shut the Imagen 4 ids
+     * down on 2026-08-17 (see ModelCatalog::RETIREMENTS[115]) — so this path now
+     * only serves an Imagen model an operator added themselves.
      *
      * @see https://ai.google.dev/gemini-api/docs/imagen
      */

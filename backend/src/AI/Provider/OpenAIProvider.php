@@ -1462,11 +1462,15 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     /**
      * Pick the mainline model to use with the Responses API image generation tool.
      * Image-specific models (gpt-image-*) need a mainline model wrapper.
+     *
+     * The wrapper is GPT-5.6 Terra, the successor ModelCatalog::RETIREMENTS[30]
+     * records for gpt-4.1: the catalog stopped carrying gpt-4.1 on 2026-07-27, so
+     * that wrapper billed tokens against a model with no price row.
      */
     private function pickResponsesModel(string $imageModel): string
     {
         if (str_starts_with($imageModel, 'gpt-image-')) {
-            return 'gpt-4.1';
+            return 'gpt-5.6-terra';
         }
 
         return $imageModel;

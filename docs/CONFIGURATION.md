@@ -234,7 +234,7 @@ ANTHROPIC_API_KEY=sk-ant-your_key_here
 GOOGLE_GEMINI_API_KEY=your_key_here
 ```
 
-Also unlocks the Google media models (Imagen 4, Nano Banana, Veo 3.1, Gemini TTS).
+Also unlocks the Google media models (Nano Banana image generation, Veo 3.1 video, Gemini TTS).
 
 ### Mistral
 

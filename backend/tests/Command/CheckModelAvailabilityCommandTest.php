@@ -18,6 +18,7 @@ use App\Service\DiscordNotificationService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -26,6 +27,12 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class CheckModelAvailabilityCommandTest extends TestCase
 {
+    /**
+     * A BID the real catalog does not carry, so the draft entry exercises the
+     * "no sibling to suggest" branch without depending on catalog data.
+     */
+    private const OFFERED_BID = 99999;
+
     /** @var list<string> */
     private array $webhookCalls = [];
 
@@ -91,6 +98,49 @@ final class CheckModelAvailabilityCommandTest extends TestCase
         $this->assertStringContainsString('docs/PRICING_MAINTENANCE.md', $display, 'The report must point at the retirement procedure.');
     }
 
+    /**
+     * Whoever reads this report is about to write the registry entry, so the
+     * report writes it for them — keyed by the BID, dated today, with the
+     * provider named in the reason.
+     */
+    public function testConfirmedFindingPrintsThePasteReadyRegistryEntry(): void
+    {
+        $tester = $this->tester(ProviderModelListing::ok(['unrelated']), ModelProbeResult::Gone);
+        $tester->execute([]);
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('ModelCatalog::RETIREMENTS', $display);
+        $this->assertStringContainsString(self::OFFERED_BID.' => [', $display);
+        $this->assertStringContainsString("'providerId' => 'retired-test-model',", $display);
+        $this->assertStringContainsString("'retiredOn' => '2026-09-17',", $display);
+        $this->assertStringContainsString("'reason' => 'Groq no longer serves retired-test-model.',", $display);
+    }
+
+    /**
+     * A BID the catalog does not carry has no sibling to suggest, and guessing
+     * one would be worse than saying so: `null` is the entry that forbids a
+     * substitution.
+     */
+    public function testTheDraftRecordsNoSuccessorWhenTheCatalogOffersNoSibling(): void
+    {
+        $tester = $this->tester(ProviderModelListing::ok(['unrelated']), ModelProbeResult::Gone);
+        $tester->execute([]);
+
+        $this->assertStringContainsString("'successor' => null,", $tester->getDisplay());
+    }
+
+    /**
+     * Nothing is gone, so there is nothing to draft — the report must not invite
+     * a retirement it did not confirm.
+     */
+    public function testNoDraftWithoutAConfirmedFinding(): void
+    {
+        $tester = $this->tester(ProviderModelListing::ok(['unrelated']), ModelProbeResult::Inconclusive);
+        $tester->execute([]);
+
+        $this->assertStringNotContainsString('ModelCatalog::RETIREMENTS', $tester->getDisplay());
+    }
+
     private function tester(ProviderModelListing $listing, ModelProbeResult $verdict): CommandTester
     {
         $this->webhookCalls = [];
@@ -130,6 +180,7 @@ final class CheckModelAvailabilityCommandTest extends TestCase
                 $this->createStub(UserRepository::class),
                 'https://discord.test/webhook',
             ),
+            new MockClock('2026-09-17'),
         );
 
         $application = new Application();
@@ -146,6 +197,10 @@ final class CheckModelAvailabilityCommandTest extends TestCase
         $model->setName('Retired Test Model');
         $model->setTag('chat');
         $model->setActive(1);
+
+        // The BID is what a registry entry is keyed by, and Doctrine owns it.
+        $id = new \ReflectionProperty(Model::class, 'id');
+        $id->setValue($model, self::OFFERED_BID);
 
         return $model;
     }

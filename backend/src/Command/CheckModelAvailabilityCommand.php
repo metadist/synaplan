@@ -6,7 +6,10 @@ namespace App\Command;
 
 use App\AI\Service\ModelAvailabilityChecker;
 use App\AI\Service\ProviderModelListing;
+use App\Model\ModelCatalog;
 use App\Service\DiscordNotificationService;
+use Psr\Clock\ClockInterface;
+use Symfony\Component\Clock\Clock;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -40,6 +43,7 @@ final class CheckModelAvailabilityCommand extends Command
     public function __construct(
         private readonly ModelAvailabilityChecker $checker,
         private readonly DiscordNotificationService $discord,
+        private readonly ClockInterface $clock = new Clock(),
     ) {
         parent::__construct();
     }
@@ -167,6 +171,63 @@ final class CheckModelAvailabilityCommand extends Command
             '',
             'Rows marked as a provider default are urgent: <info>app:provider:apply-defaults --auto</info>',
             'assigns them unattended at container start.',
+            '',
+        ]);
+
+        $this->renderRetirementDraft($io, $findings);
+    }
+
+    /**
+     * The registry entry the finding implies, ready to paste.
+     *
+     * The entry is the whole retirement — the catalog row's active/selectable are
+     * derived from it — so handing it over complete is the difference between a
+     * five-minute edit and re-reading the procedure. The successor is the closest
+     * live sibling, which is a suggestion: only the provider's own deprecation
+     * notice can say whether it really replaces the model.
+     *
+     * @param list<array{provider: string, providerId: string, name: string, tag: string, bids: list<int>, scopes: list<string>, recommended: bool, confirmed: bool}> $findings
+     */
+    private function renderRetirementDraft(SymfonyStyle $io, array $findings): void
+    {
+        $today = $this->clock->now()->format('Y-m-d');
+        $serviceNames = ModelCatalog::serviceNames();
+        $lines = [];
+
+        foreach ($findings as $finding) {
+            $service = $serviceNames[$finding['provider']] ?? $finding['provider'];
+
+            foreach ($finding['bids'] as $bid) {
+                $suggestion = ModelCatalog::suggestSuccessorKey($bid);
+
+                $lines[] = sprintf('        %d => [', $bid);
+                $lines[] = sprintf("            'providerId' => '%s',", $finding['providerId']);
+                $lines[] = sprintf("            'retiredOn' => '%s',", $today);
+                $lines[] = null === $suggestion
+                    ? "            'successor' => null,"
+                    : sprintf("            'successor' => '%s',", $suggestion);
+                $lines[] = sprintf(
+                    "            'reason' => '%s no longer serves %s.',",
+                    $service,
+                    $finding['providerId'],
+                );
+                $lines[] = '        ],';
+            }
+        }
+
+        if ([] === $lines) {
+            return;
+        }
+
+        $io->writeln('Draft entries for <info>ModelCatalog::RETIREMENTS</info>:');
+        $io->writeln('');
+        $io->writeln($lines);
+        $io->writeln('');
+        $io->writeln([
+            'The successor is the nearest live row of the same provider and capability, or',
+            '<info>null</info> where the catalog has none. Confirm it against the provider — a matching',
+            'price does not prove a matching capability — and keep <info>null</info> when there really is',
+            'no replacement. Nothing else needs editing: the row is switched off from the entry.',
             '',
         ]);
     }

@@ -474,6 +474,74 @@ class ModelConfigServiceTest extends TestCase
         self::assertSame(255, $this->service->resolveUsableModelId(9, 'CHAT', 1));
     }
 
+    /**
+     * A widget still bound to a retired BID must land on the successor the
+     * registry recorded, not on whichever DEFAULTMODEL happens to be live —
+     * those are often a different provider and a different price.
+     */
+    public function testResolveUsableModelIdFollowsTheRecordedSuccessor(): void
+    {
+        $this->givenModels(
+            [335 => 'TrustedTokens', 332 => 'TrustedTokens', 255 => 'OpenAI'],
+            inactiveModelIds: [335],
+            successorByModelId: [335 => 332],
+        );
+        $this->givenUsableProviders(['trustedtokens', 'openai']);
+        $this->givenDefaultModelRows([0 => 255]);
+
+        self::assertSame(332, $this->service->resolveUsableModelId(335, 'CHAT', 1));
+    }
+
+    /**
+     * `successor: null` is a statement: do not invent a replacement. The
+     * capability default is then the correct fall-through (xAI grok-stt).
+     */
+    public function testResolveUsableModelIdFallsToTheDefaultWhenRetirementRecordedNoSuccessor(): void
+    {
+        $this->givenModels(
+            [321 => 'xAI', 255 => 'OpenAI'],
+            inactiveModelIds: [321],
+        );
+        $this->givenUsableProviders(['xai', 'openai']);
+        $this->givenDefaultModelRows([0 => 255]);
+
+        self::assertSame(255, $this->service->resolveUsableModelId(321, 'CHAT', 1));
+    }
+
+    /**
+     * The dated Flash-0731 successor was itself retired; the walk has to land
+     * on the live row, not stop on the next dead one.
+     */
+    public function testResolveUsableModelIdWalksAChainOfRetiredSuccessors(): void
+    {
+        $this->givenModels(
+            [335 => 'TrustedTokens', 336 => 'TrustedTokens', 332 => 'TrustedTokens', 255 => 'OpenAI'],
+            inactiveModelIds: [335, 336],
+            successorByModelId: [335 => 336, 336 => 332],
+        );
+        $this->givenUsableProviders(['trustedtokens', 'openai']);
+        $this->givenDefaultModelRows([0 => 255]);
+
+        self::assertSame(332, $this->service->resolveUsableModelId(335, 'CHAT', 1));
+    }
+
+    /**
+     * DEFAULTMODEL itself may still hold the retired BID. Following the
+     * successor there is what saves an install that never had a widget override.
+     */
+    public function testGetDefaultModelFollowsTheSuccessorOfARetiredBinding(): void
+    {
+        $this->givenModels(
+            [335 => 'TrustedTokens', 332 => 'TrustedTokens', 255 => 'OpenAI'],
+            inactiveModelIds: [335],
+            successorByModelId: [335 => 332],
+        );
+        $this->givenUsableProviders(['trustedtokens', 'openai']);
+        $this->givenDefaultModelRows([1 => 335, 0 => 255]);
+
+        self::assertSame(332, $this->service->getDefaultModel('CHAT', 1));
+    }
+
     public function testResolveUsableModelIdKeepsAnOverrideThatStillWorks(): void
     {
         $this->givenModels([255 => 'OpenAI']);
@@ -497,15 +565,17 @@ class ModelConfigServiceTest extends TestCase
      * @param array<int, string> $servicesByModelId
      * @param array<int, string> $providerIdsByModelId
      * @param list<int>          $inactiveModelIds     BIDs to hand back with BACTIVE = 0
+     * @param array<int, int>    $successorByModelId
      */
     private function givenModels(
         array $servicesByModelId,
         array $providerIdsByModelId = [],
         array $inactiveModelIds = [],
+        array $successorByModelId = [],
     ): void {
         $this->modelRepository
             ->method('find')
-            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds): ?Model {
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId): ?Model {
                 if (!isset($servicesByModelId[$modelId])) {
                     return null;
                 }
@@ -514,6 +584,7 @@ class ModelConfigServiceTest extends TestCase
                 $model->method('getService')->willReturn($servicesByModelId[$modelId]);
                 $model->method('getProviderId')->willReturn($providerIdsByModelId[$modelId] ?? '');
                 $model->method('getActive')->willReturn(in_array($modelId, $inactiveModelIds, true) ? 0 : 1);
+                $model->method('getSuccessorId')->willReturn($successorByModelId[$modelId] ?? null);
 
                 return $model;
             });
