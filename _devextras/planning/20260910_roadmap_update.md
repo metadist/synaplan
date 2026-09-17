@@ -3,7 +3,7 @@
 **Status:** Live plan as of 2026-09-13. Replaces
 [`20260903_roadmap.md`](./20260903_roadmap.md) as the overview; the 2026-09-03
 text is frozen at
-[`20260903_roadmap/20260903_roadmap.md`](./20260903_roadmap/20260903_roadmap.md).
+[`2026-archive/20260903_roadmap/20260903_roadmap.md`](./2026-archive/20260903_roadmap/20260903_roadmap.md).
 Track directories, sprint files,
 [`202609_ux_user_flows.md`](./202609_ux_user_flows.md) and
 [`20260913-use-case-research/`](./20260913-use-case-research/README.md) stay
@@ -41,7 +41,7 @@ current row is met.
 | - | ---- | ---------- | ---- |
 | 1 | **Two bugfixes (first)** | E-mail formatting + chat memory. Production reports, not a new track. | **Done** on `main` via [#1787](https://github.com/metadist/synaplan/pull/1787) (2026-09-10). Spec stays in §4. |
 | 2 | **Wave 4** | Tools / approvals / custom tools + the compute sidecar (A0–A2). **Done** on `main` via [#1774](https://github.com/metadist/synaplan/pull/1774) (2026-09-10). | Merged. Approvals, custom HTTP and the workflow builder later default on for new installs (#1827). No PHP compute client yet. |
-| 3 | **Intermezzo** | Leaner architecture and faster execution: declared feature modules, lazy registries, dead-weight removal. Plan: [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md). | **Done.** S1–S4 on `main` (#1815–#1817, [#1843](https://github.com/metadist/synaplan/pull/1843), [#1856](https://github.com/metadist/synaplan/pull/1856)). S5 stays optional. |
+| 3 | **Intermezzo** | Leaner architecture and faster execution: declared feature modules, lazy registries, dead-weight removal. Plan: [`2026-archive/20260910-feature-modules/`](./2026-archive/20260910-feature-modules/00_master_plan.md). | **Done.** S1–S4 on `main` (#1815–#1817, [#1843](https://github.com/metadist/synaplan/pull/1843), [#1856](https://github.com/metadist/synaplan/pull/1856)). S5 stays optional. |
 | 4 | **Wave 5** | Former Wave 5, plus the 10 Sep partner review. Workflow builder, compute Phase B, reliability / activation, then the complete-workflow experiences. | **In progress.** Finish Tools S5 (TL41, TL45–TL47, J-TL-5), then Compute A3 + B1. Named in §7. |
 
 **Next coding work is Wave 5 remainder**, in that order: close Tools S5,
@@ -60,9 +60,9 @@ feeds the Wave 5 ticks; it does not replace this order.
 | Wave 4 | Unchanged in *content*: track 4 S1–S4 + track 5 A0–A2. Merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774) (2026-09-10), before the two bugfixes. |
 | **Two bugfixes** | Shipped in [#1787](https://github.com/metadist/synaplan/pull/1787). Spec retained in §4. |
 | **Intermezzo** | Named release between Wave 4 and Wave 5 (the "4.5" slot). Not a new track number. S1–S4 on `main`; S5 optional. |
-| Wave 5 | Same product intent as the 2026-09-03 Wave 5, plus the partner review in [`20260910-wave5-architecture-research/03_architecture_and_steps.txt`](./20260910-wave5-architecture-research/03_architecture_and_steps.txt). Product slices started on `main` before Intermezzo closed; compute Phase B has not. |
+| Wave 5 | Same product intent as the 2026-09-03 Wave 5, plus the partner review in [`2026-archive/20260910-wave5-architecture-research/03_architecture_and_steps.txt`](./2026-archive/20260910-wave5-architecture-research/03_architecture_and_steps.txt). Product slices started on `main` before Intermezzo closed; compute Phase B has not. |
 | Six tracks, principles, UX contract, vocabulary | Unchanged. Principles and the 2026-09-03 decision log live in the archive. U1–U12 in the UX contract still bind every `ota-candidate` step. The 13 Sep use-case list applies those rules to ten jobs. |
-| Secure Compute vs Desktop | Research verdict ([`01_compute_vs_headless_desktop.md`](./20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md)): Desktop is **not** the compute runtime. Wave 4 already put the runner in `sidecars/synaplan-compute`. Research §7 rows 1–4 and 6 are settled; row 5 (launch name) stays open. |
+| Secure Compute vs Desktop | Research verdict ([`01_compute_vs_headless_desktop.md`](./2026-archive/20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md)): Desktop is **not** the compute runtime. Wave 4 already put the runner in `sidecars/synaplan-compute`. Research §7 rows 1–4 and 6 are settled; row 5 (launch name) stays open. |
 
 Waves remain a capacity plan, not a calendar promise. A wave ends when its
 exit is met.
@@ -84,10 +84,10 @@ exit is met.
 
 | # | Track | Directory | Wave 4 / Intermezzo / Wave 5 |
 | - | ----- | --------- | ---------------------------- |
-| 1 | IAM | [`202609_iam/`](./202609_iam/00_master_plan.md) | Shipped through S5. IAM-UX Share dialog on `main` via [#1726](https://github.com/metadist/synaplan/pull/1726). |
-| 2 | Agent Builder | [`202609_agent_builder/`](./202609_agent_builder/00_master_plan.md) | S1–S6 on `main`. Wave 5 may tighten publish-as-deployment (partner review). |
-| 3 | AI Plugs | [`202609_ai_plugs/`](./202609_ai_plugs/00_master_plan.md) | S1–S6 on `main`. `PL37` leftover. Intermezzo reuses the plug-declaration pattern. |
-| 4 | Tools, Approval & Workflows | [`202609_tools_approval_workflows/`](./202609_tools_approval_workflows/00_master_plan.md) | S1–S4 on `main` (#1774). S5 started (#1821): Steps + webhook live; TL41, TL45–TL47 and J-TL-5 still open. |
+| 1 | IAM | [`2026-archive/202609_iam/`](./2026-archive/202609_iam/00_master_plan.md) | Shipped through S5. IAM-UX Share dialog on `main` via [#1726](https://github.com/metadist/synaplan/pull/1726). |
+| 2 | Agent Builder | [`2026-archive/202609_agent_builder/`](./2026-archive/202609_agent_builder/00_master_plan.md) | S1–S6 on `main`. Wave 5 may tighten publish-as-deployment (partner review). |
+| 3 | AI Plugs | [`2026-archive/202609_ai_plugs/`](./2026-archive/202609_ai_plugs/00_master_plan.md) | S1–S6 on `main`. `PL37` leftover. Intermezzo reuses the plug-declaration pattern. |
+| 4 | Tools, Approval & Workflows | [`2026-archive/202609_tools_approval_workflows/`](./2026-archive/202609_tools_approval_workflows/00_master_plan.md) | S1–S4 on `main` (#1774). S5 started (#1821): Steps + webhook live; TL41, TL45–TL47 and J-TL-5 still open. |
 | 5 | Secure Compute | [`202609_secure_compute/`](./202609_secure_compute/00_master_plan.md) | A0–A2 on `main` (#1774, `sidecars/synaplan-compute`, no PHP client). A3 + B1–B4 = Wave 5. First PHP feature that must be born as a module. |
 | 6 | More Nextcloud | [`202609_more_nextcloud/`](./202609_more_nextcloud/00_master_plan.md) | S1 on `main`. S2–S3 stay in partner repos; not a Wave 4/5 blocker. |
 
@@ -219,9 +219,9 @@ that proves absent means absent.
 
 | Plan | Role |
 | ---- | ---- |
-| [`20260910-wave5-architecture-research/02_conditional_module_loading.md`](./20260910-wave5-architecture-research/02_conditional_module_loading.md) | Measured findings (2026-09-10 `main`) |
-| [`20260910-feature-modules/00_master_plan.md`](./20260910-feature-modules/00_master_plan.md) | Implementation plan, S1–S5. **§0 must be ticked before any Intermezzo code.** |
-| [`20260910-feature-modules/STATUS.md`](./20260910-feature-modules/STATUS.md) | Step state |
+| [`2026-archive/20260910-wave5-architecture-research/02_conditional_module_loading.md`](./2026-archive/20260910-wave5-architecture-research/02_conditional_module_loading.md) | Measured findings (2026-09-10 `main`) |
+| [`2026-archive/20260910-feature-modules/00_master_plan.md`](./2026-archive/20260910-feature-modules/00_master_plan.md) | Implementation plan, S1–S5. **§0 must be ticked before any Intermezzo code.** |
+| [`2026-archive/20260910-feature-modules/STATUS.md`](./2026-archive/20260910-feature-modules/STATUS.md) | Step state |
 
 **Why it sits here, not in Wave 5.** Wave 5 adds a PHP compute client, more
 tools, and more optional services. Each of those would otherwise grow the
@@ -244,7 +244,7 @@ builder, compute Phase B, sovereignty policies, assistant packs.
 ## 7. Wave 5 — after Intermezzo
 
 Former 2026-09-03 Wave 5, informed by the 10 Sep partner review
-([`03_architecture_and_steps.txt`](./20260910-wave5-architecture-research/03_architecture_and_steps.txt)).
+([`03_architecture_and_steps.txt`](./2026-archive/20260910-wave5-architecture-research/03_architecture_and_steps.txt)).
 The review's "insert a reliability release between 3 and 4" is answered by
 §4 (two concrete bugs first) plus this wave's reliability slice — not by
 delaying Wave 4.
@@ -257,7 +257,7 @@ assistant builder and the step-list workflow editor.
 
 | Slice | Track | Notes |
 | ----- | ----- | ----- |
-| Workflow builder v1 + webhook trigger | Tools S5 | [`05_sprint_5_workflow_builder_and_webhook.md`](./202609_tools_approval_workflows/05_sprint_5_workflow_builder_and_webhook.md). Steps + webhook on `main` (#1821). Seeder default on (#1827). Open: TL41 templates, TL45 `saved_tasks` bundle section, TL46 C7 + five-step run, TL47 docs, J-TL-5 walk. |
+| Workflow builder v1 + webhook trigger | Tools S5 | [`05_sprint_5_workflow_builder_and_webhook.md`](./2026-archive/202609_tools_approval_workflows/05_sprint_5_workflow_builder_and_webhook.md). Steps + webhook on `main` (#1821). Seeder default on (#1827). Open: TL41 templates, TL45 `saved_tasks` bundle section, TL46 C7 + five-step run, TL47 docs, J-TL-5 walk. |
 | Compute contract freeze | Compute A3 | Fixtures frozen at `protocol: 1`. |
 | PHP client + `code_run` + policy | Compute B1–B2 | Born as a feature module. Write-class; unattended default `approve`. |
 | Workspaces, egress, hardening | Compute B3–B4 | Default off. T2 (gVisor) on a separate **compute node** before Cloud enable. |
@@ -365,7 +365,7 @@ This file is the wave overview. It does not replace track STATUS.
 | 1 | Archive `20260903_roadmap.md` under `20260903_roadmap/` and keep a stub at the old path so existing links work. |
 | 2 | **Two production bugfixes first** (§4): scheduled mail HTML, chat memory. Then Wave 4, then Intermezzo, then Wave 5. |
 | 3 | Wave 4 is the tools / approvals / compute-sidecar work. It merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774) on 2026-09-10, before the two bugfixes. |
-| 4 | Insert **Intermezzo** (not "Wave 6", not Wave 5) for feature modules and faster execution. Tick [`20260910-feature-modules/00_master_plan.md`](./20260910-feature-modules/00_master_plan.md) §0 before Intermezzo code. |
+| 4 | Insert **Intermezzo** (not "Wave 6", not Wave 5) for feature modules and faster execution. Tick [`2026-archive/20260910-feature-modules/00_master_plan.md`](./2026-archive/20260910-feature-modules/00_master_plan.md) §0 before Intermezzo code. |
 | 5 | Wave 5 keeps Tools S5 + Compute A3/B1–B4 and absorbs the partner review's reliability / activation and complete-workflow ideas as §7.2–§7.3, to be ticked per track before the first Wave 5 PR. |
 | 6 | Do not implement Secure Compute as headless Desktop. Add **compute node** to vocabulary. Research §7 rows 1–4 and 6 settled 2026-09-13; row 5 (launch name) stays open. |
 | 7 | Git: Wave 4 is on `main` (#1774). This planning branch merges onto that. Bugfix PRs target `main` and may land before Intermezzo. |
@@ -379,10 +379,10 @@ This file is the wave overview. It does not replace track STATUS.
 
 | Document | Use |
 | -------- | --- |
-| [`20260903_roadmap/20260903_roadmap.md`](./20260903_roadmap/20260903_roadmap.md) | Frozen original (tracks, inventory, 2026-09-03 decisions) |
+| [`2026-archive/20260903_roadmap/20260903_roadmap.md`](./2026-archive/20260903_roadmap/20260903_roadmap.md) | Frozen original (tracks, inventory, 2026-09-03 decisions) |
 | [`202609_ux_user_flows.md`](./202609_ux_user_flows.md) | Binding UX |
 | [`20260913-use-case-research/`](./20260913-use-case-research/README.md) | Ten jobs + Perfect-UX bar; feeds Wave 5 ticks |
-| [`20260910-wave5-architecture-research/`](./20260910-wave5-architecture-research/README.md) | Compute vs Desktop; conditional modules; partner review (`03_…`) |
-| [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md) | Intermezzo plan of record (S1–S4 done) |
+| [`2026-archive/20260910-wave5-architecture-research/`](./2026-archive/20260910-wave5-architecture-research/README.md) | Compute vs Desktop; conditional modules; partner review (`03_…`) |
+| [`2026-archive/20260910-feature-modules/`](./2026-archive/20260910-feature-modules/00_master_plan.md) | Intermezzo plan of record (S1–S4 done) |
 | [`20260914-navigation-consolidation/`](./20260914-navigation-consolidation/00_master_plan.md) | Nav duplicates, reachability, wording, Operate stacked UI (NV01–NV23); awaits D1–D7 |
 | Track 4 / 5 `STATUS.md` on `main` | Tools S1–S5 (S5 open) and compute A0–A2 as implemented |

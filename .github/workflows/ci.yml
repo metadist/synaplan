@@ -1098,6 +1098,11 @@ jobs:
         working-directory: frontend
         run: |
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          # GitHub-hosted images ship packages.microsoft.com. When that mirror
+          # returns 403 / "no longer signed", apt update fails and Playwright
+          # never installs the Ubuntu Chromium deps we actually need.
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/apt-mirrors.txt 2>/dev/null || true
           npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Install Playwright system dependencies
@@ -1105,6 +1110,8 @@ jobs:
         working-directory: frontend
         run: |
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/apt-mirrors.txt 2>/dev/null || true
           npx playwright install-deps ${{ matrix.browser }}
 
       - name: Wait for test services
@@ -1334,6 +1341,8 @@ jobs:
         working-directory: frontend
         run: |
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/apt-mirrors.txt 2>/dev/null || true
           npx playwright install --with-deps chromium
 
       - name: Run visual snapshot tests

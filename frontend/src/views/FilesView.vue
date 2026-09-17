@@ -936,6 +936,16 @@
                         @activate="describeAndSort(file)"
                       />
                       <button
+                        v-if="file.chat_id"
+                        type="button"
+                        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                        :title="$t('files.openInChat')"
+                        :data-testid="`btn-open-in-chat-${file.id}`"
+                        @click="openInChat(file)"
+                      >
+                        <ChatBubbleLeftRightIcon class="w-4 h-4" />
+                      </button>
+                      <button
                         class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                         :title="$t('common.view')"
                         @click="viewFileContent(file.id)"
@@ -1016,7 +1026,17 @@
                               displayName(file)
                             }}</span>
                             <div class="flex items-center gap-2 min-w-0 flex-wrap overflow-hidden">
-                              <FileSourceBadge v-if="file.source" :source="file.source" />
+                              <button
+                                v-if="file.source && file.chat_id"
+                                type="button"
+                                class="inline-flex min-w-0 max-w-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                                :title="$t('files.openInChat')"
+                                :data-testid="`btn-open-in-chat-${file.id}`"
+                                @click="openInChat(file)"
+                              >
+                                <FileSourceBadge :source="file.source" />
+                              </button>
+                              <FileSourceBadge v-else-if="file.source" :source="file.source" />
                               <FileVectorPill
                                 :state="vectorStateOf(file)"
                                 :chunk-count="file.chunk_count ?? file.chunks ?? 0"
@@ -1061,6 +1081,16 @@
                             :busy="isDescribing(file.id)"
                             @activate="describeAndSort(file)"
                           />
+                          <button
+                            v-if="file.chat_id"
+                            type="button"
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('files.openInChat')"
+                            :data-testid="`btn-open-in-chat-${file.id}`"
+                            @click="openInChat(file)"
+                          >
+                            <ChatBubbleLeftRightIcon class="w-4 h-4" />
+                          </button>
                           <button
                             class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                             :title="$t('files.download')"
@@ -1299,6 +1329,16 @@
                       @activate="describeAndSort(file)"
                     />
                     <button
+                      v-if="file.chat_id"
+                      type="button"
+                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                      :title="$t('files.openInChat')"
+                      :data-testid="`btn-open-in-chat-${file.id}`"
+                      @click="openInChat(file)"
+                    >
+                      <ChatBubbleLeftRightIcon class="w-4 h-4" />
+                    </button>
+                    <button
                       class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                       :title="$t('common.view')"
                       data-testid="btn-view"
@@ -1382,7 +1422,17 @@
                             displayName(file)
                           }}</span>
                           <div class="flex items-center gap-2 min-w-0 flex-wrap overflow-hidden">
-                            <FileSourceBadge v-if="file.source" :source="file.source" />
+                            <button
+                              v-if="file.source && file.chat_id"
+                              type="button"
+                              class="inline-flex min-w-0 max-w-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                              :title="$t('files.openInChat')"
+                              :data-testid="`btn-open-in-chat-${file.id}`"
+                              @click="openInChat(file)"
+                            >
+                              <FileSourceBadge :source="file.source" />
+                            </button>
+                            <FileSourceBadge v-else-if="file.source" :source="file.source" />
                             <FileVectorPill
                               :state="vectorStateOf(file)"
                               :chunk-count="file.chunk_count ?? file.chunks ?? 0"
@@ -1420,6 +1470,16 @@
                           :busy="isDescribing(file.id)"
                           @activate="describeAndSort(file)"
                         />
+                        <button
+                          v-if="file.chat_id"
+                          type="button"
+                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                          :title="$t('files.openInChat')"
+                          :data-testid="`btn-open-in-chat-${file.id}`"
+                          @click="openInChat(file)"
+                        >
+                          <ChatBubbleLeftRightIcon class="w-4 h-4" />
+                        </button>
                         <button
                           class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
                           :title="$t('files.download')"
@@ -1640,6 +1700,7 @@ import { useFilePersistence } from '@/composables/useInputPersistence'
 import { useRouter, useRoute } from 'vue-router'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { useAuthStore } from '@/stores/auth'
+import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
@@ -1649,6 +1710,7 @@ import { kindOfSharedVia } from '@/utils/chatKind'
 const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
+const chatsStore = useChatsStore()
 
 type DisplayedFolder = {
   name: string
@@ -1670,6 +1732,12 @@ function useFolderInChat(folder: DisplayedFolder | string): void {
         ? `shared:${folder.resourceId}`
         : folder.name
   router.push({ path: '/', query: { folder: key } })
+}
+
+function openInChat(file: FileItem): void {
+  if (!file.chat_id) return
+  chatsStore.setActiveChat(file.chat_id)
+  router.push({ name: 'chat' })
 }
 
 function sharedFolderPill(folder: DisplayedFolder) {

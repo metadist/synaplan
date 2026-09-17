@@ -45,6 +45,8 @@ final class OpenAiMessagesTranslatorTest extends TestCase
 
         $this->assertArrayNotHasKey('thinking', $payload);
         $this->assertSame('gpt-4o', $payload['model']);
+        $this->assertSame(64, $payload['max_tokens']);
+        $this->assertArrayNotHasKey('max_completion_tokens', $payload);
         $this->assertSame('Be brief.', $payload['messages'][0]['content']);
         $this->assertSame('function', $payload['tools'][0]['type']);
         $this->assertSame('mcp__1__rag_search', $payload['tools'][0]['function']['name']);
@@ -119,6 +121,232 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         ], stream: false);
 
         $this->assertSame('hi', $payload['messages'][0]['content']);
+    }
+
+    public function testReasoningModelsSendMaxCompletionTokens(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        foreach (['gpt-6-astra', 'openai:gpt-6-astra:chat', 'gpt-5.4', 'o3-mini'] as $model) {
+            $payload = $t->toOpenAiRequest([
+                'model' => $model,
+                'max_tokens' => 1024,
+                'messages' => [['role' => 'user', 'content' => 'PONG']],
+            ], stream: true);
+
+            $this->assertSame(
+                1024,
+                $payload['max_completion_tokens'],
+                $model.' must remap max_tokens',
+            );
+            $this->assertArrayNotHasKey('max_tokens', $payload, $model.' must not send max_tokens');
+        }
+    }
+
+    public function testOpenAiReasoningModelsUseResponses(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $this->assertTrue($t->shouldUseResponses(
+            ['model' => 'openai:gpt-6-astra:chat'],
+            ['provider' => 'openai'],
+        ));
+        $this->assertTrue($t->shouldUseResponses(
+            ['model' => 'gpt-5.4'],
+            ['provider' => 'openai'],
+        ));
+        $this->assertFalse($t->shouldUseResponses(
+            ['model' => 'gpt-4o'],
+            ['provider' => 'openai'],
+        ));
+        $this->assertFalse($t->shouldUseResponses(
+            ['model' => 'openai:gpt-6-astra:chat'],
+            ['provider' => 'groq'],
+        ));
+        $this->assertFalse($t->shouldUseResponses(
+            ['model' => 'gpt-6-astra'],
+            ['provider' => 'openai', 'openai_completions_url' => 'https://example.test/v1/chat/completions'],
+        ));
+        $this->assertSame('https://api.openai.com/v1/responses', $t->resolveResponsesUrl(['provider' => 'openai']));
+    }
+
+    public function testToResponsesRequestMapsToolsHistoryAndLowestEffort(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toResponsesRequest([
+            'model' => 'openai:gpt-6-astra:chat',
+            'max_tokens' => 64,
+            'system' => 'Be brief.',
+            'tools' => [[
+                'name' => 'web_search',
+                'description' => 'search',
+                'input_schema' => ['type' => 'object', 'properties' => ['q' => ['type' => 'string']]],
+            ]],
+            'messages' => [
+                ['role' => 'user', 'content' => 'hi'],
+                ['role' => 'assistant', 'content' => [[
+                    'type' => 'tool_use',
+                    'id' => 'call_1',
+                    'name' => 'web_search',
+                    'input' => ['q' => 'x'],
+                ]]],
+                ['role' => 'user', 'content' => [[
+                    'type' => 'tool_result',
+                    'tool_use_id' => 'call_1',
+                    'content' => 'hit',
+                ]]],
+            ],
+        ], stream: true);
+
+        $this->assertSame('openai:gpt-6-astra:chat', $payload['model']);
+        $this->assertSame(64, $payload['max_output_tokens']);
+        $this->assertArrayNotHasKey('max_tokens', $payload);
+        $this->assertArrayNotHasKey('max_completion_tokens', $payload);
+        $this->assertSame('Be brief.', $payload['instructions']);
+        $this->assertSame(['effort' => 'low'], $payload['reasoning']);
+        $this->assertTrue($payload['stream']);
+        $this->assertFalse($payload['store']);
+        $this->assertSame('function', $payload['tools'][0]['type']);
+        $this->assertSame('web_search', $payload['tools'][0]['name']);
+        $this->assertSame('user', $payload['input'][0]['role']);
+        $this->assertSame('function_call', $payload['input'][1]['type']);
+        $this->assertSame('call_1', $payload['input'][1]['call_id']);
+        $this->assertSame('function_call_output', $payload['input'][2]['type']);
+        $this->assertSame('hit', $payload['input'][2]['output']);
+    }
+
+    public function testToResponsesRequestKeepsNonAutoImageDetail(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toResponsesRequest([
+            'model' => 'openai:gpt-6-astra:chat',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => [
+                ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/page.png']],
+            ]]],
+        ], stream: false, imageDetail: 'low');
+
+        $part = $payload['input'][0]['content'][0];
+        $this->assertSame('input_image', $part['type']);
+        $this->assertSame('https://example.test/page.png', $part['image_url']);
+        $this->assertSame('low', $part['detail']);
+    }
+
+    public function testToResponsesRequestDropsAutoImageDetail(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toResponsesRequest([
+            'model' => 'openai:gpt-6-astra:chat',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => [
+                ['type' => 'image', 'source' => ['type' => 'url', 'url' => 'https://example.test/page.png']],
+            ]]],
+        ], stream: false, imageDetail: 'auto');
+
+        $part = $payload['input'][0]['content'][0];
+        $this->assertSame('input_image', $part['type']);
+        $this->assertArrayNotHasKey('detail', $part);
+    }
+
+    public function testFromResponsesMapsFunctionCallAndText(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromResponsesResponse([
+            'id' => 'resp_1',
+            'status' => 'completed',
+            'output' => [
+                [
+                    'type' => 'function_call',
+                    'call_id' => 'call_1',
+                    'name' => 'web_search',
+                    'arguments' => '{"q":"node lts"}',
+                ],
+                [
+                    'type' => 'message',
+                    'content' => [['type' => 'output_text', 'text' => 'Node 24']],
+                ],
+            ],
+            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+        ], ['model' => 'gpt-6-astra']);
+
+        $this->assertSame('tool_use', $anthropic['stop_reason']);
+        $this->assertSame('tool_use', $anthropic['content'][0]['type']);
+        $this->assertSame(['q' => 'node lts'], $anthropic['content'][0]['input']);
+        $this->assertSame('text', $anthropic['content'][1]['type']);
+        $this->assertSame('Node 24', $anthropic['content'][1]['text']);
+        $this->assertSame(10, $anthropic['usage']['input_tokens']);
+    }
+
+    public function testCompletePostsGpt6ToResponses(): void
+    {
+        $seenUrl = null;
+        $seenBody = null;
+        $client = new MockHttpClient(static function (string $method, string $url, array $options) use (&$seenUrl, &$seenBody): MockResponse {
+            $seenUrl = $url;
+            $seenBody = json_decode((string) ($options['body'] ?? ''), true);
+
+            return new MockResponse((string) json_encode([
+                'id' => 'resp_1',
+                'status' => 'completed',
+                'output' => [[
+                    'type' => 'message',
+                    'content' => [['type' => 'output_text', 'text' => 'PONG']],
+                ]],
+                'usage' => ['input_tokens' => 3, 'output_tokens' => 1],
+            ]));
+        });
+        $t = new OpenAiMessagesTranslator($client);
+
+        $result = $t->complete(
+            [
+                'model' => 'gpt-6-astra',
+                'max_tokens' => 64,
+                'messages' => [['role' => 'user', 'content' => 'Reply with PONG']],
+            ],
+            [
+                'api_key' => 'sk_test',
+                'upstream_url' => 'https://api.anthropic.com',
+                'provider' => 'openai',
+            ],
+        );
+
+        $this->assertSame('https://api.openai.com/v1/responses', $seenUrl);
+        $this->assertIsArray($seenBody);
+        $this->assertSame(64, $seenBody['max_output_tokens']);
+        $this->assertSame(['effort' => 'low'], $seenBody['reasoning']);
+        $this->assertSame(200, $result['status']);
+        $this->assertIsArray($result['body']);
+        $this->assertSame('PONG', $result['body']['content'][0]['text']);
+    }
+
+    public function testStreamMapsResponsesTextDelta(): void
+    {
+        $sse = "event: response.output_text.delta\n"
+            ."data: {\"type\":\"response.output_text.delta\",\"delta\":\"PONG\"}\n\n"
+            ."event: response.completed\n"
+            ."data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"status\":\"completed\",\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}}\n\n";
+        $client = new MockHttpClient(new MockResponse($sse));
+        $t = new OpenAiMessagesTranslator($client);
+        $events = [];
+        $usage = $t->stream(
+            [
+                'model' => 'gpt-6-astra',
+                'max_tokens' => 64,
+                'messages' => [['role' => 'user', 'content' => 'PONG']],
+            ],
+            ['api_key' => 'sk_test', 'upstream_url' => 'https://api.anthropic.com', 'provider' => 'openai'],
+            static function (array $event) use (&$events): void {
+                $events[] = $event;
+            },
+        );
+
+        $deltas = array_values(array_filter(
+            $events,
+            static fn (array $e): bool => 'content_block_delta' === $e['event'],
+        ));
+        $this->assertSame('PONG', $deltas[0]['data']['delta']['text'] ?? null);
+        $this->assertSame('end_turn', $usage->stopReason);
+        $this->assertSame(3, $usage->inputTokens);
     }
 
     public function testServerToolDeclarationsAreNotMappedToFunctions(): void

@@ -6,14 +6,18 @@ namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Connection;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\ConnectionRepository;
+use App\Repository\FileRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Calendar\CalendarEventService;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Destination\DestinationRegistry;
 use App\Service\Destination\RequestedCalendarDelivery;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileStorageService;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\FileAnalysisHandler;
@@ -1437,6 +1441,63 @@ final class RunnersTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('no file', (string) $result->error);
+    }
+
+    public function testFileAnalysisFallsBackToConversationDocument(): void
+    {
+        $file = (new File())
+            ->setUserId(1)
+            ->setFilePath('brief.pdf')
+            ->setFileType('pdf')
+            ->setFileName('brief.pdf')
+            ->setFileSize(12)
+            ->setFileMime('application/pdf')
+            ->setFileText('The brief says hello.')
+            ->setStatus('processed');
+        (new \ReflectionProperty(File::class, 'id'))->setValue($file, 42);
+
+        $entry = new ConversationFile(
+            'file:42',
+            'brief.pdf',
+            ConversationFile::CATEGORY_DOCUMENT,
+            ConversationFile::ORIGIN_UPLOADED,
+            '/tmp/brief.pdf',
+            'brief.pdf',
+            42,
+            100,
+            'IN',
+            'The brief says hello.',
+        );
+
+        $catalog = $this->createMock(ConversationFileCatalog::class);
+        $catalog->method('build')->willReturn([$entry]);
+        $catalog->method('documentInFocus')->willReturn($entry);
+
+        $files = $this->createMock(FileRepository::class);
+        $files->expects(self::once())->method('find')->with(42)->willReturn($file);
+
+        $seenMessage = null;
+        $handler = $this->createMock(FileAnalysisHandler::class);
+        $handler->method('handle')->willReturnCallback(function (Message $msg) use (&$seenMessage): array {
+            $seenMessage = $msg;
+
+            return ['content' => 'The brief says hello.', 'metadata' => ['analysis_type' => 'document']];
+        });
+
+        $runner = new FileAnalysisRunner(
+            $handler,
+            $this->createMock(LoggerInterface::class),
+            $catalog,
+            $files,
+        );
+        $node = new TaskNode('n1', Capability::FileAnalysis, [], ['prompt' => 'was steht im brief?']);
+        $inbound = (new Message())->setUserId(1)->setText('was steht im brief?')->setLanguage('de')->setDirection('IN');
+
+        $result = $runner->run($node, $this->context($inbound));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertInstanceOf(Message::class, $seenMessage);
+        self::assertTrue($seenMessage->getFiles()->contains($file));
     }
 
     public function testComposeReplyGathersTextAndAttachments(): void

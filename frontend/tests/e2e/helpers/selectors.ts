@@ -117,6 +117,9 @@ export const selectors = {
     flyoutLinkAiAccounts: '[data-testid="link-sidebar-v2-ai-accounts"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
+    flyoutLinkAdminPeople: '[data-testid="link-sidebar-v2-admin-people"]',
+    flyoutLinkAdminSetup: '[data-testid="link-sidebar-v2-admin-setup"]',
+    flyoutLinkAdminConfig: '[data-testid="link-sidebar-v2-admin-config"]',
     /** V2 chat list modal */
     modalChatManager: '[data-testid="modal-chat-manager"]',
     /** V2 chat list modal: backdrop — click outside the panel to close */
@@ -165,6 +168,13 @@ export const selectors = {
     aiAnswerBubble: '[data-testid="assistant-message-bubble"]',
     /** Empty-state for a new/empty chat (shown while messages.length === 0 && !isLoadingMessages). Use to assert that a fresh chat is fully committed before counting bubbles. */
     stateEmpty: '[data-testid="state-empty"]',
+    companionLinks: '[data-testid="comp-companion-links"]',
+    companionDesktop: '[data-testid="link-companion-desktop"]',
+    companionMobile: '[data-testid="link-companion-mobile"]',
+    companionOutlook: '[data-testid="link-companion-outlook"]',
+    selfAwareEmptyHint: '[data-testid="self-aware-empty-hint"]',
+    selfAwareEmptyHintBtn: '[data-testid="btn-self-aware-empty-hint"]',
+    userMessageBubble: '[data-testid="user-message-bubble"]',
     /** Terminal: present when streaming finished */
     chatDone: '[data-testid="message-done"]',
     /** Terminal: present when the assistant turn ended in an error notice */
@@ -342,6 +352,7 @@ export const selectors = {
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
     memoriesBtn: '[data-testid="btn-sidebar-v2-memories"]',
+    incomingBtn: '[data-testid="btn-sidebar-v2-incoming"]',
   },
   oidc: {
     keycloakButton: '[data-testid="btn-social-keycloak"]',
@@ -554,6 +565,7 @@ export const selectors = {
     profile: '[data-testid="page-profile"]',
     statistics: '[data-testid="page-statistics"]',
     chats: '[data-testid="page-chats"]',
+    aiAccounts: '[data-testid="page-ai-accounts"]',
     admin: '[data-testid="view-admin"]',
     people: '[data-testid="view-people"]',
     tools: '[data-testid="page-tools"]',

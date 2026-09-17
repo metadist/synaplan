@@ -283,12 +283,21 @@
       "ariaLabel": "Abrir {title} en la documentación"
     }
   },
-  "examplePrompts": {
-    "heading": "Prueba una de estas",
-    "items": {
-      "poemMp3": "Crea un poema sobre un gato y conviértelo en un MP3.",
-      "everglades": "Escribe un artículo sobre los Everglades de Florida y ponlo en un documento de Word para descargar.",
-      "cabinImage": "Crea una imagen de una acogedora cabaña de montaña al atardecer."
+  "companionLinks": {
+    "tagline": "Synaplan — piensa libre",
+    "ask": "Dime qué puedes hacer",
+    "opensInNewTab": "Se abre en una pestaña nueva",
+    "desktop": {
+      "title": "Cliente de escritorio",
+      "blurb": "Mantén tu investigación en local, emplea agentes en cualquier lugar."
+    },
+    "mobile": {
+      "title": "Aplicaciones móviles",
+      "blurb": "Lleva a tus usuarios sobre la marcha, configurable con libertad."
+    },
+    "outlook": {
+      "title": "Complemento de Outlook",
+      "blurb": "Porque los sistemas cerrados también deberían tener documentos locales."
     }
   },
   "marketingNews": {
@@ -2819,6 +2828,7 @@
     "intro": "Los archivos que subes se convierten en conocimiento consultable para tus chats.",
     "introCta": "Añade archivos a tus fuentes…",
     "useInChat": "Usar en el chat",
+    "openInChat": "Abrir en el chat",
     "status_error": "Error",
     "terms": {
       "vectorized": "consultable por IA",
@@ -3214,11 +3224,14 @@
           "unavailable": "Todavía no disponible: Microsoft 365 debe configurarse una vez para esta instalación.",
           "adminLink": "Configúralo en los ajustes del sistema.",
           "askAdmin": "Pide a una persona administradora que lo active.",
+          "preconditions": "Usa una cuenta profesional o educativa. Una cuenta personal de Microsoft no puede conectarse a menos que esta instalación permita cuentas personales. Es posible que tu organización necesite que una persona administradora apruebe esta aplicación primero.",
           "errors": {
             "access_denied": "Cancelaste el inicio de sesión de Microsoft, así que no se conectó nada.",
             "missing_code": "Microsoft envió una respuesta incompleta. Vuelve a iniciar la conexión.",
             "exchange_failed": "Microsoft aceptó el inicio de sesión, pero no se pudo obtener el token. Revisa el secreto de cliente en los ajustes del sistema e inténtalo de nuevo.",
             "invalid_state": "El inicio de sesión tardó demasiado o se empezó en otra pestaña. Inténtalo de nuevo.",
+            "personal_account": "Microsoft rechazó este inicio de sesión porque es una cuenta personal. Usa una cuenta profesional o educativa, o pide que se permitan cuentas personales en el registro de la aplicación.",
+            "admin_consent": "Microsoft necesita que una persona administradora de tu organización apruebe esta aplicación antes de conectar. No se conectó nada.",
             "unknown": "No se pudo conectar Microsoft 365. Inténtalo de nuevo."
           },
           "hosting": "Tu correo permanece en Microsoft, un proveedor de nube con sede en EE. UU."

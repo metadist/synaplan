@@ -4,11 +4,12 @@
 two "missing" surfaces become reachable; Memories behaves the same on every
 device; the Summarizer becomes a chat tool.
 
-**Progress 2026-09-15:** NV01–NV06 merged
-([#1917](https://github.com/metadist/synaplan/pull/1917)). **NV07** on
-`feat/nav-nv07-summarize-in-chat`. Then NV08, NV09. Sprint B is a separate
-pass — see [`02_sprint_b_wording.md`](./02_sprint_b_wording.md) and the
-master plan §8.
+**Progress 2026-09-16:** NV01–NV07 merged
+([#1917](https://github.com/metadist/synaplan/pull/1917),
+[#1921](https://github.com/metadist/synaplan/pull/1921)). **NV08**
+[#1970](https://github.com/metadist/synaplan/pull/1970). **NV09** on
+`feat/nav-nv09-journeys`. Sprint B is a separate pass — see
+[`02_sprint_b_wording.md`](./02_sprint_b_wording.md) and the master plan §8.
 
 **Goal:** after this sprint an administrator and a user can each name *the*
 place for people, chats, usage, provider keys, connections, memories and

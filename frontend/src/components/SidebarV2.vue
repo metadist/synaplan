@@ -396,6 +396,7 @@
         <div
           class="modal-panel w-full sm:max-w-xl flex flex-col rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden bg-white/95 dark:bg-[#0e1628]/95 backdrop-blur-xl border-t sm:border border-white/20 dark:border-white/[0.08] sm:m-4"
           data-testid="modal-chat-manager"
+          :data-chats-loading="chatsStore.loading ? 'true' : 'false'"
           @click.stop
         >
           <!-- Mobile drag handle -->

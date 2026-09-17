@@ -301,6 +301,58 @@ class ConversationFileCatalogTest extends TestCase
     }
 
     /**
+     * The history window can drop the upload turn. Chat-scoped lookup still
+     * offers that PDF so a follow-up can answer from it.
+     */
+    public function testChatScopedFilesAreOfferedWhenTheHistoryWindowDroppedTheUpload(): void
+    {
+        $pdf = $this->file(77, 'brief.pdf', messageId: 100);
+        $pdf->setFileText('Clause 1: pay on Friday.');
+
+        $repository = $this->createMock(FileRepository::class);
+        $repository->method('findFilesByMessageIds')->willReturn([]);
+        $repository->expects($this->once())
+            ->method('findFilesByChatId')
+            ->with(7, 42, $this->anything())
+            ->willReturn([$pdf]);
+        $repository->method('findOneBy')->willReturn(null);
+
+        $catalog = $this->catalog($repository)
+            ->build((new Message())->setUserId(7)->setChatId(42), []);
+
+        $this->assertSame(['file:77'], $this->references($catalog));
+        $this->assertSame(ConversationFile::CATEGORY_DOCUMENT, $catalog[0]->category);
+        $this->assertSame('Clause 1: pay on Friday.', $catalog[0]->extractedText);
+    }
+
+    public function testPromptContextReinjectsDocumentTextMissingFromTheThread(): void
+    {
+        $service = $this->catalog($this->repository([]));
+        $evicted = new ConversationFile(
+            'file:77',
+            'brief.pdf',
+            ConversationFile::CATEGORY_DOCUMENT,
+            ConversationFile::ORIGIN_UPLOADED,
+            '/tmp/brief.pdf',
+            'brief.pdf',
+            77,
+            100,
+            'IN',
+            'Clause 1: pay on Friday.',
+        );
+
+        $block = $service->renderPromptContext([$evicted]);
+        $this->assertStringContainsString('## Files available in this conversation', $block);
+        $this->assertStringContainsString('stay available for the whole conversation', $block);
+        $this->assertStringContainsString('Clause 1: pay on Friday.', $block);
+
+        $listedOnly = $service->renderPromptContext([$evicted], [77 => true]);
+        $this->assertStringContainsString('`file:77`', $listedOnly);
+        $this->assertStringNotContainsString('Clause 1: pay on Friday.', $listedOnly);
+        $this->assertSame('', $service->renderPromptContext([]));
+    }
+
+    /**
      * @param list<ConversationFile> $catalog
      *
      * @return list<string>
@@ -322,6 +374,7 @@ class ConversationFileCatalogTest extends TestCase
     {
         $repository = $this->createMock(FileRepository::class);
         $repository->method('findFilesByMessageIds')->willReturn($linkedFiles);
+        $repository->method('findFilesByChatId')->willReturn([]);
         $repository->method('findOneBy')->willReturn(null);
 
         return $repository;

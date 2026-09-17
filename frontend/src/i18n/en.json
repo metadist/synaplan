@@ -284,12 +284,21 @@
       "ariaLabel": "Open {title} in the documentation"
     }
   },
-  "examplePrompts": {
-    "heading": "Try one of these",
-    "items": {
-      "poemMp3": "Create a poem about a cat and convert it into an MP3.",
-      "everglades": "Write an article about the Florida Everglades and put it into a Word document for download.",
-      "cabinImage": "Create an image of a cozy mountain cabin at sunset."
+  "companionLinks": {
+    "tagline": "Synaplan — think free",
+    "ask": "Tell me what you can do",
+    "opensInNewTab": "Opens in a new tab",
+    "desktop": {
+      "title": "Desktop Client",
+      "blurb": "Keep your research local, employ Agents anywhere."
+    },
+    "mobile": {
+      "title": "Mobile Apps",
+      "blurb": "Get your users on the road, freely configurable."
+    },
+    "outlook": {
+      "title": "Outlook add-in",
+      "blurb": "Because closed systems should have local documents."
     }
   },
   "marketingNews": {
@@ -1339,6 +1348,7 @@
     "intro": "Files you upload become searchable knowledge for your chats.",
     "introCta": "Add files to your sources…",
     "useInChat": "Use in chat",
+    "openInChat": "Open in chat",
     "terms": {
       "vectorized": "searchable by AI",
       "knowledgeGroup": "knowledge folder",
@@ -2240,11 +2250,14 @@
           "unavailable": "Not available yet — Microsoft 365 has to be set up once for this installation.",
           "adminLink": "Set it up in system settings.",
           "askAdmin": "Ask an administrator to enable it.",
+          "preconditions": "Use a work or school account. A personal Microsoft account cannot connect unless this installation allows personal accounts. Your organisation may need an administrator to approve this app first.",
           "errors": {
             "access_denied": "You cancelled the Microsoft sign-in, so nothing was connected.",
             "missing_code": "Microsoft sent an incomplete answer. Please start the connection again.",
             "exchange_failed": "Microsoft accepted the sign-in but the token could not be collected. Check the client secret in system settings, then try again.",
             "invalid_state": "The sign-in took too long or was started in another tab. Please try again.",
+            "personal_account": "Microsoft refused this sign-in because it is a personal account. Use a work or school account, or ask an administrator to allow personal accounts in the app registration.",
+            "admin_consent": "Microsoft needs an administrator in your organisation to approve this app before you can connect. Nothing was connected.",
             "unknown": "Microsoft 365 could not be connected. Please try again."
           },
           "hosting": "Your mail stays with Microsoft, a cloud provider based in the USA."

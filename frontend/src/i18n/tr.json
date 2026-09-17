@@ -283,12 +283,21 @@
       "ariaLabel": "{title} dokümantasyonunda aç"
     }
   },
-  "examplePrompts": {
-    "heading": "Bunlardan birini deneyin",
-    "items": {
-      "poemMp3": "Bir kedi hakkında şiir yaz ve onu MP3'e dönüştür.",
-      "everglades": "Florida Everglades hakkında bir makale yaz ve indirilebilir bir Word belgesine koy.",
-      "cabinImage": "Gün batımında şirin bir dağ kulübesinin resmini oluştur."
+  "companionLinks": {
+    "tagline": "Synaplan — özgür düşün",
+    "ask": "Bana neler yapabildiğini söyle",
+    "opensInNewTab": "Yeni sekmede açılır",
+    "desktop": {
+      "title": "Masaüstü istemcisi",
+      "blurb": "Araştırmanı yerelde tut, ajanları her yerde kullan."
+    },
+    "mobile": {
+      "title": "Mobil uygulamalar",
+      "blurb": "Kullanıcılarını yola çıkar, özgürce yapılandırılabilir."
+    },
+    "outlook": {
+      "title": "Outlook eklentisi",
+      "blurb": "Çünkü kapalı sistemlerin de yerel belgelere ihtiyacı var."
     }
   },
   "marketingNews": {
@@ -2820,6 +2829,7 @@
     "intro": "Yüklediğiniz dosyalar sohbetleriniz için aranabilir bilgiye dönüşür.",
     "introCta": "Dosyaları kaynaklarınıza ekleyin…",
     "useInChat": "Sohbette kullan",
+    "openInChat": "Sohbette aç",
     "status_error": "Hata",
     "terms": {
       "vectorized": "yapay zekâ ile aranabilir",
@@ -3215,11 +3225,14 @@
           "unavailable": "Henüz kullanılamıyor — Microsoft 365’in bu kurulum için bir kez ayarlanması gerekiyor.",
           "adminLink": "Sistem ayarlarında yapılandır.",
           "askAdmin": "Etkinleştirmesi için bir yöneticiye başvur.",
+          "preconditions": "İş veya okul hesabı kullan. Bu kurulum kişisel hesaplara izin vermiyorsa kişisel bir Microsoft hesabı bağlanamaz. Kuruluşunun önce bir yöneticinin bu uygulamayı onaylaması gerekebilir.",
           "errors": {
             "access_denied": "Microsoft oturum açmayı iptal ettin, bu yüzden hiçbir şey bağlanmadı.",
             "missing_code": "Microsoft eksik bir yanıt gönderdi. Lütfen bağlantıyı yeniden başlat.",
             "exchange_failed": "Microsoft oturumu kabul etti ancak belirteç alınamadı. Sistem ayarlarındaki istemci parolasını kontrol edip tekrar dene.",
             "invalid_state": "Oturum açma çok uzun sürdü veya başka bir sekmede başlatıldı. Lütfen tekrar dene.",
+            "personal_account": "Microsoft bu oturumu kişisel hesap olduğu için reddetti. İş veya okul hesabı kullan veya uygulama kaydında kişisel hesaplara izin verilmesini iste.",
+            "admin_consent": "Microsoft, bağlanmadan önce kuruluşundaki bir yöneticinin bu uygulamayı onaylamasını ister. Hiçbir şey bağlanmadı.",
             "unknown": "Microsoft 365 bağlanamadı. Lütfen tekrar dene."
           },
           "hosting": "Postaların, merkezi ABD’de bulunan bir bulut sağlayıcısı olan Microsoft’ta kalır."

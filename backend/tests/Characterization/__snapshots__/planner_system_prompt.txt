@@ -54,7 +54,7 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 - "rag_query": Answer using the user knowledge base (retrieval-augmented).
 - "web_search": Search the web for current information. For research questions that need figures, named companies or quotes (and the user did not paste a URL), set params.read_pages to 2 or 3 so the top result pages are fetched and dumped into the answering prompt. Set params.read_pages to 0 when snippets suffice (weather, ticker, simple yes/no).
 - "url_fetch": Fetch and read the content of specific URL(s) the user named in the message (inputs.urls, falls back to URLs in the message text). Set inputs.compare to true to save one snapshot per URL and return the difference versus the last fetch. Use when the answer depends on that page's content; prefer web_search when no concrete URL is given.
-- "file_analysis": Analyze/describe/OCR an image or document — either attached by the user or produced by a prior node ($nX.file) — and answer about it.
+- "file_analysis": Analyze/describe/OCR an image or document — attached now, already present in this conversation, or produced by a prior node ($nX.file) — and answer about it. Plan this even when the current turn has no new attachment if the user asks about a file listed in the conversation.
 - "image_generation": Generate or edit an image from a prompt and/or reference images.
 - "video_generation": Generate a video clip (params.duration, params.resolution).
 - "text2sound": Synthesize speech/audio from text (params.format, e.g. mp3).

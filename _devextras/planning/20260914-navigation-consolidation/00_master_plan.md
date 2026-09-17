@@ -1,8 +1,9 @@
 # Navigation consolidation — duplicates, reachability, wording, Operate stacked UI
 
-**Status:** 2026-09-15 — Sprint A in flight (NV07 on
-`feat/nav-nv07-summarize-in-chat`). Decisions in §3 stay locked.
-See **§8 Handoff** to continue on another machine.
+**Status:** 2026-09-16 — Sprint A NV01–NV07 **merged** on `main`
+([#1921](https://github.com/metadist/synaplan/pull/1921) closed NV07).
+**Next: NV08** (one Memories page). Decisions in §3 stay locked.
+See **§8 Handoff**.
 **Input:** Confluence *20260914 - Navigation Tree (Status)* (115 rows, handles
 `W001`…`X013`, generated from `synaplan@af15fdc89`). Its §6 "Observations" is
 the cherry-pick list for this plan.
@@ -152,7 +153,7 @@ Each sprint file lists the §6 exit bullets for its journeys.
 | NV04 | `feat(ai): "Your AI accounts" page for Higgsfield and BYO Anthropic keys` | ota-candidate | — |
 | NV05 | `feat(admin): Models & keys is the one editor for instance provider keys` | backend-only + ota-candidate (two commits, one PR) | NV04 |
 | NV06 | `refactor(nav): split Connections into Connections and Developer & devices` | ota-candidate | NV04. **PR [#1917](https://github.com/metadist/synaplan/pull/1917)** |
-| NV07 | `feat(chat): Summarize a document runs in the chat; retire the Summarizer page` | ota-candidate | — |
+| NV07 | `feat(chat): Summarize a document runs in the chat; retire the Summarizer page` | ota-candidate | —. **PR [#1921](https://github.com/metadist/synaplan/pull/1921)** |
 | NV08 | `refactor(memories): one Memories page on every device; retire the dialog` | ota-candidate | — |
 | NV09 | `test(nav): journey specs J-NV-1…5 and redirect matrix` | ota-candidate | NV01–NV08 |
 | NV10 | `fix(i18n): navigation and page-title wording pass (five locales)` | ota-candidate | NV01–NV08 |
@@ -201,38 +202,37 @@ older frontend. No migrations, no seed changes, no flag changes.
 
 ---
 
-## 8. Handoff — continue tomorrow (2026-09-15)
+## 8. Handoff — 2026-09-16
 
-Pull this folder from `feat/nav-nv07-summarize-in-chat` (or from `main` after
-that PR merges). Do **not** put NV08 on the NV07 branch.
+Planning archive cleanup is on `main`
+([#1967](https://github.com/metadist/synaplan/pull/1967)). NV08 is
+[#1970](https://github.com/metadist/synaplan/pull/1970). **NV09** is
+`feat/nav-nv09-journeys` (this step). Do **not** put NV10 on the NV09 branch.
 
 ### Sprint split
 
 | Sprint | Steps | What it is | Status |
 | ------ | ----- | ---------- | ------ |
-| **A** | NV01–NV09 | One home per concept; Summarizer into chat; Memories one technique | NV01–NV06 **merged** ([#1917](https://github.com/metadist/synaplan/pull/1917)). **NV07** on `feat/nav-nv07-summarize-in-chat`. NV08–NV09 not started |
-| **B** | NV10–NV12 | Wording / sentence case / stale keys, five locales | **After A** (needs the final tree) |
+| **A** | NV01–NV09 | One home per concept; Summarizer into chat; Memories one technique | NV01–NV07 **merged**. **NV08** [#1970](https://github.com/metadist/synaplan/pull/1970). **NV09** on `feat/nav-nv09-journeys` |
+| **B** | NV10–NV12 | Wording / sentence case / stale keys, five locales | After A (needs the final tree). Owns the #1917 page-title / tooltip leftovers |
 | **C** | NV13–NV21 | Operate stacked UI | Not started. NV13/NV14 may be prepared after B; NV15+ need NV01/NV05 |
 
-One PR per step. Branch names `feat/nav-nv08-memories-page`,
-`feat/nav-nv09-journeys`, `feat/nav-nv10-wording`, … Never on `main`.
+One PR per step. Branch names `feat/nav-nv09-journeys`,
+`feat/nav-nv10-wording`, … Never on `main`.
 
 ### Next machine — first commands
 
 ```bash
 git fetch origin
-git checkout feat/nav-nv07-summarize-in-chat && git pull
-# After the NV07 PR merges:
+git checkout feat/nav-nv09-journeys && git pull
+# After NV08 + NV09 merge:
 git checkout main && git pull
+git checkout -b feat/nav-nv10-wording
 ```
 
-1. If the NV07 PR is red, fix **product** failures on that branch and push.
-   A local blank Vite page waiting on `/api/v1/chats` is the known
-   login-timeout flake — not NV07.
-2. **Next implementation: NV08** — new branch from `origin/main`. Then NV09
-   (NV09 waits for NV01–NV08).
-3. **Then Sprint B NV10.** That pass owns the page-title / tooltip strings
-   Copilot asked for on #1917 (see below). Then NV11, NV12.
+1. **Finish NV08 / NV09** — merge [#1970](https://github.com/metadist/synaplan/pull/1970) then this NV09 PR.
+2. **Then Sprint B NV10.** Page-title / tooltip strings Copilot asked for
+   on #1917. Then NV11, NV12.
 
 ### Copilot on #1917 — locked 2026-09-15
 

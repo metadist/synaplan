@@ -749,6 +749,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        $systemPrompt .= $this->conversationFilePromptContext($message, $thread);
+
         // Append explicit language directive based on detected language from classification.
         // Built via LanguageDirectiveBuilder so the wording stays consistent
         // across handlers and includes the anti-echo clause that prevents
@@ -1439,6 +1441,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'url_content_length' => strlen($urlContent),
             ]);
         }
+
+        $systemPrompt .= $this->conversationFilePromptContext($message, $thread);
 
         // Append explicit language directive based on detected language from classification.
         // The sort prompt detects the user's language (BLANG), but the system prompt only says
@@ -2882,6 +2886,43 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return $this->conversationFileCatalog->documentInFocus(
             $this->conversationFileCatalog->build($currentMessage, $thread),
         );
+    }
+
+    /**
+     * Side list of every file this conversation still has, plus extracted
+     * text for documents the history window already dropped.
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     */
+    private function conversationFilePromptContext(Message $message, array $thread): string
+    {
+        $catalog = $this->conversationFileCatalog->build($message, $thread);
+        if ([] === $catalog) {
+            return '';
+        }
+
+        $present = [];
+        foreach ([$message, ...$thread] as $entry) {
+            if (!$entry instanceof Message) {
+                continue;
+            }
+            foreach ($entry->getFiles() as $file) {
+                $id = $file->getId();
+                if (null !== $id && '' !== trim($file->getFileText())) {
+                    $present[$id] = true;
+                }
+            }
+        }
+
+        $block = $this->conversationFileCatalog->renderPromptContext($catalog, $present);
+        if ('' !== $block) {
+            $this->logger->info('ChatHandler: Conversation file inventory appended to system prompt', [
+                'message_id' => $message->getId(),
+                'file_count' => count($catalog),
+            ]);
+        }
+
+        return $block;
     }
 
     /**

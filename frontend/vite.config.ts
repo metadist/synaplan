@@ -96,9 +96,6 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    optimizeDeps: {
-      exclude: ['vue-i18n'],
-    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

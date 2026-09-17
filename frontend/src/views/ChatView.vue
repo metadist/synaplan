@@ -172,7 +172,6 @@
               <p class="txt-secondary">
                 {{ emptyLandingHint }}
               </p>
-              <SelfAwareEmptyHint v-if="!pinnedAgentId" @ask="handleSendMessage" />
             </div>
 
             <!-- Speed config: the expanded mix card greets the user on every
@@ -192,7 +191,8 @@
               :prompts="pinnedStarterPrompts"
               @pick="handleExamplePick"
             />
-            <ExamplePrompts v-else-if="showExamplePrompts" @pick="handleExamplePick" />
+            <CompanionLinks v-else-if="showCompanionLinks" />
+            <SelfAwareEmptyHint v-if="showSelfAwareEmptyHint" @ask="handleExamplePick" />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -520,7 +520,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
-import ExamplePrompts from '@/components/ExamplePrompts.vue'
+import CompanionLinks from '@/components/CompanionLinks.vue'
 import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
 import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
 import { parsePlatformDocs } from '@/components/chat/refs/DocRefPill'
@@ -585,6 +585,7 @@ import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
+import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import {
@@ -817,21 +818,14 @@ const showPendingPurchaseBanner = computed(
     pendingPurchaseAtSetup && !pendingPurchaseBannerDismissed.value && !authStore.isAuthenticated
 )
 
-// Personalizes the empty-state heading with the user's first name (Personal
-// Information -> First Name) when they've set one; falls back to the
-// generic greeting for guests and users without a first name on file.
-const welcomeGreeting = computed(() => {
-  const firstName = authStore.user?.firstName?.trim()
-  return firstName ? t('welcomeUser', { name: firstName }) : t('welcome')
-})
 const emptyLandingTitle = computed(() => {
   if (incognitoStore.active) {
     return t('incognito.emptyTitle')
   }
   if (pinnedAgentId.value) {
-    return pinnedAssistantGreeting.value || pinnedAssistantName.value || welcomeGreeting.value
+    return pinnedAssistantGreeting.value || pinnedAssistantName.value || t('companionLinks.tagline')
   }
-  return welcomeGreeting.value
+  return t('companionLinks.tagline')
 })
 const emptyLandingHint = computed(() => {
   if (incognitoStore.active) {
@@ -903,16 +897,26 @@ const isEmptyLanding = computed(
     !historyStore.isLoadingMessages
 )
 
-// Guest landing only — signed-in empty chats keep the greeting, no teaser cards.
-const showExamplePrompts = computed(
-  () => !authStore.isAuthenticated && !incognitoStore.active && !configStore.marketingNews.enabled
-)
-
 // Runtime-config first-run signal: the default chat model has no usable
 // provider. Replace the composer with a tombstone so a fresh install cannot
 // produce the cryptic HTTP 500 the old banner still allowed.
 const needsProviderSetup = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
+)
+
+// Empty start page: companion cards on the unpinned landing; the self-aware
+// CTA also covers a pinned assistant that has no starters of its own, and
+// only when the composer can actually submit the question.
+const emptyLandingActions = computed(() => ({
+  incognito: incognitoStore.active,
+  hasPinnedAssistant: Boolean(pinnedAgentId.value),
+  starterPromptCount: pinnedStarterPrompts.value.length,
+  canCompose: canComposeSharedChat.value,
+  needsProviderSetup: needsProviderSetup.value,
+}))
+const showCompanionLinks = computed(() => shouldShowCompanionLinks(emptyLandingActions.value))
+const showSelfAwareEmptyHint = computed(() =>
+  shouldShowSelfAwareEmptyHint(emptyLandingActions.value)
 )
 
 // --- Speed config (model mixes) -------------------------------------------

@@ -3,6 +3,64 @@ import { expect } from '@playwright/test'
 import { selectors } from './selectors'
 import { TIMEOUTS } from '../config/config'
 
+/**
+ * Open History and wait until the sheet's list refresh has landed.
+ *
+ * The sheet fires `loadChats()` on open. Clicking a row while that GET is
+ * still replacing the list detaches the menu button — that is the J-NV-2
+ * CI signature (`btn-chat-v2-row-menu` detached, then a rename that never
+ * appears). Wait for the GET and for `data-chats-loading="false"` before
+ * touching a row.
+ */
+export async function openChatManager(page: Page): Promise<Locator> {
+  const modal = page.locator(selectors.nav.modalChatManager)
+  const refresh = page.waitForResponse(
+    (res) => {
+      try {
+        const url = new URL(res.url())
+        return (
+          url.pathname.endsWith('/api/v1/chats') &&
+          res.request().method() === 'GET' &&
+          !url.searchParams.has('limit')
+        )
+      } catch {
+        return false
+      }
+    },
+    { timeout: TIMEOUTS.STANDARD }
+  )
+
+  await page.locator(selectors.nav.sidebarV2ChatNav).click()
+  await refresh
+  await expect(modal).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await expect(modal).toHaveAttribute('data-chats-loading', 'false', {
+    timeout: TIMEOUTS.STANDARD,
+  })
+  await modal
+    .locator(selectors.nav.chatManagerListRows)
+    .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+  return modal
+}
+
+/**
+ * Persist a unique title on the active chat through the API so a later
+ * History / All chats search does not have to win the row-menu race.
+ */
+export async function nameActiveChat(page: Page, title: string): Promise<void> {
+  const chatId = await page.evaluate(() => window.localStorage.getItem('synaplan_active_chat_id'))
+  if (!chatId) {
+    throw new Error('nameActiveChat: no synaplan_active_chat_id in localStorage')
+  }
+  const response = await page.request.patch(`/api/v1/chats/${chatId}`, {
+    data: { title },
+  })
+  if (!response.ok()) {
+    throw new Error(
+      `nameActiveChat: PATCH /api/v1/chats/${chatId} failed: ${response.status()} ${await response.text()}`
+    )
+  }
+}
+
 export class ChatHelper {
   constructor(private page: Page) {}
 
