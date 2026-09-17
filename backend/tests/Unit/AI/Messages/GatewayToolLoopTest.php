@@ -679,7 +679,8 @@ final class GatewayToolLoopTest extends TestCase
                     ];
                 }
 
-                $this->assertSame(['type' => 'none'], $body['tool_choice']);
+                $this->assertArrayNotHasKey('tools', $body);
+                $this->assertArrayNotHasKey('tool_choice', $body);
                 $last = $body['messages'][array_key_last($body['messages'])];
                 $this->assertSame('user', $last['role']);
                 $this->assertIsString($last['content']);

@@ -897,7 +897,10 @@ final readonly class GatewayToolLoop
      */
     private function forceWrapUp(array $requestBody): array
     {
-        $requestBody['tool_choice'] = ['type' => 'none'];
+        // Drop tools entirely. `tool_choice: none` still leaves the
+        // declarations in the payload; Groq then 400s with "Tool choice is
+        // none, but model called a tool" when the model ignores the hint.
+        unset($requestBody['tools'], $requestBody['tool_choice']);
         $messages = $requestBody['messages'] ?? [];
         if (!\is_array($messages)) {
             $messages = [];
