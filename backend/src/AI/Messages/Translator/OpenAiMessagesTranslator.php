@@ -1351,9 +1351,6 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         );
     }
 
-    /**
-     * @param mixed $output
-     */
     private function responsesOutputHasFunctionCall(mixed $output): bool
     {
         if (!\is_array($output)) {
