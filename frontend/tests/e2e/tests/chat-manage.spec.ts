@@ -1,8 +1,7 @@
-import type { Page } from '@playwright/test'
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
-import { ChatHelper } from '../helpers/chat'
+import { ChatHelper, openChatManager } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 /**
@@ -10,15 +9,6 @@ import { TIMEOUTS } from '../config/config'
  * confirm). Complements chat-share.spec.ts, which covers the third row
  * action (Share) through the same menu.
  */
-
-async function openChatManager(page: Page): Promise<void> {
-  await page.locator(selectors.nav.sidebarV2ChatNav).click()
-  const modal = page.locator(selectors.nav.modalChatManager)
-  await modal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-  await modal
-    .locator(selectors.nav.chatManagerListRows)
-    .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-}
 
 test.describe('@ci Chat Management', () => {
   test('user can rename a chat and delete it via the chat manager', async ({ page }) => {

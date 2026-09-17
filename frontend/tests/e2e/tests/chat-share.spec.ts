@@ -1,7 +1,7 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
-import { ChatHelper } from '../helpers/chat'
+import { ChatHelper, openChatManager } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 test.describe('@ci @smoke Chat Share', () => {
@@ -32,12 +32,7 @@ test.describe('@ci @smoke Chat Share', () => {
       const v2ChatNav = page.locator(selectors.nav.sidebarV2ChatNav)
       const v2Visible = await v2ChatNav.isVisible()
       if (v2Visible) {
-        await v2ChatNav.click()
-        const modal = page.locator(selectors.nav.modalChatManager)
-        await modal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-        await modal
-          .locator(selectors.nav.chatManagerListRows)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        const modal = await openChatManager(page)
         const lastChatRow = modal.locator(selectors.nav.chatV2Row).first()
         await lastChatRow.scrollIntoViewIfNeeded()
         await lastChatRow.hover()

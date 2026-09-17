@@ -201,6 +201,49 @@ describe('Chats Store', () => {
       expect(store.activeChatId).toBe(9)
     })
 
+    it('ignores a stale loadChats response when a newer load has already landed', async () => {
+      const store = useChatsStore()
+      let resolveFirst: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      )
+      const first = store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+      await store.loadChats()
+      expect(store.chats.map((c) => c.id)).toEqual([9])
+
+      resolveFirst({ chats: [regularChat(1)] })
+      await first
+
+      expect(store.chats.map((c) => c.id)).toEqual([9])
+    })
+
+    it('does not let a late loadChats overwrite a title that was just saved', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
+      await store.loadChats()
+
+      let resolveSlow: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSlow = resolve
+        })
+      )
+      const pendingLoad = store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce({})
+      await store.updateChatTitle(1, 'Renamed while refresh was in flight')
+      expect(store.chats[0].title).toBe('Renamed while refresh was in flight')
+
+      resolveSlow({ chats: [regularChat(1)] })
+      await pendingLoad
+
+      expect(store.chats[0].title).toBe('Renamed while refresh was in flight')
+    })
+
     it('re-validates a kept foreign id once the incoming list has loaded without it', async () => {
       incomingOpenableMock.mockReturnValue(true)
       localStorage.setItem('synaplan_active_chat_id', '13')

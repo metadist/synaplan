@@ -83,6 +83,15 @@ export const useChatsStore = defineStore('chats', () => {
   let conversationAccessSeq = 0
   const loading = ref(false)
   const error = ref<string | null>(null)
+  /**
+   * Bumped at the start of every `loadChats()` and of any local list mutation
+   * a previously started GET cannot know about (rename / delete / generated
+   * title). A response whose generation no longer matches is dropped so it
+   * cannot replace a title the user just saved, or resurrect a chat they
+   * just deleted — History opens with a fire-and-forget refresh, and that
+   * GET regularly lands after the PATCH.
+   */
+  let chatsLoadSeq = 0
 
   /**
    * Paginated history for the mobile drawer. Kept separate from `chats` so the
@@ -178,9 +187,15 @@ export const useChatsStore = defineStore('chats', () => {
     }
   )
 
+  function invalidateInFlightChatsLoad() {
+    chatsLoadSeq += 1
+    loading.value = false
+  }
+
   async function loadChats() {
     if (!checkAuthOrRedirect()) return
 
+    const seq = ++chatsLoadSeq
     loading.value = true
     error.value = null
 
@@ -188,14 +203,22 @@ export const useChatsStore = defineStore('chats', () => {
       const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
         '/api/v1/chats'
       )
+      if (seq !== chatsLoadSeq) {
+        return
+      }
       chats.value = (data.chats || []).map((chat) => normalizeChat(chat))
       activeRunChatIds.value = new Set(data.activeRunChatIds ?? [])
       ensureValidActiveChat()
     } catch (err: unknown) {
+      if (seq !== chatsLoadSeq) {
+        return
+      }
       error.value = getErrorMessage(err) || 'Failed to load chats'
       console.error('Error loading chats:', err)
     } finally {
-      loading.value = false
+      if (seq === chatsLoadSeq) {
+        loading.value = false
+      }
     }
   }
 
@@ -376,6 +399,8 @@ export const useChatsStore = defineStore('chats', () => {
   async function updateChatTitle(chatId: number, title: string) {
     if (!checkAuthOrRedirect()) return
 
+    invalidateInFlightChatsLoad()
+
     try {
       await httpClient(`/api/v1/chats/${chatId}`, {
         method: 'PATCH',
@@ -397,6 +422,7 @@ export const useChatsStore = defineStore('chats', () => {
    * value is already persisted, so re-sending it would be a redundant PATCH.
    */
   function applyChatTitle(chatId: number, title: string) {
+    invalidateInFlightChatsLoad()
     const chat = chats.value.find((c) => c.id === chatId)
     if (chat) {
       chat.title = title
@@ -405,6 +431,8 @@ export const useChatsStore = defineStore('chats', () => {
 
   async function deleteChat(chatId: number, silent: boolean = false) {
     if (!checkAuthOrRedirect()) return
+
+    invalidateInFlightChatsLoad()
 
     try {
       await httpClient(`/api/v1/chats/${chatId}`, {
@@ -628,6 +656,7 @@ export const useChatsStore = defineStore('chats', () => {
     conversationAccess.value = null
     conversationSource.value = null
     conversationAccessSeq = 0
+    chatsLoadSeq = 0
     activeRunChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
