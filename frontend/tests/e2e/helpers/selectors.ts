@@ -179,6 +179,8 @@ export const selectors = {
     chatDone: '[data-testid="message-done"]',
     /** Terminal: present when the assistant turn ended in an error notice */
     chatError: '[data-testid="chat-error-notice"]',
+    /** The human-readable sentence inside {@link chatError} */
+    chatErrorBody: '[data-testid="chat-error-body"]',
     messageUser: '[data-testid="message-user"]',
     messageAssistant: '[data-testid="message-assistant"]',
     /** Present inside assistant bubble when streaming finished (prefer over loader hidden) */
@@ -191,8 +193,6 @@ export const selectors = {
     messageText: '[data-testid="message-text"]',
     /** Audio player section rendered for an `audio` message part (TTS / voice reply / uploads) */
     messageAudio: '[data-testid="section-message-audio"]',
-    /** Present when the assistant turn ended in ChatErrorNotice */
-    messageTopicError: '[data-testid="chat-error-notice"]',
     // The "Again with… ▾" control is a single button that opens the model
     // dropdown; picking a model re-runs the prompt. (Previously a split button +
     // separate toggle — now unified, so both aliases point to the same element.)

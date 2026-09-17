@@ -16,6 +16,11 @@ import { TIMEOUTS } from '../config/config'
 
 test.describe('@ci Incognito Chat', () => {
   test('incognito turn is not persisted and ending the session discards it', async ({ page }) => {
+    // Cold-boot arrange plus a full chat round-trip does not fit the 60s
+    // default under shard load; without the headroom the generous waits inside
+    // openApp() and waitForAnswer() cannot be reached and the test dies on the
+    // wall clock, reporting no failing step.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     // Kept short so the full text fits into both the chat title (50 chars)
     // and the sidebar preview (30 chars) if it ever leaked into a row.
     const uniqueMessage = `Incognito E2E ${Date.now()}`
