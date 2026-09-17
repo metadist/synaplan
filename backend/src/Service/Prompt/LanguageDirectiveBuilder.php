@@ -90,6 +90,14 @@ final class LanguageDirectiveBuilder
     private const ANTI_ECHO_CLAUSE = 'Do not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as "[Reply in X]", "[Language: X]", or "Note: responding in X". Just answer the user.';
 
     /**
+     * Lead rule for every chat turn: match the latest user message, not the
+     * UI locale, the sorter's guess, or the English wrappers around search
+     * results and these instructions. A wrong `en` classification used to
+     * emit "Respond in English" and lock a German conversation into English.
+     */
+    private const MATCH_LATEST_MESSAGE = 'Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English.';
+
+    /**
      * Build a directive when the language is detected automatically per-message.
      *
      * Used when the upstream classification step does not pin a single
@@ -97,13 +105,15 @@ final class LanguageDirectiveBuilder
      */
     public static function buildAutoDirective(): string
     {
-        return "\n\nLanguage: respond in the same language the user writes in. Detect it from the latest user message and match it exactly.\n"
+        return "\n\nLanguage: ".self::MATCH_LATEST_MESSAGE."\n"
             .self::ANTI_ECHO_CLAUSE;
     }
 
     /**
      * Build a directive when a specific language has been detected/selected.
      *
+     * The classified language is a hint, not a hard claim: a false `en`
+     * (UI-locale seed, sorter default) must not override a German message.
      * Accepts both ISO-639 codes ('de') and full names already resolved by
      * the caller; unknown codes fall back to the raw value, mirroring the
      * previous inline behaviour.
@@ -112,7 +122,8 @@ final class LanguageDirectiveBuilder
     {
         $languageName = self::nameFor($language);
 
-        return "\n\nLanguage: the user's current message is in {$languageName}. Respond in {$languageName}.\n"
+        return "\n\nLanguage: ".self::MATCH_LATEST_MESSAGE
+            ." The latest message looks like {$languageName}; prefer {$languageName} unless that message is clearly in another language.\n"
             .self::ANTI_ECHO_CLAUSE;
     }
 

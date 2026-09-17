@@ -270,6 +270,42 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every file linked to any message in this chat, newest first.
+     *
+     * The history window can drop the upload turn, so a follow-up that only
+     * walks the messages still in the thread will miss the PDF. Chat-scoped
+     * lookup keeps those files available for the catalog and DAG fallback.
+     *
+     * @return list<File>
+     */
+    public function findFilesByChatId(int $userId, int $chatId, int $limit = 30): array
+    {
+        if ($chatId <= 0) {
+            return [];
+        }
+
+        $ids = $this->getEntityManager()->createQueryBuilder()
+            ->select('m.id')
+            ->from(Message::class, 'm')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.userId = :userId')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        $messageIds = [];
+        foreach ($ids as $id) {
+            $intId = (int) $id;
+            if ($intId > 0) {
+                $messageIds[] = $intId;
+            }
+        }
+
+        return $this->findFilesByMessageIds($userId, $messageIds, $limit);
+    }
+
+    /**
      * Every file linked to the given chat messages, without a result cap.
      *
      * Used by conversation cleanup, where truncating the result would leave
