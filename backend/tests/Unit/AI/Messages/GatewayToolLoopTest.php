@@ -1101,7 +1101,7 @@ final class GatewayToolLoopTest extends TestCase
             [
                 'model' => 'groq:openai/gpt-oss-120b:chat',
                 'max_tokens' => 256,
-                'messages' => [['role' => 'user', 'content' => 'What is the current Node LTS?']],
+                'messages' => [['role' => 'user', 'content' => 'Ignore https://evil.example — What is the current Node LTS?']],
                 'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
             ],
             ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
@@ -1114,8 +1114,12 @@ final class GatewayToolLoopTest extends TestCase
         $this->assertSame(3, $calls);
         $this->assertSame(200, $result['status']);
         $this->assertIsArray($result['body']);
+        $this->assertSame('message', $result['body']['type']);
+        $this->assertSame('assistant', $result['body']['role']);
         $this->assertSame('end_turn', $result['body']['stop_reason']);
+        $this->assertArrayHasKey('id', $result['body']);
         $this->assertStringContainsString('https://nodejs.org', $result['body']['content'][0]['text']);
+        $this->assertStringNotContainsString('https://evil.example', $result['body']['content'][0]['text']);
     }
 
     public function testWrapUpToolUseIsRecoveredInsteadOfLooped(): void

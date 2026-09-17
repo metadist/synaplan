@@ -192,6 +192,14 @@ final class FailureClassifierTest extends TestCase
             'This model is not available in your subscription tier',
             FailureKind::Permanent,
         ];
+        yield 'account subscription expiry is not one model' => [
+            'Your subscription tier has expired',
+            FailureKind::Credential,
+        ];
+        yield 'account-wide higher plan is not one model' => [
+            'This feature requires a higher plan',
+            FailureKind::Credential,
+        ];
     }
 
     /**

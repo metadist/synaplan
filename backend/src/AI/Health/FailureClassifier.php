@@ -56,11 +56,11 @@ final readonly class FailureClassifier
         'is sunset',
         'sunsetting',
         'not_found_error',
-        // Provider plan: this one model is off the current key, others still work.
-        'subscription tier',
-        'not available in your subscription',
-        'not included in your plan',
-        'requires a higher plan',
+        // Provider plan: THIS model is off the current key. Bare
+        // "subscription / higher plan" wording is account-wide → Credential.
+        'model is not available in your subscription',
+        'model is not included in your plan',
+        'model requires a higher plan',
     ];
 
     /** Credential, entitlement and billing problems — every model of the provider is affected. */
@@ -85,6 +85,9 @@ final readonly class FailureClassifier
         'payment required',
         'quota exceeded',
         'exceeded your current quota',
+        'subscription tier',
+        'not included in your plan',
+        'requires a higher plan',
     ];
 
     /** The request was at fault, not the model. */

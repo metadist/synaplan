@@ -509,6 +509,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         $buffer = '';
         $toolIndex = 0;
         $carrySig = null;
+        $candidateSig = null;
 
         foreach ($this->httpClient->stream($response) as $chunk) {
             set_time_limit(0);
@@ -534,7 +535,16 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                     $cacheRead = (int) ($decoded['usageMetadata']['cachedContentTokenCount'] ?? $cacheRead);
                 }
 
-                $parts = $decoded['candidates'][0]['content']['parts'] ?? [];
+                $candidate = $decoded['candidates'][0] ?? [];
+                if (\is_array($candidate)) {
+                    $eventCandidateSig = self::thoughtSignatureFromPart($candidate, []);
+                    if (null !== $eventCandidateSig) {
+                        $candidateSig = $eventCandidateSig;
+                    }
+                    $parts = $candidate['content']['parts'] ?? [];
+                } else {
+                    $parts = [];
+                }
                 if (!\is_array($parts)) {
                     continue;
                 }
@@ -581,8 +591,9 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                             'name' => (string) ($fc['name'] ?? 'tool'),
                             'input' => [],
                         ];
-                        $sig = $ownSig ?? $carrySig;
+                        $sig = $ownSig ?? $carrySig ?? $candidateSig;
                         $carrySig = null;
+                        $candidateSig = null;
                         if (null !== $sig) {
                             $contentBlock['thought_signature'] = $sig;
                         }

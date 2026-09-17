@@ -29,6 +29,13 @@ final readonly class VectorizationService
      */
     private const EMBED_BATCH_SIZE = 8;
 
+    /**
+     * Per-window PHP budget. FrankenPHP's max_execution_time is wall-clock;
+     * a one-time set_time_limit(0) does not disable it. Re-arming each window
+     * resets the counter the way the long-running provider poll loops do.
+     */
+    private const WINDOW_TIME_BUDGET_SECONDS = 120;
+
     /** Desktop project knowledge folders. Index must use the same VECTORIZE default as search. */
     public const DESKTOP_GROUP_PREFIX = 'DESKTOP:';
 
@@ -79,11 +86,9 @@ final readonly class VectorizationService
             ];
         }
 
+        $persistedAny = false;
         try {
-            // Large desktop folders (3 MB handbook) take minutes of local
-            // embeddings. A 300s max_execution_time turns that into HTTP 500
-            // and a Failed file. The worker and CLI already run without a cap.
-            set_time_limit(0);
+            $this->extendExecutionTime();
 
             $embeddingModelId = $this->resolveEmbeddingModelId($embeddingModelId, $groupKey, $userId);
 
@@ -223,13 +228,17 @@ final readonly class VectorizationService
 
                 ++$chunksCreated;
                 if (\count($pending) >= self::EMBED_BATCH_SIZE) {
+                    $this->extendExecutionTime();
                     $this->vectorStorage->storeChunkBatch($pending);
+                    $persistedAny = true;
                     $pending = [];
                 }
             }
 
             if ([] !== $pending) {
+                $this->extendExecutionTime();
                 $this->vectorStorage->storeChunkBatch($pending);
+                $persistedAny = true;
             }
 
             // #1344: every chunk embedding can fail (continue above) while we still
@@ -268,6 +277,17 @@ final readonly class VectorizationService
                 'provider' => $this->vectorStorage->getProviderName(),
             ];
         } catch (\Throwable $e) {
+            if ($persistedAny) {
+                try {
+                    $this->vectorStorage->deleteByFile($userId, $messageId);
+                } catch (\Throwable $cleanup) {
+                    $this->logger->error('VectorizationService: failed to roll back partial index', [
+                        'user_id' => $userId,
+                        'message_id' => $messageId,
+                        'error' => $cleanup->getMessage(),
+                    ]);
+                }
+            }
             $this->logger->error('VectorizationService: Vectorization failed', [
                 'user_id' => $userId,
                 'message_id' => $messageId,
@@ -304,6 +324,7 @@ final readonly class VectorizationService
         $failed = 0;
 
         foreach (array_chunk($chunkTexts, self::EMBED_BATCH_SIZE, true) as $window) {
+            $this->extendExecutionTime();
             $part = $this->embedWindowResilient($window, $userId, $provider, $modelName);
             foreach ($part['embeddings'] as $i => $vector) {
                 $embeddings[$i] = $vector;
@@ -387,7 +408,7 @@ final readonly class VectorizationService
     }
 
     /**
-     * @param array<int, string>            $chunkTexts
+     * @param array<int, string>             $chunkTexts
      * @param array<int, array<float>|mixed> $vectors
      *
      * @return array<int, array<float>>
@@ -436,6 +457,20 @@ final readonly class VectorizationService
         }
 
         return false;
+    }
+
+    /**
+     * Re-arm the PHP execution-time limit for one embed/store window.
+     *
+     * Under FrankenPHP max_execution_time is wall-clock and a one-time
+     * set_time_limit(0) does not disable it. set_time_limit() resets the
+     * counter from zero. Guarded because the function can be disabled.
+     */
+    private function extendExecutionTime(int $seconds = self::WINDOW_TIME_BUDGET_SECONDS): void
+    {
+        if (\function_exists('set_time_limit')) {
+            set_time_limit(max(30, $seconds));
+        }
     }
 
     /**
