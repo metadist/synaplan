@@ -418,7 +418,7 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
         props.memories?.find((m) => m.id === memoryId) ||
         memoriesStore.memories.find((m) => m.id === memoryId)
 
-      // Dispatch window event to open MemoriesDialog in ChatView (stay in chat!)
+      // Opens the Memories page; browser Back returns to this chat.
       if (memory) {
         window.dispatchEvent(new CustomEvent('open-memory-dialog', { detail: { memory } }))
       }

@@ -682,9 +682,6 @@
     @public-link="openPublicLinkFromIam"
   />
 
-  <!-- Memories Dialog -->
-  <MemoriesDialog :is-open="isMemoriesDialogOpen" @close="isMemoriesDialogOpen = false" />
-
   <!-- Guest hint popover -->
   <GuestHintPopover
     :is-open="featureGateOpen"
@@ -739,7 +736,6 @@ import {
   type ChatKind,
   type ChatListFilter,
 } from '@/utils/chatKind'
-import MemoriesDialog from './MemoriesDialog.vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
 import ChatKindPill from './iam/ChatKindPill.vue'
@@ -763,7 +759,6 @@ const { isDark } = useTheme()
 const { iconSrc } = useBrandLogo(isDark)
 const route = useRoute()
 const router = useRouter()
-const isMemoriesDialogOpen = ref(false)
 const userMenuOpen = ref(false)
 const userBtnRef = ref<HTMLElement | null>(null)
 const userDropdownStyle = ref<Record<string, string>>({})
@@ -968,13 +963,11 @@ const handleProfileSettings = () => {
 }
 
 const handleOpenMemories = () => {
-  userMenuOpen.value = false
-  closeFlyout()
   if (!memoriesEnabledForUser.value) {
-    router.push('/profile?highlight=memories')
+    handleNavigate('/profile?highlight=memories')
     return
   }
-  isMemoriesDialogOpen.value = true
+  handleNavigate('/memories')
 }
 
 const handleLogout = async () => {

@@ -4980,6 +4980,7 @@
     "value": "Wert",
     "updated": "Aktualisiert",
     "createButton": "Neue Erinnerung",
+    "backToChat": "Zurück zum Chat",
     "userDisabled": {
       "title": "Erinnerungen sind für dein Konto deaktiviert",
       "message": "Die KI nutzt keine Erinnerungen und aktualisiert sie nicht automatisch. Du kannst das jederzeit in den Profileinstellungen aktivieren.",

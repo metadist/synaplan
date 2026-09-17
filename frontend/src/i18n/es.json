@@ -4158,6 +4158,7 @@
     "value": "Valor",
     "updated": "Actualizado",
     "createButton": "Nuevo recuerdo",
+    "backToChat": "Volver al chat",
     "userDisabled": {
       "title": "Los recuerdos están desactivados para tu cuenta",
       "message": "La IA no usará ni actualizará automáticamente los recuerdos. Puedes activarlo en la configuración de tu perfil en cualquier momento.",

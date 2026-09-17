@@ -117,6 +117,9 @@ export const selectors = {
     flyoutLinkAiAccounts: '[data-testid="link-sidebar-v2-ai-accounts"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
+    flyoutLinkAdminPeople: '[data-testid="link-sidebar-v2-admin-people"]',
+    flyoutLinkAdminSetup: '[data-testid="link-sidebar-v2-admin-setup"]',
+    flyoutLinkAdminConfig: '[data-testid="link-sidebar-v2-admin-config"]',
     /** V2 chat list modal */
     modalChatManager: '[data-testid="modal-chat-manager"]',
     /** V2 chat list modal: backdrop — click outside the panel to close */
@@ -341,6 +344,8 @@ export const selectors = {
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
+    memoriesBtn: '[data-testid="btn-sidebar-v2-memories"]',
+    incomingBtn: '[data-testid="btn-sidebar-v2-incoming"]',
   },
   oidc: {
     keycloakButton: '[data-testid="btn-social-keycloak"]',
@@ -553,6 +558,7 @@ export const selectors = {
     profile: '[data-testid="page-profile"]',
     statistics: '[data-testid="page-statistics"]',
     chats: '[data-testid="page-chats"]',
+    aiAccounts: '[data-testid="page-ai-accounts"]',
     admin: '[data-testid="view-admin"]',
     people: '[data-testid="view-people"]',
     tools: '[data-testid="page-tools"]',
@@ -591,6 +597,9 @@ export const selectors = {
     inputConfirmPassword: '[data-testid="input-confirm-password"]',
   },
   memories: {
+    page: '[data-testid="page-memories"]',
+    btnBack: '[data-testid="btn-memories-back"]',
+    highlighted: '[data-memory-highlighted="true"]',
     btnCreate: '[data-testid="btn-memory-create"]',
     /** Rendered twice per memory (desktop row + mobile card) — filter visible */
     item: '[data-testid="item-memory"]',

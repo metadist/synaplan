@@ -132,9 +132,13 @@
             v-for="memory in filteredMemories"
             :key="memory.id"
             :data-memory-id="memory.id"
+            :data-memory-highlighted="isHighlighted(memory.id) ? 'true' : undefined"
             data-testid="item-memory"
             class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-surface-soft transition-colors cursor-pointer"
-            :class="{ 'bg-brand-500/10': isSelected(memory.id) }"
+            :class="{
+              'bg-brand-500/10': isSelected(memory.id),
+              'ring-2 ring-brand bg-brand-alpha-light': isHighlighted(memory.id),
+            }"
             @click="toggleSelect(memory.id)"
           >
             <td class="p-3">
@@ -197,9 +201,16 @@
           v-for="memory in filteredMemories"
           :key="memory.id"
           :data-memory-id="memory.id"
+          :data-memory-highlighted="isHighlighted(memory.id) ? 'true' : undefined"
           data-testid="item-memory"
           class="surface-card rounded-xl p-4 cursor-pointer"
-          :class="isSelected(memory.id) ? 'ring-2 ring-brand' : ''"
+          :class="
+            isHighlighted(memory.id)
+              ? 'ring-2 ring-brand bg-brand-alpha-light'
+              : isSelected(memory.id)
+                ? 'ring-2 ring-brand'
+                : ''
+          "
           @click="toggleSelect(memory.id)"
         >
           <div class="flex items-start gap-3">
@@ -278,6 +289,7 @@ import { useDateFormat } from '@/composables/useDateFormat'
 interface Props {
   memories: UserMemory[]
   availableCategories: Array<{ category: string; count: number }>
+  highlightedMemoryId?: number | null
 }
 
 interface Emits {
@@ -358,6 +370,10 @@ const isAllSelected = computed(() => {
 
 function isSelected(id: number): boolean {
   return selectedMemories.value.includes(id)
+}
+
+function isHighlighted(id: number): boolean {
+  return props.highlightedMemoryId === id
 }
 
 function toggleSelect(id: number) {

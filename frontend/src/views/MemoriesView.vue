@@ -1,10 +1,23 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative overflow-x-hidden">
+    <div
+      class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative overflow-x-hidden"
+      data-testid="page-memories"
+    >
       <div class="max-w-7xl mx-auto h-full flex flex-col">
         <!-- Header -->
         <PageHeader :title="$t('pageTitles.memories')" icon="heroicons:light-bulb">
           <template #actions>
+            <button
+              v-if="canGoBack"
+              type="button"
+              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
+              data-testid="btn-memories-back"
+              @click="router.back()"
+            >
+              <Icon icon="mdi:arrow-left" class="w-4 h-4" />
+              {{ $t('memories.backToChat') }}
+            </button>
             <!-- View Toggle -->
             <div class="flex items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto">
               <button
@@ -100,6 +113,7 @@
               v-if="viewMode === 'list'"
               :memories="memoriesStore.memories"
               :available-categories="availableCategories"
+              :highlighted-memory-id="highlightedMemoryId"
               @edit="handleEdit"
               @delete="handleDelete"
               @bulk-delete="handleBulkDelete"
@@ -210,7 +224,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -259,6 +273,18 @@ const selectedGraphMemory = ref<UserMemory | null>(null)
 
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
 
+const canGoBack = computed(() => typeof window !== 'undefined' && window.history.length > 1)
+
+const highlightedMemoryId = computed(() => {
+  const raw = route.query.highlight
+  const value = Array.isArray(raw) ? raw[0] : raw
+  if (typeof value !== 'string' || value === '') {
+    return null
+  }
+  const memoryId = Number.parseInt(value, 10)
+  return Number.isFinite(memoryId) && memoryId > 0 ? memoryId : null
+})
+
 // The dedicated memories page must tolerate a slow first Qdrant read (e.g.
 // cold collection / CI load) instead of the store's 1500ms fast-fail default,
 // which would otherwise render the "service unavailable" branch on a healthy
@@ -301,23 +327,6 @@ onMounted(async () => {
         handleEdit(memory)
       }
     }
-
-    // Check if we should highlight a memory from query params
-    if (route.query.highlight) {
-      const memoryId = parseInt(route.query.highlight as string)
-      // Wait a bit for the view to render
-      setTimeout(() => {
-        const memoryElement = document.querySelector(`[data-memory-id="${memoryId}"]`)
-        if (memoryElement) {
-          memoryElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          // Add temporary highlight class
-          memoryElement.classList.add('ring-2', 'ring-brand', 'bg-brand-alpha-light')
-          setTimeout(() => {
-            memoryElement.classList.remove('ring-2', 'ring-brand', 'bg-brand-alpha-light')
-          }, 2000)
-        }
-      }, 300)
-    }
   } catch (err) {
     // Check if it's a service unavailable error
     if (
@@ -347,6 +356,15 @@ watch(
     }
   }
 )
+
+watch([() => memoriesStore.memories, highlightedMemoryId], async ([list, memoryId]) => {
+  if (memoryId === null || !list.some((memory) => memory.id === memoryId)) {
+    return
+  }
+  await nextTick()
+  const memoryElement = document.querySelector(`[data-memory-id="${memoryId}"]`)
+  memoryElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+})
 
 const retryingConnection = ref(false)
 

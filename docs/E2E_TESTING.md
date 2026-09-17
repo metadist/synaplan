@@ -83,6 +83,15 @@ without `@ci` in its title chain does not run in CI, period. Other tags:
 When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on
 every PR) or `@noci` (needs real providers/keys or is nightly-grade).
 
+### Navigation journeys
+
+`tests/nav-journeys.spec.ts` (`@ci Navigation journeys`) walks J-NV-1…5 from
+the navigation consolidation plan — click, type, find, undo — without sending
+a summarize turn. A moved route adds a redirect row in `redirects.spec.ts` in
+the **same PR** that retires the old path. Bookmarks that only arm a chat tool
+(`/?tool=summarize`) are dedicated tests: the query is stripped after the tool
+is ready, so they cannot live in the path-equality loop.
+
 ### Cross-browser (firefox) — opt-in via `@crossbrowser`
 
 Firefox is a **focused cross-browser smoke, not a second full suite.** The

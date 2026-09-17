@@ -1,11 +1,22 @@
 /**
- * Transitional-redirect watchdog — §4.6 of the navigation IA cleanup
- * (_devextras/planning/20260611-navigation-ia-cleanup.md).
+ * Transitional-redirect watchdog — §4.6 of the navigation IA cleanup and
+ * Sprint A of 20260914-navigation-consolidation.
  *
  * Every legacy path must land on its canonical successor (bookmarks, docs,
  * support articles). The redirects stay for at least 2 releases; when they
- * are removed (phase 7) this spec is the tripwire that forces the removal
- * to be a conscious, documented decision.
+ * are removed this spec is the tripwire that forces a conscious decision.
+ *
+ * A moved route adds a row in the same PR that retires the old path.
+ *
+ * Sprint A successors live as dedicated tests below (not this path-equality
+ * loop): admin bookmarks need an admin session; Higgsfield keeps a query
+ * string the loop regex does not escape; Summarizer bookmarks arm a tool
+ * and then strip `?tool=`.
+ *   /admin?tab=users            → /admin/people
+ *   /statistics#chats           → /chats
+ *   /ai/providers/higgsfield    → /ai/providers?section=higgsfield
+ *   /ai/summarizer              → / with Summarize armed
+ *   /tools/doc-summary          → / with Summarize armed
  */
 import { test, expect } from '../test-setup'
 import { login, openApp } from '../helpers/auth'
