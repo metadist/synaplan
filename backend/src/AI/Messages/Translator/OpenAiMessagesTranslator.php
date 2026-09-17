@@ -276,13 +276,8 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
     {
         $imageDetail = $this->imageDetail($context);
         if ($this->shouldUseResponses($requestBody, $context)) {
-            $url = $this->resolveResponsesUrl($context);
-            if (null === $url) {
-                return null;
-            }
-
             return [
-                'url' => $url,
+                'url' => $this->resolveResponsesUrl($context),
                 'payload' => $this->toResponsesRequest($requestBody, $stream, $imageDetail),
                 'responses' => true,
             ];
@@ -303,7 +298,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
     /**
      * @param array<string, mixed> $context
      */
-    public function resolveResponsesUrl(array $context): ?string
+    public function resolveResponsesUrl(array $context): string
     {
         if (isset($context['openai_responses_url']) && \is_string($context['openai_responses_url']) && '' !== $context['openai_responses_url']) {
             return rtrim($context['openai_responses_url'], '/');

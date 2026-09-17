@@ -272,6 +272,7 @@ final class OpenAiMessagesTranslatorTest extends TestCase
             ],
             [
                 'api_key' => 'sk_test',
+                'upstream_url' => 'https://api.anthropic.com',
                 'provider' => 'openai',
             ],
         );
@@ -300,7 +301,7 @@ final class OpenAiMessagesTranslatorTest extends TestCase
                 'max_tokens' => 64,
                 'messages' => [['role' => 'user', 'content' => 'PONG']],
             ],
-            ['api_key' => 'sk_test', 'provider' => 'openai'],
+            ['api_key' => 'sk_test', 'upstream_url' => 'https://api.anthropic.com', 'provider' => 'openai'],
             static function (array $event) use (&$events): void {
                 $events[] = $event;
             },
@@ -308,7 +309,7 @@ final class OpenAiMessagesTranslatorTest extends TestCase
 
         $deltas = array_values(array_filter(
             $events,
-            static fn (array $e): bool => 'content_block_delta' === ($e['event'] ?? ''),
+            static fn (array $e): bool => 'content_block_delta' === $e['event'],
         ));
         $this->assertSame('PONG', $deltas[0]['data']['delta']['text'] ?? null);
         $this->assertSame('end_turn', $usage->stopReason);
