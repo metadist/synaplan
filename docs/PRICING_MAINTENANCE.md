@@ -522,16 +522,26 @@ git diff backend/tests/Unit/Model/__snapshots__/
 
 It also enforces that a recorded successor resolves to exactly one live catalog entry and is not itself retired, so a chain of retirements can never repoint an install at another dead model.
 
-**The second guard, `RetiredModelReferenceTest`:** a retired id must not be what any class falls
-back to. The registry switches the catalog row off and the seeder switches the database row off,
-but neither can see an id another class spelled out itself — `GoogleProvider::generateImage()` read
+**The second guard, `RetiredModelReferenceTest`:** a retired id must not be what any class picks.
+The registry switches the catalog row off and the seeder switches the database row off, but neither
+can see an id another class spelled out itself — `GoogleProvider::generateImage()` read
 `$options['model'] ?? 'imagen-4.0-generate-001'` for a month after Google shut that endpoint down,
-on the one path where the caller passes no model. The test flags a retired id in a default position
-(`??`, `?:`, `return`) anywhere in `backend/src/`, and nowhere else on purpose: a retired id is
-legitimate in a family check (`str_starts_with($model, 'gpt-5')`), in `AnthropicProvider`'s
-`SUPPORTED_MODELS` (the ids Claude Code sends us), and in an OpenAPI `example`. What none of those
-do is decide which model a request goes to. When it fires, point the default at the successor the
-registry records for that BID.
+on the one path where the caller passes no model. It is not a rare shape: thirteen provider classes
+keep a `DEFAULT_CHAT_MODEL` / `DEFAULT_VISION_MODEL` constant, and `GroqProvider`'s still named
+`meta-llama/llama-4-scout-17b-16e-instruct` when Groq dropped it (fixed by hand in #1513).
+
+The test flags a retired id anywhere in `backend/src/` where a model is **chosen** — assigned
+(`=`, `??=`, which covers a `const` and a parameter default), defaulted (`??`, `?:`) or returned —
+and nowhere else on purpose: a retired id is legitimate in a family check
+(`str_starts_with($model, 'gpt-5')`), in `AnthropicProvider`'s `SUPPORTED_MODELS` (the ids Claude
+Code sends us), and in an OpenAPI `example`. What none of those do is decide which model a request
+goes to; 23 such mentions exist and all of them are correct. When it fires, point the choice at the
+successor the registry records for that BID.
+
+`ModelCatalogRetirementTest` also fails when `CONTEXT_PRICING` still prices a long-context tier for
+a model no live row carries any more — dead config that reads like a live rate. Retiring one tag of
+a model whose other tag lives on changes nothing there: the tier is keyed by `providerId` and
+applies to every row of that model.
 
 **What the registry does not reach:** prose. `README.md` and `docs/CONFIGURATION.md` advertise
 models per provider in editorial summaries, so no test can tell that "Imagen 4" became a lie — it

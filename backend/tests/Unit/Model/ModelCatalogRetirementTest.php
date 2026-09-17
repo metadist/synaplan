@@ -246,6 +246,42 @@ final class ModelCatalogRetirementTest extends TestCase
         self::assertGreaterThan(0, $checked, 'No retired row is still in the catalog, so nothing was actually checked.');
     }
 
+    /**
+     * A long-context tier keyed on a model nobody can select any more is dead
+     * config that reads like a live rate — and dropping it was another line on
+     * the retirement checklist that only a person could remember.
+     *
+     * The tier is keyed by providerId and applies to every tag of that model, so
+     * it stays legitimate as long as one row still carries the id: retiring the
+     * chat row of a model whose vision row lives on changes nothing here.
+     */
+    public function testNoLongContextTierIsKeyedOnAModelThatIsFullyRetired(): void
+    {
+        $liveProviderIds = [];
+        foreach (ModelCatalog::all() as $model) {
+            if (1 === (int) ($model['active'] ?? 0)) {
+                $liveProviderIds[(string) $model['providerId']] = true;
+            }
+        }
+
+        $stale = [];
+        foreach (ModelCatalog::retirements() as $record) {
+            $providerId = $record['providerId'];
+            if (isset($liveProviderIds[$providerId])) {
+                continue;
+            }
+            if (null !== ModelCatalog::contextPricing($providerId)) {
+                $stale[$providerId] = true;
+            }
+        }
+
+        self::assertSame([], array_keys($stale), sprintf(
+            'ModelCatalog::CONTEXT_PRICING still prices a long-context tier for %s, which no live row '
+            .'carries any more. Drop the tier together with the last row of that model.',
+            implode(', ', array_keys($stale)),
+        ));
+    }
+
     public function testARetirementNeverPointsAtItself(): void
     {
         foreach (array_keys(ModelCatalog::retirements()) as $bid) {
