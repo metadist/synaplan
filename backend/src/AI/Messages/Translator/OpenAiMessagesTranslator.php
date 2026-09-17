@@ -495,12 +495,24 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
                     'text' => (string) ($part['text'] ?? ''),
                 ];
             } elseif ('image_url' === $type) {
-                $url = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
-                if (\is_string($url) && '' !== $url) {
-                    $converted[] = [
+                $imageUrl = $part['image_url'] ?? null;
+                $url = '';
+                $detail = null;
+                if (\is_array($imageUrl)) {
+                    $url = \is_string($imageUrl['url'] ?? null) ? $imageUrl['url'] : '';
+                    $detail = $imageUrl['detail'] ?? null;
+                } elseif (\is_string($imageUrl)) {
+                    $url = $imageUrl;
+                }
+                if ('' !== $url) {
+                    $image = [
                         'type' => 'input_image',
                         'image_url' => $url,
                     ];
+                    if (\is_string($detail) && '' !== $detail && 'auto' !== $detail) {
+                        $image['detail'] = $detail;
+                    }
+                    $converted[] = $image;
                 }
             }
         }
