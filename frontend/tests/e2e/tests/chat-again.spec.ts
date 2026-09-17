@@ -36,8 +36,13 @@ test.describe('@ci @smoke Chat Again', () => {
         firstResponseIndex +
         ') and select a model',
       async () => {
+        // No scrollIntoViewIfNeeded(): it snapshots the element handle and
+        // throws "Element is not attached to the DOM" when
+        // historyStore.loadMessages() swaps the bubble mid-call. The
+        // toBeVisible() assertion below re-resolves the locator, and
+        // Playwright auto-scrolls before the click. Same reasoning as
+        // ChatHelper.waitForAnswer().
         const bubble = chat.conversationBubbles().nth(firstResponseIndex)
-        await bubble.scrollIntoViewIfNeeded()
         const againBtn = bubble.locator(selectors.chat.againBtn)
         await expect(againBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
         await expect(againBtn).toBeEnabled({ timeout: TIMEOUTS.SHORT })
@@ -65,8 +70,6 @@ test.describe('@ci @smoke Chat Again', () => {
         ') and select a model',
       async () => {
         const bubble = chat.conversationBubbles().nth(secondResponseIndex)
-        await bubble.scrollIntoViewIfNeeded()
-
         const toggle = bubble.locator(selectors.chat.againDropdown)
         await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
         await expect(toggle).toBeEnabled({ timeout: TIMEOUTS.SHORT })

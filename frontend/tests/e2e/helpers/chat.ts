@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 import { expect } from '@playwright/test'
 import { selectors } from './selectors'
+import { assertStreamSucceeded } from './stream'
 import { TIMEOUTS } from '../config/config'
 
 /**
@@ -111,26 +112,7 @@ export class ChatHelper {
     // fast at the done/error race below, so this does not mask real breakage.
     await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
 
-    const errorNotice = newBubble.locator(selectors.chat.chatError)
-    const result = await Promise.race([
-      newBubble
-        .locator(selectors.chat.messageDone)
-        .waitFor({ state: 'visible', timeout: raceTimeout })
-        .then(() => 'done' as const),
-      errorNotice.waitFor({ state: 'visible', timeout: raceTimeout }).then(() => 'error' as const),
-    ])
-    // message-done must not be treated as success when the honest error
-    // notice is also (or subsequently) on the bubble — the catalog sentence
-    // is no longer in section-message-text, so reading the body would hang.
-    if (result === 'error' || (await errorNotice.isVisible())) {
-      const explanation = errorNotice.locator('[data-testid="chat-error-body"]')
-      const text = (await explanation.isVisible()) ? (await explanation.innerText()).trim() : ''
-      throw new Error(
-        text
-          ? `Assistant message ended in error state: ${text}`
-          : 'Assistant message ended in error state (chat-error-notice visible)'
-      )
-    }
+    await assertStreamSucceeded(newBubble, raceTimeout)
 
     const answerBody = newBubble.locator(selectors.chat.assistantAnswerBody).last()
     await answerBody.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
@@ -168,6 +150,14 @@ export class ChatHelper {
         stableSince = 0
       }
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+    }
+
+    // Leaving the loop with nothing to read is not a slow render, it is an
+    // empty answer. Returning it silently pushed the failure into whichever
+    // assertion the caller happened to make next, so the report named that
+    // assertion instead of the empty stream.
+    if (lastText.length === 0) {
+      throw new Error(`Assistant answer body stayed empty for ${MAX_WAIT_MS}ms after message-done`)
     }
 
     return lastText.toLowerCase()

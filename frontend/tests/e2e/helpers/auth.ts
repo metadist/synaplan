@@ -123,12 +123,30 @@ export async function provisionUser(
  * the active-chat selection when the chat list response lands (e.g. a chat
  * created by the test would be deselected again). The slower UI login used
  * to mask this race.
+ *
+ * Two details carry most of this suite's recorded flakiness, because almost
+ * every spec runs through here:
+ *
+ * 1. The wait must survive a cold stack. This is the first request of the
+ *    first test in a worker, against a backend that shares four runner cores
+ *    with MariaDB, Qdrant, the stubs and four browsers. STANDARD (10s) was
+ *    the single most frequent first-attempt signature
+ *    ("page.waitForResponse: Timeout 10000ms exceeded") and it showed up in
+ *    navigation, multitask, memories, mcp-config and chats-archive alike —
+ *    different specs, one shared wait. VERY_LONG costs nothing once the stack
+ *    is warm: waitForResponse returns as soon as the response lands.
+ * 2. The predicate must require a usable response. Without `res.ok()` an
+ *    expired access cookie satisfies the wait with its 401; the app then
+ *    refreshes and re-fetches, and we return into exactly the
+ *    `ensureValidActiveChat()` race this helper exists to prevent.
  */
 export async function openApp(page: Page): Promise<void> {
   const chatsLoaded = page.waitForResponse(
     (res) =>
-      new URL(res.url()).pathname.endsWith('/api/v1/chats') && res.request().method() === 'GET',
-    { timeout: TIMEOUTS.STANDARD }
+      new URL(res.url()).pathname.endsWith('/api/v1/chats') &&
+      res.request().method() === 'GET' &&
+      res.ok(),
+    { timeout: TIMEOUTS.VERY_LONG }
   )
   await page.goto('/')
   await chatsLoaded
@@ -160,9 +178,22 @@ export async function login(page: Page, credentials?: { user: string; pass: stri
   await page.click(selectors.login.submit)
 
   try {
-    await page.waitForSelector(selectors.chat.textInput, { timeout: TIMEOUTS.STANDARD })
-  } catch {
-    throw new Error(`Login failed: current URL is ${page.url()}`)
+    await page.waitForSelector(selectors.chat.textInput, { timeout: TIMEOUTS.VERY_LONG })
+  } catch (cause) {
+    // Never relabel this as "Login failed" without checking which of the two
+    // things went wrong. The sign-in form is a guest-only route, so an
+    // app-root URL in the message means the sign-in SUCCEEDED and only the
+    // composer had not rendered yet. The old wording claimed the opposite and
+    // sent CI investigations at the wrong subsystem — including flakes booked
+    // against impersonation that were this wait. The original Playwright error
+    // stays attached as `cause` so the failing selector survives in the report.
+    const signInFormStillUp = await page.locator(selectors.login.submit).isVisible()
+    throw new Error(
+      signInFormStillUp
+        ? `Sign-in did not complete — still on the sign-in form at ${page.url()}`
+        : `Signed in, but the chat composer never rendered at ${page.url()}`,
+      { cause }
+    )
   }
 }
 

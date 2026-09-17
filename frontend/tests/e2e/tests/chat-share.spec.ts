@@ -6,6 +6,11 @@ import { TIMEOUTS } from '../config/config'
 
 test.describe('@ci @smoke Chat Share', () => {
   test('user can share chat and open shared link in incognito', async ({ page }) => {
+    // Cold-boot arrange plus a full chat round-trip plus the share roundtrip
+    // does not fit the 60s default under shard load. Without the headroom the
+    // generous waits inside openApp() and waitForAnswer() cannot be reached:
+    // the test dies on the wall clock and reports no failing step.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const uniqueMessage = `Chat share E2E ${Date.now()} – please reply briefly.`
 
     await test.step('Arrange: login via UI', async () => {

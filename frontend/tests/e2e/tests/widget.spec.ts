@@ -192,8 +192,12 @@ test.describe('@ci @smoke Widget', () => {
 
     const assistantIndex = previousCount + 1
     const newBubble = messageContainers.nth(assistantIndex)
-    await newBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
-    await newBubble.scrollIntoViewIfNeeded()
+    // Wait straight for 'visible'. The attached → scrollIntoViewIfNeeded →
+    // visible sequence snapshots the element handle and throws "Element is not
+    // attached to the DOM" when the bubble is re-rendered mid-call; waitFor
+    // re-resolves the locator instead. ChatHelper.waitForAnswer() dropped this
+    // sequence for the same reason, and this was the last @ci test still
+    // carrying it (it runs in both the chromium and firefox jobs).
     await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
     await newBubble
