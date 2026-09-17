@@ -84,14 +84,23 @@ export const useChatsStore = defineStore('chats', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   /**
-   * Bumped at the start of every `loadChats()` and of any local list mutation
-   * a previously started GET cannot know about (rename / delete / generated
-   * title). A response whose generation no longer matches is dropped so it
-   * cannot replace a title the user just saved, or resurrect a chat they
-   * just deleted — History opens with a fire-and-forget refresh, and that
-   * GET regularly lands after the PATCH.
+   * Bumped at the start of every `loadChats()`, on `$reset`, and after any
+   * local list mutation a previously started GET cannot know about (rename /
+   * delete / generated title). A response whose generation no longer matches
+   * is dropped so it cannot replace a title the user just saved, resurrect a
+   * chat they just deleted, or leak the previous user's list after logout.
+   * The counter stays monotonic — resetting it to 0 would let a pre-logout
+   * `seq === 1` match the next user's first load.
+   *
+   * Creates and activity bumps are merged into the applied snapshot instead
+   * of bumping this counter: discarding the boot GET because the user clicked
+   * New Chat mid-load would drop every other chat.
    */
   let chatsLoadSeq = 0
+  /** Chat ids `markChatGenerating(id, true)` has set in this session. */
+  const liveGeneratingIds = new Set<number>()
+  /** Chat ids `markChatGenerating(id, false)` has cleared in this session. */
+  const liveClearedIds = new Set<number>()
 
   /**
    * Paginated history for the mobile drawer. Kept separate from `chats` so the
@@ -192,6 +201,38 @@ export const useChatsStore = defineStore('chats', () => {
     loading.value = false
   }
 
+  function mergeLoadedChat(local: Chat | undefined, server: Chat): Chat {
+    if (!local) {
+      return server
+    }
+    const localTs = Date.parse(local.updatedAt ?? '') || 0
+    const serverTs = Date.parse(server.updatedAt ?? '') || 0
+    return {
+      ...server,
+      updatedAt: localTs > serverTs ? local.updatedAt : server.updatedAt,
+      messageCount:
+        Math.max(local.messageCount ?? 0, server.messageCount ?? 0) || server.messageCount,
+      firstMessagePreview: local.firstMessagePreview ?? server.firstMessagePreview,
+    }
+  }
+
+  function applyChatsFromServer(incoming: Chat[], serverRunIds: number[]) {
+    const serverIds = new Set(incoming.map((chat) => chat.id))
+    const localById = new Map(chats.value.map((chat) => [chat.id, chat]))
+    const merged = incoming.map((server) => mergeLoadedChat(localById.get(server.id), server))
+    const createdLocally = chats.value.filter((chat) => !serverIds.has(chat.id))
+    chats.value = createdLocally.length > 0 ? [...createdLocally, ...merged] : merged
+
+    const nextRuns = new Set(serverRunIds)
+    for (const id of liveGeneratingIds) {
+      nextRuns.add(id)
+    }
+    for (const id of liveClearedIds) {
+      nextRuns.delete(id)
+    }
+    activeRunChatIds.value = nextRuns
+  }
+
   async function loadChats() {
     if (!checkAuthOrRedirect()) return
 
@@ -206,8 +247,10 @@ export const useChatsStore = defineStore('chats', () => {
       if (seq !== chatsLoadSeq) {
         return
       }
-      chats.value = (data.chats || []).map((chat) => normalizeChat(chat))
-      activeRunChatIds.value = new Set(data.activeRunChatIds ?? [])
+      applyChatsFromServer(
+        (data.chats || []).map((chat) => normalizeChat(chat)),
+        data.activeRunChatIds ?? []
+      )
       ensureValidActiveChat()
     } catch (err: unknown) {
       if (seq !== chatsLoadSeq) {
@@ -237,8 +280,12 @@ export const useChatsStore = defineStore('chats', () => {
     // reads of activeRunChatIds would not re-render on add/delete alone.
     const next = new Set(activeRunChatIds.value)
     if (generating) {
+      liveGeneratingIds.add(chatId)
+      liveClearedIds.delete(chatId)
       next.add(chatId)
     } else {
+      liveGeneratingIds.delete(chatId)
+      liveClearedIds.add(chatId)
       next.delete(chatId)
     }
     activeRunChatIds.value = next
@@ -411,6 +458,9 @@ export const useChatsStore = defineStore('chats', () => {
       if (chat) {
         chat.title = title
       }
+      // A load that started while the PATCH was in flight can have been
+      // served the old title. Drop it so it cannot land after this write.
+      invalidateInFlightChatsLoad()
     } catch (err: unknown) {
       error.value = getErrorMessage(err) || 'Failed to update chat'
       console.error('Error updating chat:', err)
@@ -441,6 +491,7 @@ export const useChatsStore = defineStore('chats', () => {
 
       const wasActiveChat = activeChatId.value === chatId
       chats.value = chats.value.filter((c) => c.id !== chatId)
+      invalidateInFlightChatsLoad()
 
       // If the deleted chat was active and it was the last chat, create a new one
       if (wasActiveChat && chats.value.length === 0) {
@@ -656,7 +707,9 @@ export const useChatsStore = defineStore('chats', () => {
     conversationAccess.value = null
     conversationSource.value = null
     conversationAccessSeq = 0
-    chatsLoadSeq = 0
+    invalidateInFlightChatsLoad()
+    liveGeneratingIds.clear()
+    liveClearedIds.clear()
     activeRunChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
