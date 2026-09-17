@@ -210,6 +210,11 @@ final readonly class GatewayToolLoop
 
             $stopReason = \is_string($lastBody['stop_reason'] ?? null) ? $lastBody['stop_reason'] : null;
             if ('tool_use' !== $stopReason) {
+                if ($this->shouldWrapForMissingUrl($lastBody, $webSearchRounds, $body)) {
+                    $body = $this->forceWrapUp($body);
+                    continue;
+                }
+
                 return [
                     'status' => $lastStatus,
                     'headers' => $lastHeaders,
@@ -321,6 +326,13 @@ final readonly class GatewayToolLoop
             if ('tool_use' !== $turn['stop_reason']) {
                 if ($webSearchRounds > 0 && !$emitter->hasEmittedText()) {
                     $emitter->emitAssistantText(self::EMPTY_SEARCH_RECOVERY);
+                    $this->finishStream($emitter, $turn);
+
+                    return $totalUsage->withStopReason($turn['stop_reason']);
+                }
+                if ($this->shouldWrapForMissingUrlFromTurn($turn, $webSearchRounds, $body)) {
+                    $body = $this->forceWrapUp($body);
+                    continue;
                 }
                 $this->finishStream($emitter, $turn);
 
@@ -888,6 +900,56 @@ final readonly class GatewayToolLoop
         }
 
         return $n;
+    }
+
+    /**
+     * Groq (and some others) cite footnotes like `【3†L1】` and never write an
+     * http URL. One more wrap-up turn, without tools, asks for the URL.
+     *
+     * @param array<string, mixed> $lastBody
+     * @param array<string, mixed> $currentBody
+     */
+    private function shouldWrapForMissingUrl(array $lastBody, int $webSearchRounds, array $currentBody): bool
+    {
+        if ($webSearchRounds < 1 || $this->alreadyWrapped($currentBody)) {
+            return false;
+        }
+        $content = $lastBody['content'] ?? [];
+        if (!\is_array($content)) {
+            return false;
+        }
+        $text = $this->assistantText($content);
+
+        return '' !== $text && !str_contains(strtolower($text), 'http');
+    }
+
+    /**
+     * @param array{content: list<array<string, mixed>>} $turn
+     * @param array<string, mixed>                       $currentBody
+     */
+    private function shouldWrapForMissingUrlFromTurn(array $turn, int $webSearchRounds, array $currentBody): bool
+    {
+        return $this->shouldWrapForMissingUrl(
+            ['content' => $turn['content']],
+            $webSearchRounds,
+            $currentBody,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function alreadyWrapped(array $body): bool
+    {
+        $messages = $body['messages'] ?? [];
+        if (!\is_array($messages) || [] === $messages) {
+            return false;
+        }
+        $last = $messages[array_key_last($messages)];
+
+        return \is_array($last)
+            && 'user' === ($last['role'] ?? '')
+            && self::WRAP_UP_AFTER_SEARCH === ($last['content'] ?? null);
     }
 
     /**
