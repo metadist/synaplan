@@ -738,8 +738,8 @@ class ModelCatalogTest extends TestCase
 
     /**
      * TrustedTokens (TNG, Germany) — chat + vision rows from
-     * https://trustedtokens.eu/api/billing/models (re-verified 2026-09-08;
-     * prices unchanged from the 2026-08-29 snapshot except BID 335 retired).
+     * https://trustedtokens.eu/api/billing/models (re-verified 2026-09-17;
+     * prices unchanged from the 2026-08-29 snapshot except BIDs 335–337 retired).
      * Provider ids keep the upstream org/name form. Prices are USD/1M.
      */
     public function testTrustedTokensModelsAreAvailableWithExpectedApiIds(): void
@@ -779,11 +779,19 @@ class ModelCatalogTest extends TestCase
         $this->assertSame(0, $v4Flash[0]['active']);
         $this->assertSame(0, $v4Flash[0]['selectable']);
         $this->assertTrue(ModelCatalog::isRetired(335));
-        $this->assertSame(336, ModelCatalog::successorBid(335));
+        $this->assertSame(332, ModelCatalog::successorBid(335));
         $this->assertSame('deepseek-ai/DeepSeek-V4-Flash-0731', $v4Flash0731[0]['providerId']);
-        $this->assertSame(1, $v4Flash0731[0]['active']);
-        $this->assertSame(1, $v4Flash0731[0]['selectable']);
+        $this->assertSame(336, $v4Flash0731[0]['id']);
+        $this->assertSame(0, $v4Flash0731[0]['active']);
+        $this->assertSame(0, $v4Flash0731[0]['selectable']);
+        $this->assertTrue(ModelCatalog::isRetired(336));
+        $this->assertSame(332, ModelCatalog::successorBid(336));
         $this->assertSame('deepseek-ai/DeepSeek-V4-Pro-0813', $v4Pro[0]['providerId']);
+        $this->assertSame(337, $v4Pro[0]['id']);
+        $this->assertSame(0, $v4Pro[0]['active']);
+        $this->assertSame(0, $v4Pro[0]['selectable']);
+        $this->assertTrue(ModelCatalog::isRetired(337));
+        $this->assertSame(331, ModelCatalog::successorBid(337));
         $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $qwenChat[0]['providerId']);
         $this->assertSame('openai/gpt-oss-120b', $gptOss[0]['providerId']);
 
