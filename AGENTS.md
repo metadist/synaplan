@@ -33,7 +33,7 @@ Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, e
 Without usability and stability the software is bad, whatever the API does.
 Every plan, sprint file and PR that touches anything a person sees or waits
 for is measured against this bar. It is the merge gate, not a polish pass.
-The binding contract is `_devextras/planning/202609_ux_user_flows.md`
+The binding contract is `_devextras/planning/20260907_ux_user_flows.md`
 (rules **U1–U12**); the use-case list that applies it is
 `_devextras/planning/20260913-use-case-research/README.md` §1.
 

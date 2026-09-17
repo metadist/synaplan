@@ -1,7 +1,8 @@
 # Status — Feature modules
 
 **Intermezzo** release of
-[`../20260910_roadmap_update.md`](../20260910_roadmap_update.md)
+[`../../20260917_roadmap.md`](../../20260917_roadmap.md)
+(frozen: [`../20260910_roadmap/20260910_roadmap_update.md`](../20260910_roadmap/20260910_roadmap_update.md))
 (after the two bugfixes; Wave 4 is on `main` via #1774; Intermezzo S1–S4
 closed 2026-09-13). Plan of record:
 [`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked
@@ -42,7 +43,7 @@ same day.**
 | Date | Decision |
 | ---- | -------- |
 | 2026-09-10 | Initiative proposed by the research in `../20260910-wave5-architecture-research/02_conditional_module_loading.md`: runtime-gated declared modules instead of compile-time exclusion; vendor slimming first; CI `minimal`/`full` matrix as the proof. |
-| 2026-09-10 | Named **Intermezzo** in `../20260910_roadmap_update.md`: after the two production bugfixes and Wave 4, before Wave 5. Not a seventh track. |
+| 2026-09-10 | Named **Intermezzo** in the 2026-09-10 roadmap: after the two production bugfixes and Wave 4, before Wave 5. Not a seventh track. |
 | 2026-09-10 | Wave 4 merged to `main` as #1774. Intermezzo still waits on the two bugfixes and on §0 ticks. |
 | 2026-09-10 | Bugfixes confirmed on `main` (#1787: Parsedown HTML on SMTP + Graph `contentType: html`; rolling summary applied on stream and non-stream, refresh dispatched after persist; characterization snapshots untouched). §0 rows 1–15 ticked at their proposed defaults. **Intermezzo S1 started** on `intermezzo/s1-inventory-and-dead-weight`. |
 | 2026-09-10 | **S1 delivered as PR #1815.** **S2 started** on `intermezzo/s2-registry-and-descriptors` (stacked on S1). Two S2 design decisions taken and recorded here: (a) `routeNames()` entries are exact route names or `prefix*` — plain prefix matching would have caught never-gate routes such as `api_webhooks_whatsapp_verify` via `api_webhooks_whatsapp`; (b) the feature-status page keeps its historic row shape and wording (snapshot-locked) and gains an additive `modules` list instead of being rewritten around module ids, because `features`/`summary` are a frontend contract (C2). |

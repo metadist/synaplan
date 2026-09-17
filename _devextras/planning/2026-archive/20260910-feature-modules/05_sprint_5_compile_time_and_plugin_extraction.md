@@ -8,7 +8,7 @@ prove the long-term direction by extracting one first-party optional feature
 (Higgsfield) into a plugin with zero core edits. Both halves have their own
 go/no-go in `STATUS.md`; neither is required for the initiative to be complete.
 **Depends on:** S4 (matrix, byte-diff); plugin-platform manifest v2
-(`PL39`/`PL40` in `202609_ai_plugs/06_sprint_6_plugin_adapters.md` or
+(`PL39`/`PL40` in `20260903_ai_plugs/06_sprint_6_plugin_adapters.md` or
 `20260822-open-plugin-platform` S1.4).
 **Unlocks:** the plugin catalog listing first-party optional features; a
 documented answer to "why not compile-time" that does not need re-litigating.
