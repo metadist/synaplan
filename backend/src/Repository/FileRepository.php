@@ -276,6 +276,9 @@ class FileRepository extends ServiceEntityRepository
      * walks the messages still in the thread will miss the PDF. Chat-scoped
      * lookup keeps those files available for the catalog and DAG fallback.
      *
+     * Query by chat via subselects so a long conversation does not materialize
+     * every message ID into an `IN (...)` list before `$limit` can apply.
+     *
      * @return list<File>
      */
     public function findFilesByChatId(int $userId, int $chatId, int $limit = 30): array
@@ -284,25 +287,32 @@ class FileRepository extends ServiceEntityRepository
             return [];
         }
 
-        $ids = $this->getEntityManager()->createQueryBuilder()
-            ->select('m.id')
-            ->from(Message::class, 'm')
-            ->where('m.chatId = :chatId')
-            ->andWhere('m.userId = :userId')
-            ->setParameter('chatId', $chatId)
+        $messageIdsDql = $this->getEntityManager()->createQueryBuilder()
+            ->select('chatMessage.id')
+            ->from(Message::class, 'chatMessage')
+            ->where('chatMessage.chatId = :chatId')
+            ->andWhere('chatMessage.userId = :userId')
+            ->getDQL();
+
+        $attachedIdsDql = $this->getEntityManager()->createQueryBuilder()
+            ->select('attached.id')
+            ->from(Message::class, 'msg')
+            ->innerJoin('msg.files', 'attached')
+            ->where('msg.chatId = :chatId')
+            ->andWhere('msg.userId = :userId')
+            ->andWhere('attached.userId = :userId')
+            ->getDQL();
+
+        return $this->createQueryBuilder('f')
+            ->distinct()
+            ->where('f.userId = :userId')
+            ->andWhere('(f.messageId IN ('.$messageIdsDql.') OR f.id IN ('.$attachedIdsDql.'))')
             ->setParameter('userId', $userId)
+            ->setParameter('chatId', $chatId)
+            ->orderBy('f.id', 'DESC')
+            ->setMaxResults($limit)
             ->getQuery()
-            ->getSingleColumnResult();
-
-        $messageIds = [];
-        foreach ($ids as $id) {
-            $intId = (int) $id;
-            if ($intId > 0) {
-                $messageIds[] = $intId;
-            }
-        }
-
-        return $this->findFilesByMessageIds($userId, $messageIds, $limit);
+            ->getResult();
     }
 
     /**
