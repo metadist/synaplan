@@ -24,8 +24,10 @@ final readonly class VectorizationService
     /**
      * One embedBatch / storeChunkBatch window. A 3 MB handbook can produce
      * hundreds of chunks; embedding them all in one request OOMs PHP (HTTP 500).
+     * Windows of 8 keep a slow local Ollama embed from sitting on one HTTP
+     * call until PHP's max_execution_time kills the upload.
      */
-    private const EMBED_BATCH_SIZE = 32;
+    private const EMBED_BATCH_SIZE = 8;
 
     /** Desktop project knowledge folders. Index must use the same VECTORIZE default as search. */
     public const DESKTOP_GROUP_PREFIX = 'DESKTOP:';
@@ -78,6 +80,11 @@ final readonly class VectorizationService
         }
 
         try {
+            // Large desktop folders (3 MB handbook) take minutes of local
+            // embeddings. A 300s max_execution_time turns that into HTTP 500
+            // and a Failed file. The worker and CLI already run without a cap.
+            set_time_limit(0);
+
             $embeddingModelId = $this->resolveEmbeddingModelId($embeddingModelId, $groupKey, $userId);
 
             if (!$embeddingModelId) {

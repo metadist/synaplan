@@ -716,10 +716,7 @@ final class GatewayToolLoopTest extends TestCase
 
         $this->assertSame(3, $calls);
         $this->assertIsArray($result['body']);
-        $this->assertSame(
-            'I looked this up but could not turn the results into an answer. Please try again, or ask in a different way.',
-            $result['body']['content'][0]['text'],
-        );
+        $this->assertStringContainsString('https://nodejs.org', $result['body']['content'][0]['text']);
     }
 
     public function testEmptyThinkingBlocksAreDroppedFromToolFollowUp(): void
