@@ -201,6 +201,160 @@ describe('Chats Store', () => {
       expect(store.activeChatId).toBe(9)
     })
 
+    it('ignores a stale loadChats response when a newer load has already landed', async () => {
+      const store = useChatsStore()
+      let resolveFirst: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      )
+      const first = store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+      await store.loadChats()
+      expect(store.chats.map((c) => c.id)).toEqual([9])
+
+      resolveFirst({ chats: [regularChat(1)] })
+      await first
+
+      expect(store.chats.map((c) => c.id)).toEqual([9])
+    })
+
+    it('does not let a late loadChats overwrite a title that was just saved', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
+      await store.loadChats()
+
+      let resolveSlow: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSlow = resolve
+        })
+      )
+      const pendingLoad = store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce({})
+      await store.updateChatTitle(1, 'Renamed while refresh was in flight')
+      expect(store.chats[0].title).toBe('Renamed while refresh was in flight')
+
+      resolveSlow({ chats: [regularChat(1)] })
+      await pendingLoad
+
+      expect(store.chats[0].title).toBe('Renamed while refresh was in flight')
+    })
+
+    it('does not let a load started during PATCH overwrite the saved title', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
+      await store.loadChats()
+
+      let resolvePatch: (value: unknown) => void = () => {}
+      let resolveLoad: (value: unknown) => void = () => {}
+      httpClientMock
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolvePatch = resolve
+          })
+        )
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolveLoad = resolve
+          })
+        )
+
+      const pendingRename = store.updateChatTitle(1, 'Renamed during refresh')
+      const pendingLoad = store.loadChats()
+
+      resolvePatch({})
+      await pendingRename
+      expect(store.chats[0].title).toBe('Renamed during refresh')
+
+      resolveLoad({ chats: [regularChat(1)] })
+      await pendingLoad
+
+      expect(store.chats[0].title).toBe('Renamed during refresh')
+    })
+
+    it('does not resurrect a chat the server no longer returns', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1), regularChat(2)] })
+      await store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
+      await store.loadChats()
+
+      expect(store.chats.map((c) => c.id)).toEqual([1])
+    })
+
+    it('keeps a chat created while a list refresh is in flight', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
+      await store.loadChats()
+
+      let resolveLoad: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveLoad = resolve
+        })
+      )
+      const pendingLoad = store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce(chatPayload(7))
+      await store.createChat()
+
+      resolveLoad({ chats: [regularChat(1)] })
+      await pendingLoad
+
+      expect(store.chats.map((c) => c.id)).toEqual(expect.arrayContaining([7, 1]))
+    })
+
+    it('keeps a local activity bump when a stale list refresh lands', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
+      await store.loadChats()
+
+      let resolveLoad: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveLoad = resolve
+        })
+      )
+      const pendingLoad = store.loadChats()
+
+      store.bumpChatActivity(1, { firstMessagePreview: 'hello' })
+      const bumpedAt = store.chats[0].updatedAt
+
+      resolveLoad({ chats: [regularChat(1)] })
+      await pendingLoad
+
+      expect(store.chats[0].updatedAt).toBe(bumpedAt)
+      expect(store.chats[0].messageCount).toBe(2)
+      expect(store.chats[0].firstMessagePreview).toBe('hello')
+    })
+
+    it('does not apply a pre-logout load after $reset', async () => {
+      const store = useChatsStore()
+      let resolveFirst: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      )
+      const first = store.loadChats()
+
+      store.$reset()
+
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+      await store.loadChats()
+      expect(store.chats.map((c) => c.id)).toEqual([9])
+
+      resolveFirst({ chats: [regularChat(1)] })
+      await first
+
+      expect(store.chats.map((c) => c.id)).toEqual([9])
+    })
+
     it('re-validates a kept foreign id once the incoming list has loaded without it', async () => {
       incomingOpenableMock.mockReturnValue(true)
       localStorage.setItem('synaplan_active_chat_id', '13')
@@ -578,6 +732,66 @@ describe('Chats Store', () => {
       await store.loadChats()
 
       expect(store.activeRunChatIds.has(2)).toBe(true)
+      expect(store.activeRunChatIds.has(1)).toBe(false)
+    })
+
+    it('keeps a live generating mark when a stale list snapshot has none', async () => {
+      const store = useChatsStore()
+      let resolveLoad: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveLoad = resolve
+        })
+      )
+      const pending = store.loadChats()
+
+      store.markChatGenerating(1, true)
+      resolveLoad({ chats: [chatPayload(1).chat], activeRunChatIds: [] })
+      await pending
+
+      expect(store.activeRunChatIds.has(1)).toBe(true)
+    })
+
+    it('lets a later list load clear a walked-away generating mark', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat],
+        activeRunChatIds: [],
+      })
+      await store.loadChats()
+
+      store.markChatGenerating(1, true)
+      expect(store.activeRunChatIds.has(1)).toBe(true)
+
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat],
+        activeRunChatIds: [],
+      })
+      await store.loadChats()
+
+      expect(store.activeRunChatIds.has(1)).toBe(false)
+    })
+
+    it('keeps a live clear when a stale in-flight snapshot still lists the run', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat],
+        activeRunChatIds: [1],
+      })
+      await store.loadChats()
+
+      let resolveLoad: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveLoad = resolve
+        })
+      )
+      const pending = store.loadChats()
+
+      store.markChatGenerating(1, false)
+      resolveLoad({ chats: [chatPayload(1).chat], activeRunChatIds: [1] })
+      await pending
+
       expect(store.activeRunChatIds.has(1)).toBe(false)
     })
 

@@ -12,7 +12,7 @@ import { login, loginViaApi, openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
 import { getRuntimeFeatures } from '../helpers/features'
-import { ChatHelper } from '../helpers/chat'
+import { ChatHelper, nameActiveChat, openChatManager } from '../helpers/chat'
 import { FIXTURE_PATHS } from '../config/test-data'
 import { TIMEOUTS, getApiUrl } from '../config/config'
 
@@ -126,25 +126,11 @@ test.describe('@ci Navigation journeys', () => {
     await test.step('History › Show all opens All chats', async () => {
       await openApp(page)
       await chat.startNewChat()
-      await page.locator(NAV.sidebarV2ChatNav).click()
-      const modal = page.locator(NAV.modalChatManager)
-      await expect(modal).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      await modal.locator(NAV.chatManagerListRows).waitFor({
-        state: 'visible',
-        timeout: TIMEOUTS.STANDARD,
-      })
-      const newestRow = modal.locator(NAV.chatV2Row).first()
-      await expect(newestRow).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      // The manager list re-renders as chats persist; hover waits for
-      // layout stability and times out when the row detaches. The menu
-      // button is force-clicked (same as chat-manage) so a mid-refresh
-      // does not stall the journey.
-      await newestRow.locator(NAV.chatV2RowMenu).click({ force: true })
-      await page.locator(NAV.chatV2Rename).click()
-      const promptInput = page.locator(selectors.dialog.promptInput)
-      await promptInput.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-      await promptInput.fill(title)
-      await page.locator(selectors.dialog.confirmBtn).click()
+      // Name the chat through the API. The journey is find-and-open, not
+      // rename; the row-menu click races the sheet's loadChats() refresh
+      // (detached btn-chat-v2-row-menu, then a title that never appears).
+      await nameActiveChat(page, title)
+      const modal = await openChatManager(page)
       await expect(modal.locator(NAV.chatV2Row).filter({ hasText: title })).toHaveCount(1, {
         timeout: TIMEOUTS.STANDARD,
       })
