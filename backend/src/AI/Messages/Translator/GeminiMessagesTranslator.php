@@ -202,12 +202,17 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                 if (isset($part['functionCall']) && \is_array($part['functionCall'])) {
                     $fc = $part['functionCall'];
                     $args = $fc['args'] ?? [];
-                    $content[] = [
+                    $block = [
                         'type' => 'tool_use',
                         'id' => 'toolu_gemini_'.$i,
                         'name' => (string) ($fc['name'] ?? 'tool'),
                         'input' => \is_array($args) ? $args : [],
                     ];
+                    $sig = self::thoughtSignatureFromPart($part, $fc);
+                    if (null !== $sig) {
+                        $block['thought_signature'] = $sig;
+                    }
+                    $content[] = $block;
                 }
             }
         }
@@ -296,12 +301,15 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                         $parts[] = $part;
                     }
                 } elseif ('tool_use' === $type) {
-                    $parts[] = [
-                        'functionCall' => [
-                            'name' => (string) ($block['name'] ?? 'tool'),
-                            'args' => \is_array($block['input'] ?? null) ? $block['input'] : new \stdClass(),
-                        ],
+                    $call = [
+                        'name' => (string) ($block['name'] ?? 'tool'),
+                        'args' => \is_array($block['input'] ?? null) ? $block['input'] : new \stdClass(),
                     ];
+                    $sig = $block['thought_signature'] ?? $block['thoughtSignature'] ?? null;
+                    if (\is_string($sig) && '' !== $sig) {
+                        $call['thoughtSignature'] = $sig;
+                    }
+                    $parts[] = ['functionCall' => $call];
                     $geminiRole = 'model';
                 } elseif ('tool_result' === $type) {
                     $result = $block['content'] ?? '';
@@ -359,6 +367,29 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
 
         if ('url' === $sourceType && \is_string($source['url'] ?? null) && '' !== $source['url']) {
             return ['fileData' => ['mimeType' => $mimeType, 'fileUri' => $source['url']]];
+        }
+
+        return null;
+    }
+
+    /**
+     * Gemini 3.x requires the thought signature from a functionCall to be
+     * replayed on the next generateContent, or the follow-up 400s.
+     *
+     * @param array<string, mixed> $part
+     * @param array<string, mixed> $functionCall
+     */
+    private static function thoughtSignatureFromPart(array $part, array $functionCall): ?string
+    {
+        foreach ([
+            $functionCall['thoughtSignature'] ?? null,
+            $functionCall['thought_signature'] ?? null,
+            $part['thoughtSignature'] ?? null,
+            $part['thought_signature'] ?? null,
+        ] as $sig) {
+            if (\is_string($sig) && '' !== $sig) {
+                return $sig;
+            }
         }
 
         return null;
@@ -525,17 +556,22 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                         $fc = $part['functionCall'];
                         $args = $fc['args'] ?? [];
                         $json = json_encode(\is_array($args) ? $args : [], \JSON_THROW_ON_ERROR);
+                        $contentBlock = [
+                            'type' => 'tool_use',
+                            'id' => 'toolu_gemini_'.$toolIndex++,
+                            'name' => (string) ($fc['name'] ?? 'tool'),
+                            'input' => [],
+                        ];
+                        $sig = self::thoughtSignatureFromPart($part, $fc);
+                        if (null !== $sig) {
+                            $contentBlock['thought_signature'] = $sig;
+                        }
                         $emit([
                             'event' => 'content_block_start',
                             'data' => [
                                 'type' => 'content_block_start',
                                 'index' => $idx,
-                                'content_block' => [
-                                    'type' => 'tool_use',
-                                    'id' => 'toolu_gemini_'.$toolIndex++,
-                                    'name' => (string) ($fc['name'] ?? 'tool'),
-                                    'input' => [],
-                                ],
+                                'content_block' => $contentBlock,
                             ],
                         ]);
                         $emit([

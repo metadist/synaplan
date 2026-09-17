@@ -157,6 +157,78 @@ final class MessagesContextInjectorTest extends TestCase
         $this->assertSame('project-chat-y', $result['body']['model']);
     }
 
+    public function testDesktopRagGroupSkipsCacheAndSearchesLatestUserText(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(3);
+
+        $queries = [];
+        $memory = $this->createMock(UserMemoryService::class);
+        $memory->expects($this->exactly(2))->method('embedUserQuery')->willReturnCallback(
+            function (int $userId, string $query) use (&$queries): array {
+                $this->assertSame(3, $userId);
+                $queries[] = $query;
+
+                return [
+                    'embedding' => [0.1, 0.2],
+                    'model_id' => 1,
+                    'model_name' => 'bge',
+                    'provider' => 'ollama',
+                ];
+            }
+        );
+        $memory->method('embedQueryForMemorySearch')->willReturn([
+            'embedding' => [0.1, 0.2],
+            'model_id' => 1,
+            'model_name' => 'bge',
+            'provider' => 'ollama',
+        ]);
+        $memory->method('searchMemoriesByVector')->willReturn([]);
+
+        $vector = $this->createMock(VectorSearchService::class);
+        $vector->expects($this->exactly(2))->method('semanticSearchByVector')->willReturn([]);
+
+        $cache = $this->createMock(CacheItemPoolInterface::class);
+        $cache->expects($this->never())->method('getItem');
+
+        $injector = new MessagesContextInjector(
+            $memory,
+            $vector,
+            new KnowledgeContextFormatter(),
+            $cache,
+            new NullLogger(),
+            $this->createFeedbackConfig(),
+        );
+
+        $desktop = new DesktopTurnOptions(null, 'DESKTOP:personal');
+        $injector->inject(
+            [
+                'messages' => [['role' => 'user', 'content' => 'I uploaded the invoice']],
+            ],
+            $user,
+            'sess-desktop-live',
+            null,
+            $desktop,
+        );
+        $injector->inject(
+            [
+                'messages' => [
+                    ['role' => 'user', 'content' => 'I uploaded the invoice'],
+                    ['role' => 'assistant', 'content' => 'Ready.'],
+                    ['role' => 'user', 'content' => 'What is the invoice total?'],
+                ],
+            ],
+            $user,
+            'sess-desktop-live',
+            null,
+            $desktop,
+        );
+
+        $this->assertSame('I uploaded the invoice', $queries[0]);
+        $this->assertStringContainsString('I uploaded the invoice', $queries[1]);
+        $this->assertStringContainsString('What is the invoice total?', $queries[1]);
+    }
+
     public function testDesktopRagWithoutAmbientMemoriesSkipsMemorySearch(): void
     {
         $user = $this->createMock(User::class);

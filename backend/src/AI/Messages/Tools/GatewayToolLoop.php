@@ -59,6 +59,9 @@ final readonly class GatewayToolLoop
     private const MAX_TOOLS_PER_TURN = 16;
     private const WALL_CLOCK_SECONDS = 240;
     private const PING_INTERVAL_SECONDS = 15;
+    private const WEB_SEARCH_WRAP_AFTER = 2;
+    private const WRAP_UP_AFTER_SEARCH = 'You already have the web search results. Answer the user now in one or two sentences. Do not search again.';
+    private const EMPTY_SEARCH_RECOVERY = 'I looked this up but could not turn the results into an answer. Please try again, or ask in a different way.';
 
     public function __construct(
         private McpToolCatalogAdapter $catalogAdapter,
@@ -181,6 +184,7 @@ final readonly class GatewayToolLoop
         $lastHeaders = [];
         $lastStatus = 200;
         $lastBody = null;
+        $webSearchRounds = 0;
 
         for ($i = 0; $i < $maxIterations; ++$i) {
             if (microtime(true) > $deadline) {
@@ -209,7 +213,7 @@ final readonly class GatewayToolLoop
                 return [
                     'status' => $lastStatus,
                     'headers' => $lastHeaders,
-                    'body' => $this->withUsage($lastBody, $totalUsage),
+                    'body' => $this->withUsage($this->withEmptySearchRecovery($lastBody, $webSearchRounds), $totalUsage),
                     'usage' => $totalUsage->withStopReason($stopReason),
                     'iterations' => $iterations,
                 ];
@@ -236,8 +240,12 @@ final readonly class GatewayToolLoop
                 break;
             }
 
+            $webSearchRounds += $this->countWebSearches($partition['ours']);
             $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, null, $this->assistantFrom($translatorContext));
             $body = $this->appendToolTurn($body, $content, $toolResults);
+            if ($webSearchRounds >= self::WEB_SEARCH_WRAP_AFTER) {
+                $body = $this->forceWrapUp($body);
+            }
         }
 
         if (!\is_array($lastBody)) {
@@ -249,6 +257,10 @@ final readonly class GatewayToolLoop
                 ],
             ];
             $lastStatus = 502;
+        }
+
+        if ($lastStatus < 400) {
+            $lastBody = $this->withEmptySearchRecovery($lastBody, $webSearchRounds);
         }
 
         return [
@@ -289,6 +301,7 @@ final readonly class GatewayToolLoop
         $deadline = microtime(true) + self::WALL_CLOCK_SECONDS;
         $totalUsage = new MessagesUsage();
         $suppressNames = array_keys($snapshot['dispatch']);
+        $webSearchRounds = 0;
 
         for ($i = 0; $i < $maxIterations; ++$i) {
             if (microtime(true) > $deadline) {
@@ -300,15 +313,16 @@ final readonly class GatewayToolLoop
             $totalUsage = $this->sumUsage($totalUsage, $turn['usage']);
 
             if ($turn['error']) {
-                $emitter->ensureClosed();
+                $this->finishStream($emitter, $turn);
 
                 return $totalUsage;
             }
 
             if ('tool_use' !== $turn['stop_reason']) {
-                // Final turn was already relayed with isFinalTurn=true once we
-                // know — collectStreamedTurn uses a two-phase approach.
-                $emitter->ensureClosed();
+                if ($webSearchRounds > 0 && !$emitter->hasEmittedText()) {
+                    $emitter->emitAssistantText(self::EMPTY_SEARCH_RECOVERY);
+                }
+                $this->finishStream($emitter, $turn);
 
                 return $totalUsage->withStopReason($turn['stop_reason']);
             }
@@ -317,11 +331,12 @@ final readonly class GatewayToolLoop
             if ([] !== $partition['client'] || [] === $partition['ours']) {
                 // Client owns remaining tools — already streamed (suppress list
                 // only hides ours). Close the message.
-                $emitter->ensureClosed();
+                $this->finishStream($emitter, $turn);
 
                 return $totalUsage->withStopReason('tool_use');
             }
 
+            $webSearchRounds += $this->countWebSearches($partition['ours']);
             $toolResults = $this->executeOurs(
                 $partition['ours'],
                 $snapshot['dispatch'],
@@ -332,8 +347,14 @@ final readonly class GatewayToolLoop
                 assistant: $this->assistantFrom($translatorContext),
             );
             $body = $this->appendToolTurn($body, $turn['content'], $toolResults);
+            if ($webSearchRounds >= self::WEB_SEARCH_WRAP_AFTER) {
+                $body = $this->forceWrapUp($body);
+            }
         }
 
+        if ($webSearchRounds > 0 && !$emitter->hasEmittedText()) {
+            $emitter->emitAssistantText(self::EMPTY_SEARCH_RECOVERY);
+        }
         $emitter->ensureClosed();
 
         return $totalUsage;
@@ -353,7 +374,8 @@ final readonly class GatewayToolLoop
      *     content: list<array<string, mixed>>,
      *     stop_reason: string|null,
      *     usage: MessagesUsage,
-     *     error: bool
+     *     error: bool,
+     *     held_stop: array{event: string, data: array<string, mixed>}|null
      * }
      */
     private function collectStreamedTurn(
@@ -513,7 +535,13 @@ final readonly class GatewayToolLoop
             }
         }
 
+        $heldStop = null;
         foreach ($tail as $item) {
+            $type = (string) ($item['data']['type'] ?? $item['event']);
+            if ('message_stop' === $type) {
+                $heldStop = $item;
+                continue;
+            }
             $emitter->relay(
                 $item['event'],
                 $item['data'],
@@ -534,6 +562,7 @@ final readonly class GatewayToolLoop
                 stopReason: $stopReason,
             ),
             'error' => $error,
+            'held_stop' => $heldStop,
         ];
     }
 
@@ -835,6 +864,111 @@ final readonly class GatewayToolLoop
     }
 
     /**
+     * @param array{held_stop?: array{event: string, data: array<string, mixed>}|null} $turn
+     */
+    private function finishStream(MessagesEventEmitter $emitter, array $turn): void
+    {
+        $held = $turn['held_stop'] ?? null;
+        if (\is_array($held)) {
+            $emitter->relay((string) $held['event'], $held['data'], isFinalTurn: true);
+        }
+        $emitter->ensureClosed();
+    }
+
+    /**
+     * @param list<array<string, mixed>> $ours
+     */
+    private function countWebSearches(array $ours): int
+    {
+        $n = 0;
+        foreach ($ours as $block) {
+            if (WebSearchTool::NAME === ($block['name'] ?? '')) {
+                ++$n;
+            }
+        }
+
+        return $n;
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function forceWrapUp(array $requestBody): array
+    {
+        $requestBody['tool_choice'] = ['type' => 'none'];
+        $messages = $requestBody['messages'] ?? [];
+        if (!\is_array($messages)) {
+            $messages = [];
+        }
+        $messages[] = ['role' => 'user', 'content' => self::WRAP_UP_AFTER_SEARCH];
+        $requestBody['messages'] = $messages;
+
+        return $requestBody;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     *
+     * @return array<string, mixed>
+     */
+    private function withEmptySearchRecovery(array $body, int $webSearchRounds): array
+    {
+        if ($webSearchRounds < 1) {
+            return $body;
+        }
+        $content = $body['content'] ?? [];
+        if (!\is_array($content)) {
+            $content = [];
+        }
+        if ('' !== $this->assistantText($content)) {
+            return $body;
+        }
+        $body['content'] = [['type' => 'text', 'text' => self::EMPTY_SEARCH_RECOVERY]];
+        $body['stop_reason'] = 'end_turn';
+
+        return $body;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $content
+     */
+    private function assistantText(array $content): string
+    {
+        $parts = [];
+        foreach ($content as $block) {
+            if ('text' === ($block['type'] ?? '') && isset($block['text'])) {
+                $parts[] = (string) $block['text'];
+            }
+        }
+
+        return trim(implode('', $parts));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $content
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function dropEmptyThinking(array $content): array
+    {
+        $out = [];
+        foreach ($content as $block) {
+            if ('thinking' === ($block['type'] ?? '')) {
+                $text = (string) ($block['thinking'] ?? $block['text'] ?? '');
+                if ('' === trim($text)) {
+                    continue;
+                }
+                $block['thinking'] = $text;
+            }
+            $out[] = $block;
+        }
+
+        return $out;
+    }
+
+    /**
      * @param array<string, mixed>       $requestBody
      * @param list<array<string, mixed>> $assistantContent
      * @param list<array<string, mixed>> $toolResults
@@ -850,7 +984,7 @@ final readonly class GatewayToolLoop
 
         $messages[] = [
             'role' => 'assistant',
-            'content' => $assistantContent,
+            'content' => $this->dropEmptyThinking($assistantContent),
         ];
         $messages[] = [
             'role' => 'user',

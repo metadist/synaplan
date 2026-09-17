@@ -173,7 +173,16 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         ];
 
         if (isset($requestBody['max_tokens'])) {
-            $payload['max_tokens'] = (int) $requestBody['max_tokens'];
+            $max = (int) $requestBody['max_tokens'];
+            $model = (string) $payload['model'];
+            // Anthropic clients always send `max_tokens`. Reasoning models on
+            // Chat Completions reject that name (GPT-6 Astra: "Use
+            // max_completion_tokens instead").
+            if (self::usesCompletionTokens($model)) {
+                $payload['max_completion_tokens'] = $max;
+            } else {
+                $payload['max_tokens'] = $max;
+            }
         }
         if (isset($requestBody['temperature'])) {
             $payload['temperature'] = $requestBody['temperature'];
@@ -212,6 +221,26 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         }
 
         return $payload;
+    }
+
+    /**
+     * Reasoning models (o-series, gpt-5+, gpt-6) reject `max_tokens` on
+     * Chat Completions. Accepts a bare model id or a catalog key
+     * (`openai:gpt-6-astra:chat`).
+     */
+    public static function usesCompletionTokens(string $model): bool
+    {
+        $model = strtolower($model);
+        if (str_contains($model, ':')) {
+            $parts = explode(':', $model);
+            $model = $parts[1] ?? $model;
+        }
+
+        return str_starts_with($model, 'o1')
+            || str_starts_with($model, 'o3')
+            || str_starts_with($model, 'o4')
+            || str_starts_with($model, 'gpt-5')
+            || str_starts_with($model, 'gpt-6');
     }
 
     /**
