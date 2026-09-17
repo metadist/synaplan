@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8c86cc96fde7293ff01febc0c856716a",
+    "content-hash": "702298fc555661e01b39e8f86449ae3f",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -2759,16 +2759,16 @@
         },
         {
             "name": "doctrine/orm",
-            "version": "3.7.0",
+            "version": "3.7.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/orm.git",
-                "reference": "f25c5e5385d3a0bca2dc364d556d3b83a06559ed"
+                "reference": "037807a39697890dcede8b766c5efe8a1b4855fe"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/orm/zipball/f25c5e5385d3a0bca2dc364d556d3b83a06559ed",
-                "reference": "f25c5e5385d3a0bca2dc364d556d3b83a06559ed",
+                "url": "https://api.github.com/repos/doctrine/orm/zipball/037807a39697890dcede8b766c5efe8a1b4855fe",
+                "reference": "037807a39697890dcede8b766c5efe8a1b4855fe",
                 "shasum": ""
             },
             "require": {
@@ -2843,9 +2843,9 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/orm/issues",
-                "source": "https://github.com/doctrine/orm/tree/3.7.0"
+                "source": "https://github.com/doctrine/orm/tree/3.7.1"
             },
-            "time": "2026-09-07T19:35:17+00:00"
+            "time": "2026-09-14T05:45:59+00:00"
         },
         {
             "name": "doctrine/persistence",
