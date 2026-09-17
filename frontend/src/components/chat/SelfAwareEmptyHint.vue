@@ -1,13 +1,12 @@
 <template>
-  <p v-if="visible" class="txt-secondary mt-2" data-testid="self-aware-empty-hint">
-    <span>{{ lead }}</span>
+  <p v-if="visible" class="text-center txt-secondary" data-testid="self-aware-empty-hint">
     <button
       type="button"
-      class="underline txt-brand ml-1"
+      class="underline txt-brand"
       data-testid="btn-self-aware-empty-hint"
       @click="emit('ask', question)"
     >
-      {{ action }}
+      {{ $t('companionLinks.ask') }}
     </button>
   </p>
 </template>
@@ -27,21 +26,5 @@ const configStore = useConfigStore()
 const incognitoStore = useIncognitoStore()
 
 const visible = computed(() => configStore.features.selfAware && !incognitoStore.active)
-const question = computed(() => t('selfAware.emptyHintQuestion'))
-
-const splitHint = computed(() => {
-  const hint = t('selfAware.emptyHint')
-  const idx = hint.lastIndexOf('?')
-  if (idx === -1) {
-    return { lead: hint, action: question.value }
-  }
-  const action = hint.slice(idx + 1).trim()
-  return {
-    lead: hint.slice(0, idx + 1).trimEnd(),
-    action: action || question.value,
-  }
-})
-
-const lead = computed(() => splitHint.value.lead)
-const action = computed(() => splitHint.value.action)
+const question = computed(() => t('selfAware.examplePrompt'))
 </script>

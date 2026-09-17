@@ -284,12 +284,21 @@
       "ariaLabel": "{title} in der Dokumentation öffnen"
     }
   },
-  "examplePrompts": {
-    "heading": "Probiere eines davon",
-    "items": {
-      "poemMp3": "Schreibe ein Gedicht über eine Katze und wandle es in eine MP3 um.",
-      "everglades": "Schreibe einen Artikel über die Everglades in Florida und lege ihn als Word-Dokument zum Download an.",
-      "cabinImage": "Erstelle ein Bild einer gemütlichen Berghütte im Sonnenuntergang."
+  "companionLinks": {
+    "tagline": "Synaplan — denk frei",
+    "ask": "… oder sag mir, was du kannst!",
+    "opensInNewTab": "Öffnet in einem neuen Tab",
+    "desktop": {
+      "title": "Desktop-Client",
+      "blurb": "Forschung bleibt lokal — Agenten arbeiten überall."
+    },
+    "mobile": {
+      "title": "Mobile Apps",
+      "blurb": "Bring deine Nutzer unterwegs mit — frei konfigurierbar."
+    },
+    "outlook": {
+      "title": "Outlook-Add-in",
+      "blurb": "Weil geschlossene Systeme trotzdem lokale Dokumente brauchen."
     }
   },
   "marketingNews": {
@@ -783,7 +792,7 @@
   },
   "chatInput": {
     "attach": "Anhängen",
-    "placeholder": "Schreibe deine Nachricht hier...",
+    "placeholder": "Schreibe deine Nachricht...",
     "placeholderShort": "Nachricht...",
     "provider": "Anbieter",
     "model": "Modell",

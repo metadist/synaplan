@@ -284,12 +284,21 @@
       "ariaLabel": "Open {title} in the documentation"
     }
   },
-  "examplePrompts": {
-    "heading": "Try one of these",
-    "items": {
-      "poemMp3": "Create a poem about a cat and convert it into an MP3.",
-      "everglades": "Write an article about the Florida Everglades and put it into a Word document for download.",
-      "cabinImage": "Create an image of a cozy mountain cabin at sunset."
+  "companionLinks": {
+    "tagline": "Synaplan — think free",
+    "ask": "… or tell me what you can do!",
+    "opensInNewTab": "Opens in a new tab",
+    "desktop": {
+      "title": "Desktop Client",
+      "blurb": "Keep your research local, employ Agents anywhere."
+    },
+    "mobile": {
+      "title": "Mobile Apps",
+      "blurb": "Get your users on the road, freely configurable."
+    },
+    "outlook": {
+      "title": "Outlook add-in",
+      "blurb": "Because closed systems should have local documents."
     }
   },
   "marketingNews": {

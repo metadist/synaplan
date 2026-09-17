@@ -283,12 +283,21 @@
       "ariaLabel": "Abrir {title} en la documentación"
     }
   },
-  "examplePrompts": {
-    "heading": "Prueba una de estas",
-    "items": {
-      "poemMp3": "Crea un poema sobre un gato y conviértelo en un MP3.",
-      "everglades": "Escribe un artículo sobre los Everglades de Florida y ponlo en un documento de Word para descargar.",
-      "cabinImage": "Crea una imagen de una acogedora cabaña de montaña al atardecer."
+  "companionLinks": {
+    "tagline": "Synaplan — piensa libre",
+    "ask": "… o dime qué puedes hacer!",
+    "opensInNewTab": "Se abre en una pestaña nueva",
+    "desktop": {
+      "title": "Cliente de escritorio",
+      "blurb": "Mantén tu investigación en local, emplea agentes en cualquier lugar."
+    },
+    "mobile": {
+      "title": "Aplicaciones móviles",
+      "blurb": "Lleva a tus usuarios sobre la marcha, configurable con libertad."
+    },
+    "outlook": {
+      "title": "Complemento de Outlook",
+      "blurb": "Porque los sistemas cerrados también deberían tener documentos locales."
     }
   },
   "marketingNews": {
