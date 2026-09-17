@@ -129,7 +129,14 @@ const consumeConsentResult = async () => {
       success(t(`config.connections.providers.${provider}.connected`))
     } else {
       const reason = typeof route.query.reason === 'string' ? route.query.reason : 'unknown'
-      const known = ['access_denied', 'missing_code', 'exchange_failed', 'invalid_state']
+      const known = [
+        'access_denied',
+        'missing_code',
+        'exchange_failed',
+        'invalid_state',
+        'personal_account',
+        'admin_consent',
+      ]
       showError(
         t(
           known.includes(reason)
@@ -272,6 +279,9 @@ onMounted(async () => {
             <p class="text-xs txt-secondary flex items-start gap-1">
               <Icon icon="heroicons:globe-alt" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
               {{ $t('config.connections.providers.m365.hosting') }}
+            </p>
+            <p class="text-sm txt-secondary leading-relaxed" data-testid="m365-preconditions">
+              {{ $t('config.connections.providers.m365.preconditions') }}
             </p>
             <p
               v-if="m365Connected"

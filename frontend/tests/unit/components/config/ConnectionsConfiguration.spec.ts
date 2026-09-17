@@ -251,6 +251,29 @@ describe('ConnectionsConfiguration', () => {
     expect(mockReplace).toHaveBeenCalledWith({ query: {} })
   })
 
+  it('names a personal Microsoft account instead of calling it a cancellation', async () => {
+    route.query = { m365: 'error', reason: 'personal_account' }
+    await mountPage()
+
+    expect(mockError).toHaveBeenCalledWith(expect.stringContaining('personal account'))
+  })
+
+  it('names missing admin consent instead of calling it a cancellation', async () => {
+    route.query = { m365: 'error', reason: 'admin_consent' }
+    await mountPage()
+
+    expect(mockError).toHaveBeenCalledWith(expect.stringContaining('administrator'))
+  })
+
+  it('states Microsoft account preconditions before the user leaves the page', async () => {
+    mockStatus.mockResolvedValue({ available: true, redirectUri: 'https://app/callback' })
+    const wrapper = await mountPage()
+
+    expect(wrapper.get('[data-testid="m365-preconditions"]').text()).toContain(
+      'Use a work or school account'
+    )
+  })
+
   it('explains why Dropbox cannot be connected yet, and points admins at the setting', async () => {
     const wrapper = await mountPage()
     expect(wrapper.find('[data-testid="btn-connect-dropbox"]').exists()).toBe(false)

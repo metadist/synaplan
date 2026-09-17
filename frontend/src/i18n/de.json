@@ -2393,11 +2393,14 @@
           "unavailable": "Noch nicht verfügbar – Microsoft 365 muss für diese Installation einmalig eingerichtet werden.",
           "adminLink": "In den Systemeinstellungen einrichten.",
           "askAdmin": "Bitte eine Administratorin oder einen Administrator, es zu aktivieren.",
+          "preconditions": "Nutze ein Geschäfts- oder Schulkonto. Ein privates Microsoft-Konto kann sich nicht verbinden, solange diese Installation keine privaten Konten zulässt. Deine Organisation muss diese App möglicherweise zuerst durch eine Administratorin oder einen Administrator genehmigen.",
           "errors": {
             "access_denied": "Du hast die Microsoft-Anmeldung abgebrochen, es wurde nichts verbunden.",
             "missing_code": "Microsoft hat eine unvollständige Antwort geschickt. Bitte starte die Verbindung erneut.",
             "exchange_failed": "Microsoft hat die Anmeldung akzeptiert, aber das Token konnte nicht abgeholt werden. Prüfe den Client Secret in den Systemeinstellungen und versuche es erneut.",
             "invalid_state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Tab gestartet. Bitte versuche es erneut.",
+            "personal_account": "Microsoft hat diese Anmeldung abgelehnt, weil es ein privates Konto ist. Nutze ein Geschäfts- oder Schulkonto, oder lass private Konten in der App-Registrierung zu.",
+            "admin_consent": "Microsoft braucht in deiner Organisation eine Administratorin oder einen Administrator, der diese App zuerst genehmigt. Es wurde nichts verbunden.",
             "unknown": "Microsoft 365 konnte nicht verbunden werden. Bitte versuche es erneut."
           },
           "hosting": "Deine Mails bleiben bei Microsoft, einem Cloud-Anbieter mit Sitz in den USA."

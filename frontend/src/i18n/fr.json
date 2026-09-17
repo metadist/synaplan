@@ -2238,11 +2238,14 @@
           "unavailable": "Pas encore disponible — Microsoft 365 doit être configuré une fois pour cette installation.",
           "adminLink": "Configurez-le dans les paramètres système.",
           "askAdmin": "Demandez à un administrateur de l’activer.",
+          "preconditions": "Utilisez un compte professionnel ou scolaire. Un compte Microsoft personnel ne peut pas se connecter tant que cette installation n’autorise pas les comptes personnels. Votre organisation peut devoir faire approuver cette application par un administrateur d’abord.",
           "errors": {
             "access_denied": "Vous avez annulé la connexion Microsoft, rien n’a donc été connecté.",
             "missing_code": "Microsoft a envoyé une réponse incomplète. Veuillez relancer la connexion.",
             "exchange_failed": "Microsoft a accepté la connexion mais le jeton n’a pas pu être récupéré. Vérifiez le secret client dans les paramètres système, puis réessayez.",
             "invalid_state": "La connexion a pris trop de temps ou a été lancée dans un autre onglet. Veuillez réessayer.",
+            "personal_account": "Microsoft a refusé cette connexion car il s’agit d’un compte personnel. Utilisez un compte professionnel ou scolaire, ou demandez d’autoriser les comptes personnels dans l’enregistrement de l’application.",
+            "admin_consent": "Microsoft a besoin qu’un administrateur de votre organisation approuve cette application avant la connexion. Rien n’a été connecté.",
             "unknown": "Microsoft 365 n’a pas pu être connecté. Veuillez réessayer."
           },
           "hosting": "Vos e-mails restent chez Microsoft, un fournisseur cloud basé aux États-Unis."
