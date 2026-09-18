@@ -24,6 +24,7 @@ vi.mock('@/services/authService', () => ({
 
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn(),
+  getConfigSync: () => ({ features: {} }),
 }))
 
 const apiFile = {
