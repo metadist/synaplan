@@ -16,6 +16,7 @@ const i18n = createI18n({
           hint: 'Questions you ask still use these files.',
           attach: 'Use {name} in the next message',
           attached: '{name} will be sent with your next message',
+          count: '{count} file | {count} files',
         },
       },
     },
@@ -49,15 +50,26 @@ describe('ConversationFilesBar', () => {
     expect(wrapper.find('[data-testid="conversation-files-bar"]').exists()).toBe(false)
   })
 
-  it('lists conversation files and emits attach on click', async () => {
+  it('shows a compact toggle with the file count', () => {
     const wrapper = mountBar()
 
-    expect(wrapper.get('[data-testid="conversation-files-bar"]').text()).toContain(
-      'Files in this chat'
-    )
-    expect(wrapper.get('[data-testid="conversation-file-chip"]').text()).toContain('contract.pdf')
+    const toggle = wrapper.get('[data-testid="conversation-files-toggle"]')
+    expect(toggle.text()).toContain('1')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+  })
 
-    await wrapper.get('[data-testid="conversation-file-chip"]').trigger('click')
+  it('reveals the files on toggle and emits attach on click', async () => {
+    const wrapper = mountBar()
+
+    await wrapper.get('[data-testid="conversation-files-toggle"]').trigger('click')
+
+    const popover = wrapper.get('[data-testid="conversation-files-popover"]')
+    expect(popover.text()).toContain('Files in this chat')
+
+    const chip = wrapper.get('[data-testid="conversation-file-chip"]')
+    expect(chip.text()).toContain('contract.pdf')
+
+    await chip.trigger('click')
 
     expect(wrapper.emitted('attach')?.[0]).toEqual([contract])
   })
@@ -65,6 +77,7 @@ describe('ConversationFilesBar', () => {
   it('does not emit attach when the surface is read-only', async () => {
     const wrapper = mountBar([contract], false)
 
+    await wrapper.get('[data-testid="conversation-files-toggle"]').trigger('click')
     await wrapper.get('[data-testid="conversation-file-chip"]').trigger('click')
 
     expect(wrapper.emitted('attach')).toBeUndefined()

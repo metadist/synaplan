@@ -400,7 +400,8 @@
       "title": "Dateien in diesem Chat",
       "hint": "Deine nächsten Fragen nutzen weiter diese Dateien.",
       "attach": "{name} in die nächste Nachricht übernehmen",
-      "attached": "{name} wird mit der nächsten Nachricht mitgeschickt"
+      "attached": "{name} wird mit der nächsten Nachricht mitgeschickt",
+      "count": "{count} Datei | {count} Dateien"
     },
     "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
     "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht.",
