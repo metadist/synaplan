@@ -222,7 +222,7 @@ mobile support a narrow, reviewable compatibility layer:
 ## Essential Commands
 
 ```bash
-docker compose up -d / down            # Start/stop services
+make up / docker compose down          # Start (status page first) / stop services
 make ci-local                          # Unit/static gate (lint, phpstan, tests, vue-tsc)
 make test-e2e                          # Playwright @ci — required before push
 make build                             # Frontend app + widget

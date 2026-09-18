@@ -5,8 +5,10 @@ Commands and workflows for developing Synaplan.
 ## Service Management
 
 ```bash
-# Start all services
-docker compose up -d
+# Start all services (status page on :5173 first, then remaining images)
+make up
+# equivalent: ./scripts/compose-up.sh
+# A plain `docker compose up -d` waits for every image pull before :5173 answers.
 
 # Stop all services
 docker compose down

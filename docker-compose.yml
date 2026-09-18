@@ -6,7 +6,11 @@
 # - Download size: ~3 GB
 #
 # Usage:
-#   docker compose up -d
+#   make up
+#   # or: ./scripts/compose-up.sh
+# Starts the boot-status page on :5173 first, then pulls/starts the rest.
+# A plain `docker compose up -d` still works but waits for every image pull
+# before :5173 answers.
 #
 # To add local AI (Ollama + the bge-m3 embedding model, ~1 GB extra):
 #   COMPOSE_PROFILES=local-ai docker compose up -d

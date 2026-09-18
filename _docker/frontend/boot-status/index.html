@@ -165,9 +165,9 @@
 
   <h1 id="headline">Synaplan is getting ready…</h1>
   <p class="lead" id="lead">
-    Everything runs on your machine, so the very first start has to download and
-    prepare a few things. You can watch each step below — this page switches to
-    the app automatically the moment it is ready.
+    This page is up first so you can watch the rest come online. Docker may
+    still be downloading other images. It switches to the app automatically
+    the moment everything is ready.
   </p>
 
   <div class="ready-banner" id="readyBanner">
@@ -445,7 +445,7 @@
         if (b.stop) state.append(document.createTextNode(' — switch off: '), kbd(b.stop))
       } else if (b.defaultOn) {
         row.classList.add('pending')
-        state.append(document.createTextNode('Starting with the stack — or stopped by you (that is fine, the feature just stays hidden)'))
+        state.append(document.createTextNode('Starting — Docker may still be downloading this image. The feature stays hidden until it is up.'))
       } else {
         state.append(document.createTextNode('Off — enable with '), kbd(b.start))
       }

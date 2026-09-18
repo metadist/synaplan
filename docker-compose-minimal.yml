@@ -14,7 +14,7 @@
 # These are tiny compared to the ~4GB Ollama/Whisper stack this file omits.
 #
 # Usage:
-#   docker compose -f docker-compose-minimal.yml up -d
+#   ./scripts/compose-up.sh -f docker-compose-minimal.yml
 #
 # To switch to standard install (with Ollama + Whisper):
 #   docker compose -f docker-compose-minimal.yml down

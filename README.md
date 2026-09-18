@@ -41,7 +41,7 @@ Or do exactly the same by hand:
 ```bash
 git clone https://github.com/metadist/synaplan.git
 cd synaplan
-docker compose up -d
+make up
 ```
 
 1. **Open <http://localhost:5173> immediately.** A live status screen appears within seconds and shows every boot step — database, backend, AI model download, interface — then switches to the app automatically the moment it is ready (first start: 5–15 minutes; every later start: seconds). It also lists which [optional building blocks](#lean-by-design-core-vs-optional-building-blocks) (Qdrant, Centrifugo, Collabora, …) this install is running and how to switch each on or off. The same notes print in `docker compose logs -f startup-notes`.
