@@ -1280,6 +1280,19 @@ const handleFilesSelected = async (selectedFiles: FileItem[]) => {
   success(`${selectedFiles.length} file(s) attached`)
 }
 
+const attachExistingFile = (file: { file_id: number; filename: string; file_type: string }) => {
+  if (uploadedFiles.value.some((f) => f.file_id === file.file_id)) {
+    return
+  }
+  uploadedFiles.value.push({
+    file_id: file.file_id,
+    filename: file.filename,
+    file_type: file.file_type,
+    processing: false,
+  })
+  success(t('chat.conversationFiles.attached', { name: file.filename }))
+}
+
 const handleMentionSelect = (file: FileItem) => {
   const alreadyAttached = uploadedFiles.value.some((f) => f.file_id === file.id)
   if (!alreadyAttached) {
@@ -1931,6 +1944,7 @@ const startDictation = async (): Promise<boolean> => {
 defineExpose<{
   textareaRef: Ref<InstanceType<typeof Textarea> | null>
   uploadFiles: (files: File[]) => Promise<void>
+  attachExistingFile: (file: { file_id: number; filename: string; file_type: string }) => void
   setInputText: (text: string) => void
   submitText: (text: string) => void
   startDictation: () => Promise<boolean>
@@ -1938,6 +1952,7 @@ defineExpose<{
 }>({
   textareaRef,
   uploadFiles,
+  attachExistingFile,
   setInputText,
   submitText,
   startDictation,

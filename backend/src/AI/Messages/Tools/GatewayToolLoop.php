@@ -193,6 +193,7 @@ final readonly class GatewayToolLoop
             }
 
             ++$iterations;
+            $body = $this->sanitizeRequestMessages($body);
             $result = $translator->complete($body, $context);
             $lastStatus = $result['status'];
             $lastHeaders = $result['headers'];
@@ -349,6 +350,7 @@ final readonly class GatewayToolLoop
             }
 
             $emitter->resetTurnMapping();
+            $body = $this->sanitizeRequestMessages($body);
             $canRecoverWrapUp = $this->alreadyWrapped($body) && $webSearchRounds > 0;
             $turn = $this->collectStreamedTurn(
                 $translator,
@@ -671,6 +673,11 @@ final readonly class GatewayToolLoop
             $name = (string) ($block['name'] ?? '');
             if (isset($dispatch[$name]) || $this->catalogAdapter->isOurs($name)) {
                 $ours[] = $block;
+            } elseif (AnthropicServerTools::isPassthroughServerToolName($name)) {
+                // Anthropic owns web_fetch / unreplaced web_search — not a
+                // client tool. Handing them to the desktop as `tool_use`
+                // produced unpaired `srvtoolu_*` replays.
+                continue;
             } else {
                 $client[] = $block;
             }
@@ -1238,6 +1245,25 @@ final readonly class GatewayToolLoop
     }
 
     /**
+     * Drop unpaired Anthropic server-tool uses from every assistant turn
+     * before the next upstream call.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function sanitizeRequestMessages(array $requestBody): array
+    {
+        $messages = $requestBody['messages'] ?? [];
+        if (!\is_array($messages)) {
+            return $requestBody;
+        }
+        $requestBody['messages'] = ServerToolReplay::sanitizeMessages($messages);
+
+        return $requestBody;
+    }
+
+    /**
      * @param array<string, mixed>       $requestBody
      * @param list<array<string, mixed>> $assistantContent
      * @param list<array<string, mixed>> $toolResults
@@ -1253,7 +1279,9 @@ final readonly class GatewayToolLoop
 
         $messages[] = [
             'role' => 'assistant',
-            'content' => $this->dropEmptyThinking($assistantContent),
+            'content' => ServerToolReplay::sanitizeAssistantContent(
+                $this->dropEmptyThinking($assistantContent),
+            ),
         ];
         $messages[] = [
             'role' => 'user',

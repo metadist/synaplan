@@ -352,6 +352,65 @@ class ConversationFileCatalogTest extends TestCase
         $this->assertSame('', $service->renderPromptContext([]));
     }
 
+    public function testAnalyzableForFollowUpPrefersUploadedDocumentsOverGeneratedImages(): void
+    {
+        $service = $this->catalog($this->repository([]));
+        $pdf = new ConversationFile(
+            'file:77',
+            'brief.pdf',
+            ConversationFile::CATEGORY_DOCUMENT,
+            ConversationFile::ORIGIN_UPLOADED,
+            $this->uploadDir.'/brief.pdf',
+            'brief.pdf',
+            77,
+            100,
+            'IN',
+            'Clause 1.',
+        );
+        $image = new ConversationFile(
+            'file:88',
+            'cat.png',
+            ConversationFile::CATEGORY_IMAGE,
+            ConversationFile::ORIGIN_GENERATED,
+            $this->uploadDir.'/cat.png',
+            'cat.png',
+            88,
+            200,
+            'OUT',
+        );
+
+        $picks = $service->analyzableForFollowUp([$image, $pdf]);
+        $this->assertSame(['file:77'], $this->references($picks));
+    }
+
+    public function testBuildKeepsDocumentWithExtractedTextWhenBytesAreGone(): void
+    {
+        $pdf = $this->file(77, 'missing.pdf', onDisk: false, messageId: 100);
+        $pdf->setFileText('Still extracted.');
+
+        $catalog = $this->catalog($this->repository([$pdf]))
+            ->build((new Message())->setUserId(7), [$this->threadMessage(100)], [], null, false);
+
+        $this->assertSame(['file:77'], $this->references($catalog));
+        $this->assertSame('Still extracted.', $catalog[0]->extractedText);
+    }
+
+    public function testBuildForChatUsesChatScopedLookup(): void
+    {
+        $pdf = $this->file(77, 'brief.pdf', messageId: 100);
+        $repository = $this->createMock(FileRepository::class);
+        $repository->method('findFilesByMessageIds')->willReturn([]);
+        $repository->expects($this->once())
+            ->method('findFilesByChatId')
+            ->with(7, 42, $this->anything())
+            ->willReturn([$pdf]);
+        $repository->method('findOneBy')->willReturn(null);
+
+        $catalog = $this->catalog($repository)->buildForChat(7, 42);
+
+        $this->assertSame(['file:77'], $this->references($catalog));
+    }
+
     /**
      * @param list<ConversationFile> $catalog
      *

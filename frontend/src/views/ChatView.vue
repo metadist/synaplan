@@ -326,6 +326,12 @@
           @always-allow="onChatApprovalAlwaysAllow"
         />
       </div>
+      <ConversationFilesBar
+        v-if="!needsProviderSetup && conversationFiles.length > 0"
+        :files="conversationFiles"
+        :can-attach="canComposeSharedChat"
+        @attach="attachConversationFile"
+      />
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
@@ -549,6 +555,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useApprovalsStore } from '@/stores/approvals'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
+import ConversationFilesBar from '@/components/chat/ConversationFilesBar.vue'
+import { useConversationFiles } from '@/composables/useConversationFiles'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
@@ -658,6 +666,18 @@ const { goToProviderSetup } = useFirstRunSetup()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
+const { files: conversationFiles } = useConversationFiles()
+
+const attachConversationFile = (file: { id: number | null; name: string; fileType: string }) => {
+  if (file.id === null) {
+    return
+  }
+  chatInputRef.value?.attachExistingFile({
+    file_id: file.id,
+    filename: file.name,
+    file_type: file.fileType,
+  })
+}
 const quoting = useMessageQuoting(chatContainer)
 const autoScroll = ref(true)
 // While streaming we pin the start of the answer to the top once it grows past

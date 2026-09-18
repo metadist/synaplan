@@ -401,6 +401,12 @@
       "share": "Partager le chat",
       "public": "Public"
     },
+    "conversationFiles": {
+      "title": "Fichiers de cette conversation",
+      "hint": "Vos prochaines questions utilisent encore ces fichiers.",
+      "attach": "Utiliser {name} dans le prochain message",
+      "attached": "{name} sera envoyé avec le prochain message"
+    },
     "fileOnlyDefaultMessage": "Veuillez examiner le fichier joint.",
     "voiceMessageDefaultMessage": "Veuillez répondre à mon message vocal.",
     "conversation": "conversation",

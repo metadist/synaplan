@@ -9,6 +9,8 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Service\Context\ContextCondenser;
 use App\Service\Context\ModelContextWindow;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileTypeResolver;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessagePreProcessor;
@@ -61,6 +63,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
         private ?ChatErrorPresenter $chatErrorPresenter = null,
         private ?TranslatorInterface $translator = null,
+        private ?ConversationFileCatalog $conversationFileCatalog = null,
     ) {
     }
 
@@ -89,11 +92,13 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $userPrompt = $message->getText();
 
-        $filesInfo = $this->getFilesInfo($message);
+        [$filesInfo, $fromConversation] = $this->resolveFiles($message, $thread);
 
         if ([] === $filesInfo) {
             $this->logger->error('FileAnalysisHandler: No file found', [
                 'message_id' => $message->getId(),
+                'chat_id' => $message->getChatId(),
+                'thread_count' => count($thread),
             ]);
 
             return [
@@ -102,7 +107,11 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             ];
         }
 
-        $this->logFilesInfo($message, $filesInfo, streaming: false);
+        if ($fromConversation) {
+            $this->notify($progressCallback, 'analyzing', $this->conversationProgressMessage($filesInfo));
+        }
+
+        $this->logFilesInfo($message, $filesInfo, streaming: false, fromConversation: $fromConversation);
 
         $route = $this->routeFiles($filesInfo);
 
@@ -180,11 +189,13 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $userPrompt = $message->getText();
 
-        $filesInfo = $this->getFilesInfo($message);
+        [$filesInfo, $fromConversation] = $this->resolveFiles($message, $thread);
 
         if ([] === $filesInfo) {
             $this->logger->error('FileAnalysisHandler: No file found (streaming)', [
                 'message_id' => $message->getId(),
+                'chat_id' => $message->getChatId(),
+                'thread_count' => count($thread),
             ]);
 
             $streamCallback('No file was provided for analysis. Please upload a file and try again.');
@@ -194,7 +205,11 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             ];
         }
 
-        $this->logFilesInfo($message, $filesInfo, streaming: true);
+        if ($fromConversation) {
+            $this->notify($progressCallback, 'analyzing', $this->conversationProgressMessage($filesInfo));
+        }
+
+        $this->logFilesInfo($message, $filesInfo, streaming: true, fromConversation: $fromConversation);
 
         $route = $this->routeFiles($filesInfo);
 
@@ -1167,6 +1182,31 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
+     * Files this turn should analyze: attachments on the current message
+     * first, otherwise the conversation catalog (and, as a last resort,
+     * File entities still hanging off history messages).
+     *
+     * A follow-up like "check the whole contract" has no new upload. The
+     * previous implementation looked only at this message and answered
+     * "No file was provided" even though the PDF was still in the chat.
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     *
+     * @return array{0: list<array<string, mixed>>, 1: bool}
+     */
+    private function resolveFiles(Message $message, array $thread): array
+    {
+        $fromMessage = $this->filesFromMessage($message);
+        if ([] !== $fromMessage) {
+            return [$fromMessage, false];
+        }
+
+        $fromConversation = $this->filesFromConversation($message, $thread);
+
+        return [$fromConversation, [] !== $fromConversation];
+    }
+
+    /**
      * Get file information for every attachment on the message. Issue
      * #978: returning the full collection (instead of only the first
      * row) is the foundation for the multi-document routing in
@@ -1174,7 +1214,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      *
      * @return list<array<string, mixed>>
      */
-    private function getFilesInfo(Message $message): array
+    private function filesFromMessage(Message $message): array
     {
         $infos = [];
 
@@ -1203,6 +1243,104 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         return $infos;
+    }
+
+    /**
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function filesFromConversation(Message $message, array $thread): array
+    {
+        if (null !== $this->conversationFileCatalog) {
+            $catalog = $this->conversationFileCatalog->build($message, $thread, [], null, false);
+            $picks = $this->conversationFileCatalog->analyzableForFollowUp($catalog);
+            if ([] !== $picks) {
+                return array_map($this->buildFileInfoFromConversation(...), $picks);
+            }
+        }
+
+        return $this->filesFromThreadEntities($thread);
+    }
+
+    /**
+     * Belt-and-suspenders when the catalog is missing or dropped a file
+     * (no on-disk path, no file id). History Message entities still carry
+     * the upload via the message relation.
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function filesFromThreadEntities(array $thread): array
+    {
+        $infos = [];
+        $seen = [];
+
+        foreach ($thread as $entry) {
+            if (!$entry instanceof Message) {
+                continue;
+            }
+
+            foreach ($entry->getFiles() as $file) {
+                $id = $file->getId();
+                if (null !== $id) {
+                    if (isset($seen[$id])) {
+                        continue;
+                    }
+                    $seen[$id] = true;
+                }
+                $infos[] = $this->buildFileInfoFromEntity($file);
+            }
+
+            if (!$entry->getFiles()->isEmpty()) {
+                continue;
+            }
+
+            $legacyPath = $entry->getFilePath();
+            if ('' !== $legacyPath) {
+                $extension = strtolower(pathinfo($legacyPath, PATHINFO_EXTENSION));
+                $infos[] = $this->buildFileInfo(
+                    id: null,
+                    name: basename($legacyPath),
+                    type: $extension,
+                    rawPath: $legacyPath,
+                    text: $entry->getFileText() ?: '',
+                    status: null,
+                );
+            }
+        }
+
+        return $infos;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildFileInfoFromConversation(ConversationFile $file): array
+    {
+        $extension = strtolower(pathinfo($file->relativePath, PATHINFO_EXTENSION));
+
+        return $this->buildFileInfo(
+            id: $file->fileId,
+            name: $file->displayName,
+            type: '' !== $extension ? $extension : $file->category,
+            rawPath: $file->relativePath,
+            text: $file->extractedText,
+            status: '' !== trim($file->extractedText) ? 'processed' : null,
+        );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $filesInfo
+     */
+    private function conversationProgressMessage(array $filesInfo): string
+    {
+        $names = $this->describeFileList($filesInfo);
+
+        return 1 === count($filesInfo)
+            ? 'Using '.$names.' from earlier in this chat...'
+            : 'Using files from earlier in this chat: '.$names.'...';
     }
 
     /**
@@ -1753,11 +1891,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      *
      * @param list<array<string, mixed>> $filesInfo
      */
-    private function logFilesInfo(Message $message, array $filesInfo, bool $streaming): void
+    private function logFilesInfo(Message $message, array $filesInfo, bool $streaming, bool $fromConversation = false): void
     {
         $suffix = $streaming ? ' (streaming)' : '';
         $this->logger->info('FileAnalysisHandler: Processing file(s)'.$suffix, [
             'message_id' => $message->getId(),
+            'from_conversation' => $fromConversation,
             'file_count' => count($filesInfo),
             'files' => array_map(static fn (array $info): array => [
                 'id' => $info['id'] ?? null,

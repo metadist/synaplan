@@ -264,6 +264,44 @@ class ChatControllerTest extends WebTestCase
         $this->assertArrayHasKey('chat', $response);
         $this->assertEquals($chat->getId(), $response['chat']['id']);
         $this->assertEquals('Single Test Chat', $response['chat']['title']);
+        $this->assertArrayHasKey('conversationFiles', $response['chat']);
+        $this->assertSame([], $response['chat']['conversationFiles']);
+    }
+
+    public function testGetConversationFilesEmpty(): void
+    {
+        $chat = new Chat();
+        $chat->setUserId($this->user->getId());
+        $chat->setTitle('Files Chat');
+        $chat->setCreatedAt(new \DateTime());
+        $chat->setUpdatedAt(new \DateTime());
+
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        $this->client->request(
+            'GET',
+            '/api/v1/chats/'.$chat->getId().'/files',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
+        );
+
+        $this->assertResponseIsSuccessful();
+
+        $response = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertIsArray($response);
+        $this->assertTrue($response['success']);
+        $this->assertSame([], $response['files']);
+    }
+
+    public function testGetConversationFilesWithoutAuth(): void
+    {
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/chats/1/files');
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
     public function testGetChatByIdUnauthorized(): void

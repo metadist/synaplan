@@ -9,6 +9,7 @@ use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use App\Service\Chat\ChatDeletionService;
 use App\Service\Chat\Run\ChatRunService;
+use App\Service\File\ConversationFileHistory;
 use App\Service\File\OgImageService;
 use App\Service\Iam\AccessGate;
 use App\Service\Iam\ConversationCopyService;
@@ -49,6 +50,7 @@ class ChatController extends AbstractController
         private ConversationCopyService $conversationCopyService,
         private ShareService $shareService,
         private UserRepository $userRepository,
+        private ConversationFileHistory $conversationFileHistory,
     ) {
     }
 
@@ -323,6 +325,24 @@ class ChatController extends AbstractController
                                         new OA\Property(property: 'name', type: 'string', example: 'Sales', description: 'Group name, or empty for "everyone" / a direct share'),
                                     ]
                                 ),
+                                new OA\Property(
+                                    property: 'conversationFiles',
+                                    type: 'array',
+                                    description: 'Files this chat can still use on later turns, including uploads whose original message has scrolled out of the history window.',
+                                    items: new OA\Items(
+                                        required: ['id', 'reference', 'name', 'category', 'origin', 'fileType', 'messageId', 'hasText'],
+                                        properties: [
+                                            new OA\Property(property: 'id', type: 'integer', nullable: true, example: 77),
+                                            new OA\Property(property: 'reference', type: 'string', example: 'file:77'),
+                                            new OA\Property(property: 'name', type: 'string', example: 'contract.pdf'),
+                                            new OA\Property(property: 'category', type: 'string', enum: ['image', 'document', 'audio', 'video', 'other'], example: 'document'),
+                                            new OA\Property(property: 'origin', type: 'string', enum: ['attached', 'uploaded', 'generated'], example: 'uploaded'),
+                                            new OA\Property(property: 'fileType', type: 'string', example: 'pdf'),
+                                            new OA\Property(property: 'messageId', type: 'integer', nullable: true, example: 100),
+                                            new OA\Property(property: 'hasText', type: 'boolean', example: true),
+                                        ]
+                                    )
+                                ),
                             ]
                         ),
                     ]
@@ -372,7 +392,77 @@ class ChatController extends AbstractController
                     ConversationKind::KEY,
                     (string) $chat->getId(),
                 ),
+                'conversationFiles' => $this->conversationFileHistory->forChat(
+                    $chat->getUserId(),
+                    (int) $chat->getId(),
+                ),
             ],
+        ]);
+    }
+
+    #[Route('/{id}/files', name: 'files', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats/{id}/files',
+        summary: 'List files this chat can still use',
+        description: 'Returns every file that belongs to this conversation — uploads and generated artefacts — so a follow-up can name or reuse them without re-attaching. The same list is also on GET /api/v1/chats/{id} as `conversationFiles`.',
+        tags: ['Chats', 'Files'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Conversation file history',
+                content: new OA\JsonContent(
+                    required: ['success', 'files'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'files',
+                            type: 'array',
+                            items: new OA\Items(
+                                required: ['id', 'reference', 'name', 'category', 'origin', 'fileType', 'messageId', 'hasText'],
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', nullable: true, example: 77),
+                                    new OA\Property(property: 'reference', type: 'string', example: 'file:77'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'contract.pdf'),
+                                    new OA\Property(property: 'category', type: 'string', enum: ['image', 'document', 'audio', 'video', 'other'], example: 'document'),
+                                    new OA\Property(property: 'origin', type: 'string', enum: ['attached', 'uploaded', 'generated'], example: 'uploaded'),
+                                    new OA\Property(property: 'fileType', type: 'string', example: 'pdf'),
+                                    new OA\Property(property: 'messageId', type: 'integer', nullable: true, example: 100),
+                                    new OA\Property(property: 'hasText', type: 'boolean', example: true),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Shared chat does not reach this user'),
+            new OA\Response(response: 404, description: 'Chat not found'),
+        ]
+    )]
+    public function files(
+        int $id,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $chat = $this->chatRepository->find($id);
+        $denied = $this->denyConversation($user, $chat);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($chat instanceof Chat);
+
+        return $this->json([
+            'success' => true,
+            'files' => $this->conversationFileHistory->forChat(
+                $chat->getUserId(),
+                (int) $chat->getId(),
+            ),
         ]);
     }
 
