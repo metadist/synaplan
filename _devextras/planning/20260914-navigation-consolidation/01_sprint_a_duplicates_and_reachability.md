@@ -15,7 +15,7 @@ device; the Summarizer becomes a chat tool.
 place for people, chats, usage, provider keys, connections, memories and
 document summaries — and every old bookmark still lands somewhere sensible.
 
-**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md);
+**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md);
 journeys **J-NV-1 … J-NV-5** ([`00_master_plan.md`](./00_master_plan.md) §4).
 
 **UX exit (§6 of the contract) — all five hold before the sprint closes:**

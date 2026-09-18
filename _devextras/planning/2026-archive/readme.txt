@@ -14,3 +14,8 @@ Ralf
 April/May topical dump (`2026-04-05-topic-docs/`, formerly
 `_devextras/planning/archive/`) live here. Live plans stay one level up;
 see `_devextras/planning/README.md`.
+
+2026-09-17 housekeeping: every `YYYYMM_*` folder was renamed to
+`YYYYMMDD_*` (day taken from the first decision date). The 2026-09-10
+roadmap is frozen here as `20260910_roadmap/`. Live plan is
+`_devextras/planning/20260917_roadmap.md`.

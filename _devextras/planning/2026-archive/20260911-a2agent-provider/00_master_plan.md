@@ -17,9 +17,10 @@ admin/frontend surfaces every keyed provider has — preceded by one
 (read-time availability filtering — new rows are invisible until a key exists),
 [`../20260910-feature-modules/00_master_plan.md`](../20260910-feature-modules/00_master_plan.md)
 (Intermezzo — keyed cloud providers stay core, registries become lazy),
-[`../20260910_roadmap_update.md`](../20260910_roadmap_update.md) §1 (binding
-order of work; this plan runs in parallel with the two bugfixes by decision
-§10 row 10).
+[`../../20260917_roadmap.md`](../../20260917_roadmap.md) §1 (Wave 5
+leftovers, then Wave 6). This provider landed under the frozen
+[`../20260910_roadmap/20260910_roadmap_update.md`](../20260910_roadmap/20260910_roadmap_update.md)
+and ran in parallel with the two bugfixes (that file’s §10 row 10).
 
 ---
 

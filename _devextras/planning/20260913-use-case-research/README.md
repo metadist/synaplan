@@ -11,8 +11,8 @@ this change.
 **Purpose:** decide whether Synaplan is the right solution for a job, and
 turn that answer into work. Every case is written so a non-technical reader
 can recognise their own situation.
-**Companion:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
-(U1–U12, binding) and [`../20260910_roadmap_update.md`](../20260910_roadmap_update.md)
+**Companion:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+(U1–U12, binding) and [`../20260917_roadmap.md`](../20260917_roadmap.md)
 (live wave plan). This file does not replace either; it feeds them.
 
 ---
@@ -350,10 +350,10 @@ week or is closed with a note.
 ## 7. Next steps
 
 1. Product owner ticks the tiers and the folder-watch decision (§3, §4).
-2. **Coding order** follows the live roadmap §1: finish Tools S5
-   (TL41, TL45–TL47, J-TL-5), then Compute A3 + B1. Q1 (approve
-   continues the chat turn) is a Tools Wave 5 row, not a substitute
-   for closing S5.
+2. **Coding order** follows the live roadmap §1: in-flight leftovers
+   (nav NV08–NV12, Q1, Compute B3), then the Wave 6 integration
+   contract. Tools S5 and Compute A3 + B1 are on `main`. Q1 (approve
+   continues the chat turn) is still the highest leftover UX row.
 3. Q4 goes on Agent Builder STATUS as a Wave 5 row before it is coded.
 4. Tier A: one branch per case — utterance test + browser walk + docs page.
 5. The Perfect-UX rules in §1 are lifted into `AGENTS.md` (done on this

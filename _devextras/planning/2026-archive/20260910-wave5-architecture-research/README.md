@@ -5,7 +5,9 @@ review. **Research only — no product code was changed.** Documents 1–2 were
 written against the verified state of the `main` checkout on 2026-09-10
 (see the "Evidence" sections; every number was measured, not estimated).
 
-**Live roadmap:** [`../20260910_roadmap_update.md`](../20260910_roadmap_update.md)
+**Live roadmap:** [`../../20260917_roadmap.md`](../../20260917_roadmap.md)
+(this research informed the frozen
+[`../20260910_roadmap/20260910_roadmap_update.md`](../20260910_roadmap/20260910_roadmap_update.md)).
 — Wave 4 and Intermezzo S1–S4 are on `main`; next coding is Wave 5
 remainder (Tools S5, then Compute A3 + B1). The 2026-09-03 overview is
 archived at [`../20260903_roadmap/`](../20260903_roadmap/README.md).

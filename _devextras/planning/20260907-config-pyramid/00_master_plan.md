@@ -16,7 +16,7 @@ their own repos. Nothing here is `store-required`.
   production contract and the "adapters call the scripts" rule
 - [`../20260822-open-plugin-platform/README.md`](../20260822-open-plugin-platform/README.md)
   — manifest v2; plugin activation moves into the pyramid (§4.5)
-- [`../2026-archive/202609_ai_plugs/00_master_plan.md`](../2026-archive/202609_ai_plugs/00_master_plan.md)
+- [`../2026-archive/20260903_ai_plugs/00_master_plan.md`](../2026-archive/20260903_ai_plugs/00_master_plan.md)
   — `PLUGS.*` and `plug_keys`; the first track that must use the registry
 - [`../20260903_roadmap.md`](../20260903_roadmap.md) §8.1 — `synaplan-bundle.v1`;
   the instance profile is its admin-level section (§4.3)

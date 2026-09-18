@@ -7,7 +7,7 @@ See **§8 Handoff**.
 **Input:** Confluence *20260914 - Navigation Tree (Status)* (115 rows, handles
 `W001`…`X013`, generated from `synaplan@af15fdc89`). Its §6 "Observations" is
 the cherry-pick list for this plan.
-**Binding contracts:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+**Binding contracts:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
 (U1–U12, §6 sprint-file contract) and AGENTS.md "Perfect UX & Stability".
 **Owner of the surface:** frontend shell (`useNavItems.ts`, `router/index.ts`,
 `SidebarV2.vue`, `MobileNav.vue`) plus the Operate pages.
