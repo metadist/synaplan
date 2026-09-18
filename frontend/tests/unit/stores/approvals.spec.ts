@@ -26,7 +26,7 @@ vi.mock('@/services/api/httpClient', () => ({
   getConfigSync: () => ({ realtime: { enabled: false } }),
 }))
 
-import { useApprovalsStore } from '@/stores/approvals'
+import { useApprovalsStore, parseChatContinuation } from '@/stores/approvals'
 
 const row = {
   id: 8,
@@ -75,5 +75,49 @@ describe('approvals store', () => {
     store.addFromStream(row)
     expect(store.pending).toHaveLength(1)
     expect(store.pendingCount).toBe(1)
+  })
+
+  it('parses chat continuation events and drops malformed ones', () => {
+    expect(parseChatContinuation({ approvalId: 42, chatId: 5, outcome: 'executed' })).toEqual({
+      approvalId: 42,
+      chatId: 5,
+      outcome: 'executed',
+    })
+    expect(parseChatContinuation(null)).toBeNull()
+    expect(parseChatContinuation({ approvalId: '42', chatId: 5, outcome: 'executed' })).toBeNull()
+    expect(parseChatContinuation({ approvalId: 42, chatId: 5 })).toBeNull()
+  })
+
+  it('notifies continuation listeners and honors unsubscribe', () => {
+    const store = useApprovalsStore()
+    const seen: Array<{ approvalId: number; chatId: number }> = []
+    const stop = store.onChatContinued((continuation) => {
+      seen.push(continuation)
+    })
+    store.ingestContinuationEvent({ approvalId: 42, chatId: 5, outcome: 'executed' })
+    store.ingestContinuationEvent({ bogus: true })
+    expect(seen).toEqual([{ approvalId: 42, chatId: 5, outcome: 'executed' }])
+    stop()
+    store.ingestContinuationEvent({ approvalId: 43, chatId: 5, outcome: 'executed' })
+    expect(seen).toHaveLength(1)
+  })
+
+  it('waitForOutcome resolves once the worker reaches a terminal state', async () => {
+    const store = useApprovalsStore()
+    const approved = { ...row, id: 8, status: 'approved' }
+    const executed = { ...row, id: 8, status: 'executed' }
+    mockList
+      .mockResolvedValueOnce({ pendingCount: 0, approvals: [approved] })
+      .mockResolvedValue({ pendingCount: 0, approvals: [executed] })
+    const outcome = await store.waitForOutcome(8, { timeoutMs: 1000, intervalMs: 5 })
+    expect(mockList).toHaveBeenCalledWith('decided')
+    expect(outcome).toEqual(executed)
+  })
+
+  it('waitForOutcome resolves null when the outcome never lands', async () => {
+    const store = useApprovalsStore()
+    mockList.mockResolvedValue({ pendingCount: 0, approvals: [] })
+    const outcome = await store.waitForOutcome(8, { timeoutMs: 30, intervalMs: 5 })
+    expect(outcome).toBeNull()
   })
 })

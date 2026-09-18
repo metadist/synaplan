@@ -14,6 +14,7 @@ use App\Repository\UserRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Tool\ApprovalRealtimeNotifier;
 use App\Service\Tool\ApprovalReference;
+use App\Service\Tool\ChatApprovalContinuationService;
 use App\Service\Tool\Custom\HttpToolExecutor;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolRegistry;
@@ -29,8 +30,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * re-executes the waiting node inside the DAG. Interactive requests are
  * executed here directly (custom HTTP and MCP tools); the outcome is written to
  * BRESULTREF and published on the owner's realtime channel so the inbox and the
- * chat card can show it. Every failure marks the row `failed` — an approved row
- * must never stay `approved` forever.
+ * chat card can show it. Chat approvals additionally continue the thread with
+ * a one-sentence follow-up ({@see ChatApprovalContinuationService}, Q1).
+ * Every failure marks the row `failed` — an approved row must never stay
+ * `approved` forever, and a chat row must never claim `executed` for a tool
+ * this handler cannot run.
  */
 #[AsMessageHandler]
 final readonly class ResumeApprovalCommandHandler
@@ -46,6 +50,7 @@ final readonly class ResumeApprovalCommandHandler
         private McpServerConfigRepository $mcpServers,
         private McpClient $mcpClient,
         private ApprovalRealtimeNotifier $realtime,
+        private ChatApprovalContinuationService $continuation,
         private MessageBusInterface $bus,
         private LoggerInterface $logger,
     ) {
@@ -79,12 +84,16 @@ final readonly class ResumeApprovalCommandHandler
             return;
         }
 
+        if (ToolSource::Custom !== $descriptor->source && ToolSource::Mcp !== $descriptor->source) {
+            $this->failUnsupported($approval);
+
+            return;
+        }
+
         try {
-            [$resultRef, $summary] = match ($descriptor->source) {
-                ToolSource::Custom => $this->executeCustom($approval, $descriptor),
-                ToolSource::Mcp => $this->executeMcp($approval, $descriptor),
-                default => ['chat', null],
-            };
+            [$resultRef, $summary] = ToolSource::Custom === $descriptor->source
+                ? $this->executeCustom($approval, $descriptor)
+                : $this->executeMcp($approval, $descriptor);
         } catch (\Throwable $e) {
             $this->logger->warning('ResumeApproval: execution failed', [
                 'approval_id' => $approval->getId(),
@@ -96,9 +105,38 @@ final readonly class ResumeApprovalCommandHandler
             return;
         }
 
+        $announce = $this->continuation->continueChat($approval, ChatApprovalContinuationService::OUTCOME_EXECUTED, $summary);
         $approval->markExecuted($resultRef);
         $this->approvals->save($approval);
         $this->realtime->executed($approval, $summary);
+        if (null !== $announce) {
+            $announce();
+        }
+    }
+
+    /**
+     * Sources this handler cannot execute (builtin, skill, document, plugin,
+     * compute). Outside chat the historic outcome is kept; in chat an approval
+     * must never claim a run that never happened (U8), so the row fails
+     * honestly and the thread gets the one-sentence follow-up (Q1).
+     */
+    private function failUnsupported(Approval $approval): void
+    {
+        $reference = ApprovalReference::parse($approval->getRequestedBy());
+        if (ApprovalReference::KIND_CHAT !== $reference->kind) {
+            $approval->markExecuted('chat');
+            $this->approvals->save($approval);
+            $this->realtime->executed($approval, null);
+
+            return;
+        }
+        $announce = $this->continuation->continueChat($approval, ChatApprovalContinuationService::OUTCOME_UNSUPPORTED, null);
+        $approval->markFailed('chat_execution_unsupported');
+        $this->approvals->save($approval);
+        $this->realtime->executed($approval, null);
+        if (null !== $announce) {
+            $announce();
+        }
     }
 
     /**
@@ -137,9 +175,14 @@ final readonly class ResumeApprovalCommandHandler
 
     private function fail(Approval $approval, string $reason, ?string $detail): void
     {
+        $clipped = null === $detail ? null : $this->clip($detail);
+        $announce = $this->continuation->continueChat($approval, ChatApprovalContinuationService::OUTCOME_FAILED, $clipped);
         $approval->markFailed($reason);
         $this->approvals->save($approval);
-        $this->realtime->executed($approval, null === $detail ? null : $this->clip($detail));
+        $this->realtime->executed($approval, $clipped);
+        if (null !== $announce) {
+            $announce();
+        }
     }
 
     /**

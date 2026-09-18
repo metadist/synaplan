@@ -1,0 +1,8 @@
+approval:
+  chat_followup:
+    executed: 'C''est fait : %preview%.'
+    executed_with_result: 'C''est fait : %preview%. Résultat : %result%'
+    failed: 'Impossible d''exécuter %preview% : %reason%. Rien n''a été envoyé.'
+    failed_generic: 'Impossible d''exécuter %preview%. Rien n''a été envoyé.'
+    rejected: 'Compris, je ne l''ai pas exécuté. Rien n''a été envoyé.'
+    unsupported: 'Impossible d''exécuter %preview% après votre approbation pour le moment. Rien n''a été envoyé.'

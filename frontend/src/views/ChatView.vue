@@ -554,6 +554,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useApprovalsStore } from '@/stores/approvals'
+import { useRealtimeStore } from '@/stores/realtime'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import ConversationFilesBar from '@/components/chat/ConversationFilesBar.vue'
 import { useConversationFiles } from '@/composables/useConversationFiles'
@@ -736,6 +737,7 @@ const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const mediaJobsStore = useMediaJobsStore()
 const approvalsStore = useApprovalsStore()
+const realtimeStore = useRealtimeStore()
 const guestStore = useGuestStore()
 
 const chatPendingApprovals = computed(() =>
@@ -748,6 +750,7 @@ async function onChatApprovalApproved(id: number): Promise<void> {
   try {
     await approvalsStore.approve(id)
     showSuccessToast(t('approvals.approvedToast'))
+    void settleChatApproval(id)
   } catch {
     showErrorToast(t('approvals.decideFailed'))
   }
@@ -757,6 +760,7 @@ async function onChatApprovalRejected(id: number, reason: string): Promise<void>
   try {
     await approvalsStore.reject(id, reason)
     showSuccessToast(t('approvals.rejectedToast'))
+    void settleChatApproval(id)
   } catch {
     showErrorToast(t('approvals.decideFailed'))
   }
@@ -766,10 +770,48 @@ async function onChatApprovalAlwaysAllow(id: number): Promise<void> {
   try {
     await approvalsStore.approve(id, true)
     showSuccessToast(t('approvals.approvedToast'))
+    void settleChatApproval(id)
   } catch {
     showErrorToast(t('approvals.decideFailed'))
   }
 }
+
+/**
+ * Q1: the decided approval continues this thread. With realtime the
+ * `approval.chat_continued` listener below reloads the messages; without it
+ * (disabled or terminally broken socket) wait for the worker outcome, then
+ * reload once — the reload is cheap and idempotent either way.
+ */
+async function settleChatApproval(id: number): Promise<void> {
+  if (isViewUnmounted) {
+    return
+  }
+  if (realtimeStore.state !== 'disabled' && realtimeStore.state !== 'error') {
+    return // the approval.chat_continued event reloads the thread
+  }
+  const chatId = chatsStore.activeChatId
+  if (chatId == null) {
+    return
+  }
+  await approvalsStore.waitForOutcome(id)
+  if (isViewUnmounted) {
+    return
+  }
+  await historyStore.loadMessages(chatId)
+}
+
+// Q1: a decided chat approval appends a follow-up message to the thread —
+// from this card or from the Approvals inbox (J-TL-2). Reload the open chat
+// when its thread continued elsewhere.
+const stopContinuationListen = approvalsStore.onChatContinued((continuation) => {
+  if (isViewUnmounted) {
+    return
+  }
+  if (continuation.chatId !== chatsStore.activeChatId) {
+    return
+  }
+  void historyStore.loadMessages(continuation.chatId)
+})
 
 function ingestApprovalRequired(data: StreamUpdatePayload): void {
   if (!isApprovalsEnabled()) {
@@ -1602,6 +1644,7 @@ async function resumeActiveRunIfAny() {
 onBeforeUnmount(() => {
   isViewUnmounted = true
   mediaJobsStore.unsubscribe()
+  stopContinuationListen()
   handleNavigateAway()
   // Leaving the chat surface ends an incognito session: the transcript is
   // discarded and the session's ephemeral files are deleted (best effort —
