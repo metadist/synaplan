@@ -401,6 +401,12 @@
       "share": "Share chat",
       "public": "Public"
     },
+    "conversationFiles": {
+      "title": "Files in this chat",
+      "hint": "Questions you ask still use these files.",
+      "attach": "Use {name} in the next message",
+      "attached": "{name} will be sent with your next message"
+    },
     "fileOnlyDefaultMessage": "Please review the attached file.",
     "voiceMessageDefaultMessage": "Please respond to my voice message.",
     "conversation": "conversation",

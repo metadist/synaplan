@@ -394,6 +394,12 @@
       "share": "Sohbeti paylaş",
       "public": "Herkese Açık"
     },
+    "conversationFiles": {
+      "title": "Bu sohbetteki dosyalar",
+      "hint": "Sonraki soruların bu dosyaları kullanmaya devam eder.",
+      "attach": "Sonraki iletide {name} kullan",
+      "attached": "{name} sonraki iletide gönderilecek"
+    },
     "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
     "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin.",
     "conversation": "sohbet",

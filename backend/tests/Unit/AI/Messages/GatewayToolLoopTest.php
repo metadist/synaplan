@@ -10,6 +10,7 @@ use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
+use App\AI\Messages\Tools\ServerToolReplay;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
@@ -1169,6 +1170,135 @@ final class GatewayToolLoopTest extends TestCase
         $this->assertSame(200, $result['status']);
         $this->assertIsArray($result['body']);
         $this->assertStringContainsString('https://nodejs.org', $result['body']['content'][0]['text']);
+    }
+
+    public function testUnpairedWebFetchIsDroppedBeforeTheNextUpstreamCall(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->expects($this->once())
+            ->method('execute')
+            ->willReturn([
+                'text' => 'See https://nodejs.org/en',
+                'isError' => false,
+                'query' => 'node lts',
+                'resultCount' => 1,
+            ]);
+
+        $loop = $this->webSearchLoop($webSearch);
+        $unpaired = json_decode(
+            (string) file_get_contents(dirname(__DIR__, 3).'/Fixtures/messages/web_fetch_unpaired_assistant.json'),
+            true,
+        );
+        self::assertIsArray($unpaired);
+
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls, $unpaired): array {
+                ++$calls;
+                if (1 === $calls) {
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'content' => $unpaired,
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 8, 'output_tokens' => 4],
+                        ],
+                        'usage' => new MessagesUsage(8, 4, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $assistant = $body['messages'][1];
+                self::assertSame('assistant', $assistant['role']);
+                self::assertSame([], ServerToolReplay::unpairedUseIds($assistant['content']));
+                $names = array_map(
+                    static fn (array $block): string => (string) ($block['name'] ?? ''),
+                    $assistant['content'],
+                );
+                self::assertContains('web_search', $names);
+                self::assertNotContains('web_fetch', $names);
+                self::assertSame('tool_result', $body['messages'][2]['content'][0]['type']);
+                self::assertSame('toolu_search', $body['messages'][2]['content'][0]['tool_use_id']);
+
+                return $this->textBody('Node.js 22 LTS — https://nodejs.org');
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'anthropic:claude-sonnet-4-6',
+                'max_tokens' => 256,
+                'messages' => [['role' => 'user', 'content' => 'What is the current Node LTS?']],
+                'tools' => [
+                    ['type' => 'web_search_20250305', 'name' => 'web_search'],
+                    ['type' => 'web_fetch_20250910', 'name' => 'web_fetch'],
+                ],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webSearchSnapshot(),
+            ['web_search'],
+        );
+
+        self::assertSame(2, $calls);
+        self::assertSame(200, $result['status']);
+        self::assertIsArray($result['body']);
+        self::assertStringContainsString('https://nodejs.org', $result['body']['content'][0]['text']);
+    }
+
+    public function testIncomingUnpairedWebFetchHistoryIsSanitizedOnTheFirstCall(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $loop = $this->webSearchLoop($this->createMock(WebSearchTool::class));
+        $dirty = [
+            [
+                'type' => 'server_tool_use',
+                'id' => 'srvtoolu_01HUranyxaWc8P1UAGp6UAfb',
+                'name' => 'web_fetch',
+                'input' => ['url' => 'https://nodejs.org/en'],
+            ],
+            ['type' => 'text', 'text' => 'Looking that up.'],
+        ];
+
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->expects($this->once())
+            ->method('complete')
+            ->willReturnCallback(function (array $body): array {
+                $assistant = $body['messages'][1];
+                self::assertSame([], ServerToolReplay::unpairedUseIds($assistant['content']));
+                foreach ($assistant['content'] as $block) {
+                    self::assertNotSame('web_fetch', $block['name'] ?? '');
+                }
+                self::assertSame('Looking that up.', $assistant['content'][0]['text'] ?? '');
+
+                return $this->textBody('ok');
+            });
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'anthropic:claude-sonnet-4-6',
+                'max_tokens' => 64,
+                'messages' => [
+                    ['role' => 'user', 'content' => 'research'],
+                    ['role' => 'assistant', 'content' => $dirty],
+                    ['role' => 'user', 'content' => 'continue'],
+                ],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $this->webSearchSnapshot(),
+            ['web_search'],
+        );
+
+        self::assertSame(200, $result['status']);
     }
 
     /**

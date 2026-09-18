@@ -15,6 +15,24 @@ import { UserMemorySchema } from './userMemoriesApi'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import { GetApiChatsMessagesResponseSchema } from '@/generated/api-schemas'
+
+export const ConversationFileRowSchema = z.object({
+  id: z.number().int().nullable(),
+  reference: z.string(),
+  name: z.string(),
+  category: z.enum(['image', 'document', 'audio', 'video', 'other']),
+  origin: z.enum(['attached', 'uploaded', 'generated']),
+  fileType: z.string(),
+  messageId: z.number().int().nullable(),
+  hasText: z.boolean(),
+})
+
+export const GetConversationFilesResponseSchema = z.object({
+  success: z.boolean(),
+  files: z.array(ConversationFileRowSchema),
+})
+
+export type ConversationFileRow = z.infer<typeof ConversationFileRowSchema>
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
 /**
@@ -800,6 +818,17 @@ export const chatApi = {
     return httpClient(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
       method: 'GET',
       schema: GetApiChatsMessagesResponseSchema,
+    })
+  },
+
+  /**
+   * Files this chat can still use on later turns (uploads and generated
+   * artefacts). The same list is on GET /api/v1/chats/{id} as `conversationFiles`.
+   */
+  async getConversationFiles(chatId: number) {
+    return httpClient(`/api/v1/chats/${chatId}/files`, {
+      method: 'GET',
+      schema: GetConversationFilesResponseSchema,
     })
   },
 

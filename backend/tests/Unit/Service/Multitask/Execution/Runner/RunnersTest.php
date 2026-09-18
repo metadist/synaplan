@@ -55,6 +55,8 @@ final class RunnersTest extends TestCase
         $m->method('getText')->willReturn($text);
         $m->method('getFileText')->willReturn($fileText);
         $m->method('getLanguage')->willReturn('en');
+        $m->method('getUserId')->willReturn(1);
+        $m->method('getChatId')->willReturn(null);
         $m->method('getFile')->willReturn(0);
         $m->method('getFilePath')->willReturn('');
         $m->method('getFiles')->willReturn(new ArrayCollection());
@@ -68,6 +70,8 @@ final class RunnersTest extends TestCase
         $m->method('getText')->willReturn($text);
         $m->method('getFileText')->willReturn('');
         $m->method('getLanguage')->willReturn('en');
+        $m->method('getUserId')->willReturn(1);
+        $m->method('getChatId')->willReturn(null);
         $m->method('getFile')->willReturn(1);
         $m->method('getFilePath')->willReturn('01/000/00001/2026/06/cat.png');
         $m->method('getFileType')->willReturn('png');
@@ -1470,8 +1474,18 @@ final class RunnersTest extends TestCase
         );
 
         $catalog = $this->createMock(ConversationFileCatalog::class);
-        $catalog->method('build')->willReturn([$entry]);
-        $catalog->method('documentInFocus')->willReturn($entry);
+        $catalog->expects(self::once())
+            ->method('build')
+            ->willReturnCallback(function (Message $message, array $thread, array $extra, ?string $category, bool $requireOnDisk) use ($entry): array {
+                self::assertSame(42, $message->getChatId());
+                self::assertSame([], $thread);
+                self::assertSame([], $extra);
+                self::assertNull($category);
+                self::assertFalse($requireOnDisk);
+
+                return [$entry];
+            });
+        $catalog->method('analyzableForFollowUp')->willReturn([$entry]);
 
         $files = $this->createMock(FileRepository::class);
         $files->expects(self::once())->method('find')->with(42)->willReturn($file);
@@ -1491,12 +1505,13 @@ final class RunnersTest extends TestCase
             $files,
         );
         $node = new TaskNode('n1', Capability::FileAnalysis, [], ['prompt' => 'was steht im brief?']);
-        $inbound = (new Message())->setUserId(1)->setText('was steht im brief?')->setLanguage('de')->setDirection('IN');
+        $inbound = (new Message())->setUserId(1)->setChatId(42)->setText('was steht im brief?')->setLanguage('de')->setDirection('IN');
 
         $result = $runner->run($node, $this->context($inbound));
 
         self::assertTrue($result->isSuccessful());
         self::assertInstanceOf(Message::class, $seenMessage);
+        self::assertSame(42, $seenMessage->getChatId());
         self::assertTrue($seenMessage->getFiles()->contains($file));
     }
 

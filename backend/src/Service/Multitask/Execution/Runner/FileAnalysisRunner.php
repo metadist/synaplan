@@ -7,7 +7,6 @@ namespace App\Service\Multitask\Execution\Runner;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\FileRepository;
-use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Multitask\Execution\NodeContext;
@@ -124,6 +123,9 @@ final readonly class FileAnalysisRunner implements TaskRunner
 
         $m = new Message();
         $m->setUserId((int) $source->getUserId());
+        // Handler catalog fallback uses this message's chatId for
+        // findFilesByChatId when the history window dropped the upload.
+        $m->setChatId($source->getChatId());
         $m->setText(null !== $prompt && '' !== trim($prompt) ? $prompt : (string) $source->getText());
         $m->setLanguage($source->getLanguage() ?: 'en');
         $m->setDirection('IN');
@@ -196,27 +198,35 @@ final readonly class FileAnalysisRunner implements TaskRunner
             return;
         }
 
-        $catalog = $this->conversationFiles->build($context->message, $context->thread);
-        $pick = $this->conversationFiles->documentInFocus($catalog) ?? $this->firstAnalyzable($catalog);
-        if (null === $pick) {
+        $catalog = $this->conversationFiles->build($context->message, $context->thread, [], null, false);
+        $picks = $this->conversationFiles->analyzableForFollowUp($catalog);
+        if ([] === $picks) {
             return;
         }
 
         $userId = (int) $synthetic->getUserId();
+        $attached = 0;
 
-        if (null !== $pick->fileId) {
+        foreach ($picks as $pick) {
+            if (null === $pick->fileId) {
+                continue;
+            }
             $file = $this->fileRepository->find($pick->fileId);
             if ($file instanceof File && $file->getUserId() === $userId) {
                 $synthetic->addFile($file);
-                $this->logger->info('FileAnalysisRunner: analyzing conversation file', [
-                    'file_id' => $pick->fileId,
-                    'reference' => $pick->reference,
-                ]);
-
-                return;
+                ++$attached;
             }
         }
 
+        if ($attached > 0) {
+            $this->logger->info('FileAnalysisRunner: analyzing conversation file(s)', [
+                'file_count' => $attached,
+            ]);
+
+            return;
+        }
+
+        $pick = $picks[0];
         $synthetic->setFile(1);
         $synthetic->setFilePath($pick->relativePath);
         $extension = strtolower(pathinfo($pick->relativePath, PATHINFO_EXTENSION));
@@ -226,20 +236,6 @@ final readonly class FileAnalysisRunner implements TaskRunner
         $this->logger->info('FileAnalysisRunner: analyzing conversation file by path', [
             'path' => $pick->relativePath,
         ]);
-    }
-
-    /**
-     * @param list<ConversationFile> $catalog
-     */
-    private function firstAnalyzable(array $catalog): ?ConversationFile
-    {
-        foreach ($catalog as $file) {
-            if ($file->isDocument()) {
-                return $file;
-            }
-        }
-
-        return $catalog[0] ?? null;
     }
 
     /**

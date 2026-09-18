@@ -57,12 +57,13 @@ final readonly class ConversationFileCatalog
      * turn, then the files of the conversation, newest first.
      *
      * @param array<int, Message|array{role: string, content: string}> $thread
-     * @param list<string>                                             $extraPaths upload-dir-relative paths produced in this turn (multitask upstream nodes)
-     * @param string|null                                              $category   restrict to one CATEGORY_* value
+     * @param list<string>                                             $extraPaths    upload-dir-relative paths produced in this turn (multitask upstream nodes)
+     * @param string|null                                              $category      restrict to one CATEGORY_* value
+     * @param bool                                                     $requireOnDisk when false, documents that still have extracted text are kept even if the bytes are gone (file analysis only needs the text)
      *
      * @return list<ConversationFile>
      */
-    public function build(Message $message, array $thread = [], array $extraPaths = [], ?string $category = null): array
+    public function build(Message $message, array $thread = [], array $extraPaths = [], ?string $category = null, bool $requireOnDisk = true): array
     {
         $userId = (int) $message->getUserId();
 
@@ -80,11 +81,12 @@ final readonly class ConversationFileCatalog
                 $message->getId(),
                 $message->getDirection(),
                 $index + 1,
+                $requireOnDisk,
             );
         }
 
         foreach ($this->filesForPaths($userId, $extraPaths) as $file) {
-            $this->collect($entries, $seenIds, $seenPaths, $file, ConversationFile::ORIGIN_GENERATED, $file->getMessageId(), 'OUT');
+            $this->collect($entries, $seenIds, $seenPaths, $file, ConversationFile::ORIGIN_GENERATED, $file->getMessageId(), 'OUT', null, $requireOnDisk);
         }
 
         foreach ($this->threadFiles($userId, $thread, $message->getChatId()) as $candidate) {
@@ -96,6 +98,8 @@ final readonly class ConversationFileCatalog
                 $this->originOf($candidate['file']),
                 $candidate['message_id'],
                 $candidate['direction'],
+                null,
+                $requireOnDisk,
             );
         }
 
@@ -112,6 +116,75 @@ final readonly class ConversationFileCatalog
         }
 
         return $this->capPerCategory($entries);
+    }
+
+    /**
+     * Files of one chat, without a current turn. Used by the chat/API file
+     * history so a client can list every file the conversation still has.
+     *
+     * @return list<ConversationFile>
+     */
+    public function buildForChat(int $userId, int $chatId, bool $requireOnDisk = true): array
+    {
+        if ($userId <= 0 || $chatId <= 0) {
+            return [];
+        }
+
+        $probe = (new Message())->setUserId($userId)->setChatId($chatId);
+
+        return $this->build($probe, [], [], null, $requireOnDisk);
+    }
+
+    /**
+     * Files a follow-up analysis should read when this turn has no attachment.
+     *
+     * User-provided documents win (all of them — a contract plus its annex
+     * stay a set). Generated documents are next. Images/audio/video are last
+     * and only when no document is left. A newer generated picture must not
+     * hide the PDF the user is still asking about.
+     *
+     * @param list<ConversationFile> $catalog
+     *
+     * @return list<ConversationFile>
+     */
+    public function analyzableForFollowUp(array $catalog): array
+    {
+        $uploadedDocuments = [];
+        $otherDocuments = [];
+        $media = [];
+
+        foreach ($catalog as $file) {
+            if ($file->isDocument()) {
+                if (ConversationFile::ORIGIN_GENERATED === $file->origin) {
+                    $otherDocuments[] = $file;
+                } else {
+                    $uploadedDocuments[] = $file;
+                }
+                continue;
+            }
+
+            if ($file->isImage() && '' === $file->absolutePath) {
+                continue;
+            }
+
+            if (in_array($file->category, [
+                ConversationFile::CATEGORY_IMAGE,
+                ConversationFile::CATEGORY_AUDIO,
+                ConversationFile::CATEGORY_VIDEO,
+            ], true)) {
+                $media[] = $file;
+            }
+        }
+
+        if ([] !== $uploadedDocuments) {
+            return $uploadedDocuments;
+        }
+
+        if ([] !== $otherDocuments) {
+            return $otherDocuments;
+        }
+
+        return $media;
     }
 
     /**
@@ -341,6 +414,7 @@ final readonly class ConversationFileCatalog
         ?int $messageId,
         string $direction,
         ?int $attachmentIndex = null,
+        bool $requireOnDisk = true,
     ): void {
         $id = $file->getId();
         if (null !== $id && isset($seenIds[$id])) {
@@ -348,7 +422,16 @@ final readonly class ConversationFileCatalog
         }
 
         $path = $this->absolutePath($file);
-        if (null === $path || isset($seenPaths[$path])) {
+        $extracted = $file->getFileText();
+        if (null === $path) {
+            if ($requireOnDisk || '' === trim($extracted)) {
+                return;
+            }
+            $path = '';
+        }
+
+        $pathKey = '' !== $path ? $path : 'missing:'.($id ?? $file->getFilePath());
+        if (isset($seenPaths[$pathKey])) {
             return;
         }
 
@@ -359,7 +442,7 @@ final readonly class ConversationFileCatalog
         if (null !== $id) {
             $seenIds[$id] = true;
         }
-        $seenPaths[$path] = true;
+        $seenPaths[$pathKey] = true;
 
         $relative = $this->normalizeRelativePath($file->getFilePath());
 
