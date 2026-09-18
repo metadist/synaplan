@@ -53,75 +53,86 @@
     </div>
 
     <div class="surface-card p-6" data-testid="section-create-key">
-      <div class="flex flex-col sm:flex-row gap-3">
-        <input
-          v-model="newKeyName"
-          type="text"
-          :placeholder="$t('config.apiKeys.namePlaceholder')"
-          class="w-full sm:flex-1 px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          data-testid="input-key-name"
-          @keypress.enter="createAPIKey"
-        />
-        <div class="flex flex-col gap-2 sm:w-auto">
-          <p class="text-xs txt-secondary">{{ $t('config.apiKeys.scopes.hint') }}</p>
-          <label class="flex items-center gap-2 text-sm txt-primary">
-            <input
-              v-model="includeIamRead"
-              type="checkbox"
-              class="rounded border-light-border/30 dark:border-dark-border/20"
-              data-testid="checkbox-scope-iam-read"
-            />
-            {{ $t('config.apiKeys.scopes.iamRead') }}
-          </label>
-          <label class="flex items-center gap-2 text-sm txt-primary">
-            <input
-              v-model="includeIamManage"
-              type="checkbox"
-              class="rounded border-light-border/30 dark:border-dark-border/20"
-              data-testid="checkbox-scope-iam-manage"
-            />
-            {{ $t('config.apiKeys.scopes.iamManage') }}
-          </label>
-          <label v-if="computeEnabled" class="flex items-center gap-2 text-sm txt-primary">
-            <input
-              v-model="includeComputeRun"
-              type="checkbox"
-              class="rounded border-light-border/30 dark:border-dark-border/20"
-              data-testid="checkbox-scope-compute-run"
-            />
-            {{ $t('config.apiKeys.scopes.computeRun') }}
-          </label>
-        </div>
-        <button
-          :disabled="!newKeyName.trim() || loading"
-          class="w-full sm:w-auto btn-primary px-5 py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="btn-create"
-          @click="createAPIKey"
-        >
-          <svg
-            v-if="loading"
-            class="animate-spin h-5 w-5"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <input
+            v-model="newKeyName"
+            type="text"
+            :placeholder="$t('config.apiKeys.namePlaceholder')"
+            class="w-full sm:flex-1 sm:min-w-0 px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-key-name"
+            @keypress.enter="createAPIKey"
+          />
+          <button
+            :disabled="!newKeyName.trim() || loading"
+            class="w-full sm:w-auto sm:shrink-0 btn-primary px-5 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-create"
+            @click="createAPIKey"
           >
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              stroke-width="4"
-            ></circle>
-            <path
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <PlusIcon v-else class="w-5 h-5" />
-          {{ loading ? 'Creating...' : $t('config.apiKeys.createKey') }}
-        </button>
+            <svg
+              v-if="loading"
+              class="animate-spin h-5 w-5"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <PlusIcon v-else class="w-5 h-5" />
+            {{ loading ? 'Creating...' : $t('config.apiKeys.createKey') }}
+          </button>
+        </div>
+        <div
+          class="flex flex-col gap-2 border-t border-light-border/30 dark:border-dark-border/20 pt-4"
+        >
+          <p class="text-xs txt-secondary leading-relaxed">
+            {{ $t('config.apiKeys.scopes.hint') }}
+          </p>
+          <div class="flex flex-col gap-2">
+            <label class="flex items-start gap-2 text-sm txt-primary cursor-pointer">
+              <input
+                v-model="includeIamRead"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-light-border/30 dark:border-dark-border/20 accent-[var(--brand)]"
+                data-testid="checkbox-scope-iam-read"
+              />
+              {{ $t('config.apiKeys.scopes.iamRead') }}
+            </label>
+            <label class="flex items-start gap-2 text-sm txt-primary cursor-pointer">
+              <input
+                v-model="includeIamManage"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-light-border/30 dark:border-dark-border/20 accent-[var(--brand)]"
+                data-testid="checkbox-scope-iam-manage"
+              />
+              {{ $t('config.apiKeys.scopes.iamManage') }}
+            </label>
+            <label
+              v-if="computeEnabled"
+              class="flex items-start gap-2 text-sm txt-primary cursor-pointer"
+            >
+              <input
+                v-model="includeComputeRun"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-light-border/30 dark:border-dark-border/20 accent-[var(--brand)]"
+                data-testid="checkbox-scope-compute-run"
+              />
+              {{ $t('config.apiKeys.scopes.computeRun') }}
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 
