@@ -318,10 +318,12 @@ function isAuthMutationInProgress(): boolean {
 
 /**
  * Await the open auth-mutation critical section, if any. Independent
- * `/auth/refresh` pools (chatApi's SSE warmer, authService, legacy apiService)
- * call this before their raw refresh so they don't fire with pre-swap cookies
- * during an impersonation swap and clobber the new session. Resolves
- * immediately when no swap is in progress.
+ * `/auth/refresh` pools (chatApi, authService, legacy apiService)
+ * await this before they record an in-flight fetch so they don't fire with
+ * pre-swap cookies during an impersonation swap and clobber the new session.
+ * Resolves immediately when no swap is in progress. The in-flight promise
+ * they expose afterwards is only the fetch itself, so a swap holder can
+ * join it without deadlocking on this lock.
  */
 async function awaitAuthMutation(): Promise<void> {
   if (authMutationPromise) {

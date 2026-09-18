@@ -204,29 +204,50 @@ export const useAuthStore = defineStore('auth', () => {
     await useMediaJobsStore().subscribe(userId)
   }
 
+  /**
+   * Drain cookie-refreshes that are already on the wire. Must run AFTER
+   * `beginAuthMutation()`: new refreshes park on the lock, and each pool now
+   * only records an in-flight promise once it has passed that wait, so joining
+   * these cannot deadlock. A fetch that started before the lock still carries
+   * pre-swap cookies — its Set-Cookie has to land before the swap response.
+   */
+  async function settleInFlightRefreshes(): Promise<void> {
+    const [{ getInFlightRefresh: httpRefresh }, chatApi, apiService] = await Promise.all([
+      import('@/services/api/httpClient'),
+      import('@/services/api/chatApi'),
+      import('@/services/apiService'),
+    ])
+    const pending = [
+      httpRefresh(),
+      chatApi.getInFlightRefresh(),
+      authService.getInFlightRefresh(),
+      apiService.getInFlightRefresh(),
+    ]
+    await Promise.all(
+      pending.map(async (inFlight) => {
+        if (!inFlight) return
+        try {
+          await inFlight
+        } catch {
+          // A failed stale refresh must not abort login / impersonation.
+        }
+      })
+    )
+  }
+
   // Actions
   async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
     loading.value = true
     error.value = null
 
-    const { beginAuthMutation, endAuthMutation, getInFlightRefresh } =
-      await import('@/services/api/httpClient')
+    const { beginAuthMutation, endAuthMutation } = await import('@/services/api/httpClient')
     // Same cookie-swap lock as impersonation: a refresh that started on the
     // expired-session login page still carries the dead cookie. If it lands
     // after this POST, it 401s and logout() clears the hint — the new session
     // looks logged out even though the cookies were just set.
     beginAuthMutation()
     try {
-      // Only the httpClient pool: authService._doRefresh waits on this lock
-      // before fetching, so joining it here would deadlock.
-      const pendingHttpRefresh = getInFlightRefresh()
-      if (pendingHttpRefresh) {
-        try {
-          await pendingHttpRefresh
-        } catch {
-          /* a failed stale refresh must not abort login */
-        }
-      }
+      await settleInFlightRefreshes()
 
       const result = await authService.login(email, password, recaptchaToken)
 
@@ -454,13 +475,11 @@ export const useAuthStore = defineStore('auth', () => {
    * can show success / error notifications.
    */
   async function startImpersonation(userId: number): Promise<{ success: boolean; error?: string }> {
-    const [
-      { impersonationApi },
-      { beginAuthMutation, endAuthMutation, getInFlightRefresh, refreshAccessToken },
-    ] = await Promise.all([
-      import('@/services/api/impersonationApi'),
-      import('@/services/api/httpClient'),
-    ])
+    const [{ impersonationApi }, { beginAuthMutation, endAuthMutation, refreshAccessToken }] =
+      await Promise.all([
+        import('@/services/api/impersonationApi'),
+        import('@/services/api/httpClient'),
+      ])
 
     // Guard the cookie-swap window (impersonate response -> /auth/me read)
     // against the automatic 401 -> /auth/refresh path. A refresh that fires
@@ -471,16 +490,9 @@ export const useAuthStore = defineStore('auth', () => {
     // and retry with the new cookie instead of racing it.
     beginAuthMutation()
     try {
-      // Let a refresh that started *before* the lock settle first, so our
+      // Let refreshes that started *before* the lock settle first, so our
       // impersonate response is guaranteed to be the last writer of the cookie.
-      const inFlight = getInFlightRefresh()
-      if (inFlight) {
-        try {
-          await inFlight
-        } catch {
-          // A failed background refresh must not abort the swap.
-        }
-      }
+      await settleInFlightRefreshes()
 
       // Mint a fresh admin access token as the guaranteed LAST writer before
       // the swap. impersonationApi.start() is a raw fetch with no 401-retry, so
@@ -545,13 +557,11 @@ export const useAuthStore = defineStore('auth', () => {
    * landing page past the banner hide (`refreshUser` clears `impersonator`).
    */
   async function stopImpersonation(): Promise<{ success: boolean; error?: string }> {
-    const [
-      { impersonationApi },
-      { beginAuthMutation, endAuthMutation, getInFlightRefresh, refreshAccessToken },
-    ] = await Promise.all([
-      import('@/services/api/impersonationApi'),
-      import('@/services/api/httpClient'),
-    ])
+    const [{ impersonationApi }, { beginAuthMutation, endAuthMutation, refreshAccessToken }] =
+      await Promise.all([
+        import('@/services/api/impersonationApi'),
+        import('@/services/api/httpClient'),
+      ])
 
     // Symmetric to startImpersonation: while exiting, a concurrent refresh
     // still carrying the impersonation cookies (stash present) would be
@@ -559,14 +569,7 @@ export const useAuthStore = defineStore('auth', () => {
     // admin session the exit endpoint just restored. Guard the swap window.
     beginAuthMutation()
     try {
-      const inFlight = getInFlightRefresh()
-      if (inFlight) {
-        try {
-          await inFlight
-        } catch {
-          // A failed background refresh must not abort the swap.
-        }
-      }
+      await settleInFlightRefreshes()
 
       // Keep the session alive as the last writer before exiting: the exit call
       // is a raw fetch with no 401-retry, so a fresh (still impersonation-aware)

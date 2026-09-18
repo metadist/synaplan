@@ -71,6 +71,11 @@ vi.mock('@/stores/history', () => ({
 
 vi.mock('@/services/api/chatApi', () => ({
   clearSseToken: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
+}))
+
+vi.mock('@/services/apiService', () => ({
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('@/stores/userMemories', () => ({

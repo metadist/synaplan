@@ -141,10 +141,27 @@ let tokenProactiveTimer: ReturnType<typeof setTimeout> | null = null
  * `POST /api/v1/auth/refresh`, log a misleading "session expired" error
  * and force-redirect to `/login?reason=session_expired`.
  */
+/**
+ * Cookie-refresh already on the wire, if any. Principal-swap callers await
+ * this AFTER taking the auth-mutation lock. The promise is only assigned once
+ * `awaitAuthMutation()` has resolved, so joining it cannot deadlock on the
+ * lock we hold — it is a real in-flight fetch that must finish (and write
+ * its Set-Cookie) before the swap response becomes the last writer.
+ */
+export function getInFlightRefresh(): Promise<boolean> | null {
+  return tokenRefreshPromise
+}
+
 async function refreshAccessToken(): Promise<boolean> {
   if (!hasSessionHint()) {
     return false
   }
+
+  // Wait for an in-progress impersonation/login swap BEFORE recording an
+  // in-flight fetch. Putting this inside the coalesced promise used to make
+  // getInFlightRefresh() return a waiter parked on the lock — awaiting that
+  // from the swap deadlocked until the 15s force-release.
+  await awaitAuthMutation()
 
   if (tokenRefreshPromise) {
     return tokenRefreshPromise
@@ -152,11 +169,6 @@ async function refreshAccessToken(): Promise<boolean> {
 
   tokenRefreshPromise = (async () => {
     try {
-      // This pool is invisible to the httpClient auth-mutation lock. Let an
-      // in-progress impersonation swap settle first, else this fires with
-      // pre-swap cookies and clobbers the new session.
-      await awaitAuthMutation()
-
       const refreshResponse = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
