@@ -13,8 +13,8 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | A3 Freeze | `feat/wave5-compute-b2` (#1860) | implemented | Protocol 1 fixtures vendored + checksums; compose profile `compute`. `COMPUTE_TOKEN` interpolates empty so `docker compose` works without the profile. |
 | B1 Client & capability | same | implemented | FeatureModule `compute`, `ComputeClient`, `code_run`, run card, artefacts as `BFILES` `source=compute`. Flag default off. |
 | B2 Tools & policy | same | implemented | `code_execution` is offered only with `compute:run`. Write-class / unattended default `approve`. |
-| B3 Workspaces & egress | `feat/wave5-compute-b3` | in progress | CS18–CS25. Flags `COMPUTE.WORKSPACES_ENABLED` and `COMPUTE.EGRESS_ENABLED` default off. |
-| B4 Hardening & GA | — | planned | Wave 5. |
+| B3 Workspaces & egress | `main` (#1870) | implemented | CS18–CS25. Flags `COMPUTE.WORKSPACES_ENABLED` and `COMPUTE.EGRESS_ENABLED` default off (seeder `0`). J-CP-2 verified 2026-09-18: run card keeps “Open workspace”, WorkspaceView reuses FilesTabs, empty copy verbatim, no egress control on the card. Follow-up: shipped sidecar reports `features.egress=false` (CP22 proxy not built) so the egress switch stays fail-closed off until that sidecar release — PHP side complete. |
+| B4 Hardening & GA | — | planned | Wave 5. Needs T2 (gVisor) on a compute node before Cloud, plus the CP22 egress-proxy sidecar release for B3 egress. |
 
 ## Decisions
 
@@ -32,6 +32,8 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-13 | **Compose (CP30):** opt-in `compute` profile builds `sidecars/synaplan-compute` and mounts `docker.sock` **only** on that service. Backend/worker `COMPUTE_URL`/`COMPUTE_TOKEN` stay empty unless the operator sets them. |
 | 2026-09-14 | Review follow-up on #1860: unique artefact names, refuse oversized tool input, grant `compute:run` with `desktop:messages`/`desktop:files` (no `*`), enforce concurrent/CPU quotas, cancel the sidecar on PHP wait timeout, unique multipart names, fail missing inputs, document docker GID + runtime-image preload. Workspace MB stays B3. |
 | 2026-09-14 | B1/B2 merged as #1860. B3 starts on `feat/wave5-compute-b3` (workspaces + egress, both default off). |
+| 2026-09-14 | B3 merged as [#1870](https://github.com/metadist/synaplan/pull/1870) (workspaces + egress behind default-off flags, SSRF widening, fail-closed approval gating, sidecar nested listing + quota). |
+| 2026-09-18 | **B3 closed on `main`.** STATUS corrected (was still “in progress”): flags seeded `0`, J-CP-2 verified against the shipped UI. **Egress follow-up recorded:** the in-repo sidecar reports `features.egress=false` (CP22 proxy not built); the admin switch stays fail-closed off and the PHP side waits for that sidecar release. B3 egress is not silently dropped — it rides with B4/sidecar work. |
 
 ## Review log
 
