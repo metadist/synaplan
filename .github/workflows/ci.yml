@@ -1222,70 +1222,53 @@ jobs:
     needs: [e2e]
     if: always() && (needs.e2e.result == 'success' || needs.e2e.result == 'failure')
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Download Playwright reports
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: playwright-results-*
           path: artifacts
           merge-multiple: false
+          # Missing artifacts are the infra case (stack never started, browser
+          # install 403, quay.io timeout). Must not fail this job or we cannot
+          # tell that apart from a retry-pass flake.
+          if-no-artifact-found: ignore
 
-      - name: Notify Discord if any flaky tests
+      - name: Summarise flakes
         env:
-          HOOK: ${{ secrets.DISCORD_REPORT_LOGS_WEBHOOK }}
           BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+          mkdir -p artifacts
+          node scripts/e2e-flake-report.mjs \
+            --dir artifacts \
+            --e2e-result "${{ needs.e2e.result }}" \
+            --json flake-summary.json \
+            --markdown "$GITHUB_STEP_SUMMARY" \
+            --payload /tmp/discord-payload.json
+
+      - name: Upload flake summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-flake-summary
+          path: flake-summary.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Notify Discord
+        env:
+          HOOK: ${{ secrets.DISCORD_REPORT_LOGS_WEBHOOK }}
+        run: |
+          set -euo pipefail
           [ -n "${HOOK:-}" ] || exit 0
-          mapfile -t REPORTS < <(find artifacts -type f -name results.json 2>/dev/null | sort || true)
-          [ "${#REPORTS[@]}" -gt 0 ] || exit 0
-
-          # project · file · title — file avoids collapsing distinct tests with the same title
-          LIST=$(jq -r '
-            .. | objects
-            | select((.specs? | type) == "array")
-            | . as $suite
-            | .specs[]?
-            | . as $spec
-            | .tests[]?
-            | select(.status == "flaky")
-            | "• " + (.projectName // "?")
-              + " · " + ($suite.file // $suite.title // "?")
-              + " · " + ($spec.title // "?")
-          ' "${REPORTS[@]}" | sort -u)
-          [ -n "$LIST" ] || exit 0
-
-          N=$(printf '%s\n' "$LIST" | wc -l | tr -d ' ')
-          SHOWN=$(printf '%s\n' "$LIST" | head -15)
-          EXTRA=$(( N > 15 ? N - 15 : 0 ))
-          [ "$EXTRA" -gt 0 ] && SHOWN=$(printf '%s\n… and %s more' "$SHOWN" "$EXTRA")
-
-          # Match DiscordNotificationService embed shape (title/fields/footer/timestamp).
-          # Field values max 1024; keep the flaky list under that.
-          PAYLOAD=$(jq -n \
-            --arg branch "$BRANCH" \
-            --arg url "$RUN_URL" \
-            --arg n "$N" \
-            --arg list "$SHOWN" \
-            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{
-              embeds: [{
-                title: ("⚠️ Flaky E2E: " + $n + " test(s)"),
-                color: 16776960,
-                fields: [
-                  { name: "Branch", value: ("`" + $branch + "`"), inline: true },
-                  { name: "Count", value: $n, inline: true },
-                  { name: "Flaky tests", value: ($list | .[0:1000]), inline: false },
-                  { name: "CI run", value: ("[Open CI run](" + $url + ")"), inline: false }
-                ],
-                footer: { text: "Synaplan CI" },
-                timestamp: $ts
-              }]
-            }')
-
+          [ -s /tmp/discord-payload.json ] || exit 0
           curl --fail-with-body --silent --show-error --retry 3 \
             -H 'Content-Type: application/json' \
-            -d "$PAYLOAD" \
+            -d @/tmp/discord-payload.json \
             "$HOOK" \
             || echo "::warning::Discord notification failed"
 
