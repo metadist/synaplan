@@ -64,13 +64,13 @@
             @keypress.enter="createAPIKey"
           />
           <button
-            :disabled="!newKeyName.trim() || loading"
+            :disabled="!newKeyName.trim() || creating"
             class="w-full sm:w-auto sm:shrink-0 btn-primary px-5 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-create"
             @click="createAPIKey"
           >
             <svg
-              v-if="loading"
+              v-if="creating"
               class="animate-spin h-5 w-5"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -91,7 +91,7 @@
               ></path>
             </svg>
             <PlusIcon v-else class="w-5 h-5" />
-            {{ loading ? 'Creating...' : $t('config.apiKeys.createKey') }}
+            {{ creating ? $t('common.creating') : $t('config.apiKeys.createKey') }}
           </button>
         </div>
         <div
@@ -176,7 +176,7 @@
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         ></path>
       </svg>
-      <p class="txt-secondary text-lg">Loading API keys...</p>
+      <p class="txt-secondary text-lg">{{ $t('common.loading') }}</p>
     </div>
 
     <div
@@ -473,7 +473,10 @@ const includeIamRead = ref(false)
 const includeIamManage = ref(false)
 const includeComputeRun = ref(false)
 const computeEnabled = computed(() => getConfigSync().features?.computeEnabled === true)
+// loading tracks the initial key-list fetch; creating tracks key creation only,
+// so the form stays usable while the list loads.
 const loading = ref(false)
+const creating = ref(false)
 const error = ref<string | null>(null)
 const showKeyModal = ref(false)
 const newlyCreatedKey = ref<string>('')
@@ -509,10 +512,10 @@ const loadAPIKeys = async () => {
 }
 
 const createAPIKey = async () => {
-  if (!newKeyName.value.trim()) return
+  if (!newKeyName.value.trim() || creating.value) return
 
   try {
-    loading.value = true
+    creating.value = true
     error.value = null
 
     const scopes: string[] = []
@@ -577,7 +580,7 @@ const createAPIKey = async () => {
     error.value = getErrorMessage(err) || t('config.apiKeys.errorCreating')
     showError(error.value!)
   } finally {
-    loading.value = false
+    creating.value = false
   }
 }
 
