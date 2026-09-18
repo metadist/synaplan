@@ -174,7 +174,11 @@ async function loadFiles(): Promise<void> {
     files.value = []
     return
   }
-  files.value = await promptsApi.getPromptFiles(topic.value)
+  try {
+    files.value = await promptsApi.getPromptFiles(topic.value)
+  } catch {
+    files.value = []
+  }
 }
 
 async function onDeleteFile(file: PromptFile): Promise<void> {

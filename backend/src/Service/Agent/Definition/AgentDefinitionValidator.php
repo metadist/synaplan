@@ -71,9 +71,16 @@ final class AgentDefinitionValidator
 
     public const EVENT_KINDS = ['mail', 'whatsapp', 'widget', 'api', 'mcp', 'desktop', 'webhook'];
 
-    private const MODEL_KEY_PATTERN = '/^[a-z0-9._-]+:[a-z0-9._-]+(?::[a-z0-9._-]+)?$/i';
+    /**
+     * Catalog keys are `service:providerId:tag` as built by
+     * {@see \App\Service\Iam\Policy\GroupPolicyService::catalogKey()}:
+     * colons inside providerId become dashes, but `/` and `@` stay
+     * (`groq:openai/gpt-oss-120b:chat`, `cloudflare:@cf/baai/bge-m3:vectorize`).
+     */
+    private const MODEL_KEY_PATTERN = '/^[a-z0-9._-]+:[a-z0-9._\/@+-]+(?::[a-z0-9._-]+)?$/i';
 
-    private const FOLDER_PATTERN = '/^\d+:[A-Za-z0-9:_-]+$/';
+    /** `{ownerId}:{groupKey}` — group keys include contact folders like `contact:alice@example.com`. */
+    private const FOLDER_PATTERN = '/^\d+:[A-Za-z0-9:_.@+-]+$/';
 
     /**
      * @param array<mixed> $json
