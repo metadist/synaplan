@@ -61,9 +61,16 @@ describe('ConversationFilesBar', () => {
   it('reveals the files on toggle and emits attach on click', async () => {
     const wrapper = mountBar()
 
-    await wrapper.get('[data-testid="conversation-files-toggle"]').trigger('click')
-
+    // v-show keeps the popover mounted, so presence alone proves nothing. The
+    // toggle's aria-expanded state is the deterministic signal that it opened
+    // (and it is what assistive tech reads).
+    const toggle = wrapper.get('[data-testid="conversation-files-toggle"]')
     const popover = wrapper.get('[data-testid="conversation-files-popover"]')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+
+    await toggle.trigger('click')
+
+    expect(toggle.attributes('aria-expanded')).toBe('true')
     expect(popover.text()).toContain('Files in this chat')
 
     const chip = wrapper.get('[data-testid="conversation-file-chip"]')
@@ -72,6 +79,8 @@ describe('ConversationFilesBar', () => {
     await chip.trigger('click')
 
     expect(wrapper.emitted('attach')?.[0]).toEqual([contract])
+    // Attaching closes the popover again.
+    expect(toggle.attributes('aria-expanded')).toBe('false')
   })
 
   it('does not emit attach when the surface is read-only', async () => {

@@ -116,6 +116,10 @@
     --brand: #003fc7;
     --brand-light: #6b8fd6;
     --brand-hover: #0035b0;
+    /* Readable ink for text/icons placed ON a --brand fill. White works on the
+       deep light-mode brand; the dark theme flips brand to a light blue, so the
+       ink flips to near-black there (see .dark). Both pass WCAG AA. */
+    --on-brand: #fff;
 
     --bg-app: #f2f2f2;
     --bg-sidebar: #ebebeb;
@@ -171,6 +175,8 @@
     --brand: #6d9ae0;
     --brand-light: #93b8e8;
     --brand-hover: #83b0e8;
+    /* Dark brand is a light blue, so on-brand ink is near-black (6.5:1). */
+    --on-brand: #0a0e1a;
 
     --bg-app: #0a0e1a;
     --bg-sidebar: #0d1525;

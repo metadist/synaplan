@@ -17,48 +17,55 @@
       :aria-label="$t('chat.conversationFiles.count', files.length)"
       :title="$t('chat.conversationFiles.count', files.length)"
       :aria-expanded="open"
-      aria-haspopup="true"
+      aria-haspopup="dialog"
       data-testid="conversation-files-toggle"
       @click="toggle"
     >
       <Icon icon="mdi:paperclip" class="w-4 h-4" />
       <span
-        class="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-[var(--brand)] text-white text-[10px] font-semibold inline-flex items-center justify-center"
+        class="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-[var(--brand)] text-[color:var(--on-brand)] text-[10px] font-semibold inline-flex items-center justify-center"
       >
         {{ files.length }}
       </span>
     </button>
 
-    <!-- Popover: the actual file list, opening upward so it is never clipped
-         by the composer at the bottom of the viewport. -->
+    <!-- Popover: the actual file list, opening upward so it is never clipped by
+         the composer at the bottom of the viewport. The outer wrapper carries
+         the vertical offset as padding (not margin) so the hover area bridges
+         the gap between the trigger and the panel — a margin gap would drop the
+         hover and the panel could never be reached without a click. -->
     <div
       v-show="open"
-      class="absolute bottom-full left-0 mb-2 w-72 max-w-[80vw] surface-card border border-light-border/30 dark:border-dark-border/20 rounded-xl shadow-lg p-3 z-40"
-      role="dialog"
-      :aria-label="$t('chat.conversationFiles.title')"
+      class="absolute bottom-full left-0 pb-2 z-40"
       data-testid="conversation-files-popover"
     >
-      <p class="text-xs font-medium txt-primary mb-1">{{ $t('chat.conversationFiles.title') }}</p>
-      <p class="text-xs txt-secondary mb-2">{{ $t('chat.conversationFiles.hint') }}</p>
-      <div class="flex flex-col gap-1.5 max-h-64 overflow-y-auto" role="list">
-        <button
-          v-for="file in files"
-          :key="file.reference"
-          type="button"
-          class="btn-secondary w-full px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="!canAttach || file.id === null"
-          :title="attachTitle(file)"
-          :aria-label="attachTitle(file)"
-          data-testid="conversation-file-chip"
-          role="listitem"
-          @click="onAttach(file)"
-        >
-          <Icon
-            :icon="fileIcon(file.fileType || file.category)"
-            class="w-3.5 h-3.5 flex-shrink-0"
-          />
-          <span class="truncate">{{ file.name }}</span>
-        </button>
+      <div
+        class="w-72 max-w-[80vw] surface-card border border-light-border/30 dark:border-dark-border/20 rounded-xl shadow-lg p-3"
+        role="dialog"
+        :aria-label="$t('chat.conversationFiles.title')"
+      >
+        <p class="text-xs font-medium txt-primary mb-1">{{ $t('chat.conversationFiles.title') }}</p>
+        <p class="text-xs txt-secondary mb-2">{{ $t('chat.conversationFiles.hint') }}</p>
+        <div class="flex flex-col gap-1.5 max-h-64 overflow-y-auto" role="list">
+          <button
+            v-for="file in files"
+            :key="file.reference"
+            type="button"
+            class="btn-secondary w-full px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="!canAttach || file.id === null"
+            :title="attachTitle(file)"
+            :aria-label="attachTitle(file)"
+            data-testid="conversation-file-chip"
+            role="listitem"
+            @click="onAttach(file)"
+          >
+            <Icon
+              :icon="fileIcon(file.fileType || file.category)"
+              class="w-3.5 h-3.5 flex-shrink-0"
+            />
+            <span class="truncate">{{ file.name }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
