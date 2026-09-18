@@ -398,7 +398,8 @@
       "title": "Bu sohbetteki dosyalar",
       "hint": "Sonraki soruların bu dosyaları kullanmaya devam eder.",
       "attach": "Sonraki iletide {name} kullan",
-      "attached": "{name} sonraki iletide gönderilecek"
+      "attached": "{name} sonraki iletide gönderilecek",
+      "count": "{count} dosya"
     },
     "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
     "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin.",

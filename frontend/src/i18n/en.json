@@ -405,7 +405,8 @@
       "title": "Files in this chat",
       "hint": "Questions you ask still use these files.",
       "attach": "Use {name} in the next message",
-      "attached": "{name} will be sent with your next message"
+      "attached": "{name} will be sent with your next message",
+      "count": "{count} file | {count} files"
     },
     "fileOnlyDefaultMessage": "Please review the attached file.",
     "voiceMessageDefaultMessage": "Please respond to my voice message.",
