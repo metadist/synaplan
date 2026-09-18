@@ -314,6 +314,12 @@ export const authService = {
       return false
     }
 
+    const { awaitAuthMutation } = await import('@/services/api/httpClient')
+    // Park behind an in-progress principal swap BEFORE recording an in-flight
+    // fetch. Awaiting this promise from the swap used to deadlock: the lock
+    // holder waited on us, we waited on the lock.
+    await awaitAuthMutation()
+
     // Prevent multiple simultaneous refresh calls
     if (isRefreshing.value && refreshPromise) {
       return refreshPromise
@@ -331,17 +337,17 @@ export const authService = {
   },
 
   /**
-   * Refresh already in flight, if any. Login awaits this so a 401 handler
-   * cannot clear the session hint after the new cookies are written.
+   * Cookie-refresh already on the wire, if any. Callers starting a principal
+   * swap await this after taking the auth-mutation lock so a fetch that began
+   * before the lock (and therefore still carries pre-swap cookies) settles
+   * first. Null while merely parked on the lock — joining that would deadlock.
    */
   getInFlightRefresh(): Promise<boolean> | null {
     return isRefreshing.value ? refreshPromise : null
   },
 
   async _doRefresh(): Promise<boolean> {
-    const { awaitAuthMutation, isAuthMutationInProgress } =
-      await import('@/services/api/httpClient')
-    await awaitAuthMutation()
+    const { isAuthMutationInProgress } = await import('@/services/api/httpClient')
 
     try {
       const native = isNativeApp()
