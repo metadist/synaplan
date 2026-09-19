@@ -6,6 +6,10 @@ this HTTP API (protocol 1).
 
 **Go/no-go (A0):** own sidecar. See [docs/SPIKE.md](docs/SPIKE.md), [docs/API.md](docs/API.md), and [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
+Developers start this from the Synaplan checkout with a plain
+`docker compose up`. Details: [root README](../../README.md#file-work)
+and [docs/COMPUTE.md](../../docs/COMPUTE.md).
+
 ## Layout
 
 | Path | Role |

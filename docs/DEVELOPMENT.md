@@ -76,29 +76,15 @@ keys in both overlay files (the architecture test fails if either is
 missing), and never a second hand-written `isEnabled()` + feature-status
 block.
 
-### Secure compute (optional)
+### Secure compute
 
-Short Python or Node file work for the assistant. Off by default. The sidecar
-is a Compose profile; PHP never talks to Docker.
+Short Python or Node file work for the assistant. `docker compose up` starts
+the sidecar, builds the Python/Node runtimes from this repo, and turns the
+feature on. PHP never talks to Docker. Never publish port 8080.
 
-```bash
-make -C sidecars/synaplan-compute images
-COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  docker compose --profile compute up -d
-```
-
-The sidecar process is distroless `nonroot`. Set `COMPUTE_DOCKER_GID` to the
-host docker socket group so it can talk to dockerd. The runner never pulls:
-build the Python/Node images (`make -C sidecars/synaplan-compute images`) and
-pin those digests in `sidecars/synaplan-compute/internal/images/map.go` or the
-first run fails with image-not-found.
-
-Then set **COMPUTE.ENABLED** under Operate → System config (or
-`FEATURE_COMPUTE_ENABLED=true`). Feature Status → *Secure compute* must show
-Available. Never publish port 8080. Persistent folders and website fetches
-are extra switches (`COMPUTE.WORKSPACES_ENABLED`, `COMPUTE.EGRESS_ENABLED`),
-also off. See [COMPUTE.md](./COMPUTE.md) and
+Hide it with `COMPUTE_URL=disabled` or `FEATURE_COMPUTE_ENABLED=false`.
+Website fetches stay off (`COMPUTE.EGRESS_ENABLED`). See
+[COMPUTE.md](./COMPUTE.md) and
 [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
 
 ### Office conversion (optional)

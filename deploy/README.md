@@ -167,6 +167,20 @@ stays in the app (login + file ownership). `OFFICE_CONVERT_URL=disabled` turns
 the engine off. Details:
 [Office documents](https://docs.synaplan.com/index.php/office-documents).
 
+## File work (secure compute)
+
+Spoken answers start with the stack. File work stays a one-line profile
+because it mounts the host Docker socket:
+
+```dotenv
+COMPOSE_PROFILES=compute
+```
+
+`prepare.sh` writes `COMPUTE_TOKEN` and the scratch dirs. Combine profiles
+with a comma (`local-ai,office,compute`). Never publish port `8080`. A
+multi-node cluster must use a separate gVisor box — never T1 on the web
+nodes. Details: [docs/COMPUTE.md](../docs/COMPUTE.md).
+
 ## Network and persistence
 
 Only the web service binds a host port. MariaDB, Redis, Centrifugo, Tika, Qdrant,

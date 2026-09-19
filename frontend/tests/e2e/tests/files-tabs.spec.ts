@@ -7,8 +7,8 @@ const FILES = selectors.files
 
 /**
  * Files "world" tab bar (§4.6): the knowledge base is one page with Browse,
- * Incoming, Generated, Search, Vectors. Workspace is a sibling tab only when
- * COMPUTE.WORKSPACES_ENABLED is on (default off — no teaser). Only Browse↔Search
+ * Incoming, Generated, Search, Vectors. Workspace is a sibling tab when
+ * COMPUTE.WORKSPACES_ENABLED is on (local compose pins it on). Only Browse↔Search
  * was covered (rag-search.spec.ts); the Incoming/Generated/Vectors views shipped
  * with the File Management World and had no E2E. This is a pure navigation smoke:
  * each tab renders its page root without error. Content assertions (uploads,
@@ -39,10 +39,6 @@ test.describe('@ci Files tabs', () => {
       await page.locator(FILES.tabSearch).click()
       await expect(page).toHaveURL(/\/files\/search/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(selectors.rag.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    })
-
-    await test.step('Workspace tab stays hidden while the folder flag is off', async () => {
-      await expect(page.locator(FILES.tabWorkspace)).toHaveCount(0)
     })
 
     await test.step('Vectors tab is admin-only (hidden for the worker user)', async () => {

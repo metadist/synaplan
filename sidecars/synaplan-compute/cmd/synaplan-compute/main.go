@@ -30,8 +30,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	imgs := images.Default()
-	if err := imgs.RequireDigests(); err != nil {
+	imgs, err := images.Load()
+	if err != nil {
 		log.Fatal(err)
 	}
 

@@ -27,5 +27,5 @@ hostile:
 	$(GO) test ./tests/hostile/ ./internal/runner/ ./internal/audit/
 
 images:
-	docker build -t synaplan-compute-python ./images/python
-	docker build -t synaplan-compute-node ./images/node
+	docker build -t synaplan-compute-python:local ./images/python
+	docker build -t synaplan-compute-node:local ./images/node

@@ -1849,7 +1849,7 @@ final readonly class SystemConfigService
             'COMPUTE_ENABLED' => [
                 'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Let the assistant do short file work (Python or Node) on copies of files you chose. Also needs COMPUTE_URL and COMPUTE_TOKEN pointing at the compute sidecar. Off by default — nothing is offered until both the sidecar and this switch are on.',
+                'description' => 'Let the assistant do short file work (Python or Node) on copies of files you chose. Needs the compute sidecar (COMPUTE_URL + COMPUTE_TOKEN). Local `docker compose up` starts that sidecar and turns this on.',
                 'default' => 'false',
                 'source' => 'database',
                 'dbGroup' => ComputeConfig::CONFIG_GROUP,

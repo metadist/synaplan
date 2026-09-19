@@ -2,6 +2,7 @@ package images
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -20,6 +21,7 @@ type Image struct {
 // Map is the only source of image references. A run never pulls; keys only.
 type Map struct {
 	images map[string]Image
+	local  bool
 }
 
 // Default is the v1 Python + Node catalog, pinned to the published 1.0.0
@@ -40,13 +42,57 @@ func Default() *Map {
 	})
 }
 
-// New validates that every ref is digest-pinned.
+// New copies list. Digest pinning is enforced by RequireDigests or Load.
 func New(list []Image) *Map {
 	m := &Map{images: make(map[string]Image, len(list))}
 	for _, img := range list {
 		m.images[img.Key] = img
 	}
 	return m
+}
+
+// Load is Default() plus optional local-dev overrides.
+//
+// Production (no extra env) keeps the published digest pins and refuses to
+// start without them. A fresh `docker compose up` sets
+// COMPUTE_ALLOW_LOCAL_IMAGES=1 and COMPUTE_IMAGE_{PYTHON,NODE} to the
+// images Compose just built from sidecars/synaplan-compute/images, so a
+// clone does not need GHCR package access or a digest paste.
+func Load() (*Map, error) {
+	m := Default()
+	allowLocal := envTruthy("COMPUTE_ALLOW_LOCAL_IMAGES")
+	if ref := strings.TrimSpace(os.Getenv("COMPUTE_IMAGE_PYTHON")); ref != "" {
+		if !allowLocal {
+			return nil, fmt.Errorf("COMPUTE_IMAGE_PYTHON requires COMPUTE_ALLOW_LOCAL_IMAGES=1")
+		}
+		m.setRef(KeyPython, ref)
+	}
+	if ref := strings.TrimSpace(os.Getenv("COMPUTE_IMAGE_NODE")); ref != "" {
+		if !allowLocal {
+			return nil, fmt.Errorf("COMPUTE_IMAGE_NODE requires COMPUTE_ALLOW_LOCAL_IMAGES=1")
+		}
+		m.setRef(KeyNode, ref)
+	}
+	if allowLocal {
+		m.local = true
+		return m, nil
+	}
+	return m, m.RequireDigests()
+}
+
+func (m *Map) setRef(key, ref string) {
+	img := m.images[key]
+	img.Ref = ref
+	m.images[key] = img
+}
+
+func envTruthy(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 // Lookup returns the image for key.
@@ -81,7 +127,11 @@ func (m *Map) List() []Image {
 }
 
 // RequireDigests fails if any ref is not name@sha256:hex.
+// Local-dev maps from Load() skip this — Compose built those tags.
 func (m *Map) RequireDigests() error {
+	if m != nil && m.local {
+		return nil
+	}
 	for _, img := range m.images {
 		if err := requireDigest(img.Ref); err != nil {
 			return fmt.Errorf("image %s: %w", img.Key, err)

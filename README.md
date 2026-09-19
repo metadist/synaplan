@@ -24,7 +24,7 @@
 - **DAG task routing that saves tokens.** An AI planner decomposes complex requests into a directed task graph (extract → summarize → generate → reply) and routes every step to the model that fits it — a cheap fast model for extraction, a strong one only where reasoning is needed. Live task cards stream while the graph executes, and every answer shows what it cost.
 - **Sovereign by design.** Run on-prem, in the EU cloud, or fully air-gapped: chat, RAG knowledge search, document processing, transcription and speech run with zero internet connection. No training on your data, no forced telemetry — proven in production up to 5,000-workplace offline deployments.
 - **Everywhere you work.** Web app, [iPhone](https://apps.apple.com/app/id6784278288?ct=github-readme) and [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) apps, [Desktop](https://github.com/metadist/synaplan-desktop), [Outlook add-in](https://github.com/metadist/Synamail), embeddable chat widget, WhatsApp, email — plus the tools you already run: Microsoft 365, Dropbox, Nextcloud / ownCloud, calendars, Jira and Confluence, and [OpenCloud](https://github.com/metadist/synaplan-opencloud).
-- **Extensible without forking.** A non-invasive plugin system, an OpenAPI-documented REST API, an MCP server *and* client, and an Anthropic-compatible endpoint for Claude Code and friends.
+- **Extensible without forking.** A non-invasive plugin system, an OpenAPI-documented REST API, an MCP server *and* client, and an Anthropic-compatible endpoint for Claude Code and friends. Optional sidecars stay optional: file work, office conversion and local search never leak a half-working control when they are off.
 
 ---
 
@@ -209,7 +209,7 @@ Everything below is the same platform, packaged for different homes. Pick what f
 - **Docker** + **Docker Compose v2** (Docker Desktop on macOS/Windows, or Docker Engine + the Compose plugin on Linux)
 - **Git**
 - **8 GB RAM** minimum (16 GB recommended once you add the `local-ai` profile)
-- **~3 GB free disk** for the standard install (+~1 GB for the `local-ai` profile, +~14 GB if you also enable the local chat model)
+- **~4 GB free disk** for the standard install (includes file work + spoken answers; +~1 GB for `local-ai`, +~14 GB if you also enable the local chat model)
 - Free TCP ports `5173`, `8000`, `8082`, `8025`, `3307`, `6333`, `11435`
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The three-step start above already does this: `docker compose up -d` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. The pre-built `ghcr.io/metadist/synaplan` image published for production deployments is `linux/amd64` only, so pulling it instead means running the whole backend under emulation. The first local build takes a few minutes; every later start is a cache hit. Two optional dev tools (phpMyAdmin, MailHog) are still amd64-only upstream images — if you keep them, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so those two emulate quickly.
@@ -221,8 +221,8 @@ Everything below is the same platform, packaged for different homes. Pick what f
 | Mode | Command | Size | Best For |
 |------|---------|------|----------|
 | **One-liner** | `curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh \| bash` | ~3 GB | Easiest start — checks prerequisites, fetches, and starts the standard stack (`--minimal` and `--mode server` available) |
-| **Standard** | `docker compose up -d` | ~3 GB | Local try-out: full features, cloud AI — add one provider key and chat works |
-| **+ local AI** | `COMPOSE_PROFILES=local-ai docker compose up -d` | ~4 GB | Adds Ollama and the `bge-m3` embedding model on your own hardware (local chat model optional, +~14 GB) |
+| **Standard** | `docker compose up -d` | ~4 GB | Local try-out: chat, file work, spoken answers — add one provider key and it works |
+| **+ local AI** | `COMPOSE_PROFILES=local-ai docker compose up -d` | ~5 GB | Adds Ollama and the `bge-m3` embedding model on your own hardware (local chat model optional, +~14 GB) |
 | **Production** | `install.sh --mode server` or `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
 | **Kubernetes** | [synaplan-charts](https://github.com/metadist/synaplan-charts) | published image | Helm-based cluster deployments for partners and enterprises |
 
@@ -268,13 +268,18 @@ docker compose up -d
 - **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/index.php/widget))
 - **Mobile Apps** — Chat, documents and voice on iPhone and Android, pointed at web.synaplan.com or at your own server ([App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme))
 - **Desktop Client** — Pair a computer and run Agents locally ([synaplan-desktop](https://github.com/metadist/synaplan-desktop))
+- **AI assistants** — Saved recipes (instructions, knowledge folders, tools, triggers) that you publish in versions ([assistants](https://docs.synaplan.com/assistants))
+- **Tools & approvals** — One tool registry; write-class actions pause under **Approvals** ([tools](https://docs.synaplan.com/tools-and-approvals))
+- **People & groups** — Share folders, chats, assistants and tasks; **Operate → People** ([people](https://docs.synaplan.com/people-and-groups))
+- **File work** — Short Python or Node runs on *copies* of files you picked, in an isolated sidecar ([guide](docs/COMPUTE.md))
 - **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md))
 - **WhatsApp** — Meta Business API integration
 - **Email** — AI-powered email responses, plus live mailbox search (IMAP and Microsoft 365)
 - **Connections** — Microsoft 365, Dropbox, Nextcloud / ownCloud / WebDAV, CalDAV — read mail, file results, write calendar events ([connections guide](docs/CONNECTIONS.md))
-- **Saved Tasks** — Pin a multi-step plan and run it on demand or on a schedule (**Channels → Saved Tasks**)
+- **Saved Tasks** — Pin a multi-step plan and run it on demand or on a schedule, with a **Steps** editor and webhook trigger (**Manage → Automations → Saved Tasks**)
+- **Watched pages** — Save a URL, compare it on a schedule, and mail the diff when it changes
 - **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output; four baked voices, UI language selects the voice)
-- **Documents** — PDF, Word, Excel, images with OCR; optional Collabora CODE sidecar for office thumbnails, PDF export, preview and combine ([office documents](https://docs.synaplan.com/index.php/office-documents))
+- **Documents** — PDF, Word, Excel, images with OCR; the assistant can also build and revise Office files; optional Collabora CODE sidecar for thumbnails, PDF export, preview and combine ([office documents](https://docs.synaplan.com/index.php/office-documents))
 - **AI Memories** — User profiling with Qdrant vector search
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
@@ -322,7 +327,10 @@ Synaplan is provider-neutral: connect the providers you want in **Admin → AI P
 | **Centrifugo** (`centrifugo`) | Live support: human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md)) | on | `REALTIME_ENABLED=false docker compose up -d` (then `docker compose stop centrifugo`) — the dashboard falls back to plain REST refreshes |
 | **Apache Tika** (`tika`) | Text extraction from PDF, Word, Excel and 1000+ formats for RAG | on | `docker compose stop tika` — uploads then index plain text / OCR only |
 | **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](#office-documents-optional-collabora-code) | **off** | `docker compose --profile office up -d` |
-| **Text-to-speech** (`tts`) | Spoken answers, four built-in voices — [details](#text-to-speech-optional) | **off** | `docker compose --profile tts up -d` |
+| **Docling** (`docling`) | Layout-aware extraction (tables, headings) in front of Tika — [module](https://docs.synaplan.com/modules/docling) | **off** | `docker compose --profile docling up -d` |
+| **SearXNG** (`searxng`) | Self-hosted web search so queries stay on your network — [module](https://docs.synaplan.com/modules/searxng) | **off** | `docker compose --profile searxng up -d` |
+| **File work** (`compute`) | Short Python / Node jobs on copies of files you pick — [details](#file-work) | **on** | `COMPUTE_URL=disabled docker compose up -d` |
+| **Text-to-speech** (`tts`) | Spoken answers, four built-in voices — [details](#text-to-speech) | **on** | `docker compose stop tts` |
 | **Keycloak** (`keycloak`) | SSO test realm for OIDC development ([configuration](docs/CONFIGURATION.md)) | **off** | `docker compose --profile oidc up -d` |
 
 **Keep a default-on block off across restarts.** `docker compose stop` is undone by the next `up -d`. To make a block opt-in permanently, give it a profile in a `docker-compose.override.yml` (not tracked by git) — plain `up -d` then skips it, `--profile optional` brings it back:
@@ -333,7 +341,7 @@ services:
     profiles: [optional]
 ```
 
-Production follows the same rule set: [`deploy/compose.yaml`](deploy/README.md) ships the core plus Qdrant, Centrifugo and Tika, with `office` and `local-ai` as profiles (`COMPOSE_PROFILES=office,local-ai` in `deploy/.env`); Kubernetes installs wire the same services via [synaplan-charts](https://github.com/metadist/synaplan-charts). The other dev-only containers (`phpmyadmin`, `mailhog`, `frontend-widgets`, `startup-notes`) never ship to production.
+Production follows the same rule set: [`deploy/compose.yaml`](deploy/README.md) ships the core plus Qdrant, Centrifugo, Tika and spoken answers, with `office`, `local-ai` and `compute` as profiles (`COMPOSE_PROFILES=office,local-ai,compute` in `deploy/.env`). Kubernetes installs wire the same services via [synaplan-charts](https://github.com/metadist/synaplan-charts). The other dev-only containers (`phpmyadmin`, `mailhog`, `frontend-widgets`, `startup-notes`) never ship to production.
 
 ---
 
@@ -351,19 +359,16 @@ In a multi-node cluster all nodes share one Redis, so WebSocket events published
 
 ---
 
-## Text-to-Speech (Optional)
+## Text-to-Speech
 
-Voice output is an **optional companion**, not part of the core stack — [synaplan-tts](https://github.com/metadist/synaplan-tts), image [`ghcr.io/metadist/synaplan-tts`](https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts). The image already contains **four Piper voices** (English, German, Spanish, Turkish). Synaplan runs fully without it; the speaker control appears when the service answers.
+Voice output starts with `docker compose up` — [synaplan-tts](https://github.com/metadist/synaplan-tts), image [`ghcr.io/metadist/synaplan-tts`](https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts). The image already contains **four Piper voices** (English, German, Spanish, Turkish). Stop the `tts` container to hide the speaker control.
 
 ```bash
-# Same compose file (recommended)
-docker compose --profile tts up -d
-
-# Or standalone, on this host or another machine
+# Already running after `docker compose up`. Standalone on another machine:
 docker run -d --name synaplan-tts -p 127.0.0.1:10200:10200 ghcr.io/metadist/synaplan-tts:latest
 ```
 
-The backend looks at `SYNAPLAN_TTS_URL` (compose default `http://host.docker.internal:10200`).
+The backend looks at `SYNAPLAN_TTS_URL` (compose default `http://tts:10200`).
 
 **The UI language selects the voice.** Chat sends the active frontend locale (`en` / `de` / `es` / `tr`); if the backend detects a different reply language, that wins. Piper then maps the short code to the matching baked voice (German UI → Thorsten, Spanish → davefx, …). There is no separate voice picker. Add more Piper models by dropping `.onnx` + `.onnx.json` into the extra-voices volume — see [synaplan-tts README](https://github.com/metadist/synaplan-tts#adding-more-voices) and [docs.synaplan.com/tts](https://docs.synaplan.com/index.php/tts).
 
@@ -404,6 +409,28 @@ Kubernetes / reuse in other projects:
 
 ---
 
+## File work
+
+The assistant can run a **short Python or Node program** on *copies* of files
+you already picked and hand the result back as files — a chart from a CSV, a
+merged spreadsheet, a renamed folder of PDFs. The program runs in an isolated
+sidecar. PHP never talks to Docker.
+
+`git clone` and `docker compose up` start it. Compose builds the sidecar and
+the Python/Node runtimes from this repo, wires a local token, and turns the
+feature on. No profile, no image pin, no extra `.env`.
+
+To hide it: `COMPUTE_URL=disabled docker compose up -d` (or
+`FEATURE_COMPUTE_ENABLED=false`). Never publish port `8080`. Production
+self-host adds `compute` to `COMPOSE_PROFILES` in `deploy/.env` —
+`prepare.sh` writes the token. Cloud uses a **separate** gVisor box, not this
+T1 sidecar on the web nodes.
+
+Full guide: [docs/COMPUTE.md](docs/COMPUTE.md) ·
+[docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
+
+---
+
 ## Common Commands
 
 ```bash
@@ -438,7 +465,8 @@ In-repo guides (for developers working on this codebase):
 |-------|-------------|
 | [Installation](docs/INSTALLATION.md) | Local development stack and production self-hosting (`deploy/`) |
 | [Configuration](docs/CONFIGURATION.md) | Environment variables, API keys |
-| [Feature flags](docs/FEATURE_FLAGS.md) | Every wave feature (people & sharing, assistants, tools, saved-task steps, desktop, …): admin toggle, `FEATURE_*` env pin, defaults |
+| [Feature flags](docs/FEATURE_FLAGS.md) | Every wave feature (people & sharing, assistants, tools, saved-task steps, desktop, file work, …): admin toggle, `FEATURE_*` env pin, defaults |
+| [File work / compute](docs/COMPUTE.md) | Optional sidecar: flags, compose profile, quotas, workspaces |
 | [Connections](docs/CONNECTIONS.md) | Microsoft 365, Dropbox, Nextcloud / WebDAV, CalDAV, Jira / Confluence |
 | [AI Model Pricing](docs/PRICING_MAINTENANCE.md) | Model catalog, provider prices, retiring a model |
 | [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
@@ -450,6 +478,7 @@ In-repo guides (for developers working on this codebase):
 | [WhatsApp](docs/WHATSAPP.md) | Meta Business API setup |
 | [Email](docs/EMAIL.md) | Email channel integration |
 | [Anthropic-compatible API](docs/ANTHROPIC_COMPATIBLE_API.md) | Claude Code / Messages API gateway (`POST /v1/messages`) |
+| [Secure compute (user docs)](https://docs.synaplan.com/modules/compute) | What people see: File work card, Workspace, quotas |
 
 ## Related Repositories
 
@@ -475,8 +504,9 @@ In-repo guides (for developers working on this codebase):
 synaplan/
 ├── backend/        # Symfony PHP API
 ├── frontend/       # Vue.js SPA
-├── docs/           # Documentation
+├── docs/           # Developer documentation
 ├── deploy/         # Production self-host compose + lifecycle scripts
+├── sidecars/       # Optional sidecars (secure compute)
 ├── _docker/        # Docker configs
 └── plugins/        # Plugin system
 ```

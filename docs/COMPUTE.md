@@ -1,9 +1,9 @@
 # File work (secure compute)
 
 > **Status.** Short Python or Node work on copies of files the user chose.
-> Off by default. Needs the compute sidecar (`COMPUTE_URL` + `COMPUTE_TOKEN`)
-> **and** `COMPUTE.ENABLED`. Persistent folders and website fetches are
-> separate switches, also off. The contract stays frozen at `protocol: 1`.
+> Local `docker compose up` starts the sidecar and turns file work +
+> workspaces on. Website fetches stay off. The contract stays frozen at
+> `protocol: 1`.
 
 ## What it is
 
@@ -23,8 +23,8 @@ the surface is absent: no chat card, no Files tab, no API tease (U11).
 
 | Flag | Env pin | Default | Effect |
 | ---- | ------- | ------- | ------ |
-| `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **off** | Sidecar + this switch must both be on. Every `/api/v1/compute/*` route answers **404** when off. |
-| `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **off** | Keep one folder per user between runs. Files → **Workspace**. The chat card shows **Open workspace** only when that run actually used the folder. |
+| `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **on** (local compose; new seed when URL+token set) | Sidecar + this switch must both be on. Every `/api/v1/compute/*` route answers **404** when off. |
+| `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **on** (same rule as ENABLED) | Keep one folder per user between runs. Files → **Workspace**. The chat card shows **Open workspace** only when that run actually used the folder. |
 | `COMPUTE.EGRESS_ENABLED` | `FEATURE_COMPUTE_EGRESS_ENABLED` | **off** | A run may fetch from a short list of public websites. Off = every run stays offline. Private or local addresses are always refused. |
 | `COMPUTE.REQUIRE_TIER` | — | `docker` | Minimum isolation the sidecar must report (`docker` < `gvisor` < `microvm`). Below it, file work stays off even when enabled; the admin UI refuses the switch with the reported tier. |
 
@@ -41,14 +41,14 @@ egress proxy, is not built yet). The PHP side (resolver, pinning, approval)
 is complete and waits for that sidecar release.
 
 Operators switch them under **Operate → System configuration → Processing →
-File work**. Seeders insert the rows as `0` when missing and never overwrite
-an existing value.
+File work**. Seeders insert missing rows and never overwrite an existing value.
 
 ```sql
 -- what ComputeConfigSeeder runs (BConfigSeeder::insertIfMissing): a no-op
 -- when the row exists, so an operator's value is never reset.
 -- New installs start enabled only when COMPUTE_URL and COMPUTE_TOKEN are
--- set at seed time; otherwise the row is inserted as '0'.
+-- set at seed time (ComputeConfigSeeder::enabledSeedValue writes '1');
+-- otherwise the row is inserted as '0'. Existing rows are never touched.
 INSERT IGNORE INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
 VALUES (0, 'COMPUTE', 'ENABLED', '0');
 ```
@@ -56,22 +56,25 @@ VALUES (0, 'COMPUTE', 'ENABLED', '0');
 The runtime-config endpoint exposes `features.computeEnabled` and
 `features.computeWorkspacesEnabled` so the UI can hide the tab and the chip.
 
-## Compose profile (T1)
+## Local compose (T1)
 
-Dev and self-host use Compose profile `compute` on the same host. That is
-**T1**: a hardened Docker container, no host network, no Docker socket in
-PHP. Honest limits: one machine, one Docker daemon, no gVisor.
+`docker compose up` starts file work on the same host. That is **T1**: a
+hardened Docker container, no host network, no Docker socket in PHP. Honest
+limits: one machine, one Docker daemon, no gVisor.
 
 ```bash
-make -C sidecars/synaplan-compute images
-COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  docker compose --profile compute up -d
+docker compose up -d
 ```
 
-Never publish port 8080. The sidecar process is distroless `nonroot`. The
-runner never pulls images: build Python/Node first or the first run fails
-with image-not-found. See [DEVELOPMENT.md](./DEVELOPMENT.md).
+Compose builds the sidecar and the Python/Node runtimes from this repo,
+creates `.compute-data/`, and injects a local token. Never publish port 8080.
+Hide it with `COMPUTE_URL=disabled` or `FEATURE_COMPUTE_ENABLED=false`.
+
+A **new** install seeds `COMPUTE.ENABLED` and `COMPUTE.WORKSPACES_ENABLED`
+as `1` when `COMPUTE_URL` and `COMPUTE_TOKEN` are set at seed time (local
+compose always sets them). An existing row is never overwritten — local
+compose also pins `FEATURE_COMPUTE_ENABLED=true` so an older database still
+offers the feature. See [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 ## T2 on a separate node
 
@@ -183,7 +186,7 @@ disables it:
    reaper commands exit idle. Run history (`BCOMPUTERUNS`) and artefacts
    in Files stay readable; the Workspace browser shows the
    not-available state instead of an error.
-2. **Sidecar down** (`docker compose --profile compute down`): the System
+2. **Sidecar down** (`docker compose stop compute`): the System
    status card degrades to unreachable (counts kept), the page itself
    stays up, and new runs fail honestly instead of hanging.
 

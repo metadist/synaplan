@@ -58,16 +58,21 @@ final class ComputeConfigSeederTest extends TestCase
         $result = (new ComputeConfigSeeder($connection))->seed();
 
         $enabled = null;
+        $workspaces = null;
         $tier = null;
         foreach ($seen as $params) {
             if ('ENABLED' === ($params[2] ?? null)) {
                 $enabled = $params[3] ?? null;
+            }
+            if ('WORKSPACES_ENABLED' === ($params[2] ?? null)) {
+                $workspaces = $params[3] ?? null;
             }
             if ('REQUIRE_TIER' === ($params[2] ?? null)) {
                 $tier = $params[3] ?? null;
             }
         }
         self::assertSame('1', $enabled);
+        self::assertSame('1', $workspaces);
         self::assertSame('docker', $tier);
         self::assertGreaterThan(0, $result->inserted);
     }

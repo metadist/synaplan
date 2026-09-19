@@ -753,6 +753,8 @@ ensure_deployment_secrets() {
     for ((index = 0; index < ${#SYNAPLAN_MANAGED_SECRET_KEYS[@]}; index++)); do
         export "${SYNAPLAN_MANAGED_SECRET_KEYS[$index]}=${values[$index]}"
     done
+
+    ensure_compute_token
 }
 
 # Whether the stack has already been initialised, which decides whether a missing
@@ -796,6 +798,32 @@ deployment_secret_is_adoptable() {
     case "$value" in
         '"'*'"' | "'"*"'") return 1 ;;
     esac
+}
+
+# File-work token is optional and only required when COMPOSE_PROFILES includes
+# compute. It lives next to the other data (not in the 8-key secrets.env) so
+# marketplace rewrites of deploy/.env do not rotate it.
+ensure_compute_token() {
+    mkdir -p "$DATA_DIR/compute/scratch" "$DATA_DIR/compute/workspaces"
+    case ",${COMPOSE_PROFILES:-}," in
+        *,compute,*) ;;
+        *) return 0 ;;
+    esac
+    local token_file="$DATA_DIR/compute.token"
+    if [[ -z "${COMPUTE_TOKEN:-}" ]]; then
+        if [[ -f "$token_file" ]]; then
+            COMPUTE_TOKEN="$(tr -d '\n' < "$token_file")"
+        else
+            COMPUTE_TOKEN="$(openssl rand -hex 32)"
+            umask 077
+            printf '%s\n' "$COMPUTE_TOKEN" > "$token_file"
+        fi
+    elif [[ ! -f "$token_file" ]]; then
+        umask 077
+        printf '%s\n' "$COMPUTE_TOKEN" > "$token_file"
+    fi
+    export COMPUTE_TOKEN
+    export COMPUTE_URL="${COMPUTE_URL:-http://compute:8080}"
 }
 
 # 32 bytes of randomness rendered as 64 hexadecimal characters.
@@ -904,7 +932,9 @@ prepare_data_directories() {
         "$DATA_DIR/qdrant" \
         "$DATA_DIR/uploads" \
         "$DATA_DIR/ollama" \
-        "$DATA_DIR/whisper"
+        "$DATA_DIR/whisper" \
+        "$DATA_DIR/compute/scratch" \
+        "$DATA_DIR/compute/workspaces"
     # 0700 on the data root as well, not only on the two directories that hold
     # dumps and lifecycle state: below it sit the raw MariaDB files, the Redis
     # append-only file and every uploaded document. post-restore.sh already

@@ -3,7 +3,7 @@
 # Cloud AI by default, exactly like a self-hosted install (deploy/compose.yaml):
 # - No AI weights are downloaded; add one provider key and chat works
 # - Whisper audio transcription (tiny model, ~75 MB)
-# - Download size: ~3 GB
+# - Download size: ~4 GB (includes file-work runtimes + spoken answers)
 #
 # Usage:
 #   make up
@@ -26,9 +26,11 @@
 #                    -> keep it off across restarts: give it a profile in a
 #                       docker-compose.override.yml, e.g.
 #                         services: { qdrant: { profiles: [optional] } }
+# On by default:     compute (file work), tts (spoken answers)
 # Opt-in profiles:   local-ai (Ollama + local embedding model, ~1 GB)
 #                    office   (Collabora CODE, office files, ~2 GB RAM)
-#                    tts      (Piper text-to-speech)
+#                    docling  (layout-aware extraction in front of Tika)
+#                    searxng  (self-hosted web search)
 #                    oidc     (Keycloak, SSO test realm)
 #                    -> COMPOSE_PROFILES=local-ai,office docker compose up -d
 # The boot page at http://localhost:5173 shows which blocks are running.
@@ -90,7 +92,8 @@ services:
              Tika        text extraction     on   (docker compose stop tika)
              Ollama      local AI            off  (COMPOSE_PROFILES=local-ai)
              Collabora   office files        off  (--profile office)
-             TTS         spoken answers      off  (--profile tts)
+             Compute     file work           on   (COMPUTE_URL=disabled)
+             TTS         spoken answers      on   (docker compose stop tts)
            Off = Synaplan keeps running, the feature simply stays hidden.
            The status screen lists the live state of every block.
 
@@ -324,10 +327,12 @@ services:
       # needs `--profile office` (it is not started by a plain `up -d`).
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
-      # Secure compute sidecar. Empty = absent. Set both when using --profile compute:
-      #   COMPUTE_URL=http://compute:8080 COMPUTE_TOKEN=$(openssl rand -hex 32)
-      COMPUTE_URL: ${COMPUTE_URL:-}
-      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-}
+      # File work sidecar. Defaults match the compute service below so
+      # `docker compose up` enables it with no extra env.
+      COMPUTE_URL: ${COMPUTE_URL:-http://compute:8080}
+      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
+      FEATURE_COMPUTE_ENABLED: ${FEATURE_COMPUTE_ENABLED:-true}
+      FEATURE_COMPUTE_WORKSPACES_ENABLED: ${FEATURE_COMPUTE_WORKSPACES_ENABLED:-true}
       AI_DEFAULT_PROVIDER: ollama
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
@@ -368,10 +373,10 @@ services:
       WHISPER_DEFAULT_MODEL: tiny
       WHISPER_ENABLED: "true"
       FFMPEG_BINARY: /usr/bin/ffmpeg
-      # Piper TTS (optional). Default reaches a host-bound synaplan-tts
-      # (`docker compose --profile tts` or the standalone repo on :10200).
+      # Piper TTS. Default is the compose `tts` service. Override to reach a
+      # standalone synaplan-tts on the host (http://host.docker.internal:10200).
       # Image: ghcr.io/metadist/synaplan-tts — 4 baked voices (en/de/es/tr).
-      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
+      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://tts:10200}
       # Raise PHP's `max_file_uploads` (base-php default is 20). The Files /
       # RAG manager allows selecting any number of files but PHP silently
       # truncates $_FILES at this limit, leaving the user with no error and
@@ -504,8 +509,10 @@ services:
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
-      COMPUTE_URL: ${COMPUTE_URL:-}
-      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-}
+      COMPUTE_URL: ${COMPUTE_URL:-http://compute:8080}
+      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
+      FEATURE_COMPUTE_ENABLED: ${FEATURE_COMPUTE_ENABLED:-true}
+      FEATURE_COMPUTE_WORKSPACES_ENABLED: ${FEATURE_COMPUTE_WORKSPACES_ENABLED:-true}
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
@@ -532,7 +539,7 @@ services:
       WHISPER_DEFAULT_MODEL: tiny
       WHISPER_ENABLED: "true"
       FFMPEG_BINARY: /usr/bin/ffmpeg
-      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
+      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://tts:10200}
     entrypoint: ["bash", "-c"]
     command:
       - |
@@ -704,6 +711,10 @@ services:
       REALTIME_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
       REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
       MAILER_DSN: smtp://mailhog:1025
+      COMPUTE_URL: ${COMPUTE_URL:-http://compute:8080}
+      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
+      FEATURE_COMPUTE_ENABLED: ${FEATURE_COMPUTE_ENABLED:-true}
+      FEATURE_COMPUTE_WORKSPACES_ENABLED: ${FEATURE_COMPUTE_WORKSPACES_ENABLED:-true}
     entrypoint: ["/bin/bash", "-ec"]
     command:
       - |
@@ -1099,9 +1110,8 @@ services:
     networks:
       - synaplan-network
 
-  # Optional Piper TTS — four baked voices (en, de, es, tr).
-  # Not started by default (keeps the core stack small). Enable with:
-  #   docker compose --profile tts up -d
+  # Piper TTS — four baked voices (en, de, es, tr). Starts with a plain
+  # `docker compose up`. Stop it to hide spoken answers.
   # Image: https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts
   # Docs:  https://docs.synaplan.com/index.php/tts
   # Extra voices: mount more .onnx + .onnx.json into /voices-extra (see the
@@ -1110,7 +1120,6 @@ services:
   tts:
     image: ghcr.io/metadist/synaplan-tts:latest@sha256:3c8ed60619be4ae1913e64ac35c28aa9b48da66e0e5006c972b91d0a5d278bb2
     container_name: synaplan-tts
-    profiles: [tts]
     restart: unless-stopped
     ports:
       - "127.0.0.1:10200:10200"
@@ -1123,41 +1132,61 @@ services:
     networks:
       - synaplan-network
 
-  # Optional secure compute — short Python/Node file work for the assistant.
-  # Not started by default. Enable with:
-  #   COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  #     COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  #     docker compose --profile compute up -d
-  # Then turn COMPUTE.ENABLED on (Operate → System config). Never publish :8080.
-  # The sidecar never pulls runtime images. Build them first:
-  #   make -C sidecars/synaplan-compute images
-  # and pin those digests in sidecars/synaplan-compute/internal/images/map.go.
+  # File-work runtimes. Compose builds them from this repo so a clone does
+  # not need GHCR package access. The sidecar never pulls; it starts the
+  # tags these services leave on the host daemon.
+  compute-python:
+    image: synaplan-compute-python:local
+    pull_policy: build
+    build:
+      context: ./sidecars/synaplan-compute/images/python
+    container_name: synaplan-compute-python
+    command: ["python", "--version"]
+    network_mode: none
+    restart: "no"
+
+  compute-node:
+    image: synaplan-compute-node:local
+    pull_policy: build
+    build:
+      context: ./sidecars/synaplan-compute/images/node
+    container_name: synaplan-compute-node
+    command: ["node", "--version"]
+    network_mode: none
+    restart: "no"
+
+  # Secure compute — short Python/Node file work. Starts with a plain
+  # `docker compose up`. Runs as root only so it can open the host Docker
+  # socket without a GID dance; PHP never sees that socket. Never publish :8080.
   compute:
+    pull_policy: build
     build:
       context: ./sidecars/synaplan-compute
     container_name: synaplan-compute
-    profiles: [compute]
+    user: "0:0"
     restart: unless-stopped
-    # Distroless nonroot (65532) cannot open a root:docker 0660 socket.
-    # Pass the host docker GID (stat -c %g /var/run/docker.sock).
-    group_add:
-      - ${COMPUTE_DOCKER_GID:-998}
+    depends_on:
+      compute-python:
+        condition: service_completed_successfully
+      compute-node:
+        condition: service_completed_successfully
     environment:
-      # Empty default so `docker compose` interpolates without --profile compute.
-      # The sidecar refuses to start unless the token is at least 32 bytes.
-      COMPUTE_AUTH_TOKEN: ${COMPUTE_TOKEN:-}
+      COMPUTE_AUTH_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
       COMPUTE_LISTEN: :8080
       COMPUTE_EGRESS_ENABLED: ${COMPUTE_EGRESS_ENABLED:-false}
       COMPUTE_SCRATCH_DIR: /scratch
       COMPUTE_WORKSPACES_DIR: /workspaces
       COMPUTE_MAX_CONCURRENT: ${COMPUTE_MAX_CONCURRENT:-2}
+      COMPUTE_ALLOW_LOCAL_IMAGES: "1"
+      COMPUTE_IMAGE_PYTHON: synaplan-compute-python:local
+      COMPUTE_IMAGE_NODE: synaplan-compute-node:local
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Host-path binds (NOT named volumes): the daemon resolves bind sources
       # on its own filesystem, so scratch/workspaces must live at the same
       # host path the sidecar maps via its own mounts (see runner/mounts.go).
-      # First start: mkdir -p .compute-data/{scratch,workspaces} && chmod -R 777 .compute-data
-      # (the distroless sidecar runs as nonroot and cannot chown).
+      # Docker creates the host dirs on first start; the sidecar runs as root
+      # here and chowns scratch for the sandbox uid.
       - ./.compute-data/scratch:/scratch
       - ./.compute-data/workspaces:/workspaces
     networks:
