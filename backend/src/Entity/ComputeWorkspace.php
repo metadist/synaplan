@@ -117,6 +117,16 @@ class ComputeWorkspace
         $this->expiresAt = $expiresAt;
     }
 
+    /**
+     * The owner came back inside the grace period: another full period,
+     * like a fresh workspace.
+     */
+    public function renew(\DateTimeImmutable $expiresAt): void
+    {
+        $this->status = self::STATUS_ACTIVE;
+        $this->expiresAt = $expiresAt;
+    }
+
     public function markDeleted(): void
     {
         $this->status = self::STATUS_DELETED;

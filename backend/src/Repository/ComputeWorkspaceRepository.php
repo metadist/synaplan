@@ -18,11 +18,15 @@ class ComputeWorkspaceRepository extends ServiceEntityRepository
         parent::__construct($registry, ComputeWorkspace::class);
     }
 
-    public function findActiveForUser(int $userId): ?ComputeWorkspace
+    /**
+     * The row the owner may still use: active ones plus expiring ones whose
+     * grace has not run out (opening renews them — see activeRow()).
+     */
+    public function findAccessibleForUser(int $userId): ?ComputeWorkspace
     {
         $found = $this->findOneBy([
             'userId' => $userId,
-            'status' => ComputeWorkspace::STATUS_ACTIVE,
+            'status' => [ComputeWorkspace::STATUS_ACTIVE, ComputeWorkspace::STATUS_EXPIRING],
         ]);
 
         return $found instanceof ComputeWorkspace ? $found : null;
