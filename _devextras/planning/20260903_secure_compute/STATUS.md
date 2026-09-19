@@ -13,8 +13,8 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | A3 Freeze | `feat/wave5-compute-b2` (#1860) | implemented | Protocol 1 fixtures vendored + checksums; compose profile `compute`. `COMPUTE_TOKEN` interpolates empty so `docker compose` works without the profile. |
 | B1 Client & capability | same | implemented | FeatureModule `compute`, `ComputeClient`, `code_run`, run card, artefacts as `BFILES` `source=compute`. Flag default off. |
 | B2 Tools & policy | same | implemented | `code_execution` is offered only with `compute:run`. Write-class / unattended default `approve`. |
-| B3 Workspaces & egress | `feat/wave5-compute-b3` | in progress | CS18–CS25. Flags `COMPUTE.WORKSPACES_ENABLED` and `COMPUTE.EGRESS_ENABLED` default off. |
-| B4 Hardening & GA | — | planned | Wave 5. |
+| B3 Workspaces & egress | `main` (#1870) | in progress (repo-local done) | CS18–CS23 on `main` (#1870): flags `COMPUTE.WORKSPACES_ENABLED` and `COMPUTE.EGRESS_ENABLED` default off (seeder `0`), J-CP-2 verified 2026-09-18 (run card keeps “Open workspace”, WorkspaceView reuses FilesTabs, empty copy verbatim, no egress control on the card). Roadmap row-1 bar (flags + J-CP-2) is met, but the track exit (§4) is not: criterion 2 (working egress) is blocked — shipped sidecar reports `features.egress=false` (CP22 proxy not built), switch stays fail-closed off; criterion 4 (docs-site page) needs CS24 (`synaplan-docs`) + CS25 (`synaplan-platform`, private), both excluded from #1870 and still outstanding. |
+| B4 Hardening & GA | — | planned | Wave 5. Needs T2 (gVisor) on a compute node before Cloud, plus the CP22 egress-proxy sidecar release for B3 egress. |
 
 ## Decisions
 
@@ -32,6 +32,8 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-13 | **Compose (CP30):** opt-in `compute` profile builds `sidecars/synaplan-compute` and mounts `docker.sock` **only** on that service. Backend/worker `COMPUTE_URL`/`COMPUTE_TOKEN` stay empty unless the operator sets them. |
 | 2026-09-14 | Review follow-up on #1860: unique artefact names, refuse oversized tool input, grant `compute:run` with `desktop:messages`/`desktop:files` (no `*`), enforce concurrent/CPU quotas, cancel the sidecar on PHP wait timeout, unique multipart names, fail missing inputs, document docker GID + runtime-image preload. Workspace MB stays B3. |
 | 2026-09-14 | B1/B2 merged as #1860. B3 starts on `feat/wave5-compute-b3` (workspaces + egress, both default off). |
+| 2026-09-14 | B3 merged as [#1870](https://github.com/metadist/synaplan/pull/1870) (workspaces + egress behind default-off flags, SSRF widening, fail-closed approval gating, sidecar nested listing + quota). |
+| 2026-09-18 | **B3 repo-local scope closed (CS18–CS23 on `main` via #1870).** STATUS corrected (was stale): flags seeded `0`, J-CP-2 verified against the shipped UI. **Not closed:** exit criterion 2 (working egress — CP22 proxy not built, `features.egress=false`) and criterion 4 (docs-site page — CS24 `synaplan-docs` + CS25 `synaplan-platform`, both excluded from #1870). Nothing silently dropped: egress rides with B4/sidecar work, docs with their repos. Corrected after Copilot review on #2009. |
 
 ## Review log
 
