@@ -25,6 +25,13 @@ x-app-command: &app-command
         export OFFICE_CONVERT_URL=http://collabora:9980
         ;;
     esac
+    case ",$${COMPOSE_PROFILES:-}," in
+      *,compute,*)
+        export COMPUTE_URL=http://compute:8080
+        export FEATURE_COMPUTE_ENABLED=true
+        export FEATURE_COMPUTE_WORKSPACES_ENABLED=true
+        ;;
+    esac
     exec /usr/local/bin/docker-entrypoint.sh
 x-app-environment: &app-environment
   APP_ENV: prod
@@ -101,6 +108,9 @@ x-app-environment: &app-environment
   # Empty until the `office` profile sets it in x-app-command.
   OFFICE_CONVERT_URL: "${OFFICE_CONVERT_URL:-}"
   OFFICE_CONVERT_TIMEOUT_MS: "${OFFICE_CONVERT_TIMEOUT_MS:-60000}"
+  SYNAPLAN_TTS_URL: "${SYNAPLAN_TTS_URL:-http://tts:10200}"
+  COMPUTE_URL: "${COMPUTE_URL:-}"
+  COMPUTE_TOKEN: "${COMPUTE_TOKEN:-}"
   COMPOSE_PROFILES: "${COMPOSE_PROFILES:-}"
   OLLAMA_BASE_URL: ""
   AUTO_DOWNLOAD_MODELS: "false"
@@ -375,6 +385,66 @@ services:
     volumes:
       - ./data/whisper:/models
     restart: "no"
+    networks: [internal]
+
+  # Spoken answers. Published image, no host port. Stop the container to hide TTS.
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:3c8ed60619be4ae1913e64ac35c28aa9b48da66e0e5006c972b91d0a5d278bb2
+    restart: unless-stopped
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium
+    networks: [internal]
+
+  # File work (T1). Off by default — needs the host Docker socket.
+  # Enable with COMPOSE_PROFILES=compute. prepare.sh writes COMPUTE_TOKEN.
+  compute-python:
+    image: synaplan-compute-python:local
+    pull_policy: build
+    profiles: [compute]
+    build:
+      context: ../sidecars/synaplan-compute/images/python
+    command: ["python", "--version"]
+    network_mode: none
+    restart: "no"
+
+  compute-node:
+    image: synaplan-compute-node:local
+    pull_policy: build
+    profiles: [compute]
+    build:
+      context: ../sidecars/synaplan-compute/images/node
+    command: ["node", "--version"]
+    network_mode: none
+    restart: "no"
+
+  compute:
+    pull_policy: build
+    profiles: [compute]
+    build:
+      context: ../sidecars/synaplan-compute
+    user: "0:0"
+    restart: unless-stopped
+    depends_on:
+      compute-python:
+        condition: service_completed_successfully
+      compute-node:
+        condition: service_completed_successfully
+    environment:
+      COMPUTE_AUTH_TOKEN: "${COMPUTE_TOKEN:-}"
+      COMPUTE_LISTEN: :8080
+      COMPUTE_EGRESS_ENABLED: "${COMPUTE_EGRESS_ENABLED:-false}"
+      COMPUTE_SCRATCH_DIR: /scratch
+      COMPUTE_WORKSPACES_DIR: /workspaces
+      COMPUTE_MAX_CONCURRENT: "${COMPUTE_MAX_CONCURRENT:-2}"
+      COMPUTE_ALLOW_LOCAL_IMAGES: "1"
+      COMPUTE_IMAGE_PYTHON: synaplan-compute-python:local
+      COMPUTE_IMAGE_NODE: synaplan-compute-node:local
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/compute/scratch:/scratch
+      - ./data/compute/workspaces:/workspaces
     networks: [internal]
 
 networks:

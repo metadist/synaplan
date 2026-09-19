@@ -27,11 +27,5 @@ hostile:
 	$(GO) test ./tests/hostile/ ./internal/runner/ ./internal/audit/
 
 images:
-	docker build -t synaplan-compute-python ./images/python
-	docker build -t synaplan-compute-node ./images/node
-	@echo
-	@echo "Local tags: synaplan-compute-python:latest  synaplan-compute-node:latest"
-	@echo "The sidecar reads digest-pinned refs from internal/images/map.go and never pulls."
-	@echo "Paste these Id digests there (synaplan-compute-<name>@<id>), then rebuild the sidecar:"
-	@printf '  python %s\n' "$$(docker inspect --format '{{.Id}}' synaplan-compute-python:latest)"
-	@printf '  node   %s\n' "$$(docker inspect --format '{{.Id}}' synaplan-compute-node:latest)"
+	docker build -t synaplan-compute-python:local ./images/python
+	docker build -t synaplan-compute-node:local ./images/node

@@ -16,7 +16,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Sidecar URL + token + the COMPUTE.ENABLED product flag.
  *
- * Either missing means the feature is absent. Defaults stay off.
+ * Either missing means the feature is absent. Local compose wires both
+ * and pins the feature on.
  */
 final readonly class ComputeConfig
 {

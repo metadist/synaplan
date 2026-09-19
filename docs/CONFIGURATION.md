@@ -526,20 +526,16 @@ Supported formats: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
 
 ---
 
-## Text-to-Speech (optional Piper)
+## Text-to-Speech (Piper)
 
-Speech **output** is a separate companion: [synaplan-tts](https://github.com/metadist/synaplan-tts)
+Speech **output** is a companion: [synaplan-tts](https://github.com/metadist/synaplan-tts)
 (`ghcr.io/metadist/synaplan-tts`). The published image ships four voices that
-match the UI locales — English, German, Spanish, Turkish. It is not started
-with the default stack.
+match the UI locales — English, German, Spanish, Turkish. Local
+`docker compose up` starts it. Stop the `tts` container to hide spoken answers.
 
 ```bash
-docker compose --profile tts up -d
-```
-
-```bash
-# backend/.env — only needed if TTS is not on localhost:10200
-SYNAPLAN_TTS_URL=http://host.docker.internal:10200
+# backend/.env — only needed if TTS is not the compose service
+SYNAPLAN_TTS_URL=http://tts:10200
 ```
 
 **Frontend language selects the voice.** `ChatView` sends the active vue-i18n

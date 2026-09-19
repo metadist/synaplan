@@ -169,16 +169,17 @@ the engine off. Details:
 
 ## File work (secure compute)
 
-This compose file has **no** `compute` service in this release. To offer file
-work on a single production host, run the sidecar as a **second** Compose
-project (the development `compute` profile, or a dedicated checkout of
-`sidecars/synaplan-compute`), keep scratch and workspaces on local disk, and
-set `COMPUTE_URL` / `COMPUTE_TOKEN` in `deploy/.env` for backend, worker and
-scheduler. Never publish port `8080`. A multi-node cluster must use a
-separate gVisor box — never T1 on the web nodes.
+Spoken answers start with the stack. File work stays a one-line profile
+because it mounts the host Docker socket:
 
-First-run recipe and image pinning: the [root README](../README.md#file-work-optional-secure-compute)
-and [docs.synaplan.com — Run the compute sidecar](https://docs.synaplan.com/compute-sidecar).
+```dotenv
+COMPOSE_PROFILES=compute
+```
+
+`prepare.sh` writes `COMPUTE_TOKEN` and the scratch dirs. Combine profiles
+with a comma (`local-ai,office,compute`). Never publish port `8080`. A
+multi-node cluster must use a separate gVisor box — never T1 on the web
+nodes. Details: [docs/COMPUTE.md](../docs/COMPUTE.md).
 
 ## Network and persistence
 

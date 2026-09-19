@@ -129,9 +129,12 @@ func New(opt Options) (*Server, error) {
 	}
 	imgs := opt.Images
 	if imgs == nil {
-		imgs = images.Default()
-	}
-	if err := imgs.RequireDigests(); err != nil {
+		loaded, loadErr := images.Load()
+		if loadErr != nil {
+			return nil, loadErr
+		}
+		imgs = loaded
+	} else if err := imgs.RequireDigests(); err != nil {
 		return nil, err
 	}
 	ws := opt.Store

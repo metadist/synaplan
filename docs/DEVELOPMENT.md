@@ -76,44 +76,15 @@ keys in both overlay files (the architecture test fails if either is
 missing), and never a second hand-written `isEnabled()` + feature-status
 block.
 
-### Secure compute (optional)
+### Secure compute
 
-Short Python or Node file work for the assistant. Off by default. The sidecar
-is a Compose profile; PHP never talks to Docker. Do this **before** the first
-`app:seed` on a new database so `COMPUTE.ENABLED` seeds on; on an existing
-database flip the flag afterwards.
+Short Python or Node file work for the assistant. `docker compose up` starts
+the sidecar, builds the Python/Node runtimes from this repo, and turns the
+feature on. PHP never talks to Docker. Never publish port 8080.
 
-```bash
-mkdir -p .compute-data/scratch .compute-data/workspaces
-chmod -R 777 .compute-data
-
-# Persist so backend + worker interpolate the same values (gitignored).
-# If .env already has COMPOSE_PROFILES, append ,compute to that line.
-COMPUTE_TOKEN=$(openssl rand -hex 32)
-printf '%s\n' \
-  'COMPOSE_PROFILES=compute' \
-  'COMPUTE_URL=http://compute:8080' \
-  "COMPUTE_TOKEN=${COMPUTE_TOKEN}" \
-  "COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock 2>/dev/null || echo 998)" \
-  >> .env
-
-# Builds local tags and prints Id digests. Paste those into
-# sidecars/synaplan-compute/internal/images/map.go — the runner never pulls,
-# and a public clone cannot pull the GHCR 1.0.0 pins without packages access.
-make -C sidecars/synaplan-compute images
-
-docker compose --profile compute up -d --build
-```
-
-The sidecar process is distroless `nonroot`. Set `COMPUTE_DOCKER_GID` to the
-numeric GID of `/var/run/docker.sock` (the compose default `998` is often
-wrong). Without it every accepted run becomes `docker_unavailable`.
-
-Feature Status → *Secure compute* must show Available. That only means
-`GET /v1/health` answered — the first run still needs the pinned runner
-images on this daemon. Never publish port 8080. Persistent folders and
-website fetches are extra switches (`COMPUTE.WORKSPACES_ENABLED`,
-`COMPUTE.EGRESS_ENABLED`), also off. See [COMPUTE.md](./COMPUTE.md) and
+Hide it with `COMPUTE_URL=disabled` or `FEATURE_COMPUTE_ENABLED=false`.
+Website fetches stay off (`COMPUTE.EGRESS_ENABLED`). See
+[COMPUTE.md](./COMPUTE.md) and
 [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
 
 ### Office conversion (optional)
