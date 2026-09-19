@@ -37,6 +37,11 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 
 ## Review log
 
+**2026-09-19 (fixture values, not a protocol change):** `health.json`
+fixtures (both sides, byte-identical) now carry the published 1.0.0 image
+digests instead of placeholders; both `CHECKSUMS.sha256` ledgers
+recomputed. Wire shapes untouched — decode suites green on both sides.
+
 **2026-09-19 (B4 CS32 — success criteria evidence):** checked against §10
 plus the B4 additions. T1 evidence is in hand; T2/staging rows stay open
 until the compute node and a release tag exist.
