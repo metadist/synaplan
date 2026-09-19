@@ -143,7 +143,10 @@ const handleConfirm = () => {
     if (dialog.value.type === 'confirm') {
       ;(resolve as (value: boolean) => void)(true)
     } else if (dialog.value.type === 'prompt') {
-      ;(resolve as (value: string | null) => void)(inputValue.value || null)
+      // OK resolves the raw input — even empty. Cancel/Escape/backdrop resolve
+      // null via close(), so callers can tell "confirmed without a note"
+      // (reject with no reason) apart from "dismissed".
+      ;(resolve as (value: string | null) => void)(inputValue.value)
     } else {
       ;(resolve as () => void)()
     }

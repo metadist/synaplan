@@ -23,6 +23,7 @@ final readonly class ApprovalService
         private ?MessageRepository $messages = null,
         private ?SavedTaskRunRepository $savedTaskRuns = null,
         private ?InternalEmailService $mail = null,
+        private ?ChatApprovalContinuationService $continuation = null,
     ) {
     }
 
@@ -80,7 +81,11 @@ final readonly class ApprovalService
     {
         $approval = $this->requireOwnedPending($id, $actor);
         $approval->markRejected((int) $actor->getId());
+        $announce = $this->continuation?->continueChat($approval, ChatApprovalContinuationService::OUTCOME_REJECTED, null);
         $this->approvals->save($approval);
+        if (null !== $announce) {
+            $announce();
+        }
         $this->auditLogWriter->record(
             (int) $actor->getId(),
             'approval.rejected',

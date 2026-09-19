@@ -11,7 +11,8 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | S2 Policy & interactive approval | same | implemented | `ApprovalPolicy` truth table, `ApprovalCard`, inbox at Manage → Automations → Approvals, SSE/realtime, instant/digest notify. On for new installs (#1827). |
 | S3 Unattended approval | same | implemented | Pause/resume Saved Task runs, 72 h expiry, waiting pill on the task card. |
 | S4 Custom tools | same | implemented | HTTP + OpenAPI import, SSRF, Connections UI, `custom_tools` + `mcp_servers` bundle sections (never tokens). On for new installs (#1827). |
-| S5 Workflow builder v1 + webhook trigger | `main` (#1859) | implemented | Steps + webhook (#1821). TL41 templates/copy checklist, TL45 `saved_tasks` bundle, TL46 C7 fixtures + five-step proof, TL47 docs. Builder flag seeded on for new installs (#1827). Q1 (approve continues the chat turn) stays open. |
+| S5 Workflow builder v1 + webhook trigger | `main` (#1859) | implemented | Steps + webhook (#1821). TL41 templates/copy checklist, TL45 `saved_tasks` bundle, TL46 C7 fixtures + five-step proof, TL47 docs. Builder flag seeded on for new installs (#1827). Q1 closed 2026-09-18 (see Q1 row). |
+| Q1 Approve continues the chat turn | `fix/tools-q1-approve-continues-chat` ([#2008](https://github.com/metadist/synaplan/pull/2008)) | implemented | `ChatApprovalContinuationService`: every decided chat approval appends one localized follow-up message to the thread + `approval.chat_continued` event (J-TL-1 in chat, J-TL-2 from inbox). Chat-kind approvals for sources the worker cannot run (compute/builtin/skill/…) now fail honestly (`chat_execution_unsupported`) instead of claiming `executed`. |
 
 ## Decisions
 
@@ -27,6 +28,7 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-10 | **Wave 5 decisions ticked (roadmap §7.2, first PR):** (1) Recoverable jobs — this strain ships honest per-outcome copy and keeps existing pause/resume; checkpoints and per-run spend limits stay scheduled. (2) Publish ≠ activated — stays on Agent Builder STATUS; not this PR. (3) Approvals on resume — re-check current permissions and hard blocks immediately before execute; bind the approval to tool + arguments (a change voids it). (4) Sovereignty as a job-wide setting — scheduled, not this PR. (5) Complete-workflow packs / For you landing — scheduled. Form-first assistant builder and step-list editor stay the product shape. |
 | 2026-09-13 | **S5 remainder is the next Tools work.** TL38–TL40, TL42–TL44 are on `main`. Do TL41, TL45–TL47 and walk J-TL-5 before Compute B1. Q1 (approve continues the chat turn) stays a Wave 5 row; it is not a substitute for closing S5. |
 | 2026-09-14 | S5 closed on `main` as [#1859](https://github.com/metadist/synaplan/pull/1859). This branch no longer carries that work. Q1 stays open. |
+| 2026-09-18 | **Q1 closed on `fix/tools-q1-approve-continues-chat` ([#2008](https://github.com/metadist/synaplan/pull/2008)).** Decisions: (1) follow-up is backend-composed via Symfony translator (`approvals` domain, en/de/es/fr/tr, owner locale) so chat-card and inbox approvals produce the identical message; (2) message persisted pre-flush, event published post-commit (announcer closure) — no reload-before-commit race; (3) non-realtime clients get a bounded `waitForOutcome` poll fallback; (4) non-executable chat-kind sources fail honestly instead of fake-`executed`. Full DAG resume for skill/compute steps in chat stays the follow-up (issue #1883). |
 
 ## Review log
 
