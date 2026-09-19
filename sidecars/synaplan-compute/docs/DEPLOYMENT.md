@@ -11,9 +11,13 @@ except `GET /v1/health`. PHP holds the same value as `COMPUTE_TOKEN`.
 Compose profile `compute` in `synaplan/docker-compose.yml`:
 
 ```bash
+mkdir -p .compute-data/scratch .compute-data/workspaces
+chmod -R 777 .compute-data
+# write COMPUTE_URL, COMPUTE_TOKEN and COMPUTE_DOCKER_GID into .env
+make -C sidecars/synaplan-compute images   # prints Id digests to pin in map.go
 COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
   COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  docker compose --profile compute up -d
+  docker compose --profile compute up -d --build
 ```
 
 `COMPUTE_TOKEN` must be at least 32 random bytes (`openssl rand -hex 32`
@@ -23,12 +27,13 @@ the profile is off, so it defaults to empty rather than failing
 
 The sidecar image runs as distroless `nonroot`. A typical Linux Docker
 socket is `root:docker` mode `0660`, so pass `COMPUTE_DOCKER_GID` (the
-numeric GID of `/var/run/docker.sock`) via `group_add`. Without it every
-accepted run becomes `docker_unavailable`.
+numeric GID of `/var/run/docker.sock`) via `group_add`. The compose default
+`998` is often wrong — without the real GID every accepted run becomes
+`docker_unavailable`.
 
-The runner never pulls images. On a clean host build the Python and Node
-runtimes first (`make -C sidecars/synaplan-compute images`) and pin those
-digests in `internal/images/map.go`.
+The runner never pulls images. `make images` builds local tags and prints
+their Id digests. Paste those into `internal/images/map.go` (the shipped
+GHCR 1.0.0 pins are not public). Then rebuild the sidecar.
 
 Honest limits: this is hardened Docker on the same machine as PHP
 (`--network none`, dropped caps, read-only rootfs). It is **not** the

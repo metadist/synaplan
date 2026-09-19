@@ -167,6 +167,19 @@ stays in the app (login + file ownership). `OFFICE_CONVERT_URL=disabled` turns
 the engine off. Details:
 [Office documents](https://docs.synaplan.com/index.php/office-documents).
 
+## File work (secure compute)
+
+This compose file has **no** `compute` service in this release. To offer file
+work on a single production host, run the sidecar as a **second** Compose
+project (the development `compute` profile, or a dedicated checkout of
+`sidecars/synaplan-compute`), keep scratch and workspaces on local disk, and
+set `COMPUTE_URL` / `COMPUTE_TOKEN` in `deploy/.env` for backend, worker and
+scheduler. Never publish port `8080`. A multi-node cluster must use a
+separate gVisor box — never T1 on the web nodes.
+
+First-run recipe and image pinning: the [root README](../README.md#file-work-optional-secure-compute)
+and [docs.synaplan.com — Run the compute sidecar](https://docs.synaplan.com/compute-sidecar).
+
 ## Network and persistence
 
 Only the web service binds a host port. MariaDB, Redis, Centrifugo, Tika, Qdrant,

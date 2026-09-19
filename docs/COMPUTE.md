@@ -48,7 +48,8 @@ an existing value.
 -- what ComputeConfigSeeder runs (BConfigSeeder::insertIfMissing): a no-op
 -- when the row exists, so an operator's value is never reset.
 -- New installs start enabled only when COMPUTE_URL and COMPUTE_TOKEN are
--- set at seed time; otherwise the row is inserted as '0'.
+-- set at seed time (ComputeConfigSeeder::enabledSeedValue writes '1');
+-- otherwise the row is inserted as '0'. Existing rows are never touched.
 INSERT IGNORE INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
 VALUES (0, 'COMPUTE', 'ENABLED', '0');
 ```
@@ -63,15 +64,35 @@ Dev and self-host use Compose profile `compute` on the same host. That is
 PHP. Honest limits: one machine, one Docker daemon, no gVisor.
 
 ```bash
+mkdir -p .compute-data/scratch .compute-data/workspaces
+chmod -R 777 .compute-data
+
+COMPUTE_TOKEN=$(openssl rand -hex 32)
+printf '%s\n' \
+  'COMPOSE_PROFILES=compute' \
+  'COMPUTE_URL=http://compute:8080' \
+  "COMPUTE_TOKEN=${COMPUTE_TOKEN}" \
+  "COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock 2>/dev/null || echo 998)" \
+  >> .env
+
 make -C sidecars/synaplan-compute images
-COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  docker compose --profile compute up -d
+# Paste the printed Id digests into internal/images/map.go, then:
+docker compose --profile compute up -d --build
 ```
 
 Never publish port 8080. The sidecar process is distroless `nonroot`. The
-runner never pulls images: build Python/Node first or the first run fails
-with image-not-found. See [DEVELOPMENT.md](./DEVELOPMENT.md).
+runner never pulls images. `make images` builds `synaplan-compute-python:latest`
+and `synaplan-compute-node:latest` and prints their Id digests — those names
+are **not** what the sidecar starts with. `map.go` ships pinned to
+`ghcr.io/metadist/synaplan-compute-{python,node}@sha256:…` (1.0.0). Those
+GHCR packages are not public; a fresh clone must pin the local Ids (or pull
+the published digests if the machine has `read:packages`). A missing image
+fails the first run (today reported as `program_error` with empty logs).
+Feature Status “Available” only means `/v1/health` answered.
+
+A **new** install seeds `COMPUTE.ENABLED` as `1` when `COMPUTE_URL` and
+`COMPUTE_TOKEN` are set at seed time. An existing row is never overwritten.
+See [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 ## T2 on a separate node
 

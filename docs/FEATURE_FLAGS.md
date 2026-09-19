@@ -74,7 +74,7 @@ now on by default. "What users see" is what disappears when the flag is off.
 | 5 | Saved Tasks Steps editor & webhook trigger | **Steps** on a saved task (tool step, condition, outbound webhook, ask-before-run); webhook trigger | `WORKFLOWS.BUILDER_ENABLED` | `FEATURE_WORKFLOWS_BUILDER_ENABLED` | on | [#1821](https://github.com/metadist/synaplan/pull/1821) |
 | 5 | Desktop client (public beta) | **Channels → Desktop**: pairing codes, connected computers, job queue; download link to [synaplan-desktop](https://github.com/metadist/synaplan-desktop) | `DESKTOP_AGENT.ENABLED` | `FEATURE_DESKTOP_AGENT_ENABLED` | on | [#1669](https://github.com/metadist/synaplan/pull/1669), [#1808](https://github.com/metadist/synaplan/pull/1808) |
 | – | Office document tools | The assistant builds and revises Word, Excel and PowerPoint files step by step | `DOCUMENT_TOOLS.ENABLED` | `FEATURE_DOCUMENT_TOOLS_ENABLED` | on | [#1685](https://github.com/metadist/synaplan/pull/1685) |
-| 5 | Secure compute (file work) | Chat card for short Python or Node file work. `/v1` gateways offer `code_execution` only with the `compute:run` API-key grant. Assistants stay opted out until `code_run` is listed. Needs `COMPUTE_URL` + `COMPUTE_TOKEN` **and** this flag. Off = absent, no teaser. | `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **off** | Wave 5 A3/B1, B2 |
+| 5 | Secure compute (file work) | Chat card for short Python or Node file work. `/v1` gateways offer `code_execution` only with the `compute:run` API-key grant. Assistants stay opted out until `code_run` is listed. Needs `COMPUTE_URL` + `COMPUTE_TOKEN` **and** this flag. Off = absent, no teaser. New installs seed **on** when URL + token are already set; otherwise **off**. | `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **off** (on at first seed if sidecar env is set) | Wave 5 A3/B1, B2 |
 | 5 | File-work workspace | **Files → Workspace** and **Open workspace** on a finished run. One folder per user between runs. Off = B1/B2 ephemeral behaviour, no tab, no chip. Needs file work itself. | `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **off** | Wave 5 B3 |
 | 5 | File-work websites | A run may fetch from a short, pinned list of public websites. Off = every run stays offline. Private addresses are always refused. Can only be switched on when the sidecar reports `features.egress: true`; the bundled sidecar does not yet. | `COMPUTE.EGRESS_ENABLED` | `FEATURE_COMPUTE_EGRESS_ENABLED` | **off** | Wave 5 B3 |
 | Intermezzo | Optional module gates | Hide an unconfigured module (Tika, Docling, SearXNG, Piper TTS, Collabora, WhatsApp, Stripe, mobile IAP, Google AI, Higgsfield, TheHive, local AI): its routes answer 404 and no card is shown | `MODULES.GATE_<ID>` | `FEATURE_MODULES_GATE_<ID>` | **On for new installs** for ids in `ModuleGateSeeder` (`DEFAULT_ON`); others **off** (visible with a "needs setup" state). Existing rows are never overwritten. | [#1815](https://github.com/metadist/synaplan/pull/1815), [#1816](https://github.com/metadist/synaplan/pull/1816), [#1817](https://github.com/metadist/synaplan/pull/1817) |
@@ -97,6 +97,7 @@ Two related switches keep their previous defaults on purpose:
 | Tools & approvals | `FEATURE_TOOLS_REGISTRY_ENABLED`, `FEATURE_TOOLS_APPROVALS_ENABLED`, `FEATURE_TOOLS_CUSTOM_HTTP_ENABLED` |
 | Office documents | `FEATURE_DOCUMENT_TOOLS_ENABLED` |
 | Desktop & partner platforms | `FEATURE_DESKTOP_AGENT_ENABLED`, `FEATURE_PLATFORM_LINKS_ENABLED` |
+| Processing → File work | `FEATURE_COMPUTE_ENABLED`, `FEATURE_COMPUTE_WORKSPACES_ENABLED`, `FEATURE_COMPUTE_EGRESS_ENABLED` |
 | Optional modules | `FEATURE_MODULES_GATE_<ID>` for every declared module |
 
 The non-boolean companions (directory claim path, group display names,
@@ -127,5 +128,5 @@ everyone-shares policy, tool policies per class, approval expiry) stay on the
   per-user row first. Writing the global switch from System configuration
   therefore also deletes the acting administrator's own row for that flag.
 
-See also [CONFIGURATION.md](CONFIGURATION.md), [ADMIN.md](ADMIN.md) and
-[DESKTOP.md](DESKTOP.md).
+See also [CONFIGURATION.md](CONFIGURATION.md), [ADMIN.md](ADMIN.md),
+[DESKTOP.md](DESKTOP.md) and [COMPUTE.md](COMPUTE.md).

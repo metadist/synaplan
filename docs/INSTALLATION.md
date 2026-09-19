@@ -210,6 +210,16 @@ COMPOSE_PROFILES=office \
 The deploy entrypoint sets `OFFICE_CONVERT_URL=http://collabora:9980` when
 `office` is in `COMPOSE_PROFILES`. See [Development Guide](DEVELOPMENT.md#office-conversion-optional).
 
+### Optional file work (secure compute)
+
+The development stack can start the compute sidecar with
+`COMPOSE_PROFILES=compute`. The production `deploy/compose.yaml` does **not**
+carry that service yet — run it as a second Compose project on the same host
+(or on a dedicated T2 box) and set `COMPUTE_URL` / `COMPUTE_TOKEN` in
+`deploy/.env`. The first-run recipe (scratch dirs, local image pin, seed-on)
+is in the [root README](../README.md#file-work-optional-secure-compute) and
+[COMPUTE.md](COMPUTE.md). Never publish port `8080`.
+
 ### Evaluate on Elestio
 
 Use Elestio's custom Docker Compose import for evaluation:
@@ -320,7 +330,7 @@ COMPOSE_PROFILES=local-ai docker compose up -d
 
 `COMPOSE_PROFILES` is the same switch a self-hosted install uses in
 `deploy/.env`, so the development stack and production behave identically.
-Combine profiles with a comma (`local-ai,office`).
+Combine profiles with a comma (`local-ai,office` or `local-ai,office,compute`).
 
 **Local chat model is opt-in on top of that.** A local chat model
 (`gpt-oss:20b`, another ~14 GB, needs a GPU or a strong CPU box) is pulled only

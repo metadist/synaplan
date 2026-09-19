@@ -28,6 +28,9 @@
 #                         services: { qdrant: { profiles: [optional] } }
 # Opt-in profiles:   local-ai (Ollama + local embedding model, ~1 GB)
 #                    office   (Collabora CODE, office files, ~2 GB RAM)
+#                    docling  (layout-aware extraction in front of Tika)
+#                    searxng  (self-hosted web search)
+#                    compute  (file work sidecar — see docs/COMPUTE.md)
 #                    tts      (Piper text-to-speech)
 #                    oidc     (Keycloak, SSO test realm)
 #                    -> COMPOSE_PROFILES=local-ai,office docker compose up -d
@@ -1124,14 +1127,14 @@ services:
       - synaplan-network
 
   # Optional secure compute — short Python/Node file work for the assistant.
-  # Not started by default. Enable with:
-  #   COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  #     COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  #     docker compose --profile compute up -d
-  # Then turn COMPUTE.ENABLED on (Operate → System config). Never publish :8080.
-  # The sidecar never pulls runtime images. Build them first:
-  #   make -C sidecars/synaplan-compute images
-  # and pin those digests in sidecars/synaplan-compute/internal/images/map.go.
+  # Not started by default. First start:
+  #   mkdir -p .compute-data/{scratch,workspaces} && chmod -R 777 .compute-data
+  #   # write COMPUTE_URL / COMPUTE_TOKEN / COMPUTE_DOCKER_GID into .env
+  #   make -C sidecars/synaplan-compute images   # prints Id digests to pin
+  #   # paste those Ids into sidecars/synaplan-compute/internal/images/map.go
+  #   docker compose --profile compute up -d --build
+  # A new database seeds COMPUTE.ENABLED on when URL+token are already set.
+  # Never publish :8080. The sidecar never pulls runtime images.
   compute:
     build:
       context: ./sidecars/synaplan-compute

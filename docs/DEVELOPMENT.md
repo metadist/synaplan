@@ -79,26 +79,41 @@ block.
 ### Secure compute (optional)
 
 Short Python or Node file work for the assistant. Off by default. The sidecar
-is a Compose profile; PHP never talks to Docker.
+is a Compose profile; PHP never talks to Docker. Do this **before** the first
+`app:seed` on a new database so `COMPUTE.ENABLED` seeds on; on an existing
+database flip the flag afterwards.
 
 ```bash
+mkdir -p .compute-data/scratch .compute-data/workspaces
+chmod -R 777 .compute-data
+
+# Persist so backend + worker interpolate the same values (gitignored).
+# If .env already has COMPOSE_PROFILES, append ,compute to that line.
+COMPUTE_TOKEN=$(openssl rand -hex 32)
+printf '%s\n' \
+  'COMPOSE_PROFILES=compute' \
+  'COMPUTE_URL=http://compute:8080' \
+  "COMPUTE_TOKEN=${COMPUTE_TOKEN}" \
+  "COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock 2>/dev/null || echo 998)" \
+  >> .env
+
+# Builds local tags and prints Id digests. Paste those into
+# sidecars/synaplan-compute/internal/images/map.go — the runner never pulls,
+# and a public clone cannot pull the GHCR 1.0.0 pins without packages access.
 make -C sidecars/synaplan-compute images
-COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  docker compose --profile compute up -d
+
+docker compose --profile compute up -d --build
 ```
 
 The sidecar process is distroless `nonroot`. Set `COMPUTE_DOCKER_GID` to the
-host docker socket group so it can talk to dockerd. The runner never pulls:
-build the Python/Node images (`make -C sidecars/synaplan-compute images`) and
-pin those digests in `sidecars/synaplan-compute/internal/images/map.go` or the
-first run fails with image-not-found.
+numeric GID of `/var/run/docker.sock` (the compose default `998` is often
+wrong). Without it every accepted run becomes `docker_unavailable`.
 
-Then set **COMPUTE.ENABLED** under Operate → System config (or
-`FEATURE_COMPUTE_ENABLED=true`). Feature Status → *Secure compute* must show
-Available. Never publish port 8080. Persistent folders and website fetches
-are extra switches (`COMPUTE.WORKSPACES_ENABLED`, `COMPUTE.EGRESS_ENABLED`),
-also off. See [COMPUTE.md](./COMPUTE.md) and
+Feature Status → *Secure compute* must show Available. That only means
+`GET /v1/health` answered — the first run still needs the pinned runner
+images on this daemon. Never publish port 8080. Persistent folders and
+website fetches are extra switches (`COMPUTE.WORKSPACES_ENABLED`,
+`COMPUTE.EGRESS_ENABLED`), also off. See [COMPUTE.md](./COMPUTE.md) and
 [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
 
 ### Office conversion (optional)
