@@ -62,10 +62,11 @@ final class ChatApprovalContinuationServiceTest extends TestCase
         ));
     }
 
-    public function testSkipsWhenTriggerBelongsToAnotherUser(): void
+    public function testSkipsWhenChatBelongsToAnotherUser(): void
     {
-        [$service, $messages, $publisher] = $this->service();
-        $messages->expects(self::any())->method('find')->with(11)->willReturn($this->trigger(userId: 8, chatId: 5));
+        [$service, $messages, $publisher, $chats] = $this->service();
+        $messages->expects(self::any())->method('find')->with(11)->willReturn($this->trigger(userId: 7, chatId: 5));
+        $chats->expects(self::any())->method('find')->with(5)->willReturn($this->chat(5, 8));
         $messages->expects(self::never())->method('save');
         $publisher->expects(self::never())->method('publish');
 
@@ -74,6 +75,23 @@ final class ChatApprovalContinuationServiceTest extends TestCase
             ChatApprovalContinuationService::OUTCOME_EXECUTED,
             'ok'
         ));
+    }
+
+    public function testContinuesWhenTriggerAuthorDiffersFromChatOwner(): void
+    {
+        // Message authors can differ from the chat owner (e.g. human operator
+        // messages in widget chats); ownership is decided by the chat.
+        [$service, $messages, , $chats, $users] = $this->service();
+        $messages->expects(self::any())->method('find')->with(11)->willReturn($this->trigger(userId: 8, chatId: 5));
+        $this->wiresChatAndOwner($chats, $users);
+
+        $messages->expects(self::once())->method('save');
+        $announce = $service->continueChat(
+            $this->approval('chat:11', ownerId: 7),
+            ChatApprovalContinuationService::OUTCOME_EXECUTED,
+            null
+        );
+        self::assertIsCallable($announce);
     }
 
     public function testSkipsWhenTriggerHasNoChat(): void
@@ -289,10 +307,11 @@ final class ChatApprovalContinuationServiceTest extends TestCase
         return $message;
     }
 
-    private function chat(int $id = 5): Chat
+    private function chat(int $id = 5, int $userId = 7): Chat
     {
         $chat = $this->createStub(Chat::class);
         $chat->method('getId')->willReturn($id);
+        $chat->method('getUserId')->willReturn($userId);
 
         return $chat;
     }

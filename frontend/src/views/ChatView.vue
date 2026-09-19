@@ -777,16 +777,17 @@ async function onChatApprovalAlwaysAllow(id: number): Promise<void> {
 }
 
 /**
- * Q1: the decided approval continues this thread. With realtime the
- * `approval.chat_continued` listener below reloads the messages; without it
- * (disabled or terminally broken socket) wait for the worker outcome, then
- * reload once — the reload is cheap and idempotent either way.
+ * Q1: the decided approval continues this thread. Only a healthy socket can be
+ * trusted to deliver the `approval.chat_continued` event: while realtime is
+ * connecting, reconnecting, or never connected, the event may be missed, so
+ * fall back to waiting for the worker outcome, then reload once — the reload
+ * is cheap and idempotent either way.
  */
 async function settleChatApproval(id: number): Promise<void> {
   if (isViewUnmounted) {
     return
   }
-  if (realtimeStore.state !== 'disabled' && realtimeStore.state !== 'error') {
+  if (realtimeStore.state === 'connected') {
     return // the approval.chat_continued event reloads the thread
   }
   const chatId = chatsStore.activeChatId

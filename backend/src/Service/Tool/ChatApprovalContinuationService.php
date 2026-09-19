@@ -61,7 +61,7 @@ final readonly class ChatApprovalContinuationService
             return null;
         }
         $trigger = $this->messages->find($reference->messageId);
-        if (!$trigger instanceof Message || $trigger->getUserId() !== $approval->getOwnerId()) {
+        if (!$trigger instanceof Message) {
             return null;
         }
         $chatId = $trigger->getChatId();
@@ -69,7 +69,11 @@ final readonly class ChatApprovalContinuationService
             return null;
         }
         $chat = $this->chats->find($chatId);
-        if (null === $chat) {
+        // Ownership is checked against the chat we write to, not the trigger
+        // message: message authors can differ from the chat owner (e.g. human
+        // operator messages in widget chats), while the follow-up must only
+        // ever land in the approval owner's own thread.
+        if (null === $chat || $chat->getUserId() !== $approval->getOwnerId()) {
             return null;
         }
         $owner = $this->users->find($approval->getOwnerId());
