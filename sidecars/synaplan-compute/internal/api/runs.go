@@ -367,8 +367,12 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 		}
 		attach = &runner.EgressAttachment{Network: egressNet.Network, ProxyURL: egressNet.ProxyURL}
 		defer func() {
-			// Best-effort: leftovers carry the run label for SweepOrphans.
-			_ = s.docker.TeardownEgress(context.Background(), egressNet)
+			// Best-effort and bounded: a hung daemon call must never
+			// stall the semaphore slot in exitExecute. Leftovers carry
+			// the run label for SweepOrphans.
+			tctx, tcancel := context.WithTimeout(context.Background(), cleanupTimeout)
+			defer tcancel()
+			_ = s.docker.TeardownEgress(tctx, egressNet)
 		}()
 	}
 	id, err := s.docker.Create(cctx, runner.Spec{

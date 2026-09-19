@@ -10,7 +10,8 @@ root = pathlib.Path(".")
 allowed_suffixes = {".md", ".md.gotmpl"}
 # The compute nightly mounts the socket to run the sidecar under test and to
 # count leftover run containers. It never ships to production.
-allowed_files = {".github/workflows/compute-nightly.yml"}
+# ci.yml only invokes this guard itself.
+allowed_files = {".github/workflows/compute-nightly.yml", ".github/workflows/ci.yml"}
 bad: list[str] = []
 for path in root.rglob("*"):
     if not path.is_file():

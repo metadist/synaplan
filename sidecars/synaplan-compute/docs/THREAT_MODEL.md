@@ -32,8 +32,10 @@ except their own proxy, so a token would add nothing — and a 407 challenge
 would break urllib, the primary script client. CONNECT tunnels and forwarded
 bodies are capped (256 MB per direction) and idle-timed-out; proxy, run
 network, and run container are removed together, with the orphan sweep as
-backstop. Scripts that ignore proxy env vars simply reach nothing —
-fail-closed by construction.
+backstop. Refusals are logged by the proxy container (`proxy: run=<id>
+refused ...`) on the same container-log pipeline as the sidecar audit,
+which keeps the admission-side `egress.refused` event. Scripts that ignore
+proxy env vars simply reach nothing — fail-closed by construction.
 
 ## Controls
 

@@ -135,7 +135,9 @@ func (s *Server) resolve(host string, port int) ([]net.IP, string) {
 	if len(pins) == 0 {
 		return nil, "unknown_host"
 	}
-	out := pins[:0]
+	// Copy: pins aliases the shared pin map and concurrent requests must
+	// never mutate it.
+	out := make([]net.IP, 0, len(pins))
 	for _, ip := range pins {
 		if privateIP(ip) {
 			return nil, "private_ip"

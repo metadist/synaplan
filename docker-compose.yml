@@ -1156,7 +1156,7 @@ services:
       # Host-path binds (NOT named volumes): the daemon resolves bind sources
       # on its own filesystem, so scratch/workspaces must live at the same
       # host path the sidecar maps via its own mounts (see runner/mounts.go).
-      # First start: mkdir -p .compute-data/{scratch,workspaces} && chmod 777 .compute-data
+      # First start: mkdir -p .compute-data/{scratch,workspaces} && chmod -R 777 .compute-data
       # (the distroless sidecar runs as nonroot and cannot chown).
       - ./.compute-data/scratch:/scratch
       - ./.compute-data/workspaces:/workspaces

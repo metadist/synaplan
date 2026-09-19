@@ -1,14 +1,17 @@
 # Compute nightly load (CS26): T1 on GitHub-hosted runners, T2 behind a flag.
 #
-# T1 builds everything from source (sidecar + run images), starts the
-# sidecar with the docker socket, and runs the mixed load scenario. Run
-# image digests are placeholders until the compute v1.x release publishes
-# real ones, so the job patches the map from the just-built local image IDs
-# (dev-only path; releases pin published digests instead).
+# T1 builds everything from source (sidecar + run images), pushes the run
+# images to an ephemeral local registry for real RepoDigests, starts the
+# sidecar with the docker socket, and runs the mixed load scenario. The
+# registry dance stands in for the compute v1.x release (which publishes
+# real digests); until then run-image refs stay placeholders in the tree.
 #
 # T2 needs a self-hosted gVisor runner that does not exist yet: the job only
 # runs when the repo variable COMPUTE_T2_NIGHTLY_ENABLED is 'true'.
 name: Compute nightly load
+
+permissions:
+  contents: read
 
 on:
   schedule:
@@ -36,24 +39,31 @@ jobs:
       - name: Build run images
         run: make images
 
-      - name: Pin map to built images (dev-only path)
+      - name: Push run images to a local registry (real digests)
         run: |
           set -euo pipefail
-          pyid=$(docker inspect --format '{{.Id}}' synaplan-compute-python:latest | sed 's/^sha256://')
-          nodeid=$(docker inspect --format '{{.Id}}' synaplan-compute-node:latest | sed 's/^sha256://')
+          docker run -d --name nightly-registry -p 127.0.0.1:5000:5000 registry:2.8
+          for img in python node; do
+            docker tag "synaplan-compute-$img:latest" "127.0.0.1:5000/compute-$img:latest"
+            docker push "127.0.0.1:5000/compute-$img:latest"
+          done
+          pyid=$(docker inspect --format '{{index .RepoDigests 0}}' 127.0.0.1:5000/compute-python:latest | sed 's/.*@//')
+          nodeid=$(docker inspect --format '{{index .RepoDigests 0}}' 127.0.0.1:5000/compute-node:latest | sed 's/.*@//')
           python3 - "$pyid" "$nodeid" << 'EOF'
           import re, sys
           pyid, nodeid = sys.argv[1], sys.argv[2]
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', pyid), pyid
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', nodeid), nodeid
           p = 'internal/images/map.go'
           text = open(p).read()
           text = re.sub(r'"ghcr\.io/metadist/synaplan-compute-python@sha256:" \+ strings\.Repeat\("a", 64\)',
-                        f'"synaplan-compute-python@sha256:{pyid}"', text)
+                        f'"127.0.0.1:5000/compute-python@{pyid}"', text)
           text = re.sub(r'"ghcr\.io/metadist/synaplan-compute-node@sha256:" \+ strings\.Repeat\("b", 64\)',
-                        f'"synaplan-compute-node@sha256:{nodeid}"', text)
+                        f'"127.0.0.1:5000/compute-node@{nodeid}"', text)
           open(p, 'w').write(text)
-          print('pinned map to local images')
+          print('pinned map to registry digests')
           EOF
-          grep -n "synaplan-compute-python@sha256:" internal/images/map.go | head -2
+          grep -n "127.0.0.1:5000/compute-python@sha256:" internal/images/map.go | head -1
 
       - name: Build and start sidecar
         run: |
@@ -107,21 +117,28 @@ jobs:
       - name: Build run images
         run: make images
 
-      - name: Pin map to built images (dev-only path)
+      - name: Push run images to a local registry (real digests)
         run: |
           set -euo pipefail
-          pyid=$(docker inspect --format '{{.Id}}' synaplan-compute-python:latest | sed 's/^sha256://')
-          nodeid=$(docker inspect --format '{{.Id}}' synaplan-compute-node:latest | sed 's/^sha256://')
+          docker run -d --name nightly-registry -p 127.0.0.1:5000:5000 registry:2.8
+          for img in python node; do
+            docker tag "synaplan-compute-$img:latest" "127.0.0.1:5000/compute-$img:latest"
+            docker push "127.0.0.1:5000/compute-$img:latest"
+          done
+          pyid=$(docker inspect --format '{{index .RepoDigests 0}}' 127.0.0.1:5000/compute-python:latest | sed 's/.*@//')
+          nodeid=$(docker inspect --format '{{index .RepoDigests 0}}' 127.0.0.1:5000/compute-node:latest | sed 's/.*@//')
           python3 - "$pyid" "$nodeid" << 'EOF'
           import re, sys
           pyid, nodeid = sys.argv[1], sys.argv[2]
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', pyid), pyid
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', nodeid), nodeid
           text = open('internal/images/map.go').read()
           text = re.sub(r'"ghcr\.io/metadist/synaplan-compute-python@sha256:" \+ strings\.Repeat\("a", 64\)',
-                        f'"synaplan-compute-python@sha256:{pyid}"', text)
+                        f'"127.0.0.1:5000/compute-python@{pyid}"', text)
           text = re.sub(r'"ghcr\.io/metadist/synaplan-compute-node@sha256:" \+ strings\.Repeat\("b", 64\)',
-                        f'"synaplan-compute-node@sha256:{nodeid}"', text)
+                        f'"127.0.0.1:5000/compute-node@{nodeid}"', text)
           open('internal/images/map.go', 'w').write(text)
-          print('pinned map to local images')
+          print('pinned map to registry digests')
           EOF
 
       - name: Build and start sidecar (gVisor tier)

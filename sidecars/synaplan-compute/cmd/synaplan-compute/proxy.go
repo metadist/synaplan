@@ -29,9 +29,10 @@ func runProxy() {
 	if port == "" {
 		port = "3128"
 	}
+	runID := os.Getenv("EGRESS_RUN_ID")
 	srv := egress.NewServer(allow, egress.Option{
 		OnRefused: func(host string, p int, reason string) {
-			log.Printf("proxy: refused %s:%d (%s)", host, p, reason)
+			log.Printf("proxy: run=%s refused %s:%d (%s)", runID, host, p, reason)
 		},
 	})
 	httpSrv := &http.Server{

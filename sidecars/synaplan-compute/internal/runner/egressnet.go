@@ -111,7 +111,7 @@ func (d *Docker) SetupEgress(ctx context.Context, cfg EgressConfig, runID string
 	if err != nil {
 		return nil, err
 	}
-	proxyID, proxyIP, err := d.startProxy(ctx, networkName, netResp.ID, outboundID, image, string(allowJSON))
+	proxyID, proxyIP, err := d.startProxy(ctx, runID, networkName, netResp.ID, outboundID, image, string(allowJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (d *Docker) inspectSelf(ctx context.Context) (types.ContainerJSON, error) {
 
 // startProxy runs the policy-carrying proxy on netName and waits for its
 // listen line. Returns the container ID and its IP on that network.
-func (d *Docker) startProxy(ctx context.Context, networkName, networkID, outboundID, image, allowJSON string) (string, string, error) {
+func (d *Docker) startProxy(ctx context.Context, runID, networkName, networkID, outboundID, image, allowJSON string) (string, string, error) {
 	mem := int64(64 * 1024 * 1024)
 	pids := int64(32)
 	initTrue := true
@@ -205,6 +205,7 @@ func (d *Docker) startProxy(ctx context.Context, networkName, networkID, outboun
 			Cmd:   []string{proxyCmd},
 			Env: []string{
 				"EGRESS_ALLOW_JSON=" + allowJSON,
+				"EGRESS_RUN_ID=" + runID,
 				fmt.Sprintf("EGRESS_PORT=%d", egressProxyPort),
 			},
 			Labels: map[string]string{runLabelKey: runLabelValue, proxyLabelKey: proxyLabelValue},
