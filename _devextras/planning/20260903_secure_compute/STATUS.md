@@ -14,7 +14,7 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | B1 Client & capability | same | implemented | FeatureModule `compute`, `ComputeClient`, `code_run`, run card, artefacts as `BFILES` `source=compute`. Flag default off. |
 | B2 Tools & policy | same | implemented | `code_execution` is offered only with `compute:run`. Write-class / unattended default `approve`. |
 | B3 Workspaces & egress | `main` (#1870) | in progress (repo-local done) | CS18–CS23 on `main` (#1870): flags `COMPUTE.WORKSPACES_ENABLED` and `COMPUTE.EGRESS_ENABLED` default off (seeder `0`), J-CP-2 verified 2026-09-18 (run card keeps “Open workspace”, WorkspaceView reuses FilesTabs, empty copy verbatim, no egress control on the card). Roadmap row-1 bar (flags + J-CP-2) is met, but the track exit (§4) is not: criterion 2 (working egress) is blocked — shipped sidecar reports `features.egress=false` (CP22 proxy not built), switch stays fail-closed off; criterion 4 (docs-site page) needs CS24 (`synaplan-docs`) + CS25 (`synaplan-platform`, private), both excluded from #1870 and still outstanding. |
-| B4 Hardening & GA | `feat/compute-b4-status-and-reapers` → PR1, `feat/compute-b4-tier-gate` → PR2, then sidecar PR3 | in progress | CS27 (status card) + CS28/CS29 (reapers) in PR1; CS30 (conditional seed) + CS31 (`REQUIRE_TIER` gate) in PR2; CP22/CS26/CS32/CS33 in PR3. Still needs T2 (gVisor) on a compute node before Cloud + the CP22 sidecar release for B3 egress. |
+| B4 Hardening & GA | `feat/compute-b4-status-and-reapers` → PR1, `feat/compute-b4-tier-gate` → PR2, `feat/compute-b4-egress-and-load` → PR3 | in progress | PR1: CS27 + CS28/CS29. PR2: CS30 + CS31. PR3: CP22 egress proxy, bind-path fix, CS26 load tool + nightly, CS32/CS33 docs. Open after merge: T2 node + gVisor runner, run-image publication (placeholder digests), CS24/CS25 external docs, staging rehearsal. |
 
 ## Decisions
 
@@ -36,6 +36,29 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-18 | **B3 repo-local scope closed (CS18–CS23 on `main` via #1870).** STATUS corrected (was stale): flags seeded `0`, J-CP-2 verified against the shipped UI. **Not closed:** exit criterion 2 (working egress — CP22 proxy not built, `features.egress=false`) and criterion 4 (docs-site page — CS24 `synaplan-docs` + CS25 `synaplan-platform`, both excluded from #1870). Nothing silently dropped: egress rides with B4/sidecar work, docs with their repos. Corrected after Copilot review on #2009. |
 
 ## Review log
+
+**2026-09-19 (B4 CS32 — success criteria evidence):** checked against §10
+plus the B4 additions. T1 evidence is in hand; T2/staging rows stay open
+until the compute node and a release tag exist.
+
+| # | Criterion (§10) | State 2026-09-19 | Evidence |
+| - | --------------- | ---------------- | -------- |
+| 1 | Hostile corpus contained on T1 and T2 | T1 done, T2 open | T1: sidecar `go test -race ./...` green (hardening, ValidateHardened, proxy refusal matrix); `egress_proxy_abuse.py/js` walked live against dev (proxy held, direct/DNS/IP-literal all refused). T2: needs the gVisor runner (`COMPUTE_T2_NIGHTLY_ENABLED`, compute-nightly.yml T2 leg). |
+| 2 | XLSX recalculation returns a downloadable XLSX | Done (dev) | `_devextras/testing/compute/xlsx-recalc.sh` → PASS (recalculated values verified in the downloaded file). Requires pinned run images (release step). |
+| 3 | No `compute:run` scope ⇒ no `code_execution`; assistant without `code_run` never plans it | Done | `GatewayCodeExecutionToolTest`, `AssistantSkillGateTest` green in `make ci-local`. |
+| 4 | Scheduled task pauses for approval, runs after approval, audit complete | Tests done, staging open | `SavedTaskComputePauseTest` green; manual staging run pending (needs staging + images). |
+| 5 | Flag off / URL unset: gate green, snapshots untouched, `code_execution` unavailable, no `docker.sock` in PHP | Done | `make ci-local` green; `check-no-docker-sock.sh` now wired into the Compute Sidecar CI job and passing; local rollback rehearsal below. |
+| 6 | Contract fixtures identical in both repos | Done | `TestFixtureChecksums` (Go) + `ComputeContractFixtureTest` (PHP) green. |
+| 7 | J-CP-1 walked (CSV → card → PNG, quota sentence) | Open | Blocked on published run images (placeholder digests can't resolve); API-level proof via the load tool's csv_chart scenario + the xlsx script. Walk it on staging after the compute v1.x release. |
+
+**2026-09-19 (B4 CS33 — rollback rehearsal, local):** flag on → `COMPUTE.ENABLED=0`
+→ both reaper commands exit idle (SUCCESS, no work); `/api/v1/compute/*`
+answers 404; System status card reads OFF with the disabled sentence;
+`--profile compute down` → features payload degrades (`reachable:false`,
+counts kept), page stays HTTP 200, no 500 anywhere. Planner/gateway
+disappearance is covered by unit tests (`AssistantSkillGateTest`,
+gateway suites); the ten-run staging rehearsal in §2.6 stays an ops item.
+Rollback section added to `docs/COMPUTE.md`.
 
 **2026-09-03 (first pass):** master plan drafted against the verified
 codebase state (see roadmap §5).

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/metadist/synaplan-compute/internal/runner"
+	"github.com/metadist/synaplan-compute/pkg/contract"
 )
 
 // fakeRunner is a hermetic runner.Runner: no dockerd, deterministic exits,
@@ -150,5 +151,18 @@ func (f *fakeRunner) Logs(ctx context.Context, id string, stdout, stderr io.Writ
 	case <-c.exited:
 	case <-c.killed:
 	}
+	return nil
+}
+
+func (f *fakeRunner) SetupEgress(_ context.Context, _ runner.EgressConfig, runID string, _ []contract.EgressHost) (*runner.EgressNet, error) {
+	return &runner.EgressNet{
+		NetworkID: "fake-net",
+		Network:   runner.EgressNetworkName(runID),
+		ProxyID:   "fake-proxy",
+		ProxyURL:  "http://127.0.0.1:3128",
+	}, nil
+}
+
+func (f *fakeRunner) TeardownEgress(_ context.Context, _ *runner.EgressNet) error {
 	return nil
 }

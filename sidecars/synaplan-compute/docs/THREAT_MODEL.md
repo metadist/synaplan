@@ -10,17 +10,38 @@ The sandbox answers that by executing **only** inside an ephemeral T1 (or T2) co
 
 Attacker positions: **script author** (model-written code), **prompt injector** (untrusted chat text that becomes a script), **compromised compute host**, **malicious artefact** (poisoned `/out` file).
 
-## Network posture (A0–A2)
+## Network posture (CP22: per-run proxy)
 
-**Egress is not implemented.** There is no proxy listener, `runner.Spec` has no network field, `Hardened` always emits `NetworkMode=none`, and `ValidateHardened` rejects anything else (including `container:`, `host`, `bridge`, and custom networks) before `ContainerCreate`. `POST /v1/runs` refuses any non-empty `egress.allow` with `egress_not_allowed` regardless of `COMPUTE_EGRESS_ENABLED`, and `GET /v1/health` reports `features.egress=false`. The allow-list policy (`egress.CheckAllowList`, `egress.Proxy`) is kept under test as the future contract only.
+Runs without `egress.allow` are `NetworkMode=none` exactly as before.
+A run **with** an allow-list (only when `COMPUTE_EGRESS_ENABLED=1`) gets a
+private internal network plus a throwaway proxy container running this same
+image as `synaplan-compute proxy` with that run's pin map. The run container
+joins no other network, resolves no DNS (nameserver `127.0.0.1`), and carries
+only `HTTP_PROXY`/`HTTPS_PROXY` (proxy IP literal) plus `NO_PROXY`.
+`ValidateHardened` enforces that exact shape at `Create`: any other
+`NetworkMode` (`host`, `bridge`, `container:`, foreign custom networks),
+any extra env var, or any live DNS is refused.
+
+The proxy itself is dual-homed: the run network plus the long-lived
+`compute-egress-out` bridge that gives it (and only it — run containers
+never join it) the outbound route. The proxy dials pinned public IPs only:
+unknown host, wrong port, IP literal, or private/special-range IP gets 403
+and an `egress.refused` audit event. It never resolves DNS itself.
+Deliberately no proxy authentication: run containers cannot route anywhere
+except their own proxy, so a token would add nothing — and a 407 challenge
+would break urllib, the primary script client. CONNECT tunnels and forwarded
+bodies are capped (256 MB per direction) and idle-timed-out; proxy, run
+network, and run container are removed together, with the orphan sweep as
+backstop. Scripts that ignore proxy env vars simply reach nothing —
+fail-closed by construction.
 
 ## Controls
 
 | Threat | Attacker | Asset | T1 control | T2 control | Residual risk | Proof |
 | ------ | -------- | ----- | ---------- | ---------- | ------------- | ----- |
 | Container escape | script author | host kernel, other tenants | `Hardened`: NetworkMode none, ReadonlyRootfs, tmpfs `noexec,nosuid,nodev`, CapDrop ALL, no CapAdd, no-new-privileges, non-root uid:gid (`COMPUTE_SANDBOX_UID`, default 65534), Init, never privileged, empty `Env`, default pid/ipc/uts/userns/cgroupns, no devices, no docker.sock, no legacy `Binds`; bind sources must exist, be directories, and not be symlinks; `BindOptions.NonRecursive`; `ValidateHardened` re-checks every item at `Create` | gVisor `runsc` when `COMPUTE_TIER=gvisor`; Cloud requires T2 on a separate node | Kernel 0-days; accepted on T1, mitigated by T2/T3 | `TestHostConfigHardening`; `TestValidateHardenedRejectsWeakenedConfig`; `TestHardenedNeverPrivilegedEvenIfRuntimeSet`; corpus `setuid.py` / `setuid.js` |
-| Data exfiltration via network | script author / prompt injector | user files in `/work` | Every run is `NetworkMode=none`; any `egress.allow` entry is refused; runner cannot select another mode | Same; runtime does not add a NIC | None until an egress proxy ships (separate review) | `TestEgressEmptyMeansNoNetwork`; `TestEgressFailsClosedEvenWhenEnabled`; `TestEgressAllowListRefusedFailClosed`; `TestValidateHardenedRejectsWeakenedConfig` (network cases); corpus `dns_attempt.py` / `dns_attempt.js` |
-| Future egress to an unpinned or private IP | prompt injector | internal network | Policy kept for the proxy: pinned IPs only; loopback, private, link-local, multicast, CGNAT `100.64/10`, `0/8`, `192.0.0/24`, `198.18/15`, `255.255.255.255` refused; host cap | Same | Not wired to any container yet | `TestProxyRefusesUnpinnedHost`; `TestProxyRefusesPrivateIp`; `TestEgressDisabledRefusesAllowList` |
+| Data exfiltration via network | script author / prompt injector | user files in `/work` | Offline runs: `NetworkMode=none`; any `egress.allow` entry refused when disabled. Egress runs: private internal network with exactly the proxy as peer; run container DNS is dead (`127.0.0.1`); only `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` env; proxy dials pinned public IPs, 403 + audit otherwise; bodies capped per direction; all torn down with the run | Same; runtime does not add a NIC | TLS SNI still visible to a network observer (same as any TLS); scripts ignoring proxy env reach nothing (fail-closed); proxy compromise blast radius is one empty container on a 2-member network | `TestEgressEmptyMeansNoNetwork`; `TestEgressDisabledRefusesAllowList`; `TestConnectUnknownHostRefused`; `TestConnectIPLiteralRefused`; `TestConnectPrivatePinRefused`; `TestRelayEnforcesBodyCap`; `TestHardenedEgressShapePassesValidation`; `TestValidateHardenedRejectsWeakenedConfig` (network cases); corpus `dns_attempt.py` / `dns_attempt.js`, `egress_proxy_abuse.py` |
+| Egress to an unpinned or private IP | prompt injector | internal network | Pinned IPs only; loopback, private, link-local, multicast, CGNAT `100.64/10`, `0/8`, `192.0.0/24`, `198.18/15`, `255.255.255.255` refused at admission (`CheckAllowList`) and re-checked at dial; host cap; IP literals refused even when pinned | Same | Pins are resolved by PHP at submit; a record changing mid-run keeps the old IP until the next run (by design — no re-resolution inside the trust boundary) | `TestProxyRefusesUnpinnedHost`; `TestProxyRefusesPrivateIp`; `TestEgressDisabledRefusesAllowList`; `TestEgressAllowListAcceptedWhenEnabled`; corpus `egress_proxy_abuse.py` |
 | Fork bomb / PID exhaustion | script author | host scheduler | `PidsLimit` from `limits.pids`; Init reaps the tree; `ValidateHardened` requires PidsLimit > 0 | gVisor extra | Shared-host noisy neighbour on T1; the service reports `program_error`, not `pids_limit` | `TestHostConfigHardening` (PidsLimit); `TestValidateHardenedRejectsWeakenedConfig` (pids cases); corpus `fork_bomb.py` / `fork_bomb.js` |
 | Disk fill | script author | host disk | `fsize` ulimit = `outputMb` per file; tmpfs `size=64m`; after the run the sum of `/work` + `/out` above `outputMb` fails the run with `output_limit` and blocks artefact download; workspace quota is pre-checked on upload | Same | No in-run filesystem quota: a script can exceed `outputMb` until it exits; scratch volume sizing is an operator task | `TestOutputLimitAfterRunBlocksArtefacts`; `TestArtefactSizeCap`; `TestWorkspaceQuotaKillsRun`; `TestWorkspaceQuotaPrecheck`; corpus `disk_fill.py` / `disk_fill.js` |
 | Infinite loop / hang | script author | capacity slots | `context.WithTimeout(limits.timeoutSec)`; on expiry SIGKILL + `ContainerRemove{Force}` with a fresh cleanup context; reason `timeout` | Same | Slow disk on kill | `TestTimeoutKillsAndReportsTimeout`; corpus `long_sleep.py` / `long_sleep.js` |
@@ -56,7 +77,6 @@ Attacker positions: **script author** (model-written code), **prompt injector** 
 
 ## Not implemented (do not claim)
 
-- Egress of any kind: no proxy, no `compute-egress` network, no `HTTP_PROXY` injection.
 - In-run workspace quota kill.
 - Cosign verification of images (A3).
 - Live hostile-corpus job: `tests/hostile` only verifies headers hermetically; execution against dockerd is gated on `COMPUTE_HOSTILE_DOCKER=1` and lives outside this repository's CI.

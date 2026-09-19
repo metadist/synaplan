@@ -1,0 +1,155 @@
+# Compute nightly load (CS26): T1 on GitHub-hosted runners, T2 behind a flag.
+#
+# T1 builds everything from source (sidecar + run images), starts the
+# sidecar with the docker socket, and runs the mixed load scenario. Run
+# image digests are placeholders until the compute v1.x release publishes
+# real ones, so the job patches the map from the just-built local image IDs
+# (dev-only path; releases pin published digests instead).
+#
+# T2 needs a self-hosted gVisor runner that does not exist yet: the job only
+# runs when the repo variable COMPUTE_T2_NIGHTLY_ENABLED is 'true'.
+name: Compute nightly load
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  load-t1:
+    name: Load mix on T1 (docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: sidecars/synaplan-compute
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: sidecars/synaplan-compute/go.mod
+          cache-dependency-path: sidecars/synaplan-compute/go.sum
+
+      - name: Build run images
+        run: make images
+
+      - name: Pin map to built images (dev-only path)
+        run: |
+          set -euo pipefail
+          pyid=$(docker inspect --format '{{.Id}}' synaplan-compute-python:latest | sed 's/^sha256://')
+          nodeid=$(docker inspect --format '{{.Id}}' synaplan-compute-node:latest | sed 's/^sha256://')
+          python3 - "$pyid" "$nodeid" << 'EOF'
+          import re, sys
+          pyid, nodeid = sys.argv[1], sys.argv[2]
+          p = 'internal/images/map.go'
+          text = open(p).read()
+          text = re.sub(r'"ghcr\.io/metadist/synaplan-compute-python@sha256:" \+ strings\.Repeat\("a", 64\)',
+                        f'"synaplan-compute-python@sha256:{pyid}"', text)
+          text = re.sub(r'"ghcr\.io/metadist/synaplan-compute-node@sha256:" \+ strings\.Repeat\("b", 64\)',
+                        f'"synaplan-compute-node@sha256:{nodeid}"', text)
+          open(p, 'w').write(text)
+          print('pinned map to local images')
+          EOF
+          grep -n "synaplan-compute-python@sha256:" internal/images/map.go | head -2
+
+      - name: Build and start sidecar
+        run: |
+          set -euo pipefail
+          docker build -t synaplan-compute:test .
+          mkdir -p /tmp/compute-nightly/scratch /tmp/compute-nightly/workspaces
+          chmod 777 /tmp/compute-nightly/scratch /tmp/compute-nightly/workspaces
+          token=$(openssl rand -hex 32)
+          echo "COMPUTE_TOKEN=$token" >> "$GITHUB_ENV"
+          docker run -d --name synaplan-compute-nightly \
+            -p 127.0.0.1:8080:8080 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /tmp/compute-nightly/scratch:/scratch \
+            -v /tmp/compute-nightly/workspaces:/workspaces \
+            -e COMPUTE_AUTH_TOKEN="$token" \
+            -e COMPUTE_LISTEN=:8080 \
+            -e COMPUTE_MAX_CONCURRENT=4 \
+            synaplan-compute:test
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/v1/health && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8080/v1/health | head -c 300
+          echo
+
+      - name: Run load mix (N=32, concurrency 4)
+        run: go run ./cmd/compute-load -url http://127.0.0.1:8080 -n 32 -concurrency 4
+
+      - name: Show sidecar logs on failure
+        if: failure()
+        run: docker logs synaplan-compute-nightly 2>&1 | tail -40
+
+  load-t2:
+    name: Load mix on T2 (gVisor)
+    if: vars.COMPUTE_T2_NIGHTLY_ENABLED == 'true'
+    runs-on: [self-hosted, gvisor]
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: sidecars/synaplan-compute
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: sidecars/synaplan-compute/go.mod
+          cache-dependency-path: sidecars/synaplan-compute/go.sum
+
+      - name: Build run images
+        run: make images
+
+      - name: Pin map to built images (dev-only path)
+        run: |
+          set -euo pipefail
+          pyid=$(docker inspect --format '{{.Id}}' synaplan-compute-python:latest | sed 's/^sha256://')
+          nodeid=$(docker inspect --format '{{.Id}}' synaplan-compute-node:latest | sed 's/^sha256://')
+          python3 - "$pyid" "$nodeid" << 'EOF'
+          import re, sys
+          pyid, nodeid = sys.argv[1], sys.argv[2]
+          text = open('internal/images/map.go').read()
+          text = re.sub(r'"ghcr\.io/metadist/synaplan-compute-python@sha256:" \+ strings\.Repeat\("a", 64\)',
+                        f'"synaplan-compute-python@sha256:{pyid}"', text)
+          text = re.sub(r'"ghcr\.io/metadist/synaplan-compute-node@sha256:" \+ strings\.Repeat\("b", 64\)',
+                        f'"synaplan-compute-node@sha256:{nodeid}"', text)
+          open('internal/images/map.go', 'w').write(text)
+          print('pinned map to local images')
+          EOF
+
+      - name: Build and start sidecar (gVisor tier)
+        run: |
+          set -euo pipefail
+          docker build -t synaplan-compute:test .
+          mkdir -p /tmp/compute-nightly/scratch /tmp/compute-nightly/workspaces
+          chmod 777 /tmp/compute-nightly/scratch /tmp/compute-nightly/workspaces
+          token=$(openssl rand -hex 32)
+          echo "COMPUTE_TOKEN=$token" >> "$GITHUB_ENV"
+          docker run -d --name synaplan-compute-nightly \
+            -p 127.0.0.1:8080:8080 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /tmp/compute-nightly/scratch:/scratch \
+            -v /tmp/compute-nightly/workspaces:/workspaces \
+            -e COMPUTE_AUTH_TOKEN="$token" \
+            -e COMPUTE_LISTEN=:8080 \
+            -e COMPUTE_TIER=gvisor \
+            -e COMPUTE_MAX_CONCURRENT=4 \
+            synaplan-compute:test
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/v1/health && break
+            sleep 2
+          done
+
+      - name: Run load mix (N=32, concurrency 4)
+        run: go run ./cmd/compute-load -url http://127.0.0.1:8080 -n 32 -concurrency 4
+
+      - name: Show sidecar logs on failure
+        if: failure()
+        run: docker logs synaplan-compute-nightly 2>&1 | tail -40

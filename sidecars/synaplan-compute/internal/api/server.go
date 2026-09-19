@@ -221,8 +221,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		},
 		Features: contract.HealthFeatures{
 			Workspaces: true,
-			// Egress has no proxy in A0–A2; Validate refuses every allow-list.
-			Egress: false,
+			Egress:     s.egress.Enabled,
 		},
 	})
 }

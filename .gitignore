@@ -8,6 +8,9 @@
 
 .fixtures_loaded
 
+# Local compute sidecar state (host-path binds, see docker-compose.yml)
+.compute-data/
+
 # IDE
 .vscode/
 .idea/

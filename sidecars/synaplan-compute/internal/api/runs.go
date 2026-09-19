@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -349,6 +350,27 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 	if rec.ctx.Err() != nil {
 		return
 	}
+	// Egress runs get a private network plus a throwaway proxy carrying
+	// this run's pin map (CP22). Setup failure fails the run before any
+	// container exists; teardown runs after the run container is gone.
+	var attach *runner.EgressAttachment
+	if len(rec.Req.Egress.Allow) > 0 {
+		egressNet, err := s.docker.SetupEgress(cctx, runner.EgressConfig{Image: s.cfg.ProxyImage}, rec.ID, rec.Req.Egress.Allow)
+		if err != nil {
+			if rec.ctx.Err() != nil {
+				return
+			}
+			log.Printf("egress setup failed for run %s: %v", rec.ID, err)
+			s.audit.Log(audit.Event{Event: audit.RunRefused, RunID: rec.ID, Owner: rec.Owner, Image: rec.Req.Image, Reason: contract.ReasonEgressUnavailable, EgressHosts: hostNames(rec.Req.Egress)})
+			s.finish(rec, contract.StatusFailed, -1, contract.ReasonEgressUnavailable)
+			return
+		}
+		attach = &runner.EgressAttachment{Network: egressNet.Network, ProxyURL: egressNet.ProxyURL}
+		defer func() {
+			// Best-effort: leftovers carry the run label for SweepOrphans.
+			_ = s.docker.TeardownEgress(context.Background(), egressNet)
+		}()
+	}
 	id, err := s.docker.Create(cctx, runner.Spec{
 		ImageRef:      img.Ref,
 		Cmd:           append([]string{rec.Req.Entry.Program}, rec.Req.Entry.Args...),
@@ -358,6 +380,7 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 		Limits:        rec.Req.Limits,
 		Runtime:       s.tier.Runtime,
 		User:          s.sandboxUser(),
+		Egress:        attach,
 	})
 	if err != nil {
 		if rec.ctx.Err() != nil {

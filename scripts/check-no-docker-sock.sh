@@ -8,11 +8,16 @@ import sys
 
 root = pathlib.Path(".")
 allowed_suffixes = {".md", ".md.gotmpl"}
+# The compute nightly mounts the socket to run the sidecar under test and to
+# count leftover run containers. It never ships to production.
+allowed_files = {".github/workflows/compute-nightly.yml"}
 bad: list[str] = []
 for path in root.rglob("*"):
     if not path.is_file():
         continue
     rel = path.as_posix()
+    if rel in allowed_files:
+        continue
     if any(part in {".git", "vendor", "node_modules", "var"} for part in path.parts):
         continue
     if rel.startswith("sidecars/synaplan-compute/"):
