@@ -2661,7 +2661,28 @@
       "modulesSubtitle": "Bu kurulumun bildirdiği isteğe bağlı özellikler. Her biri kendi yapılandırmasıyla açılır; liste anahtarları gösterir, değerlerini asla göstermez.",
       "modulesConfigured": "{total} modülden {configured} tanesi yapılandırıldı",
       "configuredBy": "Yapılandıran:",
-      "docs": "Belgeler"
+      "docs": "Belgeler",
+      "compute": {
+        "title": "Dosya işleri (işlem)",
+        "tierDocker": "Standart",
+        "tierGvisor": "Güçlü yalıtım",
+        "tierMicrovm": "Sanal makine",
+        "tierUnknown": "Bilinmiyor",
+        "statusOn": "Açık",
+        "statusOff": "Kapalı",
+        "statusDown": "Yanıt vermiyor",
+        "stateRunning": "Dosya işleri çalışıyor.",
+        "stateDisabled": "Sistem yapılandırmasında kapalı. Dosya işleri gizli.",
+        "stateUnreachable": "Açık, ancak sidecar yanıt vermiyor. Dosya işleri kullanılamıyor.",
+        "postureWarning": "Bu hizmet {tier} bildiriyor; bu kurulum daha güçlü yalıtım gerektiriyor.",
+        "capacity": "Kapasite",
+        "runningOf": "{running} / {max} çalışıyor",
+        "queued": "{count} kuyrukta",
+        "images": "İmajlar",
+        "runs24": "{count} çalıştırma (24 sa)",
+        "failed24": "{count} başarısız (24 sa)",
+        "openConfig": "İşlem ayarları"
+      }
     },
     "notLoggedIn": "Oturum açılmadı"
   },

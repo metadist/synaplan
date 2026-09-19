@@ -5000,7 +5000,28 @@
       "modulesSubtitle": "Fonctionnalités optionnelles déclarées par cette installation. Chacune est activée par sa configuration ; la liste affiche les clés, jamais leurs valeurs.",
       "modulesConfigured": "{configured} sur {total} configurés",
       "configuredBy": "Configuré par :",
-      "docs": "Documentation"
+      "docs": "Documentation",
+      "compute": {
+        "title": "Traitement de fichiers (compute)",
+        "tierDocker": "Standard",
+        "tierGvisor": "Isolation renforcée",
+        "tierMicrovm": "Machine virtuelle",
+        "tierUnknown": "Inconnu",
+        "statusOn": "Activé",
+        "statusOff": "Désactivé",
+        "statusDown": "En panne",
+        "stateRunning": "Le traitement de fichiers est en cours.",
+        "stateDisabled": "Désactivé dans la configuration système. Le traitement de fichiers reste masqué.",
+        "stateUnreachable": "Activé, mais le sidecar ne répond pas. Le traitement de fichiers est indisponible.",
+        "postureWarning": "Ce service signale {tier} ; cette instance exige une isolation plus forte.",
+        "capacity": "Capacité",
+        "runningOf": "{running} sur {max} en cours",
+        "queued": "{count} en file",
+        "images": "Images",
+        "runs24": "{count} exécutions (24h)",
+        "failed24": "{count} échouées (24h)",
+        "openConfig": "Réglages compute"
+      }
     },
     "notLoggedIn": "Non connecté"
   },

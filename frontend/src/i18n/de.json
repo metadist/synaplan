@@ -3943,7 +3943,28 @@
       "modulesSubtitle": "Optionale Funktionen, die diese Installation deklariert. Jede wird über ihre Konfiguration eingeschaltet; die Liste zeigt die Schlüssel, nie deren Werte.",
       "modulesConfigured": "{configured} von {total} konfiguriert",
       "configuredBy": "Konfiguriert über:",
-      "docs": "Dokumentation"
+      "docs": "Dokumentation",
+      "compute": {
+        "title": "Dateiarbeit (Compute)",
+        "tierDocker": "Standard",
+        "tierGvisor": "Starke Isolierung",
+        "tierMicrovm": "Virtuelle Maschine",
+        "tierUnknown": "Unbekannt",
+        "statusOn": "An",
+        "statusOff": "Aus",
+        "statusDown": "Gestört",
+        "stateRunning": "Dateiarbeit läuft.",
+        "stateDisabled": "In der Systemkonfiguration ausgeschaltet. Dateiarbeit bleibt verborgen.",
+        "stateUnreachable": "Eingeschaltet, aber der Sidecar antwortet nicht. Dateiarbeit ist nicht verfügbar.",
+        "postureWarning": "Dieser Dienst meldet {tier}; diese Instanz erfordert stärkere Isolierung.",
+        "capacity": "Kapazität",
+        "runningOf": "{running} von {max} aktiv",
+        "queued": "{count} wartend",
+        "images": "Images",
+        "runs24": "{count} Läufe (24h)",
+        "failed24": "{count} fehlgeschlagen (24h)",
+        "openConfig": "Compute-Einstellungen"
+      }
     },
     "notLoggedIn": "Nicht angemeldet"
   },

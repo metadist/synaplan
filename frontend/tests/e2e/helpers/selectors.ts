@@ -578,6 +578,11 @@ export const selectors = {
     moduleItem: '[data-testid="item-module"]',
     moduleStateBadge: '[data-testid="badge-module-state"]',
     moduleDocsLink: '[data-testid="link-module-docs"]',
+    computeSection: '[data-testid="section-compute-status"]',
+    computeStateLine: '[data-testid="compute-state-line"]',
+    computeStatusPill: '[data-testid="compute-status-pill"]',
+    computeRetry: '[data-testid="btn-compute-retry"]',
+    computeConfigLink: '[data-testid="link-compute-config"]',
   },
   people: {
     backToOperate: '[data-testid="link-people-back-operate"]',

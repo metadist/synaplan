@@ -527,5 +527,20 @@
             "docs_anchor": "modules/whatsapp",
             "mobile_class": "ota-candidate"
         }
-    ]
+    ],
+    "compute": {
+        "enabled": false,
+        "reachable": false,
+        "protocol": 0,
+        "tier": "",
+        "tierMeetsRequirement": false,
+        "capacity": {
+            "maxConcurrent": 0,
+            "running": 0,
+            "queued": 0
+        },
+        "images": [],
+        "runsLast24h": 0,
+        "failedLast24h": 0
+    }
 }

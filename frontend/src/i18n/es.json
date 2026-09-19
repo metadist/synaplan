@@ -2660,7 +2660,28 @@
       "modulesSubtitle": "Funciones opcionales que declara esta instalación. Cada una se activa mediante su configuración; la lista muestra las claves, nunca sus valores.",
       "modulesConfigured": "{configured} de {total} configurados",
       "configuredBy": "Configurado por:",
-      "docs": "Documentación"
+      "docs": "Documentación",
+      "compute": {
+        "title": "Trabajo con archivos (cómputo)",
+        "tierDocker": "Estándar",
+        "tierGvisor": "Aislamiento fuerte",
+        "tierMicrovm": "Máquina virtual",
+        "tierUnknown": "Desconocido",
+        "statusOn": "Activado",
+        "statusOff": "Desactivado",
+        "statusDown": "Caído",
+        "stateRunning": "El trabajo con archivos está en marcha.",
+        "stateDisabled": "Desactivado en la configuración del sistema. El trabajo con archivos está oculto.",
+        "stateUnreachable": "Activado, pero el sidecar no responde. El trabajo con archivos no está disponible.",
+        "postureWarning": "Este servicio informa {tier}; esta instancia requiere un aislamiento más fuerte.",
+        "capacity": "Capacidad",
+        "runningOf": "{running} de {max} en ejecución",
+        "queued": "{count} en cola",
+        "images": "Imágenes",
+        "runs24": "{count} ejecuciones (24h)",
+        "failed24": "{count} fallidas (24h)",
+        "openConfig": "Ajustes de cómputo"
+      }
     },
     "notLoggedIn": "No has iniciado sesión"
   },

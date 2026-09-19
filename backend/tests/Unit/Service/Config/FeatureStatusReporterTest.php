@@ -14,7 +14,12 @@ use App\Module\Sidecar\DoclingModule;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Module\Sidecar\TikaModule;
 use App\Plug\WebSearch\WebSearchGateway;
+use App\Repository\ComputeRunRepository;
 use App\Repository\ModelRepository;
+use App\Service\Compute\ComputeClient;
+use App\Service\Compute\ComputeConfig;
+use App\Service\Compute\ComputeFeatureStatusBuilder;
+use App\Service\Compute\Contract\ComputeHealth;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Infrastructure\RedisService;
 use App\Service\UserMemoryService;
@@ -26,6 +31,8 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 
 /**
@@ -186,7 +193,7 @@ final class FeatureStatusReporterTest extends TestCase
         $probe = new FakeSidecarHealthProbe();
         $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: '', officeUrl: 'disabled');
 
-        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry));
+        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry), $this->computeStatus(false));
     }
 
     private function fullReporter(): FeatureStatusReporter
@@ -262,7 +269,33 @@ final class FeatureStatusReporterTest extends TestCase
         );
         $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: ' http://docling:5001/ ', officeUrl: ' http://collabora:9980 ', tikaUser: 'tika', tikaPass: 'secret');
 
-        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry));
+        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry), $this->computeStatus(true));
+    }
+
+    private function computeStatus(bool $healthy): ComputeFeatureStatusBuilder
+    {
+        $config = $this->createStub(ComputeConfig::class);
+        $config->method('isEnabled')->willReturn($healthy);
+        $client = $this->createMock(ComputeClient::class);
+        if ($healthy) {
+            $client->expects($this->once())->method('health')->willReturn(ComputeHealth::fromJson((string) json_encode([
+                'protocol' => 1,
+                'tier' => 'gvisor',
+                'images' => [
+                    ['key' => 'python', 'ref' => 'ghcr.io/metadist/synaplan-compute-python@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6'],
+                ],
+                'capacity' => ['maxConcurrent' => 4, 'running' => 1, 'queued' => 0],
+                'caps' => ['timeoutSec' => 300, 'memoryMb' => 2048, 'cpu' => 2.0, 'pids' => 256, 'outputMb' => 200],
+                'features' => ['workspaces' => true, 'egress' => false],
+            ], \JSON_THROW_ON_ERROR)));
+        } else {
+            $client->method('health')->willThrowException(new \RuntimeException('Connection refused'));
+        }
+        $runs = $this->createStub(ComputeRunRepository::class);
+        $runs->method('countSince')->willReturn($healthy ? 12 : 0);
+        $runs->method('countFailedSince')->willReturn($healthy ? 1 : 0);
+
+        return new ComputeFeatureStatusBuilder($config, $client, $runs, new ArrayAdapter(), new NullLogger());
     }
 
     /**

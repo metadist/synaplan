@@ -78,4 +78,21 @@ test.describe('@ci Feature status', () => {
       ).toBe(configured)
     }
   })
+
+  test('shows the compute sidecar card with one plain state sentence', async ({ page }) => {
+    // The backend always sends the compute entry (healthy or degraded), so
+    // the card renders on every stack. Reachability itself depends on the
+    // environment and is asserted only as internal consistency.
+    await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
+      timeout: TIMEOUTS.EXTREME,
+    })
+    const card = page.locator(selectors.featureStatus.computeSection)
+    await expect(card).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect(card.locator(selectors.featureStatus.computeStateLine)).not.toHaveText('')
+    await expect(card.locator(selectors.featureStatus.computeStatusPill)).not.toHaveText('')
+    await expect(card.locator(selectors.featureStatus.computeConfigLink)).toHaveAttribute(
+      'href',
+      /\/admin\/config\?tab=processing&section=compute/
+    )
+  })
 })

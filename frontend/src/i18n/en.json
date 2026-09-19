@@ -5000,7 +5000,28 @@
       "modulesSubtitle": "Optional features this installation declares. Each one is switched on by its configuration; the list shows which keys, never their values.",
       "modulesConfigured": "{configured} of {total} configured",
       "configuredBy": "Configured by:",
-      "docs": "Documentation"
+      "docs": "Documentation",
+      "compute": {
+        "title": "File work (compute)",
+        "tierDocker": "Standard",
+        "tierGvisor": "Strong isolation",
+        "tierMicrovm": "Virtual machine",
+        "tierUnknown": "Unknown",
+        "statusOn": "On",
+        "statusOff": "Off",
+        "statusDown": "Down",
+        "stateRunning": "File work is running.",
+        "stateDisabled": "Turned off in System configuration. File work stays hidden.",
+        "stateUnreachable": "On, but the sidecar is not answering. File work is unavailable.",
+        "postureWarning": "This service reports {tier}; this instance requires stronger isolation.",
+        "capacity": "Capacity",
+        "runningOf": "{running} of {max} running",
+        "queued": "{count} queued",
+        "images": "Images",
+        "runs24": "{count} runs (24h)",
+        "failed24": "{count} failed (24h)",
+        "openConfig": "Compute settings"
+      }
     },
     "notLoggedIn": "Not logged in"
   },
