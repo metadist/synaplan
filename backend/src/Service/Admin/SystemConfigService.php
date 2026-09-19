@@ -554,7 +554,8 @@ final readonly class SystemConfigService
         if ('database' === $source) {
             $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value)
                 ?? $this->refuseComputeFeatureSidecarLacks($key, $value)
-                ?? $this->refuseComputeBelowRequiredTier($key, $value);
+                ?? $this->refuseComputeBelowRequiredTier($key, $value)
+                ?? $this->refuseComputeInvalidTier($key, $value);
             if (null !== $capRefuse) {
                 return $capRefuse;
             }
@@ -812,6 +813,29 @@ final readonly class SystemConfigService
                 ComputeConfig::tierDisplayName($tier),
                 ComputeConfig::tierDisplayName($required),
             ),
+        ];
+    }
+
+    /**
+     * The tier requirement is only meaningful as a known tier. Reject anything
+     * else at write time: reads fail closed to the strictest tier, so a bad
+     * row would silently pin this instance to microVM.
+     *
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeInvalidTier(string $key, string $value): ?array
+    {
+        if ('COMPUTE_REQUIRE_TIER' !== $key) {
+            return null;
+        }
+        if (isset(ComputeConfig::TIER_ORDER[strtolower(trim($value))])) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => 'Isolation tier must be one of: docker, gvisor, microvm.',
         ];
     }
 

@@ -110,7 +110,7 @@ final class ComputeFeatureStatusBuilderTest extends TestCase
     public function testCacheFailureDegradesToEmptyEntry(): void
     {
         $config = $this->createStub(ComputeConfig::class);
-        $config->method('isEnabled')->willReturn(true);
+        $config->method('isSwitchedOn')->willReturn(true);
         $cache = $this->createMock(CacheInterface::class);
         $cache->method('get')->willThrowException(new \RuntimeException('Redis down'));
         $builder = new ComputeFeatureStatusBuilder(
@@ -152,7 +152,7 @@ final class ComputeFeatureStatusBuilderTest extends TestCase
         string $requireTier = 'docker',
     ): ComputeFeatureStatusBuilder {
         $config = $this->createStub(ComputeConfig::class);
-        $config->method('isEnabled')->willReturn($enabled);
+        $config->method('isSwitchedOn')->willReturn($enabled);
         $config->method('requireTier')->willReturn($requireTier);
         if (null === $client) {
             $client = $this->createStub(ComputeClient::class);
