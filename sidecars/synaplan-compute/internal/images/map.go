@@ -22,20 +22,19 @@ type Map struct {
 	images map[string]Image
 }
 
-// Default is the v1 Python + Node catalog. Digests here are placeholders:
-// build the images (`make images`) and replace these with the published
-// digests before the first run. The @sha256: form is required; the runner
-// never pulls.
+// Default is the v1 Python + Node catalog, pinned to the published 1.0.0
+// digests. The @sha256: form is required; the runner never pulls.
+// Re-pinning (new release): rebuild, push, paste the RepoDigests here.
 func Default() *Map {
 	return New([]Image{
 		{
 			Key:      KeyPython,
-			Ref:      "ghcr.io/metadist/synaplan-compute-python@sha256:" + strings.Repeat("a", 64),
+			Ref:      "ghcr.io/metadist/synaplan-compute-python@sha256:2f2619f6bf885f1cb83261a0b33d0d650abdd48e27bf86f4da7e9bda38eeba60",
 			Programs: []string{"python", "sh"},
 		},
 		{
 			Key:      KeyNode,
-			Ref:      "ghcr.io/metadist/synaplan-compute-node@sha256:" + strings.Repeat("b", 64),
+			Ref:      "ghcr.io/metadist/synaplan-compute-node@sha256:4ce468ceb7d081f5d106f053aae308e9c1af96e9847fa0d05c25b98970491a00",
 			Programs: []string{"node", "sh"},
 		},
 	})
