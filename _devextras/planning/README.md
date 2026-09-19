@@ -23,6 +23,7 @@ paths were renamed on 2026-09-17.
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/) | Editor / partner epics still planned |
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/) | Not started |
 | [`20260829-desktop-agent-client/`](./20260829-desktop-agent-client/) | Plan of record for the desktop client |
+| [`20260919-meta-muse/`](./20260919-meta-muse/00_master_plan.md) | Meta Model API (Muse Spark) + per-model thinking levels (§0 unticked, research only) |
 
 ## Archive
 
