@@ -80,6 +80,16 @@ final class ComputeFeatureStatusBuilderTest extends TestCase
         self::assertFalse($entry['tierMeetsRequirement']);
     }
 
+    public function testBelowRequiredTierFailsRequirement(): void
+    {
+        $builder = $this->builder(enabled: true, health: $this->health(tier: 'docker'), requireTier: 'gvisor');
+
+        $entry = $builder->build();
+
+        self::assertTrue($entry['reachable']);
+        self::assertFalse($entry['tierMeetsRequirement']);
+    }
+
     public function testShortDigestFallsBackToTruncatedRef(): void
     {
         $health = ComputeHealth::fromJson((string) file_get_contents(
@@ -139,9 +149,11 @@ final class ComputeFeatureStatusBuilderTest extends TestCase
         ?ComputeClient $client = null,
         int $runs = 0,
         int $failed = 0,
+        string $requireTier = 'docker',
     ): ComputeFeatureStatusBuilder {
         $config = $this->createStub(ComputeConfig::class);
         $config->method('isEnabled')->willReturn($enabled);
+        $config->method('requireTier')->willReturn($requireTier);
         if (null === $client) {
             $client = $this->createStub(ComputeClient::class);
             $client->method('health')->willReturn($health ?? $this->health());

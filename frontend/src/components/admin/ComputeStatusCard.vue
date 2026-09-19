@@ -139,6 +139,12 @@ const tierLabel = computed(() => {
 
 const stateLine = computed(() => {
   if (!props.compute.enabled) {
+    // The flag may be on but held off by the tier gate (CS31) — the posture
+    // warning below names the reason; the sentence must not claim the switch
+    // itself is off.
+    if (props.compute.reachable && !props.compute.tierMeetsRequirement) {
+      return t('settings.features.compute.stateTierBlocked')
+    }
     return t('settings.features.compute.stateDisabled')
   }
   if (!props.compute.reachable) {

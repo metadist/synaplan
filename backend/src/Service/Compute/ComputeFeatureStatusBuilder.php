@@ -23,15 +23,6 @@ final readonly class ComputeFeatureStatusBuilder
     private const CACHE_KEY = 'compute_feature_status';
     private const CACHE_TTL_SECONDS = 30;
 
-    /**
-     * Minimum tier until CS31 introduces the COMPUTE.REQUIRE_TIER setting.
-     * `docker` is the lowest tier, so every known tier meets it.
-     */
-    private const MINIMUM_TIER = 'docker';
-
-    /** @var array<string, int> */
-    private const TIER_ORDER = ['docker' => 0, 'gvisor' => 1, 'microvm' => 2];
-
     public function __construct(
         private ComputeConfig $config,
         private ComputeClient $client,
@@ -122,16 +113,7 @@ final readonly class ComputeFeatureStatusBuilder
 
     private function tierMeetsRequirement(ComputeHealth $health): bool
     {
-        return $this->tierAtLeast($health->tier, self::MINIMUM_TIER);
-    }
-
-    private function tierAtLeast(string $tier, string $minimum): bool
-    {
-        $levels = array_keys(self::TIER_ORDER);
-        $at = array_search($tier, $levels, true);
-        $need = array_search($minimum, $levels, true);
-
-        return false !== $at && false !== $need && $at >= $need;
+        return ComputeConfig::tierAtLeast($health->tier, $this->config->requireTier());
     }
 
     private static function shortDigest(string $ref): string

@@ -2681,7 +2681,8 @@
         "images": "İmajlar",
         "runs24": "{count} çalıştırma (24 sa)",
         "failed24": "{count} başarısız (24 sa)",
-        "openConfig": "İşlem ayarları"
+        "openConfig": "İşlem ayarları",
+        "stateTierBlocked": "Açık, ancak gerekli yalıtımın altında. Dosya işleri gizli."
       }
     },
     "notLoggedIn": "Oturum açılmadı"

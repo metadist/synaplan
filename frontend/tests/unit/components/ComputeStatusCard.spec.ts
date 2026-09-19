@@ -75,6 +75,16 @@ describe('ComputeStatusCard', () => {
     expect(wrapper.find('[data-testid="link-compute-config"]').exists()).toBe(true)
   })
 
+  it('shows the tier-blocked sentence when the gate holds an enabled flag off', () => {
+    const wrapper = mountCard(
+      status({ enabled: false, reachable: true, tierMeetsRequirement: false })
+    )
+    expect(wrapper.get('[data-testid="compute-state-line"]').text()).toContain('below the required')
+    expect(wrapper.get('[data-testid="compute-posture-warning"]').text()).toContain(
+      'Strong isolation'
+    )
+  })
+
   it('shows the unreachable sentence and emits retry when the sidecar is down', async () => {
     const wrapper = mountCard(status({ reachable: false, tier: '', tierMeetsRequirement: false }))
     expect(wrapper.get('[data-testid="compute-state-line"]').text()).toContain('not answering')
