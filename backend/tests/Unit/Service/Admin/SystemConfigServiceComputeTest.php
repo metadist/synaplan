@@ -115,6 +115,37 @@ final class SystemConfigServiceComputeTest extends TestCase
         self::assertStringContainsString('not reachable', (string) ($result['message'] ?? ''));
     }
 
+    public function testRefusesEnableBelowRequiredTier(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->never())->method('setValue');
+        $repo->method('getValue')->willReturn('gvisor');
+
+        $result = $this->service($repo)->setValue('COMPUTE_ENABLED', 'true');
+
+        self::assertFalse($result['success']);
+        self::assertStringContainsString('Standard isolation', (string) ($result['message'] ?? ''));
+        self::assertStringContainsString('Strong isolation', (string) ($result['message'] ?? ''));
+    }
+
+    public function testAcceptsEnableWhenTierMeetsRequirement(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue');
+        $repo->method('getValue')->willReturn(null);
+
+        self::assertTrue($this->service($repo)->setValue('COMPUTE_ENABLED', 'true')['success']);
+    }
+
+    public function testSwitchingComputeOffIsAlwaysAllowed(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue');
+        $repo->method('getValue')->willReturn('microvm');
+
+        self::assertTrue($this->service($repo)->setValue('COMPUTE_ENABLED', 'false')['success']);
+    }
+
     private function service(ConfigRepository $repo): SystemConfigService
     {
         $health = ComputeHealth::fromJson((string) file_get_contents(

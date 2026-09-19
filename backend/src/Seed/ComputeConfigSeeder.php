@@ -21,7 +21,8 @@ final readonly class ComputeConfigSeeder
     {
         $group = ComputeConfig::CONFIG_GROUP;
         $rows = [
-            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_ENABLED, 'value' => '0'],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_ENABLED, 'value' => self::enabledSeedValue()],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_REQUIRE_TIER, 'value' => ComputeConfig::DEFAULT_REQUIRE_TIER],
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_DEFAULT_TIMEOUT_SEC, 'value' => '60'],
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_DEFAULT_MEMORY_MB, 'value' => '512'],
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_DEFAULT_CPU, 'value' => '1.0'],
@@ -38,5 +39,18 @@ final readonly class ComputeConfigSeeder
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'compute_config', $rows);
+    }
+
+    /**
+     * New installs start enabled only when a sidecar is wired at seed time.
+     * Existing rows are never touched (insertIfMissing) — enabling there is
+     * an admin decision in Operate → System config.
+     */
+    public static function enabledSeedValue(): string
+    {
+        $url = trim((string) ($_ENV['COMPUTE_URL'] ?? getenv('COMPUTE_URL') ?: ''));
+        $token = trim((string) ($_ENV['COMPUTE_TOKEN'] ?? getenv('COMPUTE_TOKEN') ?: ''));
+
+        return ('' !== $url && '' !== $token) ? '1' : '0';
     }
 }
