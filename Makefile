@@ -1,4 +1,7 @@
-.PHONY: help lint format test build deps audit test-stack-build ci-local test-e2e-minimal
+.PHONY: help up lint format test build deps audit test-stack-build ci-local test-e2e-minimal
+
+up: ## Start the stack (status page first, then remaining images)
+	./scripts/compose-up.sh
 
 help: ## Show this help
 	@echo "Common commands (runs in backend and/or frontend as appropriate):"

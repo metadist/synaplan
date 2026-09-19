@@ -156,7 +156,7 @@ if [ "$MODE" = "try" ]; then
     fi
     step "Starting the standard stack (cloud AI only, ~3 GB on first run)"
 
-    docker compose -f "$COMPOSE_FILE" up -d
+    ./scripts/compose-up.sh -f "$COMPOSE_FILE"
 
     say ""
     say "============================================================"
