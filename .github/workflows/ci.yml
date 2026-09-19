@@ -1488,7 +1488,7 @@ jobs:
     # waiting for it before building arm64 just added the E2E tail to the
     # publish path. docker-manifest still waits for E2E plus both arches
     # before moving any release tag.
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 40
     needs: [change-scope, frontend-build]
     if: >-
