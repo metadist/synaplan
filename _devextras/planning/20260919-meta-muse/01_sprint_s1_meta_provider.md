@@ -14,7 +14,7 @@ automatic provider/model rows the catalog already renders.
 Read the live Meta docs and record — with URL + access date — into this
 file's §Appendix:
 
-1. Chat Completions request/response shape (confirm OpenAI parity,esp.
+1. Chat Completions request/response shape (confirm OpenAI parity, esp.
    `stream`, `stream_options`, tool calls, structured output).
 2. Reasoning: exact parameter name, accepted levels, default, per-model
    support, whether reasoning streams as deltas (and under which field).

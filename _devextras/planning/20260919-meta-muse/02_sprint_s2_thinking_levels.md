@@ -26,15 +26,20 @@ xAI/OpenAI effort plumbing to every reasoning provider.
 
 **Machine instructions**
 
-1. Catalog JSON: `reasoning_efforts: ['low','medium','high']` (subset per
-   model) on every reasoning row that supports levels — Muse Spark first
-   (per S1.0 spike), then xAI + OpenAI families (their `REASONING_EFFORTS`
-   move into the catalog rows; provider constants stay as validators).
-   Absent list = toggle-only/unsupported (no behavior change).
+1. Catalog JSON: `reasoning_efforts: ['off','low','medium','high']`
+   (subset per model) on every reasoning row that supports levels — Muse
+   Spark first (per S1.0 spike), then xAI + OpenAI families (their
+   `REASONING_EFFORTS` move into the catalog rows; provider constants stay
+   as validators). The list is the single contract backend and UI share:
+   it holds exactly the levels the picker offers, with `off` included
+   explicitly iff the model supports disabling thinking. Absent list =
+   toggle-only/unsupported (no behavior change).
 2. Shared resolution rule (generalize xAI's order; keep each provider's
    native mapping in its own resolver):
-   explicit effort string (validated against the model's list) →
-   `reasoning` bool (true = catalog default, false = off) → send nothing.
+   explicit effort string (must be in the model's list, else rejected →
+   default + honest note) → `reasoning` bool (true = catalog default,
+   which must be in the list; false = `off` if listed, else the lowest
+   listed level for always-reasoning models) → list absent: send nothing.
 3. Storage: per-user effort default per model key, next to the default-model
    choices (`ModelConfigService` + the same config API family; OpenAPI
    annotated; migrate nothing — additive keys with safe defaults).
@@ -55,13 +60,13 @@ xAI/OpenAI effort plumbing to every reasoning provider.
 **Machine instructions**
 
 1. `AIModelsConfiguration.vue` “Default models” tab: under each reasoning
-   model's choice, an effort picker (Low/Medium/High or the model's subset)
-   appears **iff** the model row advertises `reasoning_efforts`. Rendered
-   from the same generated Zod schemas as the rest of the page — no manual
-   response interfaces.
+   model's choice, an effort picker appears **iff** the model row advertises
+   `reasoning_efforts`, offering exactly that list in order (`off` shows as
+   Off). Rendered from the same generated Zod schemas as the rest of the
+   page — no manual response interfaces.
 2. Copy (five locales, plain words): label “How hard the AI thinks” +
-   one-sentence consequence; option labels Low/Medium/High (+Off where the
-   model allows disabling). No `reasoning_effort`, no provider ids.
+   one-sentence consequence; option labels Off/Low/Medium/High (only the
+   advertised subset). No `reasoning_effort`, no provider ids.
 3. House chains: full button + form-control class chains; light/dark/V2;
    320 px stacked.
 4. Chat toggle: keep as-is visually; one plain-words hint where the toggle

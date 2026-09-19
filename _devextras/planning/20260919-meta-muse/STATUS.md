@@ -29,3 +29,9 @@ Anthropic thinking mapping, streamed thinking parts in `ChatView`, model
 page + admin models API. No effort levels and no per-model config UI exist.
 Meta facts are Docs-Excerpt level (base URL, OpenAI compatibility, 1M
 context, model names) — the S1.0 spike re-reads the live docs before code.
+
+**2026-09-19 (Copilot review on #2014):** fixed a typo in `01_*` and pinned
+the `off` contract in `02_*`: `reasoning_efforts` is the single
+backend/UI contract and carries `off` explicitly iff the model supports
+disabling; bool-false maps to `off` or, for always-reasoning models, the
+lowest listed level.
