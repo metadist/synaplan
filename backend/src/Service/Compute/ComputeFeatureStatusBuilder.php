@@ -71,7 +71,10 @@ final readonly class ComputeFeatureStatusBuilder
         }
 
         return [
-            'enabled' => $this->config->isEnabled(),
+            // Switched-on state, not the live gate: this entry already carries
+            // its own health probe, so a second probe here would double the
+            // wait on a down sidecar.
+            'enabled' => $this->config->isSwitchedOn(),
             'reachable' => true,
             'protocol' => $health->protocol,
             'tier' => $health->tier,
@@ -99,7 +102,10 @@ final readonly class ComputeFeatureStatusBuilder
     private function emptyEntry(): array
     {
         return [
-            'enabled' => $this->config->isEnabled(),
+            // Switched-on state, not the live gate: this entry already carries
+            // its own health probe, so a second probe here would double the
+            // wait on a down sidecar.
+            'enabled' => $this->config->isSwitchedOn(),
             'reachable' => false,
             'protocol' => 0,
             'tier' => '',

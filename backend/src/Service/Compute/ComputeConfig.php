@@ -89,7 +89,17 @@ final readonly class ComputeConfig
 
     public function isEnabled(?int $userId = null): bool
     {
-        return $this->hasSidecar() && $this->flagOn($userId) && $this->tierGatePasses();
+        return $this->isSwitchedOn($userId) && $this->tierGatePasses();
+    }
+
+    /**
+     * Wired + switched on, without the live tier probe. Status surfaces use
+     * this for the on/off state so a down sidecar reads as down (with retry),
+     * not as switched off. Everything that RUNS uses isEnabled().
+     */
+    public function isSwitchedOn(?int $userId = null): bool
+    {
+        return $this->hasSidecar() && $this->flagOn($userId);
     }
 
     /**
@@ -102,9 +112,14 @@ final readonly class ComputeConfig
 
     public static function normalizeTier(?string $raw): string
     {
-        $tier = strtolower(trim($raw ?? ''));
+        if (null === $raw || '' === trim($raw)) {
+            return self::DEFAULT_REQUIRE_TIER;
+        }
+        $tier = strtolower(trim($raw));
 
-        return isset(self::TIER_ORDER[$tier]) ? $tier : self::DEFAULT_REQUIRE_TIER;
+        // Fail closed: an unknown stored value must never silently become the
+        // weakest tier (writes are validated, so this is corruption-only).
+        return isset(self::TIER_ORDER[$tier]) ? $tier : self::TIER_MICROVM;
     }
 
     public static function tierAtLeast(string $tier, string $minimum): bool
@@ -129,7 +144,9 @@ final readonly class ComputeConfig
     /**
      * CS31 hard gate: the reported tier must meet REQUIRE_TIER, re-checked
      * every 60 s. Unreachable counts as failing. Skipped only when no HTTP
-     * client was wired (unit contexts keep legacy behavior).
+     * client was wired (unit contexts keep legacy behavior). The cache key
+     * is scoped to the sidecar URL so retargeting the endpoint cannot
+     * inherit the previous sidecar's tier.
      */
     private function tierGatePasses(): bool
     {
@@ -138,8 +155,9 @@ final readonly class ComputeConfig
         if (null === $http || null === $cache) {
             return true;
         }
+        $cacheKey = self::TIER_CACHE_KEY.'.'.substr(hash('sha256', $this->baseUrl()), 0, 16);
         try {
-            $tier = $cache->get(self::TIER_CACHE_KEY, function (ItemInterface $item) use ($http): ?string {
+            $tier = $cache->get($cacheKey, function (ItemInterface $item) use ($http): ?string {
                 $item->expiresAfter(self::TIER_CACHE_TTL_SECONDS);
 
                 return $this->fetchSidecarTier($http);

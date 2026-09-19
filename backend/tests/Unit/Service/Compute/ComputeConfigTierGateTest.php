@@ -52,12 +52,32 @@ final class ComputeConfigTierGateTest extends TestCase
         self::assertFalse($config->isEnabled());
     }
 
-    public function testInvalidRequirementFallsBackToDocker(): void
+    public function testInvalidRequirementFailsClosedToStrictest(): void
     {
-        $config = $this->config(requireTier: 'quantum', tier: 'docker');
+        $config = $this->config(requireTier: 'quantum', tier: 'gvisor');
+
+        self::assertSame('microvm', $config->requireTier());
+        self::assertFalse($config->isEnabled());
+    }
+
+    public function testMissingRequirementDefaultsToDocker(): void
+    {
+        $repo = $this->createStub(ConfigRepository::class);
+        $repo->method('getValue')->willReturn(null);
+        $config = new ComputeConfig($repo, 'http://compute:8080', 'token-token-token-token-token-32b');
 
         self::assertSame('docker', $config->requireTier());
-        self::assertTrue($config->isEnabled());
+    }
+
+    public function testTierCacheIsScopedToTheSidecarUrl(): void
+    {
+        $cache = new ArrayAdapter();
+        $docker = $this->configOn('http://compute-a:8080', 'docker', $cache);
+        $gvisor = $this->configOn('http://compute-b:8080', 'gvisor', $cache);
+
+        self::assertFalse($docker->isEnabled());
+        // Must probe B instead of inheriting A's cached docker tier.
+        self::assertTrue($gvisor->isEnabled());
     }
 
     public function testTierHelpers(): void
@@ -73,18 +93,23 @@ final class ComputeConfigTierGateTest extends TestCase
 
     private function config(string $requireTier, string $tier): ComputeConfig
     {
+        return $this->configOn('http://compute:8080', $tier, new ArrayAdapter(), $requireTier);
+    }
+
+    private function configOn(string $url, string $tier, ArrayAdapter $cache, string $requireTier = 'gvisor'): ComputeConfig
+    {
         $http = new MockHttpClient([
             new MockResponse((string) json_encode(['tier' => $tier]), ['http_code' => 200]),
         ]);
 
         return new ComputeConfig(
             $this->configRepo($requireTier),
-            'http://compute:8080',
+            $url,
             'token-token-token-token-token-32b',
             null,
             null,
             $http,
-            new ArrayAdapter()
+            $cache
         );
     }
 
