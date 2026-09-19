@@ -258,6 +258,9 @@ jobs:
           go build ./...
           make lint test
 
+      - name: No docker.sock outside the compute service (C2)
+        run: ./scripts/check-no-docker-sock.sh
+
   backend:
     name: Backend (PHP/Symfony)
     # Off the critical path (done around minute 2-3 while e2e runs until

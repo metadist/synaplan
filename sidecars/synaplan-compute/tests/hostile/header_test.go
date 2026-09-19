@@ -27,8 +27,8 @@ func corpusFiles(t *testing.T, pattern string) []string {
 func TestCorpusHeaders(t *testing.T) {
 	t.Parallel()
 	scripts := append(corpusFiles(t, "*.py"), corpusFiles(t, filepath.Join("node", "*.js"))...)
-	if len(scripts) != 16 {
-		t.Fatalf("expected 8 python + 8 node scripts, got %d", len(scripts))
+	if len(scripts) != 18 {
+		t.Fatalf("expected 9 python + 9 node scripts, got %d", len(scripts))
 	}
 	for _, name := range scripts {
 		name := name

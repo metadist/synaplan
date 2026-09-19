@@ -24,15 +24,15 @@ func TestEgressFailsClosedEvenWhenEnabled(t *testing.T) {
 		Port: 443,
 		IPs:  []string{"93.184.216.34"},
 	}}}
-	for _, cfg := range []Config{{Enabled: false}, {Enabled: true, MaxHosts: 8}} {
-		err := Validate(cfg, entry)
-		if err == nil {
-			t.Fatalf("enabled=%v: any allow-list must be refused until a proxy exists", cfg.Enabled)
-		}
-		ref, ok := err.(*Refused)
-		if !ok || ref.Code != contract.ErrEgressNotAllowed {
-			t.Fatalf("got %#v", err)
-		}
+	// Disabled refuses everything, even a well-formed list.
+	if err := Validate(Config{Enabled: false}, entry); err == nil {
+		t.Fatal("disabled: allow-list must be refused")
+	} else if ref, ok := err.(*Refused); !ok || ref.Code != contract.ErrEgressNotAllowed {
+		t.Fatalf("got %#v", err)
+	}
+	// Enabled accepts a well-formed list (the proxy enforces it per run).
+	if err := Validate(Config{Enabled: true, MaxHosts: 8}, entry); err != nil {
+		t.Fatalf("enabled: valid allow-list must pass: %v", err)
 	}
 }
 

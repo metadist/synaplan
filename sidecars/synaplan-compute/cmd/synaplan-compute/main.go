@@ -22,6 +22,10 @@ import (
 const janitorInterval = time.Minute
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "proxy" {
+		runProxy()
+		return
+	}
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
@@ -84,7 +88,7 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
-		log.Printf("synaplan-compute listening on %s tier=%s docker=%v sandbox=%s egress=disabled", cfg.ListenAddr, sel.Tier, docker.Available(), cfg.SandboxUser())
+		log.Printf("synaplan-compute listening on %s tier=%s docker=%v sandbox=%s egress=%v", cfg.ListenAddr, sel.Tier, docker.Available(), cfg.SandboxUser(), cfg.EgressEnabled)
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}

@@ -172,6 +172,25 @@ sidecar run id). When policy asks first, the pause is a row in `BAPPROVALS`;
 the two join on the approval id. The owner finds a pending ask under
 **Approvals**.
 
+## Rollback
+
+Turning file work off is two independent switches; either one alone
+disables it:
+
+1. **Flag off** (`COMPUTE.ENABLED = 0`, Operate → System config): the
+   planner stops offering `code_run` on the next turn, gateways stop
+   offering `code_execution`, `/api/v1/compute/*` answers 404, and both
+   reaper commands exit idle. Run history (`BCOMPUTERUNS`) and artefacts
+   in Files stay readable; the Workspace browser shows the
+   not-available state instead of an error.
+2. **Sidecar down** (`docker compose --profile compute down`): the System
+   status card degrades to unreachable (counts kept), the page itself
+   stays up, and new runs fail honestly instead of hanging.
+
+Rehearsed locally 2026-09-19 (flag flip + profile down, assertions in the
+track STATUS). The ten-run staging rehearsal from the B4 plan stays an ops
+item for the compute v1.x release.
+
 ## Related
 
 - Desktop client (skills on the user’s computer): [DESKTOP.md](./DESKTOP.md)

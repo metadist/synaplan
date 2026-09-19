@@ -1147,13 +1147,19 @@ services:
       # The sidecar refuses to start unless the token is at least 32 bytes.
       COMPUTE_AUTH_TOKEN: ${COMPUTE_TOKEN:-}
       COMPUTE_LISTEN: :8080
+      COMPUTE_EGRESS_ENABLED: ${COMPUTE_EGRESS_ENABLED:-false}
       COMPUTE_SCRATCH_DIR: /scratch
       COMPUTE_WORKSPACES_DIR: /workspaces
       COMPUTE_MAX_CONCURRENT: ${COMPUTE_MAX_CONCURRENT:-2}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - compute_scratch:/scratch
-      - compute_workspaces:/workspaces
+      # Host-path binds (NOT named volumes): the daemon resolves bind sources
+      # on its own filesystem, so scratch/workspaces must live at the same
+      # host path the sidecar maps via its own mounts (see runner/mounts.go).
+      # First start: mkdir -p .compute-data/{scratch,workspaces} && chmod -R 777 .compute-data
+      # (the distroless sidecar runs as nonroot and cannot chown).
+      - ./.compute-data/scratch:/scratch
+      - ./.compute-data/workspaces:/workspaces
     networks:
       - synaplan-network
 
@@ -1176,8 +1182,6 @@ volumes:
   qdrant_storage:
   keycloak_certs:
   tts_extra_voices:
-  compute_scratch:
-  compute_workspaces:
 
 networks:
   synaplan-network:
