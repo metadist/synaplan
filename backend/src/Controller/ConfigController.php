@@ -2206,6 +2206,39 @@ class ConfigController extends AbstractController
                         ],
                     ),
                 ),
+                new OA\Property(
+                    property: 'compute',
+                    type: 'object',
+                    description: 'File-work compute sidecar status (CS27): tier, live capacity, pinned images, last-24h run counts',
+                    properties: [
+                        new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                        new OA\Property(property: 'reachable', type: 'boolean', example: true),
+                        new OA\Property(property: 'protocol', type: 'integer', example: 1),
+                        new OA\Property(property: 'tier', type: 'string', enum: ['docker', 'gvisor', 'microvm', ''], example: 'docker'),
+                        new OA\Property(property: 'tierMeetsRequirement', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'capacity',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'maxConcurrent', type: 'integer', example: 2),
+                                new OA\Property(property: 'running', type: 'integer', example: 1),
+                                new OA\Property(property: 'queued', type: 'integer', example: 0),
+                            ]
+                        ),
+                        new OA\Property(
+                            property: 'images',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'key', type: 'string', example: 'python'),
+                                    new OA\Property(property: 'digest', type: 'string', example: 'a1b2c3d4e5f6'),
+                                ]
+                            )
+                        ),
+                        new OA\Property(property: 'runsLast24h', type: 'integer', example: 12),
+                        new OA\Property(property: 'failedLast24h', type: 'integer', example: 1),
+                    ]
+                ),
             ]
         )
     )]

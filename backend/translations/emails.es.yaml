@@ -39,3 +39,7 @@ email:
     help: '¿Necesita ayuda? Consulte nuestra documentación o contacte con el soporte.'
     company: 'Synaplan'
     rights: 'Todos los derechos reservados'
+
+  workspace_expiry:
+    subject: 'Tu espacio de trabajo se eliminará pronto'
+    body: "Tu espacio de trabajo de Synaplan lleva tiempo sin usarse y se eliminará en %days% días, junto con los archivos que la IA creó para ti. Ábrelo antes para conservarlo:\n\n%url%\n\nSi no haces nada, los archivos se eliminarán sin posibilidad de recuperarlos."

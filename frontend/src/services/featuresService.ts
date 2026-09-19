@@ -51,6 +51,31 @@ const FeatureModuleSchema = z.object({
   mobile_class: z.enum(['backend-only', 'ota-candidate']),
 })
 
+/**
+ * File-work compute sidecar status (CS27). Optional so older backends
+ * without the compute entry still render the legacy page.
+ */
+const ComputeStatusSchema = z.object({
+  enabled: z.boolean(),
+  reachable: z.boolean(),
+  protocol: z.number(),
+  tier: z.string(),
+  tierMeetsRequirement: z.boolean(),
+  capacity: z.object({
+    maxConcurrent: z.number(),
+    running: z.number(),
+    queued: z.number(),
+  }),
+  images: z.array(
+    z.object({
+      key: z.string(),
+      digest: z.string(),
+    })
+  ),
+  runsLast24h: z.number(),
+  failedLast24h: z.number(),
+})
+
 const FeaturesStatusSchema = z.object({
   features: z.record(z.string(), FeatureSchema),
   summary: z.object({
@@ -60,11 +85,13 @@ const FeaturesStatusSchema = z.object({
     all_ready: z.boolean(),
   }),
   modules: z.array(FeatureModuleSchema).optional(),
+  compute: ComputeStatusSchema.optional(),
 })
 
 export type FeatureEnvVar = z.infer<typeof FeatureEnvVarSchema>
 export type Feature = z.infer<typeof FeatureSchema>
 export type FeatureModule = z.infer<typeof FeatureModuleSchema>
+export type ComputeStatus = z.infer<typeof ComputeStatusSchema>
 export type FeaturesStatus = z.infer<typeof FeaturesStatusSchema>
 
 /** Thrown when `/api/v1/config/features` returns 403 (non-admin caller). */

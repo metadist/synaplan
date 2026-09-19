@@ -382,6 +382,25 @@ final readonly class InternalEmailService
     }
 
     /**
+     * Workspace expiry warning, sent once when the workspace flips to
+     * `expiring`. Best-effort like all reaper mail — failures are logged by
+     * the caller, never retried into a spam loop.
+     */
+    public function sendWorkspaceExpiryEmail(string $to, string $locale, int $daysLeft, string $workspaceUrl): void
+    {
+        $this->sendTaskResultEmail(
+            $to,
+            $this->translator->trans('email.workspace_expiry.subject', [], 'emails', $locale),
+            $this->translator->trans(
+                'email.workspace_expiry.body',
+                ['%days%' => $daysLeft, '%url%' => $workspaceUrl],
+                'emails',
+                $locale
+            ),
+        );
+    }
+
+    /**
      * @param list<string> $previews
      */
     public function sendApprovalDigestEmail(string $to, array $previews, int $count): void

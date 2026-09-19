@@ -57,6 +57,26 @@ the overflow. Results are pasted into the release notes of the compute tag used 
 a card: tier badge (Standard / Strong isolation / Virtual machine for `docker` / `gvisor` / `microvm`), capacity
 bar, short image digests, last-24h counts, and the posture line from `CS31`. Five locales; helper text may say "gVisor".
 
+**Journey J-CP-3 — Operator sees file work at a glance.** Admin opens
+Operate → System status, finds the Compute card next to the other services:
+tier badge, running/max capacity bar, image digests, runs in the last 24 h.
+Compute off ⇒ the card says so with the one reason (no key / sidecar
+unreachable / tier below requirement) instead of a blank section.
+
+**UX exit (U10 gate for the card):**
+
+1. **Findability (U2):** the card sits with the other service rows on
+   `/admin/features` — no new page, no new rail item.
+2. **Honest state (U8):** every state is one plain sentence: running
+   (tier + load), unreachable (sidecar not answering), disabled (flag off
+   or no key). Never a spinner forever, never an empty card.
+3. **Consequence (U3):** the card links the Compute section of System
+   configuration where the switches live; five locales.
+4. **Empty/error (U5, U11):** unreachable sidecar ⇒ card stays with the
+   reason + Retry (reloads the page data); the page never 500s because
+   compute is down.
+5. **Theme (U9):** light, dark, V2; 320 px stacked; WCAG AA on badge text.
+
 ### 2.3 Cleanup jobs (`CS28`, `CS29`)
 
 `app:compute:reap-runs` (`CS28`): `BCOMPUTERUNS` rows `queued|running` older than `MAX_TIMEOUT_SEC + 120 s` → ask

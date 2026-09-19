@@ -111,6 +111,13 @@
             :modules="featuresStatus.modules"
           />
 
+          <!-- File-work compute sidecar (absent on a backend without the compute entry) -->
+          <ComputeStatusCard
+            v-if="featuresStatus.compute"
+            :compute="featuresStatus.compute"
+            @retry="loadFeatures"
+          />
+
           <!-- Group features by category -->
           <div
             v-for="(category, categoryName) in featuresByCategory"
@@ -228,6 +235,7 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
+import ComputeStatusCard from '@/components/admin/ComputeStatusCard.vue'
 import {
   getFeaturesStatus,
   FeatureStatusForbiddenError,

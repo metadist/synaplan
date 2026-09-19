@@ -16,6 +16,7 @@ use App\Module\Sidecar\OfficeConvertModule;
 use App\Module\Sidecar\TikaModule;
 use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ModelRepository;
+use App\Service\Compute\ComputeFeatureStatusBuilder;
 use App\Service\Infrastructure\RedisService;
 use App\Service\UserMemoryService;
 use App\Service\WhisperService;
@@ -41,11 +42,12 @@ final class FeatureStatusReporter
         private readonly SidecarHealthProbeInterface $probe,
         private readonly ModuleRegistry $modules,
         private readonly ModuleStatusPresenter $modulePresenter,
+        private readonly ComputeFeatureStatusBuilder $computeStatus,
     ) {
     }
 
     /**
-     * @return array{features: array<string, array<string, mixed>>, summary: array{total: int, healthy: int, unhealthy: int, all_ready: bool}, modules: list<array<string, mixed>>}
+     * @return array{features: array<string, array<string, mixed>>, summary: array{total: int, healthy: int, unhealthy: int, all_ready: bool}, modules: list<array<string, mixed>>, compute: array<string, mixed>}
      */
     public function build(User $user): array
     {
@@ -377,6 +379,8 @@ final class FeatureStatusReporter
             ],
             // Additive, module-centric view of the same page (master plan §4.1).
             'modules' => $this->modulePresenter->rows(),
+            // Additive compute entry (CS27): tier, capacity, images, 24h counts.
+            'compute' => $this->computeStatus->build(),
         ];
     }
 
