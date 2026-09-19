@@ -7,6 +7,11 @@ namespace App\Service\Compute;
 use App\Repository\ConfigRepository;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Feature\FeatureFlagEnv;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Sidecar URL + token + the COMPUTE.ENABLED product flag.
@@ -30,6 +35,20 @@ final readonly class ComputeConfig
     public const KEY_EGRESS_REQUIRES_APPROVAL = 'EGRESS_REQUIRES_APPROVAL';
     public const KEY_EGRESS_MAX_HOSTS = 'EGRESS_MAX_HOSTS';
     public const KEY_WORKSPACE_TTL_DAYS = 'WORKSPACE_TTL_DAYS';
+    public const KEY_REQUIRE_TIER = 'REQUIRE_TIER';
+
+    public const TIER_DOCKER = 'docker';
+    public const TIER_GVISOR = 'gvisor';
+    public const TIER_MICROVM = 'microvm';
+
+    /** Isolation strength, weakest first. Shared with the status card. */
+    public const TIER_ORDER = [
+        self::TIER_DOCKER => 0,
+        self::TIER_GVISOR => 1,
+        self::TIER_MICROVM => 2,
+    ];
+
+    public const DEFAULT_REQUIRE_TIER = self::TIER_DOCKER;
 
     public const POLICY_AUTO = 'auto';
     public const POLICY_APPROVE = 'approve';
@@ -45,12 +64,18 @@ final readonly class ComputeConfig
     private const DEFAULT_POLICY_INTERACTIVE = self::POLICY_AUTO;
     private const DEFAULT_POLICY_UNATTENDED = self::POLICY_APPROVE;
 
+    private const TIER_CACHE_KEY = 'compute_tier_gate';
+    private const TIER_CACHE_TTL_SECONDS = 60;
+
     public function __construct(
         private ConfigRepository $configRepository,
         private string $computeUrl,
         private string $computeToken,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
         private ?FeatureFlagEnv $featureFlagEnv = null,
+        private ?HttpClientInterface $httpClient = null,
+        private ?CacheInterface $cache = null,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -64,7 +89,103 @@ final readonly class ComputeConfig
 
     public function isEnabled(?int $userId = null): bool
     {
+        return $this->isSwitchedOn($userId) && $this->tierGatePasses();
+    }
+
+    /**
+     * Wired + switched on, without the live tier probe. Status surfaces use
+     * this for the on/off state so a down sidecar reads as down (with retry),
+     * not as switched off. Everything that RUNS uses isEnabled().
+     */
+    public function isSwitchedOn(?int $userId = null): bool
+    {
         return $this->hasSidecar() && $this->flagOn($userId);
+    }
+
+    /**
+     * Minimum isolation tier for this instance. Synaplan Cloud pins `gvisor`.
+     */
+    public function requireTier(): string
+    {
+        return self::normalizeTier($this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_REQUIRE_TIER));
+    }
+
+    public static function normalizeTier(?string $raw): string
+    {
+        if (null === $raw || '' === trim($raw)) {
+            return self::DEFAULT_REQUIRE_TIER;
+        }
+        $tier = strtolower(trim($raw));
+
+        // Fail closed: an unknown stored value must never silently become the
+        // weakest tier (writes are validated, so this is corruption-only).
+        return isset(self::TIER_ORDER[$tier]) ? $tier : self::TIER_MICROVM;
+    }
+
+    public static function tierAtLeast(string $tier, string $minimum): bool
+    {
+        $levels = array_keys(self::TIER_ORDER);
+        $at = array_search($tier, $levels, true);
+        $need = array_search($minimum, $levels, true);
+
+        return false !== $at && false !== $need && $at >= $need;
+    }
+
+    public static function tierDisplayName(string $tier): string
+    {
+        return match ($tier) {
+            self::TIER_DOCKER => 'Standard isolation',
+            self::TIER_GVISOR => 'Strong isolation',
+            self::TIER_MICROVM => 'Virtual machine isolation',
+            default => '' !== $tier ? $tier : 'unknown isolation',
+        };
+    }
+
+    /**
+     * CS31 hard gate: the reported tier must meet REQUIRE_TIER, re-checked
+     * every 60 s. Unreachable counts as failing. Skipped only when no HTTP
+     * client was wired (unit contexts keep legacy behavior). The cache key
+     * is scoped to the sidecar URL so retargeting the endpoint cannot
+     * inherit the previous sidecar's tier.
+     */
+    private function tierGatePasses(): bool
+    {
+        $http = $this->httpClient;
+        $cache = $this->cache;
+        if (null === $http || null === $cache) {
+            return true;
+        }
+        $cacheKey = self::TIER_CACHE_KEY.'.'.substr(hash('sha256', $this->baseUrl()), 0, 16);
+        try {
+            $tier = $cache->get($cacheKey, function (ItemInterface $item) use ($http): ?string {
+                $item->expiresAfter(self::TIER_CACHE_TTL_SECONDS);
+
+                return $this->fetchSidecarTier($http);
+            });
+        } catch (\Throwable $e) {
+            $this->logger->warning('ComputeConfig: tier gate cache failed', ['error' => $e->getMessage()]);
+            $tier = $this->fetchSidecarTier($http);
+        }
+
+        return \is_string($tier) && self::tierAtLeast($tier, $this->requireTier());
+    }
+
+    private function fetchSidecarTier(HttpClientInterface $http): ?string
+    {
+        try {
+            $response = $http->request('GET', $this->baseUrl().'/v1/health', ['timeout' => 5]);
+            if (200 !== $response->getStatusCode()) {
+                return null;
+            }
+            $data = json_decode($response->getContent(), true);
+            $tier = \is_array($data) ? ($data['tier'] ?? null) : null;
+
+            return \is_string($tier) && '' !== $tier ? strtolower(trim($tier)) : null;
+        } catch (\Throwable $e) {
+            $this->logger->warning('ComputeConfig: sidecar tier probe failed', ['error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     public function baseUrl(): string

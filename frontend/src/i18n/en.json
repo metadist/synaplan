@@ -5020,7 +5020,8 @@
         "images": "Images",
         "runs24": "{count} runs (24h)",
         "failed24": "{count} failed (24h)",
-        "openConfig": "Compute settings"
+        "openConfig": "Compute settings",
+        "stateTierBlocked": "On, but below the required isolation. File work stays hidden."
       }
     },
     "notLoggedIn": "Not logged in"

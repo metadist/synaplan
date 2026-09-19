@@ -842,6 +842,7 @@ final readonly class CodeRunRunner implements TaskRunner
                 ? 'File work hit a resource limit. Anything this run already wrote to your folder is still there — open Workspace to check.'
                 : 'File work hit a resource limit. Nothing new was saved.',
             'workspace_busy' => 'Another file-work run is still using your folder. Wait for it to finish, then try again. Nothing new was saved.',
+            'egress_unavailable' => 'File work could not reach the approved websites, so the run did not start. Nothing was sent or saved.',
             'workspace_quota_exceeded' => $ran
                 ? 'This run wrote more than your file-work folder allows. The new files it created were removed. Files that were already there stay, including any this run changed.'
                 : 'Your file-work folder is full. Delete files or the folder under Files → Workspace, then try again. Nothing new was saved.',

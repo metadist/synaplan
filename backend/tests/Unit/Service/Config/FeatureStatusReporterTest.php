@@ -275,7 +275,8 @@ final class FeatureStatusReporterTest extends TestCase
     private function computeStatus(bool $healthy): ComputeFeatureStatusBuilder
     {
         $config = $this->createStub(ComputeConfig::class);
-        $config->method('isEnabled')->willReturn($healthy);
+        $config->method('isSwitchedOn')->willReturn($healthy);
+        $config->method('requireTier')->willReturn('docker');
         $client = $this->createMock(ComputeClient::class);
         if ($healthy) {
             $client->expects($this->once())->method('health')->willReturn(ComputeHealth::fromJson((string) json_encode([

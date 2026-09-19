@@ -2680,7 +2680,8 @@
         "images": "Imágenes",
         "runs24": "{count} ejecuciones (24h)",
         "failed24": "{count} fallidas (24h)",
-        "openConfig": "Ajustes de cómputo"
+        "openConfig": "Ajustes de cómputo",
+        "stateTierBlocked": "Activado, pero por debajo del aislamiento requerido. El trabajo con archivos está oculto."
       }
     },
     "notLoggedIn": "No has iniciado sesión"

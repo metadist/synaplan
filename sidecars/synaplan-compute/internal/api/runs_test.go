@@ -637,8 +637,8 @@ func TestLimitsErrorCarriesDetails(t *testing.T) {
 	}
 }
 
-func TestEgressAllowListRefusedFailClosed(t *testing.T) {
-	_, ts := newTestServer(t, testOpts{cfg: func(c *config.Config) { c.EgressEnabled = true }})
+func TestEgressAllowListRefusedWhenDisabled(t *testing.T) {
+	_, ts := newTestServer(t, testOpts{})
 	body := validRun()
 	body.Egress = contract.Egress{Allow: []contract.EgressHost{{Host: "api.example.com", Port: 443, IPs: []string{"93.184.216.34"}}}}
 	assertRunErrorOn(t, ts, body, http.StatusBadRequest, contract.ErrEgressNotAllowed)
@@ -647,7 +647,21 @@ func TestEgressAllowListRefusedFailClosed(t *testing.T) {
 	var h contract.Health
 	_ = json.NewDecoder(resp.Body).Decode(&h)
 	if h.Features.Egress {
-		t.Fatal("health must not advertise egress")
+		t.Fatal("health must not advertise egress when disabled")
+	}
+}
+
+func TestEgressAllowListAcceptedWhenEnabled(t *testing.T) {
+	_, ts := newTestServer(t, testOpts{cfg: func(c *config.Config) { c.EgressEnabled = true }})
+	body := validRun()
+	body.Egress = contract.Egress{Allow: []contract.EgressHost{{Host: "api.example.com", Port: 443, IPs: []string{"93.184.216.34"}}}}
+	submitJSON(t, ts, body)
+	resp := authed(t, http.MethodGet, ts.URL+"/v1/health", nil, "")
+	defer resp.Body.Close()
+	var h contract.Health
+	_ = json.NewDecoder(resp.Body).Decode(&h)
+	if !h.Features.Egress {
+		t.Fatal("health must advertise egress when enabled")
 	}
 }
 

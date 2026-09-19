@@ -36,7 +36,13 @@ If dockerd is unreachable, **health still works**. Runs that pass validation fai
 
 ### Networking
 
-Egress is **not implemented** in A0–A2. Every container is created with `NetworkMode=none`; a request with a non-empty `egress.allow` is refused with `egress_not_allowed`, and `COMPUTE_EGRESS_ENABLED` is reserved (parsed, no effect).
+Runs without `egress.allow` are created with `NetworkMode=none`. A run with
+an allow-list (only when `COMPUTE_EGRESS_ENABLED=1`) gets a private internal
+network plus a throwaway proxy container (same image, `proxy` subcommand)
+that dials the pinned public IPs; anything else is refused with
+`egress_not_allowed` (unknown host, wrong port, IP literal, private range,
+over the host cap, or flag off). See `docs/THREAT_MODEL.md` for the full
+posture.
 
 ### Permissions
 

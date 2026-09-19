@@ -3963,7 +3963,8 @@
         "images": "Images",
         "runs24": "{count} Läufe (24h)",
         "failed24": "{count} fehlgeschlagen (24h)",
-        "openConfig": "Compute-Einstellungen"
+        "openConfig": "Compute-Einstellungen",
+        "stateTierBlocked": "Eingeschaltet, aber unter der erforderlichen Isolierung. Dateiarbeit bleibt verborgen."
       }
     },
     "notLoggedIn": "Nicht angemeldet"

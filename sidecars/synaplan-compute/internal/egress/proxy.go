@@ -1,10 +1,11 @@
-// Package egress holds the per-run network allow-list policy.
+// Package egress holds the per-run network allow-list policy and the CONNECT
+// proxy that enforces it (CP22).
 //
-// Phases A0–A2 do not implement egress: there is no proxy listener and the
-// runner never selects a NetworkMode other than none. Validate therefore
-// fails closed on any non-empty allow-list. CheckAllowList and Proxy are the
-// future policy (pinned IPs, no private ranges, host cap) and are kept under
-// test so the contract does not drift before the proxy exists.
+// Each egress run gets a private internal network plus a throwaway proxy
+// container (same image, `proxy` subcommand) carrying that run's pin map.
+// Run containers join no other network, resolve no DNS (nameserver
+// 127.0.0.1), and reach the outside world only through the proxy, which
+// dials pinned public IPs. Empty allow-list keeps NetworkMode none.
 package egress
 
 import (
@@ -22,13 +23,15 @@ type Config struct {
 	MaxHosts int
 }
 
-// Validate is what POST /v1/runs applies: an empty allow-list is the only
-// accepted value. Any entry is refused with egress_not_allowed.
-func Validate(_ Config, eg contract.Egress) error {
+// Validate is what POST /v1/runs applies: an empty allow-list keeps the run
+// offline; a non-empty one must pass the pin policy (pinned IPs, no private
+// ranges, host cap) and requires the feature flag.
+func Validate(cfg Config, eg contract.Egress) error {
 	if len(eg.Allow) == 0 {
 		return nil
 	}
-	return &Refused{Code: contract.ErrEgressNotAllowed, Message: "egress is not available yet; every run is network-isolated"}
+	_, err := CheckAllowList(cfg, eg)
+	return err
 }
 
 // CheckAllowList is the future policy for a non-empty list: refused when the
@@ -155,4 +158,12 @@ func (p *Proxy) Allowed(host string, port int, ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+// Pins returns the dialable IPs for host:port, or nil when unknown.
+func (p *Proxy) Pins(host string, port int) []net.IP {
+	if p == nil {
+		return nil
+	}
+	return p.allow[net.JoinHostPort(host, strconv.Itoa(port))]
 }

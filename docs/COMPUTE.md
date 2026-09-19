@@ -26,6 +26,7 @@ the surface is absent: no chat card, no Files tab, no API tease (U11).
 | `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **off** | Sidecar + this switch must both be on. Every `/api/v1/compute/*` route answers **404** when off. |
 | `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **off** | Keep one folder per user between runs. Files → **Workspace**. The chat card shows **Open workspace** only when that run actually used the folder. |
 | `COMPUTE.EGRESS_ENABLED` | `FEATURE_COMPUTE_EGRESS_ENABLED` | **off** | A run may fetch from a short list of public websites. Off = every run stays offline. Private or local addresses are always refused. |
+| `COMPUTE.REQUIRE_TIER` | — | `docker` | Minimum isolation the sidecar must report (`docker` < `gvisor` < `microvm`). Below it, file work stays off even when enabled; the admin UI refuses the switch with the reported tier. |
 
 Both extra flags sit **under** `COMPUTE.ENABLED`. Turning a child on while
 file work itself is off does nothing.
@@ -45,7 +46,9 @@ an existing value.
 
 ```sql
 -- what ComputeConfigSeeder runs (BConfigSeeder::insertIfMissing): a no-op
--- when the row exists, so an operator's value is never reset
+-- when the row exists, so an operator's value is never reset.
+-- New installs start enabled only when COMPUTE_URL and COMPUTE_TOKEN are
+-- set at seed time; otherwise the row is inserted as '0'.
 INSERT IGNORE INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
 VALUES (0, 'COMPUTE', 'ENABLED', '0');
 ```
@@ -77,6 +80,11 @@ compute node** (dedicated host or a separate Docker daemon). Synaplan Cloud
 must not enable file work on the shared web hosts at T1. The node layout
 lives in the private `synaplan-platform` repo; the sidecar deploy notes are
 in `sidecars/synaplan-compute`.
+
+Operational rule for Cloud: `COMPUTE_URL` must not resolve to a web host —
+the tier gate (`COMPUTE.REQUIRE_TIER = gvisor`) verifies the isolation, but
+only the separate node gives the blast-radius separation. The platform
+runbook records the check per deploy.
 
 ## Quotas
 
@@ -163,6 +171,25 @@ Each run writes `BCOMPUTERUNS` (owner, limits, workspace id, egress hosts,
 sidecar run id). When policy asks first, the pause is a row in `BAPPROVALS`;
 the two join on the approval id. The owner finds a pending ask under
 **Approvals**.
+
+## Rollback
+
+Turning file work off is two independent switches; either one alone
+disables it:
+
+1. **Flag off** (`COMPUTE.ENABLED = 0`, Operate → System config): the
+   planner stops offering `code_run` on the next turn, gateways stop
+   offering `code_execution`, `/api/v1/compute/*` answers 404, and both
+   reaper commands exit idle. Run history (`BCOMPUTERUNS`) and artefacts
+   in Files stay readable; the Workspace browser shows the
+   not-available state instead of an error.
+2. **Sidecar down** (`docker compose --profile compute down`): the System
+   status card degrades to unreachable (counts kept), the page itself
+   stays up, and new runs fail honestly instead of hanging.
+
+Rehearsed locally 2026-09-19 (flag flip + profile down, assertions in the
+track STATUS). The ten-run staging rehearsal from the B4 plan stays an ops
+item for the compute v1.x release.
 
 ## Related
 

@@ -265,6 +265,7 @@ final readonly class SystemConfigService
                     'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
                     'compute' => ['label' => 'File work', 'fields' => [
                         'COMPUTE_ENABLED',
+                        'COMPUTE_REQUIRE_TIER',
                         'COMPUTE_WORKSPACES_ENABLED',
                         'COMPUTE_EGRESS_ENABLED',
                         'COMPUTE_EGRESS_REQUIRES_APPROVAL',
@@ -552,7 +553,9 @@ final readonly class SystemConfigService
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
             $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value)
-                ?? $this->refuseComputeFeatureSidecarLacks($key, $value);
+                ?? $this->refuseComputeFeatureSidecarLacks($key, $value)
+                ?? $this->refuseComputeBelowRequiredTier($key, $value)
+                ?? $this->refuseComputeInvalidTier($key, $value);
             if (null !== $capRefuse) {
                 return $capRefuse;
             }
@@ -766,6 +769,73 @@ final readonly class SystemConfigService
             'success' => false,
             'requiresRestart' => false,
             'message' => $subject.' not offered by this installation\'s compute sidecar yet. The switch stays off.',
+        ];
+    }
+
+    /**
+     * COMPUTE.ENABLED may only be switched on when the connected sidecar
+     * reports at least the required isolation tier (CS31). The runtime gate
+     * in ComputeConfig::isEnabled() enforces the same rule continuously, so
+     * raising REQUIRE_TIER later disables compute immediately without a
+     * refusal. Switching off is always allowed.
+     *
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeBelowRequiredTier(string $key, string $value): ?array
+    {
+        if ('COMPUTE_ENABLED' !== $key || null === $this->computeClient) {
+            return null;
+        }
+        if (!in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true)) {
+            return null;
+        }
+        try {
+            $tier = $this->computeClient->health()->tier;
+        } catch (\Throwable) {
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'message' => 'File work is not reachable right now. The switch stays off.',
+            ];
+        }
+        $required = ComputeConfig::normalizeTier(
+            $this->configRepository->getValue(0, ComputeConfig::CONFIG_GROUP, ComputeConfig::KEY_REQUIRE_TIER)
+        );
+        if (ComputeConfig::tierAtLeast($tier, $required)) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => sprintf(
+                'the compute service reports %s; this instance requires %s',
+                ComputeConfig::tierDisplayName($tier),
+                ComputeConfig::tierDisplayName($required),
+            ),
+        ];
+    }
+
+    /**
+     * The tier requirement is only meaningful as a known tier. Reject anything
+     * else at write time: reads fail closed to the strictest tier, so a bad
+     * row would silently pin this instance to microVM.
+     *
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeInvalidTier(string $key, string $value): ?array
+    {
+        if ('COMPUTE_REQUIRE_TIER' !== $key) {
+            return null;
+        }
+        if (isset(ComputeConfig::TIER_ORDER[strtolower(trim($value))])) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => 'Isolation tier must be one of: docker, gvisor, microvm.',
         ];
     }
 
@@ -1784,6 +1854,16 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => ComputeConfig::CONFIG_GROUP,
                 'dbKey' => ComputeConfig::KEY_ENABLED,
+            ],
+            'COMPUTE_REQUIRE_TIER' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Minimum isolation the compute sidecar must report before file work turns on: Standard (plain Docker), Strong isolation (gVisor), Virtual machine (microVM). Synaplan Cloud requires Strong isolation.',
+                'default' => 'docker',
+                'options' => ['docker', 'gvisor', 'microvm'],
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_REQUIRE_TIER,
             ],
             'COMPUTE_WORKSPACES_ENABLED' => [
                 'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
