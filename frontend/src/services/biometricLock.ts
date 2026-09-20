@@ -9,7 +9,7 @@
  * Native-only; every function degrades to a safe default on web.
  */
 import { isNativeApp } from '@/services/api/nativeRuntime'
-import { i18n } from '@/i18n/instance'
+import { i18n } from '@/i18n'
 import config from '@/stores/config'
 
 const ENABLED_KEY = 'biometric_lock_enabled'

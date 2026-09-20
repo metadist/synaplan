@@ -16,7 +16,7 @@ import {
 } from '@/services/api/httpClient'
 import { isNativeApp, getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
 import { checkMemoryServiceAvailability } from '@/services/api/configApi'
-import { i18n } from '@/i18n/instance'
+import { i18n } from '@/i18n'
 import { ref } from 'vue'
 
 // Async state for Qdrant availability

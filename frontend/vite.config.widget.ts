@@ -92,6 +92,10 @@ export default defineConfig(({ mode }) => ({
         replacement: fileURLToPath(new URL('./src/widget-embed-stubs/router.ts', import.meta.url)),
       },
       {
+        find: /^@\/i18n$/,
+        replacement: fileURLToPath(new URL('./src/widget-embed-stubs/i18n.ts', import.meta.url)),
+      },
+      {
         find: '@',
         replacement: fileURLToPath(new URL('./src', import.meta.url)),
       },

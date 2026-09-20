@@ -36,7 +36,9 @@ describe('i18n bundle split', () => {
     const src = readSrc('vite.config.widget.ts')
     expect(src).toContain("find: '@/router/setupGate'")
     expect(src).toContain('find: /^@\\/router$/')
+    expect(src).toContain('find: /^@\\/i18n$/')
     expect(src).toContain('widget-embed-stubs/router.ts')
+    expect(src).toContain('widget-embed-stubs/i18n.ts')
   })
 
   it('keeps config.taskPrompts out of the built app entry chunk when dist exists', () => {

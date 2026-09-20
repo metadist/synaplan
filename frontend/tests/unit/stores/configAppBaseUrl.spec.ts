@@ -22,7 +22,7 @@ vi.mock('@/services/api/configApi', () => ({
   checkMemoryServiceAvailability: vi.fn(),
 }))
 
-vi.mock('@/i18n/instance', () => ({
+vi.mock('@/i18n', () => ({
   i18n: { global: { t: (key: string) => key } },
 }))
 

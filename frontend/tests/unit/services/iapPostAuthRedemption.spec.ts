@@ -42,7 +42,7 @@ vi.mock('@/composables/useNotification', () => ({
 }))
 
 // Assert on message KEYS, not rendered copy.
-vi.mock('@/i18n/instance', () => ({
+vi.mock('@/i18n', () => ({
   i18n: { global: { t: (key: string) => key } },
 }))
 
