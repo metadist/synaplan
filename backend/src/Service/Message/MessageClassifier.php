@@ -1136,12 +1136,6 @@ final readonly class MessageClassifier
     }
 
     /**
-     * True if the message carries at least one image attachment. Accepts the
-     * generic kind `image` (as stored by generated-media pipelines, #1236) in
-     * addition to concrete extensions, and falls back to the legacy single-file
-     * columns for channel messages without File entities.
-     */
-    /**
      * Explicit execution demand on attached files ("run python on ...",
      * "using Python, compute ...").
      *
@@ -1168,6 +1162,12 @@ final readonly class MessageClassifier
             || 1 === preg_match('/\b(führe|ausführen|ausfuehren|berechne|zähle|zaehle|verarbeite|lies|analysiere)\b/iu', $text);
     }
 
+    /**
+     * True if the message carries at least one image attachment. Accepts the
+     * generic kind `image` (as stored by generated-media pipelines, #1236) in
+     * addition to concrete extensions, and falls back to the legacy single-file
+     * columns for channel messages without File entities.
+     */
     private function messageHasImageAttachment(Message $message): bool
     {
         foreach ($message->getFiles() as $file) {

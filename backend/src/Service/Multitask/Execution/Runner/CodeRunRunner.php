@@ -143,12 +143,24 @@ final readonly class CodeRunRunner implements TaskRunner
         // their numeric ids, so an interactive "run code on the attached file"
         // turn arrives with no inputFileIds — the script then can't find the
         // file (FileNotFoundError). Fall back to the message's own attachments
-        // so the user-selected files are mounted into the sandbox by name.
+        // so the user-selected files are mounted into the sandbox by name. Uses
+        // findFilesByMessageIds so BOTH the ManyToMany attachments (web chat)
+        // and the legacy single-file column (channel messages, File.messageId)
+        // are covered.
         if ([] === $inputIds) {
             foreach ($context->message->getFiles() as $file) {
                 $fileId = $file->getId();
                 if (null !== $fileId) {
                     $inputIds[] = (int) $fileId;
+                }
+            }
+            $messageId = $context->message->getId();
+            if ([] === $inputIds && $context->message->getFile() > 0 && null !== $messageId) {
+                foreach ($this->files->findFilesByMessageIds($userId, [$messageId], 20) as $file) {
+                    $fileId = $file->getId();
+                    if (null !== $fileId) {
+                        $inputIds[] = (int) $fileId;
+                    }
                 }
             }
         }
