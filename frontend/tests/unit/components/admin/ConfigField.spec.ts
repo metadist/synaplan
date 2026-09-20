@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ConfigField from '@/components/admin/ConfigField.vue'
-import { i18n } from '@/i18n'
+import { i18n, type SupportedLanguage } from '@/i18n'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
 
 const booleanSchema: ConfigFieldSchema = {
@@ -77,10 +77,10 @@ describe('ConfigField — locale overlay for backend schema copy', () => {
       },
     })
 
-  let previousLocale: string
+  let previousLocale: SupportedLanguage
 
   beforeEach(() => {
-    previousLocale = String(i18n.global.locale.value)
+    previousLocale = i18n.global.locale.value
     i18n.global.locale.value = 'en'
   })
 
