@@ -40,6 +40,21 @@ final class CapabilityReportRendererTest extends TestCase
         $this->assertStringContainsString('For plans and pricing, link the pricing page.', $admin);
     }
 
+    public function testOversizedReportTruncatesAtTheBudget(): void
+    {
+        $facts = [];
+        for ($i = 0; $i < 60; ++$i) {
+            $facts[] = new CapabilityFact('fact-'.$i, 'Capability number '.$i, CapabilityState::Available, 'with a fairly long detail string', null, null, null);
+        }
+        $report = new CapabilityReport($facts, '4.9.0', false, false);
+
+        $rendered = (new CapabilityReportRenderer())->render($report);
+
+        $this->assertLessThanOrEqual(CapabilityReportRenderer::MAX_CHARS, strlen($rendered));
+        $this->assertStringEndsWith('…', $rendered);
+        $this->assertStringContainsString('AVAILABLE NOW:', $rendered);
+    }
+
     private function fullReport(bool $isAdmin, bool $billingEnabled): CapabilityReport
     {
         $facts = [

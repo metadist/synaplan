@@ -7,11 +7,14 @@ namespace App\Service\SelfAware;
 /**
  * Compact, deterministic prompt block for a {@see CapabilityReport}.
  *
- * Budget: ≤ ~350 tokens (~1 400 characters at 4 chars/token).
+ * Budget: ≤ ~500 tokens (~2 000 characters at 4 chars/token). The budget grew
+ * with the product: assistants, approvals, custom tools and sharing joined the
+ * inventory in 4.8/4.9, and an answer that omits them lies by omission. The
+ * block stays cached per user and is only injected on the product topics.
  */
 final readonly class CapabilityReportRenderer
 {
-    public const MAX_CHARS = 1400;
+    public const MAX_CHARS = 2000;
 
     public function render(CapabilityReport $report): string
     {
@@ -21,10 +24,10 @@ final readonly class CapabilityReportRenderer
 
         $lines = [
             '## This Synaplan installation (live, version '.$report->version.')',
+            $this->rulesLine($report),
             'AVAILABLE NOW: '.('' !== $available ? $available : 'none'),
             'NEEDS SETUP: '.('' !== $needsSetup ? $needsSetup : 'none'),
             'NOT AVAILABLE: '.('' !== $absent ? $absent : 'none'),
-            $this->rulesLine($report),
         ];
 
         $block = implode("\n", $lines);
@@ -32,7 +35,9 @@ final readonly class CapabilityReportRenderer
             return $block;
         }
 
-        return substr($block, 0, self::MAX_CHARS - 1).'…';
+        $ellipsis = '…';
+
+        return substr($block, 0, self::MAX_CHARS - strlen($ellipsis)).$ellipsis;
     }
 
     /**
