@@ -153,7 +153,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MoonIcon, ServerIcon, SunIcon } from '@heroicons/vue/24/outline'
-import { supportedLanguages } from '@/i18n'
+import { cycleLocale } from '@/i18n'
 import { useTheme } from '@/composables/useTheme'
 import { useSetupState } from '@/composables/useSetupState'
 import { useAuthStore } from '@/stores/auth'
@@ -177,9 +177,7 @@ const { state, loading, error: loadError, load } = useSetupState()
 const toggleTheme = () => setTheme(isDark.value ? 'light' : 'dark')
 
 function cycleLanguage(): void {
-  const next = (supportedLanguages.indexOf(locale.value as never) + 1) % supportedLanguages.length
-  locale.value = supportedLanguages[next]
-  localStorage.setItem('language', locale.value)
+  void cycleLocale()
 }
 
 const step = ref<Step>('admin')

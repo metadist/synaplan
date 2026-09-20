@@ -5,7 +5,9 @@ import { createI18n } from 'vue-i18n'
 import AssistantGallery from '@/components/assistants/AssistantGallery.vue'
 import { useAgentsStore } from '@/stores/agents'
 import type { GalleryCard } from '@/services/api/agentsApi'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/agentsApi', () => ({
   agentsApi: {

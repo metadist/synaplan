@@ -3,7 +3,9 @@ import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ComputeRunCard from '@/components/multitask/ComputeRunCard.vue'
 import type { TaskCard } from '@/stores/history'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 const runtimeFeatures = { computeWorkspacesEnabled: false }
 

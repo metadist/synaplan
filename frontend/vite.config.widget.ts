@@ -77,9 +77,25 @@ export default defineConfig(({ mode }) => ({
   base: './',
 
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+    alias: [
+      // More specific than `@` — httpClient's `import('@/router')` must not
+      // resolve to the SPA router. inlineDynamicImports would otherwise
+      // inline every lazy view and the full app i18n glob into widget.js.
+      {
+        find: '@/router/setupGate',
+        replacement: fileURLToPath(
+          new URL('./src/widget-embed-stubs/setupGate.ts', import.meta.url)
+        ),
+      },
+      {
+        find: /^@\/router$/,
+        replacement: fileURLToPath(new URL('./src/widget-embed-stubs/router.ts', import.meta.url)),
+      },
+      {
+        find: '@',
+        replacement: fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    ],
   },
 
   build: {

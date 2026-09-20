@@ -6,7 +6,9 @@ import AssistantPublishSection from '@/components/assistants/AssistantPublishSec
 import { agentsApi, emptyAgentDraft, type Agent } from '@/services/api/agentsApi'
 import { ApiError } from '@/services/api/httpClient'
 import { useAgentsStore } from '@/stores/agents'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 const errorMock = vi.fn()
 const successMock = vi.fn()

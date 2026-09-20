@@ -144,7 +144,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { languageOptions } from '@/i18n'
+import { languageOptions, setLocale, type SupportedLanguage } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import MainLayout from '@/components/MainLayout.vue'
@@ -161,15 +161,9 @@ const { locale } = useI18n()
 
 const languages = languageOptions
 
-const selectedLanguage = computed({
-  get: () => locale.value,
-  set: (value: string) => {
-    locale.value = value
-    localStorage.setItem('language', value)
-  },
-})
+const selectedLanguage = computed(() => locale.value)
 
-const selectLanguage = (value: string) => {
-  selectedLanguage.value = value
+const selectLanguage = async (value: string) => {
+  await setLocale(value as SupportedLanguage)
 }
 </script>

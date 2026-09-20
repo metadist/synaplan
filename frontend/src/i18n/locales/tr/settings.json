@@ -1,0 +1,382 @@
+{
+  "marketingNews": {
+    "heading": "Synaplan'dan en yeniler",
+    "readMore": "Devamını oku"
+  },
+  "usageTaximeter": {
+    "sessionLabel": "Tokenlar",
+    "todayTooltip": "Bugün {tokens} token",
+    "todayAria": "Bugünkü kullanım: {cost}",
+    "openStats": "Kullanım istatistiklerini göster",
+    "usedModels": "Kullanılan modeller",
+    "promptsInSession": "Bu oturumdaki istemler",
+    "modelChanges": "Model değişiklikleri: {count}",
+    "allStatistics": "Tüm istatistikler",
+    "lessThanCent": "< 0,01 €"
+  },
+  "profile": {
+    "title": "Profil Ayarları",
+    "subtitle": "Kişisel bilgilerinizi ve hesap ayarlarınızı yönetin",
+    "personalInfo": {
+      "title": "Kişisel Bilgiler",
+      "firstName": "Ad",
+      "firstNamePlaceholder": "Adınız",
+      "lastName": "Soyad",
+      "lastNamePlaceholder": "Soyadınız",
+      "email": "E-posta",
+      "emailHint": "Giriş e-postanız (değiştirilemez)",
+      "phone": "Telefon",
+      "phonePlaceholder": "İsteğe bağlı iletişim numarası",
+      "managedBy": "Bu hesap {provider} tarafından yönetiliyor"
+    },
+    "companyInfo": {
+      "title": "Şirket Bilgileri",
+      "subtitle": "İsteğe bağlı - Bireyseniz boş bırakın",
+      "companyName": "Şirket Adı",
+      "companyNamePlaceholder": "Şirketiniz A.Ş.",
+      "vatId": "Vergi Numarası",
+      "vatIdPlaceholder": "Vergi kimlik numarası"
+    },
+    "billingAddress": {
+      "title": "Fatura Adresi",
+      "street": "Sokak & Numara",
+      "streetPlaceholder": "Sokak adı ve bina numarası",
+      "zipCode": "Posta Kodu",
+      "zipCodePlaceholder": "Posta kodu",
+      "city": "Şehir",
+      "cityPlaceholder": "Şehir adı",
+      "country": "Ülke",
+      "countryHint": "Doğru vergi hesaplaması için gerekli"
+    },
+    "accountSettings": {
+      "title": "Hesap Ayarları",
+      "language": "Dil",
+      "languageHint": "Arayüz dili",
+      "timezone": "Saat Dilimi",
+      "timezoneHint": "Yerel saat diliminiz",
+      "invoiceEmail": "Fatura E-postası",
+      "invoiceEmailPlaceholder": "Faturalar için alternatif e-posta (ana e-postayı kullanmak için boş bırakın)"
+    },
+    "changePassword": {
+      "title": "Şifre Değiştir",
+      "subtitle": "Mevcut şifreyi korumak için boş bırakın",
+      "currentPassword": "Mevcut Şifre",
+      "currentPasswordPlaceholder": "Mevcut şifreyi korumak için boş bırakın",
+      "newPassword": "Yeni Şifre",
+      "newPasswordPlaceholder": "Yeni şifre girin",
+      "newPasswordHint": "En az 8 karakter",
+      "confirmPassword": "Şifreyi Onayla",
+      "confirmPasswordPlaceholder": "Yeni şifreyi onaylayın",
+      "confirmPasswordHint": "Yeni şifreyle eşleşmeli",
+      "externalAuth": "{provider} ile giriş yapıyorsunuz. Parola orada yönetilir.",
+      "mismatch": "Parolalar eşleşmiyor",
+      "tooShort": "Parola en az 8 karakter olmalı"
+    },
+    "appSecurity": {
+      "title": "Uygulama güvenliği",
+      "subtitle": "Bu cihaz için ek koruma",
+      "biometricLock": "Biyometrik uygulama kilidi",
+      "biometricLockHint": "Uygulamayı açmak için Face ID, Touch ID veya parmak izi iste.",
+      "verifyReason": "Biyometrik kilidi etkinleştir",
+      "enableFailed": "Biyometrik kilit etkinleştirilemedi. Lütfen tekrar deneyin."
+    },
+    "legal": {
+      "title": "Gizlilik ve Şartlar",
+      "privacy": "Gizlilik Politikası",
+      "terms": "Kullanım Koşulları",
+      "accountDeletion": "Hesabını sil"
+    },
+    "dangerZone": {
+      "title": "Tehlikeli Bölge",
+      "subtitle": "Geri alınamaz işlemler",
+      "deleteAccount": "Hesabı Sil",
+      "deleteAccountDesc": "Hesabınızı kalıcı olarak silin. Bu işlem geri alınamaz.",
+      "deleteButton": "Hesabı Kalıcı Olarak Sil"
+    },
+    "deleteAccountModal": {
+      "title": "Hesabı Gerçekten Silinsin mi?",
+      "warning": "Bu işlem kalıcıdır ve geri alınamaz.",
+      "consequences": "Aşağıdaki veriler silinecek:",
+      "consequence1": "Tüm mesajlarınız ve sohbetleriniz",
+      "consequence2": "Yüklenen tüm dosyalar",
+      "consequence3": "Kişisel verileriniz ve ayarlarınız",
+      "consequence4": "API anahtarları ve kimlik bilgileri",
+      "confirmPassword": "Şifrenizle onaylayın:",
+      "confirmPasswordPlaceholder": "Mevcut şifreniz",
+      "externalAuthConfirm": "Onaylamak için 'DELETE' yazın:",
+      "externalAuthPlaceholder": "DELETE yazın",
+      "deleteButton": "Evet, Hesabı Sil",
+      "cancelButton": "İptal",
+      "deleting": "Siliniyor..."
+    },
+    "privacyNotice": "Tüm veriler güvenli bir şekilde saklanır ve yalnızca Alman yasalarına (GDPR) uygun olarak fatura amaçları için kullanılır.",
+    "saveChanges": "Değişiklikleri Kaydet",
+    "cancel": "İptal"
+  },
+  "paywall": {
+    "title": {
+      "guest_limit": "Ücretsiz mesajların bitti",
+      "free_limit": "Ücretsiz mesajların bitti",
+      "quota_exhausted": "Bu ayki kotan doldu",
+      "reminder": "{brand}'dan daha fazlasını elde edin"
+    },
+    "subtitle": {
+      "guest_limit": "Sohbete devam etmek için bir plan seç. Hesap açtığında bundan sonrası için kendi geçmişin, hafızaların ve dosyaların olur.",
+      "free_limit": "Ücretsiz kotan tükendi. Sınır olmadan sohbete devam etmek için bir plan seç.",
+      "quota_exhausted": "Hemen devam etmek için üst bir plana geç ya da kotanın gelecek ay sıfırlanmasını bekle.",
+      "reminder": "Bir plan sana daha fazla mesaj, daha güçlü AI modelleri ve daha fazla depolama verir."
+    },
+    "unavailable": "Şu anda burada bir plan satın alınamıyor. Lütfen daha sonra tekrar dene.",
+    "recommended": "Önerilen",
+    "choosePlan": "{plan} planını seç",
+    "guestNote": "Önce ücretsiz bir hesap oluştur; planın bu hesaba bağlanır.",
+    "login": "Zaten hesabım var",
+    "maybeLater": "Belki sonra",
+    "renewalNoteStore": "Abonelikler sen iptal edene kadar otomatik yenilenir. Mağaza hesabının ayarlarından istediğin zaman yönetebilir veya iptal edebilirsin.",
+    "renewalNoteWeb": "Abonelikler sen iptal edene kadar otomatik yenilenir. İstediğin zaman iptal edebilirsin.",
+    "plans": {
+      "pro": {
+        "tagline": "Yapay zekâyla günlük çalışma için"
+      },
+      "team": {
+        "tagline": "Birlikte çalışan küçük ekipler için"
+      },
+      "business": {
+        "tagline": "En yüksek beklentileri olan şirketler için"
+      }
+    }
+  },
+  "subscription": {
+    "serviceNotAvailable": "Hizmet Kullanılamıyor",
+    "title": "Abonelik Planları",
+    "subtitle": "Daha fazla özellik ve daha yüksek limitler açın",
+    "chooseYourPlan": "Planınızı Seçin",
+    "currentPlan": "Mevcut Plan",
+    "yourPlan": "Planınız",
+    "noActiveSubscription": "Aktif abonelik yok",
+    "upgradePlan": "Planı Yükselt",
+    "managePlan": "Planı Yönet",
+    "cancelPlan": "Aboneliği İptal Et",
+    "recommended": "Önerilen",
+    "selectPlan": "Plan Seç",
+    "upgrade": "Yükselt",
+    "includedInCurrent": "Planınıza dahil",
+    "highestPlan": "En yüksek plana sahipsiniz!",
+    "processing": "İşleniyor...",
+    "perMonth": "ay",
+    "perYear": "yıl",
+    "unavailable": "Abonelik Hizmeti Kullanılamıyor",
+    "unavailableDesc": "Abonelik hizmeti şu anda yapılandırılıyor. Lütfen daha sonra tekrar kontrol edin veya destek ile iletişime geçin.",
+    "serviceNotConfigured": "Abonelik hizmeti şu anda kullanılamıyor. Lütfen destek ile iletişime geçin.",
+    "checkoutFailed": "Ödeme başlatılamadı. Lütfen tekrar deneyin.",
+    "selfHosted": "Self-Hosted Sürümü — Tüm özellikler dahil",
+    "manage": {
+      "title": "Aboneliğinizi Yönetin",
+      "subtitle": "Abonelik detaylarınızı görüntüleyin ve yönetin",
+      "currentPlanLabel": "Mevcut Plan",
+      "status": "Durum",
+      "statusActive": "Aktif",
+      "statusCanceled": "İptal Edildi",
+      "statusPastDue": "Vadesi Geçmiş",
+      "statusIncomplete": "Tamamlanmamış",
+      "statusTrialing": "Deneme",
+      "statusUnpaid": "Ödenmemiş",
+      "statusPaused": "Duraklatıldı",
+      "nextBilling": "Sonraki Fatura Tarihi",
+      "cancelDate": "İptal Tarihi",
+      "billingPortal": "Fatura Portalı",
+      "billingPortalDesc": "Ödeme yöntemlerinizi yönetin, faturaları görüntüleyin ve fatura bilgilerini güncelleyin",
+      "openPortal": "Fatura Portalını Aç",
+      "cancelSubscription": "Aboneliği İptal Et",
+      "cancelWarning": "Aboneliğinizi iptal etmek istediğinizden emin misiniz?",
+      "cancelWarningDesc": "Fatura dönemi sonuna kadar erişiminiz devam edecek.",
+      "confirmCancel": "Evet, Aboneliği İptal Et",
+      "keepSubscription": "Aboneliği Koru",
+      "loadingPortal": "Fatura portalı açılıyor..."
+    },
+    "native": {
+      "purchaseTitle": "Uygulama içi satın alma",
+      "purchaseUnavailable": "Uygulama içi satın almalar bu sunucuda henüz kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+      "purchaseSuccess": "Aboneliğiniz artık aktif. Teşekkürler!",
+      "purchasePending": "Satın alma işleminiz onay bekliyor (ör. „Satın Almak İçin Sor“). Onaylandığında aboneliğiniz otomatik olarak etkinleşecek.",
+      "purchaseConflict": "Bu satın alma zaten başka bir hesaba veya mevcut bir aboneliğe bağlı. Lütfen mağaza hesabınızı kontrol edin veya destekle iletişime geçin.",
+      "purchaseFailed": "Satın alma tamamlanamadı. Sizden ücret alınmadı. Lütfen tekrar deneyin.",
+      "manageInStore": "Mağazada yönet",
+      "restoreButton": "Satın alımları geri yükle",
+      "restoreTitle": "Satın alımları geri yükle",
+      "restoreDone": "Satın alımlar geri yüklendi — aboneliğiniz aktif.",
+      "restoreNone": "Geri yüklenecek aktif bir abonelik bulunamadı.",
+      "storeNoteIos": "Satın alımlar ve abonelikler App Store üzerinden işlenir ve yönetilir.",
+      "storeNoteAndroid": "Satın alımlar ve abonelikler Google Play üzerinden işlenir ve yönetilir.",
+      "redeemBlockedExistingIos": "Bu hesabın zaten aktif bir aboneliği var, bu yüzden son mağaza satın alman bağlanmadı. Çifte ücretlendirmeyi önlemek için Apple ID aboneliklerini kontrol et ve gerekirse oradan iade talep et.",
+      "redeemBlockedExistingAndroid": "Bu hesabın zaten aktif bir aboneliği var, bu yüzden son mağaza satın alman bağlanmadı. Google Play, onaylanmayan satın almaları birkaç gün içinde otomatik olarak iade eder."
+    },
+    "plans": {
+      "pro": "Pro",
+      "team": "Takım",
+      "business": "İşletme"
+    },
+    "features": {
+      "usage": "Ücretsiz plana göre {factor}× daha fazla kullanım",
+      "advancedModels": "Gelişmiş AI Modelleri",
+      "prioritySupport": "Öncelikli Destek",
+      "everythingInPro": "Pro'daki Her Şey",
+      "everythingInTeam": "Takım'daki Her Şey",
+      "teamCollaboration": "Takım İşbirliği",
+      "customPrompts": "Özel Promptlar",
+      "apiAccess": "API Erişimi",
+      "whiteLabel": "White-label Widgetlar",
+      "dedicatedSupport": "Özel Destek",
+      "slaGuarantee": "SLA Garantisi"
+    },
+    "success": {
+      "title": "Ödeme Başarılı!",
+      "description": "Aboneliğiniz aktifleştirildi. Yükseltme için teşekkürler!",
+      "newPlan": "Yeni planınız",
+      "startUsing": "Planınızı Kullanmaya Başlayın",
+      "activating": "Planınız Aktifleştiriliyor...",
+      "activatingDesc": "Aboneliğinizi aktifleştirirken lütfen bekleyin.",
+      "almostDone": "Neredeyse Bitti!",
+      "processing": "Ödemeniz başarılı, ancak aboneliğiniz hala işleniyor.",
+      "retry": "Tekrar Dene",
+      "continueAnyway": "Yine de Devam Et"
+    },
+    "cancel": {
+      "title": "Ödeme İptal Edildi",
+      "description": "Ödemeniz iptal edildi. Herhangi bir ücret alınmadı.",
+      "tryAgain": "Tekrar Dene",
+      "backToPlans": "Planlara Dön"
+    }
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Ücretsiz Limit Doldu",
+      "description": "Ücretsiz planınızdaki tüm {limit} {action} kullandınız. Devam etmek için yükseltin!"
+    },
+    "hourly": {
+      "title": "Saatlik Limite Ulaşıldı",
+      "description": "{limit} {action} saatlik limitinize ulaştınız. Limitiniz yakında sıfırlanacak."
+    },
+    "monthly": {
+      "title": "Aylık Limite Ulaşıldı",
+      "description": "Bu ay tüm {limit} {action} kullandınız. Daha fazlası için yükseltin!"
+    },
+    "currentUsage": "Mevcut Kullanım",
+    "remaining": "Kalan",
+    "resetsIn": "Sıfırlanma",
+    "noReset": "Otomatik sıfırlama yok",
+    "upgradesBenefits": "Yükseltme avantajları:",
+    "benefits": {
+      "unlimited": "Sınırsız veya daha yüksek limitler",
+      "allFeatures": "Tüm özelliklere erişim",
+      "priority": "Öncelikli işleme",
+      "support": "Premium destek"
+    },
+    "upgradeNow": "Şimdi Yükselt",
+    "topup": {
+      "button": "€{amount} bakiye ekle",
+      "amountLabel": "Yükleme tutarı (€{step} adımları)",
+      "error": "Yükleme başlatılamadı. Lütfen tekrar deneyin."
+    },
+    "verifyPhone": "Telefon Numarasını Doğrula",
+    "footerNote": "Sorularınız mı var? Destek ekibimizle iletişime geçin.",
+    "messageBlocked": "Mesaj gönderilemedi",
+    "messageBlockedDesc": "{action} limitinize ulaştınız. Planınızı yükseltin veya limitin sıfırlanmasını bekleyin.",
+    "retryLater": "Tekrar Dene"
+  },
+  "settings": {
+    "title": "Tercihler",
+    "subtitle": "Tercihlerinizi ve yapılandırmanızı yönetin",
+    "tabs": {
+      "general": "Genel",
+      "features": "Özellikler"
+    },
+    "appMode": {
+      "title": "Uygulama Modu",
+      "description": "Basitleştirilmiş veya tam özellik seti arasında seçim yapın",
+      "easy": "Kolay Mod",
+      "easyDesc": "Temel özelliklerle basitleştirilmiş arayüz",
+      "advanced": "Gelişmiş Mod",
+      "advancedDesc": "Tüm özelliklere ve araçlara tam erişim",
+      "lockedTitle": "Gelişmiş mod özelliği",
+      "lockedMessage": "\"{feature}\" gelişmiş modun bir parçasıdır. Kullanmak için gelişmiş moda geçin — Tercihler bölümünden istediğiniz zaman geri dönebilirsiniz.",
+      "switchCta": "Gelişmiş moda geç"
+    },
+    "theme": {
+      "title": "Tema",
+      "description": "Renk şemanızı seçin",
+      "light": "Açık",
+      "dark": "Koyu",
+      "system": "Sistem"
+    },
+    "language": {
+      "title": "Dil",
+      "description": "Arayüz dilini seçin"
+    },
+    "webSearch": {
+      "title": "Web araması",
+      "description": "Yöneticinizin herkes için ayarladığı arama sağlayıcısından farklı birini kullanın.",
+      "useMyOwn": "Kendi aramamı kullan",
+      "saved": "Arama sağlayıcınız kaydedildi.",
+      "saveFailed": "Arama sağlayıcınız kaydedilemedi"
+    },
+    "account": {
+      "title": "Hesap",
+      "email": "E-posta",
+      "userLevel": "Kullanıcı Seviyesi"
+    },
+    "logout": "Çıkış Yap",
+    "features": {
+      "title": "Sistem Durumu",
+      "subtitle": "Tüm servisleri ve özellikleri izleyin",
+      "loading": "Özellikler yükleniyor...",
+      "requiredConfig": "Gerekli Yapılandırma:",
+      "set": "Ayarlandı",
+      "notSet": "Ayarlanmadı",
+      "allOperational": "Tüm Sistemler Çalışıyor",
+      "issuesDetected": "Sorunlar Tespit Edildi",
+      "ready": "Hazır",
+      "healthSummary": "{total} servisten {healthy} tanesi sağlıklı",
+      "model": "model",
+      "models": "model",
+      "adminOnlyTitle": "Yönetici erişimi gerekli",
+      "adminOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir.",
+      "modulesTitle": "Özellik modülleri",
+      "modulesSubtitle": "Bu kurulumun bildirdiği isteğe bağlı özellikler. Her biri kendi yapılandırmasıyla açılır; liste anahtarları gösterir, değerlerini asla göstermez.",
+      "modulesConfigured": "{total} modülden {configured} tanesi yapılandırıldı",
+      "configuredBy": "Yapılandıran:",
+      "docs": "Belgeler",
+      "compute": {
+        "title": "Dosya işleri (işlem)",
+        "tierDocker": "Standart",
+        "tierGvisor": "Güçlü yalıtım",
+        "tierMicrovm": "Sanal makine",
+        "tierUnknown": "Bilinmiyor",
+        "statusOn": "Açık",
+        "statusOff": "Kapalı",
+        "statusDown": "Yanıt vermiyor",
+        "stateRunning": "Dosya işleri çalışıyor.",
+        "stateDisabled": "Sistem yapılandırmasında kapalı. Dosya işleri gizli.",
+        "stateUnreachable": "Açık, ancak sidecar yanıt vermiyor. Dosya işleri kullanılamıyor.",
+        "postureWarning": "Bu hizmet {tier} bildiriyor; bu kurulum daha güçlü yalıtım gerektiriyor.",
+        "capacity": "Kapasite",
+        "runningOf": "{running} / {max} çalışıyor",
+        "queued": "{count} kuyrukta",
+        "images": "İmajlar",
+        "runs24": "{count} çalıştırma (24 sa)",
+        "failed24": "{count} başarısız (24 sa)",
+        "openConfig": "İşlem ayarları",
+        "stateTierBlocked": "Açık, ancak gerekli yalıtımın altında. Dosya işleri gizli."
+      }
+    },
+    "notLoggedIn": "Oturum açılmadı"
+  },
+  "externalLink": {
+    "title": "Harici Web Sitesi",
+    "subtitle": "Synaplan'dan ayrılmak üzeresiniz",
+    "disclaimer": "Harici bir web sitesine yönlendiriliyorsunuz. İçerik üzerinde kontrolümüz yoktur ve üçüncü taraf sitelerdeki veri koruma veya güvenlikten sorumlu değiliz. Kendi sorumluluğunuzda devam edin.",
+    "dontAskAgain": "Bu uyarıyı bir daha gösterme",
+    "cancel": "İptal",
+    "open": "Bağlantıyı aç"
+  }
+}

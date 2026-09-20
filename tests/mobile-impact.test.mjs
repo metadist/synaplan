@@ -105,10 +105,25 @@ test('classifies more-kinds share cards as ota-candidate', () => {
   assert.equal(result.classification, 'ota-candidate')
 })
 
+test('classifies split i18n locale namespaces as ota-candidate', () => {
+  const result = classifyFiles(
+    [
+      entry('frontend/src/i18n/locales/en/core.json', 'A'),
+      entry('frontend/src/i18n/locales/de/config.json', 'A'),
+      entry('frontend/src/i18n/locales/fr/widgets.json', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
 test('classifies web-layer application code and assets as ota-candidate', () => {
   const paths = [
     'frontend/src/views/ChatView.styles.css',
     'frontend/src/i18n/de.json',
+    'frontend/src/i18n/locales/en/core.json',
+    'frontend/src/i18n/locales/de/chat.json',
     'frontend/src/assets/logo.svg',
     'frontend/src/components/icons/ProviderIcon.vue',
     'frontend/src/components/ChatComposer.vue',

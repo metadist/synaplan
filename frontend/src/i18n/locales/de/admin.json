@@ -1,0 +1,1034 @@
+{
+  "adminModelStatus": {
+    "title": "Modell-Status",
+    "subtitle": "Welche KI-Modelle gerade funktionieren und welche nicht.",
+    "loading": "Modell-Status wird geladen…",
+    "loadFailed": "Der Modell-Status konnte nicht geladen werden.",
+    "never": "nie",
+    "noMatches": "Keine Modelle passen zu den gewählten Filtern.",
+    "freeHint": "Die Prüfung ist kostenlos: Es wird nur abgefragt, welche Modelle ein Anbieter veröffentlicht. Dafür wird nie ein KI-Modell ausgeführt.",
+    "states": {
+      "online": "Online",
+      "degraded": "Gestört",
+      "offline": "Offline",
+      "unconfigured": "Nicht eingerichtet",
+      "unknown": "Unbekannt"
+    },
+    "sources": {
+      "probe": "Modell-Liste des Anbieters",
+      "traffic": "echte Nutzung"
+    },
+    "summary": {
+      "allGood": "Alle Modelle antworten",
+      "problems": "{count} Modell(e) brauchen Aufmerksamkeit",
+      "lastCheck": "Zuletzt geprüft",
+      "monitoringOff": "Die automatische Prüfung ist ausgeschaltet, diese Seite zeigt daher nur den zuletzt bekannten Stand."
+    },
+    "filters": {
+      "onlyProblems": "Nur Probleme anzeigen",
+      "capability": "Aufgabe",
+      "allCapabilities": "Alle Aufgaben"
+    },
+    "provider": {
+      "affected": "{count} betroffen"
+    },
+    "model": {
+      "lastSuccess": "Zuletzt funktioniert",
+      "errorRate": "{percent} % der letzten {total} Aufrufe sind fehlgeschlagen",
+      "source": "Grundlage",
+      "autoDisabled": "Automatisch abgeschaltet",
+      "switchedOff": "Abgeschaltet",
+      "exempt": "Von automatischer Abschaltung ausgenommen"
+    },
+    "actions": {
+      "refresh": "Jetzt prüfen",
+      "refreshProvider": "Diesen Anbieter prüfen",
+      "refreshProviderAria": "{provider} jetzt prüfen",
+      "resetCounters": "Fehlerverlauf löschen",
+      "exempt": "Von Automatik ausnehmen",
+      "unexempt": "Automatik wieder erlauben"
+    },
+    "confirmResetTitle": "Fehlerverlauf löschen?",
+    "confirmResetMessage": "„{name}“ wird danach nur noch nach neuer Nutzung bewertet. Eine Prüfung, die das Modell bereits als eingestellt erkannt hat, bleibt bestehen.",
+    "messages": {
+      "refreshed": "{count} Modell(e) geprüft.",
+      "refreshFailed": "Die Prüfung konnte nicht abgeschlossen werden.",
+      "exempted": "Dieses Modell ist jetzt von der automatischen Abschaltung ausgenommen.",
+      "unexempted": "Die automatische Abschaltung gilt für dieses Modell wieder.",
+      "exemptFailed": "Die Ausnahme konnte nicht geändert werden.",
+      "countersReset": "Fehlerverlauf gelöscht.",
+      "countersResetFailed": "Der Fehlerverlauf konnte nicht gelöscht werden."
+    }
+  },
+  "platformConnect": {
+    "title": "Synaplan verbinden",
+    "subtitle": "Erlaube {client}, dieses Synaplan-Konto zu verwenden.",
+    "loading": "Sitzung wird geprüft…",
+    "confirmPrompt": "{client} unter {host} als {uid} verbinden?",
+    "connectButton": "{client} verbinden",
+    "scopesNote": "Gewährt Zugriff auf Chats, Dateien und Suche. Der Schlüssel bleibt auf der Plattform — du tippst ihn nicht ein.",
+    "connecting": "Verbinden…",
+    "successTitle": "Verbunden.",
+    "successSubtitle": "Du kannst dieses Fenster schließen, falls es sich nicht selbst schließt.",
+    "errorTitle": "Verbindung fehlgeschlagen",
+    "retry": "Erneut versuchen",
+    "helpLine": "Dieses Fenster wurde von einer anderen App geöffnet. Es kann gefahrlos geschlossen werden.",
+    "notYou": "Nicht du? Abmelden",
+    "errorMissingState": "Diese Verbindungsanfrage ist unvollständig. Starte erneut in der anderen App.",
+    "errorOfficeNotReady": "Office.js ist nicht verfügbar. Diese Seite muss aus Outlook heraus geöffnet werden.",
+    "errorNotSignedIn": "Du bist nicht angemeldet. Bitte das Fenster aktualisieren und erneut anmelden.",
+    "errorIssuanceFailed": "Synaplan konnte diese Verbindung nicht abschließen.",
+    "errorUnknownClient": "Diese Verbindungsanfrage wird nicht erkannt.",
+    "errorFlagOff": "Das Verknüpfen dieser Plattform ist auf dieser Synaplan-Instanz nicht aktiviert.",
+    "errorNoDeliveryChannel": "Synaplan konnte die Verbindung nicht an Outlook zurückgeben. Öffnen Sie diese Seite aus Outlook heraus und versuchen Sie es erneut.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "diese App"
+    }
+  },
+  "admin": {
+    "title": "Betrieb",
+    "description": "Systemverwaltung und Konfiguration",
+    "tabs": {
+      "overview": "Übersicht",
+      "users": "Benutzer",
+      "prompts": "Prompts",
+      "usage": "Nutzung",
+      "subscriptions": "Abonnements",
+      "moderation": "Moderation",
+      "appServer": "App-Server"
+    },
+    "overview": {
+      "totalUsers": "Gesamtbenutzer",
+      "recentUsers": "Neueste Benutzer"
+    },
+    "systemInfo": {
+      "title": "Systeminfo",
+      "refresh": "Aktualisieren",
+      "loadError": "Systeminfo konnte nicht geladen werden",
+      "phpVersion": "PHP-Version",
+      "memoryLimit": "Speicherlimit",
+      "inUse": "{value} belegt",
+      "diskFree": "Freier Speicher",
+      "ofTotal": "von {value} gesamt",
+      "diskUsage": "Speicherauslastung",
+      "opcache": "OPcache",
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert",
+      "peakMemory": "Spitzenspeicher",
+      "uploadMax": "Max. Upload-Größe",
+      "postMax": "Max. POST-Größe",
+      "maxExecTime": "Max. Ausführungszeit",
+      "os": "Betriebssystem",
+      "server": "Server",
+      "hostname": "Hostname"
+    },
+    "analytics": {
+      "registrations": "Benutzer-Registrierungen",
+      "usageByAction": "Nutzung nach Aktion",
+      "period": {
+        "7d": "7 Tage",
+        "30d": "30 Tage",
+        "90d": "90 Tage",
+        "1y": "1 Jahr",
+        "all": "Gesamt"
+      },
+      "groupBy": {
+        "day": "Tag",
+        "week": "Woche",
+        "month": "Monat"
+      }
+    },
+    "users": {
+      "email": "E-Mail",
+      "level": "Level",
+      "type": "Typ",
+      "provider": "Anbieter",
+      "created": "Erstellt",
+      "status": "Status",
+      "actions": "Aktionen",
+      "delete": "Benutzer löschen",
+      "currentUser": "(Du)",
+      "verified": "Verifiziert",
+      "unverified": "Nicht verifiziert",
+      "searchPlaceholder": "Nach E-Mail suchen...",
+      "noUsers": "Keine Benutzer gefunden",
+      "deleteConfirmTitle": "Benutzer löschen?",
+      "deleteConfirmDesc": "Möchtest du {email} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteConfirmCheckbox": "Ja, ich bestätige das Löschen aller Daten dieses Benutzers (inkl. Chats, Widgets, Dokumente)",
+      "userDeleted": "Benutzer {email} wurde erfolgreich gelöscht",
+      "userDeleteFailed": "Fehler beim Löschen des Benutzers",
+      "levelUpdated": "Benutzer-Level auf {level} aktualisiert",
+      "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels",
+      "loadFailed": "Benutzer konnten nicht geladen werden",
+      "invalidResponse": "Der Server hat eine unerwartete Antwort gesendet"
+    },
+    "impersonate": {
+      "button": "Als Benutzer ansehen",
+      "buttonTitle": "In diesen Benutzer einloggen",
+      "confirmTitle": "Als {email} einloggen?",
+      "confirmMessage": "Du wirst als {email} angemeldet. Jede Aktion und jede Änderung wird diesem Konto zugeordnet. Verwende das Banner oben, um die Sitzung zu beenden.",
+      "confirmAction": "Sitzung starten",
+      "started": "Du siehst die Anwendung jetzt als {email}.",
+      "startFailed": "Impersonation konnte nicht gestartet werden",
+      "disabled": "Die Ansicht als anderer Benutzer ist auf dieser Instanz ausgeschaltet.",
+      "disabledTitle": "Ansicht als anderer Benutzer ist ausgeschaltet",
+      "cannotImpersonateSelf": "Du kannst dich nicht selbst impersonieren.",
+      "banner": {
+        "viewing": "Angemeldet als {email}",
+        "adminLabel": "Eigentlich angemeldet als {email}",
+        "exitButton": "Beenden",
+        "exitButtonTitle": "Admin-Sitzung wiederherstellen"
+      },
+      "stopped": "Admin-Sitzung wiederhergestellt.",
+      "stopFailed": "Impersonation konnte nicht beendet werden"
+    },
+    "prompts": {
+      "shortDesc": "Kurzbeschreibung",
+      "prompt": "Prompt",
+      "selectionRules": "Auswahlregeln",
+      "selectionRulesPlaceholder": "Optional: Regeln zur automatischen Auswahl dieses Prompts"
+    },
+    "usage": {
+      "title": "Nutzungsstatistiken",
+      "period": {
+        "day": "24 Stunden",
+        "week": "7 Tage",
+        "month": "30 Tage",
+        "all": "Gesamt"
+      },
+      "totalRequests": "Anfragen",
+      "totalTokens": "Tokens",
+      "totalCost": "Kosten",
+      "avgLatency": "Durchschn. Latenz",
+      "byAction": "Nach Aktion",
+      "byProvider": "Nach Anbieter",
+      "topModels": "Top Modelle",
+      "topUsers": "Top-Benutzer",
+      "topUsersHint": "Benutzer mit den meisten API-Anfragen im gewählten Zeitraum (max. 25).",
+      "topUsersEmpty": "Keine Nutzungsdaten für diesen Zeitraum. Versuchen Sie „Gesamte Zeit“ oder warten Sie auf Aktivität.",
+      "model": "Modell",
+      "requests": "Anfragen",
+      "tokens": "Tokens",
+      "cost": "Kosten",
+      "activeSubscriptions": "Aktive Abos",
+      "subscriptionOverview": "Abo-Übersicht"
+    },
+    "subscriptions": {
+      "title": "Abo-Pläne",
+      "description": "Preise, Kostenbudgets und Aktivstatus für jede Abo-Stufe verwalten. Die Preise werden Nutzern im Onboarding und auf der Abo-Seite angezeigt.",
+      "level": "Stufe",
+      "name": "Name",
+      "priceMonthly": "Preis/Monat",
+      "priceYearly": "Preis/Jahr",
+      "currency": "Währung",
+      "budgetMonthly": "Budget/Monat",
+      "budgetYearly": "Budget/Jahr",
+      "active": "Aktiv",
+      "actions": "Aktionen",
+      "edit": "Bearbeiten",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "saveSuccess": "Plan erfolgreich aktualisiert",
+      "saveError": "Plan-Aktualisierung fehlgeschlagen",
+      "loadError": "Abonnements konnten nicht geladen werden",
+      "noSubscriptions": "Keine Abo-Pläne gefunden. Erstellen Sie zuerst Abo-Pläne in der Datenbank.",
+      "budgetHint": "Das Budget definiert die maximalen Token-Kosten (in EUR) pro Abrechnungszeitraum. Setzen Sie es auf 0 für unbegrenzte Nutzung. Die Preise sind die öffentlichen Anzeigepreise; Käufe in der Mobil-App nutzen den App-Store-Preis."
+    },
+    "moderation": {
+      "title": "Inhaltsmoderation",
+      "description": "Gemeldete Inhalte prüfen und bei Bedarf das betreffende Konto sperren oder bannen.",
+      "empty": "Keine Meldungen für diesen Filter.",
+      "loadError": "Meldungen konnten nicht geladen werden",
+      "updateError": "Aktualisierung fehlgeschlagen",
+      "reportUpdated": "Meldung aktualisiert",
+      "userStatusUpdated": "Kontostatus aktualisiert",
+      "unresolvedUser": "Urheber nicht ermittelt",
+      "totalCount": "{count} Meldungen",
+      "suspend": "Sperren",
+      "ban": "Bannen",
+      "reactivate": "Reaktivieren",
+      "filters": {
+        "all": "Alle",
+        "open": "Offen",
+        "reviewed": "Geprüft",
+        "actioned": "Bearbeitet",
+        "dismissed": "Verworfen"
+      },
+      "col": {
+        "reason": "Grund",
+        "content": "Inhalt",
+        "reportedUser": "Gemeldeter Nutzer",
+        "created": "Gemeldet",
+        "status": "Status",
+        "actions": "Aktionen"
+      },
+      "reportStatus": {
+        "open": "Offen",
+        "reviewed": "Geprüft",
+        "actioned": "Bearbeitet",
+        "dismissed": "Verworfen"
+      },
+      "accountStatus": {
+        "active": "Aktiv",
+        "suspended": "Gesperrt",
+        "banned": "Gebannt"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "Konto sperren?",
+          "message": "{user} sperren? Die Person wird abgemeldet und kann die Plattform bis zur Reaktivierung nicht nutzen."
+        },
+        "banned": {
+          "title": "Konto bannen?",
+          "message": "{user} bannen? Das sperrt das Konto dauerhaft. Nur bei schweren Verstößen verwenden."
+        },
+        "active": {
+          "title": "Konto reaktivieren?",
+          "message": "{user} reaktivieren? Die Person kann sich wieder anmelden und die Plattform nutzen."
+        }
+      }
+    },
+    "config": {
+      "title": "Systemkonfiguration",
+      "description": "Umgebungsvariablen und Service-Verbindungen verwalten",
+      "loadError": "Konfiguration konnte nicht geladen werden",
+      "saveError": "Konfiguration konnte nicht gespeichert werden",
+      "saved": "Konfiguration gespeichert",
+      "savedLive": "Gespeichert — sofort wirksam",
+      "dbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",
+      "managedKeys": {
+        "title": "Anbieter-Schlüssel werden unter KI-Infrastruktur › Modelle & Schlüssel verwaltet.",
+        "helm": "Schlüssel aus der Umgebung oder einem Helm-Chart werden automatisch übernommen — eine Chart-Installation braucht diese Seite nicht. Nutze Modelle & Schlüssel nur, um einen Schlüssel über die Oberfläche hinzuzufügen oder zu überschreiben.",
+        "stateNone": "nicht gesetzt",
+        "stateDb": "UI-Überschreibung",
+        "stateEnv": "Umgebung / Helm",
+        "summary": "{env} aus der Umgebung, {db} in der Oberfläche überschrieben.",
+        "cta": "Modelle & Schlüssel öffnen"
+      },
+      "envOverridesDb": "Von der Umgebungsvariablen {key} festgelegt. Aktuell: {value}. Entferne die Variable aus der Umgebung, um diese Einstellung hier zu verwalten.",
+      "unsaved": "Nicht gespeicherte Änderungen",
+      "testConnection": "Verbindung testen",
+      "testFailed": "Verbindungstest fehlgeschlagen",
+      "commandCopied": "Befehl in Zwischenablage kopiert",
+      "tabGroups": {
+        "aiData": "KI & Daten",
+        "communication": "Kommunikation",
+        "security": "Funktionen & Zugang"
+      },
+      "liveBadge": "Live",
+      "liveHint": "Änderungen werden sofort wirksam, kein Neustart erforderlich.",
+      "brandingMode": {
+        "light": "Sie bearbeiten die Einstellungen für den HELLEN Modus — hier gespeicherte Farben gelten im hellen Modus. Wechseln Sie in den dunklen Modus, um die Farben für den dunklen Modus zu bearbeiten.",
+        "dark": "Sie bearbeiten die Einstellungen für den DUNKLEN Modus — hier gespeicherte Farben gelten im dunklen Modus. Wechseln Sie in den hellen Modus, um die Farben für den hellen Modus zu bearbeiten."
+      },
+      "restartBanner": {
+        "title": "Konfiguration aktualisiert — Neustart erforderlich",
+        "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",
+        "copyCommand": "Befehl kopieren"
+      },
+      "m365": {
+        "title": "Damit diese Felder wirken: App in Azure registrieren",
+        "intro": "Die Microsoft-365-Anmeldung braucht eine App-Registrierung in Azure. Das machst du einmal, es dauert etwa fünf Minuten, und danach kann jede Person ihr eigenes Konto verbinden.",
+        "portalLink": "Azure-Portal → App-Registrierungen",
+        "step1": "Öffne {portal} und wähle „Neue Registrierung“. Der Name ist frei, zum Beispiel „Synaplan“.",
+        "step2": "Wähle unter „Umleitungs-URI“ den Plattformtyp Web (nicht SPA) und füge genau diese Adresse ein:",
+        "step3": "Gehe zu „API-Berechtigungen“ → „Berechtigung hinzufügen“ → „Microsoft Graph“ → „Delegierte Berechtigungen“ und füge alle diese hinzu:",
+        "step3Note": "offline_access ist Pflicht: Ohne diese Berechtigung stellt Microsoft kein Refresh-Token aus, und jeder geplante Lauf hört nach einer Stunde auf zu funktionieren.",
+        "step4": "Gehe zu „Zertifikate & Geheimnisse“ → „Neuer Geheimer Clientschlüssel“ und kopiere die Spalte Wert – nicht die Geheimnis-ID. Sie wird nur dieses eine Mal angezeigt.",
+        "step5": "Trage Client-ID und Secret unten ein, setze den Mandanten und schalte M365_ENABLED ein. Danach verbinden die Nutzer ihr eigenes Konto unter Kanäle → Verbindungen.",
+        "ready": "Fertig eingerichtet – Nutzer können ihr Microsoft-365-Konto unter Kanäle → Verbindungen verbinden.",
+        "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte M365_ENABLED ein.",
+        "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell."
+      },
+      "dropbox": {
+        "title": "Bevor diese Felder funktionieren: eine App in der Dropbox App Console anlegen",
+        "intro": "Die Dropbox-Verbindung braucht eine Dropbox-App. Das machst du einmal, es dauert etwa fünf Minuten, und danach kann jeder Nutzer sein eigenes Konto verbinden.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Öffne die {console} und wähle „Create app“. Wähle „Scoped access“ und „Full Dropbox“. Der Name ist egal, zum Beispiel „Synaplan“.",
+        "step2": "Aktiviere im Tab „Permissions“ diese beiden Berechtigungen und klicke auf „Submit“:",
+        "step3": "Füge im Tab „Settings“ unter „OAuth 2 → Redirect URIs“ genau diese Adresse hinzu:",
+        "step4": "Kopiere ebenfalls im Tab „Settings“ den App key und das App secret (auf „Show“ klicken).",
+        "step5": "Trage App key und Secret in die Felder unten ein und schalte DROPBOX_ENABLED ein. Nutzer verbinden ihr Konto dann unter Kanäle → Verbindungen.",
+        "ready": "Fertig eingerichtet – Nutzer können ihr Dropbox-Konto unter Kanäle → Verbindungen verbinden.",
+        "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte DROPBOX_ENABLED ein.",
+        "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell.",
+        "resetTitle": "Alle Dropbox-Verbindungen zurücksetzen",
+        "resetDescription": "Entfernt die Dropbox-Verbindung aller Benutzer dieser Installation, einschließlich der gespeicherten Tokens. Sinnvoll, nachdem die Dropbox-App oder ihre Berechtigungen geändert wurden — danach kann sich jeder frisch neu verbinden.",
+        "resetButton": "Verbindungen zurücksetzen",
+        "resetConfirmTitle": "Alle Dropbox-Verbindungen zurücksetzen?",
+        "resetConfirmMessage": "Die Dropbox-Verbindung aller Benutzer wird entfernt, und jeder Benutzer muss sein Dropbox-Konto neu verbinden. Das kann nicht rückgängig gemacht werden.",
+        "resetDone": "Keine Dropbox-Verbindungen zu entfernen | 1 Dropbox-Verbindung entfernt | {count} Dropbox-Verbindungen entfernt",
+        "resetFailed": "Das Zurücksetzen ist fehlgeschlagen. Bitte erneut versuchen."
+      },
+      "tabs": {
+        "ai": "KI-Dienste",
+        "email": "E-Mail",
+        "branding": "Erscheinungsbild",
+        "mobile": "Mobile App",
+        "auth": "Anmeldung",
+        "channels": "Eingangskanäle",
+        "processing": "Verarbeitung",
+        "features": "Funktionen",
+        "sharing": "Teilen",
+        "routing": "Routing",
+        "interface": "Oberfläche",
+        "guest_landing": "Gäste-Startseite",
+        "vectordb": "Vektordatenbank"
+      },
+      "sections": {
+        "tika": "Apache Tika",
+        "docling": "Docling",
+        "rasterize": "PDF-Rasterizer",
+        "whisper": "Whisper (Audio)",
+        "brave": "Websuche (Brave)",
+        "media": "Medien im Hintergrund",
+        "compute": "Dateiarbeit"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "Apache-Tika-URL",
+        "TIKA_TIMEOUT_MS": "Zeitlimit der Anfrage (ms)",
+        "TIKA_RETRIES": "Maximale Wiederholungen",
+        "TIKA_HTTP_USER": "HTTP-Benutzername",
+        "TIKA_HTTP_PASS": "HTTP-Passwort",
+        "DOCLING_BASE_URL": "Docling-Serve-URL (leer = aus)",
+        "DOCLING_TIMEOUT_MS": "Zeitlimit der Anfrage (ms)",
+        "DOCLING_MAX_BYTES": "Maximale Dateigröße (Bytes)",
+        "RASTERIZE_DPI": "DPI für die PDF-Umwandlung in Bilder",
+        "RASTERIZE_PAGE_CAP": "Maximale Seitenzahl für die Umwandlung",
+        "RASTERIZE_TIMEOUT_MS": "Zeitlimit der Umwandlung (ms)",
+        "WHISPER_ENABLED": "Audio-Transkription einschalten",
+        "WHISPER_DEFAULT_MODEL": "Standard-Whisper-Modell",
+        "BRAVE_SEARCH_ENABLED": "Websuche einschalten",
+        "BRAVE_SEARCH_API_KEY": "Brave-Search-API-Schlüssel",
+        "BRAVE_SEARCH_COUNT": "Treffer pro Suche",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Bilder, Videos und Audio im Hintergrund erzeugen, damit der Chat nicht blockiert. Der Assistent zeigt den Status live und eine Meldung, wenn es fertig ist. Aus: die Antwort wartet, bis die Datei da ist. Braucht den Worker-Container.",
+        "COMPUTE_ENABLED": "Der Assistent darf kurze Dateiarbeit (Python oder Node) auf Kopien der von dir gewählten Dateien machen. Braucht den Compute-Sidecar (COMPUTE_URL + COMPUTE_TOKEN). Ein lokales docker compose up startet den Sidecar und schaltet das ein.",
+        "COMPUTE_REQUIRE_TIER": "Mindest-Isolierung, die der Sidecar melden muss, bevor Dateiarbeit an geht: Standard (normales Docker), Starke Isolierung (gVisor) oder Virtuelle Maschine (microVM). Synaplan Cloud verlangt starke Isolierung.",
+        "COMPUTE_WORKSPACES_ENABLED": "Einen Ordner zwischen den Läufen behalten, damit der Assistent frühere Dateiarbeit fortsetzen kann. Dateien → Arbeitsbereich zeigt den Inhalt. Dateiarbeit selbst muss ebenfalls an sein.",
+        "COMPUTE_EGRESS_ENABLED": "Ein Dateiarbeits-Lauf darf eine kurze Liste öffentlicher Websites holen, die der Assistent genannt hat. Standardmäßig aus — Läufe bleiben offline. Private oder lokale Adressen werden immer abgelehnt. Nur einschaltbar, wenn der Sidecar Website-Zugriff anbietet.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Wenn ein Lauf ins Web geht, zuerst die Besitzerin oder den Besitzer fragen — auch wenn alltägliche Dateiarbeit sonst automatisch liefe. Standardmäßig an.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "Wie viele Websites ein Dateiarbeits-Lauf nennen darf. Standard 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Standard-Sekunden, die ein Dateiarbeits-Lauf dauern darf.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Standard-Speicherlimit in Megabyte für einen Dateiarbeits-Lauf.",
+        "COMPUTE_DEFAULT_CPU": "Standard-CPU-Anteil für einen Dateiarbeits-Lauf.",
+        "COMPUTE_DEFAULT_PIDS": "Standard-Prozesslimit für einen Dateiarbeits-Lauf.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Standard-Größenlimit in Megabyte für Dateien, die der Lauf anlegen darf.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Harte Obergrenze in Sekunden für einen Dateiarbeits-Lauf.",
+        "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
+        "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Standard (normales Docker)",
+          "gvisor": "Starke Isolierung (gVisor)",
+          "microvm": "Virtuelle Maschine (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Automatisch ausführen",
+          "approve": "Zuerst fragen",
+          "block": "Nie ausführen"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Automatisch ausführen",
+          "approve": "Zuerst fragen",
+          "block": "Nie ausführen"
+        }
+      }
+    }
+  },
+  "statistics": {
+    "title": "Willkommen bei Synaplan!",
+    "messageStats": "Nachrichtenstatistik",
+    "totalMessages": "Nachrichten gesamt",
+    "messagesSent": "Gesendete Nachrichten",
+    "messagesReceived": "Empfangene Nachrichten",
+    "totalFiles": "Dateien gesamt",
+    "filesSent": "Gesendete Dateien",
+    "filesReceived": "Empfangene Dateien",
+    "latestFiles": "Neueste Dateien",
+    "received": "Empfangen",
+    "sent": "Gesendet"
+  },
+  "aiInfra": {
+    "modelImport": {
+      "title": "Modelle importieren",
+      "importModels": "Modelle importieren",
+      "importPulled": "Geladene Modelle importieren",
+      "unreachable": "Dieser Endpunkt hat nicht geantwortet. Prüfe ihn unter „Test“ und versuche es erneut.",
+      "empty": "Dieser Endpunkt bietet keine Modelle zum Import.",
+      "selectAllNew": "Alle neuen auswählen",
+      "probeLabel": "Prüfen, was jedes Modell kann (verbraucht etwas Guthaben)",
+      "colModel": "Modell",
+      "colTags": "Fähigkeiten",
+      "colStatus": "Status",
+      "exists": "Bereits hinzugefügt",
+      "new": "Neu",
+      "tagsHint": "Erlaubte Fähigkeiten: {tags}. Mehrere mit Komma trennen.",
+      "apply": "{count} importieren",
+      "applying": "Wird importiert…",
+      "applied": "{created} Modellzeile(n) importiert, {skipped} bereits vorhanden übersprungen.",
+      "applyFailed": "Die Modelle konnten nicht importiert werden.",
+      "noValidTags": "Gib jedem ausgewählten Modell mindestens eine gültige Fähigkeit."
+    },
+    "extraction": {
+      "lead": "Legen Sie fest, wie Dokumente zu Text werden. Docling erhält Tabellen und Überschriften; wenn es nicht läuft, übernimmt Tika — Uploads schlagen nie fehl.",
+      "family": {
+        "document": "Dokumente",
+        "text": "Klartext",
+        "image": "Bilder",
+        "audio": "Audio",
+        "audio_no_cloud": "Audio ohne Cloud-STT",
+        "video": "Video"
+      },
+      "moveUp": "Hoch",
+      "moveDown": "Runter",
+      "remove": "Entfernen",
+      "add": "Hinzufügen",
+      "addPlaceholder": "Adapter hinzufügen…",
+      "healthAvailable": "verfügbar",
+      "healthUnavailable": "nicht verfügbar",
+      "testSidecar": {
+        "tika": "Tika testen",
+        "docling": "Docling testen"
+      },
+      "testingSidecar": "Test läuft…",
+      "sidecarSettings": "URL, Timeout und der Verbindungstest für Tika und Docling liegen unter Systemkonfiguration → Verarbeitung.",
+      "sidecarSettingsLink": "Verarbeitungseinstellungen öffnen",
+      "testTitle": "Mit einer Datei testen",
+      "testHint": "Laden Sie eine Beispieldatei hoch. Sie sehen, welcher Adapter gewonnen hat und warum die anderen nicht.",
+      "testButton": "Mit einer Datei testen",
+      "testing": "Test läuft…",
+      "winner": "Gewinner: {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling nicht verfügbar — stattdessen Tika verwendet",
+      "doclingRejectedTika": "Docling erreichbar, hat die Datei aber abgelehnt — stattdessen Tika verwendet",
+      "save": "Kette speichern",
+      "saved": "Extraktionskette gespeichert. Der nächste Upload nutzt sie.",
+      "saveFailed": "Die Extraktionskette konnte nicht gespeichert werden",
+      "emptyChain": "Jeder Dateityp braucht mindestens einen Adapter.",
+      "loadFailed": "Extraktionseinstellungen konnten nicht geladen werden",
+      "verdict": {
+        "quality_ok": "akzeptiert",
+        "not_applicable": "nicht geprüft",
+        "markdown_structure": "akzeptiert (Tabellen oder Überschriften)",
+        "empty": "leer",
+        "low_quality": "zu wenig brauchbarer Text",
+        "unavailable": "nicht verfügbar",
+        "rejected": "erreichbar, Datei abgelehnt",
+        "unsupported": "unterstützt diese Datei nicht",
+        "unknown": "unbekannter Adapter",
+        "skipped": "übersprungen",
+        "rewritten": "für den nächsten Adapter umgewandelt"
+      }
+    },
+    "webSearch": {
+      "lead": "Wählen Sie, wer im Web für den Chat sucht. Die nächste Suche nutzt den neuen Anbieter — ohne Neustart. Die Testabfrage zeigt Titel, damit Sie sehen, dass es funktioniert.",
+      "docs": "Dokumentation",
+      "healthAvailable": "verfügbar",
+      "healthUnavailable": "nicht verfügbar",
+      "capabilities": "Fähigkeiten",
+      "capability": {
+        "freshness": "Aktualität",
+        "country": "Land",
+        "language": "Sprache",
+        "siteFilter": "Seitenfilter",
+        "fullContent": "Volltext",
+        "answer": "Antwort"
+      },
+      "sovereignty": {
+        "selfHosted": "selbst gehostet",
+        "eu": "EU",
+        "usCloud": "US-Cloud"
+      },
+      "apiKey": "API-Schlüssel",
+      "apiKeyPlaceholder": "API-Schlüssel einfügen",
+      "saveKey": "Schlüssel speichern",
+      "keySaved": "Schlüssel gespeichert und geprüft. Die nächste Suche kann ihn nutzen.",
+      "fallback": "Ersatzanbieter",
+      "fallbackNone": "Kein Ersatz",
+      "allowUsers": "Benutzer dürfen ihren eigenen Anbieter wählen",
+      "save": "Websuche speichern",
+      "saved": "Websuche gespeichert. Die nächste Chat-Suche nutzt die neuen Einstellungen.",
+      "savedInactive": "{provider} ist nicht bereit ({reason}). Die Websuche im Chat liefert nichts.",
+      "savedInactiveFallback": "{provider} ist nicht bereit ({reason}). Die Websuche im Chat nutzt den Ersatzanbieter.",
+      "savedInactiveBoth": "{provider} ist nicht bereit ({reason}). Der Ersatzanbieter ist ebenfalls nicht bereit. Die Websuche im Chat liefert nichts.",
+      "saveFailed": "Die Websuche-Einstellungen konnten nicht gespeichert werden",
+      "loadFailed": "Websuche-Einstellungen konnten nicht geladen werden",
+      "testTitle": "Testabfrage",
+      "testHint": "Führen Sie eine kurze Abfrage aus. Sie sehen bis zu fünf Titel des aktiven Anbieters.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Testabfrage",
+      "testing": "Test läuft…",
+      "testProvider": "Beantwortet von {provider}",
+      "testProviderFallback": "Beantwortet von {provider} (Ersatz für {from})"
+    },
+    "rerank": {
+      "lead": "Nach der Suche rückt ein Neuordner die nützlichsten Textstellen nach vorne. Lass dies aus, bis ein Test zeigt, dass es hilft. Der Chat bleibt unverändert, solange es aus ist.",
+      "enable": "Neuordnung bei der Dokumentsuche verwenden",
+      "model": "Neuordnungsmodell",
+      "modelNone": "Kein Modell gewählt",
+      "multiplier": "Wie viele zusätzliche Textstellen geholt werden (2–10)",
+      "budgetMs": "Nach so vielen Millisekunden abbrechen (100–5000)",
+      "llmFallback": "Chat-Modell nutzen, wenn kein Neuordnungsmodell gesetzt ist",
+      "llmFallbackHint": "Das nutzt das Zusammenfassungsmodell bei jeder Suche und kann mehr kosten. Ein eigenes Neuordnungsmodell ist besser.",
+      "healthAvailable": "verfügbar",
+      "healthUnavailable": "nicht verfügbar",
+      "apiKey": {
+        "jina": "Jina-API-Schlüssel",
+        "cohere": "Cohere-API-Schlüssel",
+        "voyage": "Voyage-API-Schlüssel"
+      },
+      "apiKeyPlaceholder": "API-Schlüssel einfügen",
+      "saveKey": "Schlüssel speichern",
+      "keySaved": "Schlüssel gespeichert. Die nächste Neuordnung kann ihn nutzen.",
+      "save": "Neuordnung speichern",
+      "saved": "Neuordnung gespeichert. Die nächste Dokumentsuche nutzt die Einstellungen.",
+      "savedOff": "Neuordnung gespeichert. Die Dokumentsuche behält die ursprüngliche Vektorreihenfolge.",
+      "savedInactive": "Neuordnung gespeichert. Sie bleibt inaktiv, bis ein Neuordnungsmodell oder der Chat-Modell-Fallback verfügbar ist.",
+      "saveFailed": "Die Neuordnung konnte nicht gespeichert werden",
+      "loadFailed": "Neuordnung konnte nicht geladen werden",
+      "testTitle": "Mit Beispieltexten testen",
+      "testHint": "Frage eingeben und pro Zeile einen Text. Sie sehen die neue Reihenfolge und können prüfen, ob es funktioniert.",
+      "testQueryPlaceholder": "Wie hoch ist die Rechnungssumme?",
+      "testDocumentsPlaceholder": "Die Rechnungssumme beträgt 120 Euro.\nBürozeiten sind 9 bis 17 Uhr.",
+      "testButton": "Reihenfolge testen",
+      "testing": "Test läuft…",
+      "lastEval": {
+        "title": "Letzte Messung",
+        "line": "Am {date}: richtige Stelle ohne Neuordnung {recallOff} der Fälle, mit {recallOn}. Langsamste Antworten {p95Off} ms ohne und {p95On} ms mit."
+      }
+    }
+  },
+  "providerHelp": {
+    "openAria": "So richtest du das ein",
+    "createKeyLink": "API-Schlüssel erstellen",
+    "downloadLink": "Ollama herunterladen",
+    "groq": {
+      "title": "Groq-API-Schlüssel",
+      "message": "Erstelle einen kostenlosen Groq-API-Schlüssel in der Groq-Konsole und füge ihn hier ein. Die kostenlose Stufe reicht meist, um in unter einer Minute zu chatten."
+    },
+    "openai": {
+      "title": "OpenAI-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in deinem OpenAI-Konto (API-Keys-Seite) und füge ihn hier ein. Die Nutzung wird von OpenAI abgerechnet."
+    },
+    "anthropic": {
+      "title": "Anthropic-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der Anthropic-Konsole (Einstellungen → Keys) und füge ihn hier ein, um Claude-Modelle zu nutzen."
+    },
+    "google": {
+      "title": "Google-Gemini-API-Schlüssel",
+      "message": "Erstelle einen Gemini-API-Schlüssel in Google AI Studio und füge ihn hier ein. Für viele Modelle gibt es eine kostenlose Stufe."
+    },
+    "mistral": {
+      "title": "Mistral-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der Mistral-Konsole und füge ihn hier ein. Zum Einstieg bietet Mistral eine kostenlose Stufe."
+    },
+    "trustedtokens": {
+      "title": "TrustedTokens-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel bei TrustedTokens (Konto → API-Zugang) und füge ihn hier ein. Die Inferenz läuft auf deutschen GPUs mit EU-Datenresidenz."
+    },
+    "a2agent": {
+      "title": "A2Agent-API-Schlüssel",
+      "message": "Erstelle einen Pay-as-you-go-API-Schlüssel bei A2Agent (Dashboard → API-Schlüssel) und füge ihn hier ein. Prompts werden von Modellbetreibern in Festlandchina (Qwen, DeepSeek, MiniMax) über dieses Gateway verarbeitet. A2Agent bedient Nutzer außerhalb Festlandchinas. Wer personenbezogene Daten aus der EU verarbeitet, entscheidet das anhand der eigenen DPA."
+    },
+    "huggingface": {
+      "title": "HuggingFace-API-Token",
+      "message": "Erstelle ein Access-Token in den HuggingFace-Einstellungen und füge es hier ein, um HuggingFace-Inference-Modelle zu nutzen."
+    },
+    "xai": {
+      "title": "xAI-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in der xAI-Konsole und füge ihn hier ein, um Grok-Modelle zu nutzen."
+    },
+    "perplexity": {
+      "title": "Perplexity-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in deinem Perplexity-Konto und füge ihn hier ein, um Sonar-Modelle zu nutzen. Derselbe Schlüssel gilt für die Websuche, wenn du Perplexity auf dem Tab Websuche wählst."
+    },
+    "ollama": {
+      "title": "Lokale KI mit Ollama",
+      "message": "Lade Ollama herunter und ziehe ein leistungsfähiges Modell wie gpt-oss:120b (oder ein kleineres wie llama3.2 bei weniger RAM). Kein API-Schlüssel nötig — Synaplan spricht mit Ollama unter der konfigurierten URL."
+    }
+  },
+  "people": {
+    "title": "Personen",
+    "subtitle": "Benutzer und Gruppen auf dieser Instanz.",
+    "tabs": {
+      "users": "Benutzer",
+      "groups": "Gruppen",
+      "policies": "Richtlinien",
+      "linkedPlatforms": "Plattform-Instanzen",
+      "audit": "Protokoll"
+    },
+    "openPeople": "Personen öffnen",
+    "backToOperate": "Zurück zu Betrieb",
+    "myGroups": {
+      "subtitle": "Gruppen, in denen Sie auf dieser Instanz Mitglied sind.",
+      "emptyMember": "Sie sind noch in keiner Gruppe. Ein Administrator kann Sie auf der Seite Personen hinzufügen.",
+      "emptyAdmin": "Noch keine Gruppen. Legen Sie eine auf der Seite Personen an.",
+      "leave": "Verlassen",
+      "leaveConfirm": "Die Gruppe \"{name}\" verlassen? Sie verlieren den Zugriff auf alles, was mit dieser Gruppe geteilt wurde. Die Gruppe selbst bleibt.",
+      "left": "Sie haben die Gruppe verlassen.",
+      "leaveFailed": "Die Gruppe konnte nicht verlassen werden.",
+      "leaveDirectory": "Diese Mitgliedschaft kommt aus Ihrer Anmeldung und kann hier nicht verlassen werden."
+    },
+    "users": {
+      "groups": "Gruppen",
+      "identities": "Anmeldung"
+    },
+    "groups": {
+      "name": "Name",
+      "kind": "Art",
+      "members": "Mitglieder",
+      "memberCount": "{count} Mitglieder",
+      "fromLogin": "Aus Ihrer Anmeldung",
+      "manual": "Manuell",
+      "create": "Gruppe erstellen",
+      "createTitle": "Gruppe erstellen",
+      "createPrompt": "Gruppenname",
+      "rename": "Umbenennen",
+      "renameTitle": "Gruppe umbenennen",
+      "delete": "Löschen",
+      "deleteConfirm": "Die Gruppe \"{name}\" löschen? Die Personen bleiben; nur die Gruppe wird entfernt.",
+      "empty": "Noch keine Gruppen. Erstellen Sie eine, um später zu teilen.",
+      "loadError": "Gruppen konnten nicht geladen werden.",
+      "saveError": "Die Gruppe konnte nicht gespeichert werden.",
+      "created": "Gruppe erstellt.",
+      "renamed": "Gruppe umbenannt.",
+      "deleted": "Gruppe gelöscht.",
+      "directoryReadOnly": "Diese Gruppe kommt aus Ihrer Anmeldung und kann hier nicht umbenannt oder gelöscht werden.",
+      "directoryManagedHint": "Mitgliedschaften aus der Anmeldung werden beim nächsten Anmelden aktualisiert. Sie können weiterhin Personen von Hand hinzufügen.",
+      "addMember": "Person hinzufügen",
+      "addMemberPlaceholder": "Nach E-Mail suchen",
+      "addMemberNotFound": "Kein Benutzer passt zu dieser E-Mail.",
+      "removeMember": "Entfernen",
+      "removeConfirm": "{email} aus dieser Gruppe entfernen?",
+      "roleMember": "Mitglied",
+      "roleManager": "Manager",
+      "memberAdded": "Person zur Gruppe hinzugefügt.",
+      "memberRemoved": "Person aus der Gruppe entfernt.",
+      "sharedWith": "Mit dieser Gruppe geteilt",
+      "sharedEmpty": "Mit dieser Gruppe ist noch nichts geteilt."
+    },
+    "audit": {
+      "when": "Wann",
+      "who": "Wer",
+      "actionLabel": "Aktion",
+      "kind": "Art",
+      "resource": "Ressource",
+      "subject": "Details",
+      "empty": "Noch keine Protokolleinträge.",
+      "more": "Mehr laden",
+      "loadError": "Das Protokoll konnte nicht geladen werden.",
+      "filterAll": "Alle",
+      "action": {
+        "share_grant": "Geteilt",
+        "share_revoke": "Freigabe entfernt",
+        "group_create": "Gruppe erstellt",
+        "group_update": "Gruppe geändert",
+        "group_delete": "Gruppe gelöscht",
+        "group_member_set": "Mitglied hinzugefügt",
+        "group_member_remove": "Mitglied entfernt",
+        "group_member_leave": "Gruppe verlassen",
+        "directory_sync": "Anmeldegruppe aktualisiert",
+        "impersonation_start": "Ansicht als Benutzer gestartet",
+        "impersonation_stop": "Ansicht als Benutzer beendet",
+        "admin_metadata_view": "Ressourcenliste angesehen",
+        "policy_set": "Gruppenrichtlinien geändert",
+        "policy_lock": "Einstellung gesperrt",
+        "platform_link_linked": "Plattform verknüpft",
+        "platform_link_disconnected": "Plattform getrennt",
+        "platform_link_reassigned": "Plattform-Verknüpfung zu anderem Konto verschoben",
+        "platform_link_exchange_failed": "Plattformverknüpfung fehlgeschlagen",
+        "platform_link_redirect_rejected": "Plattform-Weiterleitung abgelehnt",
+        "platform_instance_registered": "Plattform registriert",
+        "platform_instance_approved": "Plattform freigegeben",
+        "platform_instance_revoked": "Plattform widerrufen"
+      }
+    },
+    "linkedPlatforms": {
+      "intro": "Nextcloud-, ownCloud- und Outlook-Server, die dieses Synaplan nutzen möchten. Gib einen frei, damit die Nutzer ihre eigenen Konten unter Verwalten › Verbindungen › Verknüpfte Plattformen verbinden können.",
+      "empty": "Es hat sich noch keine Plattform registriert.",
+      "client": "Plattform",
+      "host": "Adresse",
+      "status": "Status",
+      "actions": "Aktionen",
+      "approve": "Freigeben",
+      "revoke": "Widerrufen",
+      "approved": "Plattform freigegeben.",
+      "revoked": "Plattform widerrufen.",
+      "approveError": "Die Plattform konnte nicht freigegeben werden.",
+      "revokeError": "Die Plattform konnte nicht widerrufen werden.",
+      "loadError": "Plattformen konnten nicht geladen werden.",
+      "revokeTitle": "Diese Plattform widerrufen?",
+      "revokeConfirm": "Diese Plattform widerrufen? Alle verknüpften Schlüssel funktionieren dann nicht mehr.",
+      "statusValue": {
+        "active": "Aktiv",
+        "pending": "Wartet auf Freigabe",
+        "revoked": "Widerrufen"
+      }
+    },
+    "policies": {
+      "group": "Gruppe",
+      "chooseGroup": "Gruppe wählen",
+      "helper": "Diese Einstellungen gelten für alle in der Gruppe. Eine persönliche Einstellung gewinnt. Eine Instanzsperre ignoriert sowohl den Gruppenwert als auch persönliche Einstellungen.",
+      "pickGroup": "Wählen Sie eine Gruppe, um ihre Richtlinien zu bearbeiten.",
+      "defaultModels": "Standardmodelle",
+      "allowedModels": "Erlaubte Modelle",
+      "allowedHelper": "Leer lassen, damit alle Modelle verfügbar bleiben. Eine Liste schränkt die Auswahl ein.",
+      "features": "Funktionen",
+      "featuresHelper": "Lassen Sie die Instanzvorgabe, es sei denn, diese Gruppe muss eine Funktion ein- oder ausschalten.",
+      "featureOn": "Für diese Gruppe ein",
+      "featureOff": "Für diese Gruppe aus",
+      "inheritedOn": "Die Instanzvorgabe ist aktiviert.",
+      "inheritedOff": "Die Instanzvorgabe ist deaktiviert.",
+      "inheritedUnset": "Es gibt keine Instanzvorgabe, daher ist das aus.",
+      "willInherit": "Nach dem Speichern gilt die Instanzvorgabe.",
+      "groupForcesOn": "Diese Gruppe schaltet das für ihre Mitglieder ein.",
+      "groupForcesOff": "Diese Gruppe schaltet das für ihre Mitglieder aus.",
+      "rateLimit": "Nutzungskontingent",
+      "useGlobal": "Instanzvorgabe verwenden",
+      "useBillingTier": "Tarif der Person verwenden",
+      "conflict": "Eine andere Gruppe setzt eine andere Vorgabe. Die Gruppe mit der kleineren Nummer gewinnt.",
+      "locks": "Gesperrte Instanzvorgaben",
+      "locksHelper": "Diese Sperren gelten für die ganze Instanz, nicht für eine Gruppe. Solange eine Sperre aktiv ist, gilt nur die Instanzvorgabe. Gruppen- und persönliche Werte bleiben gespeichert, werden aber ignoriert. Schalten Sie die Sperre aus, um sie wieder zu nutzen.",
+      "save": "Richtlinien speichern",
+      "saved": "Gruppenrichtlinien gespeichert.",
+      "lockSaved": "Instanzsperre aktualisiert.",
+      "lockIgnored": "Wird nicht verwendet, solange die Instanzsperre aktiv ist.",
+      "lockMissingDefault": "Es gibt keine Instanzvorgabe zum Sperren. Setzen Sie zuerst den Instanzwert und sperren Sie ihn danach.",
+      "loadError": "Richtlinien konnten nicht geladen werden.",
+      "saveError": "Richtlinien konnten nicht gespeichert werden.",
+      "capability": {
+        "CHAT": "Chat",
+        "VECTORIZE": "Suche",
+        "PIC2TEXT": "Bild zu Text",
+        "SOUND2TEXT": "Sprache zu Text",
+        "MEM": "Gedächtnis",
+        "TOOLS": "Werkzeuge"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Gespeicherte Aufgaben",
+        "DESKTOP_AGENT_ENABLED": "Desktop-Agent",
+        "DOCUMENT_TOOLS_ENABLED": "Dokumentwerkzeuge",
+        "MULTITASK_ROUTING_ENABLED": "Mehrschritt-Routing",
+        "MULTITASK_PARALLEL_ENABLED": "Parallele Schritte",
+        "MULTITASK_URL_FETCH_ENABLED": "Webseiten abrufen",
+        "MULTITASK_MCP_FETCH_ENABLED": "Verbundene Werkzeuge lesen",
+        "MULTITASK_MCP_ACTION_ENABLED": "Über verbundene Werkzeuge handeln",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-Mail durchsuchen",
+        "TOOLS_REGISTRY_ENABLED": "Werkzeugkatalog",
+        "TOOLS_APPROVALS_ENABLED": "Werkzeug-Freigaben",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Eigene HTTP-Werkzeuge",
+        "WORKFLOWS_BUILDER_ENABLED": "Schritte-Editor"
+      }
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Darf ansehen",
+      "use": "Darf nutzen",
+      "edit": "Darf bearbeiten",
+      "manage": "Darf verwalten"
+    },
+    "share": "Teilen",
+    "sharedWithMe": "Mit mir geteilt",
+    "incoming": {
+      "title": "Eingehende Chats",
+      "subtitle": "Chats, die Personen oder Gruppen mit dir geteilt haben",
+      "menu": "Eingehende Chats",
+      "menuNew": "Neue eingehende Chats",
+      "new": "Neu",
+      "newCount": "{count} neu im Eingang",
+      "hint": "Öffne einen Chat, um ihn anzusehen. Um eigene Nachrichten hinzuzufügen, führe ihn als deine Kopie fort.",
+      "owner": "von {name}",
+      "sourceGroup": "Dieser Chat gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
+      "sourceEveryone": "Dieser Chat gehört {owner}. Er wurde mit allen in dieser Organisation geteilt.",
+      "sourceDirect": "Dieser Chat gehört {owner}. Er wurde persönlich mit Ihnen geteilt.",
+      "emptyTitle": "Noch nichts im Eingang",
+      "emptyText": "Wenn jemand einen Chat mit dir oder einer deiner Gruppen teilt, erscheint er hier.",
+      "filter": {
+        "label": "Chats filtern",
+        "all": "Alle",
+        "private": "Privat",
+        "group": "Gruppe",
+        "widget": "Widget"
+      },
+      "pill": {
+        "private": "Privat",
+        "privateTitle": "Dein eigener Chat – nur du kannst ihn sehen",
+        "group": "Gruppe",
+        "groupTitle": "Mit der Gruppe „{name}“ geteilt",
+        "groupTitleGeneric": "Mit einer Gruppe geteilt",
+        "everyone": "Alle",
+        "everyoneTitle": "Mit allen in dieser Organisation geteilt",
+        "direct": "Mit dir geteilt",
+        "directTitle": "Persönlich mit dir geteilt",
+        "from": "Von {name}",
+        "widget": "Widget",
+        "widgetTitle": "Ein Besucher-Gespräch aus einem deiner Chat-Widgets"
+      }
+    },
+    "everyone": "Alle in dieser Organisation",
+    "owner": "Eigentümer",
+    "fileUnavailable": "Diese Datei ist nicht mehr verfügbar.",
+    "kind": {
+      "assistant": "KI-Assistent",
+      "saved_task": "Gespeicherte Aufgabe",
+      "widget": "Chat-Widget"
+    },
+    "runCopy": "Als meine Kopie ausführen",
+    "runCopyConfirm": "Eine eigene Kopie dieser gespeicherten Aufgabe anlegen? Sie läuft nur, wenn Sie sie starten.",
+    "assistantNotShared": "Der KI-Assistent dieser Aufgabe ist nicht mit Ihnen geteilt.",
+    "sharedBy": "Von {name}",
+    "continueAsCopy": "Als meine Kopie fortsetzen",
+    "continueFailed": "Ihre Kopie konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    "readOnly": "Sie können diese Unterhaltung ansehen. Um eine Nachricht hinzuzufügen, setzen Sie sie als eigene Kopie fort.",
+    "sharedFolder": "Geteilt · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "Dieser Ordner gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Dieser Ordner gehört {owner}. Er wurde mit allen in dieser Organisation geteilt.",
+        "sourceDirect": "Dieser Ordner gehört {owner}. Er wurde persönlich mit Ihnen geteilt."
+      },
+      "assistant": {
+        "sourceGroup": "Dieser Assistent gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Dieser Assistent gehört {owner}. Er wurde mit allen in dieser Organisation geteilt.",
+        "sourceDirect": "Dieser Assistent gehört {owner}. Er wurde persönlich mit Ihnen geteilt."
+      },
+      "saved_task": {
+        "sourceGroup": "Diese gespeicherte Aufgabe gehört {owner}. Sie hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Diese gespeicherte Aufgabe gehört {owner}. Sie wurde mit allen in dieser Organisation geteilt.",
+        "sourceDirect": "Diese gespeicherte Aufgabe gehört {owner}. Sie wurde persönlich mit Ihnen geteilt."
+      },
+      "widget": {
+        "sourceGroup": "Dieses Chat-Widget gehört {owner}. Es hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Dieses Chat-Widget gehört {owner}. Es wurde mit allen in dieser Organisation geteilt.",
+        "sourceDirect": "Dieses Chat-Widget gehört {owner}. Es wurde persönlich mit Ihnen geteilt."
+      }
+    },
+    "dialog": {
+      "title": "„{name}“ teilen",
+      "who": "Wer",
+      "searchPlaceholder": "Person oder Gruppe suchen…",
+      "permission": "Berechtigung",
+      "sharedWith": "Geteilt mit",
+      "empty": "Nur Sie können das sehen.",
+      "cancel": "Abbrechen",
+      "remove": "Entfernen",
+      "removeTitle": "Teilen beenden",
+      "removeConfirm": "{name} entfernen?",
+      "loadFailed": "Die Freigaben konnten nicht geladen werden.",
+      "saveFailed": "Teilen ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
+      "shared": "Mit {name} geteilt.",
+      "sharedFind": "Mit {name} geteilt. {find}",
+      "removed": "Freigabe für {name} beendet.",
+      "removeFailed": "Die Freigabe konnte nicht beendet werden. Bitte versuchen Sie es erneut.",
+      "permissionFailed": "Die Berechtigung konnte nicht geändert werden. Bitte versuchen Sie es erneut.",
+      "noMatches": "Keine Person oder Gruppe passt.",
+      "searchFailed": "Personen oder Gruppen konnten nicht gesucht werden.",
+      "tryAgain": "Erneut versuchen",
+      "ownerLine": "Eigentümer · {name}",
+      "publicLink": "Öffentlicher Link",
+      "publicLinkHint": "Jeder mit dem Link kann ihn ansehen.",
+      "managePublicLink": "Öffentlichen Link verwalten",
+      "openPublicLink": "Öffentlichen Link verwalten",
+      "subjectType": {
+        "user": "Person",
+        "group": "Gruppe"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Darf ansehen — sie können diesen Chat nur lesen.",
+          "use": "Darf nutzen — sie können diesen Chat als eigene Kopie fortsetzen."
+        },
+        "knowledge_folder": {
+          "read": "Darf ansehen — sie können den Ordner sehen.",
+          "use": "Darf nutzen — die KI darf diese Dateien verwenden.",
+          "edit": "Darf bearbeiten — sie können Dateien in diesem Ordner ändern.",
+          "manage": "Darf verwalten — sie können diesen Ordner mit anderen teilen."
+        },
+        "assistant": {
+          "read": "Darf ansehen — sie können die Karte sehen und sie klonen.",
+          "use": "Darf nutzen — sie können einen Chat mit diesem Assistenten starten.",
+          "edit": "Darf bearbeiten — sie können diesen Assistenten ändern."
+        },
+        "saved_task": {
+          "read": "Darf ansehen — sie können die Karte sehen.",
+          "use": "Darf nutzen — sie können eine eigene Kopie anlegen."
+        },
+        "widget": {
+          "read": "Darf ansehen — sie können die Widget-Einstellungen öffnen.",
+          "edit": "Darf bearbeiten — sie können die Widget-Einstellungen ändern.",
+          "manage": "Darf verwalten — sie können dieses Widget mit anderen teilen."
+        }
+      },
+      "find": {
+        "conversation": "Sie finden ihn unter Eingehende Chats.",
+        "knowledge_folder": "Er erscheint bei ihnen unter Quellen als geteilt.",
+        "assistant": "Sie finden ihn unter Assistenten → Mit mir geteilt.",
+        "saved_task": "Sie können sie unter Automatisierungen als Vorlage nutzen.",
+        "widget": "Sie können die Widget-Einstellungen öffnen."
+      }
+    }
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (Textextraktion aus Dokumenten)"
+    },
+    "docling": {
+      "label": "Docling (Dokumentkonvertierung)"
+    },
+    "office_convert": {
+      "label": "Office-Konvertierung"
+    },
+    "searxng": {
+      "label": "SearXNG-Websuche"
+    },
+    "piper_tts": {
+      "label": "Piper Text-zu-Sprache"
+    },
+    "local_ai": {
+      "label": "Lokale KI (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Higgsfield-Videogenerierung"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "TheHive-Bildgenerierung"
+    },
+    "stripe_billing": {
+      "label": "Stripe-Abrechnung"
+    },
+    "mobile_iap": {
+      "label": "Mobile In-App-Käufe"
+    },
+    "whatsapp": {
+      "label": "WhatsApp-Kanal"
+    },
+    "compute": {
+      "label": "Sichere Dateiarbeit",
+      "running": "Dateiarbeit läuft.",
+      "runningOff": "Der Sidecar läuft; Dateiarbeit ist in der Systemkonfiguration ausgeschaltet.",
+      "unreachable": "Der Dateiarbeits-Sidecar ist nicht erreichbar.",
+      "unset": "COMPUTE_URL oder COMPUTE_TOKEN ist nicht gesetzt."
+    },
+    "state": {
+      "available": "Verfügbar",
+      "needs_setup": "Einrichtung nötig",
+      "absent": "Nicht installiert"
+    },
+    "notice": {
+      "title": "{module} ist auf dieser Installation nicht verfügbar",
+      "body": "Diese Funktion ist optional. Sie wird vom Administrator dieser Installation eingeschaltet.",
+      "howToEnable": "So wird sie aktiviert",
+      "openFeatureStatus": "Feature-Status öffnen"
+    }
+  }
+}

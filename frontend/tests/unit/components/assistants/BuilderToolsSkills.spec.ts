@@ -5,7 +5,9 @@ import { createI18n } from 'vue-i18n'
 import BuilderToolsSkills from '@/components/assistants/BuilderToolsSkills.vue'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/mcpServersApi', () => ({
   mcpServersApi: { list: vi.fn().mockResolvedValue({ servers: [] }) },

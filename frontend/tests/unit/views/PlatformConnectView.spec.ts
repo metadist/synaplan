@@ -47,7 +47,9 @@ vi.mock('@/utils/pendingAuthRedirect', () => ({
 }))
 
 import PlatformConnectView from '@/views/PlatformConnectView.vue'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 const assign = vi.fn()
 const messageParent = vi.fn()

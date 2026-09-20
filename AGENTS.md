@@ -330,7 +330,7 @@ Every UI surface must be readable in **both light and dark theme** (and in the V
 ### i18n
 
 - All UI text through `vue-i18n` — never hardcode user-facing strings.
-- **Always update ALL five locales**: `en.json`, `de.json`, `es.json`, `fr.json`, `tr.json` (`frontend/src/i18n/`, registered as `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`). A missing key silently falls back to English.
+- **Always update ALL five locales** in `frontend/src/i18n/locales/{en,de,es,fr,tr}/<namespace>.json` (registered as `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`). Put a new top-level key in the namespace that already owns its siblings — see `NAMESPACE_KEYS` in `frontend/src/i18n/namespaces.ts` and `docs/FRONTEND_CONVENTIONS.md`. A missing key silently falls back to English.
 - **This is enforced.** `tests/unit/i18n/localeParity.spec.ts` gates full-file key parity against `localeParityBaseline.json`, a frozen ledger of the drift that predates the gate (`es`/`tr` ~78% translated, `de` ~93%, `fr` 100%). An English-only key added to a namespace fails the suite. The ledger is compared exactly, so it can only shrink: translate a listed key ⇒ delete its ledger entry in the same change. Only add to the ledger for a genuine exception, never to silence the gate.
 - Placeholder names (`{count}`, `{folder}`) must match English in every locale — a dropped one renders as literal text. Plural **branch counts** may differ legitimately (Turkish uses one form after a numeral), so only the placeholder names are compared.
 

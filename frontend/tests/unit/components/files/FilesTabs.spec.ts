@@ -3,7 +3,9 @@ import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import FilesTabs from '@/components/files/FilesTabs.vue'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 const runtimeFeatures = { computeWorkspacesEnabled: false }
 

@@ -7,7 +7,9 @@ import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api/chatApi'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/chatApi', () => ({
   chatApi: {

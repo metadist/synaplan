@@ -1,0 +1,412 @@
+{
+  "marketingNews": {
+    "heading": "Neues von Synaplan",
+    "readMore": "Mehr lesen"
+  },
+  "usageTaximeter": {
+    "sessionLabel": "Tokens",
+    "todayTooltip": "{tokens} Tokens heute",
+    "todayAria": "Verbrauch heute: {cost}",
+    "openStats": "Nutzungsstatistik anzeigen",
+    "usedModels": "Verwendete Modelle",
+    "promptsInSession": "Prompts in dieser Sitzung",
+    "modelChanges": "Modelländerungen: {count}",
+    "allStatistics": "Alle Statistiken",
+    "lessThanCent": "< 0,01 €"
+  },
+  "export": {
+    "title": "Export",
+    "format": "Format",
+    "recommended": "Empfohlen",
+    "dateRange": "Zeitraum",
+    "allTime": "Gesamter Zeitraum",
+    "today": "Heute",
+    "last7Days": "Letzte 7 Tage",
+    "last30Days": "Letzte 30 Tage",
+    "custom": "Benutzerdefiniert",
+    "sessionType": "Sitzungstyp",
+    "allSessions": "Alle Sitzungen",
+    "aiOnly": "Nur KI-Chats",
+    "humanOnly": "Nur Mensch-Chats",
+    "download": "Herunterladen",
+    "exporting": "Exportiere...",
+    "selectedChats": "{count} Chats ausgewählt",
+    "selectedChatsHint": "Nur diese ausgewählten Chats werden exportiert"
+  },
+  "profile": {
+    "title": "Profil-Einstellungen",
+    "subtitle": "Verwalte deine persönlichen Daten und Kontoeinstellungen",
+    "personalInfo": {
+      "title": "Persönliche Informationen",
+      "firstName": "Vorname",
+      "firstNamePlaceholder": "Dein Vorname",
+      "lastName": "Nachname",
+      "lastNamePlaceholder": "Dein Nachname",
+      "email": "E-Mail",
+      "emailHint": "Deine Login-E-Mail (kann nicht geändert werden)",
+      "phone": "Telefon",
+      "phonePlaceholder": "Optionale Telefonnummer",
+      "managedBy": "Dieses Konto wird von {provider} verwaltet"
+    },
+    "companyInfo": {
+      "title": "Firmeninformationen",
+      "subtitle": "Optional - Leer lassen wenn du eine Privatperson bist",
+      "companyName": "Firmenname",
+      "companyNamePlaceholder": "Deine Firma GmbH",
+      "vatId": "USt-IdNr.",
+      "vatIdPlaceholder": "Umsatzsteuer-Identifikationsnummer"
+    },
+    "billingAddress": {
+      "title": "Rechnungsadresse",
+      "street": "Straße & Hausnummer",
+      "streetPlaceholder": "Straßenname und Hausnummer",
+      "zipCode": "PLZ",
+      "zipCodePlaceholder": "Postleitzahl",
+      "city": "Stadt",
+      "cityPlaceholder": "Stadtname",
+      "country": "Land",
+      "countryHint": "Erforderlich für korrekte Steuerberechnung"
+    },
+    "accountSettings": {
+      "title": "Kontoeinstellungen",
+      "language": "Sprache",
+      "languageHint": "Sprache der Benutzeroberfläche",
+      "timezone": "Zeitzone",
+      "timezoneHint": "Deine lokale Zeitzone",
+      "invoiceEmail": "Rechnungs-E-Mail",
+      "invoiceEmailPlaceholder": "Alternative E-Mail für Rechnungen (leer lassen um Haupt-E-Mail zu verwenden)"
+    },
+    "memories": {
+      "title": "Erinnerungen",
+      "subtitle": "Steuere, ob Synaplan deine Erinnerungen zur Personalisierung nutzen und automatisch aktualisieren darf.",
+      "toggleLabel": "Erinnerungen für mein Konto aktivieren",
+      "enabledHint": "Aktiv: Die KI kann Erinnerungen nutzen und anhand von Gesprächen aktualisieren.",
+      "disabledHint": "Deaktiviert: Die KI nutzt keine Erinnerungen und aktualisiert sie nicht automatisch. Du kannst es jederzeit wieder aktivieren."
+    },
+    "changePassword": {
+      "title": "Passwort ändern",
+      "subtitle": "Leer lassen um aktuelles Passwort zu behalten",
+      "currentPassword": "Aktuelles Passwort",
+      "currentPasswordPlaceholder": "Leer lassen um aktuelles Passwort zu behalten",
+      "newPassword": "Neues Passwort",
+      "newPasswordPlaceholder": "Neues Passwort eingeben",
+      "newPasswordHint": "Mindestens 8 Zeichen",
+      "confirmPassword": "Passwort bestätigen",
+      "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
+      "confirmPasswordHint": "Muss mit neuem Passwort übereinstimmen",
+      "externalAuth": "Sie melden sich mit {provider} an. Die Passwortverwaltung erfolgt dort.",
+      "mismatch": "Die Passwörter stimmen nicht überein",
+      "tooShort": "Das Passwort muss mindestens 8 Zeichen haben"
+    },
+    "appSecurity": {
+      "title": "App-Sicherheit",
+      "subtitle": "Zusätzlicher Schutz für dieses Gerät",
+      "biometricLock": "Biometrische App-Sperre",
+      "biometricLockHint": "Face ID, Touch ID oder Fingerabdruck zum Öffnen der App verlangen.",
+      "verifyReason": "Biometrische Sperre aktivieren",
+      "enableFailed": "Die biometrische Sperre konnte nicht aktiviert werden. Bitte erneut versuchen."
+    },
+    "legal": {
+      "title": "Datenschutz & AGB",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen",
+      "accountDeletion": "Konto löschen"
+    },
+    "dangerZone": {
+      "title": "Gefahrenzone",
+      "subtitle": "Irreversible Aktionen",
+      "deleteAccount": "Account löschen",
+      "deleteAccountDesc": "Lösche dein Konto dauerhaft. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteButton": "Account dauerhaft löschen"
+    },
+    "deleteAccountModal": {
+      "title": "Account wirklich löschen?",
+      "warning": "Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden.",
+      "consequences": "Folgende Daten werden gelöscht:",
+      "consequence1": "Alle deine Nachrichten und Chats",
+      "consequence2": "Alle hochgeladenen Dateien",
+      "consequence3": "Deine persönlichen Daten und Einstellungen",
+      "consequence4": "API-Schlüssel und Zugangsdaten",
+      "confirmPassword": "Bestätige mit deinem Passwort:",
+      "confirmPasswordPlaceholder": "Dein aktuelles Passwort",
+      "externalAuthConfirm": "Gib 'DELETE' ein um zu bestätigen:",
+      "externalAuthPlaceholder": "DELETE eingeben",
+      "deleteButton": "Ja, Account löschen",
+      "cancelButton": "Abbrechen",
+      "deleting": "Wird gelöscht..."
+    },
+    "privacyNotice": "Alle Daten werden sicher gespeichert und nur für Abrechnungszwecke gemäß deutschem Recht (DSGVO) verwendet.",
+    "saveChanges": "Änderungen speichern",
+    "cancel": "Abbrechen"
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Kostenloses Limit Erreicht",
+      "description": "Sie haben alle {limit} {action} in Ihrem kostenlosen Plan verbraucht. Upgraden Sie, um fortzufahren!"
+    },
+    "hourly": {
+      "title": "Stündliches Limit Erreicht",
+      "description": "Sie haben Ihr stündliches Limit von {limit} {action} erreicht. Ihr Limit wird bald zurückgesetzt."
+    },
+    "monthly": {
+      "title": "Monatliches Limit Erreicht",
+      "description": "Sie haben alle {limit} {action} diesen Monat verbraucht. Upgraden Sie für mehr!"
+    },
+    "currentUsage": "Aktuelle Nutzung",
+    "remaining": "Verbleibend",
+    "resetsIn": "Zurücksetzen in",
+    "noReset": "Keine automatische Zurücksetzung",
+    "upgradesBenefits": "Upgrade-Vorteile:",
+    "benefits": {
+      "unlimited": "Unbegrenzt oder höhere Limits",
+      "allFeatures": "Zugriff auf alle Funktionen",
+      "priority": "Priorisierte Verarbeitung",
+      "support": "Premium-Support"
+    },
+    "upgradeNow": "Jetzt Upgraden",
+    "topup": {
+      "button": "€{amount} Guthaben aufladen",
+      "amountLabel": "Aufladebetrag (€{step}-Schritte)",
+      "error": "Aufladung konnte nicht gestartet werden. Bitte versuche es erneut."
+    },
+    "verifyPhone": "Telefonnummer Verifizieren",
+    "footerNote": "Fragen? Kontaktieren Sie unser Support-Team.",
+    "messageBlocked": "Nachricht konnte nicht gesendet werden",
+    "messageBlockedDesc": "Du hast dein {action}-Limit erreicht. Upgrade deinen Plan oder warte bis das Limit zurückgesetzt wird.",
+    "retryLater": "Erneut versuchen"
+  },
+  "paywall": {
+    "title": {
+      "guest_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
+      "free_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
+      "quota_exhausted": "Dein Kontingent für diesen Monat ist aufgebraucht",
+      "reminder": "Hol mehr aus {brand} heraus"
+    },
+    "subtitle": {
+      "guest_limit": "Wähle einen Tarif und chatte weiter. Mit einem Account bekommst du ab dann eigenen Verlauf, Erinnerungen und Dateien.",
+      "free_limit": "Dein Gratis-Kontingent ist verbraucht. Wähle einen Tarif und chatte ohne Limit weiter.",
+      "quota_exhausted": "Wechsle in einen größeren Tarif und mach sofort weiter, oder warte bis dein Kontingent nächsten Monat zurückgesetzt wird.",
+      "reminder": "Mit einem Tarif bekommst du mehr Nachrichten, stärkere KI-Modelle und mehr Speicher."
+    },
+    "unavailable": "Hier kann gerade kein Tarif gekauft werden. Bitte versuche es später noch einmal.",
+    "recommended": "Empfohlen",
+    "choosePlan": "{plan} wählen",
+    "guestNote": "Erstelle zuerst ein kostenloses Konto – dein Tarif wird damit verknüpft.",
+    "login": "Ich habe schon ein Konto",
+    "maybeLater": "Vielleicht später",
+    "renewalNoteStore": "Abonnements verlängern sich automatisch, bis du sie kündigst. Verwalten und kündigen kannst du sie jederzeit in den Einstellungen deines Store-Kontos.",
+    "renewalNoteWeb": "Abonnements verlängern sich automatisch, bis du sie kündigst. Du kannst jederzeit kündigen.",
+    "plans": {
+      "pro": {
+        "tagline": "Für die tägliche Arbeit mit KI"
+      },
+      "team": {
+        "tagline": "Für kleine Teams, die zusammenarbeiten"
+      },
+      "business": {
+        "tagline": "Für Unternehmen mit höchsten Ansprüchen"
+      }
+    }
+  },
+  "subscription": {
+    "serviceNotAvailable": "Dienst nicht verfügbar",
+    "title": "Abonnements",
+    "subtitle": "Schalte mehr Funktionen und höhere Limits frei",
+    "chooseYourPlan": "Wähle deinen Plan",
+    "currentPlan": "Aktueller Plan",
+    "yourPlan": "Dein Plan",
+    "noActiveSubscription": "Kein aktives Abonnement",
+    "upgradePlan": "Plan upgraden",
+    "managePlan": "Plan verwalten",
+    "cancelPlan": "Abo kündigen",
+    "recommended": "Empfohlen",
+    "selectPlan": "Plan wählen",
+    "upgrade": "Upgraden",
+    "includedInCurrent": "In deinem Plan enthalten",
+    "highestPlan": "Du hast bereits den höchsten Plan!",
+    "processing": "Wird verarbeitet...",
+    "perMonth": "Monat",
+    "perYear": "Jahr",
+    "unavailable": "Abonnement-Service nicht verfügbar",
+    "unavailableDesc": "Der Abonnement-Service wird derzeit konfiguriert. Bitte versuche es später noch einmal oder kontaktiere den Support.",
+    "serviceNotConfigured": "Abonnement-Service ist derzeit nicht verfügbar. Bitte kontaktiere den Support.",
+    "checkoutFailed": "Checkout konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "selfHosted": "Self-Hosted Edition — Alle Funktionen inklusive",
+    "manage": {
+      "title": "Dein Abonnement verwalten",
+      "subtitle": "Sieh und verwalte deine Abonnement-Details",
+      "currentPlanLabel": "Aktueller Plan",
+      "status": "Status",
+      "statusActive": "Aktiv",
+      "statusCanceled": "Gekündigt",
+      "statusPastDue": "Zahlung überfällig",
+      "statusIncomplete": "Unvollständig",
+      "statusIncompleteExpired": "Unvollständig (abgelaufen)",
+      "statusTrialing": "Testphase",
+      "statusUnpaid": "Unbezahlt",
+      "statusPaused": "Pausiert",
+      "paymentFailedTitle": "Zahlung fehlgeschlagen — bitte Karte aktualisieren",
+      "paymentFailedBody": "Wir konnten deine letzte Zahlung nicht verarbeiten. Stripe versucht es in den nächsten Wochen automatisch erneut, aber dein Abo wird pausiert, falls die Karte nicht aktualisiert wird. Öffne das Zahlungsportal, um das zu beheben.",
+      "paymentFailedCta": "Zahlungsmethode aktualisieren",
+      "nextBilling": "Nächstes Abrechnungsdatum",
+      "cancelDate": "Kündigung zum",
+      "billingPortal": "Rechnungsportal",
+      "billingPortalDesc": "Verwalte deine Zahlungsmethoden, sieh Rechnungen ein und aktualisiere Rechnungsinformationen",
+      "openPortal": "Rechnungsportal öffnen",
+      "cancelSubscription": "Abonnement kündigen",
+      "cancelWarning": "Bist du sicher, dass du dein Abonnement kündigen möchtest?",
+      "cancelWarningDesc": "Du behältst den Zugriff bis zum Ende des Abrechnungszeitraums.",
+      "confirmCancel": "Ja, Abonnement kündigen",
+      "keepSubscription": "Abonnement behalten",
+      "loadingPortal": "Rechnungsportal wird geöffnet..."
+    },
+    "native": {
+      "purchaseTitle": "In-App-Kauf",
+      "purchaseUnavailable": "In-App-Käufe sind auf diesem Server noch nicht verfügbar. Bitte versuche es später erneut.",
+      "purchaseSuccess": "Dein Abonnement ist jetzt aktiv. Vielen Dank!",
+      "purchasePending": "Dein Kauf wartet auf eine Genehmigung (z. B. „Kaufen anfragen“). Dein Abonnement wird nach der Genehmigung automatisch aktiviert.",
+      "purchaseConflict": "Dieser Kauf ist bereits mit einem anderen Konto oder einem bestehenden Abonnement verknüpft. Bitte prüfe dein Store-Konto oder kontaktiere den Support.",
+      "purchaseFailed": "Der Kauf konnte nicht abgeschlossen werden. Dir wurde nichts berechnet. Bitte versuche es erneut.",
+      "manageInStore": "Im Store verwalten",
+      "restoreButton": "Käufe wiederherstellen",
+      "restoreTitle": "Käufe wiederherstellen",
+      "restoreDone": "Käufe wiederhergestellt – dein Abonnement ist aktiv.",
+      "restoreNone": "Es wurde kein aktives Abonnement zum Wiederherstellen gefunden.",
+      "storeNoteIos": "Käufe und Abonnements werden über den App Store abgewickelt und verwaltet.",
+      "storeNoteAndroid": "Käufe und Abonnements werden über Google Play abgewickelt und verwaltet.",
+      "redeemBlockedExistingIos": "Dieses Konto hat bereits ein aktives Abo, daher wurde dein letzter Store-Kauf nicht verknüpft. Prüfe deine Abos in deiner Apple-ID und fordere dort bei Bedarf eine Erstattung an, um doppelte Zahlungen zu vermeiden.",
+      "redeemBlockedExistingAndroid": "Dieses Konto hat bereits ein aktives Abo, daher wurde dein letzter Store-Kauf nicht verknüpft. Google Play erstattet nicht bestätigte Käufe innerhalb weniger Tage automatisch."
+    },
+    "plans": {
+      "pro": "Pro",
+      "team": "Team",
+      "business": "Business"
+    },
+    "features": {
+      "usage": "{factor}× mehr Nutzung als im Free-Plan",
+      "advancedModels": "Erweiterte KI-Modelle",
+      "prioritySupport": "Priority Support",
+      "everythingInPro": "Alles aus Pro",
+      "everythingInTeam": "Alles aus Team",
+      "teamCollaboration": "Team-Zusammenarbeit",
+      "customPrompts": "Benutzerdefinierte Prompts",
+      "apiAccess": "API-Zugriff",
+      "whiteLabel": "White-label Widgets",
+      "dedicatedSupport": "Dedizierter Support",
+      "slaGuarantee": "SLA-Garantie"
+    },
+    "success": {
+      "title": "Zahlung erfolgreich!",
+      "description": "Dein Abonnement wurde aktiviert. Vielen Dank für das Upgrade!",
+      "newPlan": "Dein neuer Plan",
+      "startUsing": "Plan jetzt nutzen",
+      "activating": "Plan wird aktiviert...",
+      "activatingDesc": "Bitte warte, während wir dein Abonnement aktivieren.",
+      "almostDone": "Fast fertig!",
+      "processing": "Deine Zahlung war erfolgreich, aber wir verarbeiten noch dein Abonnement.",
+      "retry": "Erneut versuchen",
+      "continueAnyway": "Trotzdem fortfahren"
+    },
+    "cancel": {
+      "title": "Zahlung abgebrochen",
+      "description": "Deine Zahlung wurde abgebrochen. Es wurden keine Kosten berechnet.",
+      "tryAgain": "Erneut versuchen",
+      "backToPlans": "Zurück zu den Plänen"
+    }
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "subtitle": "Verwalten Sie Ihre Präferenzen und Konfiguration",
+    "tabs": {
+      "general": "Allgemein",
+      "features": "Features"
+    },
+    "appMode": {
+      "title": "App-Modus",
+      "description": "Wählen Sie zwischen vereinfachter oder vollständiger Funktionsumgebung",
+      "easy": "Easy Mode",
+      "easyDesc": "Vereinfachte Oberfläche mit wesentlichen Funktionen",
+      "advanced": "Advanced Mode",
+      "advancedDesc": "Voller Zugriff auf alle Funktionen und Tools",
+      "lockedTitle": "Funktion des erweiterten Modus",
+      "lockedMessage": "„{feature}“ gehört zum erweiterten Modus. Wechsle in den erweiterten Modus, um es zu nutzen — du kannst jederzeit in den Einstellungen zurückwechseln.",
+      "switchCta": "In den erweiterten Modus wechseln"
+    },
+    "theme": {
+      "title": "Design",
+      "description": "Wählen Sie Ihr Farbschema",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System"
+    },
+    "language": {
+      "title": "Sprache",
+      "description": "Wählen Sie die Sprache der Benutzeroberfläche"
+    },
+    "webSearch": {
+      "title": "Websuche",
+      "description": "Nutzen Sie einen anderen Suchanbieter als den, den Ihre Administration für alle festgelegt hat.",
+      "useMyOwn": "Meine eigene Suche verwenden",
+      "saved": "Ihr Suchanbieter wurde gespeichert.",
+      "saveFailed": "Ihr Suchanbieter konnte nicht gespeichert werden"
+    },
+    "account": {
+      "title": "Konto",
+      "email": "E-Mail",
+      "userLevel": "Benutzerebene"
+    },
+    "logout": "Abmelden",
+    "features": {
+      "title": "System-Status",
+      "subtitle": "Überwache alle Services und Features",
+      "loading": "Lade Features...",
+      "requiredConfig": "Erforderliche Konfiguration:",
+      "set": "Gesetzt",
+      "notSet": "Nicht gesetzt",
+      "allOperational": "Alle Systeme betriebsbereit",
+      "issuesDetected": "Probleme erkannt",
+      "ready": "Bereit",
+      "healthSummary": "{healthy} von {total} Services gesund",
+      "model": "Modell",
+      "models": "Modelle",
+      "adminOnlyTitle": "Admin-Zugriff erforderlich",
+      "adminOnlyMessage": "Der Feature-Status ist nur für Administratoren verfügbar.",
+      "modulesTitle": "Feature-Module",
+      "modulesSubtitle": "Optionale Funktionen, die diese Installation deklariert. Jede wird über ihre Konfiguration eingeschaltet; die Liste zeigt die Schlüssel, nie deren Werte.",
+      "modulesConfigured": "{configured} von {total} konfiguriert",
+      "configuredBy": "Konfiguriert über:",
+      "docs": "Dokumentation",
+      "compute": {
+        "title": "Dateiarbeit (Compute)",
+        "tierDocker": "Standard",
+        "tierGvisor": "Starke Isolierung",
+        "tierMicrovm": "Virtuelle Maschine",
+        "tierUnknown": "Unbekannt",
+        "statusOn": "An",
+        "statusOff": "Aus",
+        "statusDown": "Gestört",
+        "stateRunning": "Dateiarbeit läuft.",
+        "stateDisabled": "In der Systemkonfiguration ausgeschaltet. Dateiarbeit bleibt verborgen.",
+        "stateUnreachable": "Eingeschaltet, aber der Sidecar antwortet nicht. Dateiarbeit ist nicht verfügbar.",
+        "postureWarning": "Dieser Dienst meldet {tier}; diese Instanz erfordert stärkere Isolierung.",
+        "capacity": "Kapazität",
+        "runningOf": "{running} von {max} aktiv",
+        "queued": "{count} wartend",
+        "images": "Abbilder",
+        "runs24": "{count} Läufe (24h)",
+        "failed24": "{count} fehlgeschlagen (24h)",
+        "openConfig": "Dateiarbeit-Einstellungen",
+        "stateTierBlocked": "Eingeschaltet, aber unter der erforderlichen Isolierung. Dateiarbeit bleibt verborgen."
+      }
+    },
+    "notLoggedIn": "Nicht angemeldet"
+  },
+  "externalLink": {
+    "title": "Externe Website",
+    "subtitle": "Du verlässt jetzt Synaplan",
+    "disclaimer": "Du wirst auf eine externe Website weitergeleitet. Wir haben keinen Einfluss auf deren Inhalte und übernehmen keine Haftung für Datenschutz oder Sicherheit auf Drittanbieter-Seiten. Weiter auf eigene Verantwortung.",
+    "dontAskAgain": "Diese Warnung nicht mehr anzeigen",
+    "cancel": "Abbrechen",
+    "open": "Link öffnen"
+  }
+}

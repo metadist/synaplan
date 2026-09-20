@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
 import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
 import type { FeatureModule } from '@/services/featuresService'
+
+const en = loadAllMessages('en')
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
 

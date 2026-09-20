@@ -66,7 +66,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { supportedLanguages } from '@/i18n'
+import { cycleLocale } from '@/i18n'
 import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import Button from '../components/Button.vue'
@@ -90,12 +90,7 @@ const { logoSrc } = useBrandLogo(isDark)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const currentIndex = supportedLanguages.indexOf(
-    locale.value as (typeof supportedLanguages)[number]
-  )
-  const next = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
-  locale.value = next
-  localStorage.setItem('language', next)
+  void cycleLocale()
 }
 
 const toggleTheme = () => {

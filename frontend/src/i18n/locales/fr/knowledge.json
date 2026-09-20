@@ -1,0 +1,361 @@
+{
+  "memories": {
+    "fullscreen": {
+      "enter": "Plein écran",
+      "exit": "Quitter le plein écran"
+    },
+    "title": "Mémoires",
+    "description": "Informations importantes vous concernant et sur vos préférences que l’IA peut utiliser pour les conversations futures.",
+    "empty": "Aucune mémoire enregistrée pour le moment.",
+    "emptyDesc": "L’IA extraira automatiquement les informations pertinentes de vos conversations et les stockera ici. Vous pouvez aussi ajouter manuellement de nouvelles mémoires.",
+    "loading": "Chargement des mémoires…",
+    "allCategories": "Toutes les catégories",
+    "selected": "{count} sélectionnées",
+    "selectAll": "Tout sélectionner",
+    "search": {
+      "placeholder": "Rechercher des mémoires…"
+    },
+    "noResults": "Aucune mémoire trouvée",
+    "category": "Catégorie",
+    "key": "Clé",
+    "value": "Valeur",
+    "updated": "Mise à jour",
+    "createButton": "Nouvelle mémoire",
+    "backToChat": "Retour au chat",
+    "userDisabled": {
+      "title": "Les mémoires sont désactivées pour votre compte",
+      "message": "L’IA n’utilisera ni ne mettra à jour automatiquement les mémoires. Vous pouvez activer ceci dans les réglages de votre profil à tout moment.",
+      "enable": "Activer les mémoires"
+    },
+    "unavailable": {
+      "title": "Les mémoires sont en cours de configuration",
+      "message": "Le système de mémoires est actuellement en cours de configuration et temporairement indisponible. Cela peut prendre quelques minutes.",
+      "reason": "Raisons possibles :",
+      "reason1": "Le service de base vectorielle démarre",
+      "reason2": "Les embeddings IA sont en cours de reconfiguration",
+      "reason3": "Les mémoires existantes sont en cours de migration",
+      "retry": "Réessayer"
+    },
+    "listView": {
+      "title": "Vue liste",
+      "shortTitle": "Liste",
+      "source": "Source",
+      "allMemories": "Toutes les mémoires",
+      "categories": "Catégories",
+      "keys": "Clés",
+      "sortByCategory": "Trier par catégorie",
+      "sortByKey": "Trier par nom",
+      "sortByDate": "Trier par date"
+    },
+    "graphView": {
+      "title": "Vue neuronale",
+      "shortTitle": "2D"
+    },
+    "graph3dView": {
+      "title": "Visualisation 3D",
+      "shortTitle": "3D"
+    },
+    "graph3d": {
+      "categories": "Catégories",
+      "keys": "Clés",
+      "memories": "Mémoires",
+      "category": "Catégorie",
+      "key": "Clé",
+      "memory": "Mémoire",
+      "controls": {
+        "rotate": "Tourner",
+        "zoom": "Zoom",
+        "select": "Sélectionner",
+        "drag": "Glisser la souris",
+        "scroll": "Molette",
+        "click": "Cliquer"
+      }
+    },
+    "categories": {
+      "all": "Toutes les catégories",
+      "preferences": "Préférences",
+      "personal": "Personnel",
+      "work": "Travail",
+      "projects": "Projets",
+      "general": "Général",
+      "tech": "Technologie"
+    },
+    "source": {
+      "auto_detected": "Détecté automatiquement",
+      "user_created": "Créé par l’utilisateur",
+      "user_edited": "Modifié par l’utilisateur",
+      "ai_edited": "Modifié par l’IA"
+    },
+    "actions": {
+      "create": "Nouvelle mémoire",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "save": "Enregistrer",
+      "cancel": "Annuler"
+    },
+    "create": {
+      "title": "Nouvelle mémoire",
+      "category": "Catégorie",
+      "categoryPlaceholder": "p. ex. préférences, personnel, travail…",
+      "categoryHint": "Vous pouvez saisir n’importe quel nom de catégorie",
+      "key": "Clé",
+      "keyPlaceholder": "p. ex. langue_preferee",
+      "value": "Valeur",
+      "valuePlaceholder": "p. ex. TypeScript"
+    },
+    "edit": {
+      "title": "Modifier la mémoire"
+    },
+    "form": {
+      "easyMode": "Simple",
+      "advancedMode": "Avancé",
+      "easyDescription": "Décrivez simplement ce que vous voulez mémoriser et l’IA le structurera pour vous.",
+      "whatToRemember": "Que dois-je retenir ?",
+      "easyPlaceholder": "p. ex. Je préfère le mode sombre dans toutes les applications, Mon langage de programmation préféré est TypeScript, Je travaille mieux le matin…",
+      "easyHint": "Écrivez naturellement — l’IA extraira les informations clés.",
+      "easyEditDescription": "Dites-moi ce que vous voulez changer dans cette mémoire.",
+      "easyEditPlaceholder": "p. ex. Changer la valeur en…, Mettre à jour ceci en…, Supprimer cette mémoire…",
+      "easyEditHint": "Décrivez le changement naturellement — l’IA comprendra.",
+      "currentMemory": "Mémoire actuelle",
+      "whatToChange": "Que souhaitez-vous changer ?",
+      "updateWithAI": "Mettre à jour avec l’IA",
+      "categoryOptional": "Catégorie (facultatif)",
+      "customCategory": "Personnalisée",
+      "customCategoryPlaceholder": "Saisissez une catégorie personnalisée…",
+      "createWithAI": "Créer avec l’IA",
+      "aiUnavailable": "Structuration IA indisponible, enregistrement comme note",
+      "aiUnavailableCreateFallback": "IA indisponible – votre texte a été préparé comme une note simple. Confirmez pour enregistrer ou ajustez d’abord la catégorie/clé.",
+      "aiUnavailableCreateReason": "Enregistré comme une note simple car la structuration IA était indisponible.",
+      "aiUnavailableEditFallback": "IA indisponible – veuillez modifier la mémoire directement en mode manuel.",
+      "storageUnavailable": "Le stockage des mémoires est actuellement injoignable. Veuillez réessayer plus tard.",
+      "parseFailed": "Nous n’avons pas pu traiter cela. Réessayez plus tard ou enregistrez manuellement.",
+      "previewTitle": "Aperçu",
+      "previewDescription": "Vérifiez si cela vous semble correct avant d’enregistrer.",
+      "actionCreate": "Nouvelle mémoire",
+      "actionUpdate": "Mettre à jour l’existante",
+      "actionDelete": "Supprimer la mémoire",
+      "similarFound": "Mémoires similaires trouvées — envisagez plutôt une mise à jour :",
+      "confirm": "Confirmer et enregistrer",
+      "confirmSaving": "Enregistrement…",
+      "oneChange": "modification",
+      "multipleChanges": "modifications"
+    },
+    "multipleSuccess": "{count} mémoires enregistrées avec succès",
+    "delete": {
+      "title": "Supprimer la mémoire",
+      "message": "Voulez-vous vraiment supprimer cette mémoire ? Cette action est irréversible.",
+      "confirm": "Supprimer"
+    },
+    "deleteConfirm": {
+      "title": "Supprimer la mémoire ?",
+      "message": "Voulez-vous vraiment supprimer cette mémoire ? Cette action est irréversible.",
+      "confirm": "Supprimer"
+    },
+    "bulkDeleteConfirm": {
+      "title": "Supprimer plusieurs mémoires ?",
+      "message": "Voulez-vous vraiment supprimer {count} mémoires ? Cette action est irréversible."
+    },
+    "deleteSuccess": "Mémoire supprimée avec succès",
+    "deleteError": "Échec de la suppression de la mémoire",
+    "bulkDeleteSuccess": "{count} mémoires supprimées avec succès",
+    "bulkDeleteError": "Échec de la suppression des mémoires",
+    "createSuccess": "Mémoire créée avec succès",
+    "createError": "Échec de la création de la mémoire",
+    "editSuccess": "Mémoire mise à jour avec succès",
+    "editError": "Échec de la mise à jour de la mémoire",
+    "loadError": "Échec du chargement des mémoires",
+    "searchError": "La recherche a échoué",
+    "memorySaved": "Nouvelle mémoire enregistrée avec succès !",
+    "showingRecent": "Affichage des {count} mémoires les plus récentes",
+    "totalCount": "{count} mémoires stockées au total",
+    "viewAll": "Tout voir",
+    "serviceDisabled": {
+      "title": "Mémoires désactivées",
+      "message": "La base vectorielle Qdrant est actuellement indisponible. Veuillez contacter l’administrateur.",
+      "badge": "Service indisponible",
+      "tooltip": "Qdrant est désactivé ou injoignable. Cette mémoire ne peut pas être affichée."
+    },
+    "referenceMissing": {
+      "badge": "Mémoire introuvable",
+      "tooltip": "Cette mémoire n’est plus disponible. Elle a peut-être été supprimée, ou le service n’a pas pu la charger."
+    },
+    "referencePending": {
+      "badge": "Mémoire en attente",
+      "tooltip": "Cette mémoire vient d’être créée ou mise à jour. Il peut falloir quelques secondes avant qu’elle puisse être chargée."
+    },
+    "loginToView": "Connectez-vous pour voir les détails de la mémoire",
+    "memoryUsed": "Mémoire utilisée",
+    "foreign": {
+      "badge": "Mémoire privée",
+      "tooltip": "Cette mémoire appartient à la personne qui a partagé la conversation. Elle n’est pas visible pour vous."
+    },
+    "toast": {
+      "title": "Nouvelle mémoire détectée",
+      "titleCompact": "Mémoire",
+      "discard": "Écarter",
+      "discardCompact": "Ignorer",
+      "edit": "Modifier",
+      "editCompact": "Modifier",
+      "discarded": "Mémoire écartée"
+    },
+    "deleteDialog": {
+      "title": "Supprimer la mémoire ?",
+      "message": "Cela retirera la mémoire de vos données enregistrées.",
+      "undo": "Annuler",
+      "confirm": "Supprimer",
+      "memoryLabel": "Mémoire sélectionnée"
+    },
+    "usedInResponse": "{count} mémoire utilisée | {count} mémoires utilisées",
+    "context": {
+      "title": "Mémoires actives",
+      "count": "{count} mémoire chargée | {count} mémoires chargées"
+    },
+    "graph": {
+      "legend": "Légende",
+      "memoryNode": "Nœud de mémoire",
+      "connection": "Lien de catégorie",
+      "resetView": "Réinitialiser la vue",
+      "togglePhysics": "Activer/désactiver la physique",
+      "noResultsDesc": "Aucune mémoire trouvée dans les catégories sélectionnées.",
+      "noResultsKeys": "Aucune mémoire trouvée avec les clés sélectionnées.",
+      "clearFilters": "Effacer les filtres",
+      "moreCategories": "de plus",
+      "groupByCategory": "Grouper par catégorie",
+      "groupByKey": "Filtrer par clé",
+      "groupingByCategory": "Groupé par catégorie",
+      "groupingByKey": "Filtrer par clé",
+      "filterByCategory": "Filtrer par catégorie",
+      "filterByLetter": "Filtrer par première lettre"
+    }
+  },
+  "feedback": {
+    "usedInResponse": "{count} exemple(s) de retour utilisé(s)",
+    "type": {
+      "positive": "Correct",
+      "falsePositive": "Incorrect"
+    },
+    "badge": {
+      "loading": "Retour…"
+    },
+    "falsePositive": {
+      "button": "Pas correct",
+      "title": "Marquer comme faux positif",
+      "subtitle": "Sélectionnez les parties incorrectes ou utilisez la réponse entière.",
+      "selectAll": "Tout sélectionner",
+      "clear": "Effacer",
+      "useFull": "Utiliser la réponse entière",
+      "selectedCount": "{count} sélectionnés",
+      "emptyHint": "Sélectionnez au moins une section ou utilisez la réponse entière.",
+      "preview": "Continuer",
+      "stepSelect": "Sélectionner",
+      "stepConfirm": "Vérifier et enregistrer",
+      "contextLabel": "Votre question",
+      "summaryLabel": "Qu’est-ce qui était incorrect ?",
+      "summaryPlaceholder": "p. ex. L’IA a affirmé que Sydney est la capitale de l’Australie",
+      "summaryOptionsHint": "L’IA propose plusieurs options. Choisissez celle qui décrit le mieux l’erreur, ou rédigez la vôtre.",
+      "correctionLabel": "Quelle est la version correcte ?",
+      "correctionPlaceholder": "p. ex. La capitale de l’Australie est Canberra",
+      "correctionOptionsHint": "Choisissez la correction la plus précise, ou rédigez la vôtre.",
+      "recommended": "Recommandé",
+      "customOption": "Rédiger la mienne…",
+      "optional": "Facultatif",
+      "savedAsNegative": "L’IA évitera cette réponse à l’avenir",
+      "savedAsPositive": "L’IA apprendra la bonne réponse à partir de ceci",
+      "explanation": "Votre retour aide l’IA à s’améliorer : l’affirmation incorrecte enseigne ce qu’il faut éviter, et la correction (si fournie) enseigne la bonne réponse. Les deux sont mémorisées pour les conversations futures.",
+      "memoryExplanation": "L’IA a détecté qu’il s’agit de vos données personnelles. La correction mettra à jour vos mémoires au lieu de créer des retours — ainsi l’IA aura toujours vos informations correctes.",
+      "savedAsMemory": "Ceci mettra à jour votre mémoire personnelle",
+      "memoryUpdated": "Votre mémoire a été mise à jour avec succès.",
+      "memoryDeleted": "La mémoire incorrecte a été supprimée.",
+      "deleteMemoryOption": "Juste supprimer cette mémoire",
+      "deleteMemoryOptionHint": "Retirer la mémoire incorrecte sans enregistrer de remplacement. Utilisez ceci lorsque l’information ne devrait simplement pas exister.",
+      "willDeleteMemory": "La mémoire incorrecte sera supprimée (aucun remplacement enregistré)",
+      "enhance": "Améliorer",
+      "enhanceHint": "Conseil : utilisez Améliorer pour peaufiner votre texte",
+      "enhanceFailed": "Impossible d’améliorer le texte. Veuillez réessayer.",
+      "researchOption": "Rechercher des sources",
+      "researchOptionHint": "Cherchez dans vos fichiers ou sur le Web des sources fiables",
+      "researchTabKb": "Vos données",
+      "researchTabWeb": "Recherche Web",
+      "researchButtonKb": "Chercher dans vos données",
+      "researchButtonWeb": "Chercher sur le Web",
+      "researchLoadingKb": "Recherche dans vos données…",
+      "researchLoadingWeb": "Recherche sur le Web…",
+      "researchNoResultsKb": "Aucune source pertinente trouvée dans vos données.",
+      "researchNoResultsWeb": "Aucun résultat Web pertinent trouvé.",
+      "researchNoResultsHintKb": "Essayez de téléverser des documents, d’enregistrer plus de retours, ou de passer à la recherche Web.",
+      "researchNoResultsHintWeb": "Essayez d’autres termes de recherche ou utilisez « Rédiger la mienne ».",
+      "researchSelectHint": "Sélectionnez les sources qui contiennent l’information correcte :",
+      "researchSourceFile": "Source",
+      "researchRelevance": "Pertinence",
+      "sourceTypeFile": "Fichier téléversé",
+      "sourceTypeFeedbackFalse": "Marqué incorrect",
+      "sourceTypeFeedbackCorrect": "Confirmé correct",
+      "sourceTypeMemory": "Mémoire",
+      "researchSelectedCount": "{count} source sélectionnée | {count} sources sélectionnées",
+      "researchUseSelected": "Utiliser les sources sélectionnées comme correction",
+      "back": "Retour",
+      "again": "Régénérer",
+      "againTooltip": "Générer une nouvelle option de correction",
+      "needSummaryFirst": "Veuillez d’abord sélectionner ou saisir l’affirmation erronée",
+      "save": "Enregistrer le retour",
+      "saveNegative": "Enregistrer le faux positif",
+      "savePositive": "Enregistrer l’affirmation corrigée",
+      "cancel": "Annuler",
+      "success": "Merci ! Le retour a été enregistré.",
+      "positiveSuccess": "Merci ! La correction a été enregistrée.",
+      "error": "Échec de l’enregistrement du retour."
+    },
+    "contradiction": {
+      "title": "Contradiction détectée",
+      "subtitle": "L’IA a trouvé des informations contradictoires dans vos données existantes.",
+      "explanation": "Ce que vous voulez enregistrer peut entrer en conflit avec des entrées existantes. Pour chaque conflit, décidez de remplacer l’ancienne entrée ou de conserver les deux. Cliquez sur un élément pour basculer votre décision.",
+      "newStatement": "Ce que vous voulez enregistrer",
+      "existingItems": "Entrées existantes en conflit",
+      "willReplace": "Remplacer",
+      "willKeep": "Conserver",
+      "replaceAll": "Tout remplacer",
+      "keepAll": "Tout conserver",
+      "saveDecisions": "Enregistrer et appliquer les décisions",
+      "summaryReplace": "{count} seront remplacées",
+      "summaryKeep": "{count} seront conservées",
+      "cancel": "Annuler (ne rien enregistrer)",
+      "deleteOnlyHint": "Les mémoires sélectionnées seront supprimées (aucun remplacement)",
+      "type": {
+        "memory": "Mémoire",
+        "false_positive": "Marqué comme incorrect",
+        "positive": "Marqué comme correct"
+      }
+    },
+    "list": {
+      "title": "Retours",
+      "subtitle": "Gérez vos corrections IA et exemples de retour.",
+      "empty": "Aucun retour pour le moment",
+      "emptyHint": "Utilisez le bouton pouce vers le bas sur les réponses IA pour ajouter des corrections.",
+      "filterAll": "Tous",
+      "filterFalsePositive": "Incorrect",
+      "filterPositive": "Correct",
+      "typeFalsePositive": "Affirmation incorrecte",
+      "typePositive": "Affirmation correcte",
+      "edited": "modifié",
+      "searchPlaceholder": "Rechercher des retours…",
+      "selectedCount": "{count} sélectionnés",
+      "deleteSelected": "Supprimer la sélection",
+      "selectAllOnPage": "Tout sélectionner sur la page",
+      "deselectAll": "Tout désélectionner",
+      "showing": "Affichage de {from}–{to} sur {total}",
+      "noResults": "Aucun retour correspondant",
+      "noResultsHint": "Essayez un autre terme de recherche ou changez le filtre.",
+      "deleteTitle": "Supprimer le retour",
+      "deleteConfirm": "Voulez-vous vraiment supprimer ce retour ? Cette action est irréversible.",
+      "bulkDeleteTitle": "Supprimer plusieurs retours",
+      "bulkDeleteCount": "{count} entrées sélectionnées",
+      "bulkDeleteConfirm": "Voulez-vous vraiment supprimer toutes les entrées de retour sélectionnées ? Cette action est irréversible.",
+      "bulkDeleteSuccess": "{count} entrées de retour supprimées",
+      "loadError": "Échec du chargement des retours",
+      "editSuccess": "Retour mis à jour",
+      "editError": "Échec de la mise à jour du retour",
+      "deleteSuccess": "Retour supprimé",
+      "deleteError": "Échec de la suppression du retour"
+    }
+  }
+}

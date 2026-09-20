@@ -30,7 +30,7 @@ import {
 import { getNativePlatform, isNativeApp } from '@/services/api/nativeRuntime'
 import { subscriptionApi } from '@/services/api/subscriptionApi'
 import { useNotification } from '@/composables/useNotification'
-import { i18n } from '@/i18n'
+import { i18n } from '@/i18n/instance'
 
 /** Long-lived toast: refund guidance the user should actually get to read. */
 const REFUND_GUIDANCE_DURATION_MS = 12000

@@ -1,0 +1,361 @@
+{
+  "memories": {
+    "fullscreen": {
+      "enter": "Fullscreen",
+      "exit": "Exit fullscreen"
+    },
+    "title": "Memories",
+    "description": "Important information about you and your preferences that the AI can use for future conversations.",
+    "empty": "No memories saved yet.",
+    "emptyDesc": "The AI will automatically extract relevant information from your conversations and store it here. You can also manually add new memories.",
+    "loading": "Loading memories...",
+    "allCategories": "All Categories",
+    "selected": "{count} selected",
+    "selectAll": "Select All",
+    "search": {
+      "placeholder": "Search memories..."
+    },
+    "noResults": "No memories found",
+    "category": "Category",
+    "key": "Key",
+    "value": "Value",
+    "updated": "Updated",
+    "createButton": "New Memory",
+    "backToChat": "Back to chat",
+    "userDisabled": {
+      "title": "Memories are disabled for your account",
+      "message": "The AI will not use or automatically update memories. You can enable this in your profile settings at any time.",
+      "enable": "Enable memories"
+    },
+    "unavailable": {
+      "title": "Memories are being set up",
+      "message": "The memories system is currently being configured and is temporarily unavailable. This may take a few minutes.",
+      "reason": "Possible reasons:",
+      "reason1": "Vector database service is starting",
+      "reason2": "AI embeddings are being reconfigured",
+      "reason3": "Existing memories are being migrated",
+      "retry": "Retry"
+    },
+    "listView": {
+      "title": "List View",
+      "shortTitle": "List",
+      "source": "Source",
+      "allMemories": "All Memories",
+      "categories": "Categories",
+      "keys": "Keys",
+      "sortByCategory": "Sort by Category",
+      "sortByKey": "Sort by Name",
+      "sortByDate": "Sort by Date"
+    },
+    "graphView": {
+      "title": "Neural View",
+      "shortTitle": "2D"
+    },
+    "graph3dView": {
+      "title": "3D Visualization",
+      "shortTitle": "3D"
+    },
+    "graph3d": {
+      "categories": "Categories",
+      "keys": "Keys",
+      "memories": "Memories",
+      "category": "Category",
+      "key": "Key",
+      "memory": "Memory",
+      "controls": {
+        "rotate": "Rotate",
+        "zoom": "Zoom",
+        "select": "Select",
+        "drag": "Drag mouse",
+        "scroll": "Mouse wheel",
+        "click": "Click"
+      }
+    },
+    "categories": {
+      "all": "All Categories",
+      "preferences": "Preferences",
+      "personal": "Personal",
+      "work": "Work",
+      "projects": "Projects",
+      "general": "General",
+      "tech": "Technology"
+    },
+    "source": {
+      "auto_detected": "Auto-detected",
+      "user_created": "User-created",
+      "user_edited": "User-edited",
+      "ai_edited": "AI-edited"
+    },
+    "actions": {
+      "create": "New Memory",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "create": {
+      "title": "New Memory",
+      "category": "Category",
+      "categoryPlaceholder": "e.g. preferences, personal, work...",
+      "categoryHint": "You can enter any category name",
+      "key": "Key",
+      "keyPlaceholder": "e.g. favorite_language",
+      "value": "Value",
+      "valuePlaceholder": "e.g. TypeScript"
+    },
+    "edit": {
+      "title": "Edit Memory"
+    },
+    "form": {
+      "easyMode": "Easy",
+      "advancedMode": "Advanced",
+      "easyDescription": "Just describe what you want to remember and AI will structure it for you.",
+      "whatToRemember": "What should I remember?",
+      "easyPlaceholder": "e.g. I prefer dark mode in all applications, My favorite programming language is TypeScript, I work best in the morning...",
+      "easyHint": "Write naturally - the AI will extract the key information.",
+      "easyEditDescription": "Tell me what you want to change about this memory.",
+      "easyEditPlaceholder": "e.g. Change the value to..., Update this to..., Delete this memory...",
+      "easyEditHint": "Describe the change naturally - the AI will understand.",
+      "currentMemory": "Current Memory",
+      "whatToChange": "What would you like to change?",
+      "updateWithAI": "Update with AI",
+      "categoryOptional": "Category (optional)",
+      "customCategory": "Custom",
+      "customCategoryPlaceholder": "Enter custom category...",
+      "createWithAI": "Create with AI",
+      "aiUnavailable": "AI structuring unavailable, saving as note",
+      "aiUnavailableCreateFallback": "AI unavailable – your text has been prepared as a plain note. Confirm to save or adjust the category/key first.",
+      "aiUnavailableCreateReason": "Saved as a plain note because AI structuring was unavailable.",
+      "aiUnavailableEditFallback": "AI unavailable – please edit the memory directly in manual mode.",
+      "storageUnavailable": "Memory storage is currently unreachable. Please try again later.",
+      "parseFailed": "We couldn't process that. Please try again later or save manually.",
+      "previewTitle": "Preview",
+      "previewDescription": "Check if this looks correct before saving.",
+      "actionCreate": "New Memory",
+      "actionUpdate": "Update Existing",
+      "actionDelete": "Delete Memory",
+      "similarFound": "Similar memories found - consider updating instead:",
+      "confirm": "Confirm & Save",
+      "confirmSaving": "Saving…",
+      "oneChange": "change",
+      "multipleChanges": "changes"
+    },
+    "multipleSuccess": "{count} memories saved successfully",
+    "delete": {
+      "title": "Delete Memory",
+      "message": "Are you sure you want to delete this memory? This action cannot be undone.",
+      "confirm": "Delete"
+    },
+    "deleteConfirm": {
+      "title": "Delete Memory?",
+      "message": "Are you sure you want to delete this memory? This action cannot be undone.",
+      "confirm": "Delete"
+    },
+    "bulkDeleteConfirm": {
+      "title": "Delete Multiple Memories?",
+      "message": "Are you sure you want to delete {count} memories? This action cannot be undone."
+    },
+    "deleteSuccess": "Memory deleted successfully",
+    "deleteError": "Failed to delete memory",
+    "bulkDeleteSuccess": "{count} memories deleted successfully",
+    "bulkDeleteError": "Failed to delete memories",
+    "createSuccess": "Memory created successfully",
+    "createError": "Failed to create memory",
+    "editSuccess": "Memory updated successfully",
+    "editError": "Failed to update memory",
+    "loadError": "Failed to load memories",
+    "searchError": "Search failed",
+    "memorySaved": "New memory saved successfully!",
+    "showingRecent": "Showing the {count} most recent memories",
+    "totalCount": "{count} memories stored in total",
+    "viewAll": "View All",
+    "serviceDisabled": {
+      "title": "Memories Disabled",
+      "message": "The Qdrant vector database is currently unavailable. Please contact the administrator.",
+      "badge": "Service unavailable",
+      "tooltip": "Qdrant is disabled or unreachable. This memory cannot be displayed."
+    },
+    "referenceMissing": {
+      "badge": "Memory not found",
+      "tooltip": "This memory is no longer available. It may have been deleted, or the service could not load it."
+    },
+    "referencePending": {
+      "badge": "Memory pending",
+      "tooltip": "This memory was just created or updated. It may take a few seconds until it can be loaded."
+    },
+    "loginToView": "Log in to view memory details",
+    "memoryUsed": "Memory used",
+    "foreign": {
+      "badge": "Private memory",
+      "tooltip": "This memory belongs to the person who shared the chat. It is not visible to you."
+    },
+    "toast": {
+      "title": "New Memory Detected",
+      "titleCompact": "Memory",
+      "discard": "Discard",
+      "discardCompact": "Dismiss",
+      "edit": "Edit",
+      "editCompact": "Edit",
+      "discarded": "Memory discarded"
+    },
+    "deleteDialog": {
+      "title": "Delete memory?",
+      "message": "This will remove the memory from your saved data.",
+      "undo": "Undo",
+      "confirm": "Delete",
+      "memoryLabel": "Selected memory"
+    },
+    "usedInResponse": "{count} memory used | {count} memories used",
+    "context": {
+      "title": "Active Memories",
+      "count": "{count} memory loaded | {count} memories loaded"
+    },
+    "graph": {
+      "legend": "Legend",
+      "memoryNode": "Memory Node",
+      "connection": "Category Connection",
+      "resetView": "Reset View",
+      "togglePhysics": "Toggle Physics",
+      "noResultsDesc": "No memories found in selected categories.",
+      "noResultsKeys": "No memories found with selected keys.",
+      "clearFilters": "Clear Filters",
+      "moreCategories": "more",
+      "groupByCategory": "Group by Category",
+      "groupByKey": "Filter by Key",
+      "groupingByCategory": "Grouped by Category",
+      "groupingByKey": "Filter by Key",
+      "filterByCategory": "Filter by Category",
+      "filterByLetter": "Filter by First Letter"
+    }
+  },
+  "feedback": {
+    "usedInResponse": "{count} feedback example(s) used",
+    "type": {
+      "positive": "Correct",
+      "falsePositive": "Incorrect"
+    },
+    "badge": {
+      "loading": "Feedback..."
+    },
+    "falsePositive": {
+      "button": "Not correct",
+      "title": "Mark false positive",
+      "subtitle": "Select the incorrect parts or use the full answer.",
+      "selectAll": "Select all",
+      "clear": "Clear",
+      "useFull": "Use full answer",
+      "selectedCount": "{count} selected",
+      "emptyHint": "Select at least one section or use the full answer.",
+      "preview": "Continue",
+      "stepSelect": "Select",
+      "stepConfirm": "Review & Save",
+      "contextLabel": "Your question",
+      "summaryLabel": "What was incorrect?",
+      "summaryPlaceholder": "e.g. The AI claimed that Sydney is the capital of Australia",
+      "summaryOptionsHint": "The AI suggests multiple options. Pick the one that best describes the error, or write your own.",
+      "correctionLabel": "What is correct instead?",
+      "correctionPlaceholder": "e.g. The capital of Australia is Canberra",
+      "correctionOptionsHint": "Choose the most accurate correction, or write your own.",
+      "recommended": "Recommended",
+      "customOption": "Write my own...",
+      "optional": "Optional",
+      "savedAsNegative": "The AI will avoid this answer in the future",
+      "savedAsPositive": "The AI will learn the correct answer from this",
+      "explanation": "Your feedback helps the AI improve: The incorrect statement teaches what to avoid, and the correction (if provided) teaches the right answer. Both are remembered for future conversations.",
+      "memoryExplanation": "The AI detected this is about your personal data. The correction will update your memories instead of creating feedback entries — so the AI always has your correct information.",
+      "savedAsMemory": "This will update your personal memory",
+      "memoryUpdated": "Your memory has been updated successfully.",
+      "memoryDeleted": "The incorrect memory has been deleted.",
+      "deleteMemoryOption": "Just delete this memory",
+      "deleteMemoryOptionHint": "Remove the incorrect memory without saving a replacement. Use this when the information should simply not exist.",
+      "willDeleteMemory": "The incorrect memory will be deleted (no replacement saved)",
+      "enhance": "Enhance",
+      "enhanceHint": "Tip: Use Enhance to improve your text",
+      "enhanceFailed": "Could not enhance text. Please try again.",
+      "researchOption": "Research sources",
+      "researchOptionHint": "Search your files or the web for reliable sources",
+      "researchTabKb": "Your data",
+      "researchTabWeb": "Web search",
+      "researchButtonKb": "Search your data",
+      "researchButtonWeb": "Search the web",
+      "researchLoadingKb": "Searching your data...",
+      "researchLoadingWeb": "Searching the web...",
+      "researchNoResultsKb": "No relevant sources found in your data.",
+      "researchNoResultsWeb": "No relevant web results found.",
+      "researchNoResultsHintKb": "Try uploading documents, saving more feedback, or switching to web search.",
+      "researchNoResultsHintWeb": "Try different search terms or use 'Write my own'.",
+      "researchSelectHint": "Select the sources that contain the correct information:",
+      "researchSourceFile": "Source",
+      "researchRelevance": "Relevance",
+      "sourceTypeFile": "Uploaded file",
+      "sourceTypeFeedbackFalse": "Marked incorrect",
+      "sourceTypeFeedbackCorrect": "Confirmed correct",
+      "sourceTypeMemory": "Memory",
+      "researchSelectedCount": "{count} source selected | {count} sources selected",
+      "researchUseSelected": "Use selected sources as correction",
+      "back": "Back",
+      "again": "Regenerate",
+      "againTooltip": "Generate a new correction option",
+      "needSummaryFirst": "Please select or enter the false claim first",
+      "save": "Save Feedback",
+      "saveNegative": "Save false positive",
+      "savePositive": "Save corrected statement",
+      "cancel": "Cancel",
+      "success": "Thanks! The feedback was saved.",
+      "positiveSuccess": "Thanks! The correction was saved.",
+      "error": "Failed to save feedback."
+    },
+    "contradiction": {
+      "title": "Contradiction detected",
+      "subtitle": "The AI found conflicting information in your existing data.",
+      "explanation": "What you want to save may conflict with existing entries. For each conflict, decide whether to replace the old entry or keep both. Click on an item to toggle your decision.",
+      "newStatement": "What you want to save",
+      "existingItems": "Conflicting existing entries",
+      "willReplace": "Replace",
+      "willKeep": "Keep",
+      "replaceAll": "Replace all",
+      "keepAll": "Keep all",
+      "saveDecisions": "Save & apply decisions",
+      "summaryReplace": "{count} will be replaced",
+      "summaryKeep": "{count} will be kept",
+      "cancel": "Cancel (don't save anything)",
+      "deleteOnlyHint": "Selected memories will be deleted (no replacement)",
+      "type": {
+        "memory": "Memory",
+        "false_positive": "Marked as incorrect",
+        "positive": "Marked as correct"
+      }
+    },
+    "list": {
+      "title": "Feedback",
+      "subtitle": "Manage your AI corrections and feedback examples.",
+      "empty": "No feedback yet",
+      "emptyHint": "Use the thumbs-down button on AI responses to add corrections.",
+      "filterAll": "All",
+      "filterFalsePositive": "Incorrect",
+      "filterPositive": "Correct",
+      "typeFalsePositive": "Incorrect statement",
+      "typePositive": "Correct statement",
+      "edited": "edited",
+      "searchPlaceholder": "Search feedback...",
+      "selectedCount": "{count} selected",
+      "deleteSelected": "Delete selected",
+      "selectAllOnPage": "Select all on page",
+      "deselectAll": "Deselect all",
+      "showing": "Showing {from}–{to} of {total}",
+      "noResults": "No matching feedback",
+      "noResultsHint": "Try a different search term or change the filter.",
+      "deleteTitle": "Delete Feedback",
+      "deleteConfirm": "Are you sure you want to delete this feedback? This cannot be undone.",
+      "bulkDeleteTitle": "Delete Multiple Feedbacks",
+      "bulkDeleteCount": "{count} entries selected",
+      "bulkDeleteConfirm": "Are you sure you want to delete all selected feedback entries? This cannot be undone.",
+      "bulkDeleteSuccess": "{count} feedback entries deleted",
+      "loadError": "Failed to load feedback",
+      "editSuccess": "Feedback updated",
+      "editError": "Failed to update feedback",
+      "deleteSuccess": "Feedback deleted",
+      "deleteError": "Failed to delete feedback"
+    }
+  }
+}

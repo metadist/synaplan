@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import CompanionLinks from '@/components/CompanionLinks.vue'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 function mountLinks() {
   const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })

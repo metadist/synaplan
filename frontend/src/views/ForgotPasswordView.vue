@@ -170,7 +170,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { supportedLanguages } from '@/i18n'
+import { cycleLocale } from '@/i18n'
 import { SunIcon, MoonIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '@/composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
@@ -197,12 +197,7 @@ const mailerConfigured = computed(() => isMailerConfigured())
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const currentIndex = supportedLanguages.indexOf(
-    locale.value as (typeof supportedLanguages)[number]
-  )
-  const next = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
-  locale.value = next
-  localStorage.setItem('language', next)
+  void cycleLocale()
 }
 
 const toggleTheme = () => {

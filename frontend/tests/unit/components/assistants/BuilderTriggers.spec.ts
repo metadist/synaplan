@@ -5,7 +5,9 @@ import { createI18n } from 'vue-i18n'
 import BuilderTriggers from '@/components/assistants/BuilderTriggers.vue'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
-import en from '@/i18n/en.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/agentsApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/api/agentsApi')>()

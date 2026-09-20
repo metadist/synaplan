@@ -61,11 +61,29 @@ Always use `<MainLayout>` with a standard container:
 
 ## i18n (Internationalization)
 
-**Always update ALL five locales: `en.json`, `de.json`, `es.json`, `fr.json`, AND `tr.json`!** (See `frontend/src/i18n/index.ts` → `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`. A missing key silently falls back to English.)
+**Always update ALL five locales, in the matching namespace file.** Strings live in `frontend/src/i18n/locales/{en,de,es,fr,tr}/<namespace>.json`. A missing key silently falls back to English (`fallbackLocale: 'en'`), but only after that English namespace chunk is loaded too.
 
-`tests/unit/i18n/localeParity.spec.ts` enforces this: it compares full-file key parity against `localeParityBaseline.json`, a frozen ledger of pre-existing drift. Add an English-only key and the suite fails, naming the key. When you translate a key that is listed in the ledger, remove it from the ledger in the same change — the comparison is exact, so the debt can only shrink.
+Put a new top-level key in the namespace that already owns its siblings. The map is `NAMESPACE_KEYS` in `frontend/src/i18n/namespaces.ts`:
 
-Never add a new language by editing a picker by hand. `supportedLanguages` and `languageOptions` in `frontend/src/i18n/index.ts` are the single source of truth; every locale switcher derives from them.
+| File | Top-level keys |
+| ---- | -------------- |
+| `core.json` | announcements, branding, common, cookies, error, forceUpdate, header, iap, loading, models, native, nav, network, notFound, pageTitles, realtime, search, shared, sidebar, system, unsavedChanges, updates, welcome, welcomeUser |
+| `auth.json` | accountDeletion, adminSetup, auth, biometricLock, forcedPasswordChange, guest, localAiDownload, nativeServer, onboarding, setup, setupBanner |
+| `chat.json` | approvals, chat, chatError, chatInput, chatMessage, chatShare, chats, commands, companionLinks, incognito, message, messageRefs, modelMix, moderation, processing, promoTips, selfAware, summary, taskPlan |
+| `files.json` | fileMention, fileSelection, files, rag, storage, vectorStorage |
+| `knowledge.json` | feedback, memories |
+| `assistants.json` | assistants, bundle |
+| `widgets.json` | liveSupport, widget, widgetSessions, widgets |
+| `admin.json` | admin, adminModelStatus, aiInfra, iam, modules, people, platformConnect, providerHelp, statistics |
+| `config.json` | config |
+| `settings.json` | export, externalLink, limitReached, marketingNews, paywall, profile, settings, subscription, usageTaximeter |
+| `tools.json` | aiAccounts, aiProvider, channels, compute, customTools, help, jobs, linkedPlatforms, mail, mcpServers, messagesGateway, plugins, tools, workflows |
+
+Do not rename existing dotted keys when adding a file — `$t('config.savedTasks.saveAsTask')` must keep working. The embeddable widget only ships `core` + `chat` + `widgets`; never put widget-visible copy in `admin` / `config` / `tools`.
+
+`tests/unit/i18n/localeParity.spec.ts` still gates full-tree key parity against `localeParityBaseline.json`, a frozen ledger of pre-existing drift. Add an English-only key and the suite fails, naming the key. When you translate a key that is listed in the ledger, remove it from the ledger in the same change — the comparison is exact, so the debt can only shrink.
+
+Never add a new language by editing a picker by hand. `supportedLanguages` and `languageOptions` in `frontend/src/i18n/shared.ts` (re-exported from `@/i18n`) are the single source of truth; every locale switcher derives from them. Switch the UI language through `setLocale()` so the new locale's chunks load before the locale flips.
 
 ```vue
 <!-- In templates -->
