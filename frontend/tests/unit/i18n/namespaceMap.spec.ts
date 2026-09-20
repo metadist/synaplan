@@ -43,7 +43,7 @@ describe('i18n namespace map', () => {
   })
 
   it('keeps sidebar chrome namespaces on every authenticated route', () => {
-    expect([...CHROME_I18N_NAMESPACES]).toEqual(['chat', 'auth', 'admin', 'settings'])
+    expect([...CHROME_I18N_NAMESPACES]).toEqual(['chat', 'auth', 'admin', 'settings', 'tools'])
   })
 
   it('loads assistants wherever ExportImportPanel renders bundle.*', () => {

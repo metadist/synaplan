@@ -1,10 +1,11 @@
 /// <reference types="vite/client" />
 
 import 'vue-router'
+import type { I18nNamespace } from './i18n/namespaces'
 
 declare module 'vue-router' {
   interface RouteMeta {
-    i18n?: string[]
+    i18n?: I18nNamespace[]
     titleKey?: string
     requiresAuth?: boolean
     public?: boolean

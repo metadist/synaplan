@@ -238,13 +238,25 @@ const router = createRouter({
       path: '/shared/:lang([a-z]{2})/:token',
       name: 'shared-chat-lang',
       component: () => import('@/views/SharedChatView.vue'),
-      meta: { requiresAuth: false, public: true, i18n: ['chat', 'files'] },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        // Shared messages render memory/feedback badges (knowledge) via MessageText
+        // plus the demo setup CTA (auth).
+        i18n: ['chat', 'files', 'knowledge', 'auth'],
+      },
     },
     {
       path: '/shared/:token',
       name: 'shared-chat',
       component: () => import('@/views/SharedChatView.vue'),
-      meta: { requiresAuth: false, public: true, i18n: ['chat', 'files'] },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        // Shared messages render memory/feedback badges (knowledge) via MessageText
+        // plus the demo setup CTA (auth).
+        i18n: ['chat', 'files', 'knowledge', 'auth'],
+      },
     },
 
     // NOTE: There is intentionally no '/error' route.
@@ -267,7 +279,11 @@ const router = createRouter({
         requiresAuth: false,
         allowGuest: true,
         titleKey: 'pageTitles.chat',
-        i18n: ['chat', 'files'],
+        // Chat renders message badges (knowledge: memories/feedback), media-job
+        // and plugin states (tools), the assistant banner (assistants) and the
+        // model sorting label + desktop-run panel (config). All must be present
+        // on first paint — see routeCoverage.spec.ts.
+        i18n: ['chat', 'files', 'knowledge', 'tools', 'assistants', 'config'],
       },
     },
 
@@ -293,7 +309,8 @@ const router = createRouter({
         requiresAuth: true,
         helpId: 'tools.chatWidget',
         titleKey: 'pageTitles.chatWidget',
-        i18n: ['widgets'],
+        // The widget editor reuses the model capability labels (config).
+        i18n: ['widgets', 'config'],
       },
     },
     {
@@ -306,13 +323,24 @@ const router = createRouter({
       path: '/channels/widgets/:widgetId/chats',
       name: 'widget-chats',
       component: () => import('../views/WidgetSessionsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetChats', i18n: ['widgets'] },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.widgetChats',
+        // Session transcripts render memory/feedback badges (knowledge) via MessageText;
+        // the editor reuses the model capability labels (config).
+        i18n: ['widgets', 'knowledge', 'config'],
+      },
     },
     {
       path: '/channels/widgets/:widgetId',
       name: 'widget-detail',
       component: () => import('@/views/WidgetDetailView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetDetail', i18n: ['widgets'] },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.widgetDetail',
+        // The widget editor reuses the model capability labels (config).
+        i18n: ['widgets', 'config'],
+      },
     },
     {
       path: '/channels/email',
@@ -389,7 +417,12 @@ const router = createRouter({
       path: '/ai/providers',
       name: 'ai-accounts',
       component: () => import('@/views/AiAccountsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.aiAccounts', i18n: ['tools'] },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.aiAccounts',
+        // Provider cards reuse the provider labels (config).
+        i18n: ['tools', 'config'],
+      },
       beforeEnter: aiAccountsRouteGuard,
     },
     {
@@ -538,7 +571,12 @@ const router = createRouter({
       path: '/statistics',
       name: 'statistics',
       component: () => import('@/views/StatisticsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.statistics', i18n: ['admin'] },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.statistics',
+        // Usage tables reuse the action labels (config).
+        i18n: ['admin', 'config'],
+      },
       beforeEnter: (to) => {
         if (to.hash === '#chats') {
           return { path: '/chats' }

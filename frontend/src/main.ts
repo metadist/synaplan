@@ -29,7 +29,17 @@ import { applyBrandingTheme } from './utils/brandingTheme'
 ;(async () => {
   const app = createApp(App)
 
-  await preloadCore()
+  // Core strings must load before first paint, but a chunk failure (broken
+  // deploy, offline) must not blank-page the app: record it and keep mounting
+  // so the ErrorBoundary can render the inline ErrorView (same pattern as the
+  // config.init failure below).
+  let preloadError: unknown = null
+  try {
+    await preloadCore()
+  } catch (err) {
+    console.error('Bootstrap failed: preloadCore() threw', err)
+    preloadError = err
+  }
   persistLanguage(i18n.global.locale.value as SupportedLanguage)
 
   app.use(createPinia())
@@ -50,6 +60,16 @@ import { applyBrandingTheme } from './utils/brandingTheme'
   }
 
   const config = useConfigStore()
+
+  if (preloadError !== null) {
+    useGlobalErrorStore().setError({
+      message:
+        preloadError instanceof Error ? preloadError.message : 'Failed to load language files',
+      reason: 'unknown',
+      source: 'bootstrap:preloadCore',
+      stack: preloadError instanceof Error ? (preloadError.stack ?? '') : '',
+    })
+  }
 
   try {
     await config.init()
