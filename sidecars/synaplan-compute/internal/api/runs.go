@@ -479,6 +479,15 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 			reserved[f.Name] = true
 		}
 		s.promoteWorkOutputs(layout, reserved)
+		// Promotion adds files to /out, so the bytesOut computed above (before
+		// promotion) now understates what is actually served. Recompute it from
+		// /out so usage.bytesOut matches the harvested artefacts. Promoted files
+		// were already counted toward the output-limit check via /work, so this
+		// can never exceed the limit the switch already enforced.
+		promotedOut := artefact.TotalBytes(layout.Out)
+		s.mu.Lock()
+		rec.BytesOut = promotedOut
+		s.mu.Unlock()
 		s.finish(rec, contract.StatusSucceeded, code, "")
 	}
 }
