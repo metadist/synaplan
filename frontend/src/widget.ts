@@ -403,15 +403,16 @@ class SynaplanWidget {
       await this.ensureVueLoaded()
 
       // Dynamically import the chat widget components
-      const [{ createApp }, ChatWidget, { i18n }, widgetStyles, markdownStyles] = await Promise.all(
-        [
+      const [{ createApp }, ChatWidget, widgetI18n, widgetStyles, markdownStyles] =
+        await Promise.all([
           import('vue'),
           import('./components/widgets/ChatWidget.vue'),
-          import('./i18n'),
+          import('./i18n/widget'),
           import('./style.css?inline'),
           import('./assets/widget-markdown.css?inline'),
-        ]
-      )
+        ])
+
+      await widgetI18n.loadWidgetLocale()
 
       // In lazy mode: hide button but keep it for later
       // In eager mode: remove button completely
@@ -516,7 +517,7 @@ class SynaplanWidget {
         poweredByUrl: this.config!.poweredByUrl,
       })
 
-      this.app.use(i18n)
+      this.app.use(widgetI18n.i18n)
       this.app.mount(root)
 
       if (this.config?.detectTheme) {

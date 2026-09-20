@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 function mountPrompts(prompts: string[]) {
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   return mount(AssistantStarterPrompts, {
     props: { prompts },
     global: { plugins: [i18n] },

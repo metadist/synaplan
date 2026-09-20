@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useNotification } from '@/composables/useNotification'
-import { i18n } from '@/i18n'
+import { i18n } from '@/i18n/instance'
 import {
   getMemories,
   getMemoryById,

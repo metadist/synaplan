@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import de from '@/i18n/de.json'
-import en from '@/i18n/en.json'
-import es from '@/i18n/es.json'
-import fr from '@/i18n/fr.json'
-import tr from '@/i18n/tr.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
 import baseline from './localeParityBaseline.json'
+
+const de = loadAllMessages('de')
+const en = loadAllMessages('en')
+const es = loadAllMessages('es')
+const fr = loadAllMessages('fr')
+const tr = loadAllMessages('tr')
 
 /**
  * Locale-parity gate.

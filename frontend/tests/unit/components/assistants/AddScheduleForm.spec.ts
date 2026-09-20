@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import AddScheduleForm from '@/components/assistants/AddScheduleForm.vue'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 describe('AddScheduleForm', () => {
   it('keeps cron out of the primary form', () => {
-    const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+    const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
     const wrapper = mount(AddScheduleForm, { global: { plugins: [i18n] } })
     expect(wrapper.get('[data-testid="form-add-schedule"]').text().toLowerCase()).not.toContain(
       'cron'
@@ -15,7 +17,7 @@ describe('AddScheduleForm', () => {
   })
 
   it('requires an instruction', async () => {
-    const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+    const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
     const wrapper = mount(AddScheduleForm, { global: { plugins: [i18n] } })
     expect(wrapper.get('[data-testid="btn-save-schedule"]').attributes('disabled')).toBeDefined()
     await wrapper.get('[data-testid="input-schedule-instruction"]').setValue('Mail me a summary')

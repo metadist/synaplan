@@ -7,7 +7,9 @@ import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api/chatApi'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/chatApi', () => ({
   chatApi: {
@@ -52,7 +54,7 @@ function mountPanel(attach = false) {
   }
   const auth = useAuthStore()
   auth.user = { id: 1, email: 'ada@test.com', level: 'PRO', isAdmin: false } as never
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   return mount(AssistantTestPanel, {
     attachTo: attach ? document.body : undefined,
     global: {

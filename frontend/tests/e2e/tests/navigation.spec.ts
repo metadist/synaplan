@@ -399,12 +399,14 @@ test.describe('Navigation: Preferences page controls', () => {
       await page.locator(SET.btnLanguage(targetLang)).click()
     })
 
-    await test.step('Assert: localStorage reflects the new language', async () => {
+    await test.step('Assert: localStorage and visible copy follow the new language', async () => {
       await expect
         .poll(() => page.evaluate(() => localStorage.getItem('language')), {
           timeout: TIMEOUTS.SHORT,
         })
         .toBe(targetLang)
+      const expectedTitle = targetLang === 'de' ? 'Einstellungen' : 'Preferences'
+      await expect(page.locator(SET.page)).toContainText(expectedTitle)
     })
   })
 })

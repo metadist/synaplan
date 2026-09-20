@@ -26,7 +26,9 @@ vi.mock('@/services/api/httpClient', () => ({
 }))
 
 import PlatformConnectView from '@/views/PlatformConnectView.vue'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 describe('addin/connect redirect', () => {
   it('rewrites /addin/connect to /connect/platform with client=outlook and keeps query', async () => {
@@ -62,7 +64,7 @@ describe('addin/connect redirect', () => {
     const i18n = createI18n({
       legacy: false,
       locale: 'en',
-      messages: { en: { platformConnect: en.platformConnect } },
+      messages: { en: asI18nSchema({ platformConnect: en.platformConnect }) },
     })
     mount({ template: '<router-view />' }, { global: { plugins: [router, i18n] } })
     await flushPromises()

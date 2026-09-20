@@ -850,6 +850,22 @@ jobs:
         working-directory: frontend
         run: npm run check:types
 
+      # bundleSplit.spec.ts asserts on the built bundles (admin strings stay
+      # out of widget.js, config stays out of the app entry chunk) but skips
+      # when dist/ is absent. frontend-build already uploads both artifacts —
+      # download them so the assertions always execute here.
+      - name: Download frontend dist artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: Download widget dist artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: widget-dist
+          path: frontend/dist-widget
+
       - name: Run tests
         working-directory: frontend
         run: npm run test

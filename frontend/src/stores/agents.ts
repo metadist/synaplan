@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { i18n } from '@/i18n'
+import { i18n } from '@/i18n/instance'
 import { useNotification } from '@/composables/useNotification'
 import {
   agentFieldPath,

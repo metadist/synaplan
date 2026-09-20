@@ -75,7 +75,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { supportedLanguages } from '@/i18n'
+import { cycleLocale } from '@/i18n'
 import { SunIcon, MoonIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
@@ -94,12 +94,7 @@ let countdownInterval: number | null = null
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const currentIndex = supportedLanguages.indexOf(
-    locale.value as (typeof supportedLanguages)[number]
-  )
-  const next = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
-  locale.value = next
-  localStorage.setItem('language', next)
+  void cycleLocale()
 }
 
 const toggleTheme = () => {

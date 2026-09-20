@@ -1,0 +1,1030 @@
+{
+  "adminModelStatus": {
+    "title": "Estado de modelos",
+    "subtitle": "Qué modelos de IA funcionan ahora mismo y cuáles no.",
+    "loading": "Cargando el estado de los modelos…",
+    "loadFailed": "No se pudo cargar el estado de los modelos.",
+    "never": "nunca",
+    "noMatches": "Ningún modelo coincide con los filtros seleccionados.",
+    "freeHint": "La comprobación es gratuita: solo se pregunta qué modelos publica cada proveedor. Nunca se ejecuta un modelo de IA para esto.",
+    "states": {
+      "online": "En línea",
+      "degraded": "Con fallos",
+      "offline": "Fuera de servicio",
+      "unconfigured": "Sin configurar",
+      "unknown": "Desconocido"
+    },
+    "sources": {
+      "probe": "lista de modelos del proveedor",
+      "traffic": "uso real"
+    },
+    "summary": {
+      "allGood": "Todos los modelos responden",
+      "problems": "{count} modelo(s) requieren atención",
+      "lastCheck": "Última comprobación",
+      "monitoringOff": "La comprobación automática está desactivada, por lo que esta página solo muestra el último estado conocido."
+    },
+    "filters": {
+      "onlyProblems": "Mostrar solo problemas",
+      "capability": "Tarea",
+      "allCapabilities": "Todas las tareas"
+    },
+    "provider": {
+      "affected": "{count} afectados"
+    },
+    "model": {
+      "lastSuccess": "Última vez que funcionó",
+      "errorRate": "Falló el {percent} % de las últimas {total} llamadas",
+      "source": "Basado en",
+      "autoDisabled": "Desactivado automáticamente",
+      "switchedOff": "Desactivado",
+      "exempt": "Exento de la desactivación automática"
+    },
+    "actions": {
+      "refresh": "Comprobar ahora",
+      "refreshProvider": "Comprobar este proveedor",
+      "refreshProviderAria": "Comprobar {provider} ahora",
+      "resetCounters": "Borrar historial de errores",
+      "exempt": "Eximir de la automatización",
+      "unexempt": "Permitir la automatización de nuevo"
+    },
+    "confirmResetTitle": "¿Borrar el historial de errores?",
+    "confirmResetMessage": "Después, \"{name}\" se evaluará solo con el uso nuevo. Una comprobación que ya haya detectado que el modelo está retirado no se deshace.",
+    "messages": {
+      "refreshed": "Se comprobaron {count} modelo(s).",
+      "refreshFailed": "No se pudo completar la comprobación.",
+      "exempted": "Este modelo queda exento de la desactivación automática.",
+      "unexempted": "La desactivación automática vuelve a aplicarse a este modelo.",
+      "exemptFailed": "No se pudo cambiar la exención.",
+      "countersReset": "Historial de errores borrado.",
+      "countersResetFailed": "No se pudo borrar el historial de errores."
+    }
+  },
+  "platformConnect": {
+    "title": "Conectar Synaplan",
+    "subtitle": "Autoriza a {client} a usar esta cuenta de Synaplan.",
+    "loading": "Comprobando tu sesión…",
+    "confirmPrompt": "¿Conectar {client} en {host} como {uid}?",
+    "connectButton": "Conectar {client}",
+    "scopesNote": "Concede acceso a chats, archivos y búsqueda. La clave permanece en la plataforma: no la escribes aquí.",
+    "connecting": "Conectando…",
+    "successTitle": "Conectado.",
+    "successSubtitle": "Puedes cerrar esta ventana si no se cierra sola.",
+    "errorTitle": "No se pudo conectar",
+    "retry": "Reintentar",
+    "helpLine": "Esta ventana la abrió otra aplicación. Es seguro cerrarla.",
+    "notYou": "¿No eres tú? Cerrar sesión",
+    "errorMissingState": "Esta solicitud de conexión está incompleta. Empieza de nuevo en la otra aplicación.",
+    "errorOfficeNotReady": "Office.js no está disponible. Esta página debe abrirse desde Outlook.",
+    "errorNotSignedIn": "No has iniciado sesión. Actualiza la ventana e inicia sesión de nuevo.",
+    "errorIssuanceFailed": "Synaplan no pudo completar esta conexión.",
+    "errorUnknownClient": "Esta solicitud de conexión no se reconoce.",
+    "errorFlagOff": "Vincular esta plataforma no está activado en esta instancia de Synaplan.",
+    "errorNoDeliveryChannel": "Synaplan no pudo devolver la conexión a Outlook. Abre esta página desde Outlook e inténtalo de nuevo.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "esta aplicación"
+    }
+  },
+  "admin": {
+    "title": "Operar",
+    "description": "Gestión y configuración del sistema",
+    "tabs": {
+      "overview": "Resumen",
+      "users": "Usuarios",
+      "prompts": "Prompts",
+      "usage": "Uso",
+      "moderation": "Moderación",
+      "appServer": "Servidor de la app"
+    },
+    "overview": {
+      "totalUsers": "Usuarios Totales",
+      "recentUsers": "Usuarios Recientes"
+    },
+    "systemInfo": {
+      "title": "Información del Sistema",
+      "refresh": "Actualizar",
+      "loadError": "Error al cargar la información del sistema",
+      "phpVersion": "Versión de PHP",
+      "memoryLimit": "Límite de Memoria",
+      "inUse": "{value} en uso",
+      "diskFree": "Disco Libre",
+      "ofTotal": "de {value} en total",
+      "diskUsage": "Uso del disco",
+      "opcache": "OPcache",
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "peakMemory": "Memoria Máxima",
+      "uploadMax": "Tamaño Máx. de Subida",
+      "postMax": "Tamaño Máx. de POST",
+      "maxExecTime": "Tiempo Máx. de Ejecución",
+      "os": "Sistema Operativo",
+      "server": "Servidor",
+      "hostname": "Nombre de Host"
+    },
+    "analytics": {
+      "registrations": "Registros de Usuarios",
+      "usageByAction": "Uso por Acción",
+      "period": {
+        "7d": "7 Días",
+        "30d": "30 Días",
+        "90d": "90 Días",
+        "1y": "1 Año",
+        "all": "Todo el Tiempo"
+      },
+      "groupBy": {
+        "day": "Día",
+        "week": "Semana",
+        "month": "Mes"
+      }
+    },
+    "users": {
+      "email": "Correo",
+      "level": "Nivel",
+      "type": "Tipo",
+      "provider": "Proveedor",
+      "created": "Creado",
+      "status": "Estado",
+      "actions": "Acciones",
+      "delete": "Eliminar usuario",
+      "currentUser": "(Tú)",
+      "verified": "Verificado",
+      "unverified": "No verificado",
+      "searchPlaceholder": "Buscar por correo...",
+      "noUsers": "No se encontraron usuarios",
+      "deleteConfirmTitle": "¿Eliminar Usuario?",
+      "deleteConfirmDesc": "¿Estás seguro de que deseas eliminar a {email}? Esta acción no se puede deshacer.",
+      "deleteConfirmCheckbox": "Sí, confirmo la eliminación de todos los datos del usuario (incluyendo chats, widgets, documentos)",
+      "userDeleted": "Usuario {email} eliminado correctamente",
+      "userDeleteFailed": "Error al eliminar usuario",
+      "levelUpdated": "Nivel de usuario actualizado a {level}",
+      "levelUpdateFailed": "Error al actualizar nivel de usuario",
+      "loadFailed": "No se pudieron cargar los usuarios",
+      "invalidResponse": "El servidor envió una respuesta inesperada"
+    },
+    "impersonate": {
+      "button": "Ver como usuario",
+      "buttonTitle": "Suplantar a este usuario",
+      "confirmTitle": "¿Suplantar a {email}?",
+      "confirmMessage": "Iniciarás sesión como {email}. Toda acción y cambio se atribuirá a esta cuenta. Usa el banner superior para finalizar.",
+      "confirmAction": "Iniciar sesión",
+      "started": "Ahora ves la aplicación como {email}.",
+      "startFailed": "No se pudo iniciar la suplantación",
+      "disabled": "Ver la aplicación como otro usuario está desactivado en esta instancia.",
+      "disabledTitle": "Ver como otro usuario está desactivado",
+      "cannotImpersonateSelf": "No puedes suplantarte a ti mismo.",
+      "banner": {
+        "viewing": "Viendo como {email}",
+        "adminLabel": "Sesión de admin: {email}",
+        "exitButton": "Salir",
+        "exitButtonTitle": "Restaurar tu sesión de administrador"
+      },
+      "stopped": "Sesión de administrador restaurada.",
+      "stopFailed": "No se pudo finalizar la suplantación"
+    },
+    "prompts": {
+      "shortDesc": "Descripción Corta",
+      "prompt": "Prompt",
+      "selectionRules": "Reglas de Selección",
+      "selectionRulesPlaceholder": "Opcional: Reglas para la selección automática de este prompt"
+    },
+    "usage": {
+      "title": "Estadísticas de Uso",
+      "period": {
+        "day": "24 Horas",
+        "week": "7 Días",
+        "month": "30 Días",
+        "all": "Todo el Tiempo"
+      },
+      "totalRequests": "Solicitudes",
+      "totalTokens": "Tokens",
+      "totalCost": "Costo",
+      "avgLatency": "Latencia Prom.",
+      "byAction": "Por Acción",
+      "byProvider": "Por Proveedor",
+      "topModels": "Modelos Principales",
+      "topUsers": "Usuarios Principales",
+      "topUsersHint": "Usuarios con más solicitudes API en el período seleccionado (hasta 25).",
+      "topUsersEmpty": "Sin datos de uso en este período. Prueba \"Todo el tiempo\" o espera actividad de usuarios.",
+      "model": "Modelo",
+      "requests": "solicitudes",
+      "tokens": "tokens",
+      "cost": "Costo",
+      "activeSubscriptions": "Suscripciones Activas",
+      "subscriptionOverview": "Resumen de Suscripciones"
+    },
+    "subscriptions": {
+      "title": "Planes de suscripción",
+      "description": "Gestiona precios, presupuestos de costos y estado activo de cada nivel de suscripción. Los precios se muestran a los usuarios en el onboarding y en la página de suscripción.",
+      "level": "Nivel",
+      "name": "Nombre",
+      "priceMonthly": "Precio/mes",
+      "priceYearly": "Precio/año",
+      "currency": "Moneda",
+      "budgetMonthly": "Presupuesto/mes",
+      "budgetYearly": "Presupuesto/año",
+      "active": "Activo",
+      "actions": "Acciones",
+      "edit": "Editar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "saveSuccess": "Plan actualizado correctamente",
+      "saveError": "No se pudo actualizar el plan",
+      "loadError": "No se pudieron cargar las suscripciones",
+      "noSubscriptions": "No se encontraron planes de suscripción. Crea primero los planes en la base de datos.",
+      "budgetHint": "El presupuesto define el costo máximo de tokens (en EUR) por período de facturación. Establécelo en 0 para uso ilimitado. Los precios son los precios públicos mostrados; las compras en la app móvil usan el precio de la tienda de aplicaciones."
+    },
+    "moderation": {
+      "title": "Moderación de contenido",
+      "description": "Revisa el contenido reportado y, si es necesario, suspende o bloquea la cuenta infractora.",
+      "empty": "Ningún reporte coincide con este filtro.",
+      "loadError": "No se pudieron cargar los reportes",
+      "updateError": "Error al actualizar",
+      "reportUpdated": "Reporte actualizado",
+      "userStatusUpdated": "Estado de la cuenta actualizado",
+      "unresolvedUser": "Autor no identificado",
+      "totalCount": "{count} reportes",
+      "suspend": "Suspender",
+      "ban": "Bloquear",
+      "reactivate": "Reactivar",
+      "filters": {
+        "all": "Todos",
+        "open": "Abiertos",
+        "reviewed": "Revisados",
+        "actioned": "Resueltos",
+        "dismissed": "Descartados"
+      },
+      "col": {
+        "reason": "Motivo",
+        "content": "Contenido",
+        "reportedUser": "Usuario reportado",
+        "created": "Reportado",
+        "status": "Estado",
+        "actions": "Acciones"
+      },
+      "reportStatus": {
+        "open": "Abierto",
+        "reviewed": "Revisado",
+        "actioned": "Resuelto",
+        "dismissed": "Descartado"
+      },
+      "accountStatus": {
+        "active": "Activa",
+        "suspended": "Suspendida",
+        "banned": "Bloqueada"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "¿Suspender la cuenta?",
+          "message": "¿Suspender a {user}? Se cerrará su sesión y no podrá usar la plataforma hasta que se reactive."
+        },
+        "banned": {
+          "title": "¿Bloquear la cuenta?",
+          "message": "¿Bloquear a {user}? Esto bloquea la cuenta de forma permanente. Resérvalo para infracciones graves."
+        },
+        "active": {
+          "title": "¿Reactivar la cuenta?",
+          "message": "¿Reactivar a {user}? Podrá iniciar sesión y usar la plataforma de nuevo."
+        }
+      }
+    },
+    "config": {
+      "title": "Configuración del Sistema",
+      "description": "Gestionar variables de entorno y conexiones de servicios",
+      "loadError": "Error al cargar la configuración",
+      "saveError": "Error al guardar la configuración",
+      "saved": "Configuración guardada",
+      "dbOverridesEnv": "Guardada cifrada en la base de datos — tiene prioridad sobre cualquier valor coincidente en .env.",
+      "managedKeys": {
+        "title": "Las claves de proveedores se gestionan en Infraestructura de IA › Modelos y claves.",
+        "helm": "Las claves definidas en el entorno o por un chart de Helm se detectan automáticamente — una instalación con chart no necesita esta página. Usa Modelos y claves solo para añadir o sobrescribir una clave desde la interfaz.",
+        "stateNone": "sin definir",
+        "stateDb": "sobrescrita en la interfaz",
+        "stateEnv": "entorno / Helm",
+        "summary": "{env} del entorno, {db} sobrescritas en la interfaz.",
+        "cta": "Abrir Modelos y claves"
+      },
+      "envOverridesDb": "Fijado por la variable de entorno {key}. Actualmente: {value}. Elimina la variable del entorno para gestionar este ajuste aquí.",
+      "unsaved": "Cambios sin guardar",
+      "testConnection": "Probar Conexión",
+      "testFailed": "Prueba de conexión fallida",
+      "commandCopied": "Comando copiado al portapapeles",
+      "tabGroups": {
+        "aiData": "IA y datos",
+        "communication": "Comunicación",
+        "security": "Funciones y acceso"
+      },
+      "brandingMode": {
+        "light": "Está editando los ajustes del modo CLARO — los colores guardados aquí se aplican en el modo claro. Cambie la aplicación al modo oscuro para editar los colores del modo oscuro.",
+        "dark": "Está editando los ajustes del modo OSCURO — los colores guardados aquí se aplican en el modo oscuro. Cambie la aplicación al modo claro para editar los colores del modo claro."
+      },
+      "restartBanner": {
+        "title": "Configuración Actualizada — Reinicio Requerido",
+        "message": "Sus cambios se han guardado en el archivo .env. Para que los cambios surtan efecto, debe reiniciar sus contenedores Docker.",
+        "copyCommand": "Copiar Comando"
+      },
+      "m365": {
+        "title": "Antes de que estos campos sirvan: registra una aplicación en Azure",
+        "intro": "El inicio de sesión de Microsoft 365 necesita un registro de aplicación en Azure. Se hace una sola vez, lleva unos cinco minutos y después cada persona podrá conectar su propia cuenta.",
+        "portalLink": "Portal de Azure → Registros de aplicaciones",
+        "step1": "Abre {portal} y elige «Nuevo registro». El nombre da igual, por ejemplo «Synaplan».",
+        "step2": "En «URI de redirección», elige el tipo de plataforma Web (no SPA) y pega exactamente esta dirección:",
+        "step3": "Ve a «Permisos de API» → «Agregar un permiso» → «Microsoft Graph» → «Permisos delegados» y añade todos estos:",
+        "step3Note": "offline_access no es opcional: sin él Microsoft no emite un token de actualización y toda ejecución programada deja de funcionar al cabo de una hora.",
+        "step4": "Ve a «Certificados y secretos» → «Nuevo secreto de cliente» y copia la columna Valor, no el Id. de secreto. Solo se muestra esta vez.",
+        "step5": "Pega el ID de cliente y el secreto en los campos de abajo, indica el inquilino y activa M365_ENABLED. Después, cada persona conecta su cuenta en Canales → Conexiones.",
+        "ready": "Listo: ya se puede conectar una cuenta de Microsoft 365 en Canales → Conexiones.",
+        "notReady": "Todavía no está activo. Rellena los campos de abajo y activa M365_ENABLED.",
+        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente."
+      },
+      "dropbox": {
+        "title": "Antes de que estos campos funcionen: crea una aplicación en la Dropbox App Console",
+        "intro": "La conexión con Dropbox necesita una aplicación de Dropbox. Se hace una sola vez, tarda unos cinco minutos y después cada usuario puede conectar su propia cuenta.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Abre la {console} y elige «Create app». Selecciona «Scoped access» y «Full Dropbox». El nombre da igual, por ejemplo «Synaplan».",
+        "step2": "En la pestaña «Permissions», activa estos dos permisos y haz clic en «Submit»:",
+        "step3": "En la pestaña «Settings», en «OAuth 2 → Redirect URIs», añade exactamente esta dirección:",
+        "step4": "También en la pestaña «Settings», copia el App key y el App secret (haz clic en «Show»).",
+        "step5": "Pega la clave y el secreto en los campos de abajo y activa DROPBOX_ENABLED. Después, los usuarios conectan su cuenta en Canales → Conexiones.",
+        "ready": "Listo: los usuarios pueden conectar su cuenta de Dropbox en Canales → Conexiones.",
+        "notReady": "Todavía no está activo. Rellena los campos de abajo y activa DROPBOX_ENABLED.",
+        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente.",
+        "resetTitle": "Restablecer todas las conexiones de Dropbox",
+        "resetDescription": "Elimina la conexión de Dropbox de todos los usuarios de esta instalación, incluidos los tokens guardados. Útil después de cambiar la app de Dropbox o sus permisos: después, todos pueden volver a conectar su cuenta desde cero.",
+        "resetButton": "Restablecer conexiones",
+        "resetConfirmTitle": "¿Restablecer todas las conexiones de Dropbox?",
+        "resetConfirmMessage": "Se eliminará la conexión de Dropbox de todos los usuarios y cada uno tendrá que volver a conectar su cuenta de Dropbox. Esto no se puede deshacer.",
+        "resetDone": "No hay conexiones de Dropbox que eliminar | 1 conexión de Dropbox eliminada | {count} conexiones de Dropbox eliminadas",
+        "resetFailed": "El restablecimiento ha fallado. Inténtalo de nuevo."
+      },
+      "tabs": {
+        "ai": "Servicios de IA",
+        "email": "Correo",
+        "branding": "Identidad visual",
+        "mobile": "App móvil",
+        "auth": "Autenticación",
+        "channels": "Canales de entrada",
+        "processing": "Procesamiento",
+        "features": "Funciones",
+        "sharing": "Uso compartido",
+        "routing": "Enrutado",
+        "interface": "Interfaz",
+        "guest_landing": "Página de invitados",
+        "vectordb": "Base vectorial"
+      },
+      "sections": {
+        "tika": "Apache Tika",
+        "docling": "Docling",
+        "rasterize": "Rasterizador PDF",
+        "whisper": "Whisper (audio)",
+        "brave": "Búsqueda web (Brave)",
+        "media": "Generación de medios en segundo plano",
+        "compute": "Trabajo con archivos"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "URL de Apache Tika",
+        "TIKA_TIMEOUT_MS": "Tiempo de espera de la petición (ms)",
+        "TIKA_RETRIES": "Reintentos máximos",
+        "TIKA_HTTP_USER": "Usuario de autenticación HTTP",
+        "TIKA_HTTP_PASS": "Contraseña de autenticación HTTP",
+        "DOCLING_BASE_URL": "URL de Docling serve (vacío = desactivado)",
+        "DOCLING_TIMEOUT_MS": "Tiempo de espera de la petición (ms)",
+        "DOCLING_MAX_BYTES": "Tamaño máximo de archivo (bytes)",
+        "RASTERIZE_DPI": "DPI de rasterización PDF",
+        "RASTERIZE_PAGE_CAP": "Máximo de páginas a rasterizar",
+        "RASTERIZE_TIMEOUT_MS": "Tiempo de espera de rasterización (ms)",
+        "WHISPER_ENABLED": "Activar transcripción de audio",
+        "WHISPER_DEFAULT_MODEL": "Modelo Whisper predeterminado",
+        "BRAVE_SEARCH_ENABLED": "Activar búsqueda web",
+        "BRAVE_SEARCH_API_KEY": "Clave API de Brave Search",
+        "BRAVE_SEARCH_COUNT": "Resultados por búsqueda",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Genera imágenes, vídeo y audio en segundo plano para que el chat no se bloquee. El asistente muestra el estado en directo y un aviso cuando termina. Si está desactivado, el turno espera a que el archivo esté listo. Necesita el contenedor worker.",
+        "COMPUTE_ENABLED": "El asistente puede hacer trabajo corto con archivos (Python o Node) sobre copias de los archivos que elijas. Necesita el sidecar de cómputo (COMPUTE_URL + COMPUTE_TOKEN). Un docker compose up local arranca ese sidecar y activa esto.",
+        "COMPUTE_REQUIRE_TIER": "Aislamiento mínimo que el sidecar debe informar antes de activar el trabajo con archivos: Estándar (Docker normal), Aislamiento fuerte (gVisor) o Máquina virtual (microVM). Synaplan Cloud exige aislamiento fuerte.",
+        "COMPUTE_WORKSPACES_ENABLED": "Conserva una carpeta entre ejecuciones para que el asistente pueda continuar un trabajo anterior. Archivos → Espacio de trabajo muestra el contenido. El trabajo con archivos también debe estar activado.",
+        "COMPUTE_EGRESS_ENABLED": "Una ejecución puede descargar de una lista corta de sitios web públicos que el asistente haya nombrado. Desactivado por defecto: las ejecuciones permanecen sin red. Las direcciones privadas o locales se rechazan siempre. Solo se puede activar si el sidecar ofrece acceso a sitios web.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Cuando una ejecución vaya a descargar de la web, pregunta primero a la persona propietaria aunque el trabajo cotidiano con archivos se ejecutara automáticamente. Activado por defecto.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "Cuántos sitios web puede listar una ejecución. Predeterminado: 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Segundos predeterminados que puede durar una ejecución.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Límite de memoria predeterminado en megabytes para una ejecución.",
+        "COMPUTE_DEFAULT_CPU": "Cuota de CPU predeterminada para una ejecución.",
+        "COMPUTE_DEFAULT_PIDS": "Límite de procesos predeterminado para una ejecución.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Límite de tamaño predeterminado en megabytes para los archivos que la ejecución puede crear.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Tope duro en segundos para una ejecución.",
+        "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un asistente no puede relajar esto.",
+        "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un asistente no puede relajar esto.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Cuántos días puede permanecer sin uso una carpeta de trabajo con archivos antes de que la limpieza la elimine. Predeterminado: 90."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Estándar (Docker normal)",
+          "gvisor": "Aislamiento fuerte (gVisor)",
+          "microvm": "Máquina virtual (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Ejecutar automáticamente",
+          "approve": "Preguntar primero",
+          "block": "No ejecutar nunca"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Ejecutar automáticamente",
+          "approve": "Preguntar primero",
+          "block": "No ejecutar nunca"
+        }
+      }
+    }
+  },
+  "statistics": {
+    "title": "¡Bienvenido a Synaplan!",
+    "messageStats": "Estadísticas de Mensajes",
+    "totalMessages": "Mensajes Totales",
+    "messagesSent": "Mensajes Enviados",
+    "messagesReceived": "Mensajes Recibidos",
+    "totalFiles": "Archivos Totales",
+    "filesSent": "Archivos Enviados",
+    "filesReceived": "Archivos Recibidos",
+    "latestFiles": "Archivos Recientes",
+    "received": "Recibido",
+    "sent": "Enviado"
+  },
+  "aiInfra": {
+    "modelImport": {
+      "title": "Importar modelos",
+      "importModels": "Importar modelos",
+      "importPulled": "Importar modelos descargados",
+      "unreachable": "Este endpoint no respondió. Compruébalo en Probar e inténtalo de nuevo.",
+      "empty": "Este endpoint no ofrece modelos para importar.",
+      "selectAllNew": "Seleccionar todos los nuevos",
+      "probeLabel": "Comprobar qué puede hacer cada modelo (consume un poco de crédito)",
+      "colModel": "Modelo",
+      "colTags": "Capacidades",
+      "colStatus": "Estado",
+      "exists": "Ya añadido",
+      "new": "Nuevo",
+      "tagsHint": "Capacidades permitidas: {tags}. Separa varias con comas.",
+      "apply": "Importar {count}",
+      "applying": "Importando…",
+      "applied": "Se importaron {created} fila(s) de modelo, se omitieron {skipped} ya presentes.",
+      "applyFailed": "No se pudieron importar los modelos.",
+      "noValidTags": "Da a cada modelo seleccionado al menos una capacidad válida."
+    },
+    "extraction": {
+      "lead": "Elija cómo se convierte un documento en texto. Docling conserva tablas y títulos; si no está en marcha, se usa Tika y la carga nunca falla.",
+      "family": {
+        "document": "Documentos",
+        "text": "Texto plano",
+        "image": "Imágenes",
+        "audio": "Audio",
+        "audio_no_cloud": "Audio sin STT en la nube",
+        "video": "Vídeo"
+      },
+      "moveUp": "Subir",
+      "moveDown": "Bajar",
+      "remove": "Quitar",
+      "add": "Añadir",
+      "addPlaceholder": "Añadir un adaptador…",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "no disponible",
+      "testSidecar": {
+        "tika": "Probar Tika",
+        "docling": "Probar Docling"
+      },
+      "testingSidecar": "Probando…",
+      "sidecarSettings": "La URL, el tiempo de espera y la prueba de conexión de Tika y Docling están en Configuración del sistema → Procesamiento.",
+      "sidecarSettingsLink": "Abrir ajustes de procesamiento",
+      "testTitle": "Probar con un archivo",
+      "testHint": "Suba un ejemplo. Verá qué adaptador ganó y por qué los demás no.",
+      "testButton": "Probar con un archivo",
+      "testing": "Probando…",
+      "winner": "Ganador: {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling no disponible — se usó Tika",
+      "doclingRejectedTika": "Docling respondió pero rechazó el archivo — se usó Tika",
+      "save": "Guardar cadena",
+      "saved": "Cadena de extracción guardada. La próxima carga la usará.",
+      "saveFailed": "No se pudo guardar la cadena de extracción",
+      "emptyChain": "Cada tipo de archivo necesita al menos un adaptador.",
+      "loadFailed": "No se pudieron cargar los ajustes de extracción",
+      "verdict": {
+        "quality_ok": "aceptado",
+        "not_applicable": "sin filtro",
+        "markdown_structure": "aceptado (tablas o títulos)",
+        "empty": "vacío",
+        "low_quality": "demasiado poco texto útil",
+        "unavailable": "no disponible",
+        "rejected": "alcanzó el servicio pero rechazó el archivo",
+        "unsupported": "no admite este archivo",
+        "unknown": "adaptador desconocido",
+        "skipped": "omitido",
+        "rewritten": "convertido para el siguiente adaptador"
+      }
+    },
+    "webSearch": {
+      "lead": "Elija quién busca en la web para el chat. La siguiente búsqueda usa el nuevo proveedor, sin reiniciar. La consulta de prueba muestra títulos para que vea que funciona.",
+      "docs": "Documentación",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "no disponible",
+      "capabilities": "Capacidades",
+      "capability": {
+        "freshness": "Actualidad",
+        "country": "País",
+        "language": "Idioma",
+        "siteFilter": "Filtro de sitio",
+        "fullContent": "Texto completo",
+        "answer": "Respuesta"
+      },
+      "sovereignty": {
+        "selfHosted": "autohospedado",
+        "eu": "UE",
+        "usCloud": "nube de EE. UU."
+      },
+      "apiKey": "Clave API",
+      "apiKeyPlaceholder": "Pegue una clave API",
+      "saveKey": "Guardar clave",
+      "keySaved": "Clave guardada y verificada. La siguiente búsqueda puede usarla.",
+      "fallback": "Proveedor de reserva",
+      "fallbackNone": "Sin reserva",
+      "allowUsers": "Permitir que los usuarios elijan su proveedor",
+      "save": "Guardar búsqueda web",
+      "saved": "Ajustes de búsqueda web guardados. El siguiente chat los usará.",
+      "savedInactive": "{provider} no está listo ({reason}). La búsqueda web del chat no devolverá resultados.",
+      "savedInactiveFallback": "{provider} no está listo ({reason}). La búsqueda web del chat usará el proveedor de reserva.",
+      "savedInactiveBoth": "{provider} no está listo ({reason}). El proveedor de reserva tampoco está listo. La búsqueda web del chat no devolverá resultados.",
+      "saveFailed": "No se pudieron guardar los ajustes de búsqueda web",
+      "loadFailed": "No se pudieron cargar los ajustes de búsqueda web",
+      "testTitle": "Consulta de prueba",
+      "testHint": "Ejecute una consulta breve. Verá hasta cinco títulos del proveedor activo.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Consulta de prueba",
+      "testing": "Probando…",
+      "testProvider": "Respondido por {provider}",
+      "testProviderFallback": "Respondido por {provider} (reserva de {from})"
+    },
+    "rerank": {
+      "lead": "Tras la búsqueda, un reordenador pone primero los fragmentos más útiles. Déjalo apagado hasta que una prueba demuestre que ayuda. El chat no cambia mientras esté apagado.",
+      "enable": "Usar reordenación en la búsqueda de documentos",
+      "model": "Modelo de reordenación",
+      "modelNone": "Ningún modelo seleccionado",
+      "multiplier": "Cuántos fragmentos extra obtener (2–10)",
+      "budgetMs": "Abandonar después de estos milisegundos (100–5000)",
+      "llmFallback": "Usar el modelo de chat si no hay modelo de reordenación",
+      "llmFallbackHint": "Usa el modelo de resumen en cada búsqueda y puede costar más. Es mejor un modelo de reordenación dedicado.",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "no disponible",
+      "apiKey": {
+        "jina": "Clave API de Jina",
+        "cohere": "Clave API de Cohere",
+        "voyage": "Clave API de Voyage"
+      },
+      "apiKeyPlaceholder": "Pegar una clave API",
+      "saveKey": "Guardar clave",
+      "keySaved": "Clave guardada. La próxima reordenación puede usarla.",
+      "save": "Guardar reordenación",
+      "saved": "Reordenación guardada. La próxima búsqueda de documentos la usa.",
+      "savedOff": "Reordenación guardada. La búsqueda de documentos mantiene el orden vectorial original.",
+      "savedInactive": "Reordenación guardada. Sigue inactiva hasta que haya un modelo de reordenación o el respaldo del modelo de chat.",
+      "saveFailed": "No se pudieron guardar los ajustes de reordenación",
+      "loadFailed": "No se pudieron cargar los ajustes de reordenación",
+      "testTitle": "Probar con fragmentos de ejemplo",
+      "testHint": "Escribe una pregunta y un fragmento por línea. Verás el nuevo orden para comprobar que funciona.",
+      "testQueryPlaceholder": "¿Cuál es el total de la factura?",
+      "testDocumentsPlaceholder": "El total de la factura es 120 euros.\nEl horario de oficina es de 9 a 17.",
+      "testButton": "Probar orden",
+      "testing": "Probando…",
+      "lastEval": {
+        "title": "Última medición",
+        "line": "El {date}: encontró el fragmento correcto {recallOff} de las veces sin reordenación, {recallOn} con ella. Las respuestas más lentas tardaron {p95Off} ms sin y {p95On} ms con."
+      }
+    }
+  },
+  "providerHelp": {
+    "openAria": "Cómo configurar esto",
+    "createKeyLink": "Crear clave API",
+    "downloadLink": "Descargar Ollama",
+    "groq": {
+      "title": "Clave API de Groq",
+      "message": "Crea una clave API gratuita de Groq en la consola de Groq y pégala aquí. El nivel gratuito suele bastar para empezar a chatear en menos de un minuto."
+    },
+    "openai": {
+      "title": "Clave API de OpenAI",
+      "message": "Crea una clave API en tu cuenta de OpenAI (página de API keys) y pégala aquí. El uso lo factura OpenAI."
+    },
+    "anthropic": {
+      "title": "Clave API de Anthropic",
+      "message": "Crea una clave API en la consola de Anthropic (Ajustes → Keys) y pégala aquí para usar los modelos Claude."
+    },
+    "google": {
+      "title": "Clave API de Google Gemini",
+      "message": "Crea una clave API de Gemini en Google AI Studio y pégala aquí. Hay un nivel gratuito para muchos modelos."
+    },
+    "mistral": {
+      "title": "Clave API de Mistral",
+      "message": "Crea una clave API en la consola de Mistral y pégala aquí. Mistral ofrece un nivel gratuito para empezar."
+    },
+    "trustedtokens": {
+      "title": "Clave API de TrustedTokens",
+      "message": "Crea una clave API en TrustedTokens (Cuenta → Acceso API) y pégala aquí. La inferencia se ejecuta en GPUs alemanas con residencia de datos en la UE."
+    },
+    "a2agent": {
+      "title": "Clave API de A2Agent",
+      "message": "Crea una clave API de pago por uso en A2Agent (panel → claves API) y pégala aquí. Los prompts los procesan proveedores de modelos de China continental (Qwen, DeepSeek, MiniMax) a través de este gateway. A2Agent atiende a usuarios fuera de China continental. Quien trate datos personales de la UE debe decidirlo según su DPA."
+    },
+    "huggingface": {
+      "title": "Token API de HuggingFace",
+      "message": "Crea un token de acceso en la configuración de HuggingFace y pégalo aquí para usar los modelos de HuggingFace Inference."
+    },
+    "xai": {
+      "title": "Clave API de xAI",
+      "message": "Crea una clave API en la consola de xAI y pégala aquí para usar los modelos Grok."
+    },
+    "perplexity": {
+      "title": "Clave API de Perplexity",
+      "message": "Crea una clave API en tu cuenta de Perplexity y pégala aquí para usar los modelos Sonar. La misma clave sirve para la búsqueda web si eliges Perplexity en la pestaña Búsqueda web."
+    },
+    "ollama": {
+      "title": "IA local con Ollama",
+      "message": "Descarga Ollama e instala un modelo potente como gpt-oss:120b (o uno más pequeño como llama3.2 si tienes menos RAM). No hace falta clave API: Synaplan habla con Ollama en la URL configurada."
+    }
+  },
+  "people": {
+    "title": "Personas",
+    "subtitle": "Usuarios y grupos de esta instancia.",
+    "tabs": {
+      "users": "Usuarios",
+      "groups": "Grupos",
+      "policies": "Políticas",
+      "linkedPlatforms": "Instancias de plataforma",
+      "audit": "Auditoría"
+    },
+    "openPeople": "Abrir Personas",
+    "backToOperate": "Volver a Operar",
+    "myGroups": {
+      "subtitle": "Grupos a los que pertenece en esta instancia.",
+      "emptyMember": "Aún no está en ningún grupo. Un administrador puede añadirle en la página Personas.",
+      "emptyAdmin": "Aún no hay grupos. Cree uno en la página Personas.",
+      "leave": "Salir",
+      "leaveConfirm": "¿Salir del grupo \"{name}\"? Perderá el acceso a todo lo compartido con ese grupo. El grupo en sí permanece.",
+      "left": "Ha salido del grupo.",
+      "leaveFailed": "No se pudo salir del grupo.",
+      "leaveDirectory": "Esta pertenencia viene de su inicio de sesión y no se puede abandonar aquí."
+    },
+    "users": {
+      "groups": "Grupos",
+      "identities": "Inicio de sesión"
+    },
+    "groups": {
+      "name": "Nombre",
+      "kind": "Tipo",
+      "members": "Miembros",
+      "memberCount": "{count} miembros",
+      "fromLogin": "De su inicio de sesión",
+      "manual": "Manual",
+      "create": "Crear grupo",
+      "createTitle": "Crear un grupo",
+      "createPrompt": "Nombre del grupo",
+      "rename": "Renombrar",
+      "renameTitle": "Renombrar grupo",
+      "delete": "Eliminar",
+      "deleteConfirm": "¿Eliminar el grupo \"{name}\"? Las personas permanecen; solo se quita el grupo.",
+      "empty": "Aún no hay grupos. Cree uno para compartir más adelante.",
+      "loadError": "No se pudieron cargar los grupos.",
+      "saveError": "No se pudo guardar el grupo.",
+      "created": "Grupo creado.",
+      "renamed": "Grupo renombrado.",
+      "deleted": "Grupo eliminado.",
+      "directoryReadOnly": "Este grupo viene de su inicio de sesión y no se puede cambiar el nombre ni eliminar aquí.",
+      "directoryManagedHint": "Las pertenencias de su inicio de sesión se actualizan en el próximo acceso. Aún puede añadir personas a mano.",
+      "addMember": "Añadir una persona",
+      "addMemberPlaceholder": "Buscar por correo",
+      "addMemberNotFound": "Ningún usuario coincide con ese correo.",
+      "removeMember": "Quitar",
+      "removeConfirm": "¿Quitar a {email} de este grupo?",
+      "roleMember": "Miembro",
+      "roleManager": "Responsable",
+      "memberAdded": "Persona añadida al grupo.",
+      "memberRemoved": "Persona quitada del grupo.",
+      "sharedWith": "Compartido con este grupo",
+      "sharedEmpty": "Todavía no hay nada compartido con este grupo."
+    },
+    "audit": {
+      "when": "Cuándo",
+      "who": "Quién",
+      "actionLabel": "Acción",
+      "kind": "Tipo",
+      "resource": "Recurso",
+      "subject": "Detalles",
+      "empty": "Aún no hay eventos de auditoría.",
+      "more": "Cargar más",
+      "loadError": "No se pudo cargar el registro de auditoría.",
+      "filterAll": "Todos",
+      "action": {
+        "share_grant": "Compartido",
+        "share_revoke": "Uso compartido eliminado",
+        "group_create": "Grupo creado",
+        "group_update": "Grupo actualizado",
+        "group_delete": "Grupo eliminado",
+        "group_member_set": "Miembro añadido",
+        "group_member_remove": "Miembro eliminado",
+        "group_member_leave": "Salió de un grupo",
+        "directory_sync": "Grupo de inicio de sesión actualizado",
+        "impersonation_start": "Empezó a ver como usuario",
+        "impersonation_stop": "Dejó de ver como usuario",
+        "admin_metadata_view": "Consultó la lista de recursos",
+        "policy_set": "Políticas de grupo actualizadas",
+        "policy_lock": "Ajuste bloqueado",
+        "platform_link_linked": "Plataforma vinculada",
+        "platform_link_disconnected": "Plataforma desconectada",
+        "platform_link_reassigned": "Vínculo de plataforma movido a otra cuenta",
+        "platform_link_exchange_failed": "Error al vincular la plataforma",
+        "platform_link_redirect_rejected": "Redirección de plataforma rechazada",
+        "platform_instance_registered": "Plataforma registrada",
+        "platform_instance_approved": "Plataforma aprobada",
+        "platform_instance_revoked": "Plataforma revocada"
+      }
+    },
+    "linkedPlatforms": {
+      "intro": "Servidores de Nextcloud, ownCloud y Outlook que pidieron usar este Synaplan. Aprueba uno para que sus usuarios puedan conectar sus propias cuentas en Gestionar › Conexiones › Plataformas vinculadas.",
+      "empty": "Aún no se ha registrado ninguna plataforma.",
+      "client": "Plataforma",
+      "host": "Dirección",
+      "status": "Estado",
+      "actions": "Acciones",
+      "approve": "Aprobar",
+      "revoke": "Revocar",
+      "approved": "Plataforma aprobada.",
+      "revoked": "Plataforma revocada.",
+      "approveError": "No se pudo aprobar la plataforma.",
+      "revokeError": "No se pudo revocar la plataforma.",
+      "loadError": "No se pudieron cargar las plataformas.",
+      "revokeTitle": "¿Revocar esta plataforma?",
+      "revokeConfirm": "¿Revocar esta plataforma? Todas las claves vinculadas dejarán de funcionar.",
+      "statusValue": {
+        "active": "Activa",
+        "pending": "En espera de aprobación",
+        "revoked": "Revocada"
+      }
+    },
+    "policies": {
+      "group": "Grupo",
+      "chooseGroup": "Seleccione un grupo",
+      "helper": "Estos ajustes se aplican a todos en el grupo. Un ajuste personal gana. Un bloqueo de instancia ignora el valor del grupo y los ajustes personales.",
+      "pickGroup": "Seleccione un grupo para editar sus políticas.",
+      "defaultModels": "Modelos predeterminados",
+      "allowedModels": "Modelos permitidos",
+      "allowedHelper": "Déjelo vacío para que puedan usar todos los modelos. Una lista limita lo que pueden elegir.",
+      "features": "Funciones",
+      "featuresHelper": "Deje el valor de la instancia salvo que este grupo deba activar o desactivar una función.",
+      "featureOn": "Activado para este grupo",
+      "featureOff": "Desactivado para este grupo",
+      "inheritedOn": "El valor de la instancia está activado.",
+      "inheritedOff": "El valor de la instancia está desactivado.",
+      "inheritedUnset": "La instancia no tiene valor, así que está desactivado.",
+      "willInherit": "Tras guardar se usará el valor de la instancia.",
+      "groupForcesOn": "Este grupo lo activa para sus miembros.",
+      "groupForcesOff": "Este grupo lo desactiva para sus miembros.",
+      "rateLimit": "Nivel de límite de uso",
+      "useGlobal": "Usar el valor de la instancia",
+      "useBillingTier": "Usar el plan de la persona",
+      "conflict": "Otro grupo define un valor distinto. Gana el grupo con el número más bajo.",
+      "locks": "Valores de instancia bloqueados",
+      "locksHelper": "Estos bloqueos se aplican a toda la instancia, no a un grupo. Mientras un bloqueo está activo, solo se usa el valor de la instancia. Los valores de grupo y personales se conservan, pero se ignoran. Desactive el bloqueo para volver a usarlos.",
+      "save": "Guardar políticas",
+      "saved": "Políticas del grupo guardadas.",
+      "lockSaved": "Bloqueo de instancia actualizado.",
+      "lockIgnored": "No se usa mientras el bloqueo de instancia está activo.",
+      "lockMissingDefault": "No hay un valor de instancia para bloquear. Defina primero el valor de la instancia y luego bloquéelo.",
+      "loadError": "No se pudieron cargar las políticas.",
+      "saveError": "No se pudieron guardar las políticas.",
+      "capability": {
+        "CHAT": "Chat",
+        "VECTORIZE": "Búsqueda",
+        "PIC2TEXT": "Imagen a texto",
+        "SOUND2TEXT": "Voz a texto",
+        "MEM": "Memoria",
+        "TOOLS": "Herramientas"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Tareas guardadas",
+        "DESKTOP_AGENT_ENABLED": "Agente de escritorio",
+        "DOCUMENT_TOOLS_ENABLED": "Herramientas de documentos",
+        "MULTITASK_ROUTING_ENABLED": "Enrutado de varios pasos",
+        "MULTITASK_PARALLEL_ENABLED": "Pasos en paralelo",
+        "MULTITASK_URL_FETCH_ENABLED": "Obtener páginas web",
+        "MULTITASK_MCP_FETCH_ENABLED": "Leer herramientas conectadas",
+        "MULTITASK_MCP_ACTION_ENABLED": "Actuar con herramientas conectadas",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Buscar correo",
+        "TOOLS_REGISTRY_ENABLED": "Catálogo de herramientas",
+        "TOOLS_APPROVALS_ENABLED": "Aprobaciones de herramientas",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Herramientas HTTP propias",
+        "WORKFLOWS_BUILDER_ENABLED": "Editor de pasos"
+      }
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Puede ver",
+      "use": "Puede usar",
+      "edit": "Puede editar",
+      "manage": "Puede administrar"
+    },
+    "share": "Compartir",
+    "sharedWithMe": "Compartido conmigo",
+    "incoming": {
+      "title": "Chats entrantes",
+      "subtitle": "Chats que personas o grupos han compartido contigo",
+      "menu": "Chats entrantes",
+      "menuNew": "Nuevos chats entrantes",
+      "new": "Nuevo",
+      "newCount": "{count} entrantes nuevos",
+      "hint": "Abre un chat para verlo. Para añadir tus propios mensajes, continúalo como tu copia.",
+      "owner": "de {name}",
+      "sourceGroup": "Este chat pertenece a {owner}. Le llegó a través del grupo \"{name}\".",
+      "sourceEveryone": "Este chat pertenece a {owner}. Se compartió con todos en esta organización.",
+      "sourceDirect": "Este chat pertenece a {owner}. Se compartió con usted personalmente.",
+      "emptyTitle": "Aún no hay entrantes",
+      "emptyText": "Cuando alguien comparta un chat contigo o con uno de tus grupos, aparecerá aquí.",
+      "filter": {
+        "label": "Filtrar chats",
+        "all": "Todos",
+        "private": "Privado",
+        "group": "Grupo",
+        "widget": "Widget"
+      },
+      "pill": {
+        "private": "Privado",
+        "privateTitle": "Tu propio chat: solo tú puedes verlo",
+        "group": "Grupo",
+        "groupTitle": "Compartido con el grupo «{name}»",
+        "groupTitleGeneric": "Compartido con un grupo",
+        "everyone": "Todos",
+        "everyoneTitle": "Compartido con todos en esta organización",
+        "direct": "Compartido contigo",
+        "directTitle": "Compartido contigo personalmente",
+        "from": "De {name}",
+        "widget": "Widget",
+        "widgetTitle": "Una conversación de visitante de uno de tus widgets de chat"
+      }
+    },
+    "everyone": "Todos en esta organización",
+    "owner": "Propietario",
+    "fileUnavailable": "Este archivo ya no está disponible.",
+    "kind": {
+      "assistant": "Asistente de IA",
+      "saved_task": "Tarea guardada",
+      "widget": "Widget de chat"
+    },
+    "runCopy": "Ejecutar como mi copia",
+    "runCopyConfirm": "¿Crear tu propia copia de esta tarea guardada? Se ejecutará solo cuando tú la inicies.",
+    "assistantNotShared": "El asistente de IA de esta tarea no está compartido contigo.",
+    "sharedBy": "De {name}",
+    "continueAsCopy": "Continuar como mi copia",
+    "continueFailed": "No se pudo crear su copia. Inténtelo de nuevo.",
+    "readOnly": "Puede ver esta conversación. Para añadir un mensaje, continúela como su propia copia.",
+    "sharedFolder": "Compartido · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "Esta carpeta pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Esta carpeta pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceDirect": "Esta carpeta pertenece a {owner}. Se compartió con usted personalmente."
+      },
+      "assistant": {
+        "sourceGroup": "Este asistente pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Este asistente pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceDirect": "Este asistente pertenece a {owner}. Se compartió con usted personalmente."
+      },
+      "saved_task": {
+        "sourceGroup": "Esta tarea guardada pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Esta tarea guardada pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceDirect": "Esta tarea guardada pertenece a {owner}. Se compartió con usted personalmente."
+      },
+      "widget": {
+        "sourceGroup": "Este widget de chat pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Este widget de chat pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceDirect": "Este widget de chat pertenece a {owner}. Se compartió con usted personalmente."
+      }
+    },
+    "dialog": {
+      "title": "Compartir «{name}»",
+      "who": "Quién",
+      "searchPlaceholder": "Buscar una persona o un grupo…",
+      "permission": "Permiso",
+      "sharedWith": "Compartido con",
+      "empty": "Solo usted puede ver esto.",
+      "cancel": "Cancelar",
+      "remove": "Quitar",
+      "removeTitle": "Dejar de compartir",
+      "removeConfirm": "¿Quitar a {name}?",
+      "loadFailed": "No se pudo cargar con quién está compartido.",
+      "saveFailed": "No se pudo compartir. Inténtelo de nuevo.",
+      "shared": "Compartido con {name}.",
+      "sharedFind": "Compartido con {name}. {find}",
+      "removed": "Se dejó de compartir con {name}.",
+      "removeFailed": "No se pudo dejar de compartir. Inténtelo de nuevo.",
+      "permissionFailed": "No se pudo cambiar el permiso. Inténtelo de nuevo.",
+      "noMatches": "Ninguna persona o grupo coincide.",
+      "searchFailed": "No se pudo buscar personas o grupos.",
+      "tryAgain": "Intentar de nuevo",
+      "ownerLine": "Propietario · {name}",
+      "publicLink": "Enlace público",
+      "publicLinkHint": "Cualquiera con el enlace puede verlo.",
+      "managePublicLink": "Gestionar enlace público",
+      "openPublicLink": "Gestionar enlace público",
+      "subjectType": {
+        "user": "persona",
+        "group": "grupo"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Puede ver — pueden abrir este chat solo para lectura.",
+          "use": "Puede usar — pueden continuar este chat como copia propia."
+        },
+        "knowledge_folder": {
+          "read": "Puede ver — pueden ver la carpeta.",
+          "use": "Puede usar — la IA puede usar estos archivos.",
+          "edit": "Puede editar — pueden cambiar archivos de esta carpeta.",
+          "manage": "Puede gestionar — pueden compartir esta carpeta con otros."
+        },
+        "assistant": {
+          "read": "Puede ver — pueden ver la tarjeta y clonarla.",
+          "use": "Puede usar — pueden iniciar un chat con este asistente.",
+          "edit": "Puede editar — pueden cambiar este asistente."
+        },
+        "saved_task": {
+          "read": "Puede ver — pueden ver la tarjeta.",
+          "use": "Puede usar — pueden crear su propia copia."
+        },
+        "widget": {
+          "read": "Puede ver — pueden abrir la configuración del widget.",
+          "edit": "Puede editar — pueden cambiar la configuración del widget.",
+          "manage": "Puede gestionar — pueden compartir este widget con otros."
+        }
+      },
+      "find": {
+        "conversation": "Lo encontrarán en Chats entrantes.",
+        "knowledge_folder": "Aparece en sus Fuentes como compartido.",
+        "assistant": "Lo encontrarán en Asistentes → Compartido conmigo.",
+        "saved_task": "Pueden usarlo como plantilla en Automatizaciones.",
+        "widget": "Pueden abrir la configuración del widget."
+      }
+    }
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (extracción de texto de documentos)"
+    },
+    "docling": {
+      "label": "Docling (conversión de documentos)"
+    },
+    "office_convert": {
+      "label": "Conversión de Office"
+    },
+    "searxng": {
+      "label": "Búsqueda web SearXNG"
+    },
+    "piper_tts": {
+      "label": "Piper texto a voz"
+    },
+    "local_ai": {
+      "label": "IA local (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Generación de vídeo Higgsfield"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "Generación de imágenes TheHive"
+    },
+    "stripe_billing": {
+      "label": "Facturación Stripe"
+    },
+    "mobile_iap": {
+      "label": "Compras dentro de la app móvil"
+    },
+    "whatsapp": {
+      "label": "Canal de WhatsApp"
+    },
+    "compute": {
+      "label": "Cómputo seguro (trabajo con archivos)",
+      "running": "El trabajo con archivos está en marcha.",
+      "runningOff": "El sidecar está en marcha; el trabajo con archivos está desactivado en la configuración del sistema.",
+      "unreachable": "El sidecar de trabajo con archivos no es accesible.",
+      "unset": "COMPUTE_URL o COMPUTE_TOKEN no está definido."
+    },
+    "state": {
+      "available": "Disponible",
+      "needs_setup": "Requiere configuración",
+      "absent": "No instalado"
+    },
+    "notice": {
+      "title": "{module} no está disponible en esta instalación",
+      "body": "Esta función es opcional. La activa el administrador de esta instalación.",
+      "howToEnable": "Cómo activarla",
+      "openFeatureStatus": "Abrir estado de funciones"
+    }
+  }
+}

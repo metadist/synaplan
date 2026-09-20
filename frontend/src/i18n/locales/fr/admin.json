@@ -1,0 +1,1034 @@
+{
+  "adminModelStatus": {
+    "title": "État des modèles",
+    "subtitle": "Quels modèles IA fonctionnent actuellement, et lesquels ne fonctionnent pas.",
+    "loading": "Chargement de l’état des modèles…",
+    "loadFailed": "L’état des modèles n’a pas pu être chargé.",
+    "never": "jamais",
+    "noMatches": "Aucun modèle ne correspond aux filtres actuels.",
+    "freeHint": "La vérification est gratuite : on demande seulement aux fournisseurs quels modèles ils publient. Aucun modèle IA n’est jamais exécuté pour cela.",
+    "states": {
+      "online": "En ligne",
+      "degraded": "Dégradé",
+      "offline": "Hors ligne",
+      "unconfigured": "Non configuré",
+      "unknown": "Inconnu"
+    },
+    "sources": {
+      "probe": "liste de modèles du fournisseur",
+      "traffic": "utilisation réelle"
+    },
+    "summary": {
+      "allGood": "Tous les modèles répondent",
+      "problems": "{count} modèle(s) nécessitent une attention",
+      "lastCheck": "Dernière vérification",
+      "monitoringOff": "La vérification automatique est désactivée, cette page n’affiche donc que le dernier état connu."
+    },
+    "filters": {
+      "onlyProblems": "Afficher uniquement les problèmes",
+      "capability": "Tâche",
+      "allCapabilities": "Toutes les tâches"
+    },
+    "provider": {
+      "affected": "{count} concernés"
+    },
+    "model": {
+      "lastSuccess": "Dernier fonctionnement",
+      "errorRate": "{percent} % des {total} derniers appels ont échoué",
+      "source": "Basé sur",
+      "autoDisabled": "Désactivé automatiquement",
+      "switchedOff": "Désactivé",
+      "exempt": "Exempté de la désactivation automatique"
+    },
+    "actions": {
+      "refresh": "Vérifier maintenant",
+      "refreshProvider": "Vérifier ce fournisseur",
+      "refreshProviderAria": "Vérifier {provider} maintenant",
+      "resetCounters": "Effacer l’historique des erreurs",
+      "exempt": "Exempter de l’automatisation",
+      "unexempt": "Réautoriser l’automatisation"
+    },
+    "confirmResetTitle": "Effacer l’historique des erreurs ?",
+    "confirmResetMessage": "« {name} » ne sera ensuite jugé que sur la nouvelle utilisation. Une vérification qui a déjà trouvé ce modèle retiré n’est pas annulée.",
+    "messages": {
+      "refreshed": "{count} modèle(s) vérifié(s).",
+      "refreshFailed": "La vérification n’a pas pu être terminée.",
+      "exempted": "Ce modèle est désormais exempté de la désactivation automatique.",
+      "unexempted": "La désactivation automatique s’applique de nouveau à ce modèle.",
+      "exemptFailed": "L’exemption n’a pas pu être modifiée.",
+      "countersReset": "Historique des erreurs effacé.",
+      "countersResetFailed": "L’historique des erreurs n’a pas pu être effacé."
+    }
+  },
+  "platformConnect": {
+    "title": "Connecter Synaplan",
+    "subtitle": "Autoriser {client} à utiliser ce compte Synaplan.",
+    "loading": "Vérification de votre session…",
+    "confirmPrompt": "Connecter {client} sur {host} en tant que {uid} ?",
+    "connectButton": "Connecter {client}",
+    "scopesNote": "Accorde l’accès aux discussions, fichiers et recherche. La clé reste sur la plateforme — vous ne la saisissez pas.",
+    "connecting": "Connexion…",
+    "successTitle": "Connecté.",
+    "successSubtitle": "Vous pouvez fermer cette fenêtre si elle ne se ferme pas toute seule.",
+    "errorTitle": "Connexion impossible",
+    "retry": "Réessayer",
+    "helpLine": "Cette fenêtre a été ouverte par une autre application. Vous pouvez la fermer.",
+    "notYou": "Ce n’est pas vous ? Se déconnecter",
+    "errorMissingState": "Cette demande de connexion est incomplète. Recommencez depuis l’autre application.",
+    "errorOfficeNotReady": "Office.js n’est pas disponible. Cette page doit être ouverte depuis Outlook.",
+    "errorNotSignedIn": "Vous n’êtes pas connecté. Actualisez la fenêtre et connectez-vous à nouveau.",
+    "errorIssuanceFailed": "Synaplan n’a pas pu terminer cette connexion.",
+    "errorUnknownClient": "Cette demande de connexion n’est pas reconnue.",
+    "errorFlagOff": "La liaison de cette plateforme n’est pas activée sur cette instance Synaplan.",
+    "errorNoDeliveryChannel": "Synaplan n’a pas pu transmettre la connexion à Outlook. Ouvrez cette page depuis Outlook et réessayez.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "cette application"
+    }
+  },
+  "admin": {
+    "title": "Exploitation",
+    "description": "Gestion et configuration du système",
+    "tabs": {
+      "overview": "Aperçu",
+      "users": "Utilisateurs",
+      "prompts": "Instructions",
+      "usage": "Utilisation",
+      "subscriptions": "Abonnements",
+      "moderation": "Modération",
+      "appServer": "Serveur de l’application"
+    },
+    "overview": {
+      "totalUsers": "Utilisateurs au total",
+      "recentUsers": "Utilisateurs récents"
+    },
+    "systemInfo": {
+      "title": "Infos système",
+      "refresh": "Actualiser",
+      "loadError": "Échec du chargement des infos système",
+      "phpVersion": "Version PHP",
+      "memoryLimit": "Limite de mémoire",
+      "inUse": "{value} utilisés",
+      "diskFree": "Espace disque libre",
+      "ofTotal": "sur {value} au total",
+      "diskUsage": "Utilisation du disque",
+      "opcache": "OPcache",
+      "enabled": "Activé",
+      "disabled": "Désactivé",
+      "peakMemory": "Mémoire maximale",
+      "uploadMax": "Taille max. d’envoi",
+      "postMax": "Taille max. POST",
+      "maxExecTime": "Durée max. d’exécution",
+      "os": "Système d’exploitation",
+      "server": "Serveur",
+      "hostname": "Nom d’hôte"
+    },
+    "analytics": {
+      "registrations": "Inscriptions d’utilisateurs",
+      "usageByAction": "Utilisation par action",
+      "period": {
+        "7d": "7 jours",
+        "30d": "30 jours",
+        "90d": "90 jours",
+        "1y": "1 an",
+        "all": "Tout"
+      },
+      "groupBy": {
+        "day": "Jour",
+        "week": "Semaine",
+        "month": "Mois"
+      }
+    },
+    "users": {
+      "email": "E-mail",
+      "level": "Niveau",
+      "type": "Type",
+      "provider": "Fournisseur",
+      "created": "Créé",
+      "status": "Statut",
+      "actions": "Actions",
+      "delete": "Supprimer l’utilisateur",
+      "currentUser": "(Vous)",
+      "verified": "Vérifié",
+      "unverified": "Non vérifié",
+      "searchPlaceholder": "Rechercher par e-mail…",
+      "noUsers": "Aucun utilisateur trouvé",
+      "deleteConfirmTitle": "Supprimer l’utilisateur ?",
+      "deleteConfirmDesc": "Voulez-vous vraiment supprimer {email} ? Cette action est irréversible.",
+      "deleteConfirmCheckbox": "Oui, je confirme la suppression de toutes les données utilisateur (y compris chats, widgets, documents)",
+      "userDeleted": "L’utilisateur {email} a été supprimé avec succès",
+      "userDeleteFailed": "Échec de la suppression de l’utilisateur",
+      "levelUpdated": "Niveau utilisateur mis à jour : {level}",
+      "levelUpdateFailed": "Échec de la mise à jour du niveau utilisateur",
+      "loadFailed": "Impossible de charger les utilisateurs",
+      "invalidResponse": "Le serveur a renvoyé une réponse inattendue"
+    },
+    "impersonate": {
+      "button": "Voir en tant qu’utilisateur",
+      "buttonTitle": "Usurper l’identité de cet utilisateur",
+      "confirmTitle": "Se connecter en tant que {email} ?",
+      "confirmMessage": "Vous serez connecté en tant que {email}. Chaque action et chaque modification seront attribuées à ce compte. Utilisez la bannière en haut pour quitter lorsque vous avez terminé.",
+      "confirmAction": "Démarrer la session",
+      "started": "Vous consultez maintenant l’application en tant que {email}.",
+      "startFailed": "Impossible de démarrer l’usurpation d’identité",
+      "disabled": "Voir l’application en tant qu’un autre utilisateur est désactivé sur cette instance.",
+      "disabledTitle": "Voir en tant qu’un autre utilisateur est désactivé",
+      "cannotImpersonateSelf": "Vous ne pouvez pas usurper votre propre identité.",
+      "banner": {
+        "viewing": "Consultation en tant que {email}",
+        "adminLabel": "Connecté en tant que {email}",
+        "exitButton": "Quitter",
+        "exitButtonTitle": "Restaurer votre session administrateur"
+      },
+      "stopped": "Session administrateur restaurée.",
+      "stopFailed": "Impossible de quitter l’usurpation d’identité"
+    },
+    "prompts": {
+      "shortDesc": "Description courte",
+      "prompt": "Instruction",
+      "selectionRules": "Règles de sélection",
+      "selectionRulesPlaceholder": "Facultatif : règles pour la sélection automatique de cette instruction"
+    },
+    "usage": {
+      "title": "Statistiques d’utilisation",
+      "period": {
+        "day": "24 heures",
+        "week": "7 jours",
+        "month": "30 jours",
+        "all": "Tout"
+      },
+      "totalRequests": "Requêtes",
+      "totalTokens": "Jetons",
+      "totalCost": "Coût",
+      "avgLatency": "Latence moy.",
+      "byAction": "Par action",
+      "byProvider": "Par fournisseur",
+      "topModels": "Meilleurs modèles",
+      "topUsers": "Meilleurs utilisateurs",
+      "topUsersHint": "Utilisateurs avec le plus de requêtes API sur la période sélectionnée (jusqu’à 25).",
+      "topUsersEmpty": "Aucune donnée d’utilisation pour cette période. Essayez « Tout » ou attendez que les utilisateurs génèrent de l’activité.",
+      "model": "Modèle",
+      "requests": "requêtes",
+      "tokens": "jetons",
+      "cost": "Coût",
+      "activeSubscriptions": "Abonnements actifs",
+      "subscriptionOverview": "Aperçu des abonnements"
+    },
+    "subscriptions": {
+      "title": "Formules d’abonnement",
+      "description": "Gérez les prix, les budgets de coût et le statut actif de chaque niveau d’abonnement. Les prix sont affichés aux utilisateurs lors de l’accueil et sur la page d’abonnement.",
+      "level": "Niveau",
+      "name": "Nom",
+      "priceMonthly": "Prix/mois",
+      "priceYearly": "Prix/an",
+      "currency": "Devise",
+      "budgetMonthly": "Budget/mois",
+      "budgetYearly": "Budget/an",
+      "active": "Actif",
+      "actions": "Actions",
+      "edit": "Modifier",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "saveSuccess": "Formule mise à jour avec succès",
+      "saveError": "Échec de la mise à jour de la formule",
+      "loadError": "Échec du chargement des abonnements",
+      "noSubscriptions": "Aucune formule d’abonnement trouvée. Créez d’abord les formules dans la base de données.",
+      "budgetHint": "Le budget définit le coût maximal en jetons (en EUR) autorisé par période de facturation. Mettez 0 pour une utilisation illimitée. Les prix sont les prix publics affichés ; les achats dans l’application mobile utilisent le prix de la boutique."
+    },
+    "moderation": {
+      "title": "Modération des contenus",
+      "description": "Examinez les contenus signalés et, si nécessaire, suspendez ou bannissez le compte concerné.",
+      "empty": "Aucun signalement ne correspond à ce filtre.",
+      "loadError": "Échec du chargement des signalements",
+      "updateError": "Échec de la mise à jour",
+      "reportUpdated": "Signalement mis à jour",
+      "userStatusUpdated": "Statut du compte mis à jour",
+      "unresolvedUser": "Propriétaire non résolu",
+      "totalCount": "{count} signalements",
+      "suspend": "Suspendre",
+      "ban": "Bannir",
+      "reactivate": "Réactiver",
+      "filters": {
+        "all": "Tous",
+        "open": "Ouverts",
+        "reviewed": "Examinés",
+        "actioned": "Traités",
+        "dismissed": "Rejetés"
+      },
+      "col": {
+        "reason": "Motif",
+        "content": "Contenu",
+        "reportedUser": "Utilisateur signalé",
+        "created": "Signalé",
+        "status": "Statut",
+        "actions": "Actions"
+      },
+      "reportStatus": {
+        "open": "Ouvert",
+        "reviewed": "Examiné",
+        "actioned": "Traité",
+        "dismissed": "Rejeté"
+      },
+      "accountStatus": {
+        "active": "Actif",
+        "suspended": "Suspendu",
+        "banned": "Banni"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "Suspendre le compte ?",
+          "message": "Suspendre {user} ? Cette personne sera déconnectée et ne pourra pas utiliser la plateforme tant qu’elle n’aura pas été réactivée."
+        },
+        "banned": {
+          "title": "Bannir le compte ?",
+          "message": "Bannir {user} ? Cela bloque le compte de façon permanente. Réservez cette action aux violations graves."
+        },
+        "active": {
+          "title": "Réactiver le compte ?",
+          "message": "Réactiver {user} ? Cette personne pourra de nouveau se connecter et utiliser la plateforme."
+        }
+      }
+    },
+    "config": {
+      "title": "Configuration système",
+      "description": "Gérez les variables d’environnement et les connexions aux services",
+      "loadError": "Échec du chargement de la configuration",
+      "saveError": "Échec de l’enregistrement de la configuration",
+      "saved": "Configuration enregistrée",
+      "savedLive": "Enregistré — prend effet immédiatement",
+      "dbOverridesEnv": "Stocké chiffré dans la base de données — remplace toute valeur correspondante dans .env.",
+      "managedKeys": {
+        "title": "Les clés des fournisseurs sont gérées sous Infrastructure IA › Modèles et clés.",
+        "helm": "Les clés définies dans l'environnement ou par un chart Helm sont prises en compte automatiquement — une installation par chart n'a pas besoin de cette page. Utilisez Modèles et clés uniquement pour ajouter ou remplacer une clé depuis l'interface.",
+        "stateNone": "non définie",
+        "stateDb": "remplacée dans l'interface",
+        "stateEnv": "environnement / Helm",
+        "summary": "{env} depuis l'environnement, {db} remplacée(s) dans l'interface.",
+        "cta": "Ouvrir Modèles et clés"
+      },
+      "envOverridesDb": "Verrouillé par la variable d’environnement {key}. Valeur actuelle : {value}. Retirez la variable de votre environnement pour gérer ce réglage ici.",
+      "unsaved": "Modifications non enregistrées",
+      "testConnection": "Tester la connexion",
+      "testFailed": "Le test de connexion a échoué",
+      "commandCopied": "Commande copiée dans le presse-papiers",
+      "tabGroups": {
+        "aiData": "IA et données",
+        "communication": "Communication",
+        "security": "Fonctions et accès"
+      },
+      "liveBadge": "En direct",
+      "liveHint": "Les modifications prennent effet immédiatement, sans redémarrage.",
+      "brandingMode": {
+        "light": "Vous modifiez les réglages du mode CLAIR — les couleurs enregistrées ici s’appliquent lorsque l’application est en mode clair. Passez l’application en mode sombre pour modifier les couleurs du mode sombre.",
+        "dark": "Vous modifiez les réglages du mode SOMBRE — les couleurs enregistrées ici s’appliquent lorsque l’application est en mode sombre. Passez l’application en mode clair pour modifier les couleurs du mode clair."
+      },
+      "restartBanner": {
+        "title": "Configuration mise à jour — redémarrage requis",
+        "message": "Vos modifications ont été enregistrées dans le fichier .env. Pour qu’elles prennent effet, vous devez redémarrer vos conteneurs Docker.",
+        "copyCommand": "Copier la commande"
+      },
+      "m365": {
+        "title": "Avant que ces champs fonctionnent : enregistrez une application dans Azure",
+        "intro": "La connexion Microsoft 365 nécessite un enregistrement d’application dans Azure. Vous le faites une seule fois, cela prend environ cinq minutes, puis chaque utilisateur peut connecter son propre compte.",
+        "portalLink": "Portail Azure → Enregistrements d’applications",
+        "step1": "Ouvrez {portal} et choisissez « New registration ». N’importe quel nom convient, par exemple « Synaplan ».",
+        "step2": "Sous « Redirect URI », choisissez le type de plateforme Web (pas SPA) et collez cette adresse exactement :",
+        "step3": "Allez dans « API permissions » → « Add a permission » → « Microsoft Graph » → « Delegated permissions » et ajoutez toutes celles-ci :",
+        "step3Note": "offline_access n’est pas facultatif : sans lui, Microsoft n’émet pas de jeton de renouvellement et chaque exécution planifiée cesse de fonctionner au bout d’une heure.",
+        "step4": "Allez dans « Certificates & secrets » → « New client secret » et copiez la colonne Value — pas le Secret ID. Elle n’est affichée qu’une seule fois.",
+        "step5": "Collez l’identifiant client et le secret dans les champs ci-dessous, définissez le locataire, puis activez M365_ENABLED. Les utilisateurs connectent ensuite leur propre compte sous Canaux → Connexions.",
+        "ready": "Prêt — les utilisateurs peuvent connecter leur compte Microsoft 365 sous Canaux → Connexions.",
+        "notReady": "Pas encore actif. Remplissez les champs ci-dessous et activez M365_ENABLED.",
+        "copyFailed": "Impossible de copier. Sélectionnez le texte et copiez-le manuellement."
+      },
+      "dropbox": {
+        "title": "Avant que ces champs fonctionnent : créez une application dans la Dropbox App Console",
+        "intro": "La connexion Dropbox nécessite une application Dropbox. Vous le faites une seule fois, cela prend environ cinq minutes, puis chaque utilisateur peut connecter son propre compte.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Ouvrez la {console} et choisissez « Create app ». Choisissez « Scoped access » et « Full Dropbox ». N’importe quel nom convient, par exemple « Synaplan ».",
+        "step2": "Dans l’onglet « Permissions », activez ces deux options puis cliquez sur « Submit » :",
+        "step3": "Dans l’onglet « Settings », sous « OAuth 2 → Redirect URIs », ajoutez cette adresse exactement :",
+        "step4": "Toujours dans l’onglet « Settings », copiez l’App key et l’App secret (cliquez sur « Show »).",
+        "step5": "Collez la clé d’application et le secret dans les champs ci-dessous et activez DROPBOX_ENABLED. Les utilisateurs connectent ensuite leur propre compte sous Canaux → Connexions.",
+        "ready": "Prêt — les utilisateurs peuvent connecter leur compte Dropbox sous Canaux → Connexions.",
+        "notReady": "Pas encore actif. Remplissez les champs ci-dessous et activez DROPBOX_ENABLED.",
+        "copyFailed": "Impossible de copier. Sélectionnez le texte et copiez-le manuellement.",
+        "resetTitle": "Réinitialiser toutes les connexions Dropbox",
+        "resetDescription": "Supprime la connexion Dropbox de chaque utilisateur sur cette installation, y compris les jetons stockés. Utilisez-le après avoir modifié l’application Dropbox ou ses autorisations — chacun pourra alors reconnecter son compte.",
+        "resetButton": "Réinitialiser les connexions",
+        "resetConfirmTitle": "Réinitialiser toutes les connexions Dropbox ?",
+        "resetConfirmMessage": "La connexion Dropbox de chaque utilisateur sera supprimée, et chacun devra reconnecter son compte Dropbox. Cette action est irréversible.",
+        "resetDone": "Aucune connexion Dropbox à supprimer | 1 connexion Dropbox supprimée | {count} connexions Dropbox supprimées",
+        "resetFailed": "La réinitialisation a échoué. Veuillez réessayer."
+      },
+      "tabs": {
+        "ai": "Services IA",
+        "email": "E-mail",
+        "branding": "Identité visuelle",
+        "mobile": "Application mobile",
+        "auth": "Authentification",
+        "channels": "Canaux entrants",
+        "processing": "Traitement",
+        "features": "Fonctionnalités",
+        "sharing": "Partage",
+        "routing": "Routage",
+        "interface": "Interface",
+        "guest_landing": "Accueil invités",
+        "vectordb": "Base vectorielle"
+      },
+      "sections": {
+        "tika": "Apache Tika",
+        "docling": "Docling",
+        "rasterize": "Rasteriseur PDF",
+        "whisper": "Whisper (audio)",
+        "brave": "Recherche web (Brave)",
+        "media": "Génération de médias en arrière-plan",
+        "compute": "Travail sur fichiers"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "URL Apache Tika",
+        "TIKA_TIMEOUT_MS": "Délai d’attente de la requête (ms)",
+        "TIKA_RETRIES": "Nombre maximal de tentatives",
+        "TIKA_HTTP_USER": "Nom d’utilisateur HTTP",
+        "TIKA_HTTP_PASS": "Mot de passe HTTP",
+        "DOCLING_BASE_URL": "URL Docling serve (vide = désactivé)",
+        "DOCLING_TIMEOUT_MS": "Délai d’attente de la requête (ms)",
+        "DOCLING_MAX_BYTES": "Taille maximale de fichier (octets)",
+        "RASTERIZE_DPI": "DPI de rasterisation PDF",
+        "RASTERIZE_PAGE_CAP": "Nombre maximal de pages à rasteriser",
+        "RASTERIZE_TIMEOUT_MS": "Délai d’attente de la rasterisation (ms)",
+        "WHISPER_ENABLED": "Activer la transcription audio",
+        "WHISPER_DEFAULT_MODEL": "Modèle Whisper par défaut",
+        "BRAVE_SEARCH_ENABLED": "Activer la recherche web",
+        "BRAVE_SEARCH_API_KEY": "Clé API Brave Search",
+        "BRAVE_SEARCH_COUNT": "Résultats par recherche",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Génère les images, vidéos et audio en arrière-plan pour que le chat ne soit jamais bloqué. L’assistant affiche un état en direct et une notification à la fin. Désactivé : le tour attend que le fichier soit prêt. Nécessite le conteneur worker.",
+        "COMPUTE_ENABLED": "L’assistant peut effectuer un court travail sur fichiers (Python ou Node) sur des copies des fichiers que vous avez choisis. Nécessite le sidecar de calcul (COMPUTE_URL + COMPUTE_TOKEN). Un docker compose up local démarre ce sidecar et active ceci.",
+        "COMPUTE_REQUIRE_TIER": "Niveau d’isolation minimal que le sidecar doit indiquer avant d’activer le travail sur fichiers : Standard (Docker simple), Isolation forte (gVisor) ou Machine virtuelle (microVM). Synaplan Cloud exige l’isolation forte.",
+        "COMPUTE_WORKSPACES_ENABLED": "Conserver un dossier entre les exécutions pour que l’assistant puisse poursuivre un travail précédent. Fichiers → Espace de travail affiche le contenu. Le travail sur fichiers lui-même doit aussi être activé.",
+        "COMPUTE_EGRESS_ENABLED": "Une exécution peut télécharger depuis une courte liste de sites publics nommés par l’assistant. Désactivé par défaut — les exécutions restent hors ligne. Les adresses privées ou locales sont toujours refusées. Activable uniquement si le sidecar propose l’accès aux sites web.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Lorsqu’une exécution va télécharger depuis le web, demander d’abord à la personne propriétaire, même si le travail quotidien sur fichiers s’exécuterait automatiquement. Activé par défaut.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "Combien de sites web une exécution peut lister. Valeur par défaut : 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Durée par défaut en secondes d’une exécution.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Plafond mémoire par défaut en mégaoctets pour une exécution.",
+        "COMPUTE_DEFAULT_CPU": "Part de CPU par défaut pour une exécution.",
+        "COMPUTE_DEFAULT_PIDS": "Plafond de processus par défaut pour une exécution.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Plafond de taille par défaut en mégaoctets pour les fichiers que l’exécution peut créer.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Plafond dur en secondes pour une exécution.",
+        "COMPUTE_POLICY_INTERACTIVE": "Lorsque la personne propriétaire est présente (chat ou un appel API en direct) : exécuter automatiquement, demander d’abord, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
+        "COMPUTE_POLICY_UNATTENDED": "Lorsqu’une tâche enregistrée exécute un travail sur fichiers toute seule : demander d’abord (défaut), exécuter automatiquement, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Combien de jours un dossier de travail sur fichiers peut rester inutilisé avant que le nettoyage le supprime. Valeur par défaut : 90."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Standard (Docker simple)",
+          "gvisor": "Isolation forte (gVisor)",
+          "microvm": "Machine virtuelle (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Exécuter automatiquement",
+          "approve": "Demander d’abord",
+          "block": "Ne jamais exécuter"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Exécuter automatiquement",
+          "approve": "Demander d’abord",
+          "block": "Ne jamais exécuter"
+        }
+      }
+    }
+  },
+  "statistics": {
+    "title": "Bienvenue sur synaplan !",
+    "messageStats": "Statistiques des messages",
+    "totalMessages": "Messages au total",
+    "messagesSent": "Messages envoyés",
+    "messagesReceived": "Messages reçus",
+    "totalFiles": "Fichiers au total",
+    "filesSent": "Fichiers envoyés",
+    "filesReceived": "Fichiers reçus",
+    "latestFiles": "Derniers fichiers",
+    "received": "Reçus",
+    "sent": "Envoyés"
+  },
+  "aiInfra": {
+    "modelImport": {
+      "title": "Importer des modèles",
+      "importModels": "Importer des modèles",
+      "importPulled": "Importer les modèles téléchargés",
+      "unreachable": "Ce point de terminaison n'a pas répondu. Vérifiez-le via Tester, puis réessayez.",
+      "empty": "Ce point de terminaison n'offre aucun modèle à importer.",
+      "selectAllNew": "Tout sélectionner (nouveaux)",
+      "probeLabel": "Vérifier ce que chaque modèle sait faire (consomme un peu de crédit)",
+      "colModel": "Modèle",
+      "colTags": "Capacités",
+      "colStatus": "Statut",
+      "exists": "Déjà ajouté",
+      "new": "Nouveau",
+      "tagsHint": "Capacités autorisées : {tags}. Séparez-les par des virgules.",
+      "apply": "Importer {count}",
+      "applying": "Importation…",
+      "applied": "{created} ligne(s) de modèle importée(s), {skipped} déjà présente(s) ignorée(s).",
+      "applyFailed": "Les modèles n'ont pas pu être importés.",
+      "noValidTags": "Donnez à chaque modèle sélectionné au moins une capacité valide."
+    },
+    "extraction": {
+      "lead": "Choisissez comment un document devient du texte. Docling conserve les tableaux et les titres ; s’il n’est pas lancé, Tika prend le relais et l’envoi n’échoue jamais.",
+      "family": {
+        "document": "Documents",
+        "text": "Texte brut",
+        "image": "Images",
+        "audio": "Audio",
+        "audio_no_cloud": "Audio sans STT cloud",
+        "video": "Vidéo"
+      },
+      "moveUp": "Monter",
+      "moveDown": "Descendre",
+      "remove": "Retirer",
+      "add": "Ajouter",
+      "addPlaceholder": "Ajouter un adaptateur…",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "indisponible",
+      "testSidecar": {
+        "tika": "Tester Tika",
+        "docling": "Tester Docling"
+      },
+      "testingSidecar": "Test en cours…",
+      "sidecarSettings": "L’URL, le délai et le test de connexion de Tika et Docling sont dans Configuration système → Traitement.",
+      "sidecarSettingsLink": "Ouvrir les réglages de traitement",
+      "testTitle": "Tester avec un fichier",
+      "testHint": "Envoyez un exemple. Vous verrez quel adaptateur a gagné et pourquoi les autres n’ont pas été retenus.",
+      "testButton": "Tester avec un fichier",
+      "testing": "Test en cours…",
+      "winner": "Gagnant : {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling indisponible — Tika a été utilisé",
+      "doclingRejectedTika": "Docling a répondu mais a refusé le fichier — Tika a été utilisé",
+      "save": "Enregistrer la chaîne",
+      "saved": "Chaîne d’extraction enregistrée. Le prochain envoi l’utilise.",
+      "saveFailed": "Impossible d’enregistrer la chaîne d’extraction",
+      "emptyChain": "Chaque type de fichier doit avoir au moins un adaptateur.",
+      "loadFailed": "Impossible de charger les réglages d’extraction",
+      "verdict": {
+        "quality_ok": "accepté",
+        "not_applicable": "non filtré",
+        "markdown_structure": "accepté (tableaux ou titres)",
+        "empty": "vide",
+        "low_quality": "trop peu de texte utile",
+        "unavailable": "indisponible",
+        "rejected": "joignable, fichier refusé",
+        "unsupported": "ne prend pas en charge ce fichier",
+        "unknown": "adaptateur inconnu",
+        "skipped": "ignoré",
+        "rewritten": "converti pour l’adaptateur suivant"
+      }
+    },
+    "webSearch": {
+      "lead": "Choisissez qui interroge le web pour le chat. La prochaine recherche utilise le nouveau fournisseur, sans redémarrage. La requête de test affiche des titres pour confirmer que cela fonctionne.",
+      "docs": "Documentation",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "indisponible",
+      "capabilities": "Capacités",
+      "capability": {
+        "freshness": "Fraîcheur",
+        "country": "Pays",
+        "language": "Langue",
+        "siteFilter": "Filtre de site",
+        "fullContent": "Texte intégral",
+        "answer": "Réponse"
+      },
+      "sovereignty": {
+        "selfHosted": "auto-hébergé",
+        "eu": "UE",
+        "usCloud": "cloud US"
+      },
+      "apiKey": "Clé API",
+      "apiKeyPlaceholder": "Collez une clé API",
+      "saveKey": "Enregistrer la clé",
+      "keySaved": "Clé enregistrée et vérifiée. La prochaine recherche peut l’utiliser.",
+      "fallback": "Fournisseur de secours",
+      "fallbackNone": "Aucun secours",
+      "allowUsers": "Autoriser les utilisateurs à choisir leur fournisseur",
+      "save": "Enregistrer la recherche web",
+      "saved": "Paramètres de recherche web enregistrés. Le prochain chat les utilise.",
+      "savedInactive": "{provider} n’est pas prêt ({reason}). La recherche web du chat ne renverra rien.",
+      "savedInactiveFallback": "{provider} n’est pas prêt ({reason}). La recherche web du chat utilisera le fournisseur de secours.",
+      "savedInactiveBoth": "{provider} n’est pas prêt ({reason}). Le fournisseur de secours n’est pas prêt non plus. La recherche web du chat ne renverra rien.",
+      "saveFailed": "Les paramètres de recherche web n’ont pas pu être enregistrés",
+      "loadFailed": "Impossible de charger les paramètres de recherche web",
+      "testTitle": "Requête de test",
+      "testHint": "Lancez une courte requête. Vous verrez jusqu’à cinq titres du fournisseur actif.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Requête de test",
+      "testing": "Test…",
+      "testProvider": "Répondu par {provider}",
+      "testProviderFallback": "Répondu par {provider} (secours depuis {from})"
+    },
+    "rerank": {
+      "lead": "Après la recherche, un réordonnanceur place les extraits les plus utiles en premier. Laissez cette option désactivée tant qu’un test n’a pas montré qu’elle aide. Le chat ne change pas tant qu’elle est désactivée.",
+      "enable": "Utiliser le réordonnancement pour la recherche de documents",
+      "model": "Modèle de réordonnancement",
+      "modelNone": "Aucun modèle sélectionné",
+      "multiplier": "Combien d’extraits supplémentaires récupérer (2–10)",
+      "budgetMs": "Abandonner après ce nombre de millisecondes (100–5000)",
+      "llmFallback": "Utiliser le modèle de chat si aucun modèle de réordonnancement n’est défini",
+      "llmFallbackHint": "Cela utilise le modèle de résumé à chaque recherche et peut coûter plus cher. Préférez un modèle de réordonnancement dédié.",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "indisponible",
+      "apiKey": {
+        "jina": "Clé API Jina",
+        "cohere": "Clé API Cohere",
+        "voyage": "Clé API Voyage"
+      },
+      "apiKeyPlaceholder": "Coller une clé API",
+      "saveKey": "Enregistrer la clé",
+      "keySaved": "Clé enregistrée. Le prochain réordonnancement peut l’utiliser.",
+      "save": "Enregistrer le réordonnancement",
+      "saved": "Réordonnancement enregistré. La prochaine recherche de documents l’utilise.",
+      "savedOff": "Réordonnancement enregistré. La recherche de documents conserve l’ordre vectoriel d’origine.",
+      "savedInactive": "Réordonnancement enregistré. Il reste inactif tant qu’un modèle de réordonnancement ou le recours au modèle de chat n’est pas disponible.",
+      "saveFailed": "Les paramètres de réordonnancement n’ont pas pu être enregistrés",
+      "loadFailed": "Impossible de charger les paramètres de réordonnancement",
+      "testTitle": "Tester avec des extraits d’exemple",
+      "testHint": "Saisissez une question et un extrait par ligne. Vous verrez le nouvel ordre pour vérifier que cela fonctionne.",
+      "testQueryPlaceholder": "Quel est le total de la facture ?",
+      "testDocumentsPlaceholder": "Le total de la facture est de 120 euros.\nLes horaires de bureau sont de 9 h à 17 h.",
+      "testButton": "Tester l’ordre",
+      "testing": "Test…",
+      "lastEval": {
+        "title": "Dernière mesure",
+        "line": "Le {date} : extrait juste {recallOff} des fois sans réordonnancement, {recallOn} avec. Les réponses les plus lentes ont pris {p95Off} ms sans et {p95On} ms avec."
+      }
+    }
+  },
+  "providerHelp": {
+    "openAria": "Comment configurer ceci",
+    "createKeyLink": "Créer une clé API",
+    "downloadLink": "Télécharger Ollama",
+    "groq": {
+      "title": "Clé API Groq",
+      "message": "Créez une clé API Groq gratuite dans la console Groq, puis collez-la ici. Le niveau gratuit suffit généralement pour commencer à discuter en moins d’une minute."
+    },
+    "openai": {
+      "title": "Clé API OpenAI",
+      "message": "Créez une clé API dans votre compte OpenAI (page des clés API), puis collez-la ici. L’utilisation est facturée par OpenAI."
+    },
+    "anthropic": {
+      "title": "Clé API Anthropic",
+      "message": "Créez une clé API dans la console Anthropic (Settings → Keys), puis collez-la ici pour utiliser les modèles Claude."
+    },
+    "google": {
+      "title": "Clé API Google Gemini",
+      "message": "Créez une clé API Gemini dans Google AI Studio, puis collez-la ici. Un niveau gratuit est disponible pour de nombreux modèles."
+    },
+    "mistral": {
+      "title": "Clé API Mistral",
+      "message": "Créez une clé API dans la console Mistral, puis collez-la ici. Mistral propose un niveau gratuit pour démarrer."
+    },
+    "trustedtokens": {
+      "title": "Clé API TrustedTokens",
+      "message": "Créez une clé API chez TrustedTokens (Account → API Access), puis collez-la ici. L’inférence s’exécute sur des GPU allemands avec résidence des données dans l’UE."
+    },
+    "a2agent": {
+      "title": "Clé API A2Agent",
+      "message": "Créez une clé API en paiement à l’usage chez A2Agent (tableau de bord → clés API), puis collez-la ici. Les invites sont traitées par des fournisseurs de modèles de Chine continentale (Qwen, DeepSeek, MiniMax) via cette passerelle. A2Agent s’adresse aux utilisateurs hors de Chine continentale. Les opérateurs qui traitent des données personnelles de l’UE décident selon leur DPA."
+    },
+    "huggingface": {
+      "title": "Jeton API HuggingFace",
+      "message": "Créez un jeton d’accès dans vos réglages HuggingFace, puis collez-le ici pour utiliser les modèles HuggingFace Inference."
+    },
+    "xai": {
+      "title": "Clé API xAI",
+      "message": "Créez une clé API dans la console xAI, puis collez-la ici pour utiliser les modèles Grok."
+    },
+    "perplexity": {
+      "title": "Clé API Perplexity",
+      "message": "Créez une clé API dans votre compte Perplexity, puis collez-la ici pour utiliser les modèles Sonar. La même clé sert à la recherche web si vous choisissez Perplexity dans l’onglet Recherche web."
+    },
+    "ollama": {
+      "title": "IA locale avec Ollama",
+      "message": "Téléchargez Ollama et récupérez un modèle capable comme gpt-oss:120b (ou un plus petit comme llama3.2 si votre machine a moins de RAM). Aucune clé API n’est nécessaire — Synaplan parle à Ollama à l’URL configurée."
+    }
+  },
+  "people": {
+    "title": "Personnes",
+    "subtitle": "Utilisateurs et groupes de cette instance.",
+    "tabs": {
+      "users": "Utilisateurs",
+      "groups": "Groupes",
+      "policies": "Règles",
+      "linkedPlatforms": "Instances de plateforme",
+      "audit": "Journal"
+    },
+    "openPeople": "Ouvrir Personnes",
+    "backToOperate": "Retour à Exploitation",
+    "myGroups": {
+      "subtitle": "Groupes auxquels vous appartenez sur cette instance.",
+      "emptyMember": "Vous n’êtes encore dans aucun groupe. Un administrateur peut vous ajouter sur la page Personnes.",
+      "emptyAdmin": "Aucun groupe pour le moment. Créez-en un sur la page Personnes.",
+      "leave": "Quitter",
+      "leaveConfirm": "Quitter le groupe « {name} » ? Vous perdrez l’accès à tout ce qui est partagé avec ce groupe. Le groupe lui-même reste.",
+      "left": "Vous avez quitté le groupe.",
+      "leaveFailed": "Impossible de quitter le groupe.",
+      "leaveDirectory": "Cette appartenance vient de votre connexion et ne peut pas être quittée ici."
+    },
+    "users": {
+      "groups": "Groupes",
+      "identities": "Connexion"
+    },
+    "groups": {
+      "name": "Nom",
+      "kind": "Type",
+      "members": "Membres",
+      "memberCount": "{count} membres",
+      "fromLogin": "Depuis votre connexion",
+      "manual": "Manuel",
+      "create": "Créer un groupe",
+      "createTitle": "Créer un groupe",
+      "createPrompt": "Nom du groupe",
+      "rename": "Renommer",
+      "renameTitle": "Renommer le groupe",
+      "delete": "Supprimer",
+      "deleteConfirm": "Supprimer le groupe « {name} » ? Les personnes restent ; seul le groupe est retiré.",
+      "empty": "Aucun groupe pour le moment. Créez-en un pour partager plus tard.",
+      "loadError": "Impossible de charger les groupes.",
+      "saveError": "Impossible d’enregistrer le groupe.",
+      "created": "Groupe créé.",
+      "renamed": "Groupe renommé.",
+      "deleted": "Groupe supprimé.",
+      "directoryReadOnly": "Ce groupe vient de votre connexion et ne peut pas être renommé ni supprimé ici.",
+      "directoryManagedHint": "Les appartenances issues de la connexion sont mises à jour à la prochaine connexion. Vous pouvez encore ajouter des personnes à la main.",
+      "addMember": "Ajouter une personne",
+      "addMemberPlaceholder": "Rechercher par e-mail",
+      "addMemberNotFound": "Aucun utilisateur ne correspond à cet e-mail.",
+      "removeMember": "Retirer",
+      "removeConfirm": "Retirer {email} de ce groupe ?",
+      "roleMember": "Membre",
+      "roleManager": "Responsable",
+      "memberAdded": "Personne ajoutée au groupe.",
+      "memberRemoved": "Personne retirée du groupe.",
+      "sharedWith": "Partagé avec ce groupe",
+      "sharedEmpty": "Rien n’est encore partagé avec ce groupe."
+    },
+    "audit": {
+      "when": "Quand",
+      "who": "Qui",
+      "actionLabel": "Action",
+      "kind": "Type",
+      "resource": "Ressource",
+      "subject": "Détails",
+      "empty": "Aucun événement d’audit pour le moment.",
+      "more": "Charger plus",
+      "loadError": "Le journal d’audit n’a pas pu être chargé.",
+      "filterAll": "Tous",
+      "action": {
+        "share_grant": "Partagé",
+        "share_revoke": "Partage retiré",
+        "group_create": "Groupe créé",
+        "group_update": "Groupe modifié",
+        "group_delete": "Groupe supprimé",
+        "group_member_set": "Membre ajouté",
+        "group_member_remove": "Membre retiré",
+        "group_member_leave": "A quitté un groupe",
+        "directory_sync": "Groupe de connexion mis à jour",
+        "impersonation_start": "A commencé à voir en tant qu’utilisateur",
+        "impersonation_stop": "A cessé de voir en tant qu’utilisateur",
+        "admin_metadata_view": "A consulté la liste des ressources",
+        "policy_set": "Règles de groupe mises à jour",
+        "policy_lock": "Réglage verrouillé",
+        "platform_link_linked": "Plateforme liée",
+        "platform_link_disconnected": "Plateforme déconnectée",
+        "platform_link_reassigned": "Lien de plateforme déplacé vers un autre compte",
+        "platform_link_exchange_failed": "Échec de la liaison",
+        "platform_link_redirect_rejected": "Redirection de plateforme refusée",
+        "platform_instance_registered": "Plateforme enregistrée",
+        "platform_instance_approved": "Plateforme approuvée",
+        "platform_instance_revoked": "Plateforme révoquée"
+      }
+    },
+    "linkedPlatforms": {
+      "intro": "Serveurs Nextcloud, ownCloud et Outlook qui ont demandé à utiliser ce Synaplan. Approuvez-en un pour que ses utilisateurs puissent connecter leurs propres comptes sous Gérer › Connexions › Plateformes liées.",
+      "empty": "Aucune plateforme ne s’est encore enregistrée.",
+      "client": "Plateforme",
+      "host": "Adresse",
+      "status": "Statut",
+      "actions": "Actions",
+      "approve": "Approuver",
+      "revoke": "Révoquer",
+      "approved": "Plateforme approuvée.",
+      "revoked": "Plateforme révoquée.",
+      "approveError": "La plateforme n’a pas pu être approuvée.",
+      "revokeError": "La plateforme n’a pas pu être révoquée.",
+      "loadError": "Les plateformes n’ont pas pu être chargées.",
+      "revokeTitle": "Révoquer cette plateforme ?",
+      "revokeConfirm": "Révoquer cette plateforme ? Toutes les clés liées cesseront de fonctionner.",
+      "statusValue": {
+        "active": "Active",
+        "pending": "En attente d’approbation",
+        "revoked": "Révoquée"
+      }
+    },
+    "policies": {
+      "group": "Groupe",
+      "chooseGroup": "Choisir un groupe",
+      "helper": "Ces réglages s’appliquent à tout le groupe. Un réglage personnel l’emporte. Un verrou d’instance ignore à la fois la valeur du groupe et les réglages personnels.",
+      "pickGroup": "Choisissez un groupe pour modifier ses règles.",
+      "defaultModels": "Modèles par défaut",
+      "allowedModels": "Modèles autorisés",
+      "allowedHelper": "Laissez vide pour que chacun puisse utiliser tous les modèles. Une liste limite le choix.",
+      "features": "Fonctions",
+      "featuresHelper": "Gardez la valeur de l’instance, sauf si ce groupe doit activer ou désactiver une fonction.",
+      "featureOn": "Activé pour ce groupe",
+      "featureOff": "Désactivé pour ce groupe",
+      "inheritedOn": "La valeur de l’instance est activée.",
+      "inheritedOff": "La valeur de l’instance est désactivée.",
+      "inheritedUnset": "L’instance n’a pas de valeur, donc c’est désactivé.",
+      "willInherit": "Après l’enregistrement, la valeur de l’instance s’applique.",
+      "groupForcesOn": "Ce groupe l’active pour ses membres.",
+      "groupForcesOff": "Ce groupe le désactive pour ses membres.",
+      "rateLimit": "Niveau de limite d’usage",
+      "useGlobal": "Utiliser la valeur de l’instance",
+      "useBillingTier": "Utiliser l’offre de la personne",
+      "conflict": "Un autre groupe définit une autre valeur. Le groupe au plus petit numéro l’emporte.",
+      "locks": "Valeurs d’instance verrouillées",
+      "locksHelper": "Ces verrous s’appliquent à toute l’instance, pas à un groupe. Tant qu’un verrou est actif, seule la valeur d’instance est utilisée. Les valeurs de groupe et personnelles restent enregistrées, mais sont ignorées. Désactivez le verrou pour les utiliser à nouveau.",
+      "save": "Enregistrer les règles",
+      "saved": "Règles du groupe enregistrées.",
+      "lockSaved": "Verrou d’instance mis à jour.",
+      "lockIgnored": "Non utilisé tant que le verrou d’instance est actif.",
+      "lockMissingDefault": "Il n’y a pas de valeur d’instance à verrouiller. Définissez d’abord la valeur d’instance, puis verrouillez-la.",
+      "loadError": "Les règles n’ont pas pu être chargées.",
+      "saveError": "Les règles n’ont pas pu être enregistrées.",
+      "capability": {
+        "CHAT": "Discussion",
+        "VECTORIZE": "Recherche",
+        "PIC2TEXT": "Image vers texte",
+        "SOUND2TEXT": "Parole vers texte",
+        "MEM": "Mémoire",
+        "TOOLS": "Outils"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Tâches enregistrées",
+        "DESKTOP_AGENT_ENABLED": "Agent bureau",
+        "DOCUMENT_TOOLS_ENABLED": "Outils document",
+        "MULTITASK_ROUTING_ENABLED": "Routage en plusieurs étapes",
+        "MULTITASK_PARALLEL_ENABLED": "Étapes en parallèle",
+        "MULTITASK_URL_FETCH_ENABLED": "Récupérer des pages web",
+        "MULTITASK_MCP_FETCH_ENABLED": "Lire les outils connectés",
+        "MULTITASK_MCP_ACTION_ENABLED": "Agir via les outils connectés",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Rechercher dans les e-mails",
+        "TOOLS_REGISTRY_ENABLED": "Catalogue d’outils",
+        "TOOLS_APPROVALS_ENABLED": "Approbations d’outils",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Outils HTTP personnalisés",
+        "WORKFLOWS_BUILDER_ENABLED": "Éditeur d’étapes"
+      }
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Peut voir",
+      "use": "Peut utiliser",
+      "edit": "Peut modifier",
+      "manage": "Peut gérer"
+    },
+    "share": "Partager",
+    "sharedWithMe": "Partagé avec moi",
+    "incoming": {
+      "title": "Chats reçus",
+      "subtitle": "Discussions que des personnes ou des groupes ont partagées avec vous",
+      "menu": "Chats reçus",
+      "menuNew": "Nouveaux chats reçus",
+      "new": "Nouveau",
+      "newCount": "{count} nouveaux reçus",
+      "hint": "Ouvrez une discussion pour la consulter. Pour ajouter vos propres messages, poursuivez-la comme votre copie.",
+      "owner": "de {name}",
+      "sourceGroup": "Cette discussion appartient à {owner}. Elle vous est parvenue via le groupe \"{name}\".",
+      "sourceEveryone": "Cette discussion appartient à {owner}. Elle a été partagée avec tout le monde dans cette organisation.",
+      "sourceDirect": "Cette discussion appartient à {owner}. Elle a été partagée avec vous personnellement.",
+      "emptyTitle": "Rien de reçu pour le moment",
+      "emptyText": "Quand quelqu'un partage une discussion avec vous ou l'un de vos groupes, elle apparaît ici.",
+      "filter": {
+        "label": "Filtrer les discussions",
+        "all": "Toutes",
+        "private": "Privée",
+        "group": "Groupe",
+        "widget": "Widget"
+      },
+      "pill": {
+        "private": "Privée",
+        "privateTitle": "Votre propre discussion — vous seul pouvez la voir",
+        "group": "Groupe",
+        "groupTitle": "Partagée avec le groupe « {name} »",
+        "groupTitleGeneric": "Partagée avec un groupe",
+        "everyone": "Tout le monde",
+        "everyoneTitle": "Partagée avec tout le monde dans cette organisation",
+        "direct": "Partagée avec vous",
+        "directTitle": "Partagée avec vous personnellement",
+        "from": "De {name}",
+        "widget": "Widget",
+        "widgetTitle": "Une conversation de visiteur issue de l'un de vos widgets de chat"
+      }
+    },
+    "everyone": "Tout le monde dans cette organisation",
+    "owner": "Propriétaire",
+    "fileUnavailable": "Ce fichier n'est plus disponible.",
+    "kind": {
+      "assistant": "Assistant IA",
+      "saved_task": "Tâche enregistrée",
+      "widget": "Widget de chat"
+    },
+    "runCopy": "Exécuter comme ma copie",
+    "runCopyConfirm": "Créer votre propre copie de cette tâche enregistrée ? Elle ne s'exécutera que lorsque vous la lancerez.",
+    "assistantNotShared": "L'assistant IA de cette tâche n'est pas partagé avec vous.",
+    "sharedBy": "De {name}",
+    "continueAsCopy": "Continuer comme ma copie",
+    "continueFailed": "Impossible de créer votre copie. Veuillez réessayer.",
+    "readOnly": "Vous pouvez voir cette conversation. Pour ajouter un message, continuez-la comme votre propre copie.",
+    "sharedFolder": "Partagé · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "Ce dossier appartient à {owner}. Il vous a atteint par le groupe « {name} ».",
+        "sourceEveryone": "Ce dossier appartient à {owner}. Il a été partagé avec tout le monde dans cette organisation.",
+        "sourceDirect": "Ce dossier appartient à {owner}. Il a été partagé avec vous personnellement."
+      },
+      "assistant": {
+        "sourceGroup": "Cet assistant appartient à {owner}. Il vous a atteint par le groupe « {name} ».",
+        "sourceEveryone": "Cet assistant appartient à {owner}. Il a été partagé avec tout le monde dans cette organisation.",
+        "sourceDirect": "Cet assistant appartient à {owner}. Il a été partagé avec vous personnellement."
+      },
+      "saved_task": {
+        "sourceGroup": "Cette tâche enregistrée appartient à {owner}. Elle vous a atteint par le groupe « {name} ».",
+        "sourceEveryone": "Cette tâche enregistrée appartient à {owner}. Elle a été partagée avec tout le monde dans cette organisation.",
+        "sourceDirect": "Cette tâche enregistrée appartient à {owner}. Elle a été partagée avec vous personnellement."
+      },
+      "widget": {
+        "sourceGroup": "Ce widget de chat appartient à {owner}. Il vous a atteint par le groupe « {name} ».",
+        "sourceEveryone": "Ce widget de chat appartient à {owner}. Il a été partagé avec tout le monde dans cette organisation.",
+        "sourceDirect": "Ce widget de chat appartient à {owner}. Il a été partagé avec vous personnellement."
+      }
+    },
+    "dialog": {
+      "title": "Partager « {name} »",
+      "who": "Qui",
+      "searchPlaceholder": "Rechercher une personne ou un groupe…",
+      "permission": "Autorisation",
+      "sharedWith": "Partagé avec",
+      "empty": "Vous seul pouvez voir ceci.",
+      "cancel": "Annuler",
+      "remove": "Retirer",
+      "removeTitle": "Arrêter le partage",
+      "removeConfirm": "Retirer {name} ?",
+      "loadFailed": "Impossible de charger les partages.",
+      "saveFailed": "Le partage a échoué. Veuillez réessayer.",
+      "shared": "Partagé avec {name}.",
+      "sharedFind": "Partagé avec {name}. {find}",
+      "removed": "Partage avec {name} arrêté.",
+      "removeFailed": "Impossible d'arrêter le partage. Veuillez réessayer.",
+      "permissionFailed": "Impossible de changer l'autorisation. Veuillez réessayer.",
+      "noMatches": "Aucune personne ou groupe ne correspond.",
+      "searchFailed": "Impossible de rechercher des personnes ou des groupes.",
+      "tryAgain": "Réessayer",
+      "ownerLine": "Propriétaire · {name}",
+      "publicLink": "Lien public",
+      "publicLinkHint": "Toute personne ayant le lien peut le voir.",
+      "managePublicLink": "Gérer le lien public",
+      "openPublicLink": "Gérer le lien public",
+      "subjectType": {
+        "user": "personne",
+        "group": "groupe"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Peut voir — ils peuvent ouvrir ce chat en lecture seule.",
+          "use": "Peut utiliser — ils peuvent continuer ce chat comme leur propre copie."
+        },
+        "knowledge_folder": {
+          "read": "Peut voir — ils peuvent voir le dossier.",
+          "use": "Peut utiliser — l'IA peut utiliser ces fichiers.",
+          "edit": "Peut modifier — ils peuvent changer les fichiers de ce dossier.",
+          "manage": "Peut gérer — ils peuvent partager ce dossier avec d'autres."
+        },
+        "assistant": {
+          "read": "Peut voir — ils peuvent voir la carte et la cloner.",
+          "use": "Peut utiliser — ils peuvent démarrer un chat avec cet assistant.",
+          "edit": "Peut modifier — ils peuvent changer cet assistant."
+        },
+        "saved_task": {
+          "read": "Peut voir — ils peuvent voir la carte.",
+          "use": "Peut utiliser — ils peuvent créer leur propre copie."
+        },
+        "widget": {
+          "read": "Peut voir — ils peuvent ouvrir les réglages du widget.",
+          "edit": "Peut modifier — ils peuvent changer les réglages du widget.",
+          "manage": "Peut gérer — ils peuvent partager ce widget avec d'autres."
+        }
+      },
+      "find": {
+        "conversation": "Ils le trouveront sous Chats reçus.",
+        "knowledge_folder": "Il apparaît chez eux sous Sources comme partagé.",
+        "assistant": "Ils le trouveront sous Assistants → Partagé avec moi.",
+        "saved_task": "Ils peuvent l'utiliser comme modèle sous Automatisations.",
+        "widget": "Ils peuvent ouvrir les réglages du widget."
+      }
+    }
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (extraction de texte des documents)"
+    },
+    "docling": {
+      "label": "Docling (conversion de documents)"
+    },
+    "office_convert": {
+      "label": "Conversion Office"
+    },
+    "searxng": {
+      "label": "Recherche web SearXNG"
+    },
+    "piper_tts": {
+      "label": "Synthèse vocale Piper"
+    },
+    "local_ai": {
+      "label": "IA locale (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Génération vidéo Higgsfield"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "Génération d’images TheHive"
+    },
+    "stripe_billing": {
+      "label": "Facturation Stripe"
+    },
+    "mobile_iap": {
+      "label": "Achats intégrés mobiles"
+    },
+    "whatsapp": {
+      "label": "Canal WhatsApp"
+    },
+    "compute": {
+      "label": "Calcul sécurisé (travail sur fichiers)",
+      "running": "Le travail sur fichiers est en cours.",
+      "runningOff": "Le sidecar tourne ; le travail sur fichiers est désactivé dans la configuration système.",
+      "unreachable": "Le sidecar de travail sur fichiers n’est pas joignable.",
+      "unset": "COMPUTE_URL ou COMPUTE_TOKEN n’est pas défini."
+    },
+    "state": {
+      "available": "Disponible",
+      "needs_setup": "Configuration requise",
+      "absent": "Non installé"
+    },
+    "notice": {
+      "title": "{module} n’est pas disponible sur cette installation",
+      "body": "Cette fonctionnalité est optionnelle. Elle est activée par l’administrateur de cette installation.",
+      "howToEnable": "Comment l’activer",
+      "openFeatureStatus": "Ouvrir l’état des fonctionnalités"
+    }
+  }
+}

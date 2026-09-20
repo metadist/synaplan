@@ -82,6 +82,7 @@ describe('SetupWizardView', () => {
     const before = button.text()
 
     await button.trigger('click')
+    await flushPromises()
 
     expect(button.text()).not.toBe(before)
     expect(localStorage.getItem('language')).toBe(button.text().toLowerCase())

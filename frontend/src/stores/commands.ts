@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import config from '@/stores/config'
-import { i18n } from '@/i18n'
+import { i18n } from '@/i18n/instance'
 
 export interface Command {
   name: string

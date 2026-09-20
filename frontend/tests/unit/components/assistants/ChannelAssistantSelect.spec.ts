@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 const gallery = vi.fn()
 const agentsEnabled = vi.fn(() => true)
@@ -18,7 +20,7 @@ vi.mock('@/services/api/agentsApi', () => ({
 }))
 
 function mountSelect() {
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   return mount(ChannelAssistantSelect, {
     props: {
       modelValue: null,

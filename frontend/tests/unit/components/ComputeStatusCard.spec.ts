@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
 import ComputeStatusCard from '@/components/admin/ComputeStatusCard.vue'
 import type { ComputeStatus } from '@/services/featuresService'
 
-const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+const en = loadAllMessages('en')
+
+const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
 
 const status = (overrides: Partial<ComputeStatus> = {}): ComputeStatus => ({
   enabled: true,

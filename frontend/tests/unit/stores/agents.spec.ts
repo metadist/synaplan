@@ -19,7 +19,7 @@ vi.mock('@/services/api/agentsApi', async (importOriginal) => {
   }
 })
 
-vi.mock('@/i18n', () => ({
+vi.mock('@/i18n/instance', () => ({
   i18n: {
     global: {
       t: (key: string) => key,

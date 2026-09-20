@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 const sections = vi.fn()
 const preview = vi.fn()
@@ -27,7 +29,7 @@ vi.mock('@/services/api/bundleApi', () => ({
 }))
 
 function mountPanel() {
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   return mount(ExportImportPanel, { global: { plugins: [i18n] } })
 }
 

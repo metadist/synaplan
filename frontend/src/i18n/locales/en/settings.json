@@ -1,0 +1,412 @@
+{
+  "marketingNews": {
+    "heading": "Latest from Synaplan",
+    "readMore": "Read more"
+  },
+  "usageTaximeter": {
+    "sessionLabel": "Tokens",
+    "todayTooltip": "{tokens} tokens today",
+    "todayAria": "Usage today: {cost}",
+    "openStats": "Show usage statistics",
+    "usedModels": "Models used",
+    "promptsInSession": "Prompts in this session",
+    "modelChanges": "Model changes: {count}",
+    "allStatistics": "All statistics",
+    "lessThanCent": "< 0.01 €"
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Free Limit Reached",
+      "description": "You've used all {limit} {action} in your free plan. Upgrade to continue!"
+    },
+    "hourly": {
+      "title": "Hourly Limit Reached",
+      "description": "You've reached your hourly limit of {limit} {action}. Your limit will reset soon."
+    },
+    "monthly": {
+      "title": "Monthly Limit Reached",
+      "description": "You've used all {limit} {action} this month. Upgrade for more!"
+    },
+    "currentUsage": "Current Usage",
+    "remaining": "Remaining",
+    "resetsIn": "Resets in",
+    "noReset": "No automatic reset",
+    "upgradesBenefits": "Upgrade benefits:",
+    "benefits": {
+      "unlimited": "Unlimited or higher limits",
+      "allFeatures": "Access to all features",
+      "priority": "Priority processing",
+      "support": "Premium support"
+    },
+    "upgradeNow": "Upgrade Now",
+    "topup": {
+      "button": "Add €{amount} budget",
+      "amountLabel": "Top-up amount (€{step} steps)",
+      "error": "Could not start the top-up. Please try again."
+    },
+    "verifyPhone": "Verify Phone Number",
+    "footerNote": "Questions? Contact our support team.",
+    "messageBlocked": "Message could not be sent",
+    "messageBlockedDesc": "You've reached your {action} limit. Upgrade your plan or wait for the limit to reset.",
+    "retryLater": "Retry"
+  },
+  "paywall": {
+    "title": {
+      "guest_limit": "Your free messages are used up",
+      "free_limit": "Your free messages are used up",
+      "quota_exhausted": "You've used up this month's allowance",
+      "reminder": "Get more out of {brand}"
+    },
+    "subtitle": {
+      "guest_limit": "Pick a plan to keep chatting. An account gives you your own history, memories and files from here on.",
+      "free_limit": "Your free allowance is spent. Pick a plan to keep chatting without limits.",
+      "quota_exhausted": "Move up a plan to keep going right away, or wait for your allowance to reset next month.",
+      "reminder": "A plan gives you more messages, stronger AI models and more storage."
+    },
+    "unavailable": "No plans can be bought here right now. Please try again later.",
+    "recommended": "Recommended",
+    "choosePlan": "Choose {plan}",
+    "guestNote": "Create a free account first — your plan is linked to it.",
+    "login": "I already have an account",
+    "maybeLater": "Maybe later",
+    "renewalNoteStore": "Subscriptions renew automatically until you cancel them. Manage or cancel any time in your store account settings.",
+    "renewalNoteWeb": "Subscriptions renew automatically until you cancel them. You can cancel any time.",
+    "plans": {
+      "pro": {
+        "tagline": "For everyday work with AI"
+      },
+      "team": {
+        "tagline": "For small teams working together"
+      },
+      "business": {
+        "tagline": "For companies with the highest demands"
+      }
+    }
+  },
+  "subscription": {
+    "serviceNotAvailable": "Service Not Available",
+    "title": "Subscription Plans",
+    "subtitle": "Unlock more features and higher limits",
+    "chooseYourPlan": "Choose Your Plan",
+    "currentPlan": "Current Plan",
+    "yourPlan": "Your Plan",
+    "noActiveSubscription": "No active subscription",
+    "upgradePlan": "Upgrade Plan",
+    "managePlan": "Manage Plan",
+    "cancelPlan": "Cancel Subscription",
+    "recommended": "Recommended",
+    "selectPlan": "Select Plan",
+    "upgrade": "Upgrade",
+    "includedInCurrent": "Included in your plan",
+    "highestPlan": "You have the highest plan available!",
+    "processing": "Processing...",
+    "perMonth": "month",
+    "perYear": "year",
+    "unavailable": "Subscription Service Unavailable",
+    "unavailableDesc": "The subscription service is currently being configured. Please check back later or contact support for more information.",
+    "serviceNotConfigured": "Subscription service is currently unavailable. Please contact support.",
+    "checkoutFailed": "Failed to start checkout. Please try again.",
+    "selfHosted": "Self-Hosted Edition — All features included",
+    "manage": {
+      "title": "Manage Your Subscription",
+      "subtitle": "View and manage your subscription details",
+      "currentPlanLabel": "Current Plan",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusCanceled": "Canceled",
+      "statusPastDue": "Past Due",
+      "statusIncomplete": "Incomplete",
+      "statusIncompleteExpired": "Incomplete (expired)",
+      "statusTrialing": "Trialing",
+      "statusUnpaid": "Unpaid",
+      "statusPaused": "Paused",
+      "paymentFailedTitle": "Payment failed — please update your card",
+      "paymentFailedBody": "We couldn't process your last payment. Stripe will keep retrying for the next few weeks, but your subscription will be paused if the card isn't updated. Open the billing portal to fix it.",
+      "paymentFailedCta": "Update payment method",
+      "nextBilling": "Next Billing Date",
+      "cancelDate": "Cancels on",
+      "billingPortal": "Billing Portal",
+      "billingPortalDesc": "Manage your payment methods, view invoices, and update billing information",
+      "openPortal": "Open Billing Portal",
+      "cancelSubscription": "Cancel Subscription",
+      "cancelWarning": "Are you sure you want to cancel your subscription?",
+      "cancelWarningDesc": "You will retain access until the end of your billing period.",
+      "confirmCancel": "Yes, Cancel Subscription",
+      "keepSubscription": "Keep Subscription",
+      "loadingPortal": "Opening billing portal..."
+    },
+    "native": {
+      "purchaseTitle": "In-app purchase",
+      "purchaseUnavailable": "In-app purchases are not available on this server yet. Please try again later.",
+      "purchaseSuccess": "Your subscription is now active. Thank you!",
+      "purchasePending": "Your purchase is waiting for approval (e.g. Ask to Buy). Your subscription will activate automatically once it is approved.",
+      "purchaseConflict": "This purchase is already linked to another account or an existing subscription. Please check your store account or contact support.",
+      "purchaseFailed": "The purchase could not be completed. You have not been charged. Please try again.",
+      "manageInStore": "Manage in the store",
+      "restoreButton": "Restore Purchases",
+      "restoreTitle": "Restore purchases",
+      "restoreDone": "Purchases restored — your subscription is active.",
+      "restoreNone": "No active subscription was found to restore.",
+      "storeNoteIos": "Purchases and subscriptions are processed and managed through the App Store.",
+      "storeNoteAndroid": "Purchases and subscriptions are processed and managed through Google Play.",
+      "redeemBlockedExistingIos": "This account already has an active subscription, so your recent store purchase was not linked. Please check your Apple ID subscriptions and request a refund there if needed, to avoid double charges.",
+      "redeemBlockedExistingAndroid": "This account already has an active subscription, so your recent store purchase was not linked. Google Play automatically refunds unacknowledged purchases within a few days."
+    },
+    "plans": {
+      "pro": "Pro",
+      "team": "Team",
+      "business": "Business"
+    },
+    "features": {
+      "usage": "{factor}× more usage than the free plan",
+      "advancedModels": "Advanced AI Models",
+      "prioritySupport": "Priority Support",
+      "everythingInPro": "Everything in Pro",
+      "everythingInTeam": "Everything in Team",
+      "teamCollaboration": "Team Collaboration",
+      "customPrompts": "Custom Prompts",
+      "apiAccess": "API Access",
+      "whiteLabel": "White-label Widgets",
+      "dedicatedSupport": "Dedicated Support",
+      "slaGuarantee": "SLA Guarantee"
+    },
+    "success": {
+      "title": "Payment Successful!",
+      "description": "Your subscription has been activated. Thank you for upgrading!",
+      "newPlan": "Your new plan",
+      "startUsing": "Start Using Your Plan",
+      "activating": "Activating Your Plan...",
+      "activatingDesc": "Please wait while we activate your subscription.",
+      "almostDone": "Almost Done!",
+      "processing": "Your payment was successful, but we're still processing your subscription.",
+      "retry": "Retry Activation",
+      "continueAnyway": "Continue Anyway"
+    },
+    "cancel": {
+      "title": "Payment Cancelled",
+      "description": "Your payment was cancelled. No charges were made.",
+      "tryAgain": "Try Again",
+      "backToPlans": "Back to Plans"
+    }
+  },
+  "export": {
+    "title": "Export",
+    "format": "Format",
+    "recommended": "Recommended",
+    "dateRange": "Date Range",
+    "allTime": "All Time",
+    "today": "Today",
+    "last7Days": "Last 7 Days",
+    "last30Days": "Last 30 Days",
+    "custom": "Custom Range",
+    "sessionType": "Session Type",
+    "allSessions": "All Sessions",
+    "aiOnly": "AI Chats Only",
+    "humanOnly": "Human Chats Only",
+    "download": "Download",
+    "exporting": "Exporting...",
+    "selectedChats": "{count} chats selected",
+    "selectedChatsHint": "Only these selected chats will be exported"
+  },
+  "profile": {
+    "title": "Profile Settings",
+    "subtitle": "Manage your personal information and account settings",
+    "personalInfo": {
+      "title": "Personal Information",
+      "firstName": "First Name",
+      "firstNamePlaceholder": "Your given name",
+      "lastName": "Last Name",
+      "lastNamePlaceholder": "Your family name",
+      "email": "Email",
+      "emailHint": "Your login email (cannot be changed)",
+      "phone": "Phone",
+      "phonePlaceholder": "Optional contact number",
+      "managedBy": "This account is managed by {provider}"
+    },
+    "companyInfo": {
+      "title": "Company Information",
+      "subtitle": "Optional - Leave empty if you're a private person",
+      "companyName": "Company Name",
+      "companyNamePlaceholder": "Your Company GmbH",
+      "vatId": "VAT ID",
+      "vatIdPlaceholder": "German: Umsatzsteuer-ID"
+    },
+    "billingAddress": {
+      "title": "Billing Address",
+      "street": "Street & Number",
+      "streetPlaceholder": "Street name and house number",
+      "zipCode": "ZIP Code",
+      "zipCodePlaceholder": "Postal code",
+      "city": "City",
+      "cityPlaceholder": "City name",
+      "country": "Country",
+      "countryHint": "Required for proper tax calculation"
+    },
+    "accountSettings": {
+      "title": "Account Settings",
+      "language": "Language",
+      "languageHint": "Interface language",
+      "timezone": "Timezone",
+      "timezoneHint": "Your local timezone",
+      "invoiceEmail": "Invoice Email",
+      "invoiceEmailPlaceholder": "Alternative email for invoices (leave empty to use main email)"
+    },
+    "memories": {
+      "title": "Memories",
+      "subtitle": "Control whether Synaplan should use and automatically update your memories for personalization.",
+      "toggleLabel": "Enable memories for my account",
+      "enabledHint": "Enabled: the AI may use and update your memories based on conversations.",
+      "disabledHint": "Disabled: the AI will not use or auto-update memories. You can re-enable at any time."
+    },
+    "changePassword": {
+      "title": "Change Password",
+      "subtitle": "Leave empty to keep current password",
+      "currentPassword": "Current Password",
+      "currentPasswordPlaceholder": "Leave empty to keep current password",
+      "newPassword": "New Password",
+      "newPasswordPlaceholder": "Enter new password",
+      "newPasswordHint": "Minimum 8 characters",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordPlaceholder": "Confirm new password",
+      "confirmPasswordHint": "Must match new password",
+      "externalAuth": "You're using {provider} to sign in. Password management is handled there.",
+      "mismatch": "Passwords do not match",
+      "tooShort": "Password must be at least 8 characters"
+    },
+    "appSecurity": {
+      "title": "App Security",
+      "subtitle": "Extra protection for this device",
+      "biometricLock": "Biometric app lock",
+      "biometricLockHint": "Require Face ID, Touch ID or fingerprint to open the app.",
+      "verifyReason": "Enable biometric lock",
+      "enableFailed": "Could not enable the biometric lock. Please try again."
+    },
+    "legal": {
+      "title": "Privacy & Terms",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Use",
+      "accountDeletion": "Delete your account"
+    },
+    "dangerZone": {
+      "title": "Danger Zone",
+      "subtitle": "Irreversible actions",
+      "deleteAccount": "Delete Account",
+      "deleteAccountDesc": "Permanently delete your account. This action cannot be undone.",
+      "deleteButton": "Delete Account Permanently"
+    },
+    "deleteAccountModal": {
+      "title": "Really Delete Account?",
+      "warning": "This action is permanent and cannot be undone.",
+      "consequences": "The following data will be deleted:",
+      "consequence1": "All your messages and chats",
+      "consequence2": "All uploaded files",
+      "consequence3": "Your personal data and settings",
+      "consequence4": "API keys and credentials",
+      "confirmPassword": "Confirm with your password:",
+      "confirmPasswordPlaceholder": "Your current password",
+      "externalAuthConfirm": "Type 'DELETE' to confirm:",
+      "externalAuthPlaceholder": "Type DELETE",
+      "deleteButton": "Yes, Delete Account",
+      "cancelButton": "Cancel",
+      "deleting": "Deleting..."
+    },
+    "privacyNotice": "All data is stored securely and used only for invoicing purposes according to German law (DSGVO).",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel"
+  },
+  "settings": {
+    "title": "Preferences",
+    "subtitle": "Manage your preferences and configuration",
+    "tabs": {
+      "general": "General",
+      "features": "Features"
+    },
+    "appMode": {
+      "title": "App Mode",
+      "description": "Choose between simplified or full feature set",
+      "easy": "Easy Mode",
+      "easyDesc": "Simplified interface with essential features",
+      "advanced": "Advanced Mode",
+      "advancedDesc": "Full access to all features and tools",
+      "lockedTitle": "Advanced mode feature",
+      "lockedMessage": "\"{feature}\" is part of Advanced mode. Switch to Advanced mode to use it — you can change back anytime in Preferences.",
+      "switchCta": "Switch to Advanced mode"
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Choose your color scheme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Pick the language used across the interface"
+    },
+    "webSearch": {
+      "title": "Web search",
+      "description": "Use a different search provider than the one your administrator set for everyone.",
+      "useMyOwn": "Use my own search",
+      "saved": "Your search provider was saved.",
+      "saveFailed": "Your search provider could not be saved"
+    },
+    "account": {
+      "title": "Account",
+      "email": "Email",
+      "userLevel": "User Level"
+    },
+    "logout": "Logout",
+    "features": {
+      "title": "System Status",
+      "subtitle": "Monitor all services and features",
+      "loading": "Loading features...",
+      "requiredConfig": "Required Configuration:",
+      "set": "Set",
+      "notSet": "Not Set",
+      "allOperational": "All systems operational",
+      "issuesDetected": "Issues detected",
+      "ready": "Ready",
+      "healthSummary": "{healthy} of {total} services healthy",
+      "model": "model",
+      "models": "models",
+      "adminOnlyTitle": "Admin access required",
+      "adminOnlyMessage": "Feature status is available to administrators only.",
+      "modulesTitle": "Feature modules",
+      "modulesSubtitle": "Optional features this installation declares. Each one is switched on by its configuration; the list shows which keys, never their values.",
+      "modulesConfigured": "{configured} of {total} configured",
+      "configuredBy": "Configured by:",
+      "docs": "Documentation",
+      "compute": {
+        "title": "File work (compute)",
+        "tierDocker": "Standard",
+        "tierGvisor": "Strong isolation",
+        "tierMicrovm": "Virtual machine",
+        "tierUnknown": "Unknown",
+        "statusOn": "On",
+        "statusOff": "Off",
+        "statusDown": "Down",
+        "stateRunning": "File work is running.",
+        "stateDisabled": "Turned off in System configuration. File work stays hidden.",
+        "stateUnreachable": "On, but the sidecar is not answering. File work is unavailable.",
+        "postureWarning": "This service reports {tier}; this instance requires stronger isolation.",
+        "capacity": "Capacity",
+        "runningOf": "{running} of {max} running",
+        "queued": "{count} queued",
+        "images": "Images",
+        "runs24": "{count} runs (24h)",
+        "failed24": "{count} failed (24h)",
+        "openConfig": "Compute settings",
+        "stateTierBlocked": "On, but below the required isolation. File work stays hidden."
+      }
+    },
+    "notLoggedIn": "Not logged in"
+  },
+  "externalLink": {
+    "title": "External Website",
+    "subtitle": "You are about to leave Synaplan",
+    "disclaimer": "You are being redirected to an external website. We have no control over the content and are not responsible for data protection or security on third-party sites. Proceed at your own risk.",
+    "dontAskAgain": "Don't show this warning again",
+    "cancel": "Cancel",
+    "open": "Open link"
+  }
+}

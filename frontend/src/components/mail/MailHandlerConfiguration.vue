@@ -8,7 +8,7 @@
       <template #actions>
         <button
           class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
-          :aria-label="$t('widget.closeEditor')"
+          :aria-label="$t('common.close')"
           data-testid="btn-close"
           @click="$emit('cancel')"
         >

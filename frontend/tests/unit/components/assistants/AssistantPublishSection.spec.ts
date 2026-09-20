@@ -6,7 +6,9 @@ import AssistantPublishSection from '@/components/assistants/AssistantPublishSec
 import { agentsApi, emptyAgentDraft, type Agent } from '@/services/api/agentsApi'
 import { ApiError } from '@/services/api/httpClient'
 import { useAgentsStore } from '@/stores/agents'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 const errorMock = vi.fn()
 const successMock = vi.fn()
@@ -61,7 +63,7 @@ function agent(overrides: Partial<Agent> = {}): Agent {
 }
 
 function mountSection() {
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   return mount(AssistantPublishSection, {
     global: {
       plugins: [i18n],

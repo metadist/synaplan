@@ -1,0 +1,412 @@
+{
+  "marketingNews": {
+    "heading": "Actualités Synaplan",
+    "readMore": "Lire la suite"
+  },
+  "usageTaximeter": {
+    "sessionLabel": "Jetons",
+    "todayTooltip": "{tokens} jetons aujourd’hui",
+    "todayAria": "Utilisation aujourd’hui : {cost}",
+    "openStats": "Afficher les statistiques d’utilisation",
+    "usedModels": "Modèles utilisés",
+    "promptsInSession": "Instructions dans cette session",
+    "modelChanges": "Changements de modèle : {count}",
+    "allStatistics": "Toutes les statistiques",
+    "lessThanCent": "< 0,01 €"
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Limite gratuite atteinte",
+      "description": "Vous avez utilisé vos {limit} {action} de la formule gratuite. Passez à une formule supérieure pour continuer !"
+    },
+    "hourly": {
+      "title": "Limite horaire atteinte",
+      "description": "Vous avez atteint votre limite horaire de {limit} {action}. Votre limite se réinitialisera bientôt."
+    },
+    "monthly": {
+      "title": "Limite mensuelle atteinte",
+      "description": "Vous avez utilisé vos {limit} {action} ce mois-ci. Passez à une formule supérieure pour en avoir plus !"
+    },
+    "currentUsage": "Utilisation actuelle",
+    "remaining": "Restant",
+    "resetsIn": "Réinitialisation dans",
+    "noReset": "Aucune réinitialisation automatique",
+    "upgradesBenefits": "Avantages de la formule supérieure :",
+    "benefits": {
+      "unlimited": "Limites illimitées ou plus élevées",
+      "allFeatures": "Accès à toutes les fonctionnalités",
+      "priority": "Traitement prioritaire",
+      "support": "Support premium"
+    },
+    "upgradeNow": "Passer à une formule supérieure",
+    "topup": {
+      "button": "Ajouter {amount} € de budget",
+      "amountLabel": "Montant de recharge (pas de {step} €)",
+      "error": "Impossible de démarrer la recharge. Veuillez réessayer."
+    },
+    "verifyPhone": "Vérifier le numéro de téléphone",
+    "footerNote": "Des questions ? Contactez notre équipe de support.",
+    "messageBlocked": "Le message n’a pas pu être envoyé",
+    "messageBlockedDesc": "Vous avez atteint votre limite de {action}. Passez à une formule supérieure ou attendez la réinitialisation de la limite.",
+    "retryLater": "Réessayer"
+  },
+  "paywall": {
+    "title": {
+      "guest_limit": "Vos messages gratuits sont épuisés",
+      "free_limit": "Vos messages gratuits sont épuisés",
+      "quota_exhausted": "Vous avez utilisé l’allocation de ce mois",
+      "reminder": "Tirez davantage de {brand}"
+    },
+    "subtitle": {
+      "guest_limit": "Choisissez une formule pour continuer à discuter. Un compte vous donne désormais votre propre historique, vos mémoires et vos fichiers.",
+      "free_limit": "Votre allocation gratuite est épuisée. Choisissez une formule pour continuer à discuter sans limites.",
+      "quota_exhausted": "Passez à une formule supérieure pour continuer tout de suite, ou attendez la réinitialisation de votre allocation le mois prochain.",
+      "reminder": "Une formule vous donne plus de messages, des modèles IA plus puissants et plus de stockage."
+    },
+    "unavailable": "Aucune formule ne peut être achetée ici pour le moment. Veuillez réessayer plus tard.",
+    "recommended": "Recommandé",
+    "choosePlan": "Choisir {plan}",
+    "guestNote": "Créez d’abord un compte gratuit — votre formule y est liée.",
+    "login": "J’ai déjà un compte",
+    "maybeLater": "Peut-être plus tard",
+    "renewalNoteStore": "Les abonnements se renouvellent automatiquement jusqu’à ce que vous les annuliez. Gérez-les ou annulez-les à tout moment dans les réglages de votre compte boutique.",
+    "renewalNoteWeb": "Les abonnements se renouvellent automatiquement jusqu’à ce que vous les annuliez. Vous pouvez annuler à tout moment.",
+    "plans": {
+      "pro": {
+        "tagline": "Pour le travail quotidien avec l’IA"
+      },
+      "team": {
+        "tagline": "Pour les petites équipes qui travaillent ensemble"
+      },
+      "business": {
+        "tagline": "Pour les entreprises aux exigences les plus élevées"
+      }
+    }
+  },
+  "subscription": {
+    "serviceNotAvailable": "Service indisponible",
+    "title": "Formules d’abonnement",
+    "subtitle": "Débloquez plus de fonctionnalités et des limites plus élevées",
+    "chooseYourPlan": "Choisissez votre formule",
+    "currentPlan": "Formule actuelle",
+    "yourPlan": "Votre formule",
+    "noActiveSubscription": "Aucun abonnement actif",
+    "upgradePlan": "Changer de formule",
+    "managePlan": "Gérer la formule",
+    "cancelPlan": "Annuler l’abonnement",
+    "recommended": "Recommandé",
+    "selectPlan": "Choisir la formule",
+    "upgrade": "Passer à une formule supérieure",
+    "includedInCurrent": "Inclus dans votre formule",
+    "highestPlan": "Vous avez la formule la plus élevée disponible !",
+    "processing": "Traitement…",
+    "perMonth": "mois",
+    "perYear": "an",
+    "unavailable": "Service d’abonnement indisponible",
+    "unavailableDesc": "Le service d’abonnement est en cours de configuration. Revenez plus tard ou contactez le support pour plus d’informations.",
+    "serviceNotConfigured": "Le service d’abonnement est actuellement indisponible. Veuillez contacter le support.",
+    "checkoutFailed": "Impossible de démarrer le paiement. Veuillez réessayer.",
+    "selfHosted": "Édition auto-hébergée — toutes les fonctionnalités incluses",
+    "manage": {
+      "title": "Gérer votre abonnement",
+      "subtitle": "Consultez et gérez les détails de votre abonnement",
+      "currentPlanLabel": "Formule actuelle",
+      "status": "Statut",
+      "statusActive": "Actif",
+      "statusCanceled": "Annulé",
+      "statusPastDue": "Impayé",
+      "statusIncomplete": "Incomplet",
+      "statusIncompleteExpired": "Incomplet (expiré)",
+      "statusTrialing": "Essai",
+      "statusUnpaid": "Non payé",
+      "statusPaused": "En pause",
+      "paymentFailedTitle": "Paiement échoué — veuillez mettre à jour votre carte",
+      "paymentFailedBody": "Nous n’avons pas pu traiter votre dernier paiement. Stripe continuera de réessayer pendant quelques semaines, mais votre abonnement sera mis en pause si la carte n’est pas mise à jour. Ouvrez le portail de facturation pour le corriger.",
+      "paymentFailedCta": "Mettre à jour le moyen de paiement",
+      "nextBilling": "Prochaine date de facturation",
+      "cancelDate": "Annulation le",
+      "billingPortal": "Portail de facturation",
+      "billingPortalDesc": "Gérez vos moyens de paiement, consultez les factures et mettez à jour les informations de facturation",
+      "openPortal": "Ouvrir le portail de facturation",
+      "cancelSubscription": "Annuler l’abonnement",
+      "cancelWarning": "Voulez-vous vraiment annuler votre abonnement ?",
+      "cancelWarningDesc": "Vous conserverez l’accès jusqu’à la fin de votre période de facturation.",
+      "confirmCancel": "Oui, annuler l’abonnement",
+      "keepSubscription": "Conserver l’abonnement",
+      "loadingPortal": "Ouverture du portail de facturation…"
+    },
+    "native": {
+      "purchaseTitle": "Achat intégré",
+      "purchaseUnavailable": "Les achats intégrés ne sont pas encore disponibles sur ce serveur. Veuillez réessayer plus tard.",
+      "purchaseSuccess": "Votre abonnement est maintenant actif. Merci !",
+      "purchasePending": "Votre achat attend une approbation (p. ex. Demander à acheter). Votre abonnement s’activera automatiquement une fois approuvé.",
+      "purchaseConflict": "Cet achat est déjà lié à un autre compte ou à un abonnement existant. Vérifiez votre compte boutique ou contactez le support.",
+      "purchaseFailed": "L’achat n’a pas pu être terminé. Vous n’avez pas été débité. Veuillez réessayer.",
+      "manageInStore": "Gérer dans la boutique",
+      "restoreButton": "Restaurer les achats",
+      "restoreTitle": "Restaurer les achats",
+      "restoreDone": "Achats restaurés — votre abonnement est actif.",
+      "restoreNone": "Aucun abonnement actif n’a été trouvé à restaurer.",
+      "storeNoteIos": "Les achats et abonnements sont traités et gérés via l’App Store.",
+      "storeNoteAndroid": "Les achats et abonnements sont traités et gérés via Google Play.",
+      "redeemBlockedExistingIos": "Ce compte a déjà un abonnement actif, votre récent achat en boutique n’a donc pas été lié. Vérifiez les abonnements de votre identifiant Apple et demandez-y un remboursement si besoin, pour éviter un double débit.",
+      "redeemBlockedExistingAndroid": "Ce compte a déjà un abonnement actif, votre récent achat en boutique n’a donc pas été lié. Google Play rembourse automatiquement les achats non confirmés en quelques jours."
+    },
+    "plans": {
+      "pro": "Pro",
+      "team": "Team",
+      "business": "Business"
+    },
+    "features": {
+      "usage": "{factor}× plus d’utilisation que la formule gratuite",
+      "advancedModels": "Modèles IA avancés",
+      "prioritySupport": "Support prioritaire",
+      "everythingInPro": "Tout ce qui est dans Pro",
+      "everythingInTeam": "Tout ce qui est dans Team",
+      "teamCollaboration": "Collaboration d’équipe",
+      "customPrompts": "Instructions personnalisées",
+      "apiAccess": "Accès API",
+      "whiteLabel": "Widgets en marque blanche",
+      "dedicatedSupport": "Support dédié",
+      "slaGuarantee": "Garantie SLA"
+    },
+    "success": {
+      "title": "Paiement réussi !",
+      "description": "Votre abonnement a été activé. Merci d’être passé à une formule supérieure !",
+      "newPlan": "Votre nouvelle formule",
+      "startUsing": "Commencer à utiliser votre formule",
+      "activating": "Activation de votre formule…",
+      "activatingDesc": "Veuillez patienter pendant que nous activons votre abonnement.",
+      "almostDone": "Presque terminé !",
+      "processing": "Votre paiement a réussi, mais nous traitons encore votre abonnement.",
+      "retry": "Réessayer l’activation",
+      "continueAnyway": "Continuer quand même"
+    },
+    "cancel": {
+      "title": "Paiement annulé",
+      "description": "Votre paiement a été annulé. Aucun montant n’a été débité.",
+      "tryAgain": "Réessayer",
+      "backToPlans": "Retour aux formules"
+    }
+  },
+  "export": {
+    "title": "Exporter",
+    "format": "Format",
+    "recommended": "Recommandé",
+    "dateRange": "Plage de dates",
+    "allTime": "Tout",
+    "today": "Aujourd’hui",
+    "last7Days": "7 derniers jours",
+    "last30Days": "30 derniers jours",
+    "custom": "Plage personnalisée",
+    "sessionType": "Type de session",
+    "allSessions": "Toutes les sessions",
+    "aiOnly": "Chats IA uniquement",
+    "humanOnly": "Chats humains uniquement",
+    "download": "Télécharger",
+    "exporting": "Export…",
+    "selectedChats": "{count} chats sélectionnés",
+    "selectedChatsHint": "Seuls ces chats sélectionnés seront exportés"
+  },
+  "profile": {
+    "title": "Réglages du profil",
+    "subtitle": "Gérez vos informations personnelles et les réglages du compte",
+    "personalInfo": {
+      "title": "Informations personnelles",
+      "firstName": "Prénom",
+      "firstNamePlaceholder": "Votre prénom",
+      "lastName": "Nom",
+      "lastNamePlaceholder": "Votre nom de famille",
+      "email": "E-mail",
+      "emailHint": "Votre e-mail de connexion (ne peut pas être modifié)",
+      "phone": "Téléphone",
+      "phonePlaceholder": "Numéro de contact facultatif",
+      "managedBy": "Ce compte est géré par {provider}"
+    },
+    "companyInfo": {
+      "title": "Informations sur l’entreprise",
+      "subtitle": "Facultatif — laissez vide si vous êtes un particulier",
+      "companyName": "Nom de l’entreprise",
+      "companyNamePlaceholder": "Votre Société SAS",
+      "vatId": "N° de TVA",
+      "vatIdPlaceholder": "Numéro de TVA intracommunautaire"
+    },
+    "billingAddress": {
+      "title": "Adresse de facturation",
+      "street": "Rue et numéro",
+      "streetPlaceholder": "Nom de rue et numéro",
+      "zipCode": "Code postal",
+      "zipCodePlaceholder": "Code postal",
+      "city": "Ville",
+      "cityPlaceholder": "Nom de la ville",
+      "country": "Pays",
+      "countryHint": "Requis pour le calcul correct de la TVA"
+    },
+    "accountSettings": {
+      "title": "Réglages du compte",
+      "language": "Langue",
+      "languageHint": "Langue de l’interface",
+      "timezone": "Fuseau horaire",
+      "timezoneHint": "Votre fuseau horaire local",
+      "invoiceEmail": "E-mail de facturation",
+      "invoiceEmailPlaceholder": "E-mail alternatif pour les factures (laissez vide pour utiliser l’e-mail principal)"
+    },
+    "memories": {
+      "title": "Mémoires",
+      "subtitle": "Contrôlez si Synaplan doit utiliser et mettre à jour automatiquement vos mémoires pour la personnalisation.",
+      "toggleLabel": "Activer les mémoires pour mon compte",
+      "enabledHint": "Activé : l’IA peut utiliser et mettre à jour vos mémoires à partir des conversations.",
+      "disabledHint": "Désactivé : l’IA n’utilisera ni ne mettra à jour automatiquement les mémoires. Vous pouvez réactiver à tout moment."
+    },
+    "changePassword": {
+      "title": "Changer le mot de passe",
+      "subtitle": "Laissez vide pour conserver le mot de passe actuel",
+      "currentPassword": "Mot de passe actuel",
+      "currentPasswordPlaceholder": "Laissez vide pour conserver le mot de passe actuel",
+      "newPassword": "Nouveau mot de passe",
+      "newPasswordPlaceholder": "Saisissez le nouveau mot de passe",
+      "newPasswordHint": "8 caractères minimum",
+      "confirmPassword": "Confirmer le mot de passe",
+      "confirmPasswordPlaceholder": "Confirmez le nouveau mot de passe",
+      "confirmPasswordHint": "Doit correspondre au nouveau mot de passe",
+      "externalAuth": "Vous vous connectez avec {provider}. La gestion du mot de passe se fait là-bas.",
+      "mismatch": "Les mots de passe ne correspondent pas",
+      "tooShort": "Le mot de passe doit contenir au moins 8 caractères"
+    },
+    "appSecurity": {
+      "title": "Sécurité de l’application",
+      "subtitle": "Protection supplémentaire pour cet appareil",
+      "biometricLock": "Verrouillage biométrique de l’application",
+      "biometricLockHint": "Exiger Face ID, Touch ID ou une empreinte pour ouvrir l’application.",
+      "verifyReason": "Activer le verrouillage biométrique",
+      "enableFailed": "Impossible d’activer le verrouillage biométrique. Veuillez réessayer."
+    },
+    "legal": {
+      "title": "Confidentialité et conditions",
+      "privacy": "Politique de confidentialité",
+      "terms": "Conditions d’utilisation",
+      "accountDeletion": "Supprimer votre compte"
+    },
+    "dangerZone": {
+      "title": "Zone de danger",
+      "subtitle": "Actions irréversibles",
+      "deleteAccount": "Supprimer le compte",
+      "deleteAccountDesc": "Supprimez définitivement votre compte. Cette action est irréversible.",
+      "deleteButton": "Supprimer le compte définitivement"
+    },
+    "deleteAccountModal": {
+      "title": "Vraiment supprimer le compte ?",
+      "warning": "Cette action est permanente et irréversible.",
+      "consequences": "Les données suivantes seront supprimées :",
+      "consequence1": "Tous vos messages et chats",
+      "consequence2": "Tous les fichiers téléversés",
+      "consequence3": "Vos données personnelles et réglages",
+      "consequence4": "Clés API et identifiants",
+      "confirmPassword": "Confirmez avec votre mot de passe :",
+      "confirmPasswordPlaceholder": "Votre mot de passe actuel",
+      "externalAuthConfirm": "Tapez « DELETE » pour confirmer :",
+      "externalAuthPlaceholder": "Tapez DELETE",
+      "deleteButton": "Oui, supprimer le compte",
+      "cancelButton": "Annuler",
+      "deleting": "Suppression…"
+    },
+    "privacyNotice": "Toutes les données sont stockées de façon sécurisée et utilisées uniquement à des fins de facturation conformément au droit allemand (DSGVO).",
+    "saveChanges": "Enregistrer les modifications",
+    "cancel": "Annuler"
+  },
+  "settings": {
+    "title": "Préférences",
+    "subtitle": "Gérez vos préférences et votre configuration",
+    "tabs": {
+      "general": "Général",
+      "features": "Fonctionnalités"
+    },
+    "appMode": {
+      "title": "Mode de l’application",
+      "description": "Choisissez entre un ensemble de fonctionnalités simplifié ou complet",
+      "easy": "Mode simple",
+      "easyDesc": "Interface simplifiée avec les fonctionnalités essentielles",
+      "advanced": "Mode avancé",
+      "advancedDesc": "Accès complet à toutes les fonctionnalités et outils",
+      "lockedTitle": "Fonctionnalité du mode avancé",
+      "lockedMessage": "« {feature} » fait partie du mode avancé. Passez en mode avancé pour l’utiliser — vous pouvez revenir en arrière à tout moment dans Préférences.",
+      "switchCta": "Passer en mode avancé"
+    },
+    "theme": {
+      "title": "Thème",
+      "description": "Choisissez votre palette de couleurs",
+      "light": "Clair",
+      "dark": "Sombre",
+      "system": "Système"
+    },
+    "language": {
+      "title": "Langue",
+      "description": "Choisissez la langue utilisée dans toute l’interface"
+    },
+    "webSearch": {
+      "title": "Recherche web",
+      "description": "Utilisez un autre fournisseur de recherche que celui défini par votre administrateur pour tout le monde.",
+      "useMyOwn": "Utiliser ma propre recherche",
+      "saved": "Votre fournisseur de recherche a été enregistré.",
+      "saveFailed": "Votre fournisseur de recherche n’a pas pu être enregistré"
+    },
+    "account": {
+      "title": "Compte",
+      "email": "E-mail",
+      "userLevel": "Niveau utilisateur"
+    },
+    "logout": "Déconnexion",
+    "features": {
+      "title": "État du système",
+      "subtitle": "Surveillez tous les services et fonctionnalités",
+      "loading": "Chargement des fonctionnalités…",
+      "requiredConfig": "Configuration requise :",
+      "set": "Défini",
+      "notSet": "Non défini",
+      "allOperational": "Tous les systèmes opérationnels",
+      "issuesDetected": "Problèmes détectés",
+      "ready": "Prêt",
+      "healthSummary": "{healthy} services sains sur {total}",
+      "model": "modèle",
+      "models": "modèles",
+      "adminOnlyTitle": "Accès administrateur requis",
+      "adminOnlyMessage": "L’état des fonctionnalités n’est disponible que pour les administrateurs.",
+      "modulesTitle": "Modules de fonctionnalités",
+      "modulesSubtitle": "Fonctionnalités optionnelles déclarées par cette installation. Chacune est activée par sa configuration ; la liste affiche les clés, jamais leurs valeurs.",
+      "modulesConfigured": "{configured} sur {total} configurés",
+      "configuredBy": "Configuré par :",
+      "docs": "Documentation",
+      "compute": {
+        "title": "Traitement de fichiers (compute)",
+        "tierDocker": "Standard",
+        "tierGvisor": "Isolation renforcée",
+        "tierMicrovm": "Machine virtuelle",
+        "tierUnknown": "Inconnu",
+        "statusOn": "Activé",
+        "statusOff": "Désactivé",
+        "statusDown": "En panne",
+        "stateRunning": "Le traitement de fichiers est en cours.",
+        "stateDisabled": "Désactivé dans la configuration système. Le traitement de fichiers reste masqué.",
+        "stateUnreachable": "Activé, mais le sidecar ne répond pas. Le traitement de fichiers est indisponible.",
+        "postureWarning": "Ce service signale {tier} ; cette instance exige une isolation plus forte.",
+        "capacity": "Capacité",
+        "runningOf": "{running} sur {max} en cours",
+        "queued": "{count} en file",
+        "images": "Images",
+        "runs24": "{count} exécutions (24h)",
+        "failed24": "{count} échouées (24h)",
+        "openConfig": "Réglages compute",
+        "stateTierBlocked": "Activé, mais sous l'isolation requise. Le traitement de fichiers reste masqué."
+      }
+    },
+    "notLoggedIn": "Non connecté"
+  },
+  "externalLink": {
+    "title": "Site externe",
+    "subtitle": "Vous êtes sur le point de quitter Synaplan",
+    "disclaimer": "Vous allez être redirigé vers un site externe. Nous n’avons aucun contrôle sur le contenu et ne sommes pas responsables de la protection des données ni de la sécurité des sites tiers. Continuez à vos propres risques.",
+    "dontAskAgain": "Ne plus afficher cet avertissement",
+    "cancel": "Annuler",
+    "open": "Ouvrir le lien"
+  }
+}

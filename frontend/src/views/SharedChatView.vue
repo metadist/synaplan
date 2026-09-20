@@ -374,7 +374,7 @@ import {
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
-import { supportedLanguages, type SupportedLanguage } from '@/i18n'
+import { setLocale, supportedLanguages, type SupportedLanguage } from '@/i18n'
 import { parseAIResponse } from '@/utils/responseParser'
 
 // Issue #1175: user-uploaded attachments travel on the File entity M2M
@@ -420,7 +420,7 @@ const SharedChatPayloadSchema = z.object({
 const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
-const { locale, t } = useI18n()
+const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
 
 const loading = ref(true)
@@ -470,17 +470,17 @@ const initLanguage = () => {
 
   if (langParam && supportedLanguages.includes(langParam as SupportedLanguage)) {
     currentLang.value = langParam
-    locale.value = langParam
+    void setLocale(langParam)
   } else {
     // Default to English for backwards compatibility
     currentLang.value = 'en'
-    locale.value = 'en'
+    void setLocale('en')
   }
 }
 
 // Switch language and update URL
 const switchLanguage = () => {
-  locale.value = currentLang.value
+  void setLocale(currentLang.value)
 
   // Update URL to include language
   const newPath = `/shared/${currentLang.value}/${token.value}`

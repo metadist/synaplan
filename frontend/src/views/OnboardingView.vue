@@ -101,7 +101,7 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import OnboardingWelcomeStep from '@/components/onboarding/OnboardingWelcomeStep.vue'
 import { markOnboardingCompleted } from '@/composables/useOnboarding'
-import { languageOptions } from '@/i18n'
+import { languageOptions, setLocale, type SupportedLanguage } from '@/i18n'
 
 const router = useRouter()
 const { locale } = useI18n()
@@ -117,8 +117,7 @@ const languageMenuOpen = ref(false)
 const languageMenuRef = ref<HTMLElement | null>(null)
 
 const selectLanguage = (value: string) => {
-  locale.value = value
-  localStorage.setItem('language', value)
+  void setLocale(value as SupportedLanguage)
   languageMenuOpen.value = false
 }
 
