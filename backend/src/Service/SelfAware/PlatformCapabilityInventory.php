@@ -36,6 +36,12 @@ use App\Service\Update\UpdateStatusService;
 final readonly class PlatformCapabilityInventory implements CapabilityInventory
 {
     /**
+     * Head of the upload-format list kept verbatim before a "+N more" suffix.
+     * Long enough to name the everyday formats (TXT, PDF, DOCX, …).
+     */
+    private const UPLOAD_FORMAT_HEAD_CHARS = 120;
+
+    /**
      * Deliberately unsupported capabilities. Reviewed on every release that
      * adds a capability (see docs/ADMIN.md).
      *
@@ -62,7 +68,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'id' => 'phone_calls',
             'label' => 'Phone calls',
             'detail' => 'The assistant cannot place or receive voice calls',
-            'alternative' => 'WhatsApp or email when those channels are configured',
+            'alternative' => 'WhatsApp or email',
             'adminHint' => null,
             'docsSlug' => 'channels',
         ],
@@ -70,7 +76,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'id' => 'authenticated_browsing',
             'label' => 'Browsing sites behind a login',
             'detail' => 'Web fetch only reads public pages',
-            'alternative' => 'paste the text, or connect an MCP server for that system',
+            'alternative' => 'paste the text or connect an MCP server',
             'adminHint' => 'Manage → Connections → MCP Servers',
             'docsSlug' => 'mcp',
         ],
@@ -86,7 +92,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'id' => 'live_human_operator_in_chat',
             'label' => 'A live human operator in this chat',
             'detail' => 'This conversation is with the AI assistant',
-            'alternative' => 'widget live support is an operator-side feature',
+            'alternative' => 'widget live support (operator-side)',
             'adminHint' => null,
             'docsSlug' => 'architecture',
         ],
@@ -134,11 +140,12 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'Operate → AI infrastructure → Models & keys',
             'using-synaplan',
         );
+        $fileAnalysisReady = $this->modelResolves('PIC2TEXT', $userId) && $chatReady;
         $facts[] = $this->fact(
             'file_analysis',
             'File analysis',
-            $this->modelResolves('PIC2TEXT', $userId) && $chatReady,
-            'PDF, Word, Excel, images, audio',
+            $fileAnalysisReady,
+            $fileAnalysisReady ? 'documents, images, audio' : 'no vision / analysis model configured',
             'upload the file once a vision / analysis model is configured',
             'Operate → AI infrastructure → Models & keys',
             'using-synaplan',
@@ -158,25 +165,27 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'memories',
             'Memories',
             $qdrantConfigured,
-            $qdrantConfigured ? 'Qdrant memory service' : 'Qdrant is not configured',
+            $qdrantConfigured ? 'Qdrant' : 'Qdrant is not configured',
             'memories remember preferences across chats once Qdrant is set',
             'Set QDRANT_URL',
             'using-synaplan',
         );
+        $imageReady = $this->modelResolves('TEXT2PIC', $userId);
         $facts[] = $this->fact(
             'image_generation',
             'Image generation (/pic)',
-            $this->modelResolves('TEXT2PIC', $userId),
-            '/pic',
+            $imageReady,
+            $imageReady ? '' : 'no image model configured',
             'describe the image in words, or add an image model',
             'Operate → AI infrastructure → Models & keys',
             'using-synaplan',
         );
+        $videoReady = $this->modelResolves('TEXT2VID', $userId);
         $facts[] = $this->fact(
             'video_generation',
             'Video generation (/vid)',
-            $this->modelResolves('TEXT2VID', $userId),
-            '/vid',
+            $videoReady,
+            $videoReady ? '' : 'no video model configured',
             'image generation is the nearest alternative',
             'Operate → AI infrastructure → Models & keys',
             'using-synaplan',
@@ -215,7 +224,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $userId,
             MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED,
             true,
-            'read a named public page',
+            'public pages',
             'paste the page text',
             'Operate → System configuration → Routing',
             'dag-routing',
@@ -226,7 +235,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $userId,
             MultitaskRoutingConfig::KEY_MCP_FETCH_ENABLED,
             false,
-            'connected MCP servers',
+            '',
             'paste the data, or connect an MCP server',
             'Manage → Connections → MCP Servers',
             'mcp',
@@ -237,7 +246,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $userId,
             MultitaskRoutingConfig::KEY_MCP_ACTION_ENABLED,
             false,
-            'write-enabled MCP servers',
+            '',
             'do the write in that system, or enable MCP write actions',
             'Manage → Connections → MCP Servers → allow write actions',
             'mcp',
@@ -248,7 +257,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $userId,
             MultitaskRoutingConfig::KEY_EMAIL_SEARCH_ENABLED,
             false,
-            'connected mailbox',
+            '',
             'paste the mail, or connect a mailbox under Channels',
             'Manage → Channels → Email handler',
             'channels',
@@ -267,7 +276,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'pdf_export',
             'PDF export',
             $pdfReady,
-            $pdfReady ? 'office engine' : 'office engine not configured',
+            $pdfReady ? '' : 'office engine not configured',
             'DOCX, XLSX, PPTX, CSV',
             'office engine (OFFICE_CONVERT_URL)',
             'using-synaplan',
@@ -276,7 +285,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'calendar_event',
             'Calendar invites (.ics)',
             CapabilityState::Available,
-            '.ics download; Outlook when connected',
+            'download; Outlook when connected',
             null,
             null,
             'using-synaplan',
@@ -286,7 +295,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'email_me',
             'Email a result',
             $mailerOn,
-            $mailerOn ? 'mailer configured' : 'mailer not configured',
+            $mailerOn ? '' : 'mailer not configured',
             'download the file in chat',
             'Set MAILER_DSN',
             'channels',
@@ -326,7 +335,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'mcp_server',
             'MCP client',
             $mcpServerOn,
-            $mcpServerOn ? 'external MCP servers' : 'not enabled',
+            $mcpServerOn ? '' : 'not enabled',
             'paste the data from that system',
             'Manage → Connections → MCP Servers',
             'mcp',
@@ -509,10 +518,11 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         string $alternative,
         string $adminHint,
         string $docsSlug,
+        string $needsDetail = 'not enabled',
     ): CapabilityFact {
         $on = $this->routingConfig->isFeatureEnabled($flag, $userId > 0 ? $userId : null, $default);
 
-        return $this->fact($id, $label, $on, $availableDetail, $alternative, $adminHint, $docsSlug);
+        return $this->fact($id, $label, $on, $on ? $availableDetail : $needsDetail, $alternative, $adminHint, $docsSlug);
     }
 
     private function modelResolves(string $capability, int $userId): bool
@@ -588,8 +598,25 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
                 }
             }
         }
+        if ([] === $flat) {
+            return 'common documents, images, audio and video';
+        }
+        // The full list is ~200 characters; keep the head and an honest count
+        // so the prompt block stays inside its budget.
+        $head = [];
+        foreach ($flat as $ext) {
+            $candidate = [] === $head ? $ext : implode(', ', $head).', '.$ext;
+            if (strlen($candidate) > self::UPLOAD_FORMAT_HEAD_CHARS) {
+                break;
+            }
+            $head[] = $ext;
+        }
+        $rest = count($flat) - count($head);
+        if ($rest > 0) {
+            return implode(', ', $head).' +'.$rest.' more';
+        }
 
-        return [] === $flat ? 'common documents, images, audio and video' : implode(', ', $flat);
+        return implode(', ', $flat);
     }
 
     /**

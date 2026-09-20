@@ -7,14 +7,15 @@ namespace App\Service\SelfAware;
 /**
  * Compact, deterministic prompt block for a {@see CapabilityReport}.
  *
- * Budget: ≤ ~500 tokens (~2 000 characters at 4 chars/token). The budget grew
+ * Budget: ≤ ~600 tokens (~2 400 characters at 4 chars/token). The budget grew
  * with the product: assistants, approvals, custom tools and sharing joined the
  * inventory in 4.8/4.9, and an answer that omits them lies by omission. The
  * block stays cached per user and is only injected on the product topics.
+ * RULES rides directly under the header so a truncated tail can never cut it.
  */
 final readonly class CapabilityReportRenderer
 {
-    public const MAX_CHARS = 2000;
+    public const MAX_CHARS = 2400;
 
     public function render(CapabilityReport $report): string
     {
@@ -92,7 +93,7 @@ final readonly class CapabilityReportRenderer
 
     private function rulesLine(CapabilityReport $report): string
     {
-        $rules = 'RULES: When asked whether you can do something, answer from the lists above and nothing else. '
+        $rules = 'RULES: Answer capability questions from the lists below only. '
             .'Say plainly what is not available here and offer the closest alternative. '
             .'Never promise, describe, or link a file you are not delivering in this turn. '
             .'Never quote prices, plan limits or quotas.';

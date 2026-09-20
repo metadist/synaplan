@@ -233,6 +233,21 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $this->assertStringContainsString('Operate → AI infrastructure', (string) $webSearch->adminHint);
     }
 
+    public function testUploadFormatsStayCompactWithOverflowCount(): void
+    {
+        $this->setEnv('QDRANT_URL', '');
+
+        $report = $this->inventory(chatReady: false, models: [], brave: false, billing: false)->build(2);
+
+        $formats = $report->fact('upload_formats');
+        $this->assertNotNull($formats);
+        $this->assertSame(CapabilityState::Available, $formats->state);
+        $this->assertStringContainsString('PDF', (string) $formats->detail);
+        $this->assertStringContainsString('DOCX', (string) $formats->detail);
+        $this->assertMatchesRegularExpression('/\+\d+ more/', (string) $formats->detail);
+        $this->assertLessThanOrEqual(140, strlen((string) $formats->detail));
+    }
+
     public function inventoryForCompute(ComputeConfig $compute): PlatformCapabilityInventory
     {
         return $this->inventory(true, [], false, false, compute: $compute);
