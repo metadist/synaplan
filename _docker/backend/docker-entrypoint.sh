@@ -545,6 +545,19 @@ if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" 
             echo "[Background] 🎉 Model downloads completed!"
             write_ollama_download_status "ready" "" "100" "Local AI models ready"
         fi
+        # Pre-warm the embeddings model: loading bge-m3 costs ~3.4s on first
+        # use, and KEEP_ALIVE only pins models once loaded. Best-effort — a
+        # failure here just means the first real search warms it instead.
+        if curl -s "$OLLAMA_BASE_URL/api/tags" | grep -q '"name":"bge-m3'; then
+            echo "[Background] 🔥 Pre-warming bge-m3 embeddings..."
+            if curl -sS -m 180 -X POST "$OLLAMA_BASE_URL/api/embed" \
+                -H "Content-Type: application/json" \
+                -d '{"model":"bge-m3","input":"warmup"}' > /dev/null; then
+                echo "[Background] ✅ bge-m3 warmed up"
+            else
+                echo "[Background] ⚠️  bge-m3 warmup failed (non-fatal)"
+            fi
+        fi
     ) &
 
     echo "✅ Model download started in background"

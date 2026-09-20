@@ -868,6 +868,10 @@ services:
       - ollama_data:/root/.ollama
     environment:
       OLLAMA_HOST: 0.0.0.0
+      # Never unload models: without this Ollama drops bge-m3 after 5 idle
+      # minutes and the next search pays a ~3.4s cold model load. Costs ~1.2GB
+      # resident RAM for the embeddings model (plus any chat model in use).
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:--1}
     # GPU support should be configured via an override file if needed
     # Healthcheck uses bash /dev/tcp + HTTP probe (the ollama/ollama image has
     # no curl/wget/nc). Measures the round-trip and treats anything slower than
