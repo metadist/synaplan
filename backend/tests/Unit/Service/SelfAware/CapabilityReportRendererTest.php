@@ -40,6 +40,40 @@ final class CapabilityReportRendererTest extends TestCase
         $this->assertStringContainsString('For plans and pricing, link the pricing page.', $admin);
     }
 
+    public function testOversizedReportTruncatesAtTheBudget(): void
+    {
+        $facts = [];
+        for ($i = 0; $i < 60; ++$i) {
+            $facts[] = new CapabilityFact('fact-'.$i, 'Capability number '.$i, CapabilityState::Available, 'with a fairly long detail string', null, null, null);
+        }
+        $report = new CapabilityReport($facts, '4.9.0', false, false);
+
+        $rendered = (new CapabilityReportRenderer())->render($report);
+
+        $this->assertLessThanOrEqual(CapabilityReportRenderer::MAX_CHARS, strlen($rendered));
+        $this->assertStringEndsWith('…', $rendered);
+        $this->assertStringContainsString('AVAILABLE NOW:', $rendered);
+    }
+
+    public function testTruncationNeverSplitsMultibyteCharacters(): void
+    {
+        $renderer = new CapabilityReportRenderer();
+
+        // Vary the ASCII padding so the byte-budget boundary lands on every
+        // alignment inside the multibyte run: a byte-based cut would split a
+        // 2-byte character on half of these paddings, mb_strcut on none.
+        for ($pad = 0; $pad < 4; ++$pad) {
+            $facts = [
+                new CapabilityFact('mbu', 'Fact '.str_repeat('x', $pad).' '.str_repeat('é', 1500), CapabilityState::Available, '', null, null, null),
+            ];
+            $rendered = $renderer->render(new CapabilityReport($facts, '4.9.0', false, false));
+
+            $this->assertLessThanOrEqual(CapabilityReportRenderer::MAX_CHARS, strlen($rendered), "pad $pad");
+            $this->assertStringEndsWith('…', $rendered, "pad $pad");
+            $this->assertTrue(mb_check_encoding($rendered, 'UTF-8'), "pad $pad splits a character");
+        }
+    }
+
     private function fullReport(bool $isAdmin, bool $billingEnabled): CapabilityReport
     {
         $facts = [

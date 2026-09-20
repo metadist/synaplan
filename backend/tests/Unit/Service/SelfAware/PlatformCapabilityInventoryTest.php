@@ -14,10 +14,12 @@ use App\Module\Sidecar\PiperTtsModule;
 use App\Repository\ConnectionRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\Agent\AgentConfig;
 use App\Service\BillingService;
 use App\Service\Capability\CapabilityService;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Iam\IamConfig;
 use App\Service\MailerConfig;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\ModelConfigService;
@@ -28,6 +30,7 @@ use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\Search\BraveSearchService;
 use App\Service\SelfAware\CapabilityState;
 use App\Service\SelfAware\PlatformCapabilityInventory;
+use App\Service\Tool\ToolsConfig;
 use App\Service\Update\UpdateStatusService;
 use App\Tests\Support\WebSearchGatewayFactory;
 use App\Tests\Unit\Module\Fixture\FakeSidecarHealthProbe;
@@ -144,15 +147,137 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $this->assertSame('4.2.1', $report->version);
     }
 
+    public function testFullInstallReportsAssistantsApprovalsCustomToolsAndSharing(): void
+    {
+        $this->setEnv('QDRANT_URL', 'http://qdrant:6333');
+
+        $report = $this->inventory(chatReady: true, models: [], brave: false, billing: false)->build(2);
+
+        $assistants = $report->fact('assistants');
+        $this->assertNotNull($assistants);
+        $this->assertSame(CapabilityState::Available, $assistants->state);
+        $this->assertSame('assistants', $assistants->docsSlug);
+
+        $approvals = $report->fact('approvals');
+        $this->assertNotNull($approvals);
+        $this->assertSame(CapabilityState::Available, $approvals->state);
+        $this->assertSame('tools-and-approvals', $approvals->docsSlug);
+
+        $customTools = $report->fact('custom_tools');
+        $this->assertNotNull($customTools);
+        $this->assertSame(CapabilityState::Available, $customTools->state);
+        $this->assertSame('tools-and-approvals', $customTools->docsSlug);
+
+        $sharing = $report->fact('sharing');
+        $this->assertNotNull($sharing);
+        $this->assertSame(CapabilityState::Available, $sharing->state);
+        $this->assertSame('people-and-groups', $sharing->docsSlug);
+    }
+
+    public function testDisabledWaveFlagsMarkNewFactsAsNeedsSetupWithAlternatives(): void
+    {
+        $this->setEnv('QDRANT_URL', '');
+
+        $report = $this->inventory(
+            chatReady: false,
+            models: [],
+            brave: false,
+            billing: false,
+            agents: false,
+            approvals: false,
+            customTools: false,
+            sharing: false,
+        )->build(2);
+
+        foreach (['assistants', 'approvals', 'custom_tools', 'sharing'] as $id) {
+            $fact = $report->fact($id);
+            $this->assertNotNull($fact);
+            $this->assertSame(CapabilityState::NeedsSetup, $fact->state, $id);
+            $this->assertNotNull($fact->alternative, $id);
+            $this->assertNotNull($fact->adminHint, $id);
+        }
+    }
+
+    public function testCustomToolsStayOffWhenTheRegistryKillSwitchIsOff(): void
+    {
+        $this->setEnv('QDRANT_URL', '');
+
+        // Custom HTTP on, registry off: the tools are neither listed nor
+        // runnable, so the report must not claim them as available.
+        $report = $this->inventory(
+            chatReady: true,
+            models: [],
+            brave: false,
+            billing: false,
+            customTools: true,
+            registry: false,
+        )->build(2);
+
+        $fact = $report->fact('custom_tools');
+        $this->assertNotNull($fact);
+        $this->assertSame(CapabilityState::NeedsSetup, $fact->state);
+    }
+
+    public function testCustomTopicHintFollowsTheAssistantBuilderFlag(): void
+    {
+        $this->setEnv('QDRANT_URL', '');
+
+        $withAgents = $this->inventory(chatReady: false, models: [], brave: false, billing: false, agents: true)->build(2);
+        $this->assertStringContainsString('Manage → Assistants', (string) $withAgents->fact('custom_topics')?->alternative);
+
+        $withoutAgents = $this->inventory(chatReady: false, models: [], brave: false, billing: false, agents: false)->build(2);
+        $this->assertStringContainsString('AI Instructions', (string) $withoutAgents->fact('custom_topics')?->alternative);
+    }
+
+    public function testSaveToFolderNamesOpenCloudAndWebSearchDropsTheBraveOnlyWording(): void
+    {
+        $this->setEnv('QDRANT_URL', '');
+
+        $report = $this->inventory(
+            chatReady: true,
+            models: [],
+            brave: false,
+            billing: false,
+            ownedConnections: [new \App\Entity\Connection(2, 'webdav', 'OpenCloud')],
+        )->build(2);
+
+        $saveToFolder = $report->fact('save_to_folder');
+        $this->assertNotNull($saveToFolder);
+        $this->assertSame(CapabilityState::Available, $saveToFolder->state);
+        $this->assertStringContainsString('OpenCloud', (string) $saveToFolder->detail);
+
+        $webSearch = $report->fact('web_search');
+        $this->assertNotNull($webSearch);
+        $this->assertSame(CapabilityState::NeedsSetup, $webSearch->state);
+        $this->assertStringNotContainsString('Brave', (string) $webSearch->detail);
+        $this->assertStringContainsString('Operate → AI infrastructure', (string) $webSearch->adminHint);
+    }
+
+    public function testUploadFormatsStayCompactWithOverflowCount(): void
+    {
+        $this->setEnv('QDRANT_URL', '');
+
+        $report = $this->inventory(chatReady: false, models: [], brave: false, billing: false)->build(2);
+
+        $formats = $report->fact('upload_formats');
+        $this->assertNotNull($formats);
+        $this->assertSame(CapabilityState::Available, $formats->state);
+        $this->assertStringContainsString('PDF', (string) $formats->detail);
+        $this->assertStringContainsString('DOCX', (string) $formats->detail);
+        $this->assertMatchesRegularExpression('/\+\d+ more/', (string) $formats->detail);
+        $this->assertLessThanOrEqual(140, strlen((string) $formats->detail));
+    }
+
     public function inventoryForCompute(ComputeConfig $compute): PlatformCapabilityInventory
     {
         return $this->inventory(true, [], false, false, compute: $compute);
     }
 
     /**
-     * @param array<string, int> $models
+     * @param array<string, int>                $models
+     * @param list<\App\Entity\Connection>|null $ownedConnections
      */
-    protected function inventory(bool $chatReady, array $models, bool $brave, bool $billing, string $officeUrl = '', string $ttsUrl = '', ?ComputeConfig $compute = null): PlatformCapabilityInventory
+    protected function inventory(bool $chatReady, array $models, bool $brave, bool $billing, string $officeUrl = '', string $ttsUrl = '', ?ComputeConfig $compute = null, bool $agents = true, bool $approvals = true, bool $customTools = true, bool $sharing = true, ?array $ownedConnections = null, bool $registry = true): PlatformCapabilityInventory
     {
         $chatReadiness = $this->createMock(ChatReadinessService::class);
         $chatReadiness->method('isChatReady')->willReturn($chatReady);
@@ -199,7 +324,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $billingService->method('isEnabled')->willReturn($billing);
 
         $connections = $this->createMock(ConnectionRepository::class);
-        $connections->method('findByOwner')->willReturn([]);
+        $connections->method('findByOwner')->willReturn($ownedConnections ?? []);
 
         $prompts = $this->createMock(PromptRepository::class);
         $prompts->method('getTopicsWithDescriptions')->willReturn([]);
@@ -211,6 +336,17 @@ final class PlatformCapabilityInventoryTest extends TestCase
 
         $users = $this->createMock(UserRepository::class);
         $users->method('find')->willReturn($user);
+
+        $agentConfig = $this->createMock(AgentConfig::class);
+        $agentConfig->method('isEnabled')->willReturn($agents);
+
+        $toolsConfig = $this->createMock(ToolsConfig::class);
+        $toolsConfig->method('isApprovalsEnabled')->willReturn($approvals);
+        $toolsConfig->method('isCustomHttpEnabled')->willReturn($customTools);
+        $toolsConfig->method('isRegistryEnabled')->willReturn($registry);
+
+        $iamConfig = $this->createMock(IamConfig::class);
+        $iamConfig->method('isSharingEnabled')->willReturn($sharing);
 
         return new PlatformCapabilityInventory(
             $chatReadiness,
@@ -230,6 +366,9 @@ final class PlatformCapabilityInventoryTest extends TestCase
             $connections,
             $users,
             $this->modules($officeUrl, $ttsUrl),
+            $agentConfig,
+            $toolsConfig,
+            $iamConfig,
             $compute,
         );
     }
