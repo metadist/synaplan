@@ -370,6 +370,15 @@ services:
 
 Requires NVIDIA driver 550+ (for CUDA 13 compatibility with current Ollama images).
 
+### Ollama model retention
+
+`OLLAMA_KEEP_ALIVE` (default `24h`, set for the `ollama` service in
+`docker-compose.yml`) controls how long models stay loaded in memory. Without
+it, Ollama unloads `bge-m3` after 5 idle minutes and the next file search pays
+a ~3.4s cold model load. Override it from the shell or root `.env`
+(`backend/.env` is not read by compose interpolation); use `-1` to pin models
+indefinitely at the cost of resident RAM.
+
 ---
 
 ## Test Users

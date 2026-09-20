@@ -1265,40 +1265,7 @@
                       :busy="isDescribing(file.id)"
                       @activate="describeAndSort(file)"
                     />
-                    <button
-                      v-if="file.chat_id"
-                      type="button"
-                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                      :title="$t('files.openInChat')"
-                      :data-testid="`btn-open-in-chat-${file.id}`"
-                      @click="openInChat(file)"
-                    >
-                      <ChatBubbleLeftRightIcon class="w-4 h-4" />
-                    </button>
-                    <button
-                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
-                      :title="$t('common.view')"
-                      data-testid="btn-view"
-                      @click="viewFileContent(file.id)"
-                    >
-                      <Icon icon="heroicons:eye" class="w-4 h-4" />
-                    </button>
-                    <button
-                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
-                      :title="$t('files.download')"
-                      data-testid="btn-download"
-                      @click="downloadFile(file.id, file.filename)"
-                    >
-                      <ArrowDownTrayIcon class="w-4 h-4" />
-                    </button>
-                    <button
-                      class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                      :title="$t('files.delete')"
-                      data-testid="btn-delete"
-                      @click="deleteFile(file.id)"
-                    >
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
+                    <FileRowActions :actions="rowActions(file)" />
                   </div>
                 </div>
               </div>
@@ -1407,40 +1374,7 @@
                           :busy="isDescribing(file.id)"
                           @activate="describeAndSort(file)"
                         />
-                        <button
-                          v-if="file.chat_id"
-                          type="button"
-                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                          :title="$t('files.openInChat')"
-                          :data-testid="`btn-open-in-chat-${file.id}`"
-                          @click="openInChat(file)"
-                        >
-                          <ChatBubbleLeftRightIcon class="w-4 h-4" />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                          :title="$t('files.download')"
-                          data-testid="btn-download"
-                          @click="downloadFile(file.id, file.filename)"
-                        >
-                          <ArrowDownTrayIcon class="w-4 h-4" />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                          :title="$t('common.view')"
-                          data-testid="btn-view"
-                          @click="viewFileContent(file.id)"
-                        >
-                          <Icon icon="heroicons:eye" class="w-4 h-4" />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                          :title="$t('files.delete')"
-                          data-testid="btn-delete"
-                          @click="deleteFile(file.id)"
-                        >
-                          <TrashIcon class="w-4 h-4" />
-                        </button>
+                        <FileRowActions :actions="rowActions(file)" />
                       </div>
                     </td>
                   </tr>
@@ -1615,7 +1549,6 @@ import {
   CloudArrowUpIcon,
   ShareIcon,
   TrashIcon,
-  ArrowDownTrayIcon,
   XMarkIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
@@ -2238,16 +2171,19 @@ const rowActions = (file: FileItem): FileRowAction[] => {
     {
       id: 'preview',
       title: t('common.view'),
+      testid: 'btn-view',
       onSelect: () => viewFileContent(file.id),
     },
     {
       id: 'download',
       title: t('files.download'),
+      testid: 'btn-download',
       onSelect: () => downloadFile(file.id, file.filename),
     },
     {
       id: 'delete',
       title: t('files.delete'),
+      testid: 'btn-delete',
       onSelect: () => deleteFile(file.id),
     }
   )

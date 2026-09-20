@@ -85,6 +85,7 @@ File rows never hand-roll buttons: `frontend/src/components/files/FileRowActions
 owns the glyphs, order (chat → preview → download → delete), density (`p-1.5`,
 `w-4 h-4` icons) and delete styling. Callers pass titles, test IDs and handlers
 only. A new file-row action extends the component, never a second button set.
+Row deletes carry `data-testid="btn-delete"` (E2E deletion journey); keep it stable.
 
 ## i18n (Internationalization)
 
