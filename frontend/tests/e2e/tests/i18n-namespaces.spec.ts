@@ -47,6 +47,8 @@ test.describe('i18n namespace split', () => {
     await page.goto('/settings')
     await expect(page.locator(SET.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(SET.page)).toContainText('Preferences')
+    await expect(page.locator(SET.page)).toContainText('Export & import')
+    await expect(page.locator(SET.page)).not.toContainText('bundle.title')
 
     await page.locator(SET.btnLanguage('de')).click()
     await expect
@@ -55,7 +57,9 @@ test.describe('i18n namespace split', () => {
       })
       .toBe('de')
     await expect(page.locator(SET.page)).toContainText('Einstellungen')
+    await expect(page.locator(SET.page)).toContainText('Exportieren & importieren')
     await expect(page.locator(SET.page)).not.toContainText('settings.title')
+    await expect(page.locator(SET.page)).not.toContainText('bundle.title')
   })
 
   test('@ci Cold deep-links render complete copy in German', async ({ page }) => {

@@ -24,7 +24,13 @@ import {
   resolveSetupGate,
   SETUP_ROUTE,
 } from '@/router/setupGate'
-import { CHROME_I18N_NAMESPACES, i18n, loadNamespaces, rememberRouteNamespaces } from '@/i18n'
+import {
+  BUNDLE_PANEL_I18N_NAMESPACES,
+  CHROME_I18N_NAMESPACES,
+  i18n,
+  loadNamespaces,
+  rememberRouteNamespaces,
+} from '@/i18n'
 import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
@@ -556,7 +562,7 @@ const router = createRouter({
       meta: {
         requiresAuth: false,
         titleKey: 'pageTitles.settings',
-        i18n: ['settings', 'config', 'tools'],
+        i18n: ['settings', 'config', 'tools', ...BUNDLE_PANEL_I18N_NAMESPACES],
       },
     },
     {
@@ -641,7 +647,7 @@ const router = createRouter({
         requiresAuth: true,
         requiresAdmin: true,
         titleKey: 'pageTitles.adminConfig',
-        i18n: ['admin', 'config'],
+        i18n: ['admin', 'config', ...BUNDLE_PANEL_I18N_NAMESPACES],
       },
     },
     {

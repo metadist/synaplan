@@ -25,6 +25,13 @@ export type WidgetI18nNamespace = (typeof WIDGET_I18N_NAMESPACES)[number]
 export const CHROME_I18N_NAMESPACES = ['chat', 'auth', 'admin', 'settings'] as const
 
 /**
+ * ExportImportPanel (`bundle.*`). The panel is shared by Preferences and
+ * Operate → Config; those routes must declare this so `beforeEach` awaits it
+ * before first paint.
+ */
+export const BUNDLE_PANEL_I18N_NAMESPACES = ['assistants'] as const
+
+/**
  * Top-level message keys owned by each namespace file. Keys never move across
  * files without updating this map and the locale JSON together.
  *

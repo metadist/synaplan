@@ -99,6 +99,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { BUNDLE_PANEL_I18N_NAMESPACES, useI18nNamespaces } from '@/i18n'
 import { isBundleEnabled } from '@/composables/useBundleFeature'
 import { useNotification } from '@/composables/useNotification'
 import {
@@ -118,6 +119,7 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
+useI18nNamespaces(BUNDLE_PANEL_I18N_NAMESPACES)
 const { success, error: showError } = useNotification()
 
 const visible = computed(() => isBundleEnabled())
