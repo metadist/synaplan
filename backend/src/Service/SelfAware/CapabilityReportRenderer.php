@@ -38,7 +38,9 @@ final readonly class CapabilityReportRenderer
 
         $ellipsis = '…';
 
-        return substr($block, 0, self::MAX_CHARS - strlen($ellipsis)).$ellipsis;
+        // Byte budget, character boundary: mb_strcut backs up to a valid UTF-8
+        // sequence so a multibyte label can never be split mid-character.
+        return mb_strcut($block, 0, self::MAX_CHARS - strlen($ellipsis), 'UTF-8').$ellipsis;
     }
 
     /**

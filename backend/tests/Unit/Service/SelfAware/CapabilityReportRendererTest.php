@@ -55,6 +55,25 @@ final class CapabilityReportRendererTest extends TestCase
         $this->assertStringContainsString('AVAILABLE NOW:', $rendered);
     }
 
+    public function testTruncationNeverSplitsMultibyteCharacters(): void
+    {
+        $renderer = new CapabilityReportRenderer();
+
+        // Vary the ASCII padding so the byte-budget boundary lands on every
+        // alignment inside the multibyte run: a byte-based cut would split a
+        // 2-byte character on half of these paddings, mb_strcut on none.
+        for ($pad = 0; $pad < 4; ++$pad) {
+            $facts = [
+                new CapabilityFact('mbu', 'Fact '.str_repeat('x', $pad).' '.str_repeat('é', 1500), CapabilityState::Available, '', null, null, null),
+            ];
+            $rendered = $renderer->render(new CapabilityReport($facts, '4.9.0', false, false));
+
+            $this->assertLessThanOrEqual(CapabilityReportRenderer::MAX_CHARS, strlen($rendered), "pad $pad");
+            $this->assertStringEndsWith('…', $rendered, "pad $pad");
+            $this->assertTrue(mb_check_encoding($rendered, 'UTF-8'), "pad $pad splits a character");
+        }
+    }
+
     private function fullReport(bool $isAdmin, bool $billingEnabled): CapabilityReport
     {
         $facts = [

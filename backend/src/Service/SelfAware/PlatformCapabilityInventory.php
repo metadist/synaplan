@@ -414,7 +414,10 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'Operate → System configuration → Features → Tools & approvals',
             'tools-and-approvals',
         );
-        $customToolsOn = $this->toolsConfig->isCustomHttpEnabled($userId > 0 ? $userId : null);
+        // Custom tools need BOTH the per-user HTTP switch and the registry kill
+        // switch: with the registry off they are neither listed nor runnable.
+        $customToolsOn = $this->toolsConfig->isCustomHttpEnabled($userId > 0 ? $userId : null)
+            && $this->toolsConfig->isRegistryEnabled($userId > 0 ? $userId : null);
         $facts[] = $this->fact(
             'custom_tools',
             'Custom HTTP tools',

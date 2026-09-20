@@ -198,6 +198,26 @@ final class PlatformCapabilityInventoryTest extends TestCase
         }
     }
 
+    public function testCustomToolsStayOffWhenTheRegistryKillSwitchIsOff(): void
+    {
+        $this->setEnv('QDRANT_URL', '');
+
+        // Custom HTTP on, registry off: the tools are neither listed nor
+        // runnable, so the report must not claim them as available.
+        $report = $this->inventory(
+            chatReady: true,
+            models: [],
+            brave: false,
+            billing: false,
+            customTools: true,
+            registry: false,
+        )->build(2);
+
+        $fact = $report->fact('custom_tools');
+        $this->assertNotNull($fact);
+        $this->assertSame(CapabilityState::NeedsSetup, $fact->state);
+    }
+
     public function testCustomTopicHintFollowsTheAssistantBuilderFlag(): void
     {
         $this->setEnv('QDRANT_URL', '');
@@ -257,7 +277,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
      * @param array<string, int>                $models
      * @param list<\App\Entity\Connection>|null $ownedConnections
      */
-    protected function inventory(bool $chatReady, array $models, bool $brave, bool $billing, string $officeUrl = '', string $ttsUrl = '', ?ComputeConfig $compute = null, bool $agents = true, bool $approvals = true, bool $customTools = true, bool $sharing = true, ?array $ownedConnections = null): PlatformCapabilityInventory
+    protected function inventory(bool $chatReady, array $models, bool $brave, bool $billing, string $officeUrl = '', string $ttsUrl = '', ?ComputeConfig $compute = null, bool $agents = true, bool $approvals = true, bool $customTools = true, bool $sharing = true, ?array $ownedConnections = null, bool $registry = true): PlatformCapabilityInventory
     {
         $chatReadiness = $this->createMock(ChatReadinessService::class);
         $chatReadiness->method('isChatReady')->willReturn($chatReady);
@@ -323,6 +343,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $toolsConfig = $this->createMock(ToolsConfig::class);
         $toolsConfig->method('isApprovalsEnabled')->willReturn($approvals);
         $toolsConfig->method('isCustomHttpEnabled')->willReturn($customTools);
+        $toolsConfig->method('isRegistryEnabled')->willReturn($registry);
 
         $iamConfig = $this->createMock(IamConfig::class);
         $iamConfig->method('isSharingEnabled')->willReturn($sharing);
