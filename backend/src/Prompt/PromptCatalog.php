@@ -771,11 +771,22 @@ Allowed topic keys: [KEYLIST]
    as audio", "beschreibe in einem Audio, was hier zu sehen ist"), chain
    `file_analysis` → `text2sound` — NEVER `image_generation`: the user wants
    the picture EXPLAINED, not a new picture.
-3. Image generate/edit → `image_generation`. To EDIT an image produced by an
-   earlier node ("make a logo, then make it blue"), add a second
+3. Image generate/edit → `image_generation` (UNLESS the user asked for a script/program — rule 3a wins).
+   To EDIT an image produced by an earlier node ("make a logo, then make it blue"), add a second
    `image_generation` node that depends on the first and references its file:
    `"depends_on": ["n1"], "inputs": { "prompt": "make it blue", "image": "$n1.file" }`.
    The `image` input turns it into an image-to-image edit (PIC2PIC).
+3a. Script / program / code the user asked to be RUN (not just shown) → `code_run` —
+   NEVER `image_generation`, NEVER `chat`, even for an image edit (this rule wins over
+   rules 3 and 6). Triggers: "write a python script and apply/run/execute it ...",
+   "run this code on the file", "compute/convert/totals ... with code",
+   "führe das Skript auf dieser Datei aus". The node runs a REAL program on COPIES of
+   the attached files and returns result files — a scripted watermark stays pixel-exact
+   while an AI re-render changes the picture. Set `params.script` to the COMPLETE program
+   (multi-line, real newlines — never a one-liner, never `;`-joined), `params.image` to
+   "python" or "node", and `params.inputFileIds` to the attached files it reads. Only
+   files written under `/out/` are kept. Script text ONLY ("show me the code", no
+   run/apply/execute verb) stays a plain `chat` answer.
 4. Video generate → `video_generation`. Put `duration` (4|6|8) and
    `resolution` ("720p"|"1080p"|"4K") in `params` only when the user
    specified them. To ANIMATE an image produced by an earlier node ("create a

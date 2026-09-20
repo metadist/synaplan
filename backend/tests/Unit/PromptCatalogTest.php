@@ -235,6 +235,26 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('Real PDFs are NOT supported', $plan['prompt']);
     }
 
+    public function testPlanPromptRoutesScriptExecutionToCodeRun(): void
+    {
+        $plan = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:plan' === $entry['topic']) {
+                $plan = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($plan);
+        // Rule 3a: an explicit script/program/code execution request beats the
+        // image-edit rule — "write a python script and apply ..." must plan
+        // code_run, never an AI image re-render.
+        $this->assertStringContainsString('rule 3a wins', $plan['prompt']);
+        $this->assertStringContainsString('3a. Script / program / code', $plan['prompt']);
+        $this->assertStringContainsString('→ `code_run`', $plan['prompt']);
+        $this->assertStringContainsString('params.inputFileIds', $plan['prompt']);
+    }
+
     public function testGeneralPromptDoesNotBounceAlreadyPhrasedCreateRequests(): void
     {
         $general = null;
