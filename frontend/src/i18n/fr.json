@@ -1461,6 +1461,27 @@
       "closePreview": "Fermer",
       "retry": "Réessayer"
     },
+    "push": {
+      "action": "Copier vers le cloud",
+      "to": "Copier vers {name}",
+      "kind": {
+        "nextcloud": "Nextcloud",
+        "opencloud": "OpenCloud"
+      },
+      "done": "Copié dans {folder} sur {name}. Le fichier est toujours ici.",
+      "failed": "Le fichier n’a pas été copié.",
+      "failure": {
+        "unauthorized": "{connection} a refusé la connexion. Rien n’a été copié.",
+        "not_found": "{target} est introuvable. Rien n’a été copié.",
+        "quota_exceeded": "{connection} n’a plus d’espace. Rien n’a été copié.",
+        "too_large": "Le fichier est plus grand que ce que {connection} accepte. Rien n’a été copié.",
+        "unreachable": "{connection} est injoignable. Rien n’a été copié.",
+        "conflict": "Un fichier de ce nom existe déjà dans {connection}. Rien n’a été copié.",
+        "rate_limited": "{connection} a demandé d’attendre. Rien n’a été copié.",
+        "unsupported": "Ce type de fichier ne peut pas être envoyé vers {connection}. Rien n’a été copié.",
+        "compute_unavailable": "Le travail sur fichiers est indisponible pour le moment. Rien n’a été copié."
+      }
+    },
     "incomingBadge": "{count} nouveaux",
     "sourceLabel": {
       "web_upload": "Téléversement",
@@ -2375,11 +2396,12 @@
         },
         "dav": {
           "name": "Dossier et calendrier Nextcloud (WebDAV)",
-          "description": "Enregistrez les résultats de tâches dans votre dossier cloud et placez des réunions dans votre calendrier. Fonctionne avec Nextcloud, ownCloud et tout serveur WebDAV.",
+          "description": "Enregistrez les résultats de tâches dans votre dossier cloud et placez des réunions dans votre calendrier. Fonctionne avec Nextcloud, OpenCloud, ownCloud et tout serveur WebDAV.",
           "hosting": "Se connecte à un serveur que vous choisissez — vos fichiers restent sur votre propre cloud.",
           "action": "Connecter",
           "kind": {
             "nextcloud": "Nextcloud / ownCloud",
+            "opencloud": "OpenCloud",
             "webdav": "Autre adresse WebDAV"
           },
           "serverUrl": "Adresse du serveur",
@@ -2387,6 +2409,7 @@
           "username": "Nom d’utilisateur",
           "appPassword": "Mot de passe d’application",
           "appPasswordHint": "Créez-en un dans Nextcloud sous Paramètres → Sécurité → Appareils et sessions. Le mot de passe de votre compte n’est jamais stocké.",
+          "appPasswordHintOpencloud": "Créez un jeton d’application dans OpenCloud sous Paramètres → Sécurité. Le mot de passe de votre compte n’est jamais stocké.",
           "localHttpHint": "Sur cette installation de développement, vous pouvez aussi utiliser une adresse locale comme http://nextcloud.",
           "folder": "Dossier pour les résultats",
           "withCalendar": "Connecter aussi un calendrier :",

@@ -2964,6 +2964,27 @@
       "closePreview": "Cerrar",
       "retry": "Intentar de nuevo"
     },
+    "push": {
+      "action": "Copiar a la nube",
+      "to": "Copiar a {name}",
+      "kind": {
+        "nextcloud": "Nextcloud",
+        "opencloud": "OpenCloud"
+      },
+      "done": "Copiado a {folder} en {name}. El archivo sigue aquí.",
+      "failed": "El archivo no se copió.",
+      "failure": {
+        "unauthorized": "{connection} rechazó el inicio de sesión. No se copió nada.",
+        "not_found": "No se encontró {target}. No se copió nada.",
+        "quota_exceeded": "{connection} no tiene espacio. No se copió nada.",
+        "too_large": "El archivo es más grande de lo que {connection} acepta. No se copió nada.",
+        "unreachable": "No se pudo contactar con {connection}. No se copió nada.",
+        "conflict": "Ya existe un archivo con ese nombre en {connection}. No se copió nada.",
+        "rate_limited": "{connection} pidió esperar. No se copió nada.",
+        "unsupported": "Este tipo de archivo no se puede enviar a {connection}. No se copió nada.",
+        "compute_unavailable": "El trabajo con archivos no está disponible ahora. No se copió nada."
+      }
+    },
     "incomingBadge": "{count} nuevos",
     "sourceLabel": {
       "web_upload": "Subida",
@@ -3373,11 +3394,12 @@
         },
         "dav": {
           "name": "Carpeta y calendario de Nextcloud (WebDAV)",
-          "description": "Guarda los resultados de tus tareas en tu carpeta en la nube y añade reuniones a tu calendario. Funciona con Nextcloud, ownCloud y cualquier servidor WebDAV.",
+          "description": "Guarda los resultados de tus tareas en tu carpeta en la nube y añade reuniones a tu calendario. Funciona con Nextcloud, OpenCloud, ownCloud y cualquier servidor WebDAV.",
           "hosting": "Se conecta a un servidor que tú eliges: tus archivos permanecen en tu propia nube.",
           "action": "Conectar",
           "kind": {
             "nextcloud": "Nextcloud / ownCloud",
+            "opencloud": "OpenCloud",
             "webdav": "Otra dirección WebDAV"
           },
           "serverUrl": "Dirección del servidor",
@@ -3385,6 +3407,7 @@
           "username": "Nombre de usuario",
           "appPassword": "Contraseña de aplicación",
           "appPasswordHint": "Créala en Nextcloud en Ajustes → Seguridad → Dispositivos y sesiones. Tu contraseña de la cuenta nunca se guarda.",
+          "appPasswordHintOpencloud": "Crea un token de aplicación en OpenCloud en Ajustes → Seguridad. Tu contraseña de la cuenta nunca se guarda.",
           "localHttpHint": "En esta instalación de desarrollo también puedes usar una dirección local como http://nextcloud.",
           "folder": "Carpeta para los resultados",
           "withCalendar": "Conectar también un calendario:",

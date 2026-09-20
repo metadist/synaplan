@@ -2965,6 +2965,27 @@
       "closePreview": "Kapat",
       "retry": "Yeniden dene"
     },
+    "push": {
+      "action": "Buluta kopyala",
+      "to": "{name} konumuna kopyala",
+      "kind": {
+        "nextcloud": "Nextcloud",
+        "opencloud": "OpenCloud"
+      },
+      "done": "{name} üzerinde {folder} konumuna kopyalandı. Dosya burada kalır.",
+      "failed": "Dosya kopyalanmadı.",
+      "failure": {
+        "unauthorized": "{connection} oturum açmayı reddetti. Hiçbir şey kopyalanmadı.",
+        "not_found": "{target} bulunamadı. Hiçbir şey kopyalanmadı.",
+        "quota_exceeded": "{connection} dolu. Hiçbir şey kopyalanmadı.",
+        "too_large": "Dosya, {connection} kabul ettiğinden daha büyük. Hiçbir şey kopyalanmadı.",
+        "unreachable": "{connection} erişilemedi. Hiçbir şey kopyalanmadı.",
+        "conflict": "{connection} içinde bu adda bir dosya zaten var. Hiçbir şey kopyalanmadı.",
+        "rate_limited": "{connection} beklemenizi istedi. Hiçbir şey kopyalanmadı.",
+        "unsupported": "Bu dosya türü {connection} konumuna gönderilemez. Hiçbir şey kopyalanmadı.",
+        "compute_unavailable": "Dosya çalışması şu anda erişilemiyor. Hiçbir şey kopyalanmadı."
+      }
+    },
     "incomingBadge": "{count} yeni",
     "sourceLabel": {
       "web_upload": "Yükleme",
@@ -3374,11 +3395,12 @@
         },
         "dav": {
           "name": "Nextcloud klasörü ve takvimi (WebDAV)",
-          "description": "Görev sonuçlarını bulut klasörüne kaydeder ve toplantıları takvimine ekler. Nextcloud, ownCloud ve tüm WebDAV sunucularıyla çalışır.",
+          "description": "Görev sonuçlarını bulut klasörüne kaydeder ve toplantıları takvimine ekler. Nextcloud, OpenCloud, ownCloud ve tüm WebDAV sunucularıyla çalışır.",
           "hosting": "Seçtiğin bir sunucuya bağlanır — dosyaların kendi bulutunda kalır.",
           "action": "Bağlan",
           "kind": {
             "nextcloud": "Nextcloud / ownCloud",
+            "opencloud": "OpenCloud",
             "webdav": "Başka bir WebDAV adresi"
           },
           "serverUrl": "Sunucu adresi",
@@ -3386,6 +3408,7 @@
           "username": "Kullanıcı adı",
           "appPassword": "Uygulama parolası",
           "appPasswordHint": "Nextcloud'da Ayarlar → Güvenlik → Cihazlar ve oturumlar altında oluştur. Hesap parolan asla saklanmaz.",
+          "appPasswordHintOpencloud": "OpenCloud'da Ayarlar → Güvenlik altında bir uygulama jetonu oluştur. Hesap parolan asla saklanmaz.",
           "localHttpHint": "Bu geliştirme kurulumunda http://nextcloud gibi yerel bir adres de kullanabilirsiniz.",
           "folder": "Sonuçlar için klasör",
           "withCalendar": "Bir takvimi de bağla:",

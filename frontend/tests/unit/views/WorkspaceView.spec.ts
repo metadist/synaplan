@@ -29,6 +29,10 @@ vi.mock('@/composables/useDialog', () => ({
   useDialog: () => ({ confirm: vi.fn(), prompt: vi.fn() }),
 }))
 
+vi.mock('@/composables/useCloudFolderTargets', () => ({
+  useCloudFolderTargets: () => ({ targets: { value: [] }, reload: vi.fn() }),
+}))
+
 vi.mock('@iconify/vue', () => ({
   Icon: { template: '<i />' },
 }))
@@ -52,6 +56,7 @@ function mountView() {
       stubs: {
         MainLayout: { template: '<div><slot /></div>' },
         FilesTabs: { template: '<nav />' },
+        FilePushMenu: { template: '<div />' },
       },
     },
   })
@@ -93,7 +98,10 @@ describe('WorkspaceView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.find('[data-testid="btn-workspace-preview"]').trigger('click')
+    const preview = wrapper.find('[data-testid="btn-workspace-preview"]')
+    expect(preview.attributes('aria-label')).toBeTruthy()
+    expect(preview.text()).toBe('')
+    await preview.trigger('click')
     await flushPromises()
 
     const dialog = wrapper.find('[role="dialog"]')

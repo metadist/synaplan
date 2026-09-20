@@ -30,6 +30,10 @@ vi.mock('@/composables/useDialog', () => ({
   useDialog: () => ({ confirm: vi.fn() }),
 }))
 
+vi.mock('@/composables/useCloudFolderTargets', () => ({
+  useCloudFolderTargets: () => ({ targets: { value: [] }, reload: vi.fn() }),
+}))
+
 vi.mock('@/stores/chats', () => ({
   useChatsStore: () => ({ setActiveChat: vi.fn() }),
 }))
@@ -77,6 +81,7 @@ const mountGrid = () =>
         MessageVideo: { template: '<div />' },
         MessageAudio: { template: '<div />' },
         FileVectorPill: { template: '<div />' },
+        FilePushMenu: { template: '<div />' },
       },
     },
   })

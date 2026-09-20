@@ -19,6 +19,11 @@ final class PlannerChannelCatalogTest extends TestCase
             'nextcloud-Ordner (admin)',
             ['base_url' => 'http://nextcloud/remote.php/dav/files/admin'],
         ));
+        self::assertSame('opencloud', PlannerChannelCatalog::preferredKey(
+            'webdav',
+            'Team drive',
+            ['base_url' => 'https://opencloud.example.com/remote.php/webdav'],
+        ));
         self::assertSame('folder', PlannerChannelCatalog::preferredKey('webdav', 'Archive', []));
         self::assertSame('calendar', PlannerChannelCatalog::preferredKey('caldav', 'Work calendar', []));
         self::assertSame('m365', PlannerChannelCatalog::preferredKey(Connection::TYPE_M365, 'Outlook', []));
