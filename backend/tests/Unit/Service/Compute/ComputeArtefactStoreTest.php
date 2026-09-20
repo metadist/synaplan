@@ -52,7 +52,7 @@ final class ComputeArtefactStoreTest extends TestCase
         $this->assertCount(1, $persisted);
         $file = $files[0];
         $this->assertSame('compute', $file->getSource());
-        $this->assertSame('artefact', $file->getOriginKind());
+        $this->assertSame('image', $file->getOriginKind());
         $this->assertSame(File::VECTOR_STATE_NONE, $file->getVectorState());
         $this->assertSame(99, $file->getMessageId());
         $this->assertStringContainsString('run1', $file->getFileName());

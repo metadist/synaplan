@@ -142,7 +142,12 @@
       "hint": "Las siguientes preguntas siguen usando estos archivos.",
       "attach": "Usar {name} en el siguiente mensaje",
       "attached": "{name} se enviará con el siguiente mensaje",
-      "count": "{count} archivo | {count} archivos"
+      "count": "{count} archivo | {count} archivos",
+      "delete": "Quitar {name}",
+      "deleteConfirmTitle": "¿Quitar archivo?",
+      "deleteConfirmMessage": "«{name}» se eliminará de forma permanente, incluido su contenido indexado en tu base de conocimiento. Esto no se puede deshacer.",
+      "deleted": "Archivo eliminado.",
+      "deleteFailed": "No se pudo quitar el archivo. No se eliminó nada."
     },
     "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto.",
     "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz.",

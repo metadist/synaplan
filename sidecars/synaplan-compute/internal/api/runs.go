@@ -470,7 +470,44 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 	case code != 0:
 		s.finish(rec, contract.StatusFailed, code, contract.ReasonProgramError)
 	default:
+		// Promote files the script created in its working directory (/work) into
+		// /out so they are harvested as artefacts even when the script did not
+		// write to /out explicitly. The injected script and the mounted input
+		// files are reserved so inputs are never re-surfaced as results.
+		reserved := make(map[string]bool, len(rec.Req.Files))
+		for _, f := range rec.Req.Files {
+			reserved[f.Name] = true
+		}
+		s.promoteWorkOutputs(layout, reserved)
 		s.finish(rec, contract.StatusSucceeded, code, "")
+	}
+}
+
+// promoteWorkOutputs copies regular files the script left in /work into /out
+// (unless already present there), so a script that writes result files to its
+// working directory still surfaces them for download. Reserved names (script +
+// inputs) and non-regular entries (symlinks, dirs) are skipped. Best-effort:
+// any per-file error is ignored so it never turns a successful run into a
+// failure.
+func (s *Server) promoteWorkOutputs(layout runner.ScratchLayout, reserved map[string]bool) {
+	entries, err := os.ReadDir(layout.Work)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if reserved[name] || !e.Type().IsRegular() || !names.FileName(name) {
+			continue
+		}
+		outPath := filepath.Join(layout.Out, name)
+		if _, statErr := os.Stat(outPath); statErr == nil {
+			continue
+		}
+		body, readErr := os.ReadFile(filepath.Join(layout.Work, name))
+		if readErr != nil {
+			continue
+		}
+		_ = s.owner.WriteFile(outPath, body)
 	}
 }
 

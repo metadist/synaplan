@@ -142,7 +142,12 @@
       "hint": "Sonraki soruların bu dosyaları kullanmaya devam eder.",
       "attach": "Sonraki iletide {name} kullan",
       "attached": "{name} sonraki iletide gönderilecek",
-      "count": "{count} dosya"
+      "count": "{count} dosya",
+      "delete": "{name} dosyasını kaldır",
+      "deleteConfirmTitle": "Dosya kaldırılsın mı?",
+      "deleteConfirmMessage": "“{name}” bilgi tabanınızdaki dizinlenmiş içeriğiyle birlikte kalıcı olarak silinecek. Bu işlem geri alınamaz.",
+      "deleted": "Dosya kaldırıldı.",
+      "deleteFailed": "Dosya kaldırılamadı. Hiçbir şey silinmedi."
     },
     "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
     "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin.",

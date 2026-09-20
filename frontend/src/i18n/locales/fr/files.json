@@ -175,8 +175,8 @@
     "tabWorkspace": "Espace de travail",
     "workspace": {
       "title": "Espace de travail",
-      "subtitle": "Fichiers que l’IA a créés pour vous pendant le travail sur fichiers. Ils restent ici d’une exécution à l’autre.",
-      "empty": "Les fichiers que l’IA crée pour vous apparaîtront ici.",
+      "subtitle": "Le dossier de travail de l’IA pour le travail sur fichiers : elle y lit et écrit des fichiers et les réutilise d’une exécution à l’autre. Les résultats finaux sont enregistrés dans Générés.",
+      "empty": "S’affiche lorsque vous demandez à l’IA de continuer à travailler sur des fichiers d’une exécution à l’autre. Les résultats ponctuels sont enregistrés dans Générés.",
       "emptyAction": "Retour au chat",
       "usage": "{used} Mo sur {quota} Mo utilisés",
       "delete": "Supprimer l’espace de travail",
@@ -272,7 +272,7 @@
       "filteredAction": "Effacer les filtres",
       "incomingBody": "Les fichiers envoyés depuis Outlook, Nextcloud ou OpenCloud apparaissent ici pour que vous les examiniez avant de les classer.",
       "incomingAction": "Configurer les intégrations",
-      "generatedBody": "Les images, vidéos et audios que vous créez dans le chat sont enregistrés ici pour que vous puissiez les retrouver et les télécharger.",
+      "generatedBody": "Les résultats que vous créez dans le chat — y compris les fichiers produits par des exécutions de code — sont enregistrés ici pour que vous puissiez les retrouver et les télécharger. Le dossier de travail de l’IA se trouve dans Espace de travail.",
       "generatedAction": "Démarrer un chat",
       "groupBody": "Ce groupe n’a pas encore de fichiers. Ajoutez-en pour les rendre recherchables ensemble.",
       "groupAction": "Ajouter des fichiers"
@@ -322,7 +322,7 @@
     },
     "generated": {
       "title": "Générés",
-      "subtitle": "Images, vidéos, audio, documents et invitations d’agenda créés dans vos chats et tâches.",
+      "subtitle": "Résultats finaux de vos chats et tâches — images, audio, documents et fichiers créés par du code — enregistrés dans votre base de connaissances pour rechercher, réutiliser et télécharger.",
       "kinds": {
         "all": "Tous",
         "image": "Images",

@@ -48,6 +48,8 @@ final readonly class CodeRunRunner implements TaskRunner
     private const SIDECAR_CONCURRENT_CEILING = 8;
     /** Max stdout characters surfaced in the chat reply (chatty scripts are clipped). */
     private const STDOUT_REPLY_CAP = 4000;
+    /** Max stderr characters surfaced when a run fails (the tail carries the actual error). */
+    private const STDERR_REPLY_CAP = 1500;
 
     public function __construct(
         private ComputeConfig $computeConfig,
@@ -360,6 +362,19 @@ final readonly class CodeRunRunner implements TaskRunner
                 $audit->markFinished(ComputeRun::STATUS_FAILED);
                 $this->runs->save($audit);
 
+                // The stderr tail is the actual cause (a stack trace / syntax
+                // error). Log it so a failed run is diagnosable even when the DAG
+                // falls back to the legacy router and discards the node message.
+                $stderrTail = trim((string) $logs['stderr']);
+                if ('' !== $stderrTail) {
+                    $this->logger->warning('CodeRunRunner: run failed', [
+                        'compute_run_id' => $runId,
+                        'exit_code' => $status->exitCode,
+                        'reason' => $status->reason,
+                        'stderr' => mb_substr($stderrTail, -self::STDERR_REPLY_CAP),
+                    ]);
+                }
+
                 return [
                     'outcome' => 'failed',
                     'status' => ComputeRun::STATUS_FAILED,
@@ -566,8 +581,22 @@ final readonly class CodeRunRunner implements TaskRunner
             ]);
         }
         if ('ok' !== $result['outcome']) {
-            return NodeResult::failed((string) $result['error'], [
+            // Honest outcome (U8): when the user asked to run code and it ran but
+            // errored, show WHAT failed — the stderr tail carries the real cause
+            // (stack trace / syntax error) — not just a generic "it failed" line.
+            $message = (string) $result['error'];
+            $stderr = trim((string) $result['stderr']);
+            if ('' !== $stderr) {
+                if (mb_strlen($stderr) > self::STDERR_REPLY_CAP) {
+                    $stderr = '…'.mb_substr($stderr, -self::STDERR_REPLY_CAP);
+                }
+                $message .= "\n\n```\n".$stderr."\n```";
+            }
+
+            return NodeResult::failed($message, [
                 'used_workspace' => true === ($result['used_workspace'] ?? false),
+                'exit_code' => $result['exit_code'],
+                'compute_run_id' => $result['compute_run_id'],
             ]);
         }
 

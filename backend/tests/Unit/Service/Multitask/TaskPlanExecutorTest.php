@@ -253,6 +253,39 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertContains('plan_discarded', $statuses);
     }
 
+    public function testFailedCodeRunDoesNotFallBackToLegacyRouter(): void
+    {
+        // A code-run turn that fails must NOT be handed to the legacy chat router:
+        // that router cannot execute code and answers "I can't execute code or
+        // write files…", denying a capability the product has and hiding the real
+        // error. The node's own failure is surfaced instead (U8).
+        $codePlan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'code_run'],
+            ],
+        ]);
+        $this->planner->method('plan')->willReturn(new TaskPlanResult($codePlan, fallback: false, modelId: 76));
+        $this->dagExecutor->method('execute')->willReturn($this->assembled([
+            'content' => 'File work could not finish. SyntaxError: bad token',
+            'all_failed' => true,
+            'node_statuses' => ['n1' => 'failed'],
+        ]));
+
+        $this->router->expects(self::never())->method('routeStream');
+
+        $streamed = [];
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            function (string $text) use (&$streamed): void { $streamed[] = $text; },
+        );
+
+        self::assertStringContainsString('File work could not finish', (string) ($result['content'] ?? ''));
+        self::assertContains('File work could not finish. SyntaxError: bad token', $streamed);
+    }
+
     public function testSingleNodePlanFromPlannerUsesLegacyPath(): void
     {
         // Planner says single-node → trust the proven router path, no DAG.

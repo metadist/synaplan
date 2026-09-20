@@ -263,6 +263,16 @@ class Message
 
     public function setFileType(string $fileType): self
     {
+        // BFILETYPE is varchar(8). A caller passing a MIME (e.g.
+        // "application/json" from a compute artefact descriptor) would overflow
+        // the column and abort the whole turn (SQLSTATE 22001 → EntityManager
+        // closed → the reply is never saved and the chat hangs on "processing").
+        // Guarantee the value fits: keep the token after the last "/" or "." —
+        // "application/json" → "json", "text/csv" → "csv" — then hard-cap at 8.
+        if (mb_strlen($fileType) > 8) {
+            $tail = preg_replace('#^.*[/.]#', '', $fileType) ?? $fileType;
+            $fileType = mb_substr('' !== $tail ? $tail : $fileType, 0, 8);
+        }
         $this->fileType = $fileType;
 
         return $this;

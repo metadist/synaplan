@@ -229,8 +229,8 @@
     "tabWorkspace": "Çalışma alanı",
     "workspace": {
       "title": "Çalışma alanı",
-      "subtitle": "YZ’nin dosya çalışmasında sizin için oluşturduğu dosyalar. Çalıştırmalar arasında burada kalır.",
-      "empty": "Yapay zekanın sizin için oluşturduğu dosyalar burada görünür.",
+      "subtitle": "Yapay zekânın dosya çalışması için çalışma klasörü — dosyaları burada okur, yazar ve çalıştırmalar arasında yeniden kullanır. Tamamlanan sonuçlar Üretilen bölümüne kaydedilir.",
+      "empty": "Yapay zekâdan dosyalar üzerinde çalıştırmalar arasında çalışmaya devam etmesini istediğinizde burada görünür. Tek seferlik sonuçlar Üretilen bölümüne kaydedilir.",
       "emptyAction": "Sohbete dön",
       "usage": "{quota} MB’nin {used} MB’si kullanıldı",
       "delete": "Çalışma alanını sil",
@@ -326,7 +326,7 @@
       "filteredAction": "Filtreleri temizle",
       "incomingBody": "Outlook, Nextcloud veya OpenCloud'dan gönderilen dosyalar, dosyalamadan önce incelemeniz için burada görünür.",
       "incomingAction": "Entegrasyonları ayarla",
-      "generatedBody": "Sohbette oluşturduğunuz görseller, video ve ses, tekrar bulup indirebilmeniz için burada saklanır.",
+      "generatedBody": "Sohbette oluşturduğunuz sonuçlar — kod çalıştırmalarının ürettiği dosyalar dâhil — daha sonra bulup indirebilmeniz için burada saklanır. Yapay zekânın çalışma klasörü Çalışma alanı bölümündedir.",
       "generatedAction": "Sohbet başlat",
       "groupBody": "Bu grupta henüz dosya yok. Birlikte aranabilir olmaları için dosya ekleyin.",
       "groupAction": "Dosya ekle"
@@ -376,7 +376,7 @@
     },
     "generated": {
       "title": "Üretilen",
-      "subtitle": "Sohbetlerinizde ve görevlerinizde oluşturulan görseller, videolar, ses, belgeler ve takvim davetleri.",
+      "subtitle": "Sohbetlerinizden ve görevlerinizden gelen tamamlanmış sonuçlar — görseller, ses, belgeler ve kodla oluşturulan dosyalar — arama, yeniden kullanma ve indirme için bilgi tabanınıza kaydedilir.",
       "kinds": {
         "all": "Tümü",
         "image": "Görseller",

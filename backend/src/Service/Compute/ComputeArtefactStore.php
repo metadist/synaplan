@@ -120,12 +120,38 @@ final readonly class ComputeArtefactStore
         $file->setFileMime($artefact->mime);
         $file->setFileText('');
         $file->setSource('compute');
-        $file->setOriginKind('artefact');
+        $file->setOriginKind($this->originKindFor($artefact->mime, $ext));
         $file->setVectorState(File::VECTOR_STATE_NONE);
         $file->setMessageId($messageId);
         $this->em->persist($file);
         $this->em->flush();
 
         return $file;
+    }
+
+    /**
+     * Map a harvested artefact to one of {@see File::ORIGIN_KINDS} so it appears
+     * under the matching filter chip in the Generated tab (image/video/audio/
+     * calendar/document). Compute provenance is already carried by
+     * source='compute'; the origin kind describes the media, defaulting to
+     * 'document' for anything non-media (CSV, JSON, text, spreadsheets, …).
+     */
+    private function originKindFor(string $mime, string $ext): string
+    {
+        $mime = strtolower($mime);
+        if (str_starts_with($mime, 'image/')) {
+            return 'image';
+        }
+        if (str_starts_with($mime, 'video/')) {
+            return 'video';
+        }
+        if (str_starts_with($mime, 'audio/')) {
+            return 'audio';
+        }
+        if ('text/calendar' === $mime || 'ics' === $ext) {
+            return 'calendar';
+        }
+
+        return 'document';
     }
 }

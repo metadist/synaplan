@@ -216,8 +216,8 @@
     "tabWorkspace": "Arbeitsbereich",
     "workspace": {
       "title": "Arbeitsbereich",
-      "subtitle": "Dateien, die die KI bei der Dateiarbeit für Sie angelegt hat. Sie bleiben zwischen den Läufen hier.",
-      "empty": "Dateien, die die KI für Sie anlegt, erscheinen hier.",
+      "subtitle": "Der Arbeitsordner der KI für die Dateiarbeit – hier liest und schreibt sie Dateien und verwendet sie über mehrere Läufe hinweg wieder. Fertige Ergebnisse werden unter „Erzeugt“ gespeichert.",
+      "empty": "Erscheint, wenn du die KI bittest, über mehrere Läufe hinweg an Dateien weiterzuarbeiten. Einmalige Ergebnisse werden stattdessen unter „Erzeugt“ gespeichert.",
       "emptyAction": "Zurück zum Chat",
       "usage": "{used} MB von {quota} MB belegt",
       "delete": "Arbeitsbereich löschen",
@@ -313,7 +313,7 @@
       "filteredAction": "Filter zurücksetzen",
       "incomingBody": "Dateien aus Outlook, Nextcloud oder OpenCloud erscheinen hier, damit du sie vor dem Ablegen prüfen kannst.",
       "incomingAction": "Integrationen einrichten",
-      "generatedBody": "Bilder, Video und Audio, die du im Chat erstellst, werden hier gespeichert, damit du sie wiederfinden und erneut herunterladen kannst.",
+      "generatedBody": "Ergebnisse, die du im Chat erstellst – auch von Code-Läufen erzeugte Dateien – werden hier gespeichert, damit du sie später wiederfindest und herunterladen kannst. Der Arbeitsordner der KI liegt unter „Arbeitsbereich“.",
       "generatedAction": "Chat starten",
       "groupBody": "Diese Gruppe enthält noch keine Dateien. Füge Dateien hinzu, um sie gemeinsam durchsuchbar zu machen.",
       "groupAction": "Dateien hinzufügen"
@@ -363,7 +363,7 @@
     },
     "generated": {
       "title": "Erzeugt",
-      "subtitle": "Bilder, Videos, Audio, Dokumente und Kalendereinladungen aus deinen Chats und Aufgaben.",
+      "subtitle": "Fertige Ergebnisse aus deinen Chats und Aufgaben – Bilder, Audio, Dokumente und von Code erzeugte Dateien – in deiner Wissensbasis gespeichert, zum Suchen, Wiederverwenden und Herunterladen.",
       "kinds": {
         "all": "Alle",
         "image": "Bilder",
