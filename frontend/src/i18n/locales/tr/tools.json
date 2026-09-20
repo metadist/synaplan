@@ -88,7 +88,8 @@
     "details": "Ayrıntılar",
     "preview": "Önizleme",
     "openWorkspace": "Çalışma alanını aç",
-    "elapsed": "{seconds}s"
+    "elapsed": "{seconds}s",
+    "findInFiles": "Dosyalar → Oluşturulanlar'da bul"
   },
   "channels": {
     "title": "Kanallar",

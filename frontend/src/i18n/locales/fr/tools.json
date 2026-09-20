@@ -309,7 +309,8 @@
     "details": "Détails",
     "preview": "Aperçu",
     "openWorkspace": "Ouvrir l’espace de travail",
-    "elapsed": "{seconds}s"
+    "elapsed": "{seconds}s",
+    "findInFiles": "Trouver dans Fichiers → Générés"
   },
   "aiProvider": {
     "error": {

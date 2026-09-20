@@ -309,7 +309,8 @@
     "details": "Details",
     "preview": "Preview",
     "openWorkspace": "Open workspace",
-    "elapsed": "{seconds}s"
+    "elapsed": "{seconds}s",
+    "findInFiles": "Find in Files → Generated"
   },
   "aiProvider": {
     "error": {
