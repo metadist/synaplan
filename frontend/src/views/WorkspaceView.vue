@@ -74,23 +74,34 @@
                 <p class="text-sm txt-primary truncate">{{ file.path }}</p>
                 <p class="text-xs txt-muted">{{ formatSize(file.size) }}</p>
               </div>
-              <div class="flex flex-wrap gap-2 shrink-0">
+              <div class="flex items-center gap-0.5 shrink-0">
                 <button
                   type="button"
-                  class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+                  class="icon-ghost inline-flex items-center justify-center w-11 h-11 rounded-lg"
                   data-testid="btn-workspace-preview"
+                  :title="$t('files.workspace.preview')"
+                  :aria-label="$t('files.workspace.preview')"
                   @click="onPreview(file)"
                 >
-                  {{ $t('files.workspace.preview') }}
+                  <Icon icon="mdi:eye-outline" class="w-5 h-5" />
                 </button>
                 <button
                   type="button"
-                  class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+                  class="icon-ghost inline-flex items-center justify-center w-11 h-11 rounded-lg"
                   data-testid="btn-workspace-download"
+                  :title="$t('files.workspace.download')"
+                  :aria-label="$t('files.workspace.download')"
                   @click="onDownload(file)"
                 >
-                  {{ $t('files.workspace.download') }}
+                  <Icon icon="mdi:download" class="w-5 h-5" />
                 </button>
+                <FilePushMenu
+                  size="row"
+                  source="workspace"
+                  :targets="cloudTargets"
+                  :path="file.path"
+                  :file-name="workspaceFileName(file.path)"
+                />
               </div>
             </li>
           </ul>
@@ -147,6 +158,8 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import FilesTabs from '@/components/files/FilesTabs.vue'
+import FilePushMenu from '@/components/files/FilePushMenu.vue'
+import { useCloudFolderTargets } from '@/composables/useCloudFolderTargets'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { getConfigSync } from '@/services/api/httpClient'
@@ -172,6 +185,7 @@ const { t } = useI18n()
 const router = useRouter()
 const { confirm } = useDialog()
 const { success, error: notifyError } = useNotification()
+const { targets: cloudTargets } = useCloudFolderTargets()
 
 const loading = ref(true)
 const busy = ref(false)

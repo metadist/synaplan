@@ -220,9 +220,11 @@ final readonly class PlannerChannelCatalog
         $haystack = strtolower($name.' '.(is_string($config['base_url'] ?? null) ? $config['base_url'] : ''));
 
         return match ($type) {
-            'webdav' => str_contains($haystack, 'nextcloud') || str_contains($haystack, 'owncloud')
-                ? 'nextcloud'
-                : 'folder',
+            'webdav' => str_contains($haystack, 'opencloud')
+                ? 'opencloud'
+                : (str_contains($haystack, 'nextcloud') || str_contains($haystack, 'owncloud')
+                    ? 'nextcloud'
+                    : 'folder'),
             'caldav' => 'calendar',
             Connection::TYPE_DROPBOX => 'dropbox',
             Connection::TYPE_M365 => 'm365',

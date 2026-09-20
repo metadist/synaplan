@@ -11,7 +11,9 @@ const { t } = useI18n()
 const { success, error: showError } = useNotification()
 
 const open = ref(false)
-const kind = ref<'nextcloud' | 'webdav'>('nextcloud')
+type DavKind = 'nextcloud' | 'opencloud' | 'webdav'
+const kindOptions = ['nextcloud', 'opencloud', 'webdav'] as const
+const kind = ref<DavKind>('nextcloud')
 const serverUrl = ref('')
 const davUrl = ref('')
 const username = ref('')
@@ -23,11 +25,30 @@ const submitting = ref(false)
 
 const normalizedServer = computed(() => serverUrl.value.trim().replace(/\/+$/, ''))
 
-const filesBaseUrl = computed(() =>
-  kind.value === 'nextcloud'
-    ? `${normalizedServer.value}/remote.php/dav/files/${encodeURIComponent(username.value.trim())}`
-    : davUrl.value.trim().replace(/\/+$/, '')
+const usesServerPreset = computed(() => kind.value === 'nextcloud' || kind.value === 'opencloud')
+
+const filesBaseUrl = computed(() => {
+  if (kind.value === 'nextcloud') {
+    return `${normalizedServer.value}/remote.php/dav/files/${encodeURIComponent(username.value.trim())}`
+  }
+  if (kind.value === 'opencloud') {
+    return `${normalizedServer.value}/remote.php/webdav`
+  }
+  return davUrl.value.trim().replace(/\/+$/, '')
+})
+
+const appPasswordHintKey = computed(() =>
+  kind.value === 'opencloud'
+    ? 'config.connections.providers.dav.appPasswordHintOpencloud'
+    : 'config.connections.providers.dav.appPasswordHint'
 )
+
+const serverPlaceholder = computed(() => {
+  if (allowInsecureLocal) {
+    return kind.value === 'opencloud' ? 'http://opencloud' : 'http://nextcloud'
+  }
+  return 'https://cloud.example.com'
+})
 
 const calendarBaseUrl = computed(
   () =>
@@ -54,12 +75,13 @@ const isAllowedUrl = (value: string): boolean => {
 
 const canSubmit = computed(() => {
   if (!username.value.trim() || !appPassword.value) return false
-  const base = kind.value === 'nextcloud' ? normalizedServer.value : filesBaseUrl.value
+  const base = usesServerPreset.value ? normalizedServer.value : filesBaseUrl.value
   return isAllowedUrl(base)
 })
 
 const reset = () => {
   open.value = false
+  kind.value = 'nextcloud'
   serverUrl.value = ''
   davUrl.value = ''
   username.value = ''
@@ -101,7 +123,7 @@ const submit = async () => {
         username: username.value.trim(),
         folder: folder.value.trim() || 'Synaplan',
         on_conflict: 'rename',
-        channel: kind.value === 'nextcloud' ? 'nextcloud' : 'folder',
+        channel: kind.value === 'webdav' ? 'folder' : kind.value,
       },
     })
 
@@ -163,24 +185,30 @@ const submit = async () => {
     </div>
 
     <form v-if="open" class="space-y-3" data-testid="dav-form" @submit.prevent="submit">
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-x-4 gap-y-2">
         <label
-          v-for="option in ['nextcloud', 'webdav'] as const"
+          v-for="option in kindOptions"
           :key="option"
           class="flex items-center gap-2 text-sm txt-primary"
         >
-          <input v-model="kind" type="radio" :value="option" class="accent-[var(--brand)]" />
+          <input
+            v-model="kind"
+            type="radio"
+            :value="option"
+            class="accent-[var(--brand)]"
+            :data-testid="`dav-kind-${option}`"
+          />
           {{ $t(`config.connections.providers.dav.kind.${option}`) }}
         </label>
       </div>
 
-      <label v-if="kind === 'nextcloud'" class="block text-sm">
+      <label v-if="usesServerPreset" class="block text-sm">
         <span class="txt-secondary">{{ $t('config.connections.providers.dav.serverUrl') }}</span>
         <input
           v-model="serverUrl"
           type="url"
           required
-          :placeholder="allowInsecureLocal ? 'http://nextcloud' : 'https://cloud.example.com'"
+          :placeholder="serverPlaceholder"
           class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="dav-server-url"
         />
@@ -227,7 +255,7 @@ const submit = async () => {
         </label>
       </div>
       <p class="text-xs txt-secondary">
-        {{ $t('config.connections.providers.dav.appPasswordHint') }}
+        {{ $t(appPasswordHintKey) }}
       </p>
 
       <label class="block text-sm">

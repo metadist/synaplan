@@ -71,6 +71,17 @@ describe('placeOfficeActionsMenu', () => {
     expect(placed.maxHeight).toBe(400 - MENU_GAP_PX)
   })
 
+  it('opens below a file-row trigger when preferBelow is set', () => {
+    const placed = placeOfficeActionsMenu({
+      ...desktop,
+      menuHeight,
+      preferBelow: true,
+      trigger: { top: 180, bottom: 224, right: 1200 },
+    })
+    expect(placed.openAbove).toBe(false)
+    expect(placed.top).toBe(`${224 + MENU_GAP_PX}px`)
+  })
+
   it('flips below only when there is not enough room above', () => {
     const placed = placeOfficeActionsMenu({
       ...desktop,

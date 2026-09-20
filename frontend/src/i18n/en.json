@@ -1386,6 +1386,27 @@
       "closePreview": "Close",
       "retry": "Try again"
     },
+    "push": {
+      "action": "Send to cloud",
+      "to": "Send to {name}",
+      "kind": {
+        "nextcloud": "Nextcloud",
+        "opencloud": "OpenCloud"
+      },
+      "done": "Copied to {folder} on {name}. The file is still here.",
+      "failed": "The file was not copied.",
+      "failure": {
+        "unauthorized": "{connection} rejected the login. Nothing was copied.",
+        "not_found": "{target} was not found. Nothing was copied.",
+        "quota_exceeded": "{connection} is out of space. Nothing was copied.",
+        "too_large": "The file is larger than {connection} accepts. Nothing was copied.",
+        "unreachable": "{connection} could not be reached. Nothing was copied.",
+        "conflict": "A file with that name already exists in {connection}. Nothing was copied.",
+        "rate_limited": "{connection} asked us to wait. Nothing was copied.",
+        "unsupported": "This file type cannot be sent to {connection}. Nothing was copied.",
+        "compute_unavailable": "File work is not reachable right now. Nothing was copied."
+      }
+    },
     "incomingBadge": "{count} new",
     "sourceLabel": {
       "web_upload": "Upload",
@@ -2302,11 +2323,12 @@
         },
         "dav": {
           "name": "Nextcloud folder & calendar (WebDAV)",
-          "description": "Save task results into your cloud folder and put meetings into your calendar. Works with Nextcloud, ownCloud and any WebDAV server.",
+          "description": "Save task results into your cloud folder and put meetings into your calendar. Works with Nextcloud, OpenCloud, ownCloud and any WebDAV server.",
           "hosting": "Connects to a server you choose — your files stay on your own cloud.",
           "action": "Connect",
           "kind": {
             "nextcloud": "Nextcloud / ownCloud",
+            "opencloud": "OpenCloud",
             "webdav": "Other WebDAV address"
           },
           "serverUrl": "Server address",
@@ -2314,6 +2336,7 @@
           "username": "Username",
           "appPassword": "App password",
           "appPasswordHint": "Create one in Nextcloud under Settings → Security → Devices & sessions. Your account password is never stored.",
+          "appPasswordHintOpencloud": "Create an app token in OpenCloud under Settings → Security. Your account password is never stored.",
           "localHttpHint": "On this development install you can also use a local address such as http://nextcloud.",
           "folder": "Folder for results",
           "withCalendar": "Also connect a calendar:",

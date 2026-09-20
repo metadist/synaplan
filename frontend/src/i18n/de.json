@@ -2454,11 +2454,12 @@
         },
         "dav": {
           "name": "Nextcloud-Ordner & -Kalender (WebDAV)",
-          "description": "Speichert Aufgaben-Ergebnisse in deinem Cloud-Ordner und trägt Termine in deinen Kalender ein. Funktioniert mit Nextcloud, ownCloud und jedem WebDAV-Server.",
+          "description": "Speichert Aufgaben-Ergebnisse in deinem Cloud-Ordner und trägt Termine in deinen Kalender ein. Funktioniert mit Nextcloud, OpenCloud, ownCloud und jedem WebDAV-Server.",
           "hosting": "Verbindet sich mit einem Server deiner Wahl — deine Dateien bleiben in deiner eigenen Cloud.",
           "action": "Verbinden",
           "kind": {
             "nextcloud": "Nextcloud / ownCloud",
+            "opencloud": "OpenCloud",
             "webdav": "Andere WebDAV-Adresse"
           },
           "serverUrl": "Server-Adresse",
@@ -2466,6 +2467,7 @@
           "username": "Benutzername",
           "appPassword": "App-Passwort",
           "appPasswordHint": "Erstelle eines in Nextcloud unter Einstellungen → Sicherheit → Geräte & Sitzungen. Dein Konto-Passwort wird nie gespeichert.",
+          "appPasswordHintOpencloud": "Erstelle ein App-Token in OpenCloud unter Einstellungen → Sicherheit. Dein Konto-Passwort wird nie gespeichert.",
           "localHttpHint": "Auf dieser Entwicklungsinstallation kannst du auch eine lokale Adresse wie http://nextcloud verwenden.",
           "folder": "Ordner für Ergebnisse",
           "withCalendar": "Auch einen Kalender verbinden:",
@@ -3646,6 +3648,27 @@
       "previewUnavailable": "Diese Datei lässt sich hier nicht anzeigen. Laden Sie sie herunter, um sie zu öffnen.",
       "closePreview": "Schließen",
       "retry": "Erneut versuchen"
+    },
+    "push": {
+      "action": "In die Cloud kopieren",
+      "to": "Nach {name} kopieren",
+      "kind": {
+        "nextcloud": "Nextcloud",
+        "opencloud": "OpenCloud"
+      },
+      "done": "Nach {folder} auf {name} kopiert. Die Datei bleibt hier.",
+      "failed": "Die Datei wurde nicht kopiert.",
+      "failure": {
+        "unauthorized": "{connection} hat die Anmeldung abgelehnt. Es wurde nichts kopiert.",
+        "not_found": "{target} wurde nicht gefunden. Es wurde nichts kopiert.",
+        "quota_exceeded": "{connection} hat keinen Speicherplatz mehr. Es wurde nichts kopiert.",
+        "too_large": "Die Datei ist größer, als {connection} akzeptiert. Es wurde nichts kopiert.",
+        "unreachable": "{connection} war nicht erreichbar. Es wurde nichts kopiert.",
+        "conflict": "Eine Datei dieses Namens gibt es in {connection} bereits. Es wurde nichts kopiert.",
+        "rate_limited": "{connection} hat um Wartezeit gebeten. Es wurde nichts kopiert.",
+        "unsupported": "Dieser Dateityp lässt sich nicht nach {connection} senden. Es wurde nichts kopiert.",
+        "compute_unavailable": "Die Dateiarbeit ist gerade nicht erreichbar. Es wurde nichts kopiert."
+      }
     },
     "incomingBadge": "{count} neu",
     "sourceLabel": {

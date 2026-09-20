@@ -103,6 +103,13 @@
               :filename="file.display_name || file.filename"
               @preview="openPreview(file)"
             />
+            <FilePushMenu
+              size="tile"
+              source="generated"
+              :targets="cloudTargets"
+              :file-id="file.id"
+              :file-name="file.display_name || file.filename"
+            />
             <button
               class="flex-1 min-w-0 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
               :title="$t('files.generated.download')"
@@ -243,6 +250,8 @@ import { Icon } from '@iconify/vue'
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import FilePreview from '@/components/files/FilePreview.vue'
 import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
+import FilePushMenu from '@/components/files/FilePushMenu.vue'
+import { useCloudFolderTargets } from '@/composables/useCloudFolderTargets'
 import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
 import { previewKindForFile } from '@/services/filePreview'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
@@ -263,6 +272,7 @@ const router = useRouter()
 const { success: showSuccess, error: showError } = useNotification()
 const { confirm } = useDialog()
 const chatsStore = useChatsStore()
+const { targets: cloudTargets } = useCloudFolderTargets()
 
 const files = ref<FileItem[]>([])
 const previewFile = ref<{ id: number; filename: string } | null>(null)
