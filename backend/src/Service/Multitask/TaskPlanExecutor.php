@@ -556,9 +556,9 @@ final readonly class TaskPlanExecutor
      *
      * The sorter prompt counts capabilities without a legacy router equivalent
      * (calendar entry, URL fetch, connected-system lookup, mailbox search,
-     * "mail it to me", a custom tool call) as multi-step even though they
-     * produce one deliverable: skipping the planner would silently degrade them
-     * into a chat answer that only talks about the action.
+     * "mail it to me", a custom tool call, running code on files) as multi-step
+     * even though they produce one deliverable: skipping the planner would
+     * silently degrade them into a chat answer that only talks about the action.
      *
      * Deliberately strict: only an explicit `false` skips planning. A missing
      * vote (`null` — older seeded prompt, a SORT model that dropped the field,

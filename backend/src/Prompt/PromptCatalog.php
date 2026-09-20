@@ -635,6 +635,9 @@ This is the list, use only this:
    - Sending the result by email ("mail it to me", "schick es mir per Mail")
    - Saving the result to a connected folder / Nextcloud
      ("save it to my Nextcloud", "lege es in meinen Nextcloud-Account")
+   - Running code or a script on the user's files (file work)
+     ("run python on this file and tell me ...", "compute the totals with code",
+     "führe das Skript auf dieser Datei aus")
 
    Set BMULTI to 0 for everything else, including:
    - Any plain question, greeting or smalltalk
