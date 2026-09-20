@@ -36,6 +36,26 @@ final class CloudFolderTargetTest extends TestCase
         self::assertSame(CloudFolderTarget::OPENCLOUD, CloudFolderTarget::kindFor($opencloud));
     }
 
+    public function testPlannerSuffixOnASecondOpenCloudFolderIsStillOpenCloud(): void
+    {
+        $connection = $this->connection('webdav', 'Team drive', [
+            'channel' => 'opencloud-2',
+            'base_url' => 'https://cloud.example.com/remote.php/webdav',
+        ]);
+
+        self::assertSame(CloudFolderTarget::OPENCLOUD, CloudFolderTarget::kindFor($connection));
+    }
+
+    public function testStoredGenericChannelIsNotOverriddenByTheHostName(): void
+    {
+        $folder = $this->connection('webdav', 'Archive', [
+            'channel' => 'folder',
+            'base_url' => 'https://opencloud.example.com/remote.php/webdav',
+        ]);
+
+        self::assertNull(CloudFolderTarget::kindFor($folder));
+    }
+
     public function testGenericWebDavAndDropboxAreNotCloudFolders(): void
     {
         $folder = $this->connection('webdav', 'Archive', ['channel' => 'folder']);

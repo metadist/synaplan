@@ -91,6 +91,29 @@ final class WorkspaceFolderPushServiceTest extends TestCase
         self::assertFalse($result['body']['success']);
     }
 
+    public function testSidecarInternalErrorIsNotReportedAsAMissingFile(): void
+    {
+        $connection = $this->connection(12, 'OpenCloud', ['channel' => 'opencloud']);
+        $workspaces = $this->createMock(ComputeWorkspaceService::class);
+        $workspaces->method('downloadFile')->willThrowException(
+            new ComputeRefusedException('internal_error', 'Compute sidecar returned HTTP 500'),
+        );
+
+        $service = new WorkspaceFolderPushService(
+            $this->config(true),
+            $workspaces,
+            $this->connections($connection),
+            new DestinationRegistry([]),
+        );
+
+        $result = $service->push($this->user(4), 'probe.txt', 12);
+
+        self::assertSame(422, $result['status']);
+        self::assertSame(DestinationFailureCode::Unreachable->value, $result['body']['code']);
+        self::assertSame('internal_error', $result['body']['error']);
+        self::assertSame('OpenCloud', $result['body']['context']['connection']);
+    }
+
     public function testSidecarOutageCopiesNothing(): void
     {
         $connection = $this->connection(12, 'OpenCloud', ['channel' => 'opencloud']);

@@ -32,8 +32,11 @@ final readonly class CloudFolderTarget
         $stored = is_string($config['channel'] ?? null)
             ? PlannerChannelCatalog::sanitize($config['channel'])
             : '';
-        if (in_array($stored, self::KINDS, true)) {
-            return $stored;
+        // A stored slug is authoritative: "folder" stays generic even if the
+        // host happens to contain "opencloud". Planner unique() also persists
+        // nextcloud-2 / opencloud-x when a second folder exists.
+        if ('' !== $stored) {
+            return self::kindFromChannel($stored);
         }
 
         $derived = PlannerChannelCatalog::preferredKey(
@@ -43,6 +46,18 @@ final readonly class CloudFolderTarget
         );
 
         return in_array($derived, self::KINDS, true) ? $derived : null;
+    }
+
+    /**
+     * @return self::NEXTCLOUD|self::OPENCLOUD|null
+     */
+    public static function kindFromChannel(string $channel): ?string
+    {
+        if (1 !== preg_match('/^(nextcloud|opencloud)(?:-(?:\d+|x))?$/', $channel, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
     }
 
     public static function isCloudFolder(Connection $connection): bool

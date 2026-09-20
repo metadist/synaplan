@@ -50,6 +50,56 @@ describe('cloudFolderTargetsFrom', () => {
     ])
   })
 
+  it('keeps a second OpenCloud folder whose planner channel is opencloud-2', () => {
+    expect(
+      cloudFolderKindFor(
+        connection({
+          name: 'Team drive',
+          channel: 'opencloud-2',
+          config: { base_url: 'https://cloud.example.com/remote.php/webdav' },
+        })
+      )
+    ).toBe('opencloud')
+  })
+
+  it('does not treat a generic WebDAV row as OpenCloud just because the host says so', () => {
+    expect(
+      cloudFolderKindFor(
+        connection({
+          name: 'Archive',
+          channel: 'folder',
+          config: { base_url: 'https://opencloud.example.com/remote.php/webdav' },
+        })
+      )
+    ).toBeNull()
+  })
+
+  it('omits destinations that cannot receive a file', () => {
+    const targets = cloudFolderTargetsFrom([
+      connection({ id: '12', name: 'Office files', channel: 'nextcloud' }),
+      connection({
+        id: '13',
+        name: 'Broken',
+        channel: 'opencloud',
+        status: 'error',
+      }),
+      connection({
+        id: '14',
+        name: 'No secret',
+        channel: 'nextcloud',
+        has_secret: false,
+      }),
+      connection({
+        id: '15',
+        name: 'Never tested',
+        channel: 'opencloud',
+        status: 'never_tested',
+      }),
+    ])
+
+    expect(targets.map((row) => row.id)).toEqual([12])
+  })
+
   it('detects OpenCloud from the URL when no channel is stored', () => {
     expect(
       cloudFolderKindFor(

@@ -27,6 +27,16 @@ function storedChannel(connection: ConnectionItem): string {
   return typeof fromConfig === 'string' ? sanitizeChannel(fromConfig) : ''
 }
 
+/** Planner unique() stores nextcloud-2 / opencloud-x for a second folder. */
+export function kindFromChannel(channel: string): CloudFolderKind | null {
+  const match = /^(nextcloud|opencloud)(?:-(?:\d+|x))?$/.exec(channel)
+  return match ? (match[1] as CloudFolderKind) : null
+}
+
+function canReceiveFile(connection: ConnectionItem): boolean {
+  return connection.has_secret === true && connection.status === 'connected'
+}
+
 /**
  * Same rule as backend CloudFolderTarget: only Nextcloud / OpenCloud folders.
  * Generic WebDAV and Dropbox stay out of the Files "Send to cloud" list.
@@ -37,8 +47,8 @@ export function cloudFolderKindFor(connection: ConnectionItem): CloudFolderKind 
   }
 
   const stored = storedChannel(connection)
-  if (stored === 'nextcloud' || stored === 'opencloud') {
-    return stored
+  if (stored !== '') {
+    return kindFromChannel(stored)
   }
 
   const baseUrl = typeof connection.config?.base_url === 'string' ? connection.config.base_url : ''
@@ -56,7 +66,7 @@ export function cloudFolderTargetsFrom(connections: ConnectionItem[]): CloudFold
   const out: CloudFolderTargetItem[] = []
   for (const connection of connections) {
     const kind = cloudFolderKindFor(connection)
-    if (kind === null) {
+    if (kind === null || !canReceiveFile(connection)) {
       continue
     }
     const id = Number.parseInt(connection.id, 10)

@@ -55,17 +55,7 @@ final readonly class WorkspaceFolderPushService
         try {
             $downloaded = $this->workspaces->downloadFile($user, $path);
         } catch (ComputeRefusedException $e) {
-            $notFound = in_array($e->errorCode(), ['workspace_not_found', 'bad_file_name'], true);
-
-            return [
-                'status' => $notFound ? 404 : 400,
-                'body' => [
-                    'success' => false,
-                    'code' => DestinationFailureCode::NotFound->value,
-                    'error' => $e->errorCode(),
-                    'context' => ['target' => basename(str_replace('\\', '/', $path))],
-                ],
-            ];
+            return self::refusedDownload($e, $path, $connection->getName());
         } catch (HttpClientException) {
             return [
                 'status' => 503,
@@ -128,6 +118,52 @@ final readonly class WorkspaceFolderPushService
                 'kind' => $kind,
                 'reference' => $result->reference,
                 'context' => $result->context,
+            ],
+        ];
+    }
+
+    /**
+     * Only a missing workspace or a rejected path is "not found". Other sidecar
+     * refusals (busy, quota, internal_error) must keep a matching failure code
+     * so the UI does not say the file is gone.
+     *
+     * @return array{status: int, body: array<string, mixed>}
+     */
+    private static function refusedDownload(
+        ComputeRefusedException $e,
+        string $path,
+        string $connectionName,
+    ): array {
+        $sidecar = $e->errorCode();
+        $target = basename(str_replace('\\', '/', $path));
+        if (in_array($sidecar, ['workspace_not_found', 'bad_file_name'], true)) {
+            return [
+                'status' => 404,
+                'body' => [
+                    'success' => false,
+                    'code' => DestinationFailureCode::NotFound->value,
+                    'error' => $sidecar,
+                    'context' => ['target' => $target],
+                ],
+            ];
+        }
+
+        $code = match ($sidecar) {
+            'workspace_quota_exceeded', 'capacity_exceeded' => DestinationFailureCode::QuotaExceeded->value,
+            'workspace_busy' => DestinationFailureCode::Conflict->value,
+            default => DestinationFailureCode::Unreachable->value,
+        };
+
+        return [
+            'status' => 422,
+            'body' => [
+                'success' => false,
+                'code' => $code,
+                'error' => $sidecar,
+                'context' => [
+                    'target' => $target,
+                    'connection' => $connectionName,
+                ],
             ],
         ];
     }
