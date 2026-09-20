@@ -24,7 +24,7 @@ import {
   resolveSetupGate,
   SETUP_ROUTE,
 } from '@/router/setupGate'
-import { i18n, loadNamespaces, rememberRouteNamespaces } from '@/i18n'
+import { CHROME_I18N_NAMESPACES, i18n, loadNamespaces, rememberRouteNamespaces } from '@/i18n'
 import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
@@ -863,8 +863,18 @@ function targetPath(target: RouteLocationRaw): string {
 
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
+function i18nNamespacesForRoute(to: RouteLocationNormalized): string[] {
+  const declared = Array.isArray(to.meta.i18n) ? [...to.meta.i18n] : []
+  // Public marketing/auth screens have no sidebar. Authenticated (and guest)
+  // chrome always needs admin/settings/auth/chat for Incoming + Logout.
+  if (to.meta.public === true && to.meta.requiresAuth === false) {
+    return declared
+  }
+  return [...CHROME_I18N_NAMESPACES, ...declared]
+}
+
 router.beforeEach(async (to, _from, next) => {
-  const extraNamespaces = rememberRouteNamespaces(Array.isArray(to.meta.i18n) ? to.meta.i18n : [])
+  const extraNamespaces = rememberRouteNamespaces(i18nNamespacesForRoute(to))
   try {
     const locale = i18n.global.locale.value
     if (typeof locale === 'string') {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { loadAllMessages } from '@/i18n/loadAllMessages'
-import { I18N_NAMESPACES, NAMESPACE_KEYS } from '@/i18n/namespaces'
+import { CHROME_I18N_NAMESPACES, I18N_NAMESPACES, NAMESPACE_KEYS } from '@/i18n/namespaces'
 import { supportedLanguages } from '@/i18n'
 
 const EXTRA_AUTH_KEYS = ['login', 'register', 'forgotPassword', 'verifyEmail', 'emailVerified']
@@ -35,6 +35,10 @@ describe('i18n namespace map', () => {
       const unknown = Object.keys(messages).filter((key) => !map.has(key))
       expect(unknown, `${locale} has unmapped top-level keys`).toEqual([])
     }
+  })
+
+  it('keeps sidebar chrome namespaces on every authenticated route', () => {
+    expect([...CHROME_I18N_NAMESPACES]).toEqual(['chat', 'auth', 'admin', 'settings'])
   })
 
   it('keeps dotted keys stable: config.savedTasks still lives under the config namespace', () => {

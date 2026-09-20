@@ -15,4 +15,9 @@ export {
   rememberRouteNamespaces,
   type I18nNamespace,
 } from './loader'
-export { I18N_NAMESPACES, WIDGET_I18N_NAMESPACES, NAMESPACE_KEYS } from './namespaces'
+export {
+  I18N_NAMESPACES,
+  WIDGET_I18N_NAMESPACES,
+  CHROME_I18N_NAMESPACES,
+  NAMESPACE_KEYS,
+} from './namespaces'

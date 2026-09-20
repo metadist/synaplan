@@ -18,6 +18,13 @@ export const WIDGET_I18N_NAMESPACES = ['core', 'chat', 'widgets'] as const
 export type WidgetI18nNamespace = (typeof WIDGET_I18N_NAMESPACES)[number]
 
 /**
+ * Sidebar / mobile-nav chrome. Loaded on every non-public route so shell
+ * labels (`iam.incoming.*`, `settings.logout`, guest/auth, recent chats)
+ * never render as raw keys. `core` is already implied by the loader.
+ */
+export const CHROME_I18N_NAMESPACES = ['chat', 'auth', 'admin', 'settings'] as const
+
+/**
  * Top-level message keys owned by each namespace file. Keys never move across
  * files without updating this map and the locale JSON together.
  *
