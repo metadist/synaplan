@@ -59,6 +59,34 @@ Always use `<MainLayout>` with a standard container:
 </template>
 ```
 
+## Iconography (house icon map)
+
+One action ⇒ one glyph, on every surface (U9/U12). The canonical set is
+**Heroicons outline 24**: prefer the `@heroicons/vue/24/outline` components,
+`heroicons:` Iconify strings where a component cannot be used (dynamic `:icon`
+bindings). What the user sees is the glyph — `heroicons:eye` and `EyeIcon` are
+the same glyph and both fine; `mdi:eye-outline` next to either of them is the
+bug. `mdi:` is reserved for glyphs Heroicons lacks — today that is only the
+file-type icons behind `previewIconForName()` (`@/services/filePreview.ts`).
+
+| Action | Glyph |
+| ------ | ----- |
+| Download | `ArrowDownTrayIcon` |
+| Preview / view | `EyeIcon` |
+| Delete | `TrashIcon` (`text-red-400/70 hover:text-red-500`, never the secondary ink) |
+| Open in chat | `ChatBubbleLeftRightIcon` |
+| Upload | `CloudArrowUpIcon` |
+| Search | `MagnifyingGlassIcon` |
+| Close | `XMarkIcon` |
+| Share | `ShareIcon` |
+| Folder / new folder | `FolderIcon` / `FolderPlusIcon` |
+
+File rows never hand-roll buttons: `frontend/src/components/files/FileRowActions.vue`
+owns the glyphs, order (chat → preview → download → delete), density (`p-1.5`,
+`w-4 h-4` icons) and delete styling. Callers pass titles, test IDs and handlers
+only. A new file-row action extends the component, never a second button set.
+Row deletes carry `data-testid="btn-delete"` (E2E deletion journey); keep it stable.
+
 ## i18n (Internationalization)
 
 **Always update ALL five locales, in the matching namespace file.** Strings live in `frontend/src/i18n/locales/{en,de,es,fr,tr}/<namespace>.json`. A missing key silently falls back to English (`fallbackLocale: 'en'`), but only after that English namespace chunk is loaded too.

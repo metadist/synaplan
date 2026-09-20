@@ -106,10 +106,10 @@ you."
 | **U6** | **Arrival signal without a new rail.** Red-dot, badge count, or Account child. History stays a work list, not a notification dump. | Silent grant, or a fourth top-level item |
 | **U7** | **Five questions on the open surface.** Who owns this? Who else? What can they do? How do I stop it? Where did it come from / what will it touch? A sixth primary control means cut scope. | Dialog-only answers that vanish when the dialog closes |
 | **U8** | **Failure copy is product.** One sentence, no stack trace, no HTTP code, named recovery. State what did *not* happen when a write was involved. | "Request failed" / raw API error |
-| **U9** | **House visual rules.** Tokens only (`surface-card`, `txt-primary`, `btn-primary px-4 py-2.5 rounded-lg`). Dark + V2 + 320 px checked. WCAG AA. No ancestor-scoped ink that breaks overlays. | Tailwind palette colours, raw `<button class="btn-primary">` |
+| **U9** | **House visual rules.** Tokens only (`surface-card`, `txt-primary`, `btn-primary px-4 py-2.5 rounded-lg`). Dark + V2 + 320 px checked. WCAG AA. One icon-map glyph per action — the same action never ships two icons. No ancestor-scoped ink that breaks overlays. | Tailwind palette colours, raw `<button class="btn-primary">`, download as tray on one page and arrow on another |
 | **U10** | **Walk the flow before merge.** A reviewer (or the author in the browser) performs the named journey end to end: click, type, find, undo. A screenshot of the happy path is not the gate. | "Looks fine in Storybook" / one render |
 | **U11** | **Flag off hides everything.** No nav child, no badge, no empty teaser, 404 on new routes. | Greyed menu item "coming soon" |
-| **U12** | **Reuse, do not fork.** One Share dialog (after IAM-UX), one Approvals inbox, one gallery-card, one connect card, one chat run/approval card. A new kind passes `kind` + consequence copy, not a new modal. | `AssistantShareModal.vue` beside `ShareDialog.vue` |
+| **U12** | **Reuse, do not fork.** One Share dialog (after IAM-UX), one Approvals inbox, one gallery-card, one connect card, one chat run/approval card, one file-row action set. A new kind passes `kind` + consequence copy, not a new modal. | `AssistantShareModal.vue` beside `ShareDialog.vue`, hand-rolled file-row buttons beside `FileRowActions.vue` |
 
 These sit next to roadmap principle 6 ("explainable to a non-technical
 user") and do not replace it. **U1–U12 are the merge gate for every

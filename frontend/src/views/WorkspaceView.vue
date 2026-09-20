@@ -69,32 +69,13 @@
             data-testid="workspace-files"
           >
             <li v-for="file in files" :key="file.path" class="flex items-center gap-3 py-3">
-              <Icon icon="mdi:file-outline" class="w-5 h-5 txt-secondary shrink-0" />
+              <Icon :icon="previewIconForName(file.path)" class="w-5 h-5 txt-secondary shrink-0" />
               <div class="flex-1 min-w-0">
                 <p class="text-sm txt-primary truncate">{{ file.path }}</p>
                 <p class="text-xs txt-muted">{{ formatSize(file.size) }}</p>
               </div>
               <div class="flex items-center gap-0.5 shrink-0">
-                <button
-                  type="button"
-                  class="icon-ghost inline-flex items-center justify-center w-11 h-11 rounded-lg"
-                  data-testid="btn-workspace-preview"
-                  :title="$t('files.workspace.preview')"
-                  :aria-label="$t('files.workspace.preview')"
-                  @click="onPreview(file)"
-                >
-                  <Icon icon="mdi:eye-outline" class="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  class="icon-ghost inline-flex items-center justify-center w-11 h-11 rounded-lg"
-                  data-testid="btn-workspace-download"
-                  :title="$t('files.workspace.download')"
-                  :aria-label="$t('files.workspace.download')"
-                  @click="onDownload(file)"
-                >
-                  <Icon icon="mdi:download" class="w-5 h-5" />
-                </button>
+                <FileRowActions :actions="rowActions(file)" />
                 <FilePushMenu
                   size="row"
                   source="workspace"
@@ -159,6 +140,8 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import FilesTabs from '@/components/files/FilesTabs.vue'
 import FilePushMenu from '@/components/files/FilePushMenu.vue'
+import FileRowActions, { type FileRowAction } from '@/components/files/FileRowActions.vue'
+import { previewIconForName } from '@/services/filePreview'
 import { useCloudFolderTargets } from '@/composables/useCloudFolderTargets'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
@@ -269,6 +252,23 @@ async function onDownload(file: ComputeWorkspaceFile) {
     notifyError(t('files.workspace.downloadError'))
   }
 }
+
+// Canonical file-row actions, shared with /files via FileRowActions (U9/U12).
+// Test IDs stay stable for the E2E selectors.
+const rowActions = (file: ComputeWorkspaceFile): FileRowAction[] => [
+  {
+    id: 'preview',
+    title: t('files.workspace.preview'),
+    testid: 'btn-workspace-preview',
+    onSelect: () => onPreview(file),
+  },
+  {
+    id: 'download',
+    title: t('files.workspace.download'),
+    testid: 'btn-workspace-download',
+    onSelect: () => onDownload(file),
+  },
+]
 
 // Only the latest preview click may publish its result; an older response
 // arriving later is dropped without creating an object URL.

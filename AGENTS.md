@@ -281,6 +281,15 @@ Every clickable button must use a house utility **and** the standard shape:
 - **Never** a raw `<button>` or `<input type="submit">` without those classes.
 - Match nearby buttons on the same surface — do not invent a one-off size.
 
+### Icons (MANDATORY)
+
+One action ⇒ one glyph, on every surface. The canonical set is Heroicons
+outline 24 and the per-action map lives in `docs/FRONTEND_CONVENTIONS.md`
+(§ Iconography): download is `ArrowDownTrayIcon`, preview is `EyeIcon`,
+delete is `TrashIcon` — never introduce a second glyph for a mapped action.
+`mdi:` is reserved for glyphs Heroicons lacks (file-type icons via
+`previewIconForName()`). File rows use the shared `FileRowActions.vue`.
+
 ### Form controls (MANDATORY)
 
 There is **no global baseline for `input` / `textarea` / `select`** in `style.css`.
@@ -439,6 +448,7 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 - "Request failed" / a raw API error shown to a user; a write action whose copy does not say what did and did not happen
 - A run or stream that can end in a non-terminal state ("running" forever, silently skipped step)
 - A UI PR without the named journey walked in the browser (screenshot ≠ walk)
+- A second glyph for an action already in the icon map (`mdi:download` beside `ArrowDownTrayIcon`)
 - `console.log` debugging left in; `any` types
 
 ## Boundaries

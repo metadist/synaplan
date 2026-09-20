@@ -15,10 +15,7 @@
             class="flex items-start gap-3 p-3 sm:p-4 rounded-xl border border-[var(--brand)]/20 bg-[var(--brand)]/[0.05]"
             data-testid="files-explainer"
           >
-            <Icon
-              icon="mdi:information-outline"
-              class="w-5 h-5 text-[var(--brand)] shrink-0 mt-0.5"
-            />
+            <InformationCircleIcon class="w-5 h-5 text-[var(--brand)] shrink-0 mt-0.5" />
             <p class="text-sm txt-secondary flex-1 min-w-0">{{ $t('files.explainer.text') }}</p>
             <button
               class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors"
@@ -52,7 +49,7 @@
                 <div
                   class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center animate-bounce"
                 >
-                  <Icon icon="mdi:cloud-upload" class="w-8 h-8 text-primary" />
+                  <CloudArrowUpIcon class="w-8 h-8 text-primary" />
                 </div>
                 <div class="text-center">
                   <p class="text-lg font-bold txt-primary mb-0.5">{{ $t('files.dropFiles') }}</p>
@@ -935,37 +932,7 @@
                         :busy="isDescribing(file.id)"
                         @activate="describeAndSort(file)"
                       />
-                      <button
-                        v-if="file.chat_id"
-                        type="button"
-                        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                        :title="$t('files.openInChat')"
-                        :data-testid="`btn-open-in-chat-${file.id}`"
-                        @click="openInChat(file)"
-                      >
-                        <ChatBubbleLeftRightIcon class="w-4 h-4" />
-                      </button>
-                      <button
-                        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
-                        :title="$t('common.view')"
-                        @click="viewFileContent(file.id)"
-                      >
-                        <Icon icon="heroicons:eye" class="w-4 h-4" />
-                      </button>
-                      <button
-                        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
-                        :title="$t('files.download')"
-                        @click="downloadFile(file.id, file.filename)"
-                      >
-                        <ArrowDownTrayIcon class="w-4 h-4" />
-                      </button>
-                      <button
-                        class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                        :title="$t('files.delete')"
-                        @click="deleteFile(file.id)"
-                      >
-                        <TrashIcon class="w-4 h-4" />
-                      </button>
+                      <FileRowActions :actions="rowActions(file)" />
                     </div>
                   </div>
                 </div>
@@ -1081,37 +1048,7 @@
                             :busy="isDescribing(file.id)"
                             @activate="describeAndSort(file)"
                           />
-                          <button
-                            v-if="file.chat_id"
-                            type="button"
-                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                            :title="$t('files.openInChat')"
-                            :data-testid="`btn-open-in-chat-${file.id}`"
-                            @click="openInChat(file)"
-                          >
-                            <ChatBubbleLeftRightIcon class="w-4 h-4" />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                            :title="$t('files.download')"
-                            @click="downloadFile(file.id, file.filename)"
-                          >
-                            <ArrowDownTrayIcon class="w-4 h-4" />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                            :title="$t('common.view')"
-                            @click="viewFileContent(file.id)"
-                          >
-                            <Icon icon="heroicons:eye" class="w-4 h-4" />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                            :title="$t('files.delete')"
-                            @click="deleteFile(file.id)"
-                          >
-                            <TrashIcon class="w-4 h-4" />
-                          </button>
+                          <FileRowActions :actions="rowActions(file)" />
                         </div>
                       </td>
                     </tr>
@@ -1328,40 +1265,7 @@
                       :busy="isDescribing(file.id)"
                       @activate="describeAndSort(file)"
                     />
-                    <button
-                      v-if="file.chat_id"
-                      type="button"
-                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                      :title="$t('files.openInChat')"
-                      :data-testid="`btn-open-in-chat-${file.id}`"
-                      @click="openInChat(file)"
-                    >
-                      <ChatBubbleLeftRightIcon class="w-4 h-4" />
-                    </button>
-                    <button
-                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
-                      :title="$t('common.view')"
-                      data-testid="btn-view"
-                      @click="viewFileContent(file.id)"
-                    >
-                      <Icon icon="heroicons:eye" class="w-4 h-4" />
-                    </button>
-                    <button
-                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
-                      :title="$t('files.download')"
-                      data-testid="btn-download"
-                      @click="downloadFile(file.id, file.filename)"
-                    >
-                      <ArrowDownTrayIcon class="w-4 h-4" />
-                    </button>
-                    <button
-                      class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                      :title="$t('files.delete')"
-                      data-testid="btn-delete"
-                      @click="deleteFile(file.id)"
-                    >
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
+                    <FileRowActions :actions="rowActions(file)" />
                   </div>
                 </div>
               </div>
@@ -1470,40 +1374,7 @@
                           :busy="isDescribing(file.id)"
                           @activate="describeAndSort(file)"
                         />
-                        <button
-                          v-if="file.chat_id"
-                          type="button"
-                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                          :title="$t('files.openInChat')"
-                          :data-testid="`btn-open-in-chat-${file.id}`"
-                          @click="openInChat(file)"
-                        >
-                          <ChatBubbleLeftRightIcon class="w-4 h-4" />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                          :title="$t('files.download')"
-                          data-testid="btn-download"
-                          @click="downloadFile(file.id, file.filename)"
-                        >
-                          <ArrowDownTrayIcon class="w-4 h-4" />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                          :title="$t('common.view')"
-                          data-testid="btn-view"
-                          @click="viewFileContent(file.id)"
-                        >
-                          <Icon icon="heroicons:eye" class="w-4 h-4" />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                          :title="$t('files.delete')"
-                          data-testid="btn-delete"
-                          @click="deleteFile(file.id)"
-                        >
-                          <TrashIcon class="w-4 h-4" />
-                        </button>
+                        <FileRowActions :actions="rowActions(file)" />
                       </div>
                     </td>
                   </tr>
@@ -1671,15 +1542,16 @@ import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
 import FileMakeSearchableButton from '@/components/files/FileMakeSearchableButton.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
+import FileRowActions, { type FileRowAction } from '@/components/files/FileRowActions.vue'
 import { Icon } from '@iconify/vue'
 import {
   ChatBubbleLeftRightIcon,
   CloudArrowUpIcon,
   ShareIcon,
   TrashIcon,
-  ArrowDownTrayIcon,
   XMarkIcon,
   ExclamationTriangleIcon,
+  InformationCircleIcon,
 } from '@heroicons/vue/24/outline'
 import filesService, {
   type FileItem,
@@ -2282,6 +2154,41 @@ const onFolderDrop = async (event: DragEvent, folderName: string) => {
 // Icon set shared with the Generated grid via the common preview helper (#1499)
 // so both surfaces stay consistent (no divergent second icon map).
 const getFileIcon = (filename: string): string => previewIconForName(filename)
+
+// Canonical file-row actions (chat → preview → download → delete), shared by
+// the mobile card and the desktop table via FileRowActions (U9/U12).
+const rowActions = (file: FileItem): FileRowAction[] => {
+  const actions: FileRowAction[] = []
+  if (file.chat_id) {
+    actions.push({
+      id: 'openInChat',
+      title: t('files.openInChat'),
+      testid: `btn-open-in-chat-${file.id}`,
+      onSelect: () => openInChat(file),
+    })
+  }
+  actions.push(
+    {
+      id: 'preview',
+      title: t('common.view'),
+      testid: 'btn-view',
+      onSelect: () => viewFileContent(file.id),
+    },
+    {
+      id: 'download',
+      title: t('files.download'),
+      testid: 'btn-download',
+      onSelect: () => downloadFile(file.id, file.filename),
+    },
+    {
+      id: 'delete',
+      title: t('files.delete'),
+      testid: 'btn-delete',
+      onSelect: () => deleteFile(file.id),
+    }
+  )
+  return actions
+}
 
 const uploadFiles = async () => {
   if (selectedFiles.value.length === 0) {

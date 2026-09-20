@@ -100,7 +100,9 @@ final readonly class VectorSearchService
                 scopes: $scopes,
             );
 
+            $storageStarted = hrtime(true);
             $results = $this->vectorStorage->search($searchQuery);
+            $storageMs = (int) ((hrtime(true) - $storageStarted) / 1_000_000);
             $names = $this->ownerNames($results, $userId);
 
             $mapped = array_map(static function ($result) use ($userId, $names): array {
@@ -124,6 +126,14 @@ final readonly class VectorSearchService
                     'shared' => $shared,
                 ];
             }, $results);
+
+            $this->logger->info('VectorSearchService::semanticSearchByVector completed', [
+                'user_id' => $userId,
+                'storage' => $this->vectorStorage->getProviderName(),
+                'storage_ms' => $storageMs,
+                'storage_limit' => $storageLimit,
+                'hits' => count($mapped),
+            ]);
 
             if (null !== $queryText && '' !== trim($queryText)) {
                 $user = $this->userRepository->find($userId);
@@ -167,6 +177,8 @@ final readonly class VectorSearchService
         float $minScore = 0.3,
         ?array $explicitScopes = null,
     ): array {
+        $searchStarted = hrtime(true);
+
         // 1. Get embedding model from DB
         $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
 
@@ -201,6 +213,7 @@ final readonly class VectorSearchService
             'model' => $modelName,
             'provider' => $provider,
         ]);
+        $embedMs = (int) ((hrtime(true) - $searchStarted) / 1_000_000);
         $queryEmbedding = $embedResult['embedding'];
 
         $user = $this->em->getRepository(User::class)->find($userId);
@@ -221,7 +234,7 @@ final readonly class VectorSearchService
             return [];
         }
 
-        return $this->semanticSearchByVector(
+        $results = $this->semanticSearchByVector(
             $userId,
             $queryEmbedding,
             $groupKey,
@@ -230,6 +243,18 @@ final readonly class VectorSearchService
             $query,
             $explicitScopes,
         );
+
+        $this->logger->info('VectorSearchService: semantic search completed', [
+            'user_id' => $userId,
+            'model_name' => $modelName,
+            'provider' => $provider,
+            'limit' => $limit,
+            'embed_ms' => $embedMs,
+            'total_ms' => (int) ((hrtime(true) - $searchStarted) / 1_000_000),
+            'results' => count($results),
+        ]);
+
+        return $results;
     }
 
     /**
