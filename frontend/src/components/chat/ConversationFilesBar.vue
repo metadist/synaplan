@@ -2,7 +2,7 @@
   <div
     v-if="files.length > 0"
     ref="root"
-    class="relative mx-4 mb-2 inline-block"
+    class="relative mb-2 inline-block"
     data-testid="conversation-files-bar"
     @mouseenter="openPopover"
     @mouseleave="onMouseLeave"
@@ -47,24 +47,39 @@
         <p class="text-xs font-medium txt-primary mb-1">{{ $t('chat.conversationFiles.title') }}</p>
         <p class="text-xs txt-secondary mb-2">{{ $t('chat.conversationFiles.hint') }}</p>
         <div class="flex flex-col gap-1.5 max-h-64 overflow-y-auto" role="list">
-          <button
+          <div
             v-for="file in files"
             :key="file.reference"
-            type="button"
-            class="btn-secondary w-full px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!canAttach || file.id === null"
-            :title="attachTitle(file)"
-            :aria-label="attachTitle(file)"
-            data-testid="conversation-file-chip"
+            class="flex items-center gap-1"
             role="listitem"
-            @click="onAttach(file)"
           >
-            <Icon
-              :icon="fileIcon(file.fileType || file.category)"
-              class="w-3.5 h-3.5 flex-shrink-0"
-            />
-            <span class="truncate">{{ file.name }}</span>
-          </button>
+            <button
+              type="button"
+              class="btn-secondary flex-1 min-w-0 px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="!canAttach || file.id === null"
+              :title="attachTitle(file)"
+              :aria-label="attachTitle(file)"
+              data-testid="conversation-file-chip"
+              @click="onAttach(file)"
+            >
+              <Icon
+                :icon="fileIcon(file.fileType || file.category)"
+                class="w-3.5 h-3.5 flex-shrink-0"
+              />
+              <span class="truncate">{{ file.name }}</span>
+            </button>
+            <button
+              v-if="canDelete && file.id !== null"
+              type="button"
+              class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors shrink-0"
+              :title="$t('chat.conversationFiles.delete', { name: file.name })"
+              :aria-label="$t('chat.conversationFiles.delete', { name: file.name })"
+              data-testid="conversation-file-delete"
+              @click="onDelete(file)"
+            >
+              <TrashIcon class="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -74,6 +89,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import { TrashIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 
 import type { ConversationFileRow } from '@/composables/useConversationFiles'
@@ -81,10 +97,12 @@ import type { ConversationFileRow } from '@/composables/useConversationFiles'
 const props = defineProps<{
   files: ConversationFileRow[]
   canAttach?: boolean
+  canDelete?: boolean
 }>()
 
 const emit = defineEmits<{
   attach: [file: ConversationFileRow]
+  delete: [file: ConversationFileRow]
 }>()
 
 const { t } = useI18n()
@@ -97,6 +115,7 @@ const open = ref(false)
 const pinned = ref(false)
 
 const canAttach = computed(() => props.canAttach !== false)
+const canDelete = computed(() => props.canDelete === true)
 
 const openPopover = () => {
   open.value = true
@@ -131,6 +150,16 @@ const onAttach = (file: ConversationFileRow) => {
     return
   }
   emit('attach', file)
+  closePopover()
+}
+
+// Deletion is destructive and permanent, so the parent owns the confirm dialog
+// and the actual delete call; the bar only forwards the intent and closes.
+const onDelete = (file: ConversationFileRow) => {
+  if (!canDelete.value || file.id === null) {
+    return
+  }
+  emit('delete', file)
   closePopover()
 }
 

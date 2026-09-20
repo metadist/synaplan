@@ -88,7 +88,8 @@
     "details": "Detalles",
     "preview": "Vista previa",
     "openWorkspace": "Abrir espacio de trabajo",
-    "elapsed": "{seconds}s"
+    "elapsed": "{seconds}s",
+    "findInFiles": "Buscar en Archivos → Generados"
   },
   "channels": {
     "title": "Canales",

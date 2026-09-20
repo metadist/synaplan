@@ -99,7 +99,7 @@ describe('FilesGrid kind filter', () => {
 
     expect(listFiles).toHaveBeenCalledTimes(1)
     expect(listFiles).toHaveBeenCalledWith(
-      expect.objectContaining({ source: 'generated', originKind: undefined, page: 1 })
+      expect.objectContaining({ source: 'generated,compute', originKind: undefined, page: 1 })
     )
   })
 
@@ -113,7 +113,7 @@ describe('FilesGrid kind filter', () => {
 
     expect(listFiles).toHaveBeenCalledTimes(1)
     expect(listFiles).toHaveBeenCalledWith(
-      expect.objectContaining({ source: 'generated', originKind: 'document', page: 1 })
+      expect.objectContaining({ source: 'generated,compute', originKind: 'document', page: 1 })
     )
   })
 

@@ -290,6 +290,30 @@ final class CodeRunRunnerTest extends TestCase
         $this->assertSame(['allow' => []], $captured->egress);
     }
 
+    public function testSuccessfulRunSurfacesStdoutAsReply(): void
+    {
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('submitRun')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'succeeded',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 2],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => "2\n", 'stderr' => '']);
+
+        $result = $this->runner($client, $this->createStub(FileRepository::class))->run(
+            new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(2)']),
+            $this->context(),
+        );
+
+        $this->assertTrue($result->isSuccessful());
+        // The script's stdout IS the answer — not a generic "File work finished".
+        $this->assertSame('2', $result->text);
+    }
+
     public function testEgressUnavailableGetsItsOwnSentence(): void
     {
         $client = $this->createMock(ComputeClient::class);

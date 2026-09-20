@@ -175,8 +175,8 @@
     "tabWorkspace": "Workspace",
     "workspace": {
       "title": "Workspace",
-      "subtitle": "Files the AI created for you during file work. They stay here between runs.",
-      "empty": "Files the AI creates for you will show up here.",
+      "subtitle": "The AI's working folder for file work — it reads and writes files here and reuses them across runs. Finished results are saved to Generated.",
+      "empty": "This appears when you ask the AI to keep working on files across runs. One-off results are saved to Generated instead.",
       "emptyAction": "Back to chat",
       "usage": "{used} MB of {quota} MB used",
       "delete": "Delete workspace",
@@ -272,7 +272,7 @@
       "filteredAction": "Clear filters",
       "incomingBody": "Files sent in from Outlook, Nextcloud or OpenCloud appear here for you to review before filing.",
       "incomingAction": "Set up integrations",
-      "generatedBody": "Images, video and audio you create in chat are saved here so you can find and download them again.",
+      "generatedBody": "Results you create in chat — including files produced by code runs — are saved here so you can find and download them later. The AI's working folder is under Workspace.",
       "generatedAction": "Start a chat",
       "groupBody": "This group has no files yet. Add files to make them searchable together.",
       "groupAction": "Add files"
@@ -322,7 +322,7 @@
     },
     "generated": {
       "title": "Generated",
-      "subtitle": "Images, videos, audio, documents and calendar invites created in your chats and tasks.",
+      "subtitle": "Finished results from your chats and tasks — images, audio, documents and files created by code — saved to your knowledge base to search, reuse and download.",
       "kinds": {
         "all": "All",
         "image": "Images",

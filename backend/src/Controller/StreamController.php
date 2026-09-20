@@ -1670,7 +1670,11 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMessageType('WEB');
                     $outgoingMessage->setFile($hasFile);
                     $outgoingMessage->setFilePath($filePath);
-                    $outgoingMessage->setFileType($fileType);
+                    // BFILETYPE is varchar(8): a MIME like "application/json" (from a
+                    // compute artefact descriptor) overflows it and aborts the whole
+                    // turn. Store a safe short token; the SSE 'file' event above still
+                    // carries the raw type for rendering.
+                    $outgoingMessage->setFileType($this->safeMessageFileType($response['metadata']['file'] ?? null));
                     $outgoingMessage->setTopic($classification['topic']);
                     $outgoingMessage->setLanguage($classification['language']);
 
@@ -2816,7 +2820,7 @@ class StreamController extends AbstractController
             $outgoingMessage->setMessageType('WEB');
             $outgoingMessage->setFile(isset($metadata['file']) ? 1 : 0);
             $outgoingMessage->setFilePath($metadata['file']['path'] ?? '');
-            $outgoingMessage->setFileType($metadata['file']['type'] ?? '');
+            $outgoingMessage->setFileType($this->safeMessageFileType($metadata['file'] ?? null));
             $outgoingMessage->setTopic((string) ($classification['topic'] ?? $message->getTopic()));
             $outgoingMessage->setLanguage((string) ($classification['language'] ?? $message->getLanguage()));
             $outgoingMessage->setText($content);
@@ -3509,6 +3513,49 @@ class StreamController extends AbstractController
         }
 
         return $usageExtra;
+    }
+
+    /**
+     * BMESSAGES.BFILETYPE is varchar(8) and semantically a short file-type token
+     * (an extension like "csv"/"json"/"png", or a coarse kind like "audio"/
+     * "document"). A file descriptor may instead carry a MIME — compute artefacts
+     * use the sniffed MIME (e.g. "application/json" = 16 chars) — which overflows
+     * the column and aborts the ENTIRE turn (SQLSTATE 22001 → EntityManager
+     * closed → the OUT reply is never saved and the chat hangs on "processing"
+     * with an "unfinished draft" banner). Derive a value that always fits:
+     * an existing short token as-is, else the file name's extension, else a
+     * coarse kind from the MIME — never longer than the column.
+     *
+     * @param array{path?: string, type?: string, name?: string}|null $file
+     */
+    private function safeMessageFileType(?array $file): string
+    {
+        if (null === $file) {
+            return '';
+        }
+        $type = is_string($file['type'] ?? null) ? strtolower(trim($file['type'])) : '';
+        // Already a short, non-MIME token (e.g. "audio", "document", "csv"): keep it.
+        if ('' !== $type && !str_contains($type, '/') && mb_strlen($type) <= 8) {
+            return $type;
+        }
+        // A MIME (or over-long value): prefer the file name's extension.
+        $name = is_string($file['name'] ?? null) ? $file['name'] : '';
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if ('' !== $ext && mb_strlen($ext) <= 8) {
+            return $ext;
+        }
+        // Fall back to a coarse kind from the MIME prefix (all <= 8 chars).
+        if (str_starts_with($type, 'image/')) {
+            return 'image';
+        }
+        if (str_starts_with($type, 'video/')) {
+            return 'video';
+        }
+        if (str_starts_with($type, 'audio/')) {
+            return 'audio';
+        }
+
+        return 'document';
     }
 
     private function sendSSE(string $status, array $data): void

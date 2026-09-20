@@ -229,8 +229,8 @@
     "tabWorkspace": "Espacio de trabajo",
     "workspace": {
       "title": "Espacio de trabajo",
-      "subtitle": "Archivos que la IA creó para usted en el trabajo con archivos. Permanecen aquí entre ejecuciones.",
-      "empty": "Los archivos que la IA cree para usted aparecerán aquí.",
+      "subtitle": "La carpeta de trabajo de la IA para el trabajo con archivos: aquí lee y escribe archivos y los reutiliza entre ejecuciones. Los resultados finales se guardan en Generados.",
+      "empty": "Aparece cuando pides a la IA que siga trabajando con archivos entre ejecuciones. Los resultados puntuales se guardan en Generados.",
       "emptyAction": "Volver al chat",
       "usage": "{used} MB de {quota} MB usados",
       "delete": "Eliminar espacio de trabajo",
@@ -326,7 +326,7 @@
       "filteredAction": "Quitar filtros",
       "incomingBody": "Los archivos enviados desde Outlook, Nextcloud u OpenCloud aparecen aquí para que los revises antes de archivarlos.",
       "incomingAction": "Configurar integraciones",
-      "generatedBody": "Las imágenes, el vídeo y el audio que creas en el chat se guardan aquí para que puedas encontrarlos y descargarlos de nuevo.",
+      "generatedBody": "Los resultados que creas en el chat, incluidos los archivos generados por código, se guardan aquí para que puedas encontrarlos y descargarlos más tarde. La carpeta de trabajo de la IA está en Espacio de trabajo.",
       "generatedAction": "Iniciar un chat",
       "groupBody": "Este grupo aún no tiene archivos. Añade archivos para hacerlos consultables juntos.",
       "groupAction": "Añadir archivos"
@@ -376,7 +376,7 @@
     },
     "generated": {
       "title": "Generados",
-      "subtitle": "Imágenes, vídeos, audio, documentos e invitaciones de calendario creados en tus chats y tareas.",
+      "subtitle": "Resultados finales de tus chats y tareas: imágenes, audio, documentos y archivos creados por código, guardados en tu base de conocimiento para buscar, reutilizar y descargar.",
       "kinds": {
         "all": "Todos",
         "image": "Imágenes",

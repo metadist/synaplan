@@ -148,7 +148,12 @@
       "hint": "Questions you ask still use these files.",
       "attach": "Use {name} in the next message",
       "attached": "{name} will be sent with your next message",
-      "count": "{count} file | {count} files"
+      "count": "{count} file | {count} files",
+      "delete": "Remove {name}",
+      "deleteConfirmTitle": "Remove file?",
+      "deleteConfirmMessage": "\"{name}\" will be permanently deleted, including its indexed content in your knowledge base. This cannot be undone.",
+      "deleted": "File removed.",
+      "deleteFailed": "The file could not be removed. Nothing was deleted."
     },
     "fileOnlyDefaultMessage": "Please review the attached file.",
     "voiceMessageDefaultMessage": "Please respond to my voice message.",

@@ -79,7 +79,8 @@
     "details": "Details",
     "preview": "Vorschau",
     "openWorkspace": "Arbeitsbereich öffnen",
-    "elapsed": "{seconds}s"
+    "elapsed": "{seconds}s",
+    "findInFiles": "In Dateien → Erzeugt finden"
   },
   "plugins": {
     "title": "Plugins",

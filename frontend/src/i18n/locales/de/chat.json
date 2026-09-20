@@ -143,7 +143,12 @@
       "hint": "Deine nächsten Fragen nutzen weiter diese Dateien.",
       "attach": "{name} in die nächste Nachricht übernehmen",
       "attached": "{name} wird mit der nächsten Nachricht mitgeschickt",
-      "count": "{count} Datei | {count} Dateien"
+      "count": "{count} Datei | {count} Dateien",
+      "delete": "{name} entfernen",
+      "deleteConfirmTitle": "Datei entfernen?",
+      "deleteConfirmMessage": "„{name}“ wird dauerhaft gelöscht, einschließlich der indexierten Inhalte in deiner Wissensbasis. Das kann nicht rückgängig gemacht werden.",
+      "deleted": "Datei entfernt.",
+      "deleteFailed": "Die Datei konnte nicht entfernt werden. Es wurde nichts gelöscht."
     },
     "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
     "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht.",

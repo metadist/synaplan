@@ -326,12 +326,20 @@
           @always-allow="onChatApprovalAlwaysAllow"
         />
       </div>
-      <ConversationFilesBar
+      <!-- Boxed to the composer width (max-w-4xl mx-auto) so the paperclip
+           aligns with the chat box instead of sitting in a full-width stripe. -->
+      <div
         v-if="!needsProviderSetup && conversationFiles.length > 0"
-        :files="conversationFiles"
-        :can-attach="canComposeSharedChat"
-        @attach="attachConversationFile"
-      />
+        class="max-w-4xl mx-auto w-full px-3 md:px-4"
+      >
+        <ConversationFilesBar
+          :files="conversationFiles"
+          :can-attach="canComposeSharedChat"
+          :can-delete="canComposeSharedChat && !isGuestMode"
+          @attach="attachConversationFile"
+          @delete="deleteConversationFile"
+        />
+      </div>
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
@@ -583,6 +591,7 @@ import {
 } from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
@@ -667,7 +676,8 @@ const { goToProviderSetup } = useFirstRunSetup()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
-const { files: conversationFiles } = useConversationFiles()
+const { files: conversationFiles, refresh: refreshConversationFiles } = useConversationFiles()
+const { confirm: confirmDialog } = useDialog()
 
 const attachConversationFile = (file: { id: number | null; name: string; fileType: string }) => {
   if (file.id === null) {
@@ -678,6 +688,33 @@ const attachConversationFile = (file: { id: number | null; name: string; fileTyp
     filename: file.name,
     file_type: file.fileType,
   })
+}
+
+// Remove a file the chat can use, from the "Files in this chat" popover. This is
+// a permanent delete of the file (and its indexed knowledge), so it is gated
+// behind a confirm and reports honestly what did/did not happen (U3/U8).
+const deleteConversationFile = async (file: { id: number | null; name: string }) => {
+  if (file.id === null) {
+    return
+  }
+  const ok = await confirmDialog({
+    title: t('chat.conversationFiles.deleteConfirmTitle'),
+    message: t('chat.conversationFiles.deleteConfirmMessage', { name: file.name }),
+    danger: true,
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+  })
+  if (!ok) {
+    return
+  }
+  try {
+    const { deleteFile } = await import('@/services/filesService')
+    await deleteFile(file.id)
+    showSuccessToast(t('chat.conversationFiles.deleted'))
+    await refreshConversationFiles()
+  } catch {
+    showErrorToast(t('chat.conversationFiles.deleteFailed'))
+  }
 }
 const quoting = useMessageQuoting(chatContainer)
 const autoScroll = ref(true)

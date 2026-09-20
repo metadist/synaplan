@@ -2158,6 +2158,113 @@ class MessageClassifierTest extends TestCase
         return $message;
     }
 
+    /**
+     * Execution demand on attached files must reach the planner even when the
+     * AI sorter votes single-step: running code has no legacy-router
+     * equivalent, so skipping the planner degrades into a chat answer
+     * claiming no interpreter exists.
+     */
+    public function testExecutionDemandWithAttachmentForcesPlanner(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Run Python code on the attached file right now.');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter
+            ->expects($this->once())
+            ->method('classify')
+            ->willReturn([
+                'topic' => 'general',
+                'language' => 'en',
+                'multi_step' => false,
+                'sorting_model_id' => 5,
+                'sorting_provider' => 'ollama',
+                'sorting_model_name' => 'llama3',
+            ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testPlainQuestionWithAttachmentKeepsSorterVote(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('What is in this image?');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter
+            ->expects($this->once())
+            ->method('classify')
+            ->willReturn([
+                'topic' => 'general',
+                'language' => 'en',
+                'multi_step' => false,
+                'sorting_model_id' => 5,
+                'sorting_provider' => 'ollama',
+                'sorting_model_name' => 'llama3',
+            ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testExecutionDemandWithoutAttachmentKeepsSorterVote(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Run Python code: compute the sum of range(10).');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFileType')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter
+            ->method('classify')
+            ->willReturn([
+                'topic' => 'general',
+                'language' => 'en',
+                'multi_step' => false,
+                'sorting_model_id' => 5,
+                'sorting_provider' => 'ollama',
+                'sorting_model_name' => 'llama3',
+            ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
     private function plainMessage(int $id, string $text): Message&MockObject
     {
         $message = $this->createMock(Message::class);

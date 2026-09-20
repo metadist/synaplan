@@ -335,7 +335,11 @@ const load = async (page = currentPage.value) => {
   activePlayerId.value = null
   try {
     const list = await filesService.listFiles({
-      source: 'generated',
+      // Both AI-generated media (source='generated') and file-work results
+      // (source='compute') are things the user *made* in a chat/task, so the
+      // Generated tab surfaces both — otherwise a compute run's output file has
+      // no home and "Find in Files → Generated" lands on an empty list.
+      source: 'generated,compute',
       originKind: kindFilter.value || undefined,
       sort: 'date_desc',
       page,

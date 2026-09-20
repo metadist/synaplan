@@ -148,7 +148,12 @@
       "hint": "Vos prochaines questions utilisent encore ces fichiers.",
       "attach": "Utiliser {name} dans le prochain message",
       "attached": "{name} sera envoyé avec le prochain message",
-      "count": "{count} fichier | {count} fichiers"
+      "count": "{count} fichier | {count} fichiers",
+      "delete": "Retirer {name}",
+      "deleteConfirmTitle": "Retirer le fichier ?",
+      "deleteConfirmMessage": "« {name} » sera définitivement supprimé, y compris son contenu indexé dans votre base de connaissances. Cette action est irréversible.",
+      "deleted": "Fichier retiré.",
+      "deleteFailed": "Le fichier n’a pas pu être retiré. Rien n’a été supprimé."
     },
     "fileOnlyDefaultMessage": "Veuillez examiner le fichier joint.",
     "voiceMessageDefaultMessage": "Veuillez répondre à mon message vocal.",

@@ -72,6 +72,15 @@ const submitRerun = () => {
         {{ $t('compute.preview') }}
       </a>
       <router-link
+        v-if="card.state === 'done'"
+        to="/files/generated"
+        class="inline-flex items-center gap-1 pill text-xs"
+        data-testid="compute-run-generated"
+      >
+        <Icon icon="mdi:folder-outline" class="w-4 h-4" />
+        {{ $t('compute.findInFiles') }}
+      </router-link>
+      <router-link
         v-if="showWorkspace"
         to="/files/workspace"
         class="inline-flex items-center gap-1 pill text-xs"
