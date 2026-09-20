@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ConfigField from '@/components/admin/ConfigField.vue'
+import { i18n } from '@/i18n'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
 
 const booleanSchema: ConfigFieldSchema = {
@@ -63,21 +64,39 @@ describe('ConfigField — boolean pinned by an environment variable', () => {
 })
 
 describe('ConfigField — locale overlay for backend schema copy', () => {
-  it('shows the translated description when a locale key exists', () => {
-    const wrapper = mount(ConfigField, {
+  const mountOverlay = (
+    fieldKey: string,
+    schema: ConfigFieldSchema,
+    value: Partial<ConfigValue> = {}
+  ) =>
+    mount(ConfigField, {
       props: {
-        fieldKey: 'COMPUTE_ENABLED',
-        schema: {
-          tab: 'processing',
-          section: 'compute',
-          type: 'boolean',
-          sensitive: false,
-          description: 'English schema fallback that must not appear.',
-          default: 'false',
-          source: 'database',
-        },
-        value: { value: 'true', isSet: true, isMasked: false },
+        fieldKey,
+        schema,
+        value: { value: 'true', isSet: true, isMasked: false, ...value } as ConfigValue,
       },
+    })
+
+  let previousLocale: string
+
+  beforeEach(() => {
+    previousLocale = String(i18n.global.locale.value)
+    i18n.global.locale.value = 'en'
+  })
+
+  afterEach(() => {
+    i18n.global.locale.value = previousLocale
+  })
+
+  it('shows the translated description when a locale key exists', () => {
+    const wrapper = mountOverlay('COMPUTE_ENABLED', {
+      tab: 'processing',
+      section: 'compute',
+      type: 'boolean',
+      sensitive: false,
+      description: 'English schema fallback that must not appear.',
+      default: 'false',
+      source: 'database',
     })
 
     expect(wrapper.text()).toContain(
@@ -87,28 +106,29 @@ describe('ConfigField — locale overlay for backend schema copy', () => {
   })
 
   it('falls back to the schema description when no locale key exists', () => {
-    const wrapper = mountField()
+    const wrapper = mountOverlay('REGISTRATION_ENABLED', booleanSchema, {
+      value: 'true',
+      isSet: false,
+    })
 
     expect(wrapper.text()).toContain('Allow visitors to create their own account.')
   })
 
   it('translates select option labels when locale keys exist', () => {
-    const wrapper = mount(ConfigField, {
-      props: {
-        fieldKey: 'COMPUTE_REQUIRE_TIER',
-        schema: {
-          tab: 'processing',
-          section: 'compute',
-          type: 'select',
-          sensitive: false,
-          description: 'Minimum isolation',
-          default: 'docker',
-          source: 'database',
-          options: ['docker', 'gvisor', 'microvm'],
-        },
-        value: { value: 'docker', isSet: true, isMasked: false },
+    const wrapper = mountOverlay(
+      'COMPUTE_REQUIRE_TIER',
+      {
+        tab: 'processing',
+        section: 'compute',
+        type: 'select',
+        sensitive: false,
+        description: 'Minimum isolation',
+        default: 'docker',
+        source: 'database',
+        options: ['docker', 'gvisor', 'microvm'],
       },
-    })
+      { value: 'docker' }
+    )
 
     const labels = wrapper.findAll('option').map((opt) => opt.text())
     expect(labels).toEqual([
