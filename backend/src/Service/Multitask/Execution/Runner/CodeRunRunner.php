@@ -91,7 +91,10 @@ final readonly class CodeRunRunner implements TaskRunner
         if (!$this->computeEnabled($userId)) {
             return null;
         }
-        $lines = [];
+        $lines = [
+            '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". params.inputFileIds: ids of the user-selected files, mounted by filename for the script to read.',
+            '  NEVER join statements with semicolons and NEVER emit a one-liner: a compound statement (with/for/if/def/try) after ";" is a syntax error and fails the run. print() the answer (stdout is returned) and write result files to the working directory.',
+        ];
         if ($this->workspacesEnabled($userId)) {
             $lines[] = '  params.useWorkspace: true — keep this run\'s files in the user\'s persistent folder (mounted at /workspace and readable by later runs). Set it when the user wants to continue earlier file work or keep results for later; otherwise omit it.';
         }
@@ -102,7 +105,7 @@ final readonly class CodeRunRunner implements TaskRunner
             );
         }
 
-        return [] === $lines ? null : implode("\n", $lines);
+        return implode("\n", $lines);
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult
