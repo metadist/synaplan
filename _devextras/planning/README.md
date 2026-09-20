@@ -24,6 +24,7 @@ paths were renamed on 2026-09-17.
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/) | Not started |
 | [`20260829-desktop-agent-client/`](./20260829-desktop-agent-client/) | Plan of record for the desktop client |
 | [`20260919-meta-muse/`](./20260919-meta-muse/00_master_plan.md) | Meta Model API (Muse Spark) + per-model thinking levels (§0 unticked, research only) |
+| [`20260920-i18n-split/`](./20260920-i18n-split/00_master_plan.md) | i18n per-locale directories + lazy namespaces (planned 2026-09-20, postponed, not started) |
 
 ## Archive
 
