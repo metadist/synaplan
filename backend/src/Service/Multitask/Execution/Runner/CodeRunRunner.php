@@ -96,7 +96,7 @@ final readonly class CodeRunRunner implements TaskRunner
             return null;
         }
         $lines = [
-            '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". params.inputFileIds: ids of the user-selected files, mounted by filename for the script to read.',
+            '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". Omit params.inputFileIds: this turn\'s attached files are mounted automatically (you never see their numeric ids — never invent any).',
             '  NEVER join statements with semicolons and NEVER emit a one-liner: a compound statement (with/for/if/def/try) after ";" is a syntax error and fails the run. print() the answer (stdout is returned) and write any result files to /out/ (e.g. open("/out/result.csv","w")) — only files under /out are saved and offered for download; the working directory is discarded.',
         ];
         if ($this->workspacesEnabled($userId)) {

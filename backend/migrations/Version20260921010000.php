@@ -39,9 +39,10 @@ final class Version20260921010000 extends AbstractMigration
         .'   "führe das Skript auf dieser Datei aus". The node runs a REAL program on COPIES of'."\n"
         .'   the attached files and returns result files — a scripted watermark stays pixel-exact'."\n"
         .'   while an AI re-render changes the picture. Set `params.script` to the COMPLETE program'."\n"
-        .'   (multi-line, real newlines — never a one-liner, never `;`-joined), `params.image` to'."\n"
-        .'   "python" or "node", and `params.inputFileIds` to the attached files it reads. Only'."\n"
-        .'   files written under `/out/` are kept. Script text ONLY ("show me the code", no'."\n"
+        .'   (multi-line, real newlines — never a one-liner, never `;`-joined) and `params.image` to'."\n"
+        .'   "python" or "node". OMIT `params.inputFileIds`: the runner mounts this turn\'s attached'."\n"
+        .'   files automatically — you are never given their numeric ids, so never invent any.'."\n"
+        .'   Only files written under `/out/` are kept. Script text ONLY ("show me the code", no'."\n"
         .'   run/apply/execute verb) stays a plain `chat` answer.'."\n";
 
     private const MARKER = 'rule 3a wins';

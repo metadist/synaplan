@@ -112,9 +112,10 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    "führe das Skript auf dieser Datei aus". The node runs a REAL program on COPIES of
    the attached files and returns result files — a scripted watermark stays pixel-exact
    while an AI re-render changes the picture. Set `params.script` to the COMPLETE program
-   (multi-line, real newlines — never a one-liner, never `;`-joined), `params.image` to
-   "python" or "node", and `params.inputFileIds` to the attached files it reads. Only
-   files written under `/out/` are kept. Script text ONLY ("show me the code", no
+   (multi-line, real newlines — never a one-liner, never `;`-joined) and `params.image` to
+   "python" or "node". OMIT `params.inputFileIds`: the runner mounts this turn's attached
+   files automatically — you are never given their numeric ids, so never invent any.
+   Only files written under `/out/` are kept. Script text ONLY ("show me the code", no
    run/apply/execute verb) stays a plain `chat` answer.
 4. Video generate → `video_generation`. Put `duration` (4|6|8) and
    `resolution` ("720p"|"1080p"|"4K") in `params` only when the user
