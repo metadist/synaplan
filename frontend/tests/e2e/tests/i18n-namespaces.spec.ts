@@ -1,8 +1,9 @@
+import { request as playwrightRequest } from '@playwright/test'
 import { test, expect, type Page } from '../test-setup'
-import { login, openApp } from '../helpers/auth'
+import { loginViaApi } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
-import { TIMEOUTS } from '../config/config'
+import { TIMEOUTS, URLS } from '../config/config'
 
 const SET = selectors.settings
 
@@ -43,7 +44,6 @@ test.describe('i18n namespace split', () => {
   })
 
   test('@ci Language switch replaces visible Preferences copy', async ({ page }) => {
-    await openApp(page)
     await page.goto('/settings')
     await expect(page.locator(SET.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(SET.page)).toContainText('Preferences')
@@ -59,7 +59,6 @@ test.describe('i18n namespace split', () => {
   })
 
   test('@ci Cold deep-links render complete copy in German', async ({ page }) => {
-    await openApp(page)
     const checks: Array<['de', string, RegExp]> = [
       ['de', '/files', TITLES.de.files],
       ['de', '/memories', TITLES.de.memories],
@@ -75,7 +74,17 @@ test.describe('i18n namespace split', () => {
   })
 
   test('@ci Cold deep-link into Operate uses the admin namespace', async ({ page }) => {
-    await login(page, CREDENTIALS.getAdminCredentials())
+    // Admin-only route. Use API login so this spec does not depend on the
+    // chat composer mounting (UI login waits for input-chat-message).
+    const ctx = await playwrightRequest.newContext({ baseURL: URLS.BASE_URL })
+    try {
+      await loginViaApi(ctx, CREDENTIALS.getAdminCredentials())
+      const state = await ctx.storageState()
+      await page.context().clearCookies()
+      await page.context().addCookies(state.cookies)
+    } finally {
+      await ctx.dispose()
+    }
     await openWithLocale(page, 'fr', '/admin')
     await expect(page).toHaveTitle(TITLES.fr.admin)
     await expect(page.locator('body')).not.toContainText('pageTitles.admin')
