@@ -6,7 +6,7 @@ import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
 import { providerHelpByEnvVar } from '@/utils/providerHelp'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 interface Props {
   fieldKey: string
@@ -61,12 +61,23 @@ const inputType = computed(() => {
  * look like?" is the question an admin actually has. Fields without an example
  * keep the previous behaviour.
  */
+const descriptionKey = computed(() => `admin.config.fields.${props.fieldKey}`)
+
+const description = computed(() =>
+  te(descriptionKey.value) ? t(descriptionKey.value) : props.schema.description
+)
+
 const placeholder = computed(() => {
   if (props.value.isMasked && !isDirty.value && props.value.isSet) {
     return '••••••••'
   }
-  return props.schema.placeholder || props.schema.description
+  return props.schema.placeholder || description.value
 })
+
+function optionLabel(opt: string): string {
+  const key = `admin.config.fieldOptions.${props.fieldKey}.${opt}`
+  return te(key) ? t(key) : opt
+}
 
 // Handle input change
 function handleInput(event: Event) {
@@ -171,7 +182,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
       </span>
     </div>
 
-    <p class="text-xs txt-secondary mb-2">{{ schema.description }}</p>
+    <p class="text-xs txt-secondary mb-2">{{ description }}</p>
 
     <!-- Boolean Toggle -->
     <div v-if="schema.type === 'boolean'" class="flex items-center gap-3">
@@ -220,7 +231,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
         @change="handleInput"
       >
         <option v-for="opt in schema.options" :key="opt" :value="opt">
-          {{ opt }}
+          {{ optionLabel(opt) }}
         </option>
       </select>
       <button

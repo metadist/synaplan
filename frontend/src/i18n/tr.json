@@ -724,6 +724,81 @@
         "resetConfirmMessage": "Tüm kullanıcıların Dropbox bağlantısı kaldırılacak ve her kullanıcının Dropbox hesabını yeniden bağlaması gerekecek. Bu işlem geri alınamaz.",
         "resetDone": "Kaldırılacak Dropbox bağlantısı yok | 1 Dropbox bağlantısı kaldırıldı | {count} Dropbox bağlantısı kaldırıldı",
         "resetFailed": "Sıfırlama başarısız oldu. Lütfen tekrar deneyin."
+      },
+      "tabs": {
+        "ai": "Yapay zeka hizmetleri",
+        "email": "E-posta",
+        "branding": "Marka görünümü",
+        "mobile": "Mobil uygulama",
+        "auth": "Kimlik doğrulama",
+        "channels": "Gelen kanallar",
+        "processing": "İşleme",
+        "features": "Özellikler",
+        "sharing": "Paylaşım",
+        "routing": "Yönlendirme",
+        "interface": "Arayüz",
+        "guest_landing": "Misafir karşılama",
+        "vectordb": "Vektör veritabanı"
+      },
+      "sections": {
+        "tika": "Apache Tika",
+        "docling": "Docling",
+        "rasterize": "PDF rasterleştirici",
+        "whisper": "Whisper (ses)",
+        "brave": "Web araması (Brave)",
+        "media": "Arka planda medya üretimi",
+        "compute": "Dosya çalışması"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "Apache Tika URL’si",
+        "TIKA_TIMEOUT_MS": "İstek zaman aşımı (ms)",
+        "TIKA_RETRIES": "En fazla yeniden deneme",
+        "TIKA_HTTP_USER": "HTTP kimlik doğrulama kullanıcı adı",
+        "TIKA_HTTP_PASS": "HTTP kimlik doğrulama parolası",
+        "DOCLING_BASE_URL": "Docling serve URL’si (boş = kapalı)",
+        "DOCLING_TIMEOUT_MS": "İstek zaman aşımı (ms)",
+        "DOCLING_MAX_BYTES": "En fazla dosya boyutu (bayt)",
+        "RASTERIZE_DPI": "PDF rasterleştirme DPI’sı",
+        "RASTERIZE_PAGE_CAP": "Rasterleştirilecek en fazla sayfa",
+        "RASTERIZE_TIMEOUT_MS": "Rasterleştirme zaman aşımı (ms)",
+        "WHISPER_ENABLED": "Ses transkripsiyonunu aç",
+        "WHISPER_DEFAULT_MODEL": "Varsayılan Whisper modeli",
+        "BRAVE_SEARCH_ENABLED": "Web aramasını aç",
+        "BRAVE_SEARCH_API_KEY": "Brave Search API anahtarı",
+        "BRAVE_SEARCH_COUNT": "Arama başına sonuç",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Sohbetin kilitlenmemesi için görüntü, video ve ses üretimini arka planda çalıştır. Asistan canlı durum gösterir ve bitince bir bildirim verir. Kapalıyken tur, dosya hazır olana kadar bekler. Worker konteyneri gerekir.",
+        "COMPUTE_ENABLED": "Asistan, seçtiğin dosyaların kopyaları üzerinde kısa dosya çalışması (Python veya Node) yapabilir. Compute sidecar’ı gerekir (COMPUTE_URL + COMPUTE_TOKEN). Yerel bir docker compose up bu sidecar’ı başlatır ve bunu açar.",
+        "COMPUTE_REQUIRE_TIER": "Dosya çalışması açılmadan önce sidecar’ın bildirmesi gereken en düşük yalıtım: Standart (düz Docker), Güçlü yalıtım (gVisor) veya Sanal makine (microVM). Synaplan Cloud güçlü yalıtım ister.",
+        "COMPUTE_WORKSPACES_ENABLED": "Asistanın önceki çalışmayı sürdürebilmesi için dosya çalışması koşuları arasında bir klasör tut. Dosyalar → Çalışma alanı içeriği gösterir. Dosya çalışmasının kendisinin de açık olması gerekir.",
+        "COMPUTE_EGRESS_ENABLED": "Bir dosya çalışması koşusu, asistanın adlandırdığı kısa bir genel web sitesi listesinden indirme yapabilir. Varsayılan kapalı — koşular çevrimdışı kalır. Özel veya yerel adresler her zaman reddedilir. Yalnızca sidecar web sitesi erişimi sunuyorsa açılabilir.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Bir koşu web’den indirecekse, günlük dosya çalışması otomatik çalışacak olsa bile önce sahibine sor. Varsayılan açık.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "Bir dosya çalışması koşusunun listeleyebileceği web sitesi sayısı. Varsayılan 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Bir dosya çalışması koşusunun alabileceği varsayılan saniye.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Bir dosya çalışması koşusu için megabayt cinsinden varsayılan bellek tavanı.",
+        "COMPUTE_DEFAULT_CPU": "Bir dosya çalışması koşusu için varsayılan CPU payı.",
+        "COMPUTE_DEFAULT_PIDS": "Bir dosya çalışması koşusu için varsayılan süreç tavanı.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Koşunun oluşturabileceği dosyalar için megabayt cinsinden varsayılan boyut tavanı.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Bir dosya çalışması koşusu için saniye cinsinden sert üst sınır.",
+        "COMPUTE_POLICY_INTERACTIVE": "Sahip oradayken (sohbet veya canlı bir API çağrısı): dosya çalışmasını otomatik çalıştır, önce sor veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
+        "COMPUTE_POLICY_UNATTENDED": "Kayıtlı bir görev dosya çalışmasını kendi başına çalıştırdığında: önce sor (varsayılan), otomatik çalıştır veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Bir dosya çalışması klasörünün temizlik onu kaldırmadan önce kaç gün kullanılmadan durabileceği. Varsayılan 90."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Standart (düz Docker)",
+          "gvisor": "Güçlü yalıtım (gVisor)",
+          "microvm": "Sanal makine (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Otomatik çalıştır",
+          "approve": "Önce sor",
+          "block": "Hiç çalıştırma"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Otomatik çalıştır",
+          "approve": "Önce sor",
+          "block": "Hiç çalıştırma"
+        }
       }
     }
   },
@@ -5727,7 +5802,11 @@
       "label": "WhatsApp kanalı"
     },
     "compute": {
-      "label": "Güvenli dosya çalışması"
+      "label": "Güvenli dosya çalışması",
+      "running": "Dosya çalışması çalışıyor.",
+      "runningOff": "Sidecar çalışıyor; dosya çalışması Sistem yapılandırmasında kapalı.",
+      "unreachable": "Dosya çalışması sidecar’ına ulaşılamıyor.",
+      "unset": "COMPUTE_URL veya COMPUTE_TOKEN ayarlı değil."
     },
     "state": {
       "available": "Kullanılabilir",

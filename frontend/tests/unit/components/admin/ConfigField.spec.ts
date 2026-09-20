@@ -61,3 +61,60 @@ describe('ConfigField — boolean pinned by an environment variable', () => {
     expect(toggle(wrapper).attributes('aria-checked')).toBe('false')
   })
 })
+
+describe('ConfigField — locale overlay for backend schema copy', () => {
+  it('shows the translated description when a locale key exists', () => {
+    const wrapper = mount(ConfigField, {
+      props: {
+        fieldKey: 'COMPUTE_ENABLED',
+        schema: {
+          tab: 'processing',
+          section: 'compute',
+          type: 'boolean',
+          sensitive: false,
+          description: 'English schema fallback that must not appear.',
+          default: 'false',
+          source: 'database',
+        },
+        value: { value: 'true', isSet: true, isMasked: false },
+      },
+    })
+
+    expect(wrapper.text()).toContain(
+      'Let the assistant do short file work (Python or Node) on copies of files you chose.'
+    )
+    expect(wrapper.text()).not.toContain('English schema fallback that must not appear.')
+  })
+
+  it('falls back to the schema description when no locale key exists', () => {
+    const wrapper = mountField()
+
+    expect(wrapper.text()).toContain('Allow visitors to create their own account.')
+  })
+
+  it('translates select option labels when locale keys exist', () => {
+    const wrapper = mount(ConfigField, {
+      props: {
+        fieldKey: 'COMPUTE_REQUIRE_TIER',
+        schema: {
+          tab: 'processing',
+          section: 'compute',
+          type: 'select',
+          sensitive: false,
+          description: 'Minimum isolation',
+          default: 'docker',
+          source: 'database',
+          options: ['docker', 'gvisor', 'microvm'],
+        },
+        value: { value: 'docker', isSet: true, isMasked: false },
+      },
+    })
+
+    const labels = wrapper.findAll('option').map((opt) => opt.text())
+    expect(labels).toEqual([
+      'Standard (plain Docker)',
+      'Strong isolation (gVisor)',
+      'Virtual machine (microVM)',
+    ])
+  })
+})
