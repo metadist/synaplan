@@ -47,9 +47,12 @@ vi.mock('@/utils/pendingAuthRedirect', () => ({
 }))
 
 import PlatformConnectView from '@/views/PlatformConnectView.vue'
-import { loadAllMessages } from '@/i18n/loadAllMessages'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
 
 const en = loadAllMessages('en')
+const platformConnect = en.platformConnect as {
+  errorOfficeNotReady: string
+}
 
 const assign = vi.fn()
 const messageParent = vi.fn()
@@ -93,7 +96,11 @@ async function mountAt(path: string) {
   })
   await router.push(path)
   await router.isReady()
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: messages() } })
+  const i18n = createI18n({
+    legacy: false,
+    locale: 'en',
+    messages: { en: asI18nSchema(messages()) },
+  })
   const wrapper = mount(PlatformConnectView, {
     global: {
       plugins: [router, i18n],
@@ -203,7 +210,7 @@ describe('PlatformConnectView', () => {
     expect(assign).not.toHaveBeenCalled()
     expect(openerPostMessage).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain(en.platformConnect.errorOfficeNotReady)
+    expect(wrapper.text()).toContain(platformConnect.errorOfficeNotReady)
   })
 
   it('never posts the key to window.opener when the relay is rejected and Office is missing', async () => {

@@ -160,7 +160,7 @@ export function getActiveNamespaces(): I18nNamespace[] {
   return [...activeNamespaces]
 }
 
-export function getLoadedPairs(): readonly string[] {
+export function getLoadedPairs(): string[] {
   return [...loadedPairs]
 }
 

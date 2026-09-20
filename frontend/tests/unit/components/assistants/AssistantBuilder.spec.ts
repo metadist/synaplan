@@ -5,7 +5,7 @@ import { createI18n } from 'vue-i18n'
 import AssistantBuilder from '@/components/assistants/AssistantBuilder.vue'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
-import { loadAllMessages } from '@/i18n/loadAllMessages'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
 
 const en = loadAllMessages('en')
 
@@ -94,7 +94,7 @@ function mountBuilder() {
     createdAt: 1,
     updatedAt: 1,
   }
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   const wrapper = mount(AssistantBuilder, {
     global: {
       plugins: [i18n],

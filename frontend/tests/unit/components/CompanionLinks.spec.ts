@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import CompanionLinks from '@/components/CompanionLinks.vue'
-import { loadAllMessages } from '@/i18n/loadAllMessages'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
 
 const en = loadAllMessages('en')
 
 function mountLinks() {
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   return mount(CompanionLinks, {
     global: { plugins: [i18n], stubs: { Icon: true } },
   })

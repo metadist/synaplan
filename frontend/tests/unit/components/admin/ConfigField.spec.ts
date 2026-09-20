@@ -80,7 +80,7 @@ describe('ConfigField — locale overlay for backend schema copy', () => {
   let previousLocale: SupportedLanguage
 
   beforeEach(() => {
-    previousLocale = i18n.global.locale.value
+    previousLocale = i18n.global.locale.value as SupportedLanguage
     i18n.global.locale.value = 'en'
   })
 

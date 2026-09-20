@@ -8,7 +8,7 @@ import type { Feedback } from '@/services/api/userFeedbackApi'
 vi.mock('@/services/api/userFeedbackApi')
 
 // Mock i18n
-vi.mock('@/i18n', () => ({
+vi.mock('@/i18n/instance', () => ({
   i18n: {
     global: {
       t: (key: string) => key,

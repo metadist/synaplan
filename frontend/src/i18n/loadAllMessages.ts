@@ -15,6 +15,14 @@ export function loadAllMessages(locale: string): Record<string, unknown> {
   return merged
 }
 
+/**
+ * Vue-i18n's `messages` generic walks the whole tree. The split catalog is a
+ * JSON object, not that schema — cast at the createI18n boundary only.
+ */
+export function asI18nSchema(catalog: Record<string, unknown>): never {
+  return catalog as never
+}
+
 export function loadAllLocaleMessages(): Record<SupportedLanguage, Record<string, unknown>> {
   return {
     de: loadAllMessages('de'),

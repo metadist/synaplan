@@ -26,7 +26,7 @@ vi.mock('@/services/api/httpClient', () => ({
 }))
 
 import PlatformConnectView from '@/views/PlatformConnectView.vue'
-import { loadAllMessages } from '@/i18n/loadAllMessages'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
 
 const en = loadAllMessages('en')
 
@@ -64,7 +64,7 @@ describe('addin/connect redirect', () => {
     const i18n = createI18n({
       legacy: false,
       locale: 'en',
-      messages: { en: { platformConnect: en.platformConnect } },
+      messages: { en: asI18nSchema({ platformConnect: en.platformConnect }) },
     })
     mount({ template: '<router-view />' }, { global: { plugins: [router, i18n] } })
     await flushPromises()

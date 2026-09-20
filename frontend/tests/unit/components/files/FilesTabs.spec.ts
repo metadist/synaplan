@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import FilesTabs from '@/components/files/FilesTabs.vue'
-import { loadAllMessages } from '@/i18n/loadAllMessages'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
 
 const en = loadAllMessages('en')
 
@@ -25,7 +25,7 @@ function mountTabs() {
   const i18n = createI18n({
     legacy: false,
     locale: 'en',
-    messages: { en },
+    messages: { en: asI18nSchema(en) },
   })
   const router = createRouter({
     history: createMemoryHistory(),
