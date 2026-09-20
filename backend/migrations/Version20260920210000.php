@@ -27,7 +27,7 @@ final class Version20260920210000 extends AbstractMigration
         .'     ("save it to my Nextcloud", "lege es in meinen Nextcloud-Account")';
 
     private const BULLET = "\n"
-       .'   - Running code or a script on the user\'s files (file work)'."\n"
+        .'   - Running code or a script on the user\'s files (file work)'."\n"
         .'     ("run python on this file and tell me ...", "compute the totals with code",'."\n"
         .'     "führe das Skript auf dieser Datei aus")';
 

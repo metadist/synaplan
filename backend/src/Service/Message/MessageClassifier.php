@@ -578,6 +578,19 @@ final readonly class MessageClassifier
             $classification['multi_step'] = true;
         }
 
+        // File work has no legacy-router equivalent: skipping the planner
+        // degrades execution demands into a chat answer claiming no
+        // interpreter exists. The sorter prompt asks for BMULTI=1 here, but
+        // votes wobble — force the planner on deterministically when files
+        // are attached and the text explicitly demands execution.
+        if ($this->messageRequestsCodeExecution($message, $text)) {
+            $this->logger->info('MessageClassifier: forcing planner for file-work execution demand', [
+                'message_id' => $messageId,
+            ]);
+
+            $classification['multi_step'] = true;
+        }
+
         // Pass through duration if detected (for video generation)
         $duration = $result['duration'] ?? null;
         if (null !== $duration) {
@@ -1128,6 +1141,33 @@ final readonly class MessageClassifier
      * addition to concrete extensions, and falls back to the legacy single-file
      * columns for channel messages without File entities.
      */
+    /**
+     * Explicit execution demand on attached files ("run python on ...",
+     * "using Python, compute ...").
+     *
+     * Deliberately narrow on the trigger words but order-independent: it fires
+     * only when a file is attached AND the message names a programming runtime
+     * (python/node/script/code) AND an action verb, in either order. An
+     * attachment alone (describe this image) or bare computation words
+     * ("calculate 15%") must NOT force planning. Forcing the planner only skips
+     * the single-step shortcut — the planner still picks code_run vs
+     * file_analysis — so over-firing costs one planner call, never a wrong answer.
+     */
+    private function messageRequestsCodeExecution(Message $message, string $text): bool
+    {
+        if ($message->getFile() <= 0 && $message->getFiles()->count() <= 0) {
+            return false;
+        }
+
+        $namesRuntime = 1 === preg_match('/\b(python|node\.?js|node|javascript|script|code|program)\b/i', $text);
+        if (!$namesRuntime) {
+            return false;
+        }
+
+        return 1 === preg_match('/\b(run|execute|compute|calculate|count|sum|total|process|parse|analy[sz]e|read|extract)\b/i', $text)
+            || 1 === preg_match('/\b(führe|ausführen|ausfuehren|berechne|zähle|zaehle|verarbeite|lies|analysiere)\b/iu', $text);
+    }
+
     private function messageHasImageAttachment(Message $message): bool
     {
         foreach ($message->getFiles() as $file) {

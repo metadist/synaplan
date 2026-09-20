@@ -46,6 +46,8 @@ final readonly class CodeRunRunner implements TaskRunner
     private const SCRIPT_PYTHON = '_synaplan_main.py';
     private const SCRIPT_NODE = '_synaplan_main.js';
     private const SIDECAR_CONCURRENT_CEILING = 8;
+    /** Max stdout characters surfaced in the chat reply (chatty scripts are clipped). */
+    private const STDOUT_REPLY_CAP = 4000;
 
     public function __construct(
         private ComputeConfig $computeConfig,
@@ -93,7 +95,7 @@ final readonly class CodeRunRunner implements TaskRunner
         }
         $lines = [
             '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". params.inputFileIds: ids of the user-selected files, mounted by filename for the script to read.',
-            '  NEVER join statements with semicolons and NEVER emit a one-liner: a compound statement (with/for/if/def/try) after ";" is a syntax error and fails the run. print() the answer (stdout is returned) and write result files to the working directory.',
+            '  NEVER join statements with semicolons and NEVER emit a one-liner: a compound statement (with/for/if/def/try) after ";" is a syntax error and fails the run. print() the answer (stdout is returned) and write any result files to /out/ (e.g. open("/out/result.csv","w")) — only files under /out are saved and offered for download; the working directory is discarded.',
         ];
         if ($this->workspacesEnabled($userId)) {
             $lines[] = '  params.useWorkspace: true — keep this run\'s files in the user\'s persistent folder (mounted at /workspace and readable by later runs). Set it when the user wants to continue earlier file work or keep results for later; otherwise omit it.';
@@ -134,6 +136,20 @@ final readonly class CodeRunRunner implements TaskRunner
         foreach ($node->params['inputFileIds'] ?? [] as $id) {
             if (is_numeric($id)) {
                 $inputIds[] = (int) $id;
+            }
+        }
+
+        // The planner references attachments as `$message.files` and cannot know
+        // their numeric ids, so an interactive "run code on the attached file"
+        // turn arrives with no inputFileIds — the script then can't find the
+        // file (FileNotFoundError). Fall back to the message's own attachments
+        // so the user-selected files are mounted into the sandbox by name.
+        if ([] === $inputIds) {
+            foreach ($context->message->getFiles() as $file) {
+                $fileId = $file->getId();
+                if (null !== $fileId) {
+                    $inputIds[] = (int) $fileId;
+                }
             }
         }
 
@@ -552,8 +568,26 @@ final readonly class CodeRunRunner implements TaskRunner
             ];
         }
 
+        // The script's stdout is the answer the user asked for ("tell me the
+        // number of rows" → "3"). Surface it as the reply text — without it the
+        // run succeeds but the user only sees "File work finished" and never the
+        // result. Capped so a chatty script cannot flood the chat bubble.
+        $stdout = trim((string) $result['stdout']);
+        if ('' !== $stdout) {
+            if (mb_strlen($stdout) > self::STDOUT_REPLY_CAP) {
+                $stdout = mb_substr($stdout, 0, self::STDOUT_REPLY_CAP)."\n…";
+            }
+            $text = [] === $descriptors
+                ? $stdout
+                : $stdout."\n\n".'Saved '.count($descriptors).' file(s).';
+        } else {
+            $text = [] === $descriptors
+                ? 'File work finished. No new files were saved.'
+                : 'File work finished.';
+        }
+
         return NodeResult::ok(
-            [] === $descriptors ? 'File work finished. No new files were saved.' : 'File work finished.',
+            $text,
             $descriptors,
             [
                 'compute_run_id' => $result['compute_run_id'],
