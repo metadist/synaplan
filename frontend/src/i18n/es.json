@@ -724,6 +724,81 @@
         "resetConfirmMessage": "Se eliminará la conexión de Dropbox de todos los usuarios y cada uno tendrá que volver a conectar su cuenta de Dropbox. Esto no se puede deshacer.",
         "resetDone": "No hay conexiones de Dropbox que eliminar | 1 conexión de Dropbox eliminada | {count} conexiones de Dropbox eliminadas",
         "resetFailed": "El restablecimiento ha fallado. Inténtalo de nuevo."
+      },
+      "tabs": {
+        "ai": "Servicios de IA",
+        "email": "Correo",
+        "branding": "Identidad visual",
+        "mobile": "App móvil",
+        "auth": "Autenticación",
+        "channels": "Canales de entrada",
+        "processing": "Procesamiento",
+        "features": "Funciones",
+        "sharing": "Uso compartido",
+        "routing": "Enrutado",
+        "interface": "Interfaz",
+        "guest_landing": "Página de invitados",
+        "vectordb": "Base vectorial"
+      },
+      "sections": {
+        "tika": "Apache Tika",
+        "docling": "Docling",
+        "rasterize": "Rasterizador PDF",
+        "whisper": "Whisper (audio)",
+        "brave": "Búsqueda web (Brave)",
+        "media": "Generación de medios en segundo plano",
+        "compute": "Trabajo con archivos"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "URL de Apache Tika",
+        "TIKA_TIMEOUT_MS": "Tiempo de espera de la petición (ms)",
+        "TIKA_RETRIES": "Reintentos máximos",
+        "TIKA_HTTP_USER": "Usuario de autenticación HTTP",
+        "TIKA_HTTP_PASS": "Contraseña de autenticación HTTP",
+        "DOCLING_BASE_URL": "URL de Docling serve (vacío = desactivado)",
+        "DOCLING_TIMEOUT_MS": "Tiempo de espera de la petición (ms)",
+        "DOCLING_MAX_BYTES": "Tamaño máximo de archivo (bytes)",
+        "RASTERIZE_DPI": "DPI de rasterización PDF",
+        "RASTERIZE_PAGE_CAP": "Máximo de páginas a rasterizar",
+        "RASTERIZE_TIMEOUT_MS": "Tiempo de espera de rasterización (ms)",
+        "WHISPER_ENABLED": "Activar transcripción de audio",
+        "WHISPER_DEFAULT_MODEL": "Modelo Whisper predeterminado",
+        "BRAVE_SEARCH_ENABLED": "Activar búsqueda web",
+        "BRAVE_SEARCH_API_KEY": "Clave API de Brave Search",
+        "BRAVE_SEARCH_COUNT": "Resultados por búsqueda",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Genera imágenes, vídeo y audio en segundo plano para que el chat no se bloquee. El asistente muestra el estado en directo y un aviso cuando termina. Si está desactivado, el turno espera a que el archivo esté listo. Necesita el contenedor worker.",
+        "COMPUTE_ENABLED": "El asistente puede hacer trabajo corto con archivos (Python o Node) sobre copias de los archivos que elijas. Necesita el sidecar de cómputo (COMPUTE_URL + COMPUTE_TOKEN). Un docker compose up local arranca ese sidecar y activa esto.",
+        "COMPUTE_REQUIRE_TIER": "Aislamiento mínimo que el sidecar debe informar antes de activar el trabajo con archivos: Estándar (Docker normal), Aislamiento fuerte (gVisor) o Máquina virtual (microVM). Synaplan Cloud exige aislamiento fuerte.",
+        "COMPUTE_WORKSPACES_ENABLED": "Conserva una carpeta entre ejecuciones para que el asistente pueda continuar un trabajo anterior. Archivos → Espacio de trabajo muestra el contenido. El trabajo con archivos también debe estar activado.",
+        "COMPUTE_EGRESS_ENABLED": "Una ejecución puede descargar de una lista corta de sitios web públicos que el asistente haya nombrado. Desactivado por defecto: las ejecuciones permanecen sin red. Las direcciones privadas o locales se rechazan siempre. Solo se puede activar si el sidecar ofrece acceso a sitios web.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Cuando una ejecución vaya a descargar de la web, pregunta primero a la persona propietaria aunque el trabajo cotidiano con archivos se ejecutara automáticamente. Activado por defecto.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "Cuántos sitios web puede listar una ejecución. Predeterminado: 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Segundos predeterminados que puede durar una ejecución.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Límite de memoria predeterminado en megabytes para una ejecución.",
+        "COMPUTE_DEFAULT_CPU": "Cuota de CPU predeterminada para una ejecución.",
+        "COMPUTE_DEFAULT_PIDS": "Límite de procesos predeterminado para una ejecución.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Límite de tamaño predeterminado en megabytes para los archivos que la ejecución puede crear.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Tope duro en segundos para una ejecución.",
+        "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un asistente no puede relajar esto.",
+        "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un asistente no puede relajar esto.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Cuántos días puede permanecer sin uso una carpeta de trabajo con archivos antes de que la limpieza la elimine. Predeterminado: 90."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Estándar (Docker normal)",
+          "gvisor": "Aislamiento fuerte (gVisor)",
+          "microvm": "Máquina virtual (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Ejecutar automáticamente",
+          "approve": "Preguntar primero",
+          "block": "No ejecutar nunca"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Ejecutar automáticamente",
+          "approve": "Preguntar primero",
+          "block": "No ejecutar nunca"
+        }
       }
     }
   },
@@ -5726,7 +5801,11 @@
       "label": "Canal de WhatsApp"
     },
     "compute": {
-      "label": "Cómputo seguro (trabajo con archivos)"
+      "label": "Cómputo seguro (trabajo con archivos)",
+      "running": "El trabajo con archivos está en marcha.",
+      "runningOff": "El sidecar está en marcha; el trabajo con archivos está desactivado en la configuración del sistema.",
+      "unreachable": "El sidecar de trabajo con archivos no es accesible.",
+      "unset": "COMPUTE_URL o COMPUTE_TOKEN no está definido."
     },
     "state": {
       "available": "Disponible",

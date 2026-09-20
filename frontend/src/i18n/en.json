@@ -735,6 +735,81 @@
         "resetConfirmMessage": "Every user's Dropbox connection will be removed, and each user has to connect their Dropbox account again. This cannot be undone.",
         "resetDone": "No Dropbox connections to remove | 1 Dropbox connection removed | {count} Dropbox connections removed",
         "resetFailed": "The reset failed. Please try again."
+      },
+      "tabs": {
+        "ai": "AI Services",
+        "email": "Email",
+        "branding": "Branding",
+        "mobile": "Mobile App",
+        "auth": "Authentication",
+        "channels": "Inbound Channels",
+        "processing": "Processing",
+        "features": "Features",
+        "sharing": "Sharing",
+        "routing": "Routing",
+        "interface": "Interface",
+        "guest_landing": "Guest Landing",
+        "vectordb": "Vector DB"
+      },
+      "sections": {
+        "tika": "Apache Tika",
+        "docling": "Docling",
+        "rasterize": "PDF rasterizer",
+        "whisper": "Whisper (audio)",
+        "brave": "Web search (Brave)",
+        "media": "Background media generation",
+        "compute": "File work"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "Apache Tika URL",
+        "TIKA_TIMEOUT_MS": "Request timeout (ms)",
+        "TIKA_RETRIES": "Max retries",
+        "TIKA_HTTP_USER": "HTTP auth username",
+        "TIKA_HTTP_PASS": "HTTP auth password",
+        "DOCLING_BASE_URL": "Docling serve URL (empty = off)",
+        "DOCLING_TIMEOUT_MS": "Request timeout (ms)",
+        "DOCLING_MAX_BYTES": "Max file size (bytes)",
+        "RASTERIZE_DPI": "PDF rasterization DPI",
+        "RASTERIZE_PAGE_CAP": "Max pages to rasterize",
+        "RASTERIZE_TIMEOUT_MS": "Rasterization timeout (ms)",
+        "WHISPER_ENABLED": "Enable audio transcription",
+        "WHISPER_DEFAULT_MODEL": "Default Whisper model",
+        "BRAVE_SEARCH_ENABLED": "Enable web search",
+        "BRAVE_SEARCH_API_KEY": "Brave Search API key",
+        "BRAVE_SEARCH_COUNT": "Results per search",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Run image, video and audio generation in the background so chat is never blocked. The assistant shows a live status and a toast when it finishes. When off, the turn waits until the file is ready. Needs the worker container.",
+        "COMPUTE_ENABLED": "Let the assistant do short file work (Python or Node) on copies of files you chose. Needs the compute sidecar (COMPUTE_URL + COMPUTE_TOKEN). A local docker compose up starts that sidecar and turns this on.",
+        "COMPUTE_REQUIRE_TIER": "Minimum isolation the sidecar must report before file work turns on: Standard (plain Docker), Strong isolation (gVisor), or Virtual machine (microVM). Synaplan Cloud requires Strong isolation.",
+        "COMPUTE_WORKSPACES_ENABLED": "Keep a folder between file-work runs so the assistant can continue earlier work. Files → Workspace shows what is in it. Also needs file work itself to be on.",
+        "COMPUTE_EGRESS_ENABLED": "Let a file-work run fetch from a short list of public websites the assistant named. Off by default — runs stay offline. Private or local addresses are always refused. Can only be switched on when the sidecar offers website access.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "When a run will fetch from the web, ask the owner first even if everyday file work would run automatically. On by default.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "How many websites one file-work run may list. Default 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Default seconds a file-work run may take.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Default memory cap in megabytes for a file-work run.",
+        "COMPUTE_DEFAULT_CPU": "Default CPU share for a file-work run.",
+        "COMPUTE_DEFAULT_PIDS": "Default process cap for a file-work run.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Default size cap in megabytes for files the run may create.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Hard ceiling in seconds for a file-work run.",
+        "COMPUTE_POLICY_INTERACTIVE": "When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An assistant cannot loosen this.",
+        "COMPUTE_POLICY_UNATTENDED": "When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An assistant cannot loosen this.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "How many days a file-work folder may sit unused before cleanup can remove it. Default 90."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Standard (plain Docker)",
+          "gvisor": "Strong isolation (gVisor)",
+          "microvm": "Virtual machine (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Run automatically",
+          "approve": "Ask first",
+          "block": "Never run"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Run automatically",
+          "approve": "Ask first",
+          "block": "Never run"
+        }
       }
     }
   },
@@ -6712,7 +6787,11 @@
       "label": "WhatsApp channel"
     },
     "compute": {
-      "label": "Secure compute (file work)"
+      "label": "Secure compute (file work)",
+      "running": "File work is running.",
+      "runningOff": "The sidecar is running; file work is turned off in System configuration.",
+      "unreachable": "The file-work sidecar is not reachable.",
+      "unset": "COMPUTE_URL or COMPUTE_TOKEN is not set."
     },
     "state": {
       "available": "Available",

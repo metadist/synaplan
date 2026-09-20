@@ -26,7 +26,7 @@ import {
   type ConfigValue,
 } from '@/services/api/adminConfigApi'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -75,11 +75,15 @@ const tabIcons: Record<string, string> = {
 }
 
 // Computed
+function tabLabel(id: string, fallback: string): string {
+  return te(`admin.config.tabs.${id}`) ? t(`admin.config.tabs.${id}`) : fallback
+}
+
 const tabs = computed(() => {
   if (!schema.value) return []
   return Object.entries(schema.value.tabs).map(([id, tab]) => ({
     id,
-    label: tab.label,
+    label: tabLabel(id, tab.label),
     icon: tabIcons[id] || 'mdi:cog',
   }))
 })
@@ -216,6 +220,11 @@ const currentTab = computed(() => {
   return schema.value.tabs[activeTab.value]
 })
 
+const currentTabLabel = computed(() => {
+  if (!currentTab.value) return ''
+  return tabLabel(activeTab.value, currentTab.value.label)
+})
+
 const currentSections = computed(() => {
   if (!currentTab.value || !schema.value) return []
   const hiddenModeFields = isDark.value ? LIGHT_MODE_BRANDING_FIELDS : DARK_MODE_BRANDING_FIELDS
@@ -237,7 +246,7 @@ const currentSections = computed(() => {
     const isLive = allFields.some((f) => f.schema?.source === 'database')
     return {
       id,
-      label: section.label,
+      label: te(`admin.config.sections.${id}`) ? t(`admin.config.sections.${id}`) : section.label,
       fields,
       managedFields,
       allManaged: managedFields.length > 0 && fields.length === 0,
@@ -520,7 +529,7 @@ onBeforeUnmount(() => {
               >
                 <span class="flex items-center gap-2 txt-primary font-medium min-w-0">
                   <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-5 h-5 flex-shrink-0" />
-                  <span class="truncate">{{ currentTab?.label }}</span>
+                  <span class="truncate">{{ currentTabLabel }}</span>
                 </span>
                 <Icon
                   icon="heroicons:chevron-down"
@@ -583,7 +592,7 @@ onBeforeUnmount(() => {
           <div class="flex items-center justify-between gap-2">
             <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
               <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-6 h-6 text-[var(--brand)]" />
-              {{ currentTab?.label }}
+              {{ currentTabLabel }}
             </h2>
             <button
               v-if="canTestCurrentTab"

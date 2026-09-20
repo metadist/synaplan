@@ -730,6 +730,81 @@
         "resetConfirmMessage": "Die Dropbox-Verbindung aller Benutzer wird entfernt, und jeder Benutzer muss sein Dropbox-Konto neu verbinden. Das kann nicht rückgängig gemacht werden.",
         "resetDone": "Keine Dropbox-Verbindungen zu entfernen | 1 Dropbox-Verbindung entfernt | {count} Dropbox-Verbindungen entfernt",
         "resetFailed": "Das Zurücksetzen ist fehlgeschlagen. Bitte erneut versuchen."
+      },
+      "tabs": {
+        "ai": "KI-Dienste",
+        "email": "E-Mail",
+        "branding": "Erscheinungsbild",
+        "mobile": "Mobile App",
+        "auth": "Anmeldung",
+        "channels": "Eingangskanäle",
+        "processing": "Verarbeitung",
+        "features": "Funktionen",
+        "sharing": "Teilen",
+        "routing": "Routing",
+        "interface": "Oberfläche",
+        "guest_landing": "Gäste-Startseite",
+        "vectordb": "Vektordatenbank"
+      },
+      "sections": {
+        "tika": "Apache Tika",
+        "docling": "Docling",
+        "rasterize": "PDF-Rasterizer",
+        "whisper": "Whisper (Audio)",
+        "brave": "Websuche (Brave)",
+        "media": "Medien im Hintergrund",
+        "compute": "Dateiarbeit"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "Apache-Tika-URL",
+        "TIKA_TIMEOUT_MS": "Zeitlimit der Anfrage (ms)",
+        "TIKA_RETRIES": "Maximale Wiederholungen",
+        "TIKA_HTTP_USER": "HTTP-Benutzername",
+        "TIKA_HTTP_PASS": "HTTP-Passwort",
+        "DOCLING_BASE_URL": "Docling-Serve-URL (leer = aus)",
+        "DOCLING_TIMEOUT_MS": "Zeitlimit der Anfrage (ms)",
+        "DOCLING_MAX_BYTES": "Maximale Dateigröße (Bytes)",
+        "RASTERIZE_DPI": "DPI für die PDF-Umwandlung in Bilder",
+        "RASTERIZE_PAGE_CAP": "Maximale Seitenzahl für die Umwandlung",
+        "RASTERIZE_TIMEOUT_MS": "Zeitlimit der Umwandlung (ms)",
+        "WHISPER_ENABLED": "Audio-Transkription einschalten",
+        "WHISPER_DEFAULT_MODEL": "Standard-Whisper-Modell",
+        "BRAVE_SEARCH_ENABLED": "Websuche einschalten",
+        "BRAVE_SEARCH_API_KEY": "Brave-Search-API-Schlüssel",
+        "BRAVE_SEARCH_COUNT": "Treffer pro Suche",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Bilder, Videos und Audio im Hintergrund erzeugen, damit der Chat nicht blockiert. Der Assistent zeigt den Status live und eine Meldung, wenn es fertig ist. Aus: die Antwort wartet, bis die Datei da ist. Braucht den Worker-Container.",
+        "COMPUTE_ENABLED": "Der Assistent darf kurze Dateiarbeit (Python oder Node) auf Kopien der von dir gewählten Dateien machen. Braucht den Compute-Sidecar (COMPUTE_URL + COMPUTE_TOKEN). Ein lokales docker compose up startet den Sidecar und schaltet das ein.",
+        "COMPUTE_REQUIRE_TIER": "Mindest-Isolierung, die der Sidecar melden muss, bevor Dateiarbeit an geht: Standard (normales Docker), Starke Isolierung (gVisor) oder Virtuelle Maschine (microVM). Synaplan Cloud verlangt starke Isolierung.",
+        "COMPUTE_WORKSPACES_ENABLED": "Einen Ordner zwischen den Läufen behalten, damit der Assistent frühere Dateiarbeit fortsetzen kann. Dateien → Arbeitsbereich zeigt den Inhalt. Dateiarbeit selbst muss ebenfalls an sein.",
+        "COMPUTE_EGRESS_ENABLED": "Ein Dateiarbeits-Lauf darf eine kurze Liste öffentlicher Websites holen, die der Assistent genannt hat. Standardmäßig aus — Läufe bleiben offline. Private oder lokale Adressen werden immer abgelehnt. Nur einschaltbar, wenn der Sidecar Website-Zugriff anbietet.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Wenn ein Lauf ins Web geht, zuerst die Besitzerin oder den Besitzer fragen — auch wenn alltägliche Dateiarbeit sonst automatisch liefe. Standardmäßig an.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "Wie viele Websites ein Dateiarbeits-Lauf nennen darf. Standard 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Standard-Sekunden, die ein Dateiarbeits-Lauf dauern darf.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Standard-Speicherlimit in Megabyte für einen Dateiarbeits-Lauf.",
+        "COMPUTE_DEFAULT_CPU": "Standard-CPU-Anteil für einen Dateiarbeits-Lauf.",
+        "COMPUTE_DEFAULT_PIDS": "Standard-Prozesslimit für einen Dateiarbeits-Lauf.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Standard-Größenlimit in Megabyte für Dateien, die der Lauf anlegen darf.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Harte Obergrenze in Sekunden für einen Dateiarbeits-Lauf.",
+        "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
+        "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Standard (normales Docker)",
+          "gvisor": "Starke Isolierung (gVisor)",
+          "microvm": "Virtuelle Maschine (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Automatisch ausführen",
+          "approve": "Zuerst fragen",
+          "block": "Nie ausführen"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Automatisch ausführen",
+          "approve": "Zuerst fragen",
+          "block": "Nie ausführen"
+        }
       }
     }
   },
@@ -3960,10 +4035,10 @@
         "capacity": "Kapazität",
         "runningOf": "{running} von {max} aktiv",
         "queued": "{count} wartend",
-        "images": "Images",
+        "images": "Abbilder",
         "runs24": "{count} Läufe (24h)",
         "failed24": "{count} fehlgeschlagen (24h)",
-        "openConfig": "Compute-Einstellungen",
+        "openConfig": "Dateiarbeit-Einstellungen",
         "stateTierBlocked": "Eingeschaltet, aber unter der erforderlichen Isolierung. Dateiarbeit bleibt verborgen."
       }
     },
@@ -6646,7 +6721,11 @@
       "label": "WhatsApp-Kanal"
     },
     "compute": {
-      "label": "Sichere Dateiarbeit"
+      "label": "Sichere Dateiarbeit",
+      "running": "Dateiarbeit läuft.",
+      "runningOff": "Der Sidecar läuft; Dateiarbeit ist in der Systemkonfiguration ausgeschaltet.",
+      "unreachable": "Der Dateiarbeits-Sidecar ist nicht erreichbar.",
+      "unset": "COMPUTE_URL oder COMPUTE_TOKEN ist nicht gesetzt."
     },
     "state": {
       "available": "Verfügbar",

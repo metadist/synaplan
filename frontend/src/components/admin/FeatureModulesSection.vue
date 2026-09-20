@@ -31,6 +31,21 @@ const configuredCount = computed(() => props.modules.filter((m) => m.configured)
 const label = (module: FeatureModule): string =>
   te(module.label_key) ? t(module.label_key) : module.id
 
+const message = (module: FeatureModule): string => {
+  if (module.id !== 'compute') {
+    return module.message
+  }
+  const key =
+    module.state === 'absent'
+      ? 'modules.compute.unset'
+      : !module.healthy
+        ? 'modules.compute.unreachable'
+        : module.details.enabled === false
+          ? 'modules.compute.runningOff'
+          : 'modules.compute.running'
+  return te(key) ? t(key) : module.message
+}
+
 const stateClass = (state: FeatureModule['state']): string => {
   switch (state) {
     case 'available':
@@ -83,7 +98,7 @@ const docsHref = (module: FeatureModule): string =>
             <h3 class="text-base font-semibold txt-primary">{{ label(module) }}</h3>
             <code class="text-xs txt-secondary font-mono">{{ module.id }}</code>
           </div>
-          <p class="txt-secondary text-sm">{{ module.message }}</p>
+          <p class="txt-secondary text-sm">{{ message(module) }}</p>
 
           <div class="mt-3 flex flex-wrap items-center gap-2">
             <span class="text-xs font-medium txt-primary">{{

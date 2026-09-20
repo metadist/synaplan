@@ -102,4 +102,54 @@ describe('FeatureModulesSection', () => {
     expect(wrapper.get('[data-testid="item-module"] h3').text()).toBe('future')
     expect(wrapper.get('[data-testid="badge-module-state"]').text()).toBe('Not installed')
   })
+
+  it('translates the compute module line from sidecar state, not the backend sentence', () => {
+    const running = mountSection([
+      module({
+        id: 'compute',
+        state: 'available',
+        message: 'Compute sidecar is running.',
+        details: { enabled: true },
+      }),
+    ])
+    expect(running.get('[data-testid="item-module"]').text()).toContain('File work is running.')
+    expect(running.get('[data-testid="item-module"]').text()).not.toContain(
+      'Compute sidecar is running.'
+    )
+
+    const off = mountSection([
+      module({
+        id: 'compute',
+        state: 'available',
+        message: 'Compute sidecar is running.',
+        details: { enabled: false },
+      }),
+    ])
+    expect(off.get('[data-testid="item-module"]').text()).toContain(
+      'The sidecar is running; file work is turned off in System configuration.'
+    )
+
+    const down = mountSection([
+      module({
+        id: 'compute',
+        state: 'needs_setup',
+        healthy: false,
+        message: 'Compute sidecar is not reachable.',
+      }),
+    ])
+    expect(down.get('[data-testid="item-module"]').text()).toContain(
+      'The file-work sidecar is not reachable.'
+    )
+
+    const unset = mountSection([
+      module({
+        id: 'compute',
+        state: 'absent',
+        message: 'COMPUTE_URL or COMPUTE_TOKEN is not set.',
+      }),
+    ])
+    expect(unset.get('[data-testid="item-module"]').text()).toContain(
+      'COMPUTE_URL or COMPUTE_TOKEN is not set.'
+    )
+  })
 })
