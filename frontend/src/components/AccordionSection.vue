@@ -9,11 +9,13 @@ interface Props {
   open: boolean
   highlighted?: boolean
   headerTestid?: string
+  testid?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   highlighted: false,
   headerTestid: undefined,
+  testid: undefined,
 })
 
 defineEmits<{
@@ -30,6 +32,7 @@ const bodyId = computed(() => `${props.panelId}-body`)
     :class="
       highlighted ? 'outline outline-2 outline-offset-[-2px] outline-[var(--brand)]' : undefined
     "
+    :data-testid="testid"
     :data-open="open ? 'true' : 'false'"
   >
     <h3 class="m-0">
