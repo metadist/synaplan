@@ -93,7 +93,7 @@
     "happy-dom": "20.14.5",
     "openapi-zod-client": "1.18.3",
     "postcss": "8.5.28",
-    "prettier": "3.9.6",
+    "prettier": "3.9.8",
     "tailwindcss": "4.3.3",
     "terser": "5.51.2",
     "typescript": "6.0.3",
