@@ -112,9 +112,10 @@ final class ApiSessionSummaryServiceTest extends TestCase
                 $this->callback(fn (array $meta) => 'API_SUMMARY' === $meta['source']),
             );
 
-        // Chat + message are created and flushed. Mimic Doctrine's identity
-        // assignment — setMeta() needs the message to have an ID post-flush.
-        $this->em->expects($this->exactly(2))
+        // Chat + IN turn + OUT turn + summary are created and flushed. Mimic
+        // Doctrine's identity assignment — setMeta() needs the message to
+        // have an ID post-flush.
+        $this->em->expects($this->exactly(4))
             ->method('persist')
             ->willReturnCallback(fn (object $entity) => self::assignId($entity));
         $this->em->expects($this->atLeastOnce())->method('flush');
@@ -171,8 +172,9 @@ final class ApiSessionSummaryServiceTest extends TestCase
 
         $this->record('Fifth request', 'Fifth response');
 
-        // The single OUT message is updated in place, not duplicated.
-        $this->assertSame('Updated rolling summary.', $existingMessage->getText());
+        // The single summary message is updated in place, not duplicated, and
+        // labelled so it never reads as a message someone sent.
+        $this->assertSame('[Session log] Updated rolling summary.', $existingMessage->getText());
 
         $state = $this->readState();
         $this->assertSame('Updated rolling summary.', $state['summary']);
@@ -256,6 +258,61 @@ final class ApiSessionSummaryServiceTest extends TestCase
             ->willReturn(['content' => 'Resumen de la sesión.', 'usage' => []]);
 
         $this->recordWithUserLanguage('es', 'ok', 'done');
+    }
+
+    /**
+     * The thread must show what the external client saw: the real user turn,
+     * the real assistant turn, and the rolling summary as a labelled log —
+     * never the recap alone (#2023).
+     */
+    public function testRefreshPersistsTurnsAndLabelsTheSummary(): void
+    {
+        // The summary lookup must stay on its own topic now that assistant
+        // turns share direction OUT.
+        $this->messageRepository->expects($this->once())
+            ->method('findOneBy')
+            ->with($this->callback(static fn (array $criteria): bool => 'OUT' === ($criteria['direction'] ?? null)
+                && 'api_session' === ($criteria['topic'] ?? null)))
+            ->willReturn(null);
+
+        $this->aiFacade->method('chat')->willReturn(['content' => 'Greeting exchanged.', 'usage' => []]);
+
+        $persisted = [];
+        $this->em->method('persist')->willReturnCallback(
+            function (object $entity) use (&$persisted): void {
+                self::assignId($entity);
+                $persisted[] = $entity;
+            }
+        );
+        $this->em->method('flush');
+
+        $this->record('hi', 'Hallo! Wie kann ich dir heute helfen?');
+
+        $messages = array_values(array_filter($persisted, static fn (object $e): bool => $e instanceof Message));
+        self::assertCount(3, $messages);
+
+        [$userTurn, $assistantTurn, $summary] = $messages;
+
+        self::assertSame('IN', $userTurn->getDirection());
+        self::assertSame('CHAT', $userTurn->getTopic());
+        self::assertSame('hi', $userTurn->getText());
+        self::assertSame('complete', $userTurn->getStatus());
+
+        self::assertSame('OUT', $assistantTurn->getDirection());
+        self::assertSame('CHAT', $assistantTurn->getTopic());
+        self::assertSame('Hallo! Wie kann ich dir heute helfen?', $assistantTurn->getText());
+        self::assertSame('complete', $assistantTurn->getStatus());
+
+        self::assertSame('OUT', $summary->getDirection());
+        self::assertSame('api_session', $summary->getTopic());
+        self::assertSame('[Session log] Greeting exchanged.', $summary->getText());
+
+        self::assertGreaterThan($userTurn->getUnixTimestamp(), $assistantTurn->getUnixTimestamp());
+        self::assertGreaterThan(
+            $assistantTurn->getUnixTimestamp(),
+            $summary->getUnixTimestamp(),
+            'the summary lands after the turns so list previews keep showing the trail'
+        );
     }
 
     public function testSummarizerFailureKeepsPendingExcerptsForRetry(): void

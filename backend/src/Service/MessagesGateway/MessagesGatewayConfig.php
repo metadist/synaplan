@@ -267,8 +267,8 @@ final readonly class MessagesGatewayConfig
     }
 
     /**
-     * Rolling per-session summary chat (default ON — the gateway itself is
-     * opt-in, and the summary is the user-visible activity trail).
+     * Per-session activity chat (default ON — the gateway itself is opt-in):
+     * the actual turns plus a labelled rolling summary.
      */
     public function isSessionSummaryEnabled(?int $userId): bool
     {

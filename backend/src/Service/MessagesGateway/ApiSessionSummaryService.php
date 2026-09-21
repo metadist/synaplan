@@ -17,9 +17,15 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
 
 /**
- * Rolling 2-3 sentence summary of an API/agent session, kept as one chat in
- * the user's normal chat list (BCHATS source 'api' + a single OUT message
- * updated in place).
+ * Rolling record of an API/agent session, kept as one chat in the user's
+ * normal chat list (BCHATS source 'api').
+ *
+ * The chat holds the actual turns the external client saw — one IN message
+ * with the user's request excerpt and one OUT message with the assistant's
+ * response excerpt per request — plus ONE rolling summary message (topic
+ * `api_session`, labelled as a session log) that is updated in place. The
+ * summary alone used to be the whole thread, so opening the conversation in
+ * Synaplan showed a third-person recap instead of what was said (#2023).
  *
  * Runs ONLY on the messenger worker ({@see \App\MessageHandler\SummarizeApiSessionCommandHandler})
  * — never on the API request path. Excerpts arrive pre-capped in the queue
@@ -32,9 +38,9 @@ use Symfony\Component\Lock\LockFactory;
  * {@see ModelConfigService::getSummaryModelConfig()} (ANALYZE → CHAT). Never
  * hardcodes a model name.
  *
- * Privacy: mirrors BUSELOG's posture — no full transcripts are persisted,
- * only the short derived summary. Pending excerpts live in the cache pool
- * (capped) until folded, then are dropped.
+ * Privacy: no full transcripts are persisted, only the short capped excerpts
+ * ({@see self::EXCERPT_MAX_CHARS}) as turns plus the derived summary. Pending
+ * excerpts live in the cache pool (capped) until folded, then are dropped.
  */
 final readonly class ApiSessionSummaryService
 {
@@ -61,6 +67,13 @@ final readonly class ApiSessionSummaryService
     private const CHAT_SOURCE = 'api';
     private const MESSAGE_TYPE = 'API';
     private const MESSAGE_TOPIC = 'api_session';
+    // Turns reuse the plain conversation topic, mirroring how MessageProcessor
+    // persists external history — the summary keeps its own topic so the
+    // in-place lookup below never grabs a turn.
+    private const TURN_TOPIC = 'CHAT';
+    // Language-neutral tag: the summary is machine text in the user's language
+    // and must not read as a message someone sent.
+    private const SUMMARY_LABEL = '[Session log]';
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -126,7 +139,7 @@ final readonly class ApiSessionSummaryService
                 return;
             }
 
-            $chatId = $this->upsertSessionChat($userId, $state, $client, $summary, $model, $language);
+            $chatId = $this->upsertSessionChat($userId, $state, $client, $summary, $model, $language, $state['pending']);
 
             $state['summary'] = $summary;
             $state['pending'] = [];
@@ -298,12 +311,14 @@ final readonly class ApiSessionSummaryService
     }
 
     /**
-     * Create the per-session chat on first refresh, then update the single
-     * OUT message's text in place on subsequent refreshes.
+     * Create the per-session chat on first refresh, append the folded turns as
+     * real IN/OUT messages, then update the single labelled summary message's
+     * text in place on subsequent refreshes.
      *
      * @param array{chatId: int|null} $state
+     * @param list<string>            $turns pending "Request: …\nResponse: …" entries being folded
      */
-    private function upsertSessionChat(int $userId, array $state, string $client, string $summary, string $model, string $language): int
+    private function upsertSessionChat(int $userId, array $state, string $client, string $summary, string $model, string $language, array $turns): int
     {
         $chat = null;
         if (null !== $state['chatId']) {
@@ -322,9 +337,26 @@ final readonly class ApiSessionSummaryService
             $this->em->flush();
         }
 
+        // One second per message keeps the turn order stable for readers that
+        // sort by time; the summary lands last so list previews keep showing
+        // the compact trail.
+        $tick = time();
+        foreach ($turns as $entry) {
+            [$request, $response] = $this->splitTurn($entry);
+            if ('' !== $request) {
+                $this->appendTurnMessage($userId, $chat, 'IN', $request, $language, $tick);
+                ++$tick;
+            }
+            if ('' !== $response) {
+                $this->appendTurnMessage($userId, $chat, 'OUT', $response, $language, $tick);
+                ++$tick;
+            }
+        }
+
         $message = $this->em->getRepository(Message::class)->findOneBy([
             'chatId' => $chat->getId(),
             'direction' => 'OUT',
+            'topic' => self::MESSAGE_TOPIC,
         ]);
 
         if (null === $message) {
@@ -340,15 +372,46 @@ final readonly class ApiSessionSummaryService
             $this->em->flush();
         }
 
-        $message->setText($summary);
+        $message->setText(self::SUMMARY_LABEL.' '.$summary);
         $message->setLanguage($language);
-        $message->setUnixTimestamp(time());
-        $message->setDateTime(date('YmdHis'));
+        $message->setUnixTimestamp($tick);
+        $message->setDateTime(date('YmdHis', $tick));
         $message->setMeta('api_session.model', $model);
         $chat->updateTimestamp();
         $this->em->flush();
 
         return (int) $chat->getId();
+    }
+
+    private function appendTurnMessage(int $userId, Chat $chat, string $direction, string $text, string $language, int $timestamp): void
+    {
+        $turn = new Message();
+        $turn->setUserId($userId);
+        $turn->setTrackingId($timestamp);
+        $turn->setMessageType(self::MESSAGE_TYPE);
+        $turn->setTopic(self::TURN_TOPIC);
+        $turn->setDirection($direction);
+        $turn->setStatus('complete');
+        $turn->setText($text);
+        $turn->setLanguage($language);
+        $turn->setUnixTimestamp($timestamp);
+        $turn->setDateTime(date('YmdHis', $timestamp));
+        $turn->setChat($chat);
+        $this->em->persist($turn);
+    }
+
+    /**
+     * Split a folded "Request: …\nResponse: …" entry back into its turns.
+     *
+     * @return array{0: string, 1: string} request text, response text (either may be empty)
+     */
+    private function splitTurn(string $entry): array
+    {
+        if (1 !== preg_match('/^Request:\s*(.*?)(?:\nResponse:\s*(.*))?$/s', $entry, $match)) {
+            return ['', ''];
+        }
+
+        return [trim((string) $match[1]), trim((string) ($match[2] ?? ''))];
     }
 
     /**
