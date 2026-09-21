@@ -100,25 +100,28 @@
             data-testid="ollama-not-running"
           >
             {{ $t('adminSetup.localAi.notRunning') }}
+          </p>
+          <div class="flex flex-wrap gap-2 mt-3">
             <button
+              v-if="ollamaState === 'unreachable'"
               type="button"
-              class="underline font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
               data-testid="ollama-recheck"
               @click="checkOllama"
             >
               {{ $t('common.retry') }}
             </button>
-          </p>
-          <button
-            type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-3 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="ollama-import-models"
-            :disabled="ollamaState === 'unreachable'"
-            @click="importOllama = true"
-          >
-            <Icon icon="mdi:download-outline" class="w-4 h-4" aria-hidden="true" />
-            {{ $t('aiInfra.modelImport.importPulled') }}
-          </button>
+            <button
+              type="button"
+              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="ollama-import-models"
+              :disabled="ollamaState === 'unreachable'"
+              @click="importOllama = true"
+            >
+              <Icon icon="mdi:download-outline" class="w-4 h-4" aria-hidden="true" />
+              {{ $t('aiInfra.modelImport.importPulled') }}
+            </button>
+          </div>
         </div>
       </div>
     </template>
