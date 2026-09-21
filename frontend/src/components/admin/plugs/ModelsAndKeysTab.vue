@@ -94,10 +94,26 @@
             />
           </div>
           <p class="text-sm txt-secondary mt-1">{{ $t('adminSetup.localAi.description') }}</p>
+          <p
+            v-if="ollamaState === 'unreachable'"
+            class="text-sm mt-2 text-[var(--status-warning)]"
+            data-testid="ollama-not-running"
+          >
+            {{ $t('adminSetup.localAi.notRunning') }}
+            <button
+              type="button"
+              class="underline font-medium"
+              data-testid="ollama-recheck"
+              @click="checkOllama"
+            >
+              {{ $t('common.retry') }}
+            </button>
+          </p>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-3 inline-flex items-center gap-2"
+            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-3 inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="ollama-import-models"
+            :disabled="ollamaState === 'unreachable'"
             @click="importOllama = true"
           >
             <Icon icon="mdi:download-outline" class="w-4 h-4" aria-hidden="true" />
@@ -129,6 +145,7 @@ import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useNotification } from '@/composables/useNotification'
 import { useConfigStore } from '@/stores/config'
 import { listProviderKeys, type ProviderKeyStatus } from '@/services/api/providerKeysApi'
+import { adminModelsApi } from '@/services/api/adminModelsApi'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -139,6 +156,11 @@ const loadFailed = ref(false)
 const providers = ref<ProviderKeyStatus[]>([])
 const defaultChatProvider = ref('')
 const importOllama = ref(false)
+// Pre-flight for the Ollama import: the compose default does not start Ollama,
+// so the import button must not look live when no server answers. Starts
+// 'unknown' (button enabled) and only flips on a confirmed answer — a slow or
+// failed pre-flight never blocks the page; the dialog reports it with Retry.
+const ollamaState = ref<'unknown' | 'ok' | 'unreachable'>('unknown')
 
 const chatReady = computed(() => config.setup.chatReady)
 
@@ -164,8 +186,18 @@ const load = async () => {
   }
 }
 
+const checkOllama = async () => {
+  try {
+    const result = await adminModelsApi.importEndpointPreview('ollama', false)
+    ollamaState.value = result.endpointOk ? 'ok' : 'unreachable'
+  } catch {
+    // Fail open: the import dialog reports reachability itself with Retry.
+    ollamaState.value = 'unknown'
+  }
+}
+
 const refresh = async () => {
-  await Promise.all([load(), config.reload()])
+  await Promise.all([load(), config.reload(), checkOllama()])
 }
 
 onMounted(refresh)
