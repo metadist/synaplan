@@ -146,6 +146,53 @@ class AdminModelHealthControllerTest extends WebTestCase
         }
     }
 
+    /**
+     * Import listing re-checks store SOURCE_LISTING; the status endpoint must
+     * report it verbatim. The OpenAPI enum once omitted it, which made the
+     * frontend schema reject the whole snapshot (#2045).
+     */
+    public function testStatusReportsListingSourceForImportRechecks(): void
+    {
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $model = $em->getRepository(Model::class)->findOneBy([]);
+        self::assertNotNull($model, 'The model catalog must not be empty');
+        $modelId = (int) $model->getId();
+
+        $health = $em->getRepository(ModelHealth::class)->findOneBy(['modelId' => $modelId]);
+        if (null === $health) {
+            $health = (new ModelHealth())->setModelId($modelId);
+            $em->persist($health);
+        }
+        $health
+            ->setState(ModelHealthState::Offline)
+            ->setSource(ModelHealth::SOURCE_LISTING)
+            ->setKind(FailureKind::Permanent->value)
+            ->setMessage('not offered by endpoint')
+            ->setUpdated(time());
+        $em->flush();
+        $this->createdHealthIds[] = (int) $health->getId();
+
+        $data = $this->request('GET', '/api/v1/admin/model-health');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+
+        $found = null;
+        foreach ($data['providers'] as $provider) {
+            foreach ($provider['models'] as $listed) {
+                self::assertContains(
+                    $listed['source'],
+                    [ModelHealth::SOURCE_PROBE, ModelHealth::SOURCE_LISTING, ModelHealth::SOURCE_TRAFFIC],
+                    $listed['name']
+                );
+                if ($modelId === $listed['id']) {
+                    $found = $listed;
+                }
+            }
+        }
+        self::assertNotNull($found, 'The seeded model must be listed');
+        self::assertSame(ModelHealth::SOURCE_LISTING, $found['source']);
+        self::assertSame('not offered by endpoint', $found['reason']);
+    }
+
     public function testExemptingAModelPausesAndResumesTheAutomation(): void
     {
         $em = $this->client->getContainer()->get('doctrine')->getManager();
