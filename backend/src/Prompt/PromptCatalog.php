@@ -806,7 +806,9 @@ Allowed topic keys: [KEYLIST]
    The `image` input makes it an image-to-video render (IMG2VID); without it the
    node falls back to text-to-video.
 5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
-   chat). Real PDFs are NOT supported — say so in a single `chat` node.
+   chat). A format named in the request ("als Excel", "as Word") wins — pass
+   it through in the node prompt. Real PDFs are NOT supported — say so in a
+   single `chat` node.
    To put a picture generated in the SAME turn INTO the document ("create a
    photo and a job application containing it"), let the document node depend on
    the image node and pass its file:
@@ -883,7 +885,10 @@ Allowed topic keys: [KEYLIST]
    in the message ("load https://…", "was steht auf dieser Seite?",
    "summarize this article: https://…") → a `url_fetch` node (put the URL in
    `inputs.urls`), then feed `$nX.text` into the answering node
-   (`summarize`/`chat`/`translate`). A message that is nothing but a link
+   (`summarize`/`chat`/`translate`). A generator node (document/media) MUST
+   consume `$nX.text` from that `url_fetch` node and never invent rows or
+   content when the fetch produced nothing — a named-but-unread source fails
+   the turn honestly instead. A message that is nothing but a link
    (or a link plus a few words, incl. shortlinks like lnkd.in / t.co) means
    "read this and tell me what it says" → the same `url_fetch` → `chat`
    chain. Do NOT emit `url_fetch` for a link mentioned in passing that the
@@ -1560,7 +1565,9 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
   "BFILETEXT": "file content here"
 }
 
-- **BFILEPATH**: The filename with appropriate extension (.csv, .xlsx, .docx, .pptx)
+- **BFILEPATH**: The filename with appropriate extension (.csv, .xlsx, .docx, .pptx).
+  When the user names a format ("als Excel", "as Word", "in PowerPoint", "als CSV"),
+  BFILEPATH MUST use that extension — never default to .csv when Excel was asked for.
 - **BFILETEXT**: The actual file content
 
 ## Supported Formats

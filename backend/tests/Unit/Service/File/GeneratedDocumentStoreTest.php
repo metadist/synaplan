@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\GeneratedDocumentStore;
+use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\UserUploadPathBuilder;
 use Doctrine\ORM\EntityManagerInterface;
@@ -150,6 +151,83 @@ final class GeneratedDocumentStoreTest extends TestCase
             ['filename' => 'report.docx', 'content' => '   ', 'extension' => 'docx'],
             $this->message(),
         ));
+    }
+
+    /**
+     * Issue #2051: a format named in the request wins over the envelope
+     * extension when the payload renders into either container.
+     */
+    public function testNamedExcelOverridesCsvEnvelope(): void
+    {
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(false);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Vergleich Plan und Ist, ich will die Abweichung als Excel.');
+
+        $bundle = $this->store($converter)->store(
+            ['filename' => 'vergleich.csv', 'content' => "Q1,10000,9800\n", 'extension' => 'csv'],
+            $message,
+        );
+
+        self::assertNotNull($bundle);
+        self::assertSame('xlsx', $bundle->primary()->getFileType());
+        self::assertStringEndsWith('.xlsx', $bundle->primary()->getFileName());
+        self::assertStringEndsWith('.xlsx', $bundle->primary()->getFilePath());
+    }
+
+    public function testNamedFormatLeavesOtherFamiliesAlone(): void
+    {
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(false);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Fass das als Excel zusammen.');
+
+        // A docx envelope stays docx: cross-family rewrites would mangle the
+        // payload, so the backstop only renames within csv/xls/xlsx.
+        $bundle = $this->store($converter)->store(
+            ['filename' => 'brief.docx', 'content' => '# Titel', 'extension' => 'docx'],
+            $message,
+        );
+
+        self::assertNotNull($bundle);
+        self::assertSame('docx', $bundle->primary()->getFileType());
+    }
+
+    public function testPdfExportUsesOverriddenExtension(): void
+    {
+        $capturedOptions = null;
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(true);
+        $converter->method('convert')->willReturnCallback(
+            function (string $source, string $target, array $options) use (&$capturedOptions): string {
+                $capturedOptions = $options;
+                $pdf = dirname($source).'/tmp-export.pdf';
+                file_put_contents($pdf, '%PDF-ok');
+
+                return $pdf;
+            }
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Vergleich als Excel, bitte.');
+
+        $bundle = $this->store($converter)->store(
+            ['filename' => 'vergleich.csv', 'content' => "Q1,1\n", 'extension' => 'csv', 'export' => 'pdf'],
+            $message,
+        );
+
+        self::assertNotNull($bundle);
+        self::assertNotNull($bundle->export);
+        self::assertSame(
+            DocumentExportService::conversionOptions('xlsx'),
+            $capturedOptions,
+            'the PDF export must convert with the overridden extension, not the envelope one',
+        );
     }
 
     private function store(OfficeConverterClient $converter): GeneratedDocumentStore

@@ -8,6 +8,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\FileRepository;
 use App\Service\File\ConversationFileCatalog;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -37,6 +38,7 @@ final readonly class FileAnalysisRunner implements TaskRunner
         private LoggerInterface $logger,
         private ?ConversationFileCatalog $conversationFiles = null,
         private ?FileRepository $fileRepository = null,
+        private ?ChatErrorPresenter $errorPresenter = null,
     ) {
     }
 
@@ -99,7 +101,13 @@ final readonly class FileAnalysisRunner implements TaskRunner
                 'error' => $e->getMessage(),
             ]);
 
-            return NodeResult::failed('file_analysis failed: '.$e->getMessage());
+            // Never leak provider internals into the card: present the
+            // localized reason, keep the raw message in the log (#1074).
+            $copy = $this->errorPresenter instanceof ChatErrorPresenter
+                ? $this->errorPresenter->present($e, $language)->userText
+                : 'Something went wrong while answering this request. Please try again.';
+
+            return NodeResult::failed($copy);
         }
 
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];

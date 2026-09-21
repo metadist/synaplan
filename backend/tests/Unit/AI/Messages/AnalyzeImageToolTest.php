@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Messages;
 
+use App\AI\Exception\ChatFailureReason;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Service\AiFacade;
+use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ChatErrorView;
 use App\Service\Security\SsrfGuard;
 use App\Service\Vision\VisionModelResolver;
 use PHPUnit\Framework\TestCase;
@@ -98,5 +101,50 @@ final class AnalyzeImageToolTest extends TestCase
             new NullLogger(),
             sys_get_temp_dir(),
         );
+    }
+
+    /**
+     * Issue #1074 residual: a failing vision call must surface the presented
+     * reason, never the raw provider message.
+     */
+    public function testExecutePresentsFailureWithoutRawMessage(): void
+    {
+        $ai = $this->createMock(AiFacade::class);
+        $ai->method('analyzeImage')->willThrowException(new \RuntimeException('context_length_exceeded: too many tokens'));
+
+        $vision = $this->createMock(VisionModelResolver::class);
+        $vision->method('isAvailable')->willReturn(true);
+
+        $presenter = $this->createMock(ChatErrorPresenter::class);
+        $presenter->expects(self::once())->method('present')->with(
+            self::isInstanceOf(\RuntimeException::class),
+            'de',
+        )->willReturn(new ChatErrorView(
+            ChatFailureReason::ContextLengthExceeded,
+            'That image is too large to analyse.',
+            null,
+            false,
+            'context_length_exceeded: too many tokens',
+        ));
+
+        $tool = new AnalyzeImageTool(
+            $ai,
+            $vision,
+            $this->createMock(SsrfGuard::class),
+            new NullLogger(),
+            sys_get_temp_dir(),
+            $presenter,
+        );
+
+        $result = $tool->execute([
+            'prompt' => 'What is on this page?',
+            'image_base64' => base64_encode('fake-png-bytes'),
+            'media_type' => 'image/png',
+        ], 9, 'de');
+
+        self::assertTrue($result['isError']);
+        self::assertSame('That image is too large to analyse.', $result['text']);
+
+        @rmdir(sys_get_temp_dir().'/gateway-vision');
     }
 }

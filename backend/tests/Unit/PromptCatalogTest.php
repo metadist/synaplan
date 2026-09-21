@@ -262,6 +262,39 @@ final class PromptCatalogTest extends TestCase
         // Issue #2048: the script must compute the requested grouping, not
         // relabel its output to match the request.
         $this->assertStringContainsString('must be the grouping in the output', $plan['prompt']);
+        // Issue #2051: an explicitly named office format must be honoured.
+        $this->assertStringContainsString('A format named in the request', $plan['prompt']);
+    }
+
+    public function testPlanPromptRequiresFetchBeforeGeneration(): void
+    {
+        $plan = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:plan' === $entry['topic']) {
+                $plan = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($plan);
+        // Issue #2050: a generator node must consume the url_fetch output and
+        // never invent content when the named source was not read.
+        $this->assertStringContainsString('never invent rows or', $plan['prompt']);
+    }
+
+    public function testOfficeMakerPromptHonorsNamedFormat(): void
+    {
+        $officemaker = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('officemaker' === $entry['topic']) {
+                $officemaker = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($officemaker);
+        // Issue #2051: "als Excel" must come back as .xlsx, never .csv.
+        $this->assertStringContainsString('BFILEPATH MUST use that extension', $officemaker['prompt']);
     }
 
     public function testGeneralPromptDoesNotBounceAlreadyPhrasedCreateRequests(): void

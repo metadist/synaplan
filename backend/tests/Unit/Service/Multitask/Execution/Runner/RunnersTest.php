@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
+use App\AI\Exception\ChatFailureReason;
 use App\AI\Service\AiFacade;
 use App\Entity\Connection;
 use App\Entity\File;
@@ -20,6 +21,9 @@ use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileStorageService;
+use App\Service\File\UnreadSourceGuard;
+use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ChatErrorView;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Message\Handler\MediaGenerationHandler;
@@ -1154,7 +1158,7 @@ final class RunnersTest extends TestCase
             ];
         });
 
-        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class));
         $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'Create a docx with a table']);
 
         $result = $runner->run($node, $this->context($this->message('Create a docx with a table')));
@@ -1191,7 +1195,7 @@ final class RunnersTest extends TestCase
         ]]));
 
         $node = new TaskNode('n1x', Capability::DocumentGeneration, ['n1'], ['prompt' => 'write a letter with the photo']);
-        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class)))->run($node, $context);
+        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class)))->run($node, $context);
 
         self::assertTrue($result->isSuccessful());
         self::assertSame(['01/000/00001/2026/07/photo.jpg'], $options['document_images']);
@@ -1215,7 +1219,7 @@ final class RunnersTest extends TestCase
         ]]));
 
         $node = new TaskNode('n2', Capability::DocumentGeneration, ['n1'], ['prompt' => 'summarize the audio']);
-        (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class)))->run($node, $context);
+        (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class)))->run($node, $context);
 
         self::assertArrayNotHasKey('document_images', (array) $options);
     }
@@ -1235,13 +1239,62 @@ final class RunnersTest extends TestCase
                 'metadata_keys' => ['error'],
             ]);
 
-        $runner = new DocumentGenerationRunner($handler, $logger);
+        $runner = new DocumentGenerationRunner($handler, $logger, $this->createMock(UnreadSourceGuard::class));
         $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'make a doc']);
 
         $result = $runner->run($node, $this->context($this->message('make a doc')));
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('no file', (string) $result->error);
+    }
+
+    /**
+     * Issue #2050: when the unread-source guard refuses, the node ends
+     * honestly — no handler call, no file, one sentence.
+     */
+    public function testDocumentGenerationRefusesUnreadSourceUrl(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->expects(self::never())->method('handle');
+
+        $guard = $this->createMock(UnreadSourceGuard::class);
+        $guard->method('refusalFor')->willReturn('REFUSAL');
+
+        $message = $this->message('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $context = new NodeContext($message, [], 1, ['language' => 'de', 'url_pages_read' => 0]);
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $guard);
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'chart from url']);
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(0, $result->files);
+        self::assertSame('REFUSAL', $result->text);
+        self::assertFalse($result->metadata['document_generation']['created'] ?? true);
+        self::assertSame('source_unread', $result->metadata['document_generation']['reason'] ?? null);
+    }
+
+    public function testDocumentGenerationProceedsWhenGuardAllows(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->expects(self::once())->method('handle')->willReturn([
+            'metadata' => ['generated_file' => ['filename' => 'chart.xlsx', 'path' => '01/000/00001/2026/07/chart.xlsx']],
+        ]);
+
+        $guard = $this->createMock(UnreadSourceGuard::class);
+        $guard->method('refusalFor')->willReturn(null);
+
+        $message = $this->message('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $context = new NodeContext($message, [], 1, ['language' => 'de', 'url_pages_read' => 1]);
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $guard);
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'chart from url']);
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
     }
 
     public function testWebSearchReturnsFormattedResults(): void
@@ -1463,6 +1516,37 @@ final class RunnersTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('no file', (string) $result->error);
+    }
+
+    /**
+     * Issue #1074 residual: a throwing handler must surface the presented
+     * reason on the card, never the raw exception message.
+     */
+    public function testFileAnalysisPresentsHandlerFailureWithoutRawMessage(): void
+    {
+        $handler = $this->createMock(FileAnalysisHandler::class);
+        $handler->method('handle')->willThrowException(new \RuntimeException('context_length_exceeded: too many tokens'));
+
+        $presenter = $this->createMock(ChatErrorPresenter::class);
+        $presenter->method('present')->willReturn(new ChatErrorView(
+            ChatFailureReason::ContextLengthExceeded,
+            'That document is too large to analyse.',
+            null,
+            false,
+            'context_length_exceeded: too many tokens',
+        ));
+
+        $runner = new FileAnalysisRunner(
+            $handler,
+            $this->createMock(LoggerInterface::class),
+            errorPresenter: $presenter,
+        );
+        $node = new TaskNode('n1', Capability::FileAnalysis, [], ['prompt' => 'summarize it']);
+
+        $result = $runner->run($node, $this->context($this->messageWithFile('summarize it')));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame('That document is too large to analyse.', $result->error);
     }
 
     public function testFileAnalysisFallsBackToConversationDocument(): void

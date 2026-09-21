@@ -6,6 +6,8 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
 use App\Service\File\DocumentImageCatalog;
+use App\Service\File\FileGenerationEnvelope;
+use App\Service\File\UnreadSourceGuard;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -37,6 +39,7 @@ final readonly class DocumentGenerationRunner implements TaskRunner
     public function __construct(
         private ChatHandler $handler,
         private LoggerInterface $logger,
+        private UnreadSourceGuard $unreadSourceGuard,
     ) {
     }
 
@@ -63,9 +66,32 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             return NodeResult::failed('no prompt for document_generation');
         }
 
+        // A format named in the ORIGINAL request ("als Excel") wins even when
+        // the planner's prompt no longer mentions it. Appending the directive
+        // keeps the envelope consistent; GeneratedDocumentStore enforces the
+        // same rule deterministically as a backstop (#2051).
+        $namedFormat = FileGenerationEnvelope::requestedFormat((string) $context->message->getText());
+        if (null !== $namedFormat) {
+            $prompt .= "\n\nThe file MUST be a .{$namedFormat} file (the user explicitly asked for this format).";
+        }
+
         $language = is_string($context->classification['language'] ?? null)
             ? $context->classification['language']
             : ($context->message->getLanguage() ?: 'en');
+
+        $refusal = $this->unreadSourceGuard->refusalFor(
+            (string) $context->message->getText(),
+            $context->classification['url_pages_read'] ?? null,
+            $language,
+        );
+        if (null !== $refusal) {
+            return NodeResult::ok($refusal, [], [
+                'document_generation' => [
+                    'created' => false,
+                    'reason' => 'source_unread',
+                ],
+            ]);
+        }
 
         $synthetic = $this->syntheticMessage($context, $prompt, $language);
 
