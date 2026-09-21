@@ -793,7 +793,10 @@ Allowed topic keys: [KEYLIST]
    `file_analysis`. A pixel edit on an attached image (stamp, watermark, crop, resize —
    "Stempel unten rechts drauf") is ALWAYS `code_run`, never `image_generation`.
    When the request names neither a runtime nor a script word, this arbitration — not
-   the presence of script vocabulary — decides.
+   the presence of script vocabulary — decides. A grouping, column, or value named
+   in the request must be the grouping in the output — never relabel axes or headers
+   to match the request. Print the actual result values (row counts, group totals)
+   to stdout so the result can be checked against the request.
 4. Video generate → `video_generation`. Put `duration` (4|6|8) and
    `resolution` ("720p"|"1080p"|"4K") in `params` only when the user
    specified them. To ANIMATE an image produced by an earlier node ("create a

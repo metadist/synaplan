@@ -32,6 +32,8 @@ use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\ToolExecutionGate;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\IOFactory as SpreadsheetIOFactory;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -608,17 +610,17 @@ final readonly class CodeRunRunner implements TaskRunner
         // run succeeds but the user only sees "File work finished" and never the
         // result. Capped so a chatty script cannot flood the chat bubble.
         $stdout = trim((string) $result['stdout']);
-        if ('' !== $stdout) {
-            if (mb_strlen($stdout) > self::STDOUT_REPLY_CAP) {
-                $stdout = mb_substr($stdout, 0, self::STDOUT_REPLY_CAP)."\n…";
-            }
-            $text = [] === $descriptors
-                ? $stdout
-                : $stdout."\n\n".'Saved '.count($descriptors).' file(s).';
+        if ('' !== $stdout && mb_strlen($stdout) > self::STDOUT_REPLY_CAP) {
+            $stdout = mb_substr($stdout, 0, self::STDOUT_REPLY_CAP)."\n…";
+        }
+
+        if ([] === $descriptors) {
+            $text = '' !== $stdout ? $stdout : 'File work finished. No new files were saved.';
         } else {
-            $text = [] === $descriptors
-                ? 'File work finished. No new files were saved.'
-                : 'File work finished.';
+            // The file line is verified truth read back from the artefacts,
+            // not the script's narration about itself (#2048).
+            $savedLine = 'Saved '.count($descriptors).' file(s): '.implode('; ', $this->artefactFacts($result['artefacts'])).'.';
+            $text = '' !== $stdout ? $stdout."\n\n".$savedLine : 'File work finished.'."\n\n".$savedLine;
         }
 
         return NodeResult::ok(
@@ -630,6 +632,173 @@ final readonly class CodeRunRunner implements TaskRunner
                 'used_workspace' => true === ($result['used_workspace'] ?? false),
             ],
         );
+    }
+
+    /**
+     * Verified one-liners per artefact, read back from the stored files:
+     * image dimensions, CSV headers/shape, spreadsheet sheets/shape, text
+     * line counts — name and size when nothing more specific applies.
+     *
+     * Best-effort by design: a readback failure degrades to the plain
+     * name-and-size line and must never fail the node.
+     *
+     * @param list<array{file_id: int, name: string, mime: string, size: int}> $artefacts
+     *
+     * @return list<string>
+     */
+    private function artefactFacts(array $artefacts): array
+    {
+        $facts = [];
+        foreach ($artefacts as $artefact) {
+            $facts[] = $this->artefactFact($artefact);
+        }
+
+        return $facts;
+    }
+
+    /**
+     * @param array{file_id: int, name: string, mime: string, size: int} $artefact
+     */
+    private function artefactFact(array $artefact): string
+    {
+        $name = $artefact['name'];
+        $size = $artefact['size'];
+        if ($size <= 0) {
+            return sprintf('%s (empty)', $name);
+        }
+
+        try {
+            $file = $this->files->find($artefact['file_id']);
+            $path = $file instanceof File
+                ? rtrim($this->uploadDir, '/').'/'.ltrim($file->getFilePath(), '/')
+                : null;
+            if (null === $path || !is_file($path)) {
+                return sprintf('%s (%s)', $name, $this->formatBytes($size));
+            }
+
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+            return match (true) {
+                in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true) => $this->imageFact($name, $path, $size),
+                'csv' === $ext => $this->csvFact($name, $path, $size),
+                in_array($ext, ['txt', 'md', 'json', 'log'], true) => $this->textFact($name, $path, $size),
+                in_array($ext, ['xlsx', 'xls', 'ods'], true) => $this->spreadsheetFact($name, $path, $size),
+                default => sprintf('%s (%s)', $name, $this->formatBytes($size)),
+            };
+        } catch (\Throwable) {
+            return sprintf('%s (%s)', $name, $this->formatBytes($size));
+        }
+    }
+
+    private function imageFact(string $name, string $path, int $size): string
+    {
+        $info = @getimagesize($path);
+        if (false === $info) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+        $kind = match ($info[2]) {
+            IMAGETYPE_JPEG => 'JPEG image',
+            IMAGETYPE_PNG => 'PNG image',
+            IMAGETYPE_GIF => 'GIF image',
+            IMAGETYPE_WEBP => 'WebP image',
+            default => 'image',
+        };
+
+        return sprintf('%s (%s, %dx%d, %s)', $name, $kind, $info[0], $info[1], $this->formatBytes($size));
+    }
+
+    private function csvFact(string $name, string $path, int $size): string
+    {
+        $sample = @file_get_contents($path, false, null, 0, 65536);
+        if (false === $sample || '' === trim($sample)) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+        $lines = array_values(array_filter(
+            preg_split('/\r\n|\n|\r/', $sample) ?: [],
+            static fn ($line): bool => '' !== trim((string) $line),
+        ));
+        if ([] === $lines) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+        $headers = str_getcsv($lines[0], escape: '\\');
+        $headerList = implode(', ', array_slice(array_map(static fn ($h): string => trim((string) $h), $headers), 0, 6));
+        if (count($headers) > 6) {
+            $headerList .= ', …';
+        }
+        $plus = (int) @filesize($path) > 65536 ? '+' : '';
+
+        return sprintf(
+            '%s (CSV, %d%s rows × %d columns; headers: %s)',
+            $name,
+            max(0, count($lines) - 1),
+            $plus,
+            count($headers),
+            $headerList,
+        );
+    }
+
+    private function textFact(string $name, string $path, int $size): string
+    {
+        $sample = @file_get_contents($path, false, null, 0, 65536);
+        if (false === $sample || '' === trim($sample)) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+        $lines = preg_split('/\r\n|\n|\r/', $sample) ?: [];
+        $plus = (int) @filesize($path) > 65536 ? '+' : '';
+
+        return sprintf('%s (text, %d%s lines, %s)', $name, count($lines), $plus, $this->formatBytes($size));
+    }
+
+    private function spreadsheetFact(string $name, string $path, int $size): string
+    {
+        try {
+            if ((int) @filesize($path) > 10 * 1024 * 1024) {
+                return sprintf('%s (%s)', $name, $this->formatBytes($size));
+            }
+            $reader = SpreadsheetIOFactory::createReaderForFile($path);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($path);
+            try {
+                $names = [];
+                foreach ($spreadsheet->getAllSheets() as $sheet) {
+                    $names[] = $sheet->getTitle();
+                }
+                $sheetList = implode(', ', array_slice($names, 0, 4));
+                if (count($names) > 4) {
+                    $sheetList .= ', …';
+                }
+                $first = $spreadsheet->getSheet(0);
+                $rows = $first->getHighestRow();
+                $cols = Coordinate::columnIndexFromString($first->getHighestColumn());
+
+                return sprintf(
+                    '%s (Excel, %d sheet%s: %s; %s %d rows × %d columns)',
+                    $name,
+                    count($names),
+                    1 === count($names) ? '' : 's',
+                    $sheetList,
+                    $names[0] ?? 'Sheet1',
+                    $rows,
+                    $cols,
+                );
+            } finally {
+                $spreadsheet->disconnectWorksheets();
+            }
+        } catch (\Throwable) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes.' B';
+        }
+        if ($bytes < 1024 * 1024) {
+            return rtrim(rtrim(number_format($bytes / 1024, 1), '0'), '.').' KB';
+        }
+
+        return rtrim(rtrim(number_format($bytes / 1024 / 1024, 1), '0'), '.').' MB';
     }
 
     /**
