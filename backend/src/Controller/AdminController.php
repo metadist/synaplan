@@ -277,33 +277,46 @@ class AdminController extends AbstractController
             return $this->json(['error' => 'Invalid level'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Before the self-change block: demoting the only administrator —
-        // necessarily yourself — reports the operational reason (the instance
-        // would be left without an admin), not the generic self-change one.
+        // The last-admin check and the level update run in one transaction with
+        // the admin rows locked: two concurrent demotions must not both
+        // observe a count of 2 and together remove the last administrator.
+        // Guard order inside: demoting the only administrator — necessarily
+        // yourself — reports the operational reason (409), any other
+        // self-change reports the generic one (403).
         $oldLevel = $targetUser->getUserLevel();
-        if ('ADMIN' === $oldLevel && 'ADMIN' !== $newLevel && 1 >= $this->userRepository->countByUserLevel('ADMIN')) {
+        $selfChange = $user->getId() === $id;
+        $outcome = $this->em->wrapInTransaction(function () use ($targetUser, $newLevel, $oldLevel, $selfChange, $user, $id, $request): string {
+            if ('ADMIN' === $oldLevel && 'ADMIN' !== $newLevel && 1 >= $this->userRepository->countAdminsForUpdate()) {
+                return 'conflict';
+            }
+            if ($selfChange) {
+                return 'forbidden';
+            }
+
+            $targetUser->setUserLevel($newLevel);
+            $this->auditLogWriter->record(
+                (int) $user->getId(),
+                'admin.user_level_change',
+                'user',
+                (string) $id,
+                [
+                    'target_email' => $targetUser->getMail(),
+                    'old_level' => $oldLevel,
+                    'new_level' => $newLevel,
+                ],
+                (string) $request->getClientIp(),
+            );
+            $this->em->flush();
+
+            return 'ok';
+        });
+
+        if ('conflict' === $outcome) {
             return $this->json(['error' => 'Cannot demote the last administrator'], Response::HTTP_CONFLICT);
         }
-
-        if ($user->getId() === $id) {
+        if ('forbidden' === $outcome) {
             return $this->json(['error' => 'Cannot change your own level'], Response::HTTP_FORBIDDEN);
         }
-
-        $targetUser->setUserLevel($newLevel);
-        $this->em->flush();
-
-        $this->auditLogWriter->record(
-            (int) $user->getId(),
-            'admin.user_level_change',
-            'user',
-            (string) $id,
-            [
-                'target_email' => $targetUser->getMail(),
-                'old_level' => $oldLevel,
-                'new_level' => $newLevel,
-            ],
-            (string) $request->getClientIp(),
-        );
 
         $this->logger->info('Admin updated user level', [
             'admin_id' => $user->getId(),

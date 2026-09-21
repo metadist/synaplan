@@ -16,6 +16,7 @@ use App\Repository\ShareRepository;
 use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\File\FileStorageService;
 use App\Service\File\OgImageService;
+use App\Service\Iam\ConversationFeedbackCleanup;
 use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\RAG\VectorStorage\VectorStorageInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -47,6 +48,7 @@ final readonly class ChatDeletionService
         private OgImageService $ogImageService,
         private VectorStorageInterface $vectorStorage,
         private DocumentRevisionRepository $documentRevisions,
+        private ConversationFeedbackCleanup $feedbackCleanup,
     ) {
     }
 
@@ -92,6 +94,11 @@ final readonly class ChatDeletionService
                 $messageIds[] = (int) $id;
             }
         }
+
+        // Derived feedback paraphrases answers from this conversation; it must
+        // not outlive the shares, which are deleted below (#2068). Runs first
+        // because afterwards neither the messages nor the shares exist.
+        $this->feedbackCleanup->withdrawAllDerivedFromMessages($messageIds, $userId);
 
         $keptPaths = $this->releaseFiles($userId, $messageIds, $messages);
 

@@ -13,6 +13,7 @@ use App\Entity\User;
 use App\Entity\UserMemory;
 use App\Repository\ConfigRepository;
 use App\Repository\UserMemoryRepository;
+use App\Service\Chat\ChatDeletionService;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ShareService;
@@ -168,6 +169,64 @@ final class FeedbackAccessTest extends WebTestCase
         self::assertNotNull(
             $this->memories()->findForUser($memoryId, (int) $recipient->getId()),
             'feedback survives while the recipient keeps access through another grant'
+        );
+    }
+
+    public function testRevokeWithdrawsFeedbackWhenSharingIsDisabledForTheRecipient(): void
+    {
+        $owner = $this->createUser('feedback-flag-owner@synaplan.internal');
+        $recipient = $this->createUser('feedback-flag-recipient@synaplan.internal');
+        $chat = $this->createChat((int) $owner->getId(), 'flag-off feedback chat');
+        $message = $this->createMessage($owner, 'The capital of Australia is Sydney.', $chat);
+        $memoryId = $this->createFeedbackRow((int) $recipient->getId(), (int) $message->getId());
+
+        $group = $this->createGroup('Feedback Flagged '.uniqid());
+        $this->addMember($group, (int) $recipient->getId());
+        $this->shares()->grant($owner, ConversationKind::KEY, (string) $chat->getId(), Share::SUBJECT_USER, (int) $recipient->getId(), 'use');
+        $this->shares()->grant($owner, ConversationKind::KEY, (string) $chat->getId(), Share::SUBJECT_GROUP, (int) $group->getId(), 'use');
+
+        // Sharing disabled for the recipient only: the group row is stale for
+        // them (AccessGate denies), so the entries must go on revoke.
+        static::getContainer()->get(ConfigRepository::class)->setValue(
+            (int) $recipient->getId(),
+            IamConfig::CONFIG_GROUP,
+            IamConfig::KEY_SHARING_ENABLED,
+            '0'
+        );
+        $this->em->flush();
+
+        try {
+            $this->shares()->revoke($owner, ConversationKind::KEY, (string) $chat->getId(), Share::SUBJECT_USER, (int) $recipient->getId());
+
+            self::assertNull(
+                $this->memories()->findForUser($memoryId, (int) $recipient->getId()),
+                'a stale share row must not retain derived feedback without effective access'
+            );
+        } finally {
+            static::getContainer()->get(ConfigRepository::class)->setValue(
+                (int) $recipient->getId(),
+                IamConfig::CONFIG_GROUP,
+                IamConfig::KEY_SHARING_ENABLED,
+                '1'
+            );
+            $this->em->flush();
+        }
+    }
+
+    public function testChatDeletionWithdrawsDerivedFeedback(): void
+    {
+        $owner = $this->createUser('feedback-delete-owner@synaplan.internal');
+        $recipient = $this->createUser('feedback-delete-recipient@synaplan.internal');
+        $chat = $this->createChat((int) $owner->getId(), 'deleted feedback chat');
+        $message = $this->createMessage($owner, 'The capital of Australia is Sydney.', $chat);
+        $memoryId = $this->createFeedbackRow((int) $recipient->getId(), (int) $message->getId());
+        $this->shares()->grant($owner, ConversationKind::KEY, (string) $chat->getId(), Share::SUBJECT_USER, (int) $recipient->getId(), 'use');
+
+        static::getContainer()->get(ChatDeletionService::class)->deleteOwnedChat((int) $owner->getId(), $chat);
+
+        self::assertNull(
+            $this->memories()->findForUser($memoryId, (int) $recipient->getId()),
+            'derived feedback must not outlive the deleted conversation'
         );
     }
 
