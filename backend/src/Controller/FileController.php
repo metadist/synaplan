@@ -15,6 +15,7 @@ use App\Service\Document\DocumentOfficeMergeService;
 use App\Service\Document\Persist\DocumentRevisionService;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
+use App\Service\File\FileGroupDeletionService;
 use App\Service\File\FileHelper;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
@@ -53,6 +54,7 @@ class FileController extends AbstractController
     public function __construct(
         private FileUploadService $uploadService,
         private FileListService $fileListService,
+        private FileGroupDeletionService $fileGroupDeletionService,
         private FileStorageService $storageService,
         private StorageQuotaService $storageQuotaService,
         private RateLimitService $rateLimitService,
@@ -1035,6 +1037,68 @@ class FileController extends AbstractController
 
             return $this->json(['error' => 'Failed to load file groups'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    #[Route('/groups', name: 'delete_group', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/files/groups',
+        summary: 'Delete a knowledge folder, its files, and any leftover vector chunks',
+        tags: ['Files'],
+        parameters: [
+            new OA\Parameter(
+                name: 'group_key',
+                in: 'query',
+                required: true,
+                schema: new OA\Schema(type: 'string', example: 'Contracts')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Folder deleted',
+                content: new OA\JsonContent(
+                    required: ['success', 'deleted_files', 'deleted_chunks'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'deleted_files', type: 'integer', example: 2),
+                        new OA\Property(property: 'deleted_chunks', type: 'integer', example: 14),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(response: 400, description: 'Missing or invalid folder name'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 500, description: 'Folder could not be deleted'),
+        ]
+    )]
+    public function deleteGroup(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $raw = $request->query->get('group_key');
+        $groupKey = is_string($raw) ? trim($raw) : '';
+        if ('' === $groupKey || 'DEFAULT' === $groupKey || mb_strlen($groupKey) > 128) {
+            return $this->json(['error' => 'A folder name is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->fileGroupDeletionService->deleteGroup($user->getId(), $groupKey);
+        } catch (\Throwable $e) {
+            $this->logger->error('FileController: Failed to delete folder', [
+                'group_key' => $groupKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'Failed to delete folder'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->json([
+            'success' => true,
+            'deleted_files' => $result['deletedFiles'],
+            'deleted_chunks' => $result['deletedChunks'],
+        ]);
     }
 
     #[Route('/facets', name: 'facets', methods: ['GET'])]
