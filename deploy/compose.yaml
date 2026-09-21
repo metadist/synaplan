@@ -392,7 +392,7 @@ services:
 
   # Spoken answers. Published image, no host port. Stop the container to hide TTS.
   tts:
-    image: ghcr.io/metadist/synaplan-tts:latest@sha256:3c8ed60619be4ae1913e64ac35c28aa9b48da66e0e5006c972b91d0a5d278bb2
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:efa9f2188abca5603aa9c15dec59963cdf7070eb5a9e2564793a7ceba6c3642a
     restart: unless-stopped
     environment:
       VOICES_DIR: /voices
