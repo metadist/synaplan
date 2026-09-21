@@ -26,6 +26,7 @@ final class IamConfigTest extends TestCase
 
         self::assertFalse($this->iam->isGroupsEnabled(1));
         self::assertFalse($this->iam->isSharingEnabled(1));
+        self::assertFalse($this->iam->isUserSearchEnabled(1));
         self::assertFalse($this->iam->isDirectorySyncEnabled(1));
         self::assertFalse($this->iam->isGroupPoliciesEnabled(1));
         self::assertFalse($this->iam->isImpersonationDisabled(1));

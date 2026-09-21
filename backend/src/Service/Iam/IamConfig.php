@@ -14,6 +14,9 @@ use App\Service\Feature\FeatureFlagEnv;
  * Flags live in BCONFIG group {@see self::CONFIG_GROUP}:
  *   - GROUPS_ENABLED — People page, group API, AccessGate may consult groups
  *   - SHARING_ENABLED — BSHARES + Share dialog (S2)
+ *   - USER_SEARCH_ENABLED — share picker may search user accounts (OFF unless
+ *     an admin enables it: on a public instance the directory would expose
+ *     every registered account, #2060)
  *   - DIRECTORY_SYNC_ENABLED — OIDC group claim upsert (S4)
  *   - GROUP_POLICIES_ENABLED — People → Policies and group-layer defaults (S5)
  *
@@ -32,6 +35,7 @@ final readonly class IamConfig
     public const CONFIG_GROUP = 'IAM';
     public const KEY_GROUPS_ENABLED = 'GROUPS_ENABLED';
     public const KEY_SHARING_ENABLED = 'SHARING_ENABLED';
+    public const KEY_USER_SEARCH_ENABLED = 'USER_SEARCH_ENABLED';
     public const KEY_DIRECTORY_SYNC_ENABLED = 'DIRECTORY_SYNC_ENABLED';
     public const KEY_GROUP_POLICIES_ENABLED = 'GROUP_POLICIES_ENABLED';
     public const KEY_DIRECTORY_GROUPS_CLAIM = 'DIRECTORY_GROUPS_CLAIM';
@@ -67,6 +71,17 @@ final readonly class IamConfig
     {
         return $this->isGroupsEnabled($userId)
             && $this->resolveFlag(self::KEY_SHARING_ENABLED, $userId, self::DEFAULT_ENABLED);
+    }
+
+    /**
+     * Whether the share picker may search user accounts by name or email.
+     * OFF unless an admin enables it: with the whole user table in one
+     * database, an open directory exposes every registered account (#2060).
+     * Groups the actor can see are unaffected.
+     */
+    public function isUserSearchEnabled(?int $userId): bool
+    {
+        return $this->resolveFlag(self::KEY_USER_SEARCH_ENABLED, $userId, self::DEFAULT_ENABLED);
     }
 
     /**

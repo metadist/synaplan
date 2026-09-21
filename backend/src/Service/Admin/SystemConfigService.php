@@ -114,6 +114,7 @@ final readonly class SystemConfigService
             'people' => ['label' => 'People & sharing', 'fields' => [
                 'FEATURE_IAM_GROUPS_ENABLED',
                 'FEATURE_IAM_SHARING_ENABLED',
+                'FEATURE_IAM_USER_SEARCH_ENABLED',
                 'FEATURE_IAM_GROUP_POLICIES_ENABLED',
                 'FEATURE_IAM_DIRECTORY_SYNC_ENABLED',
             ]],
@@ -1314,6 +1315,15 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_SHARING_ENABLED,
+            ],
+            'FEATURE_IAM_USER_SEARCH_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'User search in the share picker: let anyone search user accounts by name or email when sharing. Keep this OFF on instances with self-registration — when on, every account in the database can be found and mailed by name. Groups are always searchable.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_USER_SEARCH_ENABLED,
             ],
             'FEATURE_IAM_GROUP_POLICIES_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',

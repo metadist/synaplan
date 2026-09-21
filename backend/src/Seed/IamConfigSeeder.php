@@ -27,6 +27,7 @@ final readonly class IamConfigSeeder
         $rows = [
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_GROUPS_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_SHARING_ENABLED, 'value' => '1'],
+            ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_USER_SEARCH_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_SYNC_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_GROUP_POLICIES_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_GROUPS_CLAIM, 'value' => IamConfig::DEFAULT_DIRECTORY_GROUPS_CLAIM],
