@@ -158,6 +158,15 @@ final class RoutingCharacterizationTest extends TestCase
                 ['type' => 'docx', 'name' => 'text.docx'],
             ]],
 
+            // ---- Produce-a-file on attachments skips analyzefile (#2047, #2049) ----
+            // A chart from an attached table or a stamp on an attached image
+            // must reach the sorter even when it votes single-step: the
+            // multi_step force sends the turn to the planner, whose rule 3a
+            // arbitrates code_run vs file_analysis/image_generation.
+            ['id' => 'produce_chart_from_csv', 'text' => 'Mach daraus ein Balkendiagramm nach Region.', 'language' => 'de', 'fastPath' => false, 'files' => [['type' => 'csv', 'name' => 'sales.csv']], 'sorter' => ['topic' => 'general', 'language' => 'de', 'multi_step' => false]],
+            ['id' => 'produce_chart_from_csv_en', 'text' => 'Make a bar chart from this table, grouped by region.', 'language' => 'en', 'fastPath' => false, 'files' => [['type' => 'csv', 'name' => 'sales.csv']], 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => false]],
+            ['id' => 'produce_stamp_on_png', 'text' => 'Stempel unten rechts INTERNAL drauf.', 'language' => 'de', 'fastPath' => false, 'files' => [['type' => 'png', 'name' => 'logo.png']], 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image', 'multi_step' => false]],
+
             // ---- Sorter-driven: media generation params — migration-risk #3 ----
             ['id' => 'sort_image', 'text' => 'make an image of a cat', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image']],
             ['id' => 'sort_video_params', 'text' => 'make a 8s 720p clip', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'video', 'duration' => 8, 'resolution' => '720p']],

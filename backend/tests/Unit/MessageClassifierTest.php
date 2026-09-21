@@ -2265,6 +2265,125 @@ class MessageClassifierTest extends TestCase
         $this->assertFalse($result['multi_step'] ?? false);
     }
 
+    /**
+     * Issues #2047/#2049: an attached table/image plus a produce-a-file verb
+     * must reach the planner even without script vocabulary — otherwise the
+     * sorter wobbles between file_analysis and the media generator.
+     */
+    public function testChartRequestOnAttachedTableForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Mach daraus ein Balkendiagramm nach Region.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testStampRequestOnAttachedImageForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Stempel unten rechts INTERNAL drauf. Das vorhandene Bild, keins neu malen.',
+            fileType: 'png',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testEnglishChartRequestOnFileEntityForcesPlanner(): void
+    {
+        $file = $this->createStub(File::class);
+        $file->method('getFileType')->willReturn('csv');
+        $file->method('getFileName')->willReturn('sales-q3.csv');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Make a bar chart from this table, grouped by region.');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection([$file]));
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testDiagramQuestionAboutImageKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'What does this diagram show?',
+            fileType: 'png',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testSummaryRequestKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'Make me a summary of this document.',
+            fileType: 'pdf',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testChartRequestOnAudioKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'Make a bar chart from this.',
+            fileType: 'mp3',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function classifyWithFile(string $text, string $fileType): array
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn($fileType);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        return $this->service->classify($message);
+    }
+
     private function plainMessage(int $id, string $text): Message&MockObject
     {
         $message = $this->createMock(Message::class);
