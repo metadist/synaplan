@@ -1128,7 +1128,7 @@ services:
   # synaplan-tts README). The UI locale / detected reply language selects
   # the matching baked voice automatically.
   tts:
-    image: ghcr.io/metadist/synaplan-tts:latest@sha256:3c8ed60619be4ae1913e64ac35c28aa9b48da66e0e5006c972b91d0a5d278bb2
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:efa9f2188abca5603aa9c15dec59963cdf7070eb5a9e2564793a7ceba6c3642a
     container_name: synaplan-tts
     restart: unless-stopped
     ports:
