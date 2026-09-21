@@ -617,8 +617,13 @@ final readonly class CodeRunRunner implements TaskRunner
         if ([] === $descriptors) {
             $text = '' !== $stdout ? $stdout : 'File work finished. No new files were saved.';
         } else {
-            // The file line is verified truth read back from the artefacts,
-            // not the script's narration about itself (#2048).
+            // The files are the deliverable here: drop a pure self-narration
+            // ("X erfolgreich erstellt") that carries no data of its own, so
+            // an unverified success claim never sits above the verified facts
+            // (#2048). Anything with substance (numbers, rows) stays.
+            if (self::isSelfNarration($stdout, $result['artefacts'])) {
+                $stdout = '';
+            }
             $savedLine = 'Saved '.count($descriptors).' file(s): '.implode('; ', $this->artefactFacts($result['artefacts'])).'.';
             $text = '' !== $stdout ? $stdout."\n\n".$savedLine : 'File work finished.'."\n\n".$savedLine;
         }
@@ -632,6 +637,31 @@ final readonly class CodeRunRunner implements TaskRunner
                 'used_workspace' => true === ($result['used_workspace'] ?? false),
             ],
         );
+    }
+
+    /**
+     * True when stdout is pure self-narration about a produced file rather
+     * than an answer: short, digit-free, carrying a completion verb and
+     * naming one of the artefacts. Fail-open by design — anything that
+     * could be the answer (numbers, longer prose) is kept.
+     *
+     * @param list<array{file_id: int, name: string, mime: string, size: int}> $artefacts
+     */
+    private static function isSelfNarration(string $stdout, array $artefacts): bool
+    {
+        if ('' === $stdout || mb_strlen($stdout) > 240 || 1 === preg_match('/\d/', $stdout)) {
+            return false;
+        }
+        if (1 !== preg_match('/\b(erfolgreich|successfully|erstellt|created|gespeichert|saved|fertig|done|completed|bereinigt|cleaned|finished)\b/i', $stdout)) {
+            return false;
+        }
+        foreach ($artefacts as $artefact) {
+            if ('' !== $artefact['name'] && str_contains($stdout, $artefact['name'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -573,6 +573,92 @@ final class CodeRunRunnerTest extends TestCase
     }
 
     /**
+     * Issue #2048: when files were produced, a pure self-narration
+     * ("X erfolgreich erstellt") carries no verified information — drop it
+     * so no unvalidated success claim sits above the readback facts.
+     */
+    public function testPureNarrationSuppressedWhenArtefactsExist(): void
+    {
+        $dir = '/tmp/coderun_narrate_'.bin2hex(random_bytes(4));
+        mkdir($dir, 0777, true);
+        try {
+            file_put_contents($dir.'/chart.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+            $png = $this->storedFile(105, 'chart.png', 'image/png', $dir.'/chart.png');
+
+            $client = $this->succeededClient("Balkendiagramm erfolgreich erstellt: chart.png\n");
+
+            $artefacts = $this->createStub(ComputeArtefactStore::class);
+            $artefacts->method('ingest')->willReturn([$png]);
+
+            $files = $this->createMock(FileRepository::class);
+            $files->method('find')->willReturn($png);
+
+            $result = $this->runner($client, $files, $artefacts)->run(
+                new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+                $this->context(),
+            );
+
+            $this->assertTrue($result->isSuccessful());
+            $this->assertStringContainsString('Saved 1 file(s): chart.png (PNG image, 1x1,', (string) $result->text);
+            $this->assertStringNotContainsString('erfolgreich', (string) $result->text);
+        } finally {
+            array_map('unlink', glob($dir.'/*') ?: []);
+            @rmdir($dir);
+        }
+    }
+
+    /**
+     * stdout that carries substance (numbers, rows) is the answer and stays —
+     * next to the verified facts, so a mismatch is visible, not hidden.
+     */
+    public function testDataStdoutKeptAlongsideVerifiedFacts(): void
+    {
+        $dir = '/tmp/coderun_narrate_'.bin2hex(random_bytes(4));
+        mkdir($dir, 0777, true);
+        try {
+            file_put_contents($dir.'/totals.csv', "region,revenue\nNorth,38000\n");
+            $csv = $this->storedFile(106, 'totals.csv', 'text/csv', $dir.'/totals.csv');
+
+            $client = $this->succeededClient("Total revenue: 38000\n");
+
+            $artefacts = $this->createStub(ComputeArtefactStore::class);
+            $artefacts->method('ingest')->willReturn([$csv]);
+
+            $files = $this->createMock(FileRepository::class);
+            $files->method('find')->willReturn($csv);
+
+            $result = $this->runner($client, $files, $artefacts)->run(
+                new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+                $this->context(),
+            );
+
+            $this->assertTrue($result->isSuccessful());
+            $this->assertStringContainsString('Total revenue: 38000', (string) $result->text);
+            $this->assertStringContainsString('totals.csv (CSV, 1 rows × 2 columns; headers: region, revenue)', (string) $result->text);
+        } finally {
+            array_map('unlink', glob($dir.'/*') ?: []);
+            @rmdir($dir);
+        }
+    }
+
+    private function succeededClient(string $stdout): ComputeClient
+    {
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('submitRun')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'succeeded',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 2],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => $stdout, 'stderr' => '']);
+
+        return $client;
+    }
+
+    /**
      * Issue #1875 / PR #1949: missing COMPUTE_CONCURRENT / COMPUTE_CPU_SECONDS_DAILY
      * rows must fall back using the resolved group tier, not the billing level.
      */

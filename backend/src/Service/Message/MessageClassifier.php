@@ -359,8 +359,15 @@ final readonly class MessageClassifier
         // would answer with `language: 'en'` — must not intercept it.
         $embeddingDeclinedForLanguage = false;
 
+        // Produce-a-file turns must reach the planner deterministically
+        // (#2047, #2049): they skip every sorter-skipping short-circuit
+        // below, and the multi_step force after the sorter sends them to
+        // the planner, whose rule 3a arbitrates code_run.
+        $produceFileWork = $this->messageRequestsFileProduction($message, $text);
+
         if (null === $overrideModelId
             && !empty($text)
+            && !$produceFileWork
             && $this->embeddingRouterConfig->isEnabled($userId)
             && !$this->isSelfAwareQuestion($text, $userId)
         ) {
@@ -437,6 +444,7 @@ final readonly class MessageClassifier
         if ($allowRoutingDeferral
             && null === $overrideModelId
             && !empty($text)
+            && !$produceFileWork
             && !$embeddingDeclinedForLanguage
             && $this->nativeToolRoutingConfig->isEnabled($userId)
             && !$this->isSelfAwareQuestion($text, $userId)
@@ -1182,8 +1190,9 @@ final readonly class MessageClassifier
     /**
      * Attached document/image/table plus a verb that produces a new file —
      * without naming a runtime. Questions about the file ("what does this
-     * diagram show", "make me a summary") must not match: EN produce verbs
-     * require a chart/file object, and audio/video attachments are excluded.
+     * diagram show", "make me a summary") must not match: bare nouns fire
+     * only for unambiguous compounds, otherwise the produce verb must pair
+     * with a chart/file object (Turkish allows both orders: verb-last).
      */
     private function messageRequestsFileProduction(Message $message, string $text): bool
     {
@@ -1191,15 +1200,38 @@ final readonly class MessageClassifier
             return false;
         }
 
-        if (1 === preg_match('/\b(mach\s+daraus|erzeug\w*|erstell\w*|(balken|torten|säulen|linien)?diagramm|stempel\w*|wasserzeichen|zuschneiden)\b/iu', $text)) {
+        // German: produce verbs, compound chart nouns, image-edit verbs.
+        if (1 === preg_match('/\b(mach\s+daraus|erzeug\w*|erstell\w*|(balken|torten|säulen|linien)?diagramm|stempel\w*|wasserzeichen|zuschneiden|skalier\w*|bereinig\w*|sauber)\b/iu', $text)) {
             return true;
         }
 
-        if (1 === preg_match('/\b(save\s+as|export\s+as|(bar|pie|line)\s+chart|watermark|stamp|crop)\b/i', $text)) {
+        // English: bare nouns only for unambiguous compounds, otherwise a
+        // produce verb paired with a chart/file object.
+        if (1 === preg_match('/\b(save\s+as|export\s+as|clean\s*up|(bar|pie|line)\s+chart|watermark|stamp|crop|resize|rotate)\b/i', $text)) {
             return true;
         }
 
-        return 1 === preg_match('/\b(make|create|generat\w+|build|draw|plot)\b.{0,40}\b(chart|diagram|graph|plot|image|file)\b/i', $text);
+        if (1 === preg_match('/\b(make|create|generat\w+|build|draw|plot)\b.{0,40}\b(chart|diagram|graph|plot|image|file)\b/i', $text)) {
+            return true;
+        }
+
+        // Spanish, French, Turkish: same verb+object discipline (Turkish
+        // allows the verb last), plus unambiguous compounds.
+        if (1 === preg_match('/\b(crea|genera|haz|guarda|exporta)\b.{0,40}\b(gráfi?co|diagram?a|imagen|archivo)\b/iu', $text)
+            || 1 === preg_match('/\b(diagrama de barras|diagrama circular|sello|marca de agua|recorta)\b/iu', $text)
+        ) {
+            return true;
+        }
+
+        if (1 === preg_match('/\b(crée|génère|fais|enregistre|exporte)\b.{0,40}\b(graphique|diagramme|image|fichier)\b/iu', $text)
+            || 1 === preg_match('/\b(camembert|tampon|filigrane|recadre)\b/iu', $text)
+        ) {
+            return true;
+        }
+
+        return 1 === preg_match('/\b(oluştur|olustur|yarat|kaydet|kaydedin|oluşturun)\b.{0,40}\b(grafik|diyagram|resim|dosya)\b/iu', $text)
+            || 1 === preg_match('/\b(grafik|diyagram|resim|dosya)\b.{0,40}\b(oluştur|olustur|yarat|kaydet|kaydedin|oluşturun)\b/iu', $text)
+            || 1 === preg_match('/\bpasta grafiği\b|\b(damga|filigran|kırp)\b/iu', $text);
     }
 
     /**
