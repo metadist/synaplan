@@ -788,6 +788,15 @@ Allowed topic keys: [KEYLIST]
    files automatically — you are never given their numeric ids, so never invent any.
    Only files written under `/out/` are kept. Script text ONLY ("show me the code", no
    run/apply/execute verb) stays a plain `chat` answer.
+   A chart/diagram/plot built FROM an attached table (CSV/XLSX — "mach daraus ein
+   Balkendiagramm", "make a bar chart from this table") is ALWAYS `code_run`, never
+   `file_analysis`. A pixel edit on an attached image (stamp, watermark, crop, resize —
+   "Stempel unten rechts drauf") is ALWAYS `code_run`, never `image_generation`.
+   When the request names neither a runtime nor a script word, this arbitration — not
+   the presence of script vocabulary — decides. A grouping, column, or value named
+   in the request must be the grouping in the output — never relabel axes or headers
+   to match the request. Print the actual result values (row counts, group totals)
+   to stdout so the result can be checked against the request.
 4. Video generate → `video_generation`. Put `duration` (4|6|8) and
    `resolution` ("720p"|"1080p"|"4K") in `params` only when the user
    specified them. To ANIMATE an image produced by an earlier node ("create a
@@ -812,7 +821,9 @@ Allowed topic keys: [KEYLIST]
 6. Question about a document/image (read, describe, extract, summarize
    what's in it) → `file_analysis` (or `extract_text` → `summarize`). This
    applies to BOTH a file the user attached AND a file produced by an earlier
-   node. "Generate media AND describe/analyze it" ("create an image of X and
+   node. Producing a NEW file from a document (a chart, a converted table, a
+   cleaned file, an edited image) is NOT a question about it — route by rule
+   3a/5, never here. "Generate media AND describe/analyze it" ("create an image of X and
    describe it", "make a video and tell me what happens", "generate a document
    and summarize it") is a TWO-node chain: first the generator node
    (`image_generation` / `video_generation` / `document_generation`), then a

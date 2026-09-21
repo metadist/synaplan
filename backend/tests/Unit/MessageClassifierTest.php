@@ -2265,6 +2265,313 @@ class MessageClassifierTest extends TestCase
         $this->assertFalse($result['multi_step'] ?? false);
     }
 
+    /**
+     * Issues #2047/#2049: an attached table/image plus a produce-a-file verb
+     * must reach the planner even without script vocabulary — otherwise the
+     * sorter wobbles between file_analysis and the media generator.
+     */
+    public function testChartRequestOnAttachedTableForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Mach daraus ein Balkendiagramm nach Region.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testStampRequestOnAttachedImageForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Stempel unten rechts INTERNAL drauf. Das vorhandene Bild, keins neu malen.',
+            fileType: 'png',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testEnglishChartRequestOnFileEntityForcesPlanner(): void
+    {
+        $file = $this->createStub(File::class);
+        $file->method('getFileType')->willReturn('csv');
+        $file->method('getFileName')->willReturn('sales-q3.csv');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Make a bar chart from this table, grouped by region.');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection([$file]));
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testDiagramQuestionAboutImageKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'What does this diagram show?',
+            fileType: 'png',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testSummaryRequestKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'Make me a summary of this document.',
+            fileType: 'pdf',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testChartRequestOnAudioKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'Make a bar chart from this.',
+            fileType: 'mp3',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testCleanCsvRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Clean up this CSV, semicolons and German decimals.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testSauberRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Mach diese Datei sauber.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testBereinigRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Bereinige die Tabelle und entferne Leerzeilen.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testResizeRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Resize this image to half.',
+            fileType: 'png',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testSpanishChartRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Haz un gráfico de barras con esta tabla.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testFrenchChartRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Crée un graphique à partir de ce tableau.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testTurkishChartRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Bu tablodan bir grafik oluştur.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    /**
+     * German bare "Diagramm" fires by design (terse creation requests like
+     * "Balkendiagramm nach Region" carry no verb): a genuine question about
+     * a chart costs one planner call and still lands on file_analysis via
+     * planner rule 6. Locked so the tradeoff stays explicit.
+     */
+    public function testGermanDiagramQuestionStillReachesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Was zeigt das Diagramm?',
+            fileType: 'png',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    /**
+     * A produce-a-file turn must skip the embedding-router short-circuit
+     * even when enabled with a confident mediamaker match: the deterministic
+     * planner route wins over the model-driven topic vote.
+     */
+    public function testProduceTurnSkipsEmbeddingRouterShortCircuit(): void
+    {
+        $embedding = $this->createMock(EmbeddingRouterService::class);
+        $embedding->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'language' => 'de',
+            'media_type' => 'image',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embedding, $sorter, true);
+        $result = $classifier->classify($this->attachedMessage(
+            'Stempel unten rechts INTERNAL drauf.',
+            fileType: 'png',
+        ));
+
+        $this->assertTrue($result['multi_step']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * Same for the native-tool deferral layer: a produce-a-file turn must
+     * reach the sorter (and the multi_step force), never the chat handoff.
+     */
+    public function testProduceTurnSkipsNativeDeferralShortCircuit(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static function (int $owner, string $group, string $setting): ?string {
+                if ('NATIVE_TOOL_ROUTING' === $group && 'ENABLED' === $setting) {
+                    return '1';
+                }
+
+                return null;
+            }
+        );
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultProvider')->willReturn('anthropic');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $modelConfig,
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            new NativeToolRoutingConfig($configRepo),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
+            new SelfAwareConfig($configRepo),
+        );
+        $result = $classifier->classify($this->attachedMessage(
+            'Mach daraus ein Balkendiagramm nach Region.',
+            fileType: 'csv',
+        ));
+
+        $this->assertTrue($result['multi_step']);
+        $this->assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    private function attachedMessage(string $text, string $fileType): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn($fileType);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        return $message;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function classifyWithFile(string $text, string $fileType): array
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn($fileType);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        return $this->service->classify($message);
+    }
+
     private function plainMessage(int $id, string $text): Message&MockObject
     {
         $message = $this->createMock(Message::class);
