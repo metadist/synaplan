@@ -224,6 +224,7 @@ test('local development, deployment, and test tooling does not trigger an app re
     '_devextras/reorganize-env.sh',
     '_devextras/screenvideo/package.json',
     '_1st_install_linux.sh',
+    'install.sh',
     'docker-compose.yml',
     'docker-compose.test.yml',
     'deploy/compose.yaml',

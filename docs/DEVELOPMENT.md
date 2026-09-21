@@ -78,7 +78,7 @@ block.
 
 ### Secure compute
 
-Short Python or Node file work for the assistant. `docker compose up` starts
+Short Python or Node file work for the assistant. `make up` starts
 the sidecar, builds the Python/Node runtimes from this repo, and turns the
 feature on. PHP never talks to Docker. Never publish port 8080.
 
@@ -92,7 +92,7 @@ Website fetches stay off (`COMPUTE.EGRESS_ENABLED`). See
 Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
 legacy-format analysis, and “Combine as PDF” need a **Collabora CODE** sidecar
 (`collabora/code`). The sidecar is **off by default** (`profiles: [office]`), so
-`docker compose up -d` does not pull the image or spend the extra ~2 GB RAM.
+`make up` does not pull the image or spend the extra ~2 GB RAM.
 The compose file defaults `OFFICE_CONVERT_URL` to `http://collabora:9980`;
 override that env for an external CODE, or set `OFFICE_CONVERT_URL=disabled`.
 
@@ -209,7 +209,7 @@ Both resolve to the host gateway (`host-gateway`). Use `docker-host` in `backend
 
 ### Vector database (Qdrant)
 
-Qdrant ships with the main compose file and starts automatically with `docker compose up -d`.
+Qdrant ships with the main compose file and starts automatically with `make up`.
 The backend reaches it via `QDRANT_URL=http://qdrant:6333` (or `http://docker-host:6333` for production parity).
 No extra repo or external service needed.
 
@@ -285,7 +285,7 @@ make -C frontend generate-schemas
 ```bash
 # Reset database (deletes all data!)
 docker compose down -v
-docker compose up -d
+make up
 
 # Run migrations
 docker compose exec backend php bin/console doctrine:migrations:migrate

@@ -800,7 +800,7 @@ The following command **permanently destroys all data** including the database, 
 
 ```bash
 docker compose down -v
-docker compose up -d
+make up
 ```
 
 **Do not run `docker compose down -v` on production systems.**

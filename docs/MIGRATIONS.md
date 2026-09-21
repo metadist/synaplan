@@ -101,7 +101,7 @@ dedicated migration that explicitly UPDATEs the rows.
 
 ```bash
 docker compose down -v       # blows away the db volume
-docker compose up -d         # entrypoint runs migrations + fixtures + seed
+make up                      # entrypoint runs migrations + fixtures + seed
 ```
 
 ## Container Startup Behaviour
@@ -244,7 +244,7 @@ Simulate a legacy production DB before deploying:
 
 ```bash
 # 1. Reset
-docker compose down -v && docker compose up -d
+docker compose down -v && make up
 # Wait for entrypoint to finish — you now have a freshly migrated dev DB.
 
 # 2. Drop the migration metadata to simulate "legacy prod"
