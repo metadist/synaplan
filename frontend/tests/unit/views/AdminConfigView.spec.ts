@@ -155,4 +155,20 @@ describe('AdminConfigView — managed provider keys (D2)', () => {
     expect(wrapper.find('input[name="GOOGLE_API_KEY"], #GOOGLE_API_KEY').exists()).toBe(false)
     expect(wrapper.text()).toContain('AI infrastructure › Models & keys')
   })
+
+  it('folds later sections and opens them from the header or jump nav', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.get('#config-section-openai').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#config-section-higgsfield').attributes('data-open')).toBe('false')
+    expect(wrapper.find('[data-testid="btn-jump-section-google"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="btn-config-section-higgsfield"]').trigger('click')
+    expect(wrapper.get('#config-section-higgsfield').attributes('data-open')).toBe('true')
+
+    await wrapper.get('[data-testid="btn-config-accordion-toggle-all"]').trigger('click')
+    expect(wrapper.get('#config-section-openai').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#config-section-higgsfield').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#config-section-google').attributes('data-open')).toBe('true')
+  })
 })

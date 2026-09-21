@@ -318,6 +318,11 @@
         "communication": "Comunicación",
         "security": "Funciones y acceso"
       },
+      "accordion": {
+        "expandAll": "Expandir todo",
+        "collapseAll": "Contraer todo",
+        "jumpTo": "Ir a la sección"
+      },
       "brandingMode": {
         "light": "Está editando los ajustes del modo CLARO — los colores guardados aquí se aplican en el modo claro. Cambie la aplicación al modo oscuro para editar los colores del modo oscuro.",
         "dark": "Está editando los ajustes del modo OSCURO — los colores guardados aquí se aplican en el modo oscuro. Cambie la aplicación al modo claro para editar los colores del modo claro."

@@ -320,6 +320,11 @@
         "communication": "Communication",
         "security": "Features & Access"
       },
+      "accordion": {
+        "expandAll": "Expand all",
+        "collapseAll": "Collapse all",
+        "jumpTo": "Jump to section"
+      },
       "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",
       "brandingMode": {
