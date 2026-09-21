@@ -920,7 +920,7 @@ final readonly class GatewayToolLoop
         }
 
         if (AnalyzeImageTool::NAME === $tool) {
-            $result = $this->analyzeImageTool->execute($arguments, $user->getId());
+            $result = $this->analyzeImageTool->execute($arguments, $user->getId(), $user->getLocale());
             $this->recordNativeUsage($user, 'VISION', $tool, $result['summary'], $result['isError']);
 
             return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);

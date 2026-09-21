@@ -94,6 +94,7 @@ final readonly class GeneratedDocumentStore
                 'requested_format' => $requestedFormat,
             ]);
             $extension = $requestedFormat;
+            $fileData['extension'] = $requestedFormat;
             $filename = pathinfo($filename, PATHINFO_FILENAME).'.'.$requestedFormat;
         }
 

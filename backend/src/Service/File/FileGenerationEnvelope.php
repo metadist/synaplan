@@ -55,16 +55,21 @@ final class FileGenerationEnvelope
     }
 
     /**
-     * Office format the user explicitly named in the request ("als Excel",
-     * "as a Word document", "in PowerPoint"), as a canonical extension — or
-     * null when no format was named.
+     * Office format the user explicitly named as the OUTPUT in the request
+     * ("als Excel", "as a Word document", "in PowerPoint"), as a canonical
+     * extension — or null when no output format was named.
      *
-     * Last match wins ("mach aus dem CSV ein Excel" → xlsx). Deliberately
-     * conservative: bare "word" is excluded ("in other words"), and PDF is
-     * excluded (the BEXPORT/pdf-engine logic owns that path, not this one).
+     * URLs are stripped first (a link ending in .xlsx is a source, never the
+     * output), and mentions reading as the SOURCE ("from this Excel", "aus
+     * dem CSV") are skipped — last remaining match wins ("mach aus dem CSV
+     * ein Excel" → xlsx). Deliberately conservative: bare "word" is excluded
+     * ("in other words"), and PDF is excluded (the BEXPORT/pdf-engine logic
+     * owns that path, not this one).
      */
     public static function requestedFormat(string $text): ?string
     {
+        $text = (string) preg_replace('#https?://\S+#i', ' ', $text);
+
         $patterns = [
             'xlsx' => '/\b\.?xlsx?\b|\bexcel\b|\bspreadsheet\b/i',
             'docx' => '/\b\.?docx?\b|word-dokument|word-datei|microsoft word|\bals word\b|\bas word\b|\bword document\b/i',
@@ -79,14 +84,29 @@ final class FileGenerationEnvelope
                 continue;
             }
             foreach ($matches[0] as [$match, $pos]) {
-                if ($pos >= $winnerPos) {
-                    $winner = $extension;
-                    $winnerPos = $pos;
+                if ($pos < $winnerPos || self::isSourceMention($text, $pos)) {
+                    continue;
                 }
+                $winner = $extension;
+                $winnerPos = $pos;
             }
         }
 
         return $winner;
+    }
+
+    /**
+     * Whether the format mention at $pos reads as the SOURCE rather than the
+     * requested output: a source preposition with at most one word between it
+     * and the format ("from this Excel", "aus dem CSV"). Kept tight so "von
+     * CSV nach Excel" still elects Excel.
+     */
+    private static function isSourceMention(string $text, int $pos): bool
+    {
+        $start = max(0, $pos - 30);
+        $before = substr($text, $start, $pos - $start);
+
+        return 1 === preg_match('/\b(from|aus|vom|von|de|del|desde|du|depuis)\b\s*(\w+\s*){0,1}$/iu', $before);
     }
 
     /**

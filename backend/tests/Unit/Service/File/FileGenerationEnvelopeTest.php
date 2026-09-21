@@ -129,6 +129,9 @@ class FileGenerationEnvelopeTest extends TestCase
         yield 'german excel' => ['Vergleich Plan und Ist, ich will die Abweichung als Excel.', 'xlsx'];
         yield 'english xlsx' => ['Compare plan and actual, give me the variance as xlsx.', 'xlsx'];
         yield 'last match wins' => ['Mach aus dem CSV ein Excel.', 'xlsx'];
+        yield 'source mention loses to output' => ['Create a Word document from this Excel spreadsheet.', 'docx'];
+        yield 'von csv nach excel' => ['Konvertiere von CSV nach Excel.', 'xlsx'];
+        yield 'url source never elects' => ['Lad https://example.com/data.xlsx und mach ein Diagramm.', null];
         yield 'csv explicit' => ['Export the table as CSV, please.', 'csv'];
         yield 'word document' => ['Write it as a Word document.', 'docx'];
         yield 'german word compound' => ['Schreib mir ein Word-Dokument dazu.', 'docx'];

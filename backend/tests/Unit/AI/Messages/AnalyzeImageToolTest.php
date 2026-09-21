@@ -116,7 +116,10 @@ final class AnalyzeImageToolTest extends TestCase
         $vision->method('isAvailable')->willReturn(true);
 
         $presenter = $this->createMock(ChatErrorPresenter::class);
-        $presenter->method('present')->willReturn(new ChatErrorView(
+        $presenter->expects(self::once())->method('present')->with(
+            self::isInstanceOf(\RuntimeException::class),
+            'de',
+        )->willReturn(new ChatErrorView(
             ChatFailureReason::ContextLengthExceeded,
             'That image is too large to analyse.',
             null,
@@ -137,7 +140,7 @@ final class AnalyzeImageToolTest extends TestCase
             'prompt' => 'What is on this page?',
             'image_base64' => base64_encode('fake-png-bytes'),
             'media_type' => 'image/png',
-        ], 9);
+        ], 9, 'de');
 
         self::assertTrue($result['isError']);
         self::assertSame('That image is too large to analyse.', $result['text']);

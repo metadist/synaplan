@@ -88,7 +88,7 @@ final readonly class AnalyzeImageTool
      *
      * @return array{text: string, isError: bool, summary: string}
      */
-    public function execute(array $input, ?int $userId = null): array
+    public function execute(array $input, ?int $userId = null, ?string $locale = null): array
     {
         $prompt = \is_string($input['prompt'] ?? null) ? trim($input['prompt']) : '';
         if ('' === $prompt) {
@@ -134,7 +134,7 @@ final readonly class AnalyzeImageTool
             // The tool result goes back to the API client: present the
             // localized reason, keep the raw message in the log (#1074).
             $copy = $this->errorPresenter instanceof ChatErrorPresenter
-                ? $this->errorPresenter->present($e, 'en')->userText
+                ? $this->errorPresenter->present($e, $locale ?? 'en')->userText
                 : 'Something went wrong while answering this request. Please try again.';
 
             return $this->error($copy);

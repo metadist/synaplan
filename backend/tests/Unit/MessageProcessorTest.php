@@ -1003,6 +1003,57 @@ class MessageProcessorTest extends TestCase
     }
 
     /**
+     * Issue #2050: when reading the linked pages throws, the failure must be
+     * recorded as an explicit zero — generator guards treat a missing value
+     * as "no read ran" and would otherwise invent content for the unread URL.
+     */
+    public function testFailedUrlReadRecordsExplicitZero(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(79);
+        $message->method('getText')->willReturn('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn(['https://example.com/data.csv']);
+        $urlContent->expects($this->never())->method('fetchMultiple');
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $research->method('readMentionedUrls')->willThrowException(new \RuntimeException('reader down'));
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(false);
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification) {
+                $this->assertSame(0, $classification['url_pages_read']);
+                $this->assertArrayNotHasKey('url_content', $classification);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $processor->processStream($message, static function (): void {}, static function (array $event): void {});
+    }
+
+    /**
      * A research question: the search runs, and its results are deepened
      * with the read pages before the answer model sees them. The sources
      * are streamed first (fast), the pages-read update follows.

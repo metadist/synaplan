@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\GeneratedDocumentStore;
+use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\UserUploadPathBuilder;
 use Doctrine\ORM\EntityManagerInterface;
@@ -194,6 +195,39 @@ final class GeneratedDocumentStoreTest extends TestCase
 
         self::assertNotNull($bundle);
         self::assertSame('docx', $bundle->primary()->getFileType());
+    }
+
+    public function testPdfExportUsesOverriddenExtension(): void
+    {
+        $capturedOptions = null;
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(true);
+        $converter->method('convert')->willReturnCallback(
+            function (string $source, string $target, array $options) use (&$capturedOptions): string {
+                $capturedOptions = $options;
+                $pdf = dirname($source).'/tmp-export.pdf';
+                file_put_contents($pdf, '%PDF-ok');
+
+                return $pdf;
+            }
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Vergleich als Excel, bitte.');
+
+        $bundle = $this->store($converter)->store(
+            ['filename' => 'vergleich.csv', 'content' => "Q1,1\n", 'extension' => 'csv', 'export' => 'pdf'],
+            $message,
+        );
+
+        self::assertNotNull($bundle);
+        self::assertNotNull($bundle->export);
+        self::assertSame(
+            DocumentExportService::conversionOptions('xlsx'),
+            $capturedOptions,
+            'the PDF export must convert with the overridden extension, not the envelope one',
+        );
     }
 
     private function store(OfficeConverterClient $converter): GeneratedDocumentStore

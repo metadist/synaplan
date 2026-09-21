@@ -1294,6 +1294,10 @@ final readonly class MessageProcessor
                 'error' => $e->getMessage(),
             ]);
 
+            // A failed read is still a read outcome: record the explicit zero
+            // so generator guards cannot mistake it for "no read ran" (#2050).
+            $classification['url_pages_read'] = 0;
+
             return $classification;
         }
 

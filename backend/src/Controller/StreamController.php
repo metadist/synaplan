@@ -31,6 +31,7 @@ use App\Service\File\GeneratedDocumentBundle;
 use App\Service\File\GeneratedDocumentStore;
 use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
+use App\Service\File\UnreadSourceGuard;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
@@ -139,6 +140,7 @@ class StreamController extends AbstractController
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
         private ?ProviderDisplayNames $providerDisplayNames = null,
+        private ?UnreadSourceGuard $unreadSourceGuard = null,
     ) {
     }
 
@@ -1683,8 +1685,21 @@ class StreamController extends AbstractController
                     // sentence no longer skips file creation and leaks the raw
                     // blob into the chat (#1406).
                     $fileEnvelope = FileGenerationEnvelope::extract($responseText);
+                    $refusal = null !== $fileEnvelope && null !== $this->unreadSourceGuard
+                        ? $this->unreadSourceGuard->refusalFor(
+                            (string) $incomingMessage->getText(),
+                            $classification['url_pages_read'] ?? null,
+                            $classification['language'] ?? 'en',
+                        )
+                        : null;
 
-                    if (null !== $fileEnvelope) {
+                    if (null !== $refusal) {
+                        // A named source URL went unread: honest refusal
+                        // instead of an invented document — same guard as
+                        // DocumentGenerationRunner (#2050).
+                        $this->logger->info('StreamController: refusing file generation, unread source URL');
+                        $finalText = $refusal;
+                    } elseif (null !== $fileEnvelope) {
                         $this->logger->info('StreamController: Detected AI file generation', [
                             'filename' => $fileEnvelope['filename'],
                         ]);

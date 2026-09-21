@@ -22,6 +22,7 @@ use App\Service\FeedbackConfigService;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
+use App\Service\File\UnreadSourceGuard;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
@@ -1844,6 +1845,83 @@ class ChatHandlerTest extends TestCase
 
         self::assertIsArray($capturedOptions);
         self::assertArrayNotHasKey('structured_output', $capturedOptions);
+    }
+
+    /**
+     * Issue #2050: single-node document plans bypass the DAG runner via the
+     * legacy router, so the unread-source guard must also hold here — an
+     * envelope answer on top of an unread source becomes the refusal text
+     * and no file is stored.
+     */
+    public function testHandleRefusesEnvelopeWhenSourceWentUnread(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $this->aiFacade
+            ->method('chat')
+            ->willReturn(['content' => '{"BFILEPATH":"chart.xlsx","BFILETEXT":"A,10"}', 'provider' => 'openai', 'model' => 'gpt-5.5-pro']);
+
+        $guard = $this->createMock(UnreadSourceGuard::class);
+        $guard->method('refusalFor')->willReturn('REFUSAL');
+
+        $handler = new ChatHandler(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->promptService,
+            $this->modelConfigService,
+            $this->modelRepository,
+            $this->logger,
+            $this->vectorSearchService,
+            $this->em,
+            '/tmp/uploads',
+            $this->userUploadPathBuilder,
+            $this->userMemoryService,
+            $this->feedbackConfigService,
+            $this->rateLimitService,
+            $this->memoryExtractionDispatcher,
+            $this->perfPipelineFlag,
+            $this->createMock(DocumentGeneratorService::class),
+            $this->createMock(DocumentImageReferenceResolver::class),
+            $this->createMock(DocumentImageCatalog::class),
+            new TimeContextBuilder(),
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->digestSearchService,
+            $this->digestConfig,
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
+            unreadSourceGuard: $guard,
+        );
+
+        $result = $handler->handle(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'de', 'model_id' => 206, 'url_pages_read' => 0],
+        );
+
+        self::assertSame('REFUSAL', $result['content']);
+        self::assertFalse($result['metadata']['document_generation']['created'] ?? true);
     }
 
     /**

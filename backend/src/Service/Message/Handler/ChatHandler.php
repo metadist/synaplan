@@ -38,6 +38,7 @@ use App\Service\File\GeneratedDocumentStore;
 use App\Service\File\GeneratedImageVisionFlag;
 use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
+use App\Service\File\UnreadSourceGuard;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\MemoryExtractionDispatcher;
@@ -138,6 +139,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private ?PlatformDocsRetriever $platformDocsRetriever = null,
         private ?ContextCondenser $contextCondenser = null,
         private ?ModelContextWindow $modelContextWindow = null,
+        private ?UnreadSourceGuard $unreadSourceGuard = null,
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
     }
@@ -925,7 +927,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Check for file generation format first (for OfficeM maker)
         $fileData = $this->extractFileGenerationData($content);
-        if (null !== $fileData) {
+        $refusal = null !== $fileData && null !== $this->unreadSourceGuard
+            ? $this->unreadSourceGuard->refusalFor(
+                (string) $message->getText(),
+                $classification['url_pages_read'] ?? null,
+                $classification['language'] ?? 'en',
+            )
+            : null;
+        if (null !== $refusal) {
+            // A named source URL went unread: honest refusal instead of an
+            // invented document — same guard as DocumentGenerationRunner,
+            // which single-node plans bypass via the legacy router (#2050).
+            $this->logger->info('ChatHandler: refusing file generation, unread source URL');
+            $content = $refusal;
+            $metadata['document_generation'] = ['created' => false, 'reason' => 'source_unread'];
+        } elseif (null !== $fileData) {
             $this->logger->info('ChatHandler: Detected AI file generation');
 
             // Store the file (ephemeral in incognito mode so it is cleaned up

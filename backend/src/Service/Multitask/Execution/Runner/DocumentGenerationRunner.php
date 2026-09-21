@@ -7,6 +7,7 @@ namespace App\Service\Multitask\Execution\Runner;
 use App\Entity\Message;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\FileGenerationEnvelope;
+use App\Service\File\UnreadSourceGuard;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -14,7 +15,6 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
-use App\Service\UrlContentService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -36,24 +36,10 @@ final readonly class DocumentGenerationRunner implements TaskRunner
     /** A document illustrated by a whole gallery is not what the planner means. */
     private const MAX_UPSTREAM_IMAGES = 4;
 
-    /**
-     * Asked instead of writing the file when the message names a source URL
-     * no fetch could read. Returned as a successful text-only result (not
-     * failed()): reply nodes only see `.text`, so a failure here would hide
-     * the cause behind a generic fallback while the file stayed missing.
-     */
-    private const UNREAD_SOURCE_TEXT = [
-        'en' => 'I could not read %s, so no file was created. Check that the link opens in a browser, then ask again.',
-        'de' => 'Ich konnte %s nicht lesen, daher wurde keine Datei erstellt. Prüfe, ob der Link im Browser funktioniert, und frag dann erneut.',
-        'es' => 'No pude leer %s, así que no se creó ningún archivo. Comprueba que el enlace funcione en un navegador y vuelve a preguntar.',
-        'fr' => 'Je n\'ai pas pu lire %s, donc aucun fichier n\'a été créé. Vérifiez que le lien s\'ouvre dans un navigateur, puis redemandez.',
-        'tr' => '%s okunamadı, bu yüzden dosya oluşturulmadı. Bağlantının tarayıcıda açıldığını kontrol edin, sonra tekrar sorun.',
-    ];
-
     public function __construct(
         private ChatHandler $handler,
         private LoggerInterface $logger,
-        private UrlContentService $urlContent,
+        private UnreadSourceGuard $unreadSourceGuard,
     ) {
     }
 
@@ -93,15 +79,16 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             ? $context->classification['language']
             : ($context->message->getLanguage() ?: 'en');
 
-        $unreadUrl = $this->namedButUnreadSourceUrl($context);
-        if (null !== $unreadUrl) {
-            $template = self::UNREAD_SOURCE_TEXT[$language] ?? self::UNREAD_SOURCE_TEXT['en'];
-
-            return NodeResult::ok(sprintf($template, $unreadUrl), [], [
+        $refusal = $this->unreadSourceGuard->refusalFor(
+            (string) $context->message->getText(),
+            $context->classification['url_pages_read'] ?? null,
+            $language,
+        );
+        if (null !== $refusal) {
+            return NodeResult::ok($refusal, [], [
                 'document_generation' => [
                     'created' => false,
                     'reason' => 'source_unread',
-                    'url' => $unreadUrl,
                 ],
             ]);
         }
@@ -263,37 +250,6 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         }
 
         return ltrim($relative, '/');
-    }
-
-    /**
-     * First URL the message treats as a source that no fetch could read — or
-     * null when generation may proceed: no URL named, at least one page read,
-     * the URL is incidental (no load/use verb), or no read ran at all
-     * (URL reading off — not this node's call).
-     */
-    private function namedButUnreadSourceUrl(NodeContext $context): ?string
-    {
-        $read = $context->classification['url_pages_read'] ?? null;
-        if (!is_int($read) || $read > 0) {
-            return null;
-        }
-        $text = (string) $context->message->getText();
-        $urls = $this->urlContent->extractUrls($text);
-        if ([] === $urls) {
-            return null;
-        }
-        if (!self::textDemandsSourceRead($text)) {
-            return null;
-        }
-
-        return mb_strlen($urls[0]) > 80 ? mb_substr($urls[0], 0, 80).'…' : $urls[0];
-    }
-
-    private static function textDemandsSourceRead(string $text): bool
-    {
-        return 1 === preg_match('/\b(lad\w*|load\w*|lies|lese\w*|read\w*|fetch\w*|hol\w*|nutz\w*|us(e|ing)|verwend\w*|zusammenfass\w*|summariz\w*|summaris\w*)\b/i', $text)
-            || 1 === preg_match('/\b(aus|von|from)\s+https?:\/\//i', $text)
-            || 1 === preg_match('/basierend auf|based on/i', $text);
     }
 
     private function syntheticMessage(NodeContext $context, string $prompt, string $language): Message
