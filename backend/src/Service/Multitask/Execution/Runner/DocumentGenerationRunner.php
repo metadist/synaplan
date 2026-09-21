@@ -6,6 +6,7 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
 use App\Service\File\DocumentImageCatalog;
+use App\Service\File\FileGenerationEnvelope;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -61,6 +62,15 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         $prompt = $this->stringInput($inputs['prompt'] ?? $inputs['text'] ?? null) ?? (string) $context->message->getText();
         if ('' === trim($prompt)) {
             return NodeResult::failed('no prompt for document_generation');
+        }
+
+        // A format named in the ORIGINAL request ("als Excel") wins even when
+        // the planner's prompt no longer mentions it. Appending the directive
+        // keeps the envelope consistent; GeneratedDocumentStore enforces the
+        // same rule deterministically as a backstop (#2051).
+        $namedFormat = FileGenerationEnvelope::requestedFormat((string) $context->message->getText());
+        if (null !== $namedFormat) {
+            $prompt .= "\n\nThe file MUST be a .{$namedFormat} file (the user explicitly asked for this format).";
         }
 
         $language = is_string($context->classification['language'] ?? null)

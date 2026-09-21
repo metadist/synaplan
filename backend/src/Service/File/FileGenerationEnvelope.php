@@ -55,6 +55,41 @@ final class FileGenerationEnvelope
     }
 
     /**
+     * Office format the user explicitly named in the request ("als Excel",
+     * "as a Word document", "in PowerPoint"), as a canonical extension — or
+     * null when no format was named.
+     *
+     * Last match wins ("mach aus dem CSV ein Excel" → xlsx). Deliberately
+     * conservative: bare "word" is excluded ("in other words"), and PDF is
+     * excluded (the BEXPORT/pdf-engine logic owns that path, not this one).
+     */
+    public static function requestedFormat(string $text): ?string
+    {
+        $patterns = [
+            'xlsx' => '/\b\.?xlsx?\b|\bexcel\b|\bspreadsheet\b/i',
+            'docx' => '/\b\.?docx?\b|word-dokument|word-datei|microsoft word|\bals word\b|\bas word\b|\bword document\b/i',
+            'pptx' => '/\b\.?pptx?\b|powerpoint|präsentation|presentation/i',
+            'csv' => '/\b\.?csv\b/i',
+        ];
+
+        $winner = null;
+        $winnerPos = -1;
+        foreach ($patterns as $extension => $pattern) {
+            if (1 !== preg_match_all($pattern, $text, $matches, PREG_OFFSET_CAPTURE)) {
+                continue;
+            }
+            foreach ($matches[0] as [$match, $pos]) {
+                if ($pos >= $winnerPos) {
+                    $winner = $extension;
+                    $winnerPos = $pos;
+                }
+            }
+        }
+
+        return $winner;
+    }
+
+    /**
      * Candidate JSON object strings to attempt, in order of confidence.
      *
      * @return list<string>

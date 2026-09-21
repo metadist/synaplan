@@ -806,7 +806,9 @@ Allowed topic keys: [KEYLIST]
    The `image` input makes it an image-to-video render (IMG2VID); without it the
    node falls back to text-to-video.
 5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
-   chat). Real PDFs are NOT supported — say so in a single `chat` node.
+   chat). A format named in the request ("als Excel", "as Word") wins — pass
+   it through in the node prompt. Real PDFs are NOT supported — say so in a
+   single `chat` node.
    To put a picture generated in the SAME turn INTO the document ("create a
    photo and a job application containing it"), let the document node depend on
    the image node and pass its file:
@@ -1560,7 +1562,9 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
   "BFILETEXT": "file content here"
 }
 
-- **BFILEPATH**: The filename with appropriate extension (.csv, .xlsx, .docx, .pptx)
+- **BFILEPATH**: The filename with appropriate extension (.csv, .xlsx, .docx, .pptx).
+  When the user names a format ("als Excel", "as Word", "in PowerPoint", "als CSV"),
+  BFILEPATH MUST use that extension — never default to .csv when Excel was asked for.
 - **BFILETEXT**: The actual file content
 
 ## Supported Formats
