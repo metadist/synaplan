@@ -232,13 +232,14 @@ test.describe('@ci Navigation journeys', () => {
       await expect(page).toHaveURL(/\/ai\/providers/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(selectors.pages.aiAccounts)).toBeVisible()
       await expect(page.locator('[data-testid="section-higgsfield"]')).toBeVisible()
+      await page.locator('[data-testid="btn-ai-accounts-higgsfield"]').click()
       await expect(page.locator('[data-testid="btn-higgsfield-test"]')).toBeVisible()
 
       await page.goto('/ai/providers/higgsfield', { waitUntil: 'commit' })
       await expect(page).toHaveURL(/\/ai\/providers\?section=higgsfield/, {
         timeout: TIMEOUTS.STANDARD,
       })
-      await expect(page.locator('[data-testid="section-higgsfield"]')).toBeVisible()
+      await expect(page.locator('[data-testid="btn-higgsfield-test"]')).toBeVisible()
     })
   })
 
