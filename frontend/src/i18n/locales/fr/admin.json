@@ -885,6 +885,7 @@
         "private": "À vous",
         "privateTitle": "Cette discussion vous appartient. La partager ne change pas cela.",
         "sharedWithPeople": "1 personne | {count} personnes",
+        "sharedWithPeopleTitle": "Partagée avec 1 personne | Partagée avec {count} personnes",
         "group": "Groupe",
         "groupTitle": "Partagée avec le groupe « {name} »",
         "groupTitleGeneric": "Partagée avec un groupe",

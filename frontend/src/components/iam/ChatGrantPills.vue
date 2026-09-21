@@ -12,6 +12,7 @@
     kind="direct"
     :size="size"
     :text="t('iam.incoming.pill.sharedWithPeople', { count: summary?.people ?? 0 })"
+    :title="t('iam.incoming.pill.sharedWithPeopleTitle', { count: summary?.people ?? 0 })"
   />
 </template>
 

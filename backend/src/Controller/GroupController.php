@@ -177,12 +177,13 @@ final class GroupController extends AbstractController
         $ip = (string) ($request->getClientIp() ?? '');
         $withdraw = $request->query->getBoolean('withdrawShares');
         $withdrawn = 0;
-        if ($withdraw) {
-            $withdrawn = $this->shareService->withdrawOwnGrantsToGroup($user, (int) $group->getId(), $ip);
-        }
 
         try {
-            $this->groupService->leave($group, $user, $ip, $withdrawn);
+            if ($withdraw) {
+                $withdrawn = $this->groupService->leaveAndStopSharing($group, $user, $ip, $this->shareService);
+            } else {
+                $this->groupService->leave($group, $user, $ip, 0);
+            }
         } catch (GroupMembershipNotFoundException) {
             return $this->json(['error' => 'You are not a member of this group.'], Response::HTTP_NOT_FOUND);
         } catch (DirectoryGroupReadOnlyException $e) {

@@ -238,6 +238,28 @@ final readonly class GroupService
     }
 
     /**
+     * Leave and delete this member's grants to the group in one transaction.
+     * Resource-kind cleanup runs only after that transaction commits, so a
+     * failed membership removal cannot leave the grants already gone.
+     */
+    public function leaveAndStopSharing(Group $group, User $actor, string $ip, ShareService $shares): int
+    {
+        /** @var list<array{kind: string, resourceId: string, subject: array{subjectType: string, subjectId: int}}> $revoked */
+        $revoked = [];
+        $count = $this->groupRepository->transactional(
+            function () use ($group, $actor, $ip, $shares, &$revoked): int {
+                $revoked = $shares->deleteOwnGrantsToGroup($actor, (int) $group->getId(), $ip);
+                $this->leave($group, $actor, $ip, \count($revoked));
+
+                return \count($revoked);
+            }
+        );
+        $shares->notifyRevocations($revoked);
+
+        return $count;
+    }
+
+    /**
      * @return list<array{group: Group, role: string, source: string}>
      */
     public function groupsOf(int $userId): array

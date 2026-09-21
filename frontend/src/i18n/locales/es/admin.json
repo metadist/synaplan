@@ -881,6 +881,7 @@
         "private": "Propio",
         "privateTitle": "Este chat es suyo. Compartirlo no cambia eso.",
         "sharedWithPeople": "1 persona | {count} personas",
+        "sharedWithPeopleTitle": "Compartido con 1 persona | Compartido con {count} personas",
         "group": "Grupo",
         "groupTitle": "Compartido con el grupo «{name}»",
         "groupTitleGeneric": "Compartido con un grupo",

@@ -297,7 +297,11 @@
                 :label="chat.kindLabel"
                 :is-new="chat.isNew"
               />
-              <ChatGrantPills v-if="chat.type === 'my'" size="sm" :summary="chat.shareSummary" />
+              <ChatGrantPills
+                v-if="iamSharingEnabled && chat.type === 'my'"
+                size="sm"
+                :summary="chat.shareSummary"
+              />
               <span
                 v-if="chat.type === 'shared' && chat.access"
                 class="text-xs txt-secondary"

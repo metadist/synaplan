@@ -154,9 +154,11 @@ class ChatController extends AbstractController
 
         $chatIds = array_map(static fn (Chat $chat) => $chat->getId(), $chats);
         $sessionMap = $this->widgetSessionService->getSessionMapForChats($chatIds);
-        $shareSummaries = $this->shareService->summarizeConversations(array_values(array_filter(
-            array_map(static fn (Chat $chat): int => (int) $chat->getId(), $chats),
-        )));
+        $shareSummaries = $this->iamConfig->isSharingEnabled((int) $user->getId())
+            ? $this->shareService->summarizeConversations(array_values(array_filter(
+                array_map(static fn (Chat $chat): int => (int) $chat->getId(), $chats),
+            )))
+            : [];
 
         $result = array_map(function (Chat $chat) use ($sessionMap, $shareSummaries) {
             // Get first user message preview (first 30 chars)

@@ -885,6 +885,7 @@
         "private": "Owned",
         "privateTitle": "You own this chat. Sharing it does not change that.",
         "sharedWithPeople": "1 person | {count} people",
+        "sharedWithPeopleTitle": "Shared with 1 person | Shared with {count} people",
         "group": "Group",
         "groupTitle": "Shared with the group \"{name}\"",
         "groupTitleGeneric": "Shared with a group",

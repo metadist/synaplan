@@ -311,34 +311,61 @@ final readonly class ShareService
      */
     public function withdrawOwnGrantsToGroup(User $actor, int $groupId, string $ip = ''): int
     {
+        $revoked = $this->deleteOwnGrantsToGroup($actor, $groupId, $ip);
+        $this->notifyRevocations($revoked);
+
+        return \count($revoked);
+    }
+
+    /**
+     * Removes the rows and writes the audit. Does not notify resource kinds, so
+     * a surrounding transaction can still roll the delete back together with
+     * the membership change.
+     *
+     * @return list<array{kind: string, resourceId: string, subject: array{subjectType: string, subjectId: int}}>
+     */
+    public function deleteOwnGrantsToGroup(User $actor, int $groupId, string $ip = ''): array
+    {
+        $revoked = [];
         $shares = $this->shareRepository->findGrantedByUserToGroup((int) $actor->getId(), $groupId);
         foreach ($shares as $share) {
             $kind = $share->getResourceKind();
             $resourceId = $share->getResourceId();
+            $subject = [
+                'subjectType' => Share::SUBJECT_GROUP,
+                'subjectId' => $groupId,
+            ];
             $this->shareRepository->remove($share);
             $this->auditLogWriter->record(
                 (int) $actor->getId(),
                 'share.revoke',
                 $kind,
                 $resourceId,
-                [
-                    'subjectType' => Share::SUBJECT_GROUP,
-                    'subjectId' => $groupId,
-                    'reason' => 'leave_and_stop_sharing',
-                ],
+                $subject + ['reason' => 'leave_and_stop_sharing'],
                 $ip,
             );
+            $revoked[] = [
+                'kind' => $kind,
+                'resourceId' => $resourceId,
+                'subject' => $subject,
+            ];
+        }
+
+        return $revoked;
+    }
+
+    /**
+     * @param list<array{kind: string, resourceId: string, subject: array{subjectType: string, subjectId: int}}> $revoked
+     */
+    public function notifyRevocations(array $revoked): void
+    {
+        foreach ($revoked as $row) {
             try {
-                $this->registry->get($kind)->onShareChanged($resourceId, [
-                    'subjectType' => Share::SUBJECT_GROUP,
-                    'subjectId' => $groupId,
-                ]);
+                $this->registry->get($row['kind'])->onShareChanged($row['resourceId'], $row['subject']);
             } catch (UnknownResourceKindException) {
                 // The row is already gone. An uninstalled kind has nothing left to clean up.
             }
         }
-
-        return \count($shares);
     }
 
     /**

@@ -885,6 +885,7 @@
         "private": "Eigene",
         "privateTitle": "Das ist dein Chat. Teilen ändert das nicht.",
         "sharedWithPeople": "1 Person | {count} Personen",
+        "sharedWithPeopleTitle": "Mit 1 Person geteilt | Mit {count} Personen geteilt",
         "group": "Gruppe",
         "groupTitle": "Mit der Gruppe „{name}“ geteilt",
         "groupTitleGeneric": "Mit einer Gruppe geteilt",

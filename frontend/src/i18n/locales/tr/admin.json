@@ -881,6 +881,7 @@
         "private": "Size ait",
         "privateTitle": "Bu sohbet size ait. Paylaşmak bunu değiştirmez.",
         "sharedWithPeople": "{count} kişi",
+        "sharedWithPeopleTitle": "{count} kişiyle paylaşıldı",
         "group": "Grup",
         "groupTitle": "\"{name}\" grubuyla paylaşıldı",
         "groupTitleGeneric": "Bir grupla paylaşıldı",

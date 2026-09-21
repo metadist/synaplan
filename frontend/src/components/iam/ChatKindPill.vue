@@ -2,7 +2,7 @@
   <span
     class="inline-flex items-center gap-1 rounded-md font-medium whitespace-nowrap max-w-full"
     :class="[sizeClass, toneClass]"
-    :title="title"
+    :title="tooltip"
     :data-testid="`pill-chat-kind-${kind}`"
     :data-kind="kind"
   >
@@ -42,11 +42,13 @@ const props = withDefaults(
     label?: string | null
     /** Replaces the default caption, for example a people-count on an owned chat. */
     text?: string | null
+    /** Replaces the kind's default tooltip when the same kind is used for a different audience. */
+    title?: string | null
     /** Red dot: this chat arrived after the user last opened Incoming. */
     isNew?: boolean
     size?: 'xs' | 'sm'
   }>(),
-  { label: null, text: null, isNew: false, size: 'xs' }
+  { label: null, text: null, title: null, isNew: false, size: 'xs' }
 )
 
 const { t } = useI18n()
@@ -103,7 +105,9 @@ const text = computed(() => {
   }
 })
 
-const title = computed(() => {
+const tooltip = computed(() => {
+  const override = props.title?.trim()
+  if (override) return override
   switch (props.kind) {
     case 'group': {
       const name = props.label?.trim() ?? ''

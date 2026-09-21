@@ -368,7 +368,7 @@
             :error-reason="errorReason"
             :error-message="errorMessage"
             :has-partial-answer="hasPartialAnswer"
-            :can-retry-model="canRetryModel"
+            :can-retry-model="canRewrite !== false && canRetryModel"
             :error-debug="errorDebug"
             :recommended-model-id="selectedModel?.id ?? null"
             :failed-model-id="failedModelId"
@@ -1815,6 +1815,7 @@ const handleSimpleAgain = () => {
 }
 
 const handleErrorRetry = (modelId?: number) => {
+  if (props.canRewrite === false) return
   emit('again', props.backendMessageId ?? 0, modelId)
 }
 
