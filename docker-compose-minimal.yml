@@ -317,7 +317,7 @@ services:
     # Pinned to Redis 7.4 for Centrifugo pub/sub compatibility (see
     # docker-compose.yml for the full rationale). Redis 8.x dropped publication
     # fan-out to the Centrifugo node and broke realtime delivery.
-    image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    image: redis:7.4-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
     container_name: synaplan-redis
     command: >-
       redis-server
@@ -447,7 +447,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.3.3@sha256:ab1c3dd381940233af12512b97d47b508fd3a0f17fbe3ba388739b7bc17cbc0b
+    image: mariadb:12.3.3@sha256:805c8e104bd563d5bfa24fadd3f31cd419ea859cb5277f32b5dbf2db714f9ed1
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
