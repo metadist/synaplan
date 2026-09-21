@@ -56,6 +56,13 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
     request,
     credentials,
   }) => {
+    // Fourteen full page boots in one test: every legacy bookmark reloads the
+    // whole SPA (~4s in CI), so the loop needs ~65s end to end — past the 60s
+    // default, which killed healthy runs mid-boot on whatever row was last
+    // (blank page, legacy URL, "Test timeout exceeded"). A genuinely broken
+    // redirect still fails fast: each row below asserts on its own STANDARD
+    // budget, so only the sum gets headroom here.
+    test.setTimeout(120_000)
     const agentsEnabled = await isAgentsEnabled(request, credentials)
     await openApp(page)
 
