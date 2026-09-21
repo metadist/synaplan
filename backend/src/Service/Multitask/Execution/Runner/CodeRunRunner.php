@@ -581,17 +581,11 @@ final readonly class CodeRunRunner implements TaskRunner
             ]);
         }
         if ('ok' !== $result['outcome']) {
-            // Honest outcome (U8): when the user asked to run code and it ran but
-            // errored, show WHAT failed — the stderr tail carries the real cause
-            // (stack trace / syntax error) — not just a generic "it failed" line.
+            // U8: one sentence a non-technical user understands — never a
+            // stack trace. The stderr tail stays in the server log (the
+            // 'CodeRunRunner: run failed' warning) so a failed run is still
+            // diagnosable; it must not reach user-facing copy (#2052).
             $message = (string) $result['error'];
-            $stderr = trim((string) $result['stderr']);
-            if ('' !== $stderr) {
-                if (mb_strlen($stderr) > self::STDERR_REPLY_CAP) {
-                    $stderr = '…'.mb_substr($stderr, -self::STDERR_REPLY_CAP);
-                }
-                $message .= "\n\n```\n".$stderr."\n```";
-            }
 
             return NodeResult::failed($message, [
                 'used_workspace' => true === ($result['used_workspace'] ?? false),

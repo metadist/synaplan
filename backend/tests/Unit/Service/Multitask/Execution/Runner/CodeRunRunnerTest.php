@@ -418,6 +418,37 @@ final class CodeRunRunnerTest extends TestCase
     }
 
     /**
+     * Issue #2052: a failed run must surface the one-sentence outcome only.
+     * The interpreter output stays in the server log, never in user copy.
+     */
+    public function testFailedRunKeepsStderrOutOfTheUserMessage(): void
+    {
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('submitRun')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'failed',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 1,
+            reason: 'program_error',
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn([
+            'stdout' => '',
+            'stderr' => "Traceback (most recent call last):\n  File \"/work/_synaplan_main.py\", line 11, in <module>\nKeyError: 'order_amount'",
+        ]);
+
+        $result = $this->runner($client, $this->createStub(FileRepository::class))->run(
+            new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+            $this->context(),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertSame('File work could not finish. Nothing new was saved.', $result->error);
+    }
+
+    /**
      * Issue #1875 / PR #1949: missing COMPUTE_CONCURRENT / COMPUTE_CPU_SECONDS_DAILY
      * rows must fall back using the resolved group tier, not the billing level.
      */
