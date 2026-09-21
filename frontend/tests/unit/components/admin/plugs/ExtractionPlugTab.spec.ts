@@ -119,6 +119,31 @@ describe('ExtractionPlugTab', () => {
     )
   })
 
+  it('folds later families and opens them from the header or jump nav', async () => {
+    const wrapper = mount(ExtractionPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+          RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('#extraction-section-document').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#extraction-section-video').attributes('data-open')).toBe('false')
+    expect(wrapper.find('[data-testid="btn-jump-section-video"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="btn-extraction-section-video"]').trigger('click')
+    expect(wrapper.get('#extraction-section-video').attributes('data-open')).toBe('true')
+
+    await wrapper.get('[data-testid="btn-extraction-accordion-toggle-all"]').trigger('click')
+    expect(wrapper.get('#extraction-section-document').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#extraction-section-audio').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#extraction-section-video').attributes('data-open')).toBe('true')
+    wrapper.unmount()
+  })
+
   it('does not save when a family chain is empty', async () => {
     const wrapper = mount(ExtractionPlugTab, {
       global: {

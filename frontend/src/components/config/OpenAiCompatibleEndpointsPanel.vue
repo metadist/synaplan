@@ -1,8 +1,8 @@
 <template>
-  <div class="surface-card p-6" data-testid="openai-endpoints-panel">
+  <div :class="embedded ? '' : 'surface-card p-6'" data-testid="openai-endpoints-panel">
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
       <div>
-        <h2 class="text-xl font-semibold txt-primary">
+        <h2 v-if="!embedded" class="text-xl font-semibold txt-primary">
           {{ t('config.openaiEndpoints.title') }}
         </h2>
         <p class="text-sm txt-secondary mt-1">
@@ -333,6 +333,8 @@ import {
 import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
 
 type AuthType = 'none' | 'bearer' | 'header'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const { t } = useI18n()
 const dialog = useDialog()

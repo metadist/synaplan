@@ -1,9 +1,9 @@
 <template>
   <div class="space-y-6" data-testid="admin-ai-models-panel">
-    <div class="surface-card p-6" data-testid="admin-ai-models-editor">
+    <div :class="embedded ? '' : 'surface-card p-6'" data-testid="admin-ai-models-editor">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
         <div>
-          <h2 class="text-xl font-semibold txt-primary">
+          <h2 v-if="!embedded" class="text-xl font-semibold txt-primary">
             {{ t('config.aiModels.admin.editModels') }}
           </h2>
           <p class="text-sm txt-secondary mt-1">
@@ -502,6 +502,8 @@ import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { adminModelsApi, type AdminModel } from '@/services/api/adminModelsApi'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const { t } = useI18n()
 const dialog = useDialog()

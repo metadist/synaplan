@@ -1,6 +1,6 @@
 <template>
-  <div class="surface-card p-6" data-testid="add-model-form">
-    <h2 class="text-xl font-semibold txt-primary mb-1">
+  <div :class="embedded ? '' : 'surface-card p-6'" data-testid="add-model-form">
+    <h2 v-if="!embedded" class="text-xl font-semibold txt-primary mb-1">
       {{ t('config.aiModels.admin.addForm.title') }}
     </h2>
     <p class="text-sm txt-secondary mb-5">
@@ -140,6 +140,8 @@ import {
   adminOpenAiEndpointsApi,
   type OpenAiEndpoint,
 } from '@/services/api/adminOpenAiEndpointsApi'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
 const emit = defineEmits<{ created: [] }>()
 
