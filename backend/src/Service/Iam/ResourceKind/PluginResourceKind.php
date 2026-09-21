@@ -68,7 +68,7 @@ final readonly class PluginResourceKind implements ShareableResourceKindInterfac
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
     }
 

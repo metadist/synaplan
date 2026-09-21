@@ -198,7 +198,10 @@ final readonly class ShareService
             ['subjectType' => $subjectType, 'subjectId' => $subjectId],
             $ip,
         );
-        $this->registry->get($kind)->onShareChanged($resourceId);
+        $this->registry->get($kind)->onShareChanged($resourceId, [
+            'subjectType' => $subjectType,
+            'subjectId' => $subjectId,
+        ]);
     }
 
     /**

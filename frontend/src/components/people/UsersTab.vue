@@ -95,7 +95,9 @@
                     class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                     :disabled="user.id === currentUserId"
                     :data-testid="`select-user-level-${user.id}`"
-                    @change="updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)"
+                    @change="
+                      updateUserLevel(user.id, ($event.target as HTMLSelectElement).value, $event)
+                    "
                   >
                     <option value="ANONYMOUS">ANONYMOUS</option>
                     <option value="NEW">NEW</option>
@@ -324,15 +326,37 @@ function debouncedSearchUsers() {
   }, 300)
 }
 
-async function updateUserLevel(userId: number, newLevel: string) {
+async function updateUserLevel(userId: number, newLevel: string, event?: Event) {
+  const user = users.value.find((u: AdminUser) => u.id === userId)
+  const oldLevel = user?.level
+  const revertSelect = () => {
+    const select = event?.target as HTMLSelectElement | undefined
+    if (select && oldLevel) select.value = oldLevel
+  }
+  const email = user?.email ?? `#${userId}`
+
+  const confirmed = await confirm({
+    title: t('admin.users.levelConfirmTitle', { email }),
+    message:
+      newLevel === 'ADMIN'
+        ? t('admin.users.levelConfirmAdmin', { email })
+        : t('admin.users.levelConfirmMessage', { email, oldLevel, newLevel }),
+    confirmText: t('admin.users.levelConfirmAction'),
+    danger: newLevel === 'ADMIN',
+  })
+  if (!confirmed) {
+    revertSelect()
+    return
+  }
+
   try {
     await adminApi.updateUserLevel(userId, newLevel)
-    const user = users.value.find((u: AdminUser) => u.id === userId)
     if (user) {
       user.level = newLevel as 'NEW' | 'PRO' | 'TEAM' | 'BUSINESS' | 'ADMIN'
     }
     success(t('admin.users.levelUpdated', { level: newLevel }))
   } catch (error) {
+    revertSelect()
     showError(error instanceof Error ? error.message : t('admin.users.levelUpdateFailed'))
   }
 }

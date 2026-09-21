@@ -21,8 +21,13 @@ interface ShareableResourceKindInterface
      */
     public function listOwnedBy(int $userId): iterable;
 
-    /** e.g. invalidate caches after a share change */
-    public function onShareChanged(string $resourceId): void;
+    /**
+     * e.g. invalidate caches after a share change.
+     *
+     * @param array{subjectType: string, subjectId: int}|null $revokedSubject Set on revoke,
+     *                                                                        null on grant or permission change
+     */
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void;
 
     /**
      * Subset of read|use|edit|manage this kind can grant to a share subject.

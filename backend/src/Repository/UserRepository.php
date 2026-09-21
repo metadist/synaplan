@@ -97,6 +97,15 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
+     * Rows at exactly this BUSERLEVEL. Used by the last-administrator guard
+     * on the admin level-change endpoint (#2059).
+     */
+    public function countByUserLevel(string $level): int
+    {
+        return $this->count(['userLevel' => $level]);
+    }
+
+    /**
      * Find user by Stripe customer ID (searches in paymentDetails JSON).
      */
     public function findByStripeCustomerId(string $stripeCustomerId): ?User

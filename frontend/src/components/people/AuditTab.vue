@@ -115,6 +115,7 @@ const ACTION_KEYS: Record<string, string> = {
   'platform_instance.registered': 'people.audit.action.platform_instance_registered',
   'platform_instance.approved': 'people.audit.action.platform_instance_approved',
   'platform_instance.revoked': 'people.audit.action.platform_instance_revoked',
+  'admin.user_level_change': 'people.audit.action.admin_user_level_change',
 }
 
 const selectedAction = ref<string | undefined>(undefined)

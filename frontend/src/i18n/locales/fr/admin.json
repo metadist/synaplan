@@ -164,6 +164,10 @@
       "userDeleteFailed": "Échec de la suppression de l’utilisateur",
       "levelUpdated": "Niveau utilisateur mis à jour : {level}",
       "levelUpdateFailed": "Échec de la mise à jour du niveau utilisateur",
+      "levelConfirmTitle": "Modifier le niveau de {email} ?",
+      "levelConfirmMessage": "{email} passe de {oldLevel} à {newLevel}. Le nouveau niveau s'applique immédiatement.",
+      "levelConfirmAdmin": "{email} devient administrateur avec un accès complet à toutes les fonctions d'administration. Cela s'applique immédiatement.",
+      "levelConfirmAction": "Modifier le niveau",
       "loadFailed": "Impossible de charger les utilisateurs",
       "invalidResponse": "Le serveur a renvoyé une réponse inattendue"
     },
@@ -752,7 +756,8 @@
         "platform_link_redirect_rejected": "Redirection de plateforme refusée",
         "platform_instance_registered": "Plateforme enregistrée",
         "platform_instance_approved": "Plateforme approuvée",
-        "platform_instance_revoked": "Plateforme révoquée"
+        "platform_instance_revoked": "Plateforme révoquée",
+        "admin_user_level_change": "Niveau utilisateur modifié"
       }
     },
     "linkedPlatforms": {
