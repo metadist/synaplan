@@ -335,7 +335,7 @@
             :plan="displayTaskPlan"
             :schedule-source="scheduleSource"
             :source-message-id="backendMessageId"
-            :guest="isGuestMode"
+            :guest="isGuestMode || canRewrite === false"
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
             @followup-task="emit('followupTask', $event)"
@@ -346,6 +346,7 @@
             <MediaJobStatus
               :media-job="mediaJob!"
               :model-label="mediaJobModelLabel ?? undefined"
+              :readonly="canRewrite === false"
               @update:media-job="emit('mediaJobUpdate', $event)"
               @completed="emit('mediaJobCompleted', $event)"
               @cancel="emit('mediaJobCancel', $event)"
@@ -923,6 +924,8 @@
                   {{ $t('limitReached.upgradeNow') }}
                 </button>
                 <button
+                  v-if="canRewrite !== false"
+                  type="button"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   @click="handleRetry"
                 >
@@ -1165,8 +1168,9 @@ interface Props {
   // Status for failed/pending messages
   isGuestMode?: boolean
   /**
-   * Owner-only rewrite actions (Again, Again with, Continue). Shared chats
-   * keep Continue as my copy on the banner instead.
+   * Owner-only writes (Again, Again with, Continue, task-plan Stop/Retry,
+   * rate-limit Retry). Shared chats keep Continue as my copy on the banner.
+   * Undefined still shows the actions; only an explicit false hides them.
    */
   canRewrite?: boolean
   /**
@@ -1763,6 +1767,7 @@ const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
 
 // Handle retry for rate-limited messages
 const handleRetry = () => {
+  if (props.canRewrite === false) return
   // Extract text content from message
   const textContent = props.parts
     .filter((p) => p.type === 'text')

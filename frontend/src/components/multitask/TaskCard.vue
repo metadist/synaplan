@@ -68,7 +68,9 @@ const showSkeleton = computed(
 // goes through ComputeClient::cancel() on the PHP wait timeout, not this button.
 const isComputeKind = computed(() => props.card.kind === 'compute')
 
-const canCancel = computed(() => isMediaKind.value && props.card.state === 'running')
+const canCancel = computed(
+  () => !props.isReadonly && isMediaKind.value && props.card.state === 'running'
+)
 
 // Live render progress (e.g. Higgsfield video) — a moving bar instead of a
 // static spinner. Only meaningful once the backend has reported a percentage.
@@ -170,7 +172,11 @@ const retryModel = computed((): AIModel | null => {
 })
 
 const canRetry = computed(
-  () => props.card.state === 'failed' && !!props.card.prompt && retryModel.value !== null
+  () =>
+    !props.isReadonly &&
+    props.card.state === 'failed' &&
+    !!props.card.prompt &&
+    retryModel.value !== null
 )
 
 const handleRetry = () => {

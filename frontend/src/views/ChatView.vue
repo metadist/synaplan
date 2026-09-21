@@ -252,7 +252,7 @@
               :usage-extra="message.usageExtra"
               :usage-taximeter-active="usageTaximeterStore.active"
               :is-guest-mode="isGuestMode"
-              :can-rewrite="!sharedConversationLocked"
+              :can-rewrite="canRewriteConversation"
               :foreign-memory="sharedConversationLocked"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
@@ -757,6 +757,10 @@ const canComposeSharedChat = computed(() => {
   }
   return !isIamSharingEnabled()
 })
+// Owner-only writes (Again, Retry, Stop, task-plan controls). Unresolved
+// access stays null while the lookup is in flight or has failed, so it must
+// not count as owner — same rule as the composer.
+const canRewriteConversation = canComposeSharedChat
 
 const continueSharedConversation = async () => {
   const id = chatsStore.activeChatId
@@ -4630,6 +4634,7 @@ const streamAIResponse = async (
 // persist the partial answer as cancelled (/save-cancelled). This is distinct
 // from navigating away, which detaches WITHOUT cancelling (handleNavigateAway).
 const handleUserStop = async () => {
+  if (!canRewriteConversation.value) return
   // CRITICAL: Abort signal FIRST to prevent any further chunk processing
   if (streamingAbortController) {
     streamingAbortController.abort()
@@ -4674,7 +4679,7 @@ const handleUserStop = async () => {
     }
   } else if (effectiveTrackId) {
     try {
-      await chatApi.stopStream(effectiveTrackId)
+      await chatApi.stopStream(effectiveTrackId, currentStreamingChatId ?? chatsStore.activeChatId)
     } catch (error) {
       console.error('❌ Failed to notify backend:', error)
     }
@@ -4858,6 +4863,7 @@ function extractUserText(message: Message): string {
 }
 
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
+  if (!canRewriteConversation.value) return
   if (!authStore.isAuthenticated) {
     console.error('❌ Not authenticated - redirecting to login')
     const { error } = useNotification()
@@ -4932,6 +4938,7 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
  * the original turn (with its successful parts) is left untouched.
  */
 const handleTaskFollowup = async (prompt: string) => {
+  if (!canRewriteConversation.value) return
   if (!authStore.isAuthenticated || isGuestMode.value) return
   if (!prompt.trim()) return
   const planMessage =
@@ -4947,6 +4954,7 @@ const handleTaskFollowup = async (prompt: string) => {
 }
 
 const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => {
+  if (!canRewriteConversation.value) return
   if (!authStore.isAuthenticated || isGuestMode.value) return
   if (!payload.prompt || !payload.modelId) return
 
@@ -4964,6 +4972,7 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
 // Mark the card cancelled immediately (the user's intent is the source of truth)
 // and signal the backend so the provider poll aborts and stops billing.
 const handleTaskCancel = async (nodeId: string) => {
+  if (!canRewriteConversation.value) return
   // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
   // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …), so
   // finding the FIRST active plan could match a stale earlier turn and cancel the
@@ -4986,7 +4995,7 @@ const handleTaskCancel = async (nodeId: string) => {
   const trackId = message?.taskPlan?.trackId ?? currentTrackId
   if (trackId !== undefined) {
     try {
-      await chatApi.cancelTask(trackId, nodeId)
+      await chatApi.cancelTask(trackId, nodeId, currentStreamingChatId ?? chatsStore.activeChatId)
     } catch {
       // Best-effort: the card already reflects the cancellation locally.
     }
@@ -5040,6 +5049,7 @@ function finishStreamingTurnLocally() {
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
+  if (!canRewriteConversation.value) return
   const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
   if (messageIndex <= 0) return
 
@@ -5065,6 +5075,7 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
 
 // Handle retry for rate-limited messages
 const handleRetryMessage = async (message: Message, content: string) => {
+  if (!canRewriteConversation.value) return
   // Clear the error status on the message
   historyStore.clearMessageError(message.id)
 
