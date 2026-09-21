@@ -45,11 +45,14 @@ use Psr\Log\LoggerInterface;
  *                      that connected calendar)
  *
  * Timezone precedence (a wall-clock time is meaningless without its zone):
- *   1. A zone the user named in THIS message ("10:00 UTC", "10 New York") —
- *      wins for this event, even over a stored profile zone.
- *   2. The stored profile timezone — authoritative, beats any planner guess.
- *   3. The planner timezone, when valid and not UTC (country inference).
- *   4. Otherwise the event is NOT written: the runner asks for the timezone
+ *   1. A zone the user named outright in THIS message (IANA identifier or
+ *      bare UTC/GMT token) — wins for this event, even over a stored profile
+ *      zone and whatever the planner emitted.
+ *   2. A planner zone corroborated by the user's own words (e.g. the city it
+ *      is named after, "10 New York").
+ *   3. The stored profile timezone — authoritative, beats any planner guess.
+ *   4. The planner timezone, when valid and not UTC (country inference).
+ *   5. Otherwise the event is NOT written: the runner asks for the timezone
  *      instead of stamping silent server UTC (#2010).
  */
 final readonly class CalendarEventRunner implements TaskRunner
@@ -262,20 +265,27 @@ final readonly class CalendarEventRunner implements TaskRunner
         $plannerTz = $this->validZone(is_string($params['timezone'] ?? null) ? trim($params['timezone']) : '');
         $profileTz = $this->profileTimezone($ownerId);
 
-        // 1. A zone the user named in this message wins for this event.
+        // 1. A zone the user named outright (IANA identifier or bare UTC/GMT
+        // token) wins even when the planner emitted something else.
+        $namedTz = $this->extractUserNamedZone($messageText);
+        if (null !== $namedTz && $namedTz !== $profileTz) {
+            return [new \DateTimeZone($namedTz), $namedTz, false];
+        }
+        // 2. A planner zone corroborated by the user's own words (e.g. the
+        // city it is named after) wins for this event.
         if (null !== $plannerTz && $plannerTz !== $profileTz && $this->isUserNamedZone($plannerTz, $messageText)) {
             return [new \DateTimeZone($plannerTz), $plannerTz, false];
         }
-        // 2. The stored profile zone is authoritative.
+        // 3. The stored profile zone is authoritative.
         if (null !== $profileTz) {
             return [new \DateTimeZone($profileTz), $profileTz, true];
         }
-        // 3. A planner zone that is not a silent UTC default (country inference).
+        // 4. A planner zone that is not a silent UTC default (country inference).
         if (null !== $plannerTz && 'UTC' !== strtoupper($plannerTz)) {
             return [new \DateTimeZone($plannerTz), $plannerTz, false];
         }
 
-        // 4. Server time only — never stamp it onto a wall-clock request.
+        // 5. Server time only — never stamp it onto a wall-clock request.
         return null;
     }
 
@@ -290,7 +300,7 @@ final readonly class CalendarEventRunner implements TaskRunner
             return null;
         }
 
-        return $name;
+        return $this->canonicalZoneName($name) ?? $name;
     }
 
     private function profileTimezone(int $userId): ?string
@@ -311,9 +321,56 @@ final readonly class CalendarEventRunner implements TaskRunner
     }
 
     /**
-     * Did the user name this zone in their own message (as opposed to the
-     * planner inferring or defaulting it)? Matches the IANA name itself, a
-     * bare UTC/GMT token for UTC, or the city the zone is named after.
+     * A zone the user named outright in their own message: a bare UTC/GMT
+     * token or an IANA identifier. Unlike isUserNamedZone() this does not
+     * depend on the planner having emitted the same zone first, so an
+     * explicit "10:00 UTC" wins even when the planner guessed otherwise.
+     */
+    private function extractUserNamedZone(string $messageText): ?string
+    {
+        if ('' === trim($messageText)) {
+            return null;
+        }
+        if (1 === preg_match('/\b(UTC|GMT)\b(?![+-]\d)/i', $messageText)) {
+            return 'UTC';
+        }
+        if (1 !== preg_match_all('#\b([A-Za-z][A-Za-z0-9_.+\-]*(?:/[A-Za-z0-9_.+\-]+)+)\b#', $messageText, $matches)) {
+            return null;
+        }
+        foreach ($matches[1] as $candidate) {
+            // Canonical lookup doubles as validation: lookalikes ("and/or",
+            // "Q3/2026") are not zones, and any casing ("europe/berlin")
+            // resolves to the spelled name ("Europe/Berlin").
+            $canonical = $this->canonicalZoneName($candidate);
+            if (null !== $canonical) {
+                return $canonical;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Canonical IANA spelling for a zone name in any casing, or null when it
+     * names no zone at all. Cached per request; the list is ~400 entries.
+     */
+    private function canonicalZoneName(string $candidate): ?string
+    {
+        static $byLower = null;
+        if (null === $byLower) {
+            $byLower = [];
+            foreach (\DateTimeZone::listIdentifiers() as $id) {
+                $byLower[strtolower($id)] = $id;
+            }
+        }
+
+        return $byLower[strtolower($candidate)] ?? null;
+    }
+
+    /**
+     * Did the user name this planner zone in their own message (as opposed to
+     * the planner inferring or defaulting it)? Matches the IANA name itself,
+     * a bare UTC/GMT token for UTC, or the city the zone is named after.
      */
     private function isUserNamedZone(string $tzName, string $messageText): bool
     {

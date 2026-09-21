@@ -188,6 +188,68 @@ final class CalendarTimezoneTest extends TestCase
         self::assertStringContainsString('(Europe/Berlin)', (string) $result->text);
     }
 
+    public function testUserNamedUtcBeatsPlannerZoneAndProfile(): void
+    {
+        // The planner missed the explicit mention and emitted Berlin anyway —
+        // the user's own "10:00 UTC" still wins.
+        $result = $this->runCalendar(
+            messageText: 'Deploy review tomorrow at 10:00 UTC',
+            params: ['title' => 'Deploy review', 'start' => '2026-09-19T10:00:00', 'timezone' => 'Europe/Berlin'],
+            profileTimezone: 'Europe/Berlin',
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertStringContainsString(
+            'Calendar invite "Deploy review" — 2026-09-19 10:00 (UTC)',
+            (string) $result->text
+        );
+        self::assertStringContainsString('DTSTART:20260919T100000Z', (string) $this->storedIcs);
+    }
+
+    public function testUserNamedIanaZoneBeatsPlannerZoneAndProfile(): void
+    {
+        $result = $this->runCalendar(
+            messageText: 'Call tomorrow at 10, America/New_York',
+            params: ['title' => 'NY call', 'start' => '2026-09-19T10:00:00', 'timezone' => 'Europe/Berlin'],
+            profileTimezone: 'Europe/Berlin',
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertStringContainsString('(America/New_York)', (string) $result->text);
+        self::assertStringContainsString('DTSTART:20260919T140000Z', (string) $this->storedIcs);
+    }
+
+    public function testLowercaseIanaZoneIsNormalized(): void
+    {
+        $result = $this->runCalendar(
+            messageText: 'Dentist tomorrow at 10, europe/berlin',
+            params: ['title' => 'Dentist', 'start' => '2026-09-19T10:00:00', 'timezone' => 'UTC'],
+            profileTimezone: null,
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertStringContainsString('(Europe/Berlin)', (string) $result->text);
+    }
+
+    public function testSlashLookalikeDoesNotExtractAZone(): void
+    {
+        $storage = $this->createMock(FileStorageService::class);
+        $storage->expects(self::never())->method('storeRawContent');
+
+        $runner = $this->runner($storage, null);
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+            'title' => 'Sync',
+            'start' => '2026-09-19T10:00:00',
+            'timezone' => 'UTC',
+        ]);
+
+        // "and/or" looks like a path but is not a zone — still ask.
+        $result = $runner->run($node, $this->context('Sync and/or review tomorrow at 10'));
+
+        self::assertCount(0, $result->files);
+        self::assertStringContainsString('I did not create "Sync"', (string) $result->text);
+    }
+
     /**
      * @param array<string, mixed> $params
      */
