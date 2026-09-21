@@ -885,7 +885,10 @@ Allowed topic keys: [KEYLIST]
    in the message ("load https://…", "was steht auf dieser Seite?",
    "summarize this article: https://…") → a `url_fetch` node (put the URL in
    `inputs.urls`), then feed `$nX.text` into the answering node
-   (`summarize`/`chat`/`translate`). A message that is nothing but a link
+   (`summarize`/`chat`/`translate`). A generator node (document/media) MUST
+   consume `$nX.text` from that `url_fetch` node and never invent rows or
+   content when the fetch produced nothing — a named-but-unread source fails
+   the turn honestly instead. A message that is nothing but a link
    (or a link plus a few words, incl. shortlinks like lnkd.in / t.co) means
    "read this and tell me what it says" → the same `url_fetch` → `chat`
    chain. Do NOT emit `url_fetch` for a link mentioned in passing that the

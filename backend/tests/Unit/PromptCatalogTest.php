@@ -266,6 +266,22 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('A format named in the request', $plan['prompt']);
     }
 
+    public function testPlanPromptRequiresFetchBeforeGeneration(): void
+    {
+        $plan = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:plan' === $entry['topic']) {
+                $plan = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($plan);
+        // Issue #2050: a generator node must consume the url_fetch output and
+        // never invent content when the named source was not read.
+        $this->assertStringContainsString('never invent rows or', $plan['prompt']);
+    }
+
     public function testOfficeMakerPromptHonorsNamedFormat(): void
     {
         $officemaker = null;

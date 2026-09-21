@@ -42,6 +42,7 @@ use App\Service\Multitask\Plan\TaskNode;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Search\BraveSearchService;
+use App\Service\UrlContentService;
 use App\Tests\Support\WebSearchGatewayFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -1154,7 +1155,7 @@ final class RunnersTest extends TestCase
             ];
         });
 
-        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UrlContentService::class));
         $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'Create a docx with a table']);
 
         $result = $runner->run($node, $this->context($this->message('Create a docx with a table')));
@@ -1191,7 +1192,7 @@ final class RunnersTest extends TestCase
         ]]));
 
         $node = new TaskNode('n1x', Capability::DocumentGeneration, ['n1'], ['prompt' => 'write a letter with the photo']);
-        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class)))->run($node, $context);
+        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UrlContentService::class)))->run($node, $context);
 
         self::assertTrue($result->isSuccessful());
         self::assertSame(['01/000/00001/2026/07/photo.jpg'], $options['document_images']);
@@ -1215,7 +1216,7 @@ final class RunnersTest extends TestCase
         ]]));
 
         $node = new TaskNode('n2', Capability::DocumentGeneration, ['n1'], ['prompt' => 'summarize the audio']);
-        (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class)))->run($node, $context);
+        (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UrlContentService::class)))->run($node, $context);
 
         self::assertArrayNotHasKey('document_images', (array) $options);
     }
@@ -1235,13 +1236,87 @@ final class RunnersTest extends TestCase
                 'metadata_keys' => ['error'],
             ]);
 
-        $runner = new DocumentGenerationRunner($handler, $logger);
+        $runner = new DocumentGenerationRunner($handler, $logger, $this->createMock(UrlContentService::class));
         $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'make a doc']);
 
         $result = $runner->run($node, $this->context($this->message('make a doc')));
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('no file', (string) $result->error);
+    }
+
+    /**
+     * Issue #2050: a URL the message treats as a source that no fetch could
+     * read must end the node honestly — no file, one sentence — instead of
+     * generating a document with invented rows.
+     */
+    public function testDocumentGenerationRefusesUnreadSourceUrl(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->expects(self::never())->method('handle');
+
+        $urls = $this->createMock(UrlContentService::class);
+        $urls->method('extractUrls')->willReturn(['https://example.com/data.csv']);
+
+        $message = $this->message('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $context = new NodeContext($message, [], 1, ['language' => 'de', 'url_pages_read' => 0]);
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $urls);
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'chart from url']);
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(0, $result->files);
+        self::assertStringContainsString('https://example.com/data.csv', (string) $result->text);
+        self::assertStringContainsString('keine Datei erstellt', (string) $result->text);
+        self::assertFalse($result->metadata['document_generation']['created'] ?? true);
+        self::assertSame('source_unread', $result->metadata['document_generation']['reason'] ?? null);
+    }
+
+    public function testDocumentGenerationProceedsWhenSourceWasRead(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->expects(self::once())->method('handle')->willReturn([
+            'metadata' => ['generated_file' => ['filename' => 'chart.xlsx', 'path' => '01/000/00001/2026/07/chart.xlsx']],
+        ]);
+
+        $urls = $this->createMock(UrlContentService::class);
+        $urls->method('extractUrls')->willReturn(['https://example.com/data.csv']);
+
+        $message = $this->message('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $context = new NodeContext($message, [], 1, ['language' => 'de', 'url_pages_read' => 1]);
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $urls);
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'chart from url']);
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
+    }
+
+    public function testDocumentGenerationIgnoresIncidentalUrl(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->expects(self::once())->method('handle')->willReturn([
+            'metadata' => ['generated_file' => ['filename' => 'novel.docx', 'path' => '01/000/00001/2026/07/novel.docx']],
+        ]);
+
+        $urls = $this->createMock(UrlContentService::class);
+        $urls->method('extractUrls')->willReturn(['https://example.com']);
+
+        // No load/use verb: the link is mentioned in passing, not a source.
+        $message = $this->message('Write a bedtime story. See also https://example.com for inspiration.');
+        $context = new NodeContext($message, [], 1, ['language' => 'en', 'url_pages_read' => 0]);
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $urls);
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'bedtime story']);
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
     }
 
     public function testWebSearchReturnsFormattedResults(): void

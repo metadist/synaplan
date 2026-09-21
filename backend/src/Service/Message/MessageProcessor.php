@@ -1268,6 +1268,10 @@ final readonly class MessageProcessor
 
             $urlContentResults = $this->urlContentService->fetchMultiple($urls);
             $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
+            // Always record the outcome, including total failure: generator
+            // nodes treat "named URL, zero pages read" as a terminal honest
+            // failure instead of inventing content (#2050).
+            $classification['url_pages_read'] = $successCount;
 
             if ($successCount > 0) {
                 $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
