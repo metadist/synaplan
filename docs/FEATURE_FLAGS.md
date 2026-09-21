@@ -54,12 +54,15 @@ directly.
 ## Features switched on in the last waves
 
 Everything below merged to `main` between 2026-09-03 and 2026-09-11 and is
-now on by default. "What users see" is what disappears when the flag is off.
+now on by default — except user search in the share picker, which is
+deliberately off by default ([#2060](https://github.com/metadist/synaplan/issues/2060)).
+"What users see" is what disappears when the flag is off.
 
 | Wave | Feature | What users see | `BCONFIG` key | Environment variable | Default | Shipped in |
 | ---- | ------- | -------------- | ------------- | -------------------- | ------- | ---------- |
 | 1 | People & groups | **Operate → People** (users, groups, audit); **Account → My groups**; group API | `IAM.GROUPS_ENABLED` | `FEATURE_IAM_GROUPS_ENABLED` | on | [#1708](https://github.com/metadist/synaplan/pull/1708), [#1742](https://github.com/metadist/synaplan/pull/1742) |
 | 1–2 | Sharing | **Share** on folders, chats, AI assistants, saved tasks and widgets; "Shared with me" filters and pills | `IAM.SHARING_ENABLED` | `FEATURE_IAM_SHARING_ENABLED` | on | [#1713](https://github.com/metadist/synaplan/pull/1713), [#1714](https://github.com/metadist/synaplan/pull/1714), [#1717](https://github.com/metadist/synaplan/pull/1717) |
+| – | User search in share picker | Finding user accounts by name or email in the share dialog; when off, only groups (and Everyone, per policy) can be picked | `IAM.USER_SEARCH_ENABLED` | `FEATURE_IAM_USER_SEARCH_ENABLED` | **off** ([#2060](https://github.com/metadist/synaplan/issues/2060)) |
 | 2 | Directory groups | Groups filled from the company login (OIDC groups claim); People → Audit | `IAM.DIRECTORY_SYNC_ENABLED` | `FEATURE_IAM_DIRECTORY_SYNC_ENABLED` | on | [#1718](https://github.com/metadist/synaplan/pull/1718) |
 | 2 | Group policies | **People → Policies**: default and allowed models, feature switches and rate-limit tier per group; locked defaults | `IAM.GROUP_POLICIES_ENABLED` | `FEATURE_IAM_GROUP_POLICIES_ENABLED` | on | [#1719](https://github.com/metadist/synaplan/pull/1719), [#1722](https://github.com/metadist/synaplan/pull/1722) |
 | 2–3 | AI assistants (agent builder) | The assistant builder (instructions, knowledge folders, tools, publish as widget), `/api/v1/agents`, shared knowledge folders | `AGENTS.ENABLED` | `FEATURE_AGENTS_ENABLED` | on | [#1738](https://github.com/metadist/synaplan/pull/1738), [#1763](https://github.com/metadist/synaplan/pull/1763), [#1769](https://github.com/metadist/synaplan/pull/1769) |
@@ -91,7 +94,7 @@ Two related switches keep their previous defaults on purpose:
 
 | Features tab section | Flags |
 | -------------------- | ----- |
-| People & sharing | `FEATURE_IAM_GROUPS_ENABLED`, `FEATURE_IAM_SHARING_ENABLED`, `FEATURE_IAM_GROUP_POLICIES_ENABLED`, `FEATURE_IAM_DIRECTORY_SYNC_ENABLED` |
+| People & sharing | `FEATURE_IAM_GROUPS_ENABLED`, `FEATURE_IAM_SHARING_ENABLED`, `FEATURE_IAM_USER_SEARCH_ENABLED`, `FEATURE_IAM_GROUP_POLICIES_ENABLED`, `FEATURE_IAM_DIRECTORY_SYNC_ENABLED` |
 | AI assistants | `FEATURE_AGENTS_ENABLED`, `FEATURE_AGENTS_ROUTABLE_ENABLED`, `FEATURE_BUNDLE_ENABLED` |
 | Saved tasks & watched pages | `FEATURE_WORKFLOWS_BUILDER_ENABLED`, `FEATURE_MULTITASK_URL_FETCH_ENABLED` |
 | Tools & approvals | `FEATURE_TOOLS_REGISTRY_ENABLED`, `FEATURE_TOOLS_APPROVALS_ENABLED`, `FEATURE_TOOLS_CUSTOM_HTTP_ENABLED` |

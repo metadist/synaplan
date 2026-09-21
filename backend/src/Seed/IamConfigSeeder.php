@@ -14,6 +14,8 @@ use Doctrine\DBAL\Connection;
  * the feature flags seed ON (Version20260911090000 also flips rows that
  * earlier releases seeded OFF); operators turn them off under System
  * configuration → Features or pin them with `FEATURE_IAM_*=false`.
+ * Exception: USER_SEARCH_ENABLED seeds OFF (#2060) — the share picker must
+ * not expose the user directory unless an admin opts in.
  */
 final readonly class IamConfigSeeder
 {
@@ -27,6 +29,7 @@ final readonly class IamConfigSeeder
         $rows = [
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_GROUPS_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_SHARING_ENABLED, 'value' => '1'],
+            ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_USER_SEARCH_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_SYNC_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_GROUP_POLICIES_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_GROUPS_CLAIM, 'value' => IamConfig::DEFAULT_DIRECTORY_GROUPS_CLAIM],

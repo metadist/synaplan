@@ -290,6 +290,9 @@ final readonly class ShareService
     /**
      * People and groups the actor may share with. "Everyone" is pinned first
      * only when {@see IamConfig::canShareWithEveryone()} allows this actor.
+     * User accounts are searchable only when
+     * {@see IamConfig::isUserSearchEnabled()} is on — otherwise the picker
+     * would expose every registered account on a public instance (#2060).
      *
      * @return list<array<string, mixed>>
      */
@@ -307,19 +310,22 @@ final readonly class ShareService
             ];
         }
         $actorId = (int) $actor->getId();
+        $usersVisible = $this->iamConfig->isUserSearchEnabled($actorId);
 
         if ('' !== $query) {
-            foreach ($this->userRepository->searchByEmailOrName($query, $limit) as $user) {
-                if ((int) $user->getId() === $actorId) {
-                    continue;
+            if ($usersVisible) {
+                foreach ($this->userRepository->searchByEmailOrName($query, $limit) as $user) {
+                    if ((int) $user->getId() === $actorId) {
+                        continue;
+                    }
+                    $out[] = [
+                        'type' => Share::SUBJECT_USER,
+                        'id' => (int) $user->getId(),
+                        'name' => $this->displayName($user),
+                        'email' => $user->getMail(),
+                        'pinned' => false,
+                    ];
                 }
-                $out[] = [
-                    'type' => Share::SUBJECT_USER,
-                    'id' => (int) $user->getId(),
-                    'name' => $this->displayName($user),
-                    'email' => $user->getMail(),
-                    'pinned' => false,
-                ];
             }
             foreach ($this->groupRepository->searchByName($query, $limit) as $group) {
                 $out[] = [

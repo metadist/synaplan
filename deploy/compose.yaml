@@ -67,8 +67,11 @@ x-app-environment: &app-environment
   # keeps it that way. "false" pins the feature off for this deployment and
   # locks the admin toggle. Module gates (FEATURE_MODULES_GATE_<ID>) are per
   # module and go into a compose override when a deployment needs one.
+  # Exception: FEATURE_IAM_USER_SEARCH_ENABLED is OFF by default (#2060); a
+  # company deployment pins it "true" to let the share picker find accounts.
   FEATURE_IAM_GROUPS_ENABLED: "${FEATURE_IAM_GROUPS_ENABLED:-}"
   FEATURE_IAM_SHARING_ENABLED: "${FEATURE_IAM_SHARING_ENABLED:-}"
+  FEATURE_IAM_USER_SEARCH_ENABLED: "${FEATURE_IAM_USER_SEARCH_ENABLED:-}"
   FEATURE_IAM_GROUP_POLICIES_ENABLED: "${FEATURE_IAM_GROUP_POLICIES_ENABLED:-}"
   FEATURE_IAM_DIRECTORY_SYNC_ENABLED: "${FEATURE_IAM_DIRECTORY_SYNC_ENABLED:-}"
   FEATURE_AGENTS_ENABLED: "${FEATURE_AGENTS_ENABLED:-}"

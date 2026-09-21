@@ -43,9 +43,13 @@ final class IamHardeningTest extends WebTestCase
      * H1 — the people picker used to run a substring LIKE over the whole
      * BUSERDETAILS JSON, which made phone numbers, provider subjects and the
      * pending phone-verification code guessable letter by letter.
+     *
+     * Since #2060 the picker searches accounts only when the instance opted
+     * into user search, so this test enables the flag first.
      */
     public function testPeoplePickerMatchesNamesAndEmailOnly(): void
     {
+        $this->enableUserSearch();
         $searcher = $this->createUser('hardening-searcher@synaplan.internal');
         $target = $this->createUser('hardening-target@synaplan.internal');
         $target->setUserDetails([
@@ -76,6 +80,37 @@ final class IamHardeningTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/iam/subjects?q=H');
         self::assertSame([], $this->userIds(), 'a single character is not a lookup');
+    }
+
+    /**
+     * Issue #2060 — with user search off (the default), the picker must not
+     * touch the user directory at all: no accounts, no mailboxes. Groups
+     * stay searchable so sharing keeps working without accounts.
+     */
+    public function testPeoplePickerHidesAccountsWhenUserSearchIsOff(): void
+    {
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_USER_SEARCH_ENABLED, '0');
+        $this->em->flush();
+
+        $searcher = $this->createUser('hardening-searcher2@synaplan.internal');
+        $target = $this->createUser('hardening-hidden@synaplan.internal');
+        $target->setUserDetails(['full_name' => 'Hanna Verborgen']);
+        $group = $this->createGroup('Hanna helpers');
+        $this->em->flush();
+        $this->authenticateClient($this->client, $searcher);
+
+        $this->client->request('GET', '/api/v1/iam/subjects?q=Hanna');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame([], $this->userIds(), 'no account may leak through the picker');
+
+        $groupIds = [];
+        foreach ($this->json()['subjects'] as $subject) {
+            if ('group' === $subject['type']) {
+                $groupIds[] = (int) $subject['id'];
+            }
+        }
+        self::assertContains((int) $group->getId(), $groupIds, 'groups stay pickable');
     }
 
     /**
@@ -240,6 +275,13 @@ final class IamHardeningTest extends WebTestCase
         $config = static::getContainer()->get(ConfigRepository::class);
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '1');
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_SHARING_ENABLED, '1');
+        $this->em->flush();
+    }
+
+    private function enableUserSearch(): void
+    {
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_USER_SEARCH_ENABLED, '1');
         $this->em->flush();
     }
 
