@@ -230,6 +230,24 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Ids of all messages in a chat, regardless of author. Used by share-revoke
+     * cleanup to find feedback entries derived from the conversation.
+     *
+     * @return list<int>
+     */
+    public function findIdsByChatId(int $chatId): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.id')
+            ->where('m.chatId = :chatId')
+            ->setParameter('chatId', $chatId)
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map(static fn (array $row): int => (int) reset($row), $rows);
+    }
+
+    /**
      * Find all messages for a chat, ordered chronologically. No character or count limits.
      * Used for summary analysis where we need the complete conversation.
      *

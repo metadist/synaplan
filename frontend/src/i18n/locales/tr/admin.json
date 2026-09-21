@@ -163,6 +163,10 @@
       "userDeleteFailed": "Kullanıcı silinemedi",
       "levelUpdated": "Kullanıcı seviyesi {level} olarak güncellendi",
       "levelUpdateFailed": "Kullanıcı seviyesi güncellenemedi",
+      "levelConfirmTitle": "{email} kullanıcısının seviyesi değiştirilsin mi?",
+      "levelConfirmMessage": "{email} {oldLevel} seviyesinden {newLevel} seviyesine geçiyor. Yeni seviye hemen uygulanır.",
+      "levelConfirmAdmin": "{email} tüm yönetici işlevlerine tam erişimi olan bir yönetici oluyor. Bu hemen uygulanır.",
+      "levelConfirmAction": "Seviyeyi değiştir",
       "loadFailed": "Kullanıcılar yüklenemedi",
       "invalidResponse": "Sunucu beklenmedik bir yanıt gönderdi"
     },
@@ -748,7 +752,8 @@
         "platform_link_redirect_rejected": "Platform yönlendirmesi reddedildi",
         "platform_instance_registered": "Platform kaydedildi",
         "platform_instance_approved": "Platform onaylandı",
-        "platform_instance_revoked": "Platform iptal edildi"
+        "platform_instance_revoked": "Platform iptal edildi",
+        "admin_user_level_change": "Kullanıcı seviyesi değiştirildi"
       }
     },
     "linkedPlatforms": {

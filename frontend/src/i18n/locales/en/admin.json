@@ -164,6 +164,10 @@
       "userDeleteFailed": "Failed to delete user",
       "levelUpdated": "User level updated to {level}",
       "levelUpdateFailed": "Failed to update user level",
+      "levelConfirmTitle": "Change the level of {email}?",
+      "levelConfirmMessage": "{email} moves from {oldLevel} to {newLevel}. The new level applies immediately.",
+      "levelConfirmAdmin": "{email} becomes an administrator with full access to every admin function. This applies immediately.",
+      "levelConfirmAction": "Change level",
       "loadFailed": "Failed to load users",
       "invalidResponse": "The server sent an unexpected response"
     },
@@ -752,7 +756,8 @@
         "platform_link_redirect_rejected": "Platform redirect rejected",
         "platform_instance_registered": "Platform registered",
         "platform_instance_approved": "Platform approved",
-        "platform_instance_revoked": "Platform revoked"
+        "platform_instance_revoked": "Platform revoked",
+        "admin_user_level_change": "User level changed"
       }
     },
     "linkedPlatforms": {

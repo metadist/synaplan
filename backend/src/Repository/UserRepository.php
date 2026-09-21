@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\Persistence\ManagerRegistry;
 
 class UserRepository extends ServiceEntityRepository
@@ -94,6 +95,25 @@ class UserRepository extends ServiceEntityRepository
     public function countAll(): int
     {
         return $this->count([]);
+    }
+
+    /**
+     * Number of administrators, locking every admin row for update.
+     *
+     * MUST be called inside a transaction — the PESSIMISTIC_WRITE lock is what
+     * stops two concurrent demotions from both observing a count of 2 and
+     * together removing the last administrator (a second demotion blocks,
+     * then sees the committed count and is refused).
+     */
+    public function countAdminsForUpdate(): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('u.userLevel = :level')
+            ->setParameter('level', 'ADMIN')
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getSingleScalarResult();
     }
 
     /**

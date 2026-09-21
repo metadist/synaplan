@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\Chat;
 use App\Entity\User;
+use App\Repository\ChatRepository;
+use App\Repository\MessageRepository;
 use App\Service\FeedbackContradictionService;
 use App\Service\FeedbackExampleService;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\ConversationKind;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,6 +29,9 @@ final class FeedbackController extends AbstractController
     public function __construct(
         private readonly FeedbackContradictionService $feedbackContradictionService,
         private readonly FeedbackExampleService $feedbackExampleService,
+        private readonly MessageRepository $messageRepository,
+        private readonly ChatRepository $chatRepository,
+        private readonly AccessGate $accessGate,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -369,6 +378,8 @@ final class FeedbackController extends AbstractController
             ),
             new OA\Response(response: 400, description: 'Validation error'),
             new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'No access to the referenced message'),
+            new OA\Response(response: 404, description: 'Referenced message not found'),
             new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
@@ -391,6 +402,10 @@ final class FeedbackController extends AbstractController
         }
 
         $messageId = isset($data['messageId']) ? (int) $data['messageId'] : null;
+
+        if (null !== $messageId && null !== ($denied = $this->denyMessage($user, $messageId))) {
+            return $denied;
+        }
 
         try {
             $example = $this->feedbackExampleService->createFalsePositive($user, $summary, $messageId);
@@ -585,6 +600,8 @@ final class FeedbackController extends AbstractController
             ),
             new OA\Response(response: 400, description: 'Validation error'),
             new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'No access to the referenced message'),
+            new OA\Response(response: 404, description: 'Referenced message not found'),
             new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
@@ -607,6 +624,10 @@ final class FeedbackController extends AbstractController
         }
 
         $messageId = isset($data['messageId']) ? (int) $data['messageId'] : null;
+
+        if (null !== $messageId && null !== ($denied = $this->denyMessage($user, $messageId))) {
+            return $denied;
+        }
 
         try {
             $example = $this->feedbackExampleService->createPositive($user, $text, $messageId);
@@ -782,5 +803,35 @@ final class FeedbackController extends AbstractController
 
             return $this->json(['error' => 'Web research failed'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Rejects a feedback reference to a message the caller cannot see.
+     * Mirrors ChatController::denyConversation: unknown message is 404,
+     * a visible message in a foreign conversation needs at least read access.
+     */
+    private function denyMessage(User $user, int $messageId): ?JsonResponse
+    {
+        $message = $this->messageRepository->find($messageId);
+        if (null === $message || null === $message->getChatId()) {
+            return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+        }
+        $chat = $this->chatRepository->find($message->getChatId());
+        if (!$chat instanceof Chat) {
+            return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($chat->getUserId() === (int) $user->getId()) {
+            return null;
+        }
+        if (!$this->accessGate->decide($user, ConversationKind::KEY, (string) $chat->getId(), Permission::Read)) {
+            $this->logger->warning('Feedback reference to an inaccessible message', [
+                'user_id' => $user->getId(),
+                'message_id' => $messageId,
+            ]);
+
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        return null;
     }
 }

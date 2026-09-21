@@ -164,6 +164,10 @@
       "userDeleteFailed": "Fehler beim Löschen des Benutzers",
       "levelUpdated": "Benutzer-Level auf {level} aktualisiert",
       "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels",
+      "levelConfirmTitle": "Level von {email} ändern?",
+      "levelConfirmMessage": "{email} wechselt von {oldLevel} zu {newLevel}. Das neue Level gilt sofort.",
+      "levelConfirmAdmin": "{email} wird Administrator mit vollem Zugriff auf alle Admin-Funktionen. Dies gilt sofort.",
+      "levelConfirmAction": "Level ändern",
       "loadFailed": "Benutzer konnten nicht geladen werden",
       "invalidResponse": "Der Server hat eine unerwartete Antwort gesendet"
     },
@@ -752,7 +756,8 @@
         "platform_link_redirect_rejected": "Plattform-Weiterleitung abgelehnt",
         "platform_instance_registered": "Plattform registriert",
         "platform_instance_approved": "Plattform freigegeben",
-        "platform_instance_revoked": "Plattform widerrufen"
+        "platform_instance_revoked": "Plattform widerrufen",
+        "admin_user_level_change": "Benutzer-Level geändert"
       }
     },
     "linkedPlatforms": {

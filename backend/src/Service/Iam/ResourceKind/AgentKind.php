@@ -73,7 +73,7 @@ final readonly class AgentKind implements ShareableResourceKindInterface
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
     }
 

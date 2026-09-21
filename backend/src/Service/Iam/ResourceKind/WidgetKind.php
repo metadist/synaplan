@@ -67,7 +67,7 @@ final readonly class WidgetKind implements ShareableResourceKindInterface
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
         $widget = $this->findWidget($resourceId);
         if (null === $widget) {

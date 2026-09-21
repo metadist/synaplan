@@ -6,7 +6,9 @@ namespace App\Service\Iam\ResourceKind;
 
 use App\Entity\Chat;
 use App\Repository\ChatRepository;
+use App\Service\Iam\ConversationFeedbackCleanup;
 use App\Service\Iam\Permission;
+use Psr\Log\LoggerInterface;
 
 /**
  * Conversation identity is BCHATS.BID. Shareable permissions in v1: read, use.
@@ -17,6 +19,8 @@ final readonly class ConversationKind implements ShareableResourceKindInterface
 
     public function __construct(
         private ChatRepository $chatRepository,
+        private ConversationFeedbackCleanup $feedbackCleanup,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -69,8 +73,26 @@ final readonly class ConversationKind implements ShareableResourceKindInterface
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
+        if (null === $revokedSubject) {
+            return;
+        }
+        $chat = $this->findChat($resourceId);
+        if (null === $chat) {
+            return;
+        }
+        try {
+            $this->feedbackCleanup->withdrawDerivedFromChat($chat);
+        } catch (\Throwable $e) {
+            // The share row is already gone: a cleanup failure must not fail
+            // the revoke or leave the caller retrying a share that no longer
+            // exists. Log loudly so the orphaned entries are found.
+            $this->logger->error('Derived-feedback cleanup failed after share revoke', [
+                'chat_id' => $chat->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function supportedPermissions(): array

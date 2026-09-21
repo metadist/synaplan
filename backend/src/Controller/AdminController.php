@@ -8,6 +8,7 @@ use App\Repository\ExternalIdentityRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UseLogRepository;
 use App\Repository\UserRepository;
+use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\GroupService;
 use App\Service\Iam\IamConfig;
 use App\Service\UsageStatsService;
@@ -36,6 +37,7 @@ class AdminController extends AbstractController
         private IamConfig $iamConfig,
         private GroupService $groupService,
         private ExternalIdentityRepository $externalIdentityRepository,
+        private AuditLogWriter $auditLogWriter,
         private LoggerInterface $logger,
     ) {
     }
@@ -250,8 +252,9 @@ class AdminController extends AbstractController
         )
     )]
     #[OA\Response(response: 200, description: 'User level updated')]
-    #[OA\Response(response: 403, description: 'Not authorized')]
+    #[OA\Response(response: 403, description: 'Not authorized or cannot change own level')]
     #[OA\Response(response: 404, description: 'User not found')]
+    #[OA\Response(response: 409, description: 'Cannot demote the last administrator')]
     public function updateUserLevel(
         int $id,
         Request $request,
@@ -274,12 +277,51 @@ class AdminController extends AbstractController
             return $this->json(['error' => 'Invalid level'], Response::HTTP_BAD_REQUEST);
         }
 
-        $targetUser->setUserLevel($newLevel);
-        $this->em->flush();
+        // The last-admin check and the level update run in one transaction with
+        // the admin rows locked: two concurrent demotions must not both
+        // observe a count of 2 and together remove the last administrator.
+        // Guard order inside: demoting the only administrator — necessarily
+        // yourself — reports the operational reason (409), any other
+        // self-change reports the generic one (403).
+        $oldLevel = $targetUser->getUserLevel();
+        $selfChange = $user->getId() === $id;
+        $outcome = $this->em->wrapInTransaction(function () use ($targetUser, $newLevel, $oldLevel, $selfChange, $user, $id, $request): string {
+            if ('ADMIN' === $oldLevel && 'ADMIN' !== $newLevel && 1 >= $this->userRepository->countAdminsForUpdate()) {
+                return 'conflict';
+            }
+            if ($selfChange) {
+                return 'forbidden';
+            }
+
+            $targetUser->setUserLevel($newLevel);
+            $this->auditLogWriter->record(
+                (int) $user->getId(),
+                'admin.user_level_change',
+                'user',
+                (string) $id,
+                [
+                    'target_email' => $targetUser->getMail(),
+                    'old_level' => $oldLevel,
+                    'new_level' => $newLevel,
+                ],
+                (string) $request->getClientIp(),
+            );
+            $this->em->flush();
+
+            return 'ok';
+        });
+
+        if ('conflict' === $outcome) {
+            return $this->json(['error' => 'Cannot demote the last administrator'], Response::HTTP_CONFLICT);
+        }
+        if ('forbidden' === $outcome) {
+            return $this->json(['error' => 'Cannot change your own level'], Response::HTTP_FORBIDDEN);
+        }
 
         $this->logger->info('Admin updated user level', [
             'admin_id' => $user->getId(),
             'target_user_id' => $id,
+            'old_level' => $oldLevel,
             'new_level' => $newLevel,
         ]);
 
