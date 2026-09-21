@@ -154,7 +154,7 @@ if [ "$MODE" = "try" ]; then
     if [ "$MINIMAL" = "true" ]; then
         say "Note: --minimal is the default now (local AI is opt-in via COMPOSE_PROFILES=local-ai)."
     fi
-    step "Starting the standard stack (cloud AI only, ~3 GB on first run)"
+    step "Starting the standard stack (cloud AI only, ~4 GB on first run)"
 
     ./scripts/compose-up.sh -f "$COMPOSE_FILE"
 

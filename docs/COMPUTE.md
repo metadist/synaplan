@@ -1,7 +1,7 @@
 # File work (secure compute)
 
 > **Status.** Short Python or Node work on copies of files the user chose.
-> Local `docker compose up` starts the sidecar and turns file work +
+> Local `make up` starts the sidecar and turns file work +
 > workspaces on. Website fetches stay off. The contract stays frozen at
 > `protocol: 1`.
 
@@ -58,12 +58,12 @@ The runtime-config endpoint exposes `features.computeEnabled` and
 
 ## Local compose (T1)
 
-`docker compose up` starts file work on the same host. That is **T1**: a
+`make up` starts file work on the same host. That is **T1**: a
 hardened Docker container, no host network, no Docker socket in PHP. Honest
 limits: one machine, one Docker daemon, no gVisor.
 
 ```bash
-docker compose up -d
+make up
 ```
 
 Compose builds the sidecar and the Python/Node runtimes from this repo,

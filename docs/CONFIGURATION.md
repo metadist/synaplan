@@ -85,7 +85,7 @@ restarts:
 
 ```bash
 docker compose down -v
-SEED_DEMO_DATA=false docker compose up -d
+SEED_DEMO_DATA=false make up
 ```
 
 ---
@@ -529,9 +529,9 @@ Supported formats: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
 ## Text-to-Speech (Piper)
 
 Speech **output** is a companion: [synaplan-tts](https://github.com/metadist/synaplan-tts)
-(`ghcr.io/metadist/synaplan-tts`). The published image ships four voices that
-match the UI locales — English, German, Spanish, Turkish. Local
-`docker compose up` starts it. Stop the `tts` container to hide spoken answers.
+(`ghcr.io/metadist/synaplan-tts`). The published image ships five voices that
+match the UI locales — English, German, Spanish, French, Turkish. Local
+`make up` starts it. Stop the `tts` container to hide spoken answers.
 
 ```bash
 # backend/.env — only needed if TTS is not the compose service
@@ -574,7 +574,7 @@ docker compose --profile office up -d
 COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
 
 # External CODE already running (reachable from backend + worker)
-OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 docker compose up -d
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 make up
 ```
 
 ```bash
