@@ -14,6 +14,8 @@ use Doctrine\DBAL\Connection;
  * the feature flags seed ON (Version20260911090000 also flips rows that
  * earlier releases seeded OFF); operators turn them off under System
  * configuration → Features or pin them with `FEATURE_IAM_*=false`.
+ * Exception: USER_SEARCH_ENABLED seeds OFF (#2060) — the share picker must
+ * not expose the user directory unless an admin opts in.
  */
 final readonly class IamConfigSeeder
 {

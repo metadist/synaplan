@@ -28,7 +28,8 @@ use App\Service\Feature\FeatureFlagEnv;
  *
  * Since 4.8 the seeder writes the flags ON. Operators change them under
  * Operate → System configuration → Features, or pin them off for an automated
- * deployment with `FEATURE_IAM_*=false`.
+ * deployment with `FEATURE_IAM_*=false`. Exception: USER_SEARCH_ENABLED
+ * seeds OFF (#2060) — user-directory search is opt-in.
  */
 final readonly class IamConfig
 {

@@ -54,7 +54,9 @@ directly.
 ## Features switched on in the last waves
 
 Everything below merged to `main` between 2026-09-03 and 2026-09-11 and is
-now on by default. "What users see" is what disappears when the flag is off.
+now on by default — except user search in the share picker, which is
+deliberately off by default ([#2060](https://github.com/metadist/synaplan/issues/2060)).
+"What users see" is what disappears when the flag is off.
 
 | Wave | Feature | What users see | `BCONFIG` key | Environment variable | Default | Shipped in |
 | ---- | ------- | -------------- | ------------- | -------------------- | ------- | ---------- |
