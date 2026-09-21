@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
+use App\AI\Exception\ChatFailureReason;
 use App\AI\Service\AiFacade;
 use App\Entity\Connection;
 use App\Entity\File;
@@ -20,6 +21,8 @@ use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileStorageService;
+use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ChatErrorView;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Message\Handler\MediaGenerationHandler;
@@ -1538,6 +1541,37 @@ final class RunnersTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('no file', (string) $result->error);
+    }
+
+    /**
+     * Issue #1074 residual: a throwing handler must surface the presented
+     * reason on the card, never the raw exception message.
+     */
+    public function testFileAnalysisPresentsHandlerFailureWithoutRawMessage(): void
+    {
+        $handler = $this->createMock(FileAnalysisHandler::class);
+        $handler->method('handle')->willThrowException(new \RuntimeException('context_length_exceeded: too many tokens'));
+
+        $presenter = $this->createMock(ChatErrorPresenter::class);
+        $presenter->method('present')->willReturn(new ChatErrorView(
+            ChatFailureReason::ContextLengthExceeded,
+            'That document is too large to analyse.',
+            null,
+            false,
+            'context_length_exceeded: too many tokens',
+        ));
+
+        $runner = new FileAnalysisRunner(
+            $handler,
+            $this->createMock(LoggerInterface::class),
+            errorPresenter: $presenter,
+        );
+        $node = new TaskNode('n1', Capability::FileAnalysis, [], ['prompt' => 'summarize it']);
+
+        $result = $runner->run($node, $this->context($this->messageWithFile('summarize it')));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame('That document is too large to analyse.', $result->error);
     }
 
     public function testFileAnalysisFallsBackToConversationDocument(): void

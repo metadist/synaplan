@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Messages\Tools;
 
 use App\AI\Service\AiFacade;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Security\SsrfGuard;
 use App\Service\Vision\VisionModelResolver;
 use Psr\Log\LoggerInterface;
@@ -37,6 +38,7 @@ final readonly class AnalyzeImageTool
         private SsrfGuard $ssrfGuard,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private ?ChatErrorPresenter $errorPresenter = null,
     ) {
     }
 
@@ -119,13 +121,23 @@ final readonly class AnalyzeImageTool
                 'isError' => false,
                 'summary' => 'image',
             ];
+        } catch (\InvalidArgumentException $e) {
+            // Input validation copy is written for the API client — pass it
+            // through untouched.
+            return $this->error($e->getMessage());
         } catch (\Throwable $e) {
             $this->logger->warning('AnalyzeImageTool: analysis failed', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->error('Image analysis failed: '.$e->getMessage());
+            // The tool result goes back to the API client: present the
+            // localized reason, keep the raw message in the log (#1074).
+            $copy = $this->errorPresenter instanceof ChatErrorPresenter
+                ? $this->errorPresenter->present($e, 'en')->userText
+                : 'Something went wrong while answering this request. Please try again.';
+
+            return $this->error($copy);
         } finally {
             if (null !== $relativePath) {
                 $full = rtrim($this->uploadDir, '/').'/'.ltrim($relativePath, '/');
