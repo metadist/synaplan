@@ -12,6 +12,7 @@ use App\Entity\Prompt;
 use App\Repository\ConnectionRepository;
 use App\Repository\FileRepository;
 use App\Repository\SearchResultRepository;
+use App\Repository\UserRepository;
 use App\Service\Calendar\CalendarEventService;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Destination\DestinationRegistry;
@@ -694,8 +695,20 @@ final class RunnersTest extends TestCase
             new CalendarEventService(),
             $storage,
             $this->inertCalendarDelivery(),
+            $this->usersWithoutProfile(),
             $this->createMock(LoggerInterface::class),
         );
+    }
+
+    /**
+     * No stored profile timezone — the runner falls back to the planner zone.
+     */
+    private function usersWithoutProfile(): UserRepository&MockObject
+    {
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn(null);
+
+        return $users;
     }
 
     /**
@@ -722,7 +735,7 @@ final class RunnersTest extends TestCase
         $node = new TaskNode('n1', Capability::CalendarEvent, [], [
             'title' => 'Meeting with Sanam',
             'start' => '2026-06-10T09:00:00',
-            'timezone' => 'UTC',
+            'timezone' => 'Europe/Berlin',
             'duration_minutes' => 60,
             'attendees' => ['Sanam'],
         ]);
@@ -775,6 +788,7 @@ final class RunnersTest extends TestCase
             new CalendarEventService(),
             $storage,
             $this->inertCalendarDelivery(),
+            $this->usersWithoutProfile(),
             $this->createMock(LoggerInterface::class),
             approvalGate: $gate,
         );
@@ -852,6 +866,7 @@ final class RunnersTest extends TestCase
                     new PlannerChannelCatalog($connections),
                     $this->createMock(LoggerInterface::class),
                 ),
+                $this->usersWithoutProfile(),
                 $this->createMock(LoggerInterface::class),
                 uploadDir: $uploadDir,
             );
@@ -904,6 +919,7 @@ final class RunnersTest extends TestCase
                 new CalendarEventService(),
                 $storage,
                 $this->inertCalendarDelivery(),
+                $this->usersWithoutProfile(),
                 $this->createMock(LoggerInterface::class),
                 uploadDir: $uploadDir,
             );
@@ -911,7 +927,7 @@ final class RunnersTest extends TestCase
             $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
                 'title' => 'Sync',
                 'start' => '2026-06-10T15:00:00',
-                'timezone' => 'UTC',
+                'timezone' => 'Europe/Berlin',
                 'channel' => 'invented',
             ]);
 
@@ -987,6 +1003,7 @@ final class RunnersTest extends TestCase
                     new PlannerChannelCatalog($connections),
                     $this->createMock(LoggerInterface::class),
                 ),
+                $this->usersWithoutProfile(),
                 $this->createMock(LoggerInterface::class),
                 uploadDir: $uploadDir,
             );
@@ -994,7 +1011,7 @@ final class RunnersTest extends TestCase
             $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
                 'title' => 'Nextcloud Test',
                 'start' => '2026-09-15T09:00:00',
-                'timezone' => 'UTC',
+                'timezone' => 'Europe/Berlin',
             ]);
 
             $result = $runner->run($node, $this->context($this->message(
@@ -1039,6 +1056,7 @@ final class RunnersTest extends TestCase
                 new CalendarEventService(),
                 $storage,
                 $this->inertCalendarDelivery(),
+                $this->usersWithoutProfile(),
                 $this->createMock(LoggerInterface::class),
                 uploadDir: $uploadDir,
             );
@@ -1046,7 +1064,7 @@ final class RunnersTest extends TestCase
             $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
                 'title' => 'Nextcloud Test',
                 'start' => '2026-09-15T09:00:00',
-                'timezone' => 'UTC',
+                'timezone' => 'Europe/Berlin',
             ]);
 
             $result = $runner->run($node, $this->context($this->message(
@@ -1075,7 +1093,7 @@ final class RunnersTest extends TestCase
         $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
             'title' => 'Sync',
             'start' => '2026-06-10T15:00:00',
-            'timezone' => 'UTC',
+            'timezone' => 'Europe/Berlin',
         ]);
 
         $result = $this->calendarRunner()->run(
@@ -1096,7 +1114,7 @@ final class RunnersTest extends TestCase
         ], [
             'title' => 'From params',
             'start' => '2026-06-10T09:00:00',
-            'timezone' => 'UTC',
+            'timezone' => 'Europe/Berlin',
         ]);
 
         $result = $this->calendarRunner()->run($node, $this->context($this->message()));
