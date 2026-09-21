@@ -16,6 +16,7 @@
     },
     "sources": {
       "probe": "liste de modèles du fournisseur",
+      "listing": "liste de la source d'importation",
       "traffic": "utilisation réelle"
     },
     "summary": {

@@ -16,6 +16,7 @@
     },
     "sources": {
       "probe": "provider model list",
+      "listing": "import source listing",
       "traffic": "real usage"
     },
     "summary": {

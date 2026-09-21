@@ -16,6 +16,7 @@
     },
     "sources": {
       "probe": "sağlayıcının model listesi",
+      "listing": "içe aktarma kaynağı listesi",
       "traffic": "gerçek kullanım"
     },
     "summary": {

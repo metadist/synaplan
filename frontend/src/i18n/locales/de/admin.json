@@ -16,6 +16,7 @@
     },
     "sources": {
       "probe": "Modell-Liste des Anbieters",
+      "listing": "Liste der Importquelle",
       "traffic": "echte Nutzung"
     },
     "summary": {

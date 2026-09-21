@@ -108,4 +108,22 @@ describe('ModelStatusView', () => {
     expect(mockResetCounters).toHaveBeenCalledWith(42)
     wrapper.unmount()
   })
+
+  it('renders a listing-source model instead of the load-error state', async () => {
+    mockGetStatus.mockResolvedValue({
+      ...snapshot,
+      providers: [
+        {
+          ...snapshot.providers[0],
+          models: [{ ...snapshot.providers[0].models[0], source: 'listing' }],
+        },
+      ],
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="state-load-error"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="item-model"]').text()).toContain('import source listing')
+    wrapper.unmount()
+  })
 })

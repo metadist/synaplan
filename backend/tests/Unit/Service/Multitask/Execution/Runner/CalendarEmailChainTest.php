@@ -87,6 +87,7 @@ final class CalendarEmailChainTest extends TestCase
                 new PlannerChannelCatalog($this->createMock(ConnectionRepository::class)),
                 $this->createMock(LoggerInterface::class),
             ),
+            $this->usersWithoutProfile(),
             $this->createMock(LoggerInterface::class),
         );
 
@@ -150,6 +151,14 @@ final class CalendarEmailChainTest extends TestCase
         $message->method('getFiles')->willReturn(new ArrayCollection());
 
         return new NodeContext($message, [], self::USER_ID, ['language' => 'en']);
+    }
+
+    private function usersWithoutProfile(): UserRepository
+    {
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn(null);
+
+        return $users;
     }
 
     private function emailRunner(InternalEmailService $emailService): EmailMeRunner

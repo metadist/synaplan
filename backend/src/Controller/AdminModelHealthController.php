@@ -105,7 +105,7 @@ final class AdminModelHealthController extends AbstractController
                                         new OA\Property(property: 'capability', type: 'string', example: 'chat'),
                                         new OA\Property(property: 'state', type: 'string', enum: ['online', 'degraded', 'offline', 'unconfigured', 'unknown'], example: 'online'),
                                         new OA\Property(property: 'reason', type: 'string', description: 'Human-readable explanation, empty when healthy', example: ''),
-                                        new OA\Property(property: 'source', type: 'string', enum: ['probe', 'traffic'], example: 'probe'),
+                                        new OA\Property(property: 'source', type: 'string', enum: ['probe', 'listing', 'traffic'], example: 'probe'),
                                         new OA\Property(property: 'lastCheck', type: 'integer', example: 1755600000),
                                         new OA\Property(property: 'lastSuccess', type: 'integer', example: 1755600000),
                                         new OA\Property(property: 'lastFailure', type: 'integer', example: 0),
