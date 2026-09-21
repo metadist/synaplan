@@ -306,19 +306,30 @@ final readonly class MessageClassifier
                     'skip_sorting' => true,
                 ];
             }
-            $this->logger->info('MessageClassifier: Forcing analyzefile route (document, audio, or video attachment)', [
-                'message_id' => $messageId,
-            ]);
+            if ($this->messageRequestsFileProduction($message, $text)) {
+                // Producing a NEW file from the attachment (chart from a
+                // table, cleaned export) is not analysis — let the turn fall
+                // through to the sorter. The multi_step force below sends it
+                // to the planner, whose rule 3a arbitrates code_run vs
+                // file_analysis (#2047).
+                $this->logger->info('MessageClassifier: Produce-a-file demand skips analyzefile force-route', [
+                    'message_id' => $messageId,
+                ]);
+            } else {
+                $this->logger->info('MessageClassifier: Forcing analyzefile route (document, audio, or video attachment)', [
+                    'message_id' => $messageId,
+                ]);
 
-            $attachmentDecision = RoutingDecision::deterministic(RoutingLayer::AttachmentRule, 'analyzefile');
+                $attachmentDecision = RoutingDecision::deterministic(RoutingLayer::AttachmentRule, 'analyzefile');
 
-            return array_merge([
-                'topic' => 'analyzefile',
-                'language' => $message->getLanguage() ?: 'en',
-                'intent' => 'file_analysis',
-                'source' => $attachmentDecision->toClassificationSource(),
-                'skip_sorting' => true,
-            ], $attachmentDecision->toClassificationFields());
+                return array_merge([
+                    'topic' => 'analyzefile',
+                    'language' => $message->getLanguage() ?: 'en',
+                    'intent' => 'file_analysis',
+                    'source' => $attachmentDecision->toClassificationSource(),
+                    'skip_sorting' => true,
+                ], $attachmentDecision->toClassificationFields());
+            }
         }
 
         // Phase 8: embedding-router cascade layer. Sits after every
@@ -1154,12 +1165,69 @@ final readonly class MessageClassifier
         }
 
         $namesRuntime = 1 === preg_match('/\b(python|node\.?js|node|javascript|script|code|program)\b/i', $text);
-        if (!$namesRuntime) {
+        if ($namesRuntime) {
+            return 1 === preg_match('/\b(run|execute|compute|calculate|count|sum|total|process|parse|analy[sz]e|read|extract)\b/i', $text)
+                || 1 === preg_match('/\b(führe|ausführen|ausfuehren|berechne|zähle|zaehle|verarbeite|lies|analysiere)\b/iu', $text);
+        }
+
+        // No runtime words: an attached document/image/table plus a
+        // produce-a-file verb is still file work ("mach daraus ein
+        // Balkendiagramm", "Stempel unten rechts drauf", "make a bar chart
+        // from this table"). Without this arm such turns fall to the sorter,
+        // which wobbles between file_analysis and the media generator and
+        // sometimes denies a capability the installation has (#2047, #2049).
+        return $this->messageRequestsFileProduction($message, $text);
+    }
+
+    /**
+     * Attached document/image/table plus a verb that produces a new file —
+     * without naming a runtime. Questions about the file ("what does this
+     * diagram show", "make me a summary") must not match: EN produce verbs
+     * require a chart/file object, and audio/video attachments are excluded.
+     */
+    private function messageRequestsFileProduction(Message $message, string $text): bool
+    {
+        if (!$this->messageHasWorkableFileAttachment($message)) {
             return false;
         }
 
-        return 1 === preg_match('/\b(run|execute|compute|calculate|count|sum|total|process|parse|analy[sz]e|read|extract)\b/i', $text)
-            || 1 === preg_match('/\b(führe|ausführen|ausfuehren|berechne|zähle|zaehle|verarbeite|lies|analysiere)\b/iu', $text);
+        if (1 === preg_match('/\b(mach\s+daraus|erzeug\w*|erstell\w*|(balken|torten|säulen|linien)?diagramm|stempel\w*|wasserzeichen|zuschneiden)\b/iu', $text)) {
+            return true;
+        }
+
+        if (1 === preg_match('/\b(save\s+as|export\s+as|(bar|pie|line)\s+chart|watermark|stamp|crop)\b/i', $text)) {
+            return true;
+        }
+
+        return 1 === preg_match('/\b(make|create|generat\w+|build|draw|plot)\b.{0,40}\b(chart|diagram|graph|plot|image|file)\b/i', $text);
+    }
+
+    /**
+     * At least one attached file the produce-a-file arm can work on: a
+     * document/table or an image — or an untyped legacy attachment, which is
+     * treated as workable so channel messages are not silently excluded.
+     * Explicit audio/video attachments are not file-work inputs.
+     */
+    private function messageHasWorkableFileAttachment(Message $message): bool
+    {
+        foreach ($message->getFiles() as $file) {
+            $category = FileTypeResolver::resolveCategory($file->getFileType() ?: '', $file->getFileName());
+            if (in_array($category, ['document', 'image', ''], true)) {
+                return true;
+            }
+        }
+
+        if ($message->getFile() > 0) {
+            $category = FileTypeResolver::resolveCategory(
+                $message->getFileType() ?: '',
+                '',
+                (string) $message->getFilePath(),
+            );
+
+            return in_array($category, ['document', 'image', ''], true);
+        }
+
+        return false;
     }
 
     /**

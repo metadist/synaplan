@@ -253,6 +253,12 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('3a. Script / program / code', $plan['prompt']);
         $this->assertStringContainsString('→ `code_run`', $plan['prompt']);
         $this->assertStringContainsString('params.inputFileIds', $plan['prompt']);
+        // Issues #2047/#2049: charts from attached tables and pixel edits on
+        // attached images arbitrate to code_run even when the request names
+        // no runtime — and producing a new file is never a "question" (rule 6).
+        $this->assertStringContainsString('built FROM an attached table', $plan['prompt']);
+        $this->assertStringContainsString('pixel edit on an attached image', $plan['prompt']);
+        $this->assertStringContainsString('Producing a NEW file from a document', $plan['prompt']);
     }
 
     public function testGeneralPromptDoesNotBounceAlreadyPhrasedCreateRequests(): void
