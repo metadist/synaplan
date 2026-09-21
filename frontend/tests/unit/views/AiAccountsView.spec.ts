@@ -109,19 +109,20 @@ describe('AiAccountsView', () => {
     const wrapper = await mountView()
     await flushPromises()
 
-    expect(wrapper.get('#section-higgsfield').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#section-higgsfield').attributes('data-open')).toBe('false')
     expect(wrapper.get('#section-anthropic').attributes('data-open')).toBe('false')
     expect(wrapper.find('[data-testid="btn-jump-section-anthropic"]').exists()).toBe(true)
 
     await wrapper.get('[data-testid="btn-ai-accounts-anthropic"]').trigger('click')
+    expect(wrapper.get('#section-higgsfield').attributes('data-open')).toBe('false')
+    expect(wrapper.get('#section-anthropic').attributes('data-open')).toBe('true')
+
+    await wrapper.get('[data-testid="btn-ai-accounts-accordion-toggle-all"]').trigger('click')
+    expect(wrapper.get('#section-higgsfield').attributes('data-open')).toBe('true')
     expect(wrapper.get('#section-anthropic').attributes('data-open')).toBe('true')
 
     await wrapper.get('[data-testid="btn-ai-accounts-accordion-toggle-all"]').trigger('click')
     expect(wrapper.get('#section-higgsfield').attributes('data-open')).toBe('false')
     expect(wrapper.get('#section-anthropic').attributes('data-open')).toBe('false')
-
-    await wrapper.get('[data-testid="btn-ai-accounts-accordion-toggle-all"]').trigger('click')
-    expect(wrapper.get('#section-higgsfield').attributes('data-open')).toBe('true')
-    expect(wrapper.get('#section-anthropic').attributes('data-open')).toBe('true')
   })
 })

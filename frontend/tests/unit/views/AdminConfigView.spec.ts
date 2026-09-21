@@ -159,7 +159,7 @@ describe('AdminConfigView — managed provider keys (D2)', () => {
   it('folds later sections and opens them from the header or jump nav', async () => {
     const wrapper = await mountView()
 
-    expect(wrapper.get('#config-section-openai').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#config-section-openai').attributes('data-open')).toBe('false')
     expect(wrapper.get('#config-section-higgsfield').attributes('data-open')).toBe('false')
     expect(wrapper.find('[data-testid="btn-jump-section-google"]').exists()).toBe(true)
 

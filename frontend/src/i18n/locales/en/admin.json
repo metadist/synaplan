@@ -680,8 +680,11 @@
       "emptyMember": "You are not in a group yet. An administrator can add you on the People page.",
       "emptyAdmin": "No groups yet. Create one on the People page.",
       "leave": "Leave",
-      "leaveConfirm": "Leave the group \"{name}\"? You will lose access to anything shared with that group. The group itself stays.",
-      "left": "You left the group.",
+      "leaveConfirm": "Leave the group \"{name}\"? You lose access to what this group can see. Anything you shared with this group stays shared with the other members. You can take that back later from each item's Share dialog.",
+      "leaveConfirmWithShares": "Leave the group \"{name}\"? You lose access to what this group can see. 1 item you shared with this group stays shared with the other members. Leave keeps that sharing. Leave and stop sharing removes it. | Leave the group \"{name}\"? You lose access to what this group can see. {count} items you shared with this group stay shared with the other members. Leave keeps that sharing. Leave and stop sharing removes it.",
+      "leaveAndStopSharing": "Leave and stop sharing",
+      "left": "You left the group. Items you shared with it stay shared with the other members.",
+      "leftAndStopped": "You left the group and stopped sharing your items with it.",
       "leaveFailed": "Could not leave the group.",
       "leaveDirectory": "This membership comes from your login and cannot be left here."
     },
@@ -712,16 +715,26 @@
       "directoryReadOnly": "This group comes from your login and cannot be renamed or deleted here.",
       "directoryManagedHint": "Membership from your login is updated at the next sign-in. You can still add extra people by hand.",
       "addMember": "Add a person",
-      "addMemberPlaceholder": "Search by email",
-      "addMemberNotFound": "No user matches that email.",
+      "addMemberPlaceholder": "Search by name or email",
+      "addMemberNotFound": "No person matches that name or email.",
       "removeMember": "Remove",
-      "removeConfirm": "Remove {email} from this group?",
+      "removeConfirm": "Remove {email} from this group? Items they shared with this group stay shared.",
       "roleMember": "Member",
       "roleManager": "Manager",
       "memberAdded": "Person added to the group.",
       "memberRemoved": "Person removed from the group.",
       "sharedWith": "Shared with this group",
-      "sharedEmpty": "Nothing is shared with this group yet."
+      "sharedEmpty": "Nothing is shared with this group yet.",
+      "sharedLoading": "Loading shared items…",
+      "resourceKind": {
+        "conversation": "Chat",
+        "knowledge_folder": "Folder",
+        "assistant": "AI assistant",
+        "saved_task": "Saved task",
+        "widget": "Chat widget",
+        "agent": "Agent",
+        "tool": "Tool"
+      }
     },
     "audit": {
       "when": "When",
@@ -864,13 +877,15 @@
       "filter": {
         "label": "Filter chats",
         "all": "All",
-        "private": "Private",
+        "private": "Owned",
         "group": "Group",
         "widget": "Widget"
       },
       "pill": {
-        "private": "Private",
-        "privateTitle": "Your own chat — only you can see it",
+        "private": "Owned",
+        "privateTitle": "You own this chat. Sharing it does not change that.",
+        "sharedWithPeople": "1 person | {count} people",
+        "sharedWithPeopleTitle": "Shared with 1 person | Shared with {count} people",
         "group": "Group",
         "groupTitle": "Shared with the group \"{name}\"",
         "groupTitleGeneric": "Shared with a group",

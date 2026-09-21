@@ -217,7 +217,7 @@ const {
   expandAll: expandAllSetupSections,
   collapseAll: collapseAllSetupSections,
   allOpen: allSetupSectionsOpen,
-} = useAccordion(() => [...setupSectionIds], { defaultOpen: 'first' })
+} = useAccordion(() => [...setupSectionIds])
 
 async function jumpToSetupSection(id: string) {
   openSetupSection(id)

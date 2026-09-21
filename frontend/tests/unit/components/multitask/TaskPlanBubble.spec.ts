@@ -468,6 +468,34 @@ describe('TaskPlanBubble', () => {
     expect(wrapper.emitted('cancelTask')).toEqual([['n2']])
   })
 
+  it('hides Stop and Retry when the plan is read-only (shared chat)', () => {
+    const aiConfig = useAiConfigStore()
+    aiConfig.models = { TEXT2PIC: [model(190, 'Nano Banana 2', 100), model(191, 'Flux', 90)] }
+    aiConfig.defaults = { TEXT2PIC: 190 }
+
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        guest: true,
+        plan: plan([
+          { nodeId: 'n2', capability: 'video_generation', kind: 'video', state: 'running' },
+          {
+            nodeId: 'n1',
+            capability: 'image_generation',
+            kind: 'image',
+            state: 'failed',
+            error: 'provider 500',
+            prompt: 'a dog in the rain',
+          },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    expect(wrapper.find('[data-testid="task-card-stop"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="task-card-retry"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-schedule-plan"]').exists()).toBe(false)
+  })
+
   it('does not offer a Stop button on a running compute card', () => {
     const wrapper = mount(TaskPlanBubble, {
       props: {

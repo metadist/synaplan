@@ -680,8 +680,11 @@
       "emptyMember": "Vous n’êtes encore dans aucun groupe. Un administrateur peut vous ajouter sur la page Personnes.",
       "emptyAdmin": "Aucun groupe pour le moment. Créez-en un sur la page Personnes.",
       "leave": "Quitter",
-      "leaveConfirm": "Quitter le groupe « {name} » ? Vous perdrez l’accès à tout ce qui est partagé avec ce groupe. Le groupe lui-même reste.",
-      "left": "Vous avez quitté le groupe.",
+      "leaveConfirm": "Quitter le groupe « {name} » ? Vous perdez l’accès à ce que ce groupe peut voir. Ce que vous avez partagé avec ce groupe reste partagé avec les autres membres. Vous pourrez le retirer plus tard dans la fenêtre Partager de chaque élément.",
+      "leaveConfirmWithShares": "Quitter le groupe « {name} » ? Vous perdez l’accès à ce que ce groupe peut voir. 1 élément que vous avez partagé avec ce groupe reste partagé avec les autres membres. Quitter conserve ce partage. Quitter et arrêter le partage le retire. | Quitter le groupe « {name} » ? Vous perdez l’accès à ce que ce groupe peut voir. {count} éléments que vous avez partagés avec ce groupe restent partagés avec les autres membres. Quitter conserve ce partage. Quitter et arrêter le partage les retire.",
+      "leaveAndStopSharing": "Quitter et arrêter le partage",
+      "left": "Vous avez quitté le groupe. Ce que vous avez partagé avec lui reste partagé avec les autres membres.",
+      "leftAndStopped": "Vous avez quitté le groupe et avez arrêté de partager vos éléments avec lui.",
       "leaveFailed": "Impossible de quitter le groupe.",
       "leaveDirectory": "Cette appartenance vient de votre connexion et ne peut pas être quittée ici."
     },
@@ -712,16 +715,26 @@
       "directoryReadOnly": "Ce groupe vient de votre connexion et ne peut pas être renommé ni supprimé ici.",
       "directoryManagedHint": "Les appartenances issues de la connexion sont mises à jour à la prochaine connexion. Vous pouvez encore ajouter des personnes à la main.",
       "addMember": "Ajouter une personne",
-      "addMemberPlaceholder": "Rechercher par e-mail",
-      "addMemberNotFound": "Aucun utilisateur ne correspond à cet e-mail.",
+      "addMemberPlaceholder": "Rechercher par nom ou e-mail",
+      "addMemberNotFound": "Aucune personne ne correspond à ce nom ou à cet e-mail.",
       "removeMember": "Retirer",
-      "removeConfirm": "Retirer {email} de ce groupe ?",
+      "removeConfirm": "Retirer {email} de ce groupe ? Ce qu’il a partagé avec ce groupe reste partagé.",
       "roleMember": "Membre",
       "roleManager": "Responsable",
       "memberAdded": "Personne ajoutée au groupe.",
       "memberRemoved": "Personne retirée du groupe.",
       "sharedWith": "Partagé avec ce groupe",
-      "sharedEmpty": "Rien n’est encore partagé avec ce groupe."
+      "sharedEmpty": "Rien n’est encore partagé avec ce groupe.",
+      "sharedLoading": "Chargement des éléments partagés…",
+      "resourceKind": {
+        "conversation": "Chat",
+        "knowledge_folder": "Dossier",
+        "assistant": "Assistant IA",
+        "saved_task": "Tâche enregistrée",
+        "widget": "Widget de chat",
+        "agent": "Agent",
+        "tool": "Outil"
+      }
     },
     "audit": {
       "when": "Quand",
@@ -864,13 +877,15 @@
       "filter": {
         "label": "Filtrer les discussions",
         "all": "Toutes",
-        "private": "Privée",
+        "private": "À vous",
         "group": "Groupe",
         "widget": "Widget"
       },
       "pill": {
-        "private": "Privée",
-        "privateTitle": "Votre propre discussion — vous seul pouvez la voir",
+        "private": "À vous",
+        "privateTitle": "Cette discussion vous appartient. La partager ne change pas cela.",
+        "sharedWithPeople": "1 personne | {count} personnes",
+        "sharedWithPeopleTitle": "Partagée avec 1 personne | Partagée avec {count} personnes",
         "group": "Groupe",
         "groupTitle": "Partagée avec le groupe « {name} »",
         "groupTitleGeneric": "Partagée avec un groupe",

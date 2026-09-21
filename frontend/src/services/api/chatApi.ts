@@ -953,14 +953,17 @@ export const chatApi = {
   /**
    * Stop streaming - notify backend to stop streaming
    */
-  async stopStream(trackId?: number): Promise<{ success: boolean; message: string }> {
+  async stopStream(
+    trackId?: number,
+    chatId?: number | null
+  ): Promise<{ success: boolean; message: string }> {
     console.log('📡 chatApi.stopStream called with trackId:', trackId)
     try {
       const result = await httpClient<{ success: boolean; message: string }>(
         '/api/v1/messages/stop-stream',
         {
           method: 'POST',
-          body: JSON.stringify({ trackId }),
+          body: JSON.stringify({ trackId, chatId: chatId ?? undefined }),
         }
       )
       console.log('📡 chatApi.stopStream response:', result)
@@ -995,10 +998,14 @@ export const chatApi = {
    * Cancel a single multitask media node (per-card Stop button) without
    * stopping the rest of the turn.
    */
-  async cancelTask(trackId: number, nodeId: string): Promise<{ success: boolean }> {
+  async cancelTask(
+    trackId: number,
+    nodeId: string,
+    chatId?: number | null
+  ): Promise<{ success: boolean }> {
     return httpClient<{ success: boolean }>('/api/v1/messages/cancel-node', {
       method: 'POST',
-      body: JSON.stringify({ trackId: String(trackId), nodeId }),
+      body: JSON.stringify({ trackId: String(trackId), nodeId, chatId: chatId ?? undefined }),
     })
   },
 

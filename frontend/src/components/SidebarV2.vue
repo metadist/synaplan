@@ -558,6 +558,10 @@
                       :label="chat.kindLabel"
                       :is-new="chat.isNew"
                     />
+                    <ChatGrantPills
+                      v-if="iamSharingEnabled && !chat.incoming"
+                      :summary="chat.shareSummary"
+                    />
                     <span class="text-[11px] txt-secondary">{{
                       formatTimestamp(chat.createdAt)
                     }}</span>
@@ -740,6 +744,7 @@ import {
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
 import ChatKindPill from './iam/ChatKindPill.vue'
+import ChatGrantPills from './iam/ChatGrantPills.vue'
 import ChatKindFilter from './iam/ChatKindFilter.vue'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 

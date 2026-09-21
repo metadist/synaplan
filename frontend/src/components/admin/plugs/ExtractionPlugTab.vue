@@ -196,7 +196,7 @@ const {
   expandAll: expandAllExtractionSections,
   collapseAll: collapseAllExtractionSections,
   allOpen: allExtractionSectionsOpen,
-} = useAccordion(() => [...families], { defaultOpen: 'first' })
+} = useAccordion(() => [...families])
 
 async function jumpToExtractionFamily(family: string) {
   openExtractionSection(family)

@@ -2,7 +2,7 @@
   <span
     class="inline-flex items-center gap-1 rounded-md font-medium whitespace-nowrap max-w-full"
     :class="[sizeClass, toneClass]"
-    :title="title"
+    :title="tooltip"
     :data-testid="`pill-chat-kind-${kind}`"
     :data-kind="kind"
   >
@@ -40,11 +40,15 @@ const props = withDefaults(
     kind: ChatKind
     /** Group name (group) or owner name (direct); ignored for other kinds. */
     label?: string | null
+    /** Replaces the default caption, for example a people-count on an owned chat. */
+    text?: string | null
+    /** Replaces the kind's default tooltip when the same kind is used for a different audience. */
+    title?: string | null
     /** Red dot: this chat arrived after the user last opened Incoming. */
     isNew?: boolean
     size?: 'xs' | 'sm'
   }>(),
-  { label: null, isNew: false, size: 'xs' }
+  { label: null, text: null, title: null, isNew: false, size: 'xs' }
 )
 
 const { t } = useI18n()
@@ -65,7 +69,7 @@ const icon = computed(() => {
     case 'widget':
       return 'mdi:puzzle-outline'
     default:
-      return 'mdi:lock-outline'
+      return 'mdi:account-outline'
   }
 })
 
@@ -83,6 +87,8 @@ const toneClass = computed(() => {
 })
 
 const text = computed(() => {
+  const override = props.text?.trim()
+  if (override) return override
   switch (props.kind) {
     case 'group':
       return props.label?.trim() || t('iam.incoming.pill.group')
@@ -99,7 +105,9 @@ const text = computed(() => {
   }
 })
 
-const title = computed(() => {
+const tooltip = computed(() => {
+  const override = props.title?.trim()
+  if (override) return override
   switch (props.kind) {
     case 'group': {
       const name = props.label?.trim() ?? ''

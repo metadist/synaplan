@@ -4035,6 +4035,51 @@ class StreamController extends AbstractController
     }
 
     /**
+     * A cancel may only flag a turn the caller owns.
+     *
+     * A persisted turn is proven by a message with this tracking id and the
+     * caller's user id (the incoming message is flushed before generation).
+     * An incognito turn is never persisted: only the owner of the chat they
+     * name may cancel it, and never a track that already belongs to someone else.
+     */
+    private function denyUnlessOwnsTrack(User $user, string $trackId, ?int $chatId): ?JsonResponse
+    {
+        if ('' === $trackId || !ctype_digit($trackId)) {
+            return $this->json(['error' => 'trackId is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $messages = $this->em->getRepository(Message::class);
+        $owned = $messages->findOneBy([
+            'trackingId' => (int) $trackId,
+            'userId' => $user->getId(),
+        ]);
+        if (null !== $owned) {
+            return null;
+        }
+
+        $foreign = $messages->findOneBy(['trackingId' => (int) $trackId]);
+        if (null === $foreign && null !== $chatId) {
+            $chat = $this->em->getRepository(Chat::class)->find($chatId);
+            if (null !== $chat && $chat->getUserId() === $user->getId()) {
+                return null;
+            }
+        }
+
+        return $this->json(['error' => 'Chat not found or access denied'], Response::HTTP_FORBIDDEN);
+    }
+
+    private function optionalChatId(mixed $data): ?int
+    {
+        if (!is_array($data) || !isset($data['chatId']) || !is_numeric($data['chatId'])) {
+            return null;
+        }
+
+        $chatId = (int) $data['chatId'];
+
+        return $chatId > 0 ? $chatId : null;
+    }
+
+    /**
      * Stop streaming endpoint - allows frontend to explicitly stop streaming.
      */
     #[Route('/stop-stream', name: 'stop_stream', methods: ['POST'])]
@@ -4050,6 +4095,7 @@ class StreamController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'trackId', type: 'integer', example: 1234567890),
+                new OA\Property(property: 'chatId', type: 'integer', example: 42, description: 'Owner chat id. Required only for an incognito turn, which has no persisted message.'),
             ]
         )
     )]
@@ -4063,6 +4109,7 @@ class StreamController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 403, description: 'The track belongs to another user')]
     public function stopStream(Request $request, #[CurrentUser] ?User $user): Response
     {
         if (!$user) {
@@ -4070,7 +4117,7 @@ class StreamController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-        $trackId = $data['trackId'] ?? null;
+        $trackId = is_array($data) && isset($data['trackId']) && is_scalar($data['trackId']) ? (string) $data['trackId'] : '';
 
         $this->logger->info('Stop stream requested', [
             'user_id' => $user->getId(),
@@ -4081,8 +4128,12 @@ class StreamController extends AbstractController
         // video) running on another worker sees it and aborts the provider call.
         // EventSource.close() alone can't interrupt a worker that is busy polling
         // and produces no output to trip connection_aborted().
-        if (null !== $trackId && '' !== (string) $trackId) {
-            $this->cancellationStore->requestCancel((string) $trackId);
+        if ('' !== $trackId) {
+            $denied = $this->denyUnlessOwnsTrack($user, $trackId, $this->optionalChatId($data));
+            if (null !== $denied) {
+                return $denied;
+            }
+            $this->cancellationStore->requestCancel($trackId);
         }
 
         return $this->json([
@@ -4110,6 +4161,7 @@ class StreamController extends AbstractController
             properties: [
                 new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
                 new OA\Property(property: 'nodeId', type: 'string', example: 'n2'),
+                new OA\Property(property: 'chatId', type: 'integer', example: 42, description: 'Owner chat id. Required only for an incognito turn, which has no persisted message.'),
             ]
         )
     )]
@@ -4122,6 +4174,7 @@ class StreamController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 403, description: 'The track belongs to another user')]
     public function cancelNode(Request $request, #[CurrentUser] ?User $user): Response
     {
         if (!$user) {
@@ -4134,6 +4187,11 @@ class StreamController extends AbstractController
 
         if ('' === $trackId || '' === $nodeId) {
             return $this->json(['error' => 'trackId and nodeId are required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $denied = $this->denyUnlessOwnsTrack($user, $trackId, $this->optionalChatId($data));
+        if (null !== $denied) {
+            return $denied;
         }
 
         $this->cancellationStore->requestCancel($trackId, $nodeId);

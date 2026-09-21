@@ -297,6 +297,11 @@
                 :label="chat.kindLabel"
                 :is-new="chat.isNew"
               />
+              <ChatGrantPills
+                v-if="iamSharingEnabled && chat.type === 'my'"
+                size="sm"
+                :summary="chat.shareSummary"
+              />
               <span
                 v-if="chat.type === 'shared' && chat.access"
                 class="text-xs txt-secondary"
@@ -527,6 +532,7 @@ import { Icon } from '@iconify/vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
 import ChatKindPill from './iam/ChatKindPill.vue'
+import ChatGrantPills from './iam/ChatGrantPills.vue'
 import ChatKindFilter from './iam/ChatKindFilter.vue'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { useIncomingStore } from '@/stores/incoming'
@@ -719,6 +725,11 @@ interface ChatItem {
   kind: ChatKind
   kindLabel: string | null
   isNew: boolean
+  shareSummary?: {
+    everyone: boolean
+    people: number
+    groups: string[]
+  }
 }
 
 // Generate default widget title from session info
@@ -797,6 +808,7 @@ const allChats = computed((): ChatItem[] => {
         kind: 'private',
         kindLabel: null,
         isNew: false,
+        shareSummary: c.shareSummary,
       }
     }
   })

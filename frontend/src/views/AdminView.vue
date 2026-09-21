@@ -669,7 +669,7 @@ const {
   expandAll: expandAllUsageSections,
   collapseAll: collapseAllUsageSections,
   allOpen: allUsageSectionsOpen,
-} = useAccordion(usageSectionIds, { defaultOpen: 'first' })
+} = useAccordion(usageSectionIds)
 
 // Load data based on active tab
 watch(activeTab, (newTab: string) => {

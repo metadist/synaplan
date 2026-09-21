@@ -28,13 +28,16 @@
                 'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
                 dialog.danger
                   ? 'bg-red-500/10 text-red-500'
-                  : dialog.type === 'confirm'
+                  : dialog.type === 'confirm' || dialog.type === 'choice'
                     ? 'bg-blue-500/10 text-blue-500'
                     : 'bg-[var(--brand)]/10 text-[var(--brand)]',
               ]"
             >
               <ExclamationTriangleIcon v-if="dialog.danger" class="w-6 h-6" />
-              <QuestionMarkCircleIcon v-else-if="dialog.type === 'confirm'" class="w-6 h-6" />
+              <QuestionMarkCircleIcon
+                v-else-if="dialog.type === 'confirm' || dialog.type === 'choice'"
+                class="w-6 h-6"
+              />
               <InformationCircleIcon v-else class="w-6 h-6" />
             </div>
 
@@ -71,6 +74,14 @@
               @click="handleCancel"
             >
               {{ dialog.cancelText }}
+            </button>
+            <button
+              v-if="dialog.extraText"
+              class="btn-danger px-4 py-2 rounded-lg text-sm font-medium"
+              data-testid="btn-dialog-extra"
+              @click="handleExtra"
+            >
+              {{ dialog.extraText }}
             </button>
             <button
               :class="[
@@ -140,7 +151,9 @@ watch(
 const handleConfirm = () => {
   const resolve = dialog.value.resolve
   if (resolve) {
-    if (dialog.value.type === 'confirm') {
+    if (dialog.value.type === 'choice') {
+      ;(resolve as (value: 'confirm' | 'extra' | null) => void)('confirm')
+    } else if (dialog.value.type === 'confirm') {
       ;(resolve as (value: boolean) => void)(true)
     } else if (dialog.value.type === 'prompt') {
       // OK resolves the raw input — even empty. Cancel/Escape/backdrop resolve
@@ -150,6 +163,14 @@ const handleConfirm = () => {
     } else {
       ;(resolve as () => void)()
     }
+  }
+  dialog.value.isOpen = false
+}
+
+const handleExtra = () => {
+  const resolve = dialog.value.resolve
+  if (resolve && dialog.value.type === 'choice') {
+    ;(resolve as (value: 'confirm' | 'extra' | null) => void)('extra')
   }
   dialog.value.isOpen = false
 }
@@ -186,7 +207,10 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
     return
   }
 
-  if (event.key === 'Enter' && dialog.value.type === 'confirm') {
+  if (
+    event.key === 'Enter' &&
+    (dialog.value.type === 'confirm' || dialog.value.type === 'choice')
+  ) {
     event.preventDefault()
     handleConfirm()
   }

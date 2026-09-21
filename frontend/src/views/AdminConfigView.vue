@@ -281,7 +281,7 @@ const {
   expandAll,
   collapseAll,
   allOpen,
-} = useAccordion(sectionIds, { defaultOpen: 'first' })
+} = useAccordion(sectionIds)
 const showSectionNav = computed(() => currentSections.value.length > 1)
 
 // Service test mapping (multiple services per tab are tested sequentially)

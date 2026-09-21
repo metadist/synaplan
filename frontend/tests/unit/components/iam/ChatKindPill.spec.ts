@@ -12,8 +12,8 @@ const i18n = createI18n({
         incoming: {
           new: 'New',
           pill: {
-            private: 'Private',
-            privateTitle: 'Your own chat',
+            private: 'Owned',
+            privateTitle: 'You own this chat. Sharing it does not change that.',
             group: 'Group',
             groupTitle: 'Shared with the group "{name}"',
             groupTitleGeneric: 'Shared with a group',
@@ -40,11 +40,11 @@ const mountPill = (props: PillProps) =>
   })
 
 describe('ChatKindPill', () => {
-  it('labels my own chats as private', () => {
+  it('labels my own chats as owned', () => {
     const wrapper = mountPill({ kind: 'private' })
-    expect(wrapper.text()).toBe('Private')
+    expect(wrapper.text()).toBe('Owned')
     expect(wrapper.attributes('data-testid')).toBe('pill-chat-kind-private')
-    expect(wrapper.attributes('title')).toBe('Your own chat')
+    expect(wrapper.attributes('title')).toBe('You own this chat. Sharing it does not change that.')
   })
 
   it('shows the group name for a group share', () => {

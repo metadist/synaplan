@@ -50,7 +50,7 @@ final class ShareServiceSearchSubjectsTest extends TestCase
         $account = $this->createStub(User::class);
         $account->method('getId')->willReturn(7);
         $account->method('getMail')->willReturn('sam@example.com');
-        $account->method('getUserDetails')->willReturn(['first_name' => 'Sam']);
+        $account->method('getDisplayName')->willReturn('Sam');
         $users = $this->createMock(UserRepository::class);
         $users->method('searchByEmailOrName')->willReturn([$account]);
 

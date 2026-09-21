@@ -61,7 +61,7 @@ const { t } = useI18n()
 const options = computed(() => {
   const list: { value: ChatListFilter; label: string; icon: string; count?: number }[] = [
     { value: 'all', label: t('iam.incoming.filter.all'), icon: 'mdi:view-list-outline' },
-    { value: 'private', label: t('iam.incoming.filter.private'), icon: 'mdi:lock-outline' },
+    { value: 'private', label: t('iam.incoming.filter.private'), icon: 'mdi:account-outline' },
     { value: 'group', label: t('iam.incoming.filter.group'), icon: 'mdi:account-group-outline' },
   ]
   if (props.showWidget) {

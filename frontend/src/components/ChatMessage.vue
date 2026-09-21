@@ -335,7 +335,7 @@
             :plan="displayTaskPlan"
             :schedule-source="scheduleSource"
             :source-message-id="backendMessageId"
-            :guest="isGuestMode"
+            :guest="isGuestMode || canRewrite === false"
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
             @followup-task="emit('followupTask', $event)"
@@ -346,6 +346,7 @@
             <MediaJobStatus
               :media-job="mediaJob!"
               :model-label="mediaJobModelLabel ?? undefined"
+              :readonly="canRewrite === false"
               @update:media-job="emit('mediaJobUpdate', $event)"
               @completed="emit('mediaJobCompleted', $event)"
               @cancel="emit('mediaJobCancel', $event)"
@@ -368,7 +369,7 @@
             :error-reason="errorReason"
             :error-message="errorMessage"
             :has-partial-answer="hasPartialAnswer"
-            :can-retry-model="canRetryModel"
+            :can-retry-model="canRewrite !== false && canRetryModel"
             :error-debug="errorDebug"
             :recommended-model-id="selectedModel?.id ?? null"
             :failed-model-id="failedModelId"
@@ -376,9 +377,10 @@
             @retry="handleErrorRetry"
           />
 
-          <!-- Continue Button (truncated response) -->
+          <!-- Continue Button (truncated response). Hidden on a shared chat:
+               continuing writes into the owner's conversation. -->
           <div
-            v-if="role === 'assistant' && truncated && !isStreaming"
+            v-if="role === 'assistant' && truncated && !isStreaming && canRewrite !== false"
             class="mt-3 pt-3 border-t border-light-border/30 dark:border-dark-border/20"
           >
             <p class="text-sm txt-muted mb-2">
@@ -795,7 +797,7 @@
                  whole plan, so offer one plain "Again" that re-runs the full
                  pipeline (re-classify + re-plan). -->
             <button
-              v-if="isMultitaskTurn"
+              v-if="isMultitaskTurn && canRewrite !== false"
               type="button"
               :disabled="isSuperseded || isGuestMode"
               :class="[
@@ -815,7 +817,7 @@
               />
             </button>
 
-            <div v-else class="relative">
+            <div v-else-if="canRewrite !== false" class="relative">
               <!-- Single "Again with… ▾" control: opening the dropdown and
                    picking a model re-runs the prompt (see selectModel). The old
                    standalone "Again with <model>" button was merged into this to
@@ -922,6 +924,8 @@
                   {{ $t('limitReached.upgradeNow') }}
                 </button>
                 <button
+                  v-if="canRewrite !== false"
+                  type="button"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   @click="handleRetry"
                 >
@@ -1163,6 +1167,12 @@ interface Props {
   usageTaximeterActive?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
+  /**
+   * Owner-only writes (Again, Again with, Continue, task-plan Stop/Retry,
+   * rate-limit Retry). Shared chats keep Continue as my copy on the banner.
+   * Undefined still shows the actions; only an explicit false hides them.
+   */
+  canRewrite?: boolean
   /**
    * Received (shared) conversation: `[Memory:ID]` belongs to the chat owner.
    * MessageText renders a terminal badge and never looks the id up.
@@ -1757,6 +1767,7 @@ const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
 
 // Handle retry for rate-limited messages
 const handleRetry = () => {
+  if (props.canRewrite === false) return
   // Extract text content from message
   const textContent = props.parts
     .filter((p) => p.type === 'text')
@@ -1809,6 +1820,7 @@ const handleSimpleAgain = () => {
 }
 
 const handleErrorRetry = (modelId?: number) => {
+  if (props.canRewrite === false) return
   emit('again', props.backendMessageId ?? 0, modelId)
 }
 

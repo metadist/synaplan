@@ -13,6 +13,7 @@ use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\Exception\ShareNotAllowedException;
 use App\Service\Iam\Exception\UnknownResourceKindException;
+use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ResourceKind\ResourceCard;
 use App\Service\Iam\ResourceKind\ResourceKindRegistry;
 use App\Service\Iam\ResourceKind\ShareableResourceKindInterface;
@@ -202,6 +203,169 @@ final readonly class ShareService
             'subjectType' => $subjectType,
             'subjectId' => $subjectId,
         ]);
+    }
+
+    /**
+     * Metadata for everything shared with one group. Content is never included.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function describeGrantsToGroup(int $groupId): array
+    {
+        $out = [];
+        foreach ($this->shareRepository->findBySubject(Share::SUBJECT_GROUP, $groupId) as $share) {
+            try {
+                $kind = $this->registry->get($share->getResourceKind());
+            } catch (UnknownResourceKindException) {
+                $out[] = [
+                    'kind' => $share->getResourceKind(),
+                    'id' => $share->getResourceId(),
+                    'name' => $share->getResourceId(),
+                    'icon' => 'file',
+                    'meta' => [],
+                    'permission' => $share->getPermission(),
+                    'ownerId' => null,
+                    'ownerName' => null,
+                ];
+                continue;
+            }
+            $card = $kind->describe($share->getResourceId());
+            $row = $this->serializeSharedCard(
+                $card,
+                $share->getPermission(),
+                $kind->ownerId($share->getResourceId()),
+            );
+            $row['kind'] = $share->getResourceKind();
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Who an owned conversation is shared with, for the history row.
+     * Public links are a separate flag on the chat and are not included.
+     *
+     * @param list<int> $chatIds
+     *
+     * @return array<string, array{everyone: bool, people: int, groups: list<string>}>
+     */
+    public function summarizeConversations(array $chatIds): array
+    {
+        $ids = array_map(static fn (int $id): string => (string) $id, $chatIds);
+        $out = [];
+        foreach ($ids as $id) {
+            $out[$id] = ['everyone' => false, 'people' => 0, 'groups' => []];
+        }
+        if ([] === $ids) {
+            return $out;
+        }
+
+        $groupIds = [];
+        $shares = $this->shareRepository->findForResources(ConversationKind::KEY, $ids);
+        foreach ($shares as $share) {
+            if (Share::SUBJECT_GROUP === $share->getSubjectType()) {
+                $groupIds[] = $share->getSubjectId();
+            }
+        }
+        $groupNames = [];
+        foreach ($this->groupRepository->findByIds(array_values(array_unique($groupIds))) as $group) {
+            $groupNames[(int) $group->getId()] = $group->getName();
+        }
+
+        foreach ($shares as $share) {
+            $id = $share->getResourceId();
+            if (!isset($out[$id])) {
+                $out[$id] = ['everyone' => false, 'people' => 0, 'groups' => []];
+            }
+            if (Share::SUBJECT_EVERYONE === $share->getSubjectType()) {
+                $out[$id]['everyone'] = true;
+            } elseif (Share::SUBJECT_USER === $share->getSubjectType()) {
+                ++$out[$id]['people'];
+            } elseif (Share::SUBJECT_GROUP === $share->getSubjectType()) {
+                $name = $groupNames[$share->getSubjectId()] ?? null;
+                if (null !== $name && '' !== $name) {
+                    $out[$id]['groups'][] = $name;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * How many shares this user granted to one group.
+     */
+    public function countOwnGrantsToGroup(User $actor, int $groupId): int
+    {
+        return $this->shareRepository->countGrantedByUserToGroup((int) $actor->getId(), $groupId);
+    }
+
+    /**
+     * Deletes only the shares this user granted to one group.
+     *
+     * A plain leave must not call this. Remaining members keep what was shared
+     * with them unless the leaving person explicitly chooses to stop sharing.
+     *
+     * @return int number of share rows removed
+     */
+    public function withdrawOwnGrantsToGroup(User $actor, int $groupId, string $ip = ''): int
+    {
+        $revoked = $this->deleteOwnGrantsToGroup($actor, $groupId, $ip);
+        $this->notifyRevocations($revoked);
+
+        return \count($revoked);
+    }
+
+    /**
+     * Removes the rows and writes the audit. Does not notify resource kinds, so
+     * a surrounding transaction can still roll the delete back together with
+     * the membership change.
+     *
+     * @return list<array{kind: string, resourceId: string, subject: array{subjectType: string, subjectId: int}}>
+     */
+    public function deleteOwnGrantsToGroup(User $actor, int $groupId, string $ip = ''): array
+    {
+        $revoked = [];
+        $shares = $this->shareRepository->findGrantedByUserToGroup((int) $actor->getId(), $groupId);
+        foreach ($shares as $share) {
+            $kind = $share->getResourceKind();
+            $resourceId = $share->getResourceId();
+            $subject = [
+                'subjectType' => Share::SUBJECT_GROUP,
+                'subjectId' => $groupId,
+            ];
+            $this->shareRepository->remove($share);
+            $this->auditLogWriter->record(
+                (int) $actor->getId(),
+                'share.revoke',
+                $kind,
+                $resourceId,
+                $subject + ['reason' => 'leave_and_stop_sharing'],
+                $ip,
+            );
+            $revoked[] = [
+                'kind' => $kind,
+                'resourceId' => $resourceId,
+                'subject' => $subject,
+            ];
+        }
+
+        return $revoked;
+    }
+
+    /**
+     * @param list<array{kind: string, resourceId: string, subject: array{subjectType: string, subjectId: int}}> $revoked
+     */
+    public function notifyRevocations(array $revoked): void
+    {
+        foreach ($revoked as $row) {
+            try {
+                $this->registry->get($row['kind'])->onShareChanged($row['resourceId'], $row['subject']);
+            } catch (UnknownResourceKindException) {
+                // The row is already gone. An uninstalled kind has nothing left to clean up.
+            }
+        }
     }
 
     /**
@@ -554,14 +718,6 @@ final readonly class ShareService
 
     private function displayName(User $user): string
     {
-        $details = $user->getUserDetails();
-        foreach (['full_name', 'first_name'] as $key) {
-            $value = $details[$key] ?? null;
-            if (is_string($value) && '' !== trim($value)) {
-                return trim($value);
-            }
-        }
-
-        return (string) $user->getMail();
+        return $user->getDisplayName();
     }
 }

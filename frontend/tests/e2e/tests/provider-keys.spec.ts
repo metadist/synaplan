@@ -105,6 +105,7 @@ test.describe('@ci Provider keys — one editor', () => {
     await expect(page.locator('[data-testid="admin-setup-tab-models"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
+    await page.locator('[data-testid="btn-setup-section-providers"]').click()
 
     for (const provider of body.providers) {
       const card = page.locator(`[data-testid="provider-card-${provider.name}"]`)

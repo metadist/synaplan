@@ -6,12 +6,14 @@ import { useAuthStore, type User } from '@/stores/auth'
 
 const listMyGroups = vi.fn()
 const leaveGroup = vi.fn()
-const confirmLeave = vi.fn()
+const countMyGrantsToGroup = vi.fn()
+const chooseLeave = vi.fn()
 
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
     listMyGroups: (...args: unknown[]) => listMyGroups(...args),
     leaveGroup: (...args: unknown[]) => leaveGroup(...args),
+    countMyGrantsToGroup: (...args: unknown[]) => countMyGrantsToGroup(...args),
   },
 }))
 
@@ -20,7 +22,7 @@ vi.mock('@/composables/useNotification', () => ({
 }))
 
 vi.mock('@/composables/useDialog', () => ({
-  useDialog: () => ({ confirm: (...args: unknown[]) => confirmLeave(...args) }),
+  useDialog: () => ({ choose: (...args: unknown[]) => chooseLeave(...args) }),
 }))
 
 vi.mock('@iconify/vue', () => ({
@@ -60,8 +62,10 @@ describe('MyGroupsView', () => {
   beforeEach(() => {
     listMyGroups.mockReset()
     leaveGroup.mockReset()
-    confirmLeave.mockReset()
-    confirmLeave.mockResolvedValue(true)
+    countMyGrantsToGroup.mockReset()
+    chooseLeave.mockReset()
+    countMyGrantsToGroup.mockResolvedValue(0)
+    chooseLeave.mockResolvedValue('confirm')
     leaveGroup.mockResolvedValue(undefined)
   })
 
@@ -106,9 +110,45 @@ describe('MyGroupsView', () => {
     await wrapper.get('[data-testid="btn-leave-group-4"]').trigger('click')
     await flushPromises()
 
-    expect(confirmLeave).toHaveBeenCalled()
-    expect(leaveGroup).toHaveBeenCalledWith(4)
+    expect(chooseLeave).toHaveBeenCalled()
+    const message = String(
+      (chooseLeave.mock.calls[0]?.[0] as { message?: string } | undefined)?.message ?? ''
+    )
+    expect(message).toContain('stays shared')
+    expect(
+      (chooseLeave.mock.calls[0]?.[0] as { extraText?: string } | undefined)?.extraText
+    ).toBeUndefined()
+    expect(leaveGroup).toHaveBeenCalledWith(4, false)
     expect(wrapper.find('[data-testid="card-my-group-4"]').exists()).toBe(false)
+  })
+
+  it('offers leave and stop sharing only when this user shared something', async () => {
+    listMyGroups.mockResolvedValue([
+      {
+        id: 4,
+        name: 'Sales',
+        slug: 'sales',
+        description: '',
+        kind: 'manual',
+        memberCount: 3,
+        role: 'member',
+        canLeave: true,
+        membershipSource: 'manual',
+      },
+    ])
+    countMyGrantsToGroup.mockResolvedValue(2)
+    chooseLeave.mockResolvedValue('extra')
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-leave-group-4"]').trigger('click')
+    await flushPromises()
+
+    const options = chooseLeave.mock.calls[0]?.[0] as { message?: string; extraText?: string }
+    expect(options.message).toContain('2 items')
+    expect(options.message).toContain('stay shared')
+    expect(options.extraText).toContain('stop sharing')
+    expect(leaveGroup).toHaveBeenCalledWith(4, true)
   })
 
   it('hides Leave for a login-synced membership', async () => {

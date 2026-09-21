@@ -325,7 +325,7 @@ const {
   expandAll: expandAllFeatureCategories,
   collapseAll: collapseAllFeatureCategories,
   allOpen: allFeatureCategoriesOpen,
-} = useAccordion(featureCategoryIds, { defaultOpen: 'first' })
+} = useAccordion(featureCategoryIds)
 
 async function jumpToFeatureCategory(categoryName: string) {
   openFeatureCategory(categoryName)

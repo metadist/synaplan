@@ -676,8 +676,11 @@
       "emptyMember": "Henüz bir grupta değilsiniz. Bir yönetici sizi Kişiler sayfasından ekleyebilir.",
       "emptyAdmin": "Henüz grup yok. Kişiler sayfasından bir tane oluşturun.",
       "leave": "Ayrıl",
-      "leaveConfirm": "\"{name}\" grubundan ayrılmak istiyor musunuz? Bu grupla paylaşılan her şeye erişiminizi kaybedersiniz. Grup kalır.",
-      "left": "Gruptan ayrıldınız.",
+      "leaveConfirm": "\"{name}\" grubundan ayrılmak istiyor musunuz? Bu grubun görebildiklerine erişiminizi kaybedersiniz. Bu grupla paylaştıklarınız diğer üyelerle paylaşılmış kalır. Bunları daha sonra her öğenin Paylaş penceresinden geri alabilirsiniz.",
+      "leaveConfirmWithShares": "\"{name}\" grubundan ayrılmak istiyor musunuz? Bu grubun görebildiklerine erişiminizi kaybedersiniz. Bu grupla paylaştığınız {count} öğe diğer üyelerle paylaşılmış kalır. Ayrılmak bunu korur. Ayrıl ve paylaşımları kaldır bunları siler.",
+      "leaveAndStopSharing": "Ayrıl ve paylaşımları kaldır",
+      "left": "Gruptan ayrıldınız. Paylaştığınız öğeler diğer üyelerle paylaşılmış kalır.",
+      "leftAndStopped": "Gruptan ayrıldınız ve bu grupla paylaşımlarınızı kaldırdınız.",
       "leaveFailed": "Gruptan ayrılamadı.",
       "leaveDirectory": "Bu üyelik girişinizden gelir; burada ayrılamazsınız."
     },
@@ -708,16 +711,26 @@
       "directoryReadOnly": "Bu grup girişinizden gelir; burada yeniden adlandırılamaz veya silinemez.",
       "directoryManagedHint": "Girişten gelen üyelikler bir sonraki oturumda güncellenir. Yine de kişileri elle ekleyebilirsiniz.",
       "addMember": "Kişi ekle",
-      "addMemberPlaceholder": "E-postayla ara",
-      "addMemberNotFound": "Bu e-postayla eşleşen kullanıcı yok.",
+      "addMemberPlaceholder": "Ad veya e-posta ile ara",
+      "addMemberNotFound": "Bu ad veya e-posta ile eşleşen kişi yok.",
       "removeMember": "Kaldır",
-      "removeConfirm": "{email} bu gruptan kaldırılsın mı?",
+      "removeConfirm": "{email} bu gruptan kaldırılsın mı? Bu kişinin grupla paylaştıkları paylaşılmış kalır.",
       "roleMember": "Üye",
       "roleManager": "Yönetici",
       "memberAdded": "Kişi gruba eklendi.",
       "memberRemoved": "Kişi gruptan kaldırıldı.",
       "sharedWith": "Bu grupla paylaşılanlar",
-      "sharedEmpty": "Bu grupla henüz hiçbir şey paylaşılmadı."
+      "sharedEmpty": "Bu grupla henüz hiçbir şey paylaşılmadı.",
+      "sharedLoading": "Paylaşılan öğeler yükleniyor…",
+      "resourceKind": {
+        "conversation": "Sohbet",
+        "knowledge_folder": "Klasör",
+        "assistant": "AI asistanı",
+        "saved_task": "Kayıtlı görev",
+        "widget": "Sohbet widget'ı",
+        "agent": "Ajan",
+        "tool": "Araç"
+      }
     },
     "audit": {
       "when": "Ne zaman",
@@ -860,13 +873,15 @@
       "filter": {
         "label": "Sohbetleri filtrele",
         "all": "Tümü",
-        "private": "Özel",
+        "private": "Size ait",
         "group": "Grup",
         "widget": "Widget"
       },
       "pill": {
-        "private": "Özel",
-        "privateTitle": "Kendi sohbetiniz — yalnızca siz görebilirsiniz",
+        "private": "Size ait",
+        "privateTitle": "Bu sohbet size ait. Paylaşmak bunu değiştirmez.",
+        "sharedWithPeople": "{count} kişi",
+        "sharedWithPeopleTitle": "{count} kişiyle paylaşıldı",
         "group": "Grup",
         "groupTitle": "\"{name}\" grubuyla paylaşıldı",
         "groupTitleGeneric": "Bir grupla paylaşıldı",
