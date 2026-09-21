@@ -51,6 +51,7 @@ test.describe('@ci Provider keys — one editor', () => {
       timeout: TIMEOUTS.STANDARD,
     })
 
+    await page.locator('[data-testid="btn-jump-section-cloud"]').click()
     const openaiChip = page.locator('[data-testid="managed-key-OPENAI_API_KEY"]')
     await expect(openaiChip).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(openaiChip).toHaveAttribute('data-state', /^(env|db|none)$/)
@@ -69,6 +70,7 @@ test.describe('@ci Provider keys — one editor', () => {
     })
 
     await test.step('a fully managed section renders no input at all', async () => {
+      await page.locator('[data-testid="btn-jump-section-media"]').click()
       const media = page.locator('#config-section-media')
       await expect(media).toBeVisible()
       await expect(media.locator('input')).toHaveCount(0)

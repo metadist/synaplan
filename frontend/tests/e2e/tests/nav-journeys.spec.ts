@@ -209,6 +209,7 @@ test.describe('@ci Navigation journeys', () => {
       })
       await page.locator('[data-testid="btn-config-group-ai-data"]').click()
       await page.locator('[data-testid="btn-config-tab-ai"]').click()
+      await page.locator('[data-testid="btn-jump-section-cloud"]').click()
       const openaiChip = page.locator('[data-testid="managed-key-OPENAI_API_KEY"]')
       await expect(openaiChip).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       const section = page.locator('#config-section-cloud')

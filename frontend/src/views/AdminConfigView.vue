@@ -5,12 +5,16 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AccordionSection from '@/components/AccordionSection.vue'
+import AccordionStack from '@/components/AccordionStack.vue'
+import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
 import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
 import ManagedKeysStatusCard from '@/components/admin/ManagedKeysStatusCard.vue'
 import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
 import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
+import { useAccordion } from '@/composables/useAccordion'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useUpdatesStore } from '@/stores/updates'
@@ -164,6 +168,7 @@ async function applyDeepLink() {
   if (typeof wantedSection !== 'string' || '' === wantedSection) {
     return
   }
+  openSection(wantedSection)
   await nextTick()
   const target = document.getElementById(`config-section-${wantedSection}`)
   if (!target) {
@@ -171,6 +176,19 @@ async function applyDeepLink() {
   }
   target.scrollIntoView({ behavior: 'smooth', block: 'start' })
   highlightedSection.value = wantedSection
+}
+
+async function jumpToSection(sectionId: string) {
+  openSection(sectionId)
+  highlightedSection.value = sectionId
+  if (route.query.section !== sectionId) {
+    void router.replace({ query: { ...route.query, section: sectionId } })
+  }
+  await nextTick()
+  document.getElementById(`config-section-${sectionId}`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  })
 }
 
 // Mobile tab dropdown: a single dropdown replaces the 3-group bar (same
@@ -254,6 +272,17 @@ const currentSections = computed(() => {
     }
   })
 })
+
+const sectionIds = computed(() => currentSections.value.map((section) => section.id))
+const {
+  isOpen: isSectionOpen,
+  toggle: toggleSection,
+  open: openSection,
+  expandAll,
+  collapseAll,
+  allOpen,
+} = useAccordion(sectionIds, { defaultOpen: 'first' })
+const showSectionNav = computed(() => currentSections.value.length > 1)
 
 // Service test mapping (multiple services per tab are tested sequentially)
 const testableServices: Record<string, string[]> = {
@@ -589,24 +618,39 @@ onBeforeUnmount(() => {
         <!-- Content -->
         <div v-else-if="schema" class="space-y-6">
           <!-- Active tab title + actions -->
-          <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
             <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
               <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-6 h-6 text-[var(--brand)]" />
               {{ currentTabLabel }}
             </h2>
-            <button
-              v-if="canTestCurrentTab"
-              type="button"
-              :disabled="!!testingService"
-              class="btn-secondary px-4 py-2 rounded-lg flex items-center gap-2"
-              @click="handleTestConnection"
-            >
-              <Icon
-                :icon="testingService ? 'mdi:loading' : 'mdi:connection'"
-                :class="['w-5 h-5', testingService && 'animate-spin']"
-              />
-              {{ $t('admin.config.testConnection') }}
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button
+                v-if="showSectionNav"
+                type="button"
+                class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+                data-testid="btn-config-accordion-toggle-all"
+                @click="allOpen ? collapseAll() : expandAll()"
+              >
+                {{
+                  allOpen
+                    ? $t('admin.config.accordion.collapseAll')
+                    : $t('admin.config.accordion.expandAll')
+                }}
+              </button>
+              <button
+                v-if="canTestCurrentTab"
+                type="button"
+                :disabled="!!testingService"
+                class="btn-secondary px-4 py-2 rounded-lg flex items-center gap-2"
+                @click="handleTestConnection"
+              >
+                <Icon
+                  :icon="testingService ? 'mdi:loading' : 'mdi:connection'"
+                  :class="['w-5 h-5', testingService && 'animate-spin']"
+                />
+                {{ $t('admin.config.testConnection') }}
+              </button>
+            </div>
           </div>
 
           <!-- Branding is edited per theme mode: tell the admin which set they are changing -->
@@ -624,34 +668,40 @@ onBeforeUnmount(() => {
             }}
           </p>
 
-          <!-- Sections -->
-          <div class="space-y-8">
-            <div
+          <!-- Jump nav: every section on this tab, without scrolling the stack -->
+          <SectionJumpNav
+            v-if="showSectionNav"
+            :items="currentSections.map((section) => ({ id: section.id, label: section.label }))"
+            :active-id="highlightedSection"
+            :nav-label="$t('admin.config.accordion.jumpTo')"
+            @select="jumpToSection"
+          />
+
+          <!-- Sections (accordion) -->
+          <AccordionStack testid="config-accordion">
+            <AccordionSection
               v-for="section in currentSections"
-              :id="`config-section-${section.id}`"
               :key="section.id"
-              class="surface-card rounded-xl p-6 scroll-mt-6"
-              :class="
-                highlightedSection === section.id
-                  ? 'outline outline-2 outline-offset-2 outline-[var(--brand)]'
-                  : ''
-              "
+              :panel-id="`config-section-${section.id}`"
+              :title="section.label"
+              :open="isSectionOpen(section.id)"
+              :highlighted="highlightedSection === section.id"
+              :header-testid="`btn-config-section-${section.id}`"
+              @toggle="toggleSection(section.id)"
             >
-              <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
-                  <Icon icon="mdi:folder-cog" class="w-5 h-5 txt-secondary" />
-                  {{ section.label }}
-                </h3>
+              <template #leading>
+                <Icon icon="mdi:folder-cog" class="w-5 h-5 txt-secondary flex-shrink-0" />
+              </template>
+              <template v-if="section.isLive" #badge>
                 <span
-                  v-if="section.isLive"
                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
                   :title="$t('admin.config.liveHint')"
                 >
                   <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                   {{ $t('admin.config.liveBadge') }}
                 </span>
-              </div>
-              <p v-if="section.isLive" class="text-xs txt-secondary mb-4 -mt-2">
+              </template>
+              <p v-if="section.isLive" class="text-xs txt-secondary mb-4">
                 {{ $t('admin.config.liveHint') }}
               </p>
               <M365SetupGuide v-if="section.id === 'm365'" />
@@ -671,8 +721,8 @@ onBeforeUnmount(() => {
                   :fields="section.managedFields"
                 />
               </div>
-            </div>
-          </div>
+            </AccordionSection>
+          </AccordionStack>
         </div>
 
         <!-- Error State -->
