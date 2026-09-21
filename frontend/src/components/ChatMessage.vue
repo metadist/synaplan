@@ -376,9 +376,10 @@
             @retry="handleErrorRetry"
           />
 
-          <!-- Continue Button (truncated response) -->
+          <!-- Continue Button (truncated response). Hidden on a shared chat:
+               continuing writes into the owner's conversation. -->
           <div
-            v-if="role === 'assistant' && truncated && !isStreaming"
+            v-if="role === 'assistant' && truncated && !isStreaming && canRewrite !== false"
             class="mt-3 pt-3 border-t border-light-border/30 dark:border-dark-border/20"
           >
             <p class="text-sm txt-muted mb-2">
@@ -795,7 +796,7 @@
                  whole plan, so offer one plain "Again" that re-runs the full
                  pipeline (re-classify + re-plan). -->
             <button
-              v-if="isMultitaskTurn"
+              v-if="isMultitaskTurn && canRewrite !== false"
               type="button"
               :disabled="isSuperseded || isGuestMode"
               :class="[
@@ -815,7 +816,7 @@
               />
             </button>
 
-            <div v-else class="relative">
+            <div v-else-if="canRewrite !== false" class="relative">
               <!-- Single "Again with… ▾" control: opening the dropdown and
                    picking a model re-runs the prompt (see selectModel). The old
                    standalone "Again with <model>" button was merged into this to
@@ -1163,6 +1164,11 @@ interface Props {
   usageTaximeterActive?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
+  /**
+   * Owner-only rewrite actions (Again, Again with, Continue). Shared chats
+   * keep Continue as my copy on the banner instead.
+   */
+  canRewrite?: boolean
   /**
    * Received (shared) conversation: `[Memory:ID]` belongs to the chat owner.
    * MessageText renders a terminal badge and never looks the id up.

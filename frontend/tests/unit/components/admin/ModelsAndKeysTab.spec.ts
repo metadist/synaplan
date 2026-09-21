@@ -88,7 +88,7 @@ describe('ModelsAndKeysTab local AI', () => {
     const wrapper = mountTab()
     await flushPromises()
 
-    expect(wrapper.get('#setup-section-providers').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#setup-section-providers').attributes('data-open')).toBe('false')
     expect(wrapper.get('#setup-section-own-service').attributes('data-open')).toBe('false')
     expect(wrapper.get('#setup-section-local-ai').attributes('data-open')).toBe('false')
     expect(wrapper.find('[data-testid="btn-jump-section-local-ai"]').exists()).toBe(true)

@@ -227,6 +227,59 @@ class AdminController extends AbstractController
     /**
      * Update user level (admin only).
      */
+    #[Route('/users/search', name: 'admin_search_users', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/admin/users/search',
+        operationId: 'searchAdminUsers',
+        summary: 'Search accounts by name or email',
+        description: 'Admin-only lookup for adding people to a group. Matches the stored name and the email. This is not the public share picker and does not depend on the user-search flag.',
+        tags: ['Admin'],
+        parameters: [
+            new OA\Parameter(name: 'q', in: 'query', required: true, schema: new OA\Schema(type: 'string', example: 'ada')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Matching accounts',
+                content: new OA\JsonContent(
+                    required: ['users'],
+                    properties: [
+                        new OA\Property(
+                            property: 'users',
+                            type: 'array',
+                            items: new OA\Items(
+                                required: ['id', 'email', 'displayName'],
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 4),
+                                    new OA\Property(property: 'email', type: 'string', example: 'ada@example.com'),
+                                    new OA\Property(property: 'displayName', type: 'string', example: 'Ada Lovelace'),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 403, description: 'Admin access required'),
+        ]
+    )]
+    public function searchUsers(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user || !$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        $query = trim((string) $request->query->get('q', ''));
+        $users = $this->userRepository->searchByEmailOrName($query, 8);
+
+        return $this->json([
+            'users' => array_map(static fn (User $match): array => [
+                'id' => (int) $match->getId(),
+                'email' => $match->getMail(),
+                'displayName' => $match->getDisplayName(),
+            ], $users),
+        ]);
+    }
+
     #[Route('/users/{id}/level', name: 'admin_update_user_level', methods: ['PATCH'])]
     #[OA\Patch(
         path: '/api/v1/admin/users/{id}/level',

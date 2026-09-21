@@ -93,7 +93,7 @@ import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
-const { confirm } = useDialog()
+const { choose } = useDialog()
 const { error, success } = useNotification()
 const loading = ref(true)
 const groups = ref<IamMyGroup[]>([])
@@ -116,15 +116,27 @@ async function loadGroups(): Promise<void> {
 }
 
 async function leaveGroup(group: IamMyGroup): Promise<void> {
-  const ok = await confirm({
-    title: t('people.myGroups.leave'),
-    message: t('people.myGroups.leaveConfirm', { name: group.name }),
-    danger: true,
-  })
-  if (!ok) return
+  let sharedCount = 0
   try {
-    await iamApi.leaveGroup(group.id)
-    success(t('people.myGroups.left'))
+    sharedCount = await iamApi.countMyGrantsToGroup(group.id)
+  } catch {
+    // Leave still works. Without a count we do not offer to delete shares.
+  }
+  const choice = await choose({
+    title: t('people.myGroups.leave'),
+    message:
+      sharedCount > 0
+        ? t('people.myGroups.leaveConfirmWithShares', { name: group.name, count: sharedCount })
+        : t('people.myGroups.leaveConfirm', { name: group.name }),
+    confirmText: t('people.myGroups.leave'),
+    cancelText: t('common.cancel'),
+    extraText: sharedCount > 0 ? t('people.myGroups.leaveAndStopSharing') : undefined,
+  })
+  if (choice === null) return
+  const withdrawShares = choice === 'extra'
+  try {
+    await iamApi.leaveGroup(group.id, withdrawShares)
+    success(t(withdrawShares ? 'people.myGroups.leftAndStopped' : 'people.myGroups.left'))
     groups.value = groups.value.filter((row) => row.id !== group.id)
   } catch {
     error(t('people.myGroups.leaveFailed'))

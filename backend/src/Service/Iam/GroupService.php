@@ -193,19 +193,36 @@ final readonly class GroupService
     }
 
     /**
-     * The current user leaves a group they were added to. Directory-synced
+     * The current user may leave a manual membership. Directory-synced
      * memberships stay read-only (they return at the next sign-in).
      */
-    public function leave(Group $group, User $actor, string $ip = ''): void
+    public function assertCanLeave(Group $group, User $actor): void
     {
-        $userId = (int) $actor->getId();
         $groupId = (int) $group->getId();
-        $member = $this->groupMemberRepository->findMembership($groupId, $userId);
+        $member = $this->groupMemberRepository->findMembership($groupId, (int) $actor->getId());
         if (null === $member) {
             throw new GroupMembershipNotFoundException($groupId);
         }
         if (GroupMember::SOURCE_DIRECTORY === $member->getSource()) {
             throw new DirectoryGroupReadOnlyException($groupId);
+        }
+    }
+
+    /**
+     * The current user leaves a group they were added to.
+     *
+     * Shares they granted to the group are left in place. Pass $withdrawnShares
+     * only after those rows were deleted by an explicit "leave and stop sharing".
+     */
+    public function leave(Group $group, User $actor, string $ip = '', int $withdrawnShares = 0): void
+    {
+        $this->assertCanLeave($group, $actor);
+
+        $userId = (int) $actor->getId();
+        $groupId = (int) $group->getId();
+        $member = $this->groupMemberRepository->findMembership($groupId, $userId);
+        if (null === $member) {
+            throw new GroupMembershipNotFoundException($groupId);
         }
 
         $this->groupMemberRepository->remove($member);
@@ -215,7 +232,7 @@ final readonly class GroupService
             'group.member_leave',
             'group',
             (string) $groupId,
-            ['userId' => $userId],
+            ['userId' => $userId, 'withdrawnShares' => $withdrawnShares],
             $ip,
         );
     }
@@ -351,6 +368,7 @@ final readonly class GroupService
         return [
             'userId' => $member->getUserId(),
             'email' => $user->getMail(),
+            'displayName' => $user->getDisplayName(),
             'role' => $member->getRole(),
             'source' => $member->getSource(),
             'created' => $member->getCreated(),

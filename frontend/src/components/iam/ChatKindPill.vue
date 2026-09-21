@@ -40,11 +40,13 @@ const props = withDefaults(
     kind: ChatKind
     /** Group name (group) or owner name (direct); ignored for other kinds. */
     label?: string | null
+    /** Replaces the default caption, for example a people-count on an owned chat. */
+    text?: string | null
     /** Red dot: this chat arrived after the user last opened Incoming. */
     isNew?: boolean
     size?: 'xs' | 'sm'
   }>(),
-  { label: null, isNew: false, size: 'xs' }
+  { label: null, text: null, isNew: false, size: 'xs' }
 )
 
 const { t } = useI18n()
@@ -65,7 +67,7 @@ const icon = computed(() => {
     case 'widget':
       return 'mdi:puzzle-outline'
     default:
-      return 'mdi:lock-outline'
+      return 'mdi:account-outline'
   }
 })
 
@@ -83,6 +85,8 @@ const toneClass = computed(() => {
 })
 
 const text = computed(() => {
+  const override = props.text?.trim()
+  if (override) return override
   switch (props.kind) {
     case 'group':
       return props.label?.trim() || t('iam.incoming.pill.group')

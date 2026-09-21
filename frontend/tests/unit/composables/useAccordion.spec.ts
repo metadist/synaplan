@@ -3,19 +3,19 @@ import { nextTick, ref } from 'vue'
 import { useAccordion } from '@/composables/useAccordion'
 
 describe('useAccordion', () => {
-  it('opens the first panel by default and toggles independently', () => {
+  it('starts closed and toggles independently', () => {
     const { isOpen, toggle, allOpen } = useAccordion(['a', 'b', 'c'])
 
-    expect(isOpen('a')).toBe(true)
+    expect(isOpen('a')).toBe(false)
     expect(isOpen('b')).toBe(false)
     expect(allOpen.value).toBe(false)
 
     toggle('b')
-    expect(isOpen('a')).toBe(true)
+    expect(isOpen('a')).toBe(false)
     expect(isOpen('b')).toBe(true)
 
     toggle('a')
-    expect(isOpen('a')).toBe(false)
+    expect(isOpen('a')).toBe(true)
     expect(isOpen('b')).toBe(true)
   })
 
@@ -33,7 +33,7 @@ describe('useAccordion', () => {
     expect(allOpen.value).toBe(false)
   })
 
-  it('resets to the first panel when the id list changes', async () => {
+  it('closes every panel again when the id list changes', async () => {
     const ids = ref(['a', 'b'])
     const { isOpen, toggle } = useAccordion(ids)
 
@@ -43,7 +43,7 @@ describe('useAccordion', () => {
     ids.value = ['x', 'y']
     await nextTick()
 
-    expect(isOpen('x')).toBe(true)
+    expect(isOpen('x')).toBe(false)
     expect(isOpen('y')).toBe(false)
     expect(isOpen('b')).toBe(false)
   })

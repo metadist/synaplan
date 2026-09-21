@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\Group;
 use App\Entity\GroupMember;
+use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Iam\IamConfig;
@@ -121,6 +122,63 @@ final class GroupControllerTest extends WebTestCase
         self::assertNull($this->em->getRepository(GroupMember::class)->findMembership((int) $group->getId(), (int) $user->getId()));
     }
 
+    public function testLeaveKeepsSharesThisUserGranted(): void
+    {
+        $this->enableFlag();
+        $user = $this->createUser('iam-leave-keep@synaplan.internal');
+        $other = $this->createUser('iam-leave-keep-other@synaplan.internal');
+        $group = $this->createGroup('sales-leave-keep');
+        $this->addMember($group, $user);
+
+        $own = $this->grantToGroup($user, $group, 'chat-keep-own');
+        $theirs = $this->grantToGroup($other, $group, 'chat-keep-theirs');
+        $ownId = $own->getId();
+        $theirsId = $theirs->getId();
+
+        $this->authenticateClient($this->client, $user);
+        $this->client->request('GET', '/api/v1/groups/'.$group->getId().'/granted-shares');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame(1, json_decode((string) $this->client->getResponse()->getContent(), true)['count']);
+
+        $this->client->request('DELETE', '/api/v1/groups/'.$group->getId().'/membership');
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertSame(0, $body['withdrawnShares']);
+        $this->em->clear();
+        self::assertNotNull($this->em->find(Share::class, $ownId));
+        self::assertNotNull($this->em->find(Share::class, $theirsId));
+    }
+
+    public function testLeaveAndStopSharingDeletesOnlyOwnGrantsToThatGroup(): void
+    {
+        $this->enableFlag();
+        $user = $this->createUser('iam-leave-kill@synaplan.internal');
+        $other = $this->createUser('iam-leave-kill-other@synaplan.internal');
+        $group = $this->createGroup('sales-leave-kill');
+        $otherGroup = $this->createGroup('sales-leave-kill-other');
+        $this->addMember($group, $user);
+
+        $own = $this->grantToGroup($user, $group, 'chat-kill-own');
+        $theirs = $this->grantToGroup($other, $group, 'chat-kill-theirs');
+        $elsewhere = $this->grantToGroup($user, $otherGroup, 'chat-kill-elsewhere');
+        $ownId = $own->getId();
+        $theirsId = $theirs->getId();
+        $elsewhereId = $elsewhere->getId();
+
+        $this->authenticateClient($this->client, $user);
+        $this->client->request('DELETE', '/api/v1/groups/'.$group->getId().'/membership?withdrawShares=1');
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertSame(1, $body['withdrawnShares']);
+        $this->em->clear();
+        self::assertNull($this->em->find(Share::class, $ownId));
+        self::assertNotNull($this->em->find(Share::class, $theirsId));
+        self::assertNotNull($this->em->find(Share::class, $elsewhereId));
+        self::assertNull($this->em->getRepository(GroupMember::class)->findMembership((int) $group->getId(), (int) $user->getId()));
+    }
+
     public function testLeaveDirectoryMembershipIs409(): void
     {
         $this->enableFlag();
@@ -154,6 +212,39 @@ final class GroupControllerTest extends WebTestCase
         static::getContainer()->get(ConfigRepository::class)
             ->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '0');
         $this->em->flush();
+    }
+
+    private function createGroup(string $slugPrefix): Group
+    {
+        $group = new Group();
+        $group->setName('Sales');
+        $group->setSlug($slugPrefix.'-'.uniqid());
+        $this->em->persist($group);
+        $this->em->flush();
+
+        return $group;
+    }
+
+    private function addMember(Group $group, User $user): void
+    {
+        $member = new GroupMember((int) $group->getId(), (int) $user->getId());
+        $this->em->persist($member);
+        $this->em->flush();
+    }
+
+    private function grantToGroup(User $granter, Group $group, string $resourceId): Share
+    {
+        $share = (new Share())
+            ->setResourceKind('conversation')
+            ->setResourceId($resourceId)
+            ->setSubjectType(Share::SUBJECT_GROUP)
+            ->setSubjectId((int) $group->getId())
+            ->setPermission('read')
+            ->setGrantedBy((int) $granter->getId());
+        $this->em->persist($share);
+        $this->em->flush();
+
+        return $share;
     }
 
     private function createUser(string $email): User

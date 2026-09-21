@@ -28,13 +28,44 @@
         data-testid="form-add-member"
         @submit.prevent="addMember"
       >
-        <input
-          v-model="memberQuery"
-          type="text"
-          :placeholder="$t('people.groups.addMemberPlaceholder')"
-          class="flex-1 min-w-[220px] px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-          data-testid="input-add-member"
-        />
+        <div ref="memberSearchRoot" class="relative flex-1 min-w-[220px]">
+          <input
+            v-model="memberQuery"
+            type="text"
+            autocomplete="off"
+            :placeholder="$t('people.groups.addMemberPlaceholder')"
+            class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+            data-testid="input-add-member"
+            @focus="memberSearchOpen = true"
+          />
+          <div
+            v-if="memberSearchOpen && (memberSuggestions.length > 0 || memberSearchEmpty)"
+            class="dropdown-panel absolute left-0 right-0 top-full mt-1 z-40 max-h-56 overflow-y-auto"
+            data-testid="list-add-member-suggestions"
+            @mousedown.prevent
+          >
+            <p v-if="memberSearchEmpty" class="px-3 py-2 text-sm txt-secondary">
+              {{ $t('people.groups.addMemberNotFound') }}
+            </p>
+            <ul v-else>
+              <li v-for="person in memberSuggestions" :key="person.id">
+                <button
+                  type="button"
+                  class="dropdown-item w-full text-left"
+                  :data-testid="`btn-add-member-suggestion-${person.id}`"
+                  @click="pickMember(person)"
+                >
+                  <span class="font-medium block truncate">{{ person.displayName }}</span>
+                  <span
+                    v-if="person.email && person.email !== person.displayName"
+                    class="block text-xs txt-secondary truncate"
+                    >{{ person.email }}</span
+                  >
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
         <select
           v-model="memberRole"
           class="px-3 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
@@ -62,8 +93,16 @@
           :key="member.userId"
           class="flex items-center justify-between gap-3 py-2 px-3 rounded-lg bg-chat"
         >
-          <div>
-            <div class="txt-primary text-sm">{{ member.email }}</div>
+          <div class="min-w-0">
+            <div class="txt-primary text-sm truncate">
+              {{ member.displayName || member.email }}
+            </div>
+            <div
+              v-if="member.displayName && member.displayName !== member.email"
+              class="txt-secondary text-xs truncate"
+            >
+              {{ member.email }}
+            </div>
             <div class="txt-secondary text-xs">
               {{
                 member.role === 'manager'
@@ -91,19 +130,46 @@
 
     <div>
       <h4 class="text-sm font-medium txt-primary mb-2">{{ $t('people.groups.sharedWith') }}</h4>
-      <p class="text-sm txt-secondary" data-testid="group-shared-empty">
+      <p v-if="sharesLoading" class="text-sm txt-secondary">
+        {{ $t('people.groups.sharedLoading') }}
+      </p>
+      <p
+        v-else-if="shares.length === 0"
+        class="text-sm txt-secondary"
+        data-testid="group-shared-empty"
+      >
         {{ $t('people.groups.sharedEmpty') }}
       </p>
+      <ul v-else class="space-y-2" data-testid="list-group-shares">
+        <li
+          v-for="share in shares"
+          :key="`${share.kind}-${share.id}`"
+          class="flex flex-wrap items-center gap-2 py-2 px-3 rounded-lg bg-chat"
+          :data-testid="`row-group-share-${share.kind}-${share.id}`"
+        >
+          <span class="txt-primary text-sm font-medium truncate">{{ share.name }}</span>
+          <span class="pill text-xs">{{ kindLabel(share.kind) }}</span>
+          <span class="pill text-xs">{{ permissionLabel(share.permission) }}</span>
+          <span v-if="share.ownerName" class="txt-secondary text-xs">
+            {{ $t('iam.dialog.ownerLine', { name: share.ownerName }) }}
+          </span>
+        </li>
+      </ul>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
-import { iamApi, type IamGroup, type IamGroupMember } from '@/services/api/iamApi'
-import { adminApi } from '@/services/api/adminApi'
+import {
+  iamApi,
+  type IamGroup,
+  type IamGroupMember,
+  type IamGroupShare,
+} from '@/services/api/iamApi'
+import { adminApi, type AdminUserSearchHit } from '@/services/api/adminApi'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 
@@ -115,15 +181,37 @@ const emit = defineEmits<{
   changed: []
 }>()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { confirm } = useDialog()
 const { success, error: showError } = useNotification()
 
+const PERMISSIONS = ['read', 'use', 'edit', 'manage'] as const
+
 const members = ref<IamGroupMember[]>([])
 const membersLoading = ref(false)
+const shares = ref<IamGroupShare[]>([])
+const sharesLoading = ref(false)
 const memberQuery = ref('')
 const memberRole = ref<'member' | 'manager'>('member')
 const adding = ref(false)
+const memberSuggestions = ref<AdminUserSearchHit[]>([])
+const memberSearchOpen = ref(false)
+const memberSearchEmpty = ref(false)
+const pickedMember = ref<AdminUserSearchHit | null>(null)
+const memberSearchRoot = ref<HTMLElement | null>(null)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+function kindLabel(kind: string): string {
+  const key = `people.groups.resourceKind.${kind}`
+  return te(key) ? t(key) : kind
+}
+
+function permissionLabel(permission: string): string {
+  if ((PERMISSIONS as readonly string[]).includes(permission)) {
+    return t(`iam.permission.${permission}`)
+  }
+  return permission
+}
 
 async function loadMembers() {
   membersLoading.value = true
@@ -136,21 +224,90 @@ async function loadMembers() {
   }
 }
 
+async function loadShares() {
+  sharesLoading.value = true
+  try {
+    shares.value = await iamApi.listGroupShares(props.group.id)
+  } catch (error) {
+    shares.value = []
+    showError(error instanceof Error ? error.message : t('people.groups.loadError'))
+  } finally {
+    sharesLoading.value = false
+  }
+}
+
+async function searchMembers(query: string) {
+  try {
+    const users = await adminApi.searchUsers(query)
+    memberSuggestions.value = users
+    memberSearchEmpty.value = users.length === 0
+  } catch {
+    memberSuggestions.value = []
+    memberSearchEmpty.value = true
+  }
+}
+
+function pickMember(person: AdminUserSearchHit) {
+  pickedMember.value = person
+  memberQuery.value = person.displayName || person.email
+  memberSuggestions.value = []
+  memberSearchEmpty.value = false
+  memberSearchOpen.value = false
+}
+
+watch(memberQuery, (value) => {
+  if (
+    pickedMember.value &&
+    value !== (pickedMember.value.displayName || pickedMember.value.email)
+  ) {
+    pickedMember.value = null
+  }
+  if (searchTimer) clearTimeout(searchTimer)
+  const query = value.trim()
+  if (query.length < 2 || pickedMember.value) {
+    memberSuggestions.value = []
+    memberSearchEmpty.value = false
+    return
+  }
+  searchTimer = setTimeout(() => {
+    void searchMembers(query)
+  }, 250)
+})
+
+function onDocumentClick(event: MouseEvent) {
+  if (memberSearchRoot.value && !memberSearchRoot.value.contains(event.target as Node)) {
+    memberSearchOpen.value = false
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('mousedown', onDocumentClick)
+}
+
+onUnmounted(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+  document.removeEventListener('mousedown', onDocumentClick)
+})
+
 async function addMember() {
-  const query = memberQuery.value.trim()
+  const query = memberQuery.value.trim().toLowerCase()
   if (!query) return
+  const person =
+    pickedMember.value ??
+    memberSuggestions.value.find(
+      (user) => user.email.toLowerCase() === query || user.displayName.toLowerCase() === query
+    ) ??
+    null
+  if (!person) {
+    showError(t('people.groups.addMemberNotFound'))
+    return
+  }
   adding.value = true
   try {
-    const result = await adminApi.getUsers(1, 20, query)
-    const match = result.users.find(
-      (user) => (user.email ?? '').toLowerCase() === query.toLowerCase()
-    )
-    if (!match) {
-      showError(t('people.groups.addMemberNotFound'))
-      return
-    }
-    await iamApi.setMember(props.group.id, match.id, memberRole.value)
+    await iamApi.setMember(props.group.id, person.id, memberRole.value)
     memberQuery.value = ''
+    pickedMember.value = null
+    memberSuggestions.value = []
     success(t('people.groups.memberAdded'))
     await loadMembers()
     emit('changed')
@@ -181,7 +338,8 @@ async function removeMember(member: IamGroupMember) {
 watch(
   () => props.group.id,
   () => {
-    loadMembers()
+    void loadMembers()
+    void loadShares()
   },
   { immediate: true }
 )

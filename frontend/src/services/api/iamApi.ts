@@ -6,8 +6,10 @@ import {
   UpdateAdminGroupResponseSchema,
   DeleteAdminGroupResponseSchema,
   ListAdminGroupMembersResponseSchema,
+  ListAdminGroupSharesResponseSchema,
   PutAdminGroupMemberResponseSchema,
   DeleteAdminGroupMemberResponseSchema,
+  CountMyGrantsToGroupResponseSchema,
   LeaveMyGroupResponseSchema,
   ListMyGroupsResponseSchema,
   ListSharesResponseSchema,
@@ -32,6 +34,9 @@ export type IamGroup = NonNullable<z.infer<typeof ListAdminGroupsResponseSchema>
 export type IamMyGroup = NonNullable<z.infer<typeof ListMyGroupsResponseSchema>['groups']>[number]
 export type IamGroupMember = NonNullable<
   z.infer<typeof ListAdminGroupMembersResponseSchema>['members']
+>[number]
+export type IamGroupShare = NonNullable<
+  z.infer<typeof ListAdminGroupSharesResponseSchema>['shares']
 >[number]
 
 export type IamShare = NonNullable<z.infer<typeof ListSharesResponseSchema>['shares']>[number]
@@ -126,6 +131,14 @@ export const iamApi = {
     return data.members ?? []
   },
 
+  async listGroupShares(groupId: number): Promise<IamGroupShare[]> {
+    const data = await httpClient(`/api/v1/admin/groups/${groupId}/shares`, {
+      method: 'GET',
+      schema: ListAdminGroupSharesResponseSchema,
+    })
+    return data.shares ?? []
+  },
+
   async setMember(
     groupId: number,
     userId: number,
@@ -154,9 +167,18 @@ export const iamApi = {
     return data.groups ?? []
   },
 
-  async leaveGroup(id: number): Promise<void> {
+  async countMyGrantsToGroup(id: number): Promise<number> {
+    const data = await httpClient(`/api/v1/groups/${id}/granted-shares`, {
+      method: 'GET',
+      schema: CountMyGrantsToGroupResponseSchema,
+    })
+    return data.count
+  },
+
+  async leaveGroup(id: number, withdrawShares = false): Promise<void> {
     await httpClient(`/api/v1/groups/${id}/membership`, {
       method: 'DELETE',
+      params: withdrawShares ? { withdrawShares: '1' } : undefined,
       schema: LeaveMyGroupResponseSchema,
     })
   },

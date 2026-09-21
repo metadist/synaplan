@@ -1,6 +1,9 @@
 // Admin API service
 import { httpClient } from './httpClient'
-import { GetAdminGetUsersResponseSchema } from '@/generated/api-schemas'
+import {
+  GetAdminGetUsersResponseSchema,
+  SearchAdminUsersResponseSchema,
+} from '@/generated/api-schemas'
 import { z } from 'zod'
 
 // Create a more flexible schema that accepts datetime strings with or without offset
@@ -27,6 +30,9 @@ const FlexibleGetAdminUsersResponseSchema = GetAdminGetUsersResponseSchema.exten
 })
 
 export type GetAdminUsersResponse = z.infer<typeof FlexibleGetAdminUsersResponseSchema>
+export type AdminUserSearchHit = NonNullable<
+  z.infer<typeof SearchAdminUsersResponseSchema>['users']
+>[number]
 
 export interface SystemPrompt {
   id: number
@@ -82,6 +88,15 @@ export interface RegistrationAnalytics {
 }
 
 export const adminApi = {
+  async searchUsers(query: string): Promise<AdminUserSearchHit[]> {
+    const data = await httpClient('/api/v1/admin/users/search', {
+      method: 'GET',
+      params: { q: query },
+      schema: SearchAdminUsersResponseSchema,
+    })
+    return data.users ?? []
+  },
+
   async getUsers(page = 1, limit = 50, search = ''): Promise<GetAdminUsersResponse> {
     const params = new URLSearchParams({
       page: page.toString(),

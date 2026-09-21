@@ -196,6 +196,41 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->userDetails;
     }
 
+    /**
+     * Name shown next to this account. Falls back to the email when no name is stored.
+     *
+     * Profile saves camelCase (`firstName`); directory login saves snake_case (`first_name`).
+     */
+    public function getDisplayName(): string
+    {
+        $full = $this->detailString(['full_name', 'fullName', 'display_name']);
+        if ('' !== $full) {
+            return $full;
+        }
+
+        $combined = trim($this->detailString(['first_name', 'firstName']).' '.$this->detailString(['last_name', 'lastName']));
+        if ('' !== $combined) {
+            return $combined;
+        }
+
+        return $this->mail;
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function detailString(array $keys): string
+    {
+        foreach ($keys as $key) {
+            $value = $this->userDetails[$key] ?? null;
+            if (\is_string($value) && '' !== trim($value)) {
+                return trim($value);
+            }
+        }
+
+        return '';
+    }
+
     public function setUserDetails(array $userDetails): self
     {
         $this->userDetails = $userDetails;

@@ -680,8 +680,11 @@
       "emptyMember": "Sie sind noch in keiner Gruppe. Ein Administrator kann Sie auf der Seite Personen hinzufügen.",
       "emptyAdmin": "Noch keine Gruppen. Legen Sie eine auf der Seite Personen an.",
       "leave": "Verlassen",
-      "leaveConfirm": "Die Gruppe \"{name}\" verlassen? Sie verlieren den Zugriff auf alles, was mit dieser Gruppe geteilt wurde. Die Gruppe selbst bleibt.",
-      "left": "Sie haben die Gruppe verlassen.",
+      "leaveConfirm": "Die Gruppe \"{name}\" verlassen? Sie verlieren den Zugriff auf das, was diese Gruppe sehen kann. Was Sie mit dieser Gruppe geteilt haben, bleibt für die anderen Mitglieder geteilt. Das können Sie später im Teilen-Dialog jedes Elements zurücknehmen.",
+      "leaveConfirmWithShares": "Die Gruppe \"{name}\" verlassen? Sie verlieren den Zugriff auf das, was diese Gruppe sehen kann. 1 Element, das Sie mit dieser Gruppe geteilt haben, bleibt für die anderen Mitglieder geteilt. Verlassen behält das. Verlassen und Freigaben beenden entfernt es. | Die Gruppe \"{name}\" verlassen? Sie verlieren den Zugriff auf das, was diese Gruppe sehen kann. {count} Elemente, die Sie mit dieser Gruppe geteilt haben, bleiben für die anderen Mitglieder geteilt. Verlassen behält das. Verlassen und Freigaben beenden entfernt es.",
+      "leaveAndStopSharing": "Verlassen und Freigaben beenden",
+      "left": "Sie haben die Gruppe verlassen. Was Sie mit ihr geteilt haben, bleibt für die anderen Mitglieder geteilt.",
+      "leftAndStopped": "Sie haben die Gruppe verlassen und Ihre Freigaben für sie beendet.",
       "leaveFailed": "Die Gruppe konnte nicht verlassen werden.",
       "leaveDirectory": "Diese Mitgliedschaft kommt aus Ihrer Anmeldung und kann hier nicht verlassen werden."
     },
@@ -712,16 +715,26 @@
       "directoryReadOnly": "Diese Gruppe kommt aus Ihrer Anmeldung und kann hier nicht umbenannt oder gelöscht werden.",
       "directoryManagedHint": "Mitgliedschaften aus der Anmeldung werden beim nächsten Anmelden aktualisiert. Sie können weiterhin Personen von Hand hinzufügen.",
       "addMember": "Person hinzufügen",
-      "addMemberPlaceholder": "Nach E-Mail suchen",
-      "addMemberNotFound": "Kein Benutzer passt zu dieser E-Mail.",
+      "addMemberPlaceholder": "Nach Name oder E-Mail suchen",
+      "addMemberNotFound": "Keine Person passt zu diesem Namen oder dieser E-Mail.",
       "removeMember": "Entfernen",
-      "removeConfirm": "{email} aus dieser Gruppe entfernen?",
+      "removeConfirm": "{email} aus dieser Gruppe entfernen? Was diese Person mit der Gruppe geteilt hat, bleibt geteilt.",
       "roleMember": "Mitglied",
       "roleManager": "Manager",
       "memberAdded": "Person zur Gruppe hinzugefügt.",
       "memberRemoved": "Person aus der Gruppe entfernt.",
       "sharedWith": "Mit dieser Gruppe geteilt",
-      "sharedEmpty": "Mit dieser Gruppe ist noch nichts geteilt."
+      "sharedEmpty": "Mit dieser Gruppe ist noch nichts geteilt.",
+      "sharedLoading": "Geteilte Elemente werden geladen…",
+      "resourceKind": {
+        "conversation": "Chat",
+        "knowledge_folder": "Ordner",
+        "assistant": "KI-Assistent",
+        "saved_task": "Gespeicherte Aufgabe",
+        "widget": "Chat-Widget",
+        "agent": "Agent",
+        "tool": "Werkzeug"
+      }
     },
     "audit": {
       "when": "Wann",
@@ -864,13 +877,14 @@
       "filter": {
         "label": "Chats filtern",
         "all": "Alle",
-        "private": "Privat",
+        "private": "Eigene",
         "group": "Gruppe",
         "widget": "Widget"
       },
       "pill": {
-        "private": "Privat",
-        "privateTitle": "Dein eigener Chat – nur du kannst ihn sehen",
+        "private": "Eigene",
+        "privateTitle": "Das ist dein Chat. Teilen ändert das nicht.",
+        "sharedWithPeople": "1 Person | {count} Personen",
         "group": "Gruppe",
         "groupTitle": "Mit der Gruppe „{name}“ geteilt",
         "groupTitleGeneric": "Mit einer Gruppe geteilt",

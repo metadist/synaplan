@@ -102,7 +102,7 @@ const {
   expandAll: expandAllAccountSections,
   collapseAll: collapseAllAccountSections,
   allOpen: allAccountSectionsOpen,
-} = useAccordion(accountSectionIds, { defaultOpen: 'first' })
+} = useAccordion(accountSectionIds)
 
 async function jumpToAccountSection(id: string) {
   openAccountSection(id)
@@ -122,5 +122,11 @@ function scrollToSection() {
   })
 }
 
-watch(() => route.query.section, scrollToSection, { immediate: true })
+// Re-open after the section list settles. A fresh list starts closed, and
+// the flags that build it can arrive after the first ?section= read.
+watch(
+  [() => route.query.section, () => accountSectionIds.value.join('\0')],
+  () => scrollToSection(),
+  { immediate: true }
+)
 </script>

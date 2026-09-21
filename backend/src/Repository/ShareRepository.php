@@ -36,6 +36,22 @@ class ShareRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every share whose subject is this user, group, or everyone row.
+     *
+     * @return list<Share>
+     */
+    public function findBySubject(string $subjectType, int $subjectId): array
+    {
+        /** @var list<Share> $rows */
+        $rows = $this->findBy(
+            ['subjectType' => $subjectType, 'subjectId' => $subjectId],
+            ['created' => 'DESC'],
+        );
+
+        return $rows;
+    }
+
+    /**
      * @return list<Share>
      */
     public function findForResource(string $kind, string $resourceId): array
@@ -45,6 +61,29 @@ class ShareRepository extends ServiceEntityRepository
             ['resourceKind' => $kind, 'resourceId' => $resourceId],
             ['created' => 'ASC'],
         );
+
+        return $rows;
+    }
+
+    /**
+     * @param list<string> $resourceIds
+     *
+     * @return list<Share>
+     */
+    public function findForResources(string $kind, array $resourceIds): array
+    {
+        if ([] === $resourceIds) {
+            return [];
+        }
+
+        /** @var list<Share> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->where('s.resourceKind = :kind')
+            ->andWhere('s.resourceId IN (:ids)')
+            ->setParameter('kind', $kind)
+            ->setParameter('ids', $resourceIds)
+            ->getQuery()
+            ->getResult();
 
         return $rows;
     }
@@ -180,6 +219,41 @@ class ShareRepository extends ServiceEntityRepository
             ->setParameter('userId', $userId)
             ->getQuery()
             ->execute();
+    }
+
+    /**
+     * Shares this user granted to one group. Grants made by anyone else are not included.
+     *
+     * @return list<Share>
+     */
+    public function findGrantedByUserToGroup(int $userId, int $groupId): array
+    {
+        /** @var list<Share> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->where('s.grantedBy = :userId')
+            ->andWhere('s.subjectType = :type')
+            ->andWhere('s.subjectId = :groupId')
+            ->setParameter('userId', $userId)
+            ->setParameter('type', Share::SUBJECT_GROUP)
+            ->setParameter('groupId', $groupId)
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    public function countGrantedByUserToGroup(int $userId, int $groupId): int
+    {
+        return (int) $this->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->where('s.grantedBy = :userId')
+            ->andWhere('s.subjectType = :type')
+            ->andWhere('s.subjectId = :groupId')
+            ->setParameter('userId', $userId)
+            ->setParameter('type', Share::SUBJECT_GROUP)
+            ->setParameter('groupId', $groupId)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**

@@ -83,7 +83,18 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                     new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
                                     new OA\Property(property: 'messageCount', type: 'integer', example: 5),
-                                    new OA\Property(property: 'isShared', type: 'boolean', example: false),
+                                    new OA\Property(property: 'isShared', type: 'boolean', example: false, description: 'A public link is on. This is not an IAM grant.'),
+                                    new OA\Property(
+                                        property: 'shareSummary',
+                                        description: 'IAM grants on this owned chat. Empty groups and people 0 mean nobody else has a grant.',
+                                        required: ['everyone', 'people', 'groups'],
+                                        properties: [
+                                            new OA\Property(property: 'everyone', type: 'boolean', example: false),
+                                            new OA\Property(property: 'people', type: 'integer', example: 0),
+                                            new OA\Property(property: 'groups', type: 'array', items: new OA\Items(type: 'string')),
+                                        ],
+                                        type: 'object',
+                                    ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, example: 'web'),
                                     new OA\Property(property: 'firstMessagePreview', type: 'string', nullable: true, example: 'How do I reset my password?'),
                                     new OA\Property(
@@ -143,8 +154,11 @@ class ChatController extends AbstractController
 
         $chatIds = array_map(static fn (Chat $chat) => $chat->getId(), $chats);
         $sessionMap = $this->widgetSessionService->getSessionMapForChats($chatIds);
+        $shareSummaries = $this->shareService->summarizeConversations(array_values(array_filter(
+            array_map(static fn (Chat $chat): int => (int) $chat->getId(), $chats),
+        )));
 
-        $result = array_map(function (Chat $chat) use ($sessionMap) {
+        $result = array_map(function (Chat $chat) use ($sessionMap, $shareSummaries) {
             // Get first user message preview (first 30 chars)
             // Direction 'IN' = user message, 'OUT' = assistant message
             $firstMessagePreview = null;
@@ -171,6 +185,11 @@ class ChatController extends AbstractController
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
                 'messageCount' => $sessionMap[$chat->getId()]['messageCount'] ?? $chat->getMessages()->count(),
                 'isShared' => $chat->isPublic(),
+                'shareSummary' => $shareSummaries[(string) $chat->getId()] ?? [
+                    'everyone' => false,
+                    'people' => 0,
+                    'groups' => [],
+                ],
                 'source' => $chat->getSource(),
                 'widgetSession' => $sessionMap[$chat->getId()] ?? null,
                 'firstMessagePreview' => $firstMessagePreview,

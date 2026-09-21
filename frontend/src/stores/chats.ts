@@ -43,6 +43,12 @@ export interface Chat {
   updatedAt: string
   messageCount?: number
   isShared?: boolean
+  /** IAM grants on an owned chat. A public link stays on isShared. */
+  shareSummary?: {
+    everyone: boolean
+    people: number
+    groups: string[]
+  }
   source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api'
   widgetSession?: WidgetSessionInfo | null
   firstMessagePreview?: string | null

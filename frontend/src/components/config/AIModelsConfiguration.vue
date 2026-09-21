@@ -616,7 +616,7 @@ const {
   expandAll: expandAllEditSections,
   collapseAll: collapseAllEditSections,
   allOpen: allEditSectionsOpen,
-} = useAccordion(() => [...editSectionIds], { defaultOpen: 'first' })
+} = useAccordion(() => [...editSectionIds])
 
 async function jumpToEditSection(id: string) {
   openEditSection(id)

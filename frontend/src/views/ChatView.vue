@@ -252,6 +252,7 @@
               :usage-extra="message.usageExtra"
               :usage-taximeter-active="usageTaximeterStore.active"
               :is-guest-mode="isGuestMode"
+              :can-rewrite="!sharedConversationLocked"
               :foreign-memory="sharedConversationLocked"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"

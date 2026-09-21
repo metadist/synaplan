@@ -155,7 +155,7 @@ final class GroupServiceTest extends TestCase
             ->method('save')
             ->with(self::callback(static function (AuditLogEntry $entry): bool {
                 return 'group.member_leave' === $entry->getAction()
-                    && ['userId' => 1] === $entry->getSubject();
+                    && ['userId' => 1, 'withdrawnShares' => 0] === $entry->getSubject();
             }));
 
         $this->service->leave($group, $this->actor);

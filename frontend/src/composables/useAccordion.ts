@@ -4,14 +4,16 @@ export type AccordionDefaultOpen = 'first' | 'all' | 'none'
 
 /**
  * Independent accordion state (several panels may be open at once).
- * Replaces the panel set when `ids` changes (tab switch) so a leftover
- * open id from the previous page never silently hides the new one.
+ * A fresh page starts with every panel closed. A deep link or jump-nav
+ * call to `open()` is what unfolds one. Replaces the panel set when `ids`
+ * changes (tab switch) so a leftover open id from the previous page never
+ * silently hides the new one.
  */
 export function useAccordion(
   ids: MaybeRefOrGetter<string[]>,
   options?: { defaultOpen?: AccordionDefaultOpen }
 ) {
-  const defaultOpen = options?.defaultOpen ?? 'first'
+  const defaultOpen = options?.defaultOpen ?? 'none'
   const openIds = ref<Set<string>>(new Set())
 
   function applyDefault(list: string[]) {

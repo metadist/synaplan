@@ -130,7 +130,7 @@ describe('ExtractionPlugTab', () => {
     })
     await flushPromises()
 
-    expect(wrapper.get('#extraction-section-document').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#extraction-section-document').attributes('data-open')).toBe('false')
     expect(wrapper.get('#extraction-section-video').attributes('data-open')).toBe('false')
     expect(wrapper.find('[data-testid="btn-jump-section-video"]').exists()).toBe(true)
 
