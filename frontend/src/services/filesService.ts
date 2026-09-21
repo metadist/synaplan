@@ -782,6 +782,25 @@ export const deleteMultipleFiles = async (
   }))
 }
 
+export const deleteFolderResponseSchema = z.object({
+  success: z.boolean(),
+  deleted_files: z.number(),
+  deleted_chunks: z.number(),
+})
+export type DeleteFolderResponse = z.infer<typeof deleteFolderResponseSchema>
+
+/**
+ * Delete a knowledge folder: its files and any vector chunks still filed under
+ * that name. Chunks can outlive the files, and the folder tile stays until
+ * those chunks are removed.
+ */
+export const deleteFolder = async (groupKey: string): Promise<DeleteFolderResponse> => {
+  const response = await api.delete(
+    `/api/v1/files/groups?group_key=${encodeURIComponent(groupKey)}`
+  )
+  return deleteFolderResponseSchema.parse(response.data)
+}
+
 /**
  * Get file groups (unique group keys with file counts from RAG documents)
  *
@@ -1203,6 +1222,7 @@ export default {
   acceptIncomingBulk,
   deleteFile,
   deleteMultipleFiles,
+  deleteFolder,
   getFileGroups,
   getFileContent,
   downloadFile,

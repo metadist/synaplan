@@ -2645,44 +2645,10 @@ const confirmDeleteFolder = async () => {
 
   isDeletingFolder.value = true
   try {
-    // Resolve the folder's CURRENT contents, then delete each file. Reuses
-    // the tested list + delete endpoints (no new server surface) and stays
-    // correct even if the cached folder `count` is stale. The backend clamps
-    // `limit` to 100, so page through every result instead of assuming one
-    // request returns the whole folder.
-    const pageSize = 100
-    const ids: number[] = []
-    let page = 1
-    let totalPages = 1
-    do {
-      const response = await filesService.listFiles({
-        groupKey: folder.name,
-        page,
-        limit: pageSize,
-      })
-      ids.push(...response.files.map((f) => f.id))
-      totalPages = response.pagination.pages
-      page++
-    } while (page <= totalPages)
-
-    if (ids.length === 0) {
-      showSuccess(t('files.folderEmptyDeleted', { folder: folder.name }))
-    } else {
-      const results = await filesService.deleteMultipleFiles(ids)
-      const successCount = results.filter((r) => r.success).length
-      const failCount = results.filter((r) => !r.success).length
-      if (failCount > 0) {
-        showError(
-          t('files.deleteFolderPartial', {
-            folder: folder.name,
-            success: successCount,
-            failed: failCount,
-          })
-        )
-      } else {
-        showSuccess(t('files.folderDeleted', { folder: folder.name, count: successCount }))
-      }
-    }
+    // One server call deletes the files and any vector chunks still labeled
+    // with this folder. Listing files and deleting them one by one leaves the
+    // tile in place when the index outlived the files.
+    const result = await filesService.deleteFolder(folder.name)
 
     removePendingFolder(folder.name)
     selectedFileIds.value = []
@@ -2693,6 +2659,17 @@ const confirmDeleteFolder = async () => {
     }
     await loadFileGroups()
     if (storageWidget.value) await storageWidget.value.refresh()
+
+    if (fileGroups.value.some((group) => group.name === folder.name)) {
+      showError(t('files.deleteFolderFailed', { folder: folder.name }))
+      return
+    }
+
+    if (result.deleted_files === 0) {
+      showSuccess(t('files.folderEmptyDeleted', { folder: folder.name }))
+    } else {
+      showSuccess(t('files.folderDeleted', { folder: folder.name, count: result.deleted_files }))
+    }
   } catch (error) {
     console.error('Folder delete error:', error)
     showError(t('files.deleteFolderFailed', { folder: folder.name }))
