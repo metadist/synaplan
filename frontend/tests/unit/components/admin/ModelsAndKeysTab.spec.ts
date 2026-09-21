@@ -84,6 +84,25 @@ describe('ModelsAndKeysTab local AI', () => {
     wrapper.unmount()
   })
 
+  it('folds later sections and opens them from the header or jump nav', async () => {
+    const wrapper = mountTab()
+    await flushPromises()
+
+    expect(wrapper.get('#setup-section-providers').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#setup-section-own-service').attributes('data-open')).toBe('false')
+    expect(wrapper.get('#setup-section-local-ai').attributes('data-open')).toBe('false')
+    expect(wrapper.find('[data-testid="btn-jump-section-local-ai"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="btn-setup-section-local-ai"]').trigger('click')
+    expect(wrapper.get('#setup-section-local-ai').attributes('data-open')).toBe('true')
+
+    await wrapper.get('[data-testid="btn-setup-accordion-toggle-all"]').trigger('click')
+    expect(wrapper.get('#setup-section-providers').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#setup-section-own-service').attributes('data-open')).toBe('true')
+    expect(wrapper.get('#setup-section-local-ai').attributes('data-open')).toBe('true')
+    wrapper.unmount()
+  })
+
   it('fails open when the pre-flight itself errors', async () => {
     mockImportEndpointPreview.mockRejectedValue(new Error('network down'))
     const wrapper = mountTab()

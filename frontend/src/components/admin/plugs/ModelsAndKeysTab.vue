@@ -48,27 +48,57 @@
     </div>
 
     <template v-else>
-      <h2 class="text-xl font-semibold txt-primary mb-3">
-        {{ $t('adminSetup.cloudProviders') }}
-      </h2>
-      <p class="text-sm txt-secondary mb-4">{{ $t('adminSetup.cloudProvidersHint') }}</p>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <ProviderKeyCard
-          v-for="provider in sortedProviders"
-          :key="provider.name"
-          :provider="provider"
-          :is-default-chat="provider.name === defaultChatProvider"
-          @changed="refresh"
+      <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
+        <SectionJumpNav
+          :items="setupSectionItems"
+          :nav-label="$t('admin.config.accordion.jumpTo')"
+          @select="jumpToSetupSection"
         />
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+          data-testid="btn-setup-accordion-toggle-all"
+          @click="allSetupSectionsOpen ? collapseAllSetupSections() : expandAllSetupSections()"
+        >
+          {{
+            allSetupSectionsOpen
+              ? $t('admin.config.accordion.collapseAll')
+              : $t('admin.config.accordion.expandAll')
+          }}
+        </button>
       </div>
 
-      <div class="surface-card rounded-lg p-5 flex items-start gap-3 mb-8">
-        <Icon icon="mdi:puzzle-plus-outline" class="w-6 h-6 shrink-0 txt-brand mt-0.5" />
-        <div class="min-w-0 flex-1">
-          <h3 class="text-lg font-semibold txt-primary">
-            {{ $t('adminSetup.ownService.title') }}
-          </h3>
-          <p class="text-sm txt-secondary mt-1">{{ $t('adminSetup.ownService.description') }}</p>
+      <AccordionStack testid="setup-models-accordion">
+        <AccordionSection
+          panel-id="setup-section-providers"
+          :title="$t('adminSetup.cloudProviders')"
+          :open="isSetupSectionOpen('providers')"
+          header-testid="btn-setup-section-providers"
+          @toggle="toggleSetupSection('providers')"
+        >
+          <p class="text-sm txt-secondary mb-4">{{ $t('adminSetup.cloudProvidersHint') }}</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ProviderKeyCard
+              v-for="provider in sortedProviders"
+              :key="provider.name"
+              :provider="provider"
+              :is-default-chat="provider.name === defaultChatProvider"
+              @changed="refresh"
+            />
+          </div>
+        </AccordionSection>
+
+        <AccordionSection
+          panel-id="setup-section-own-service"
+          :title="$t('adminSetup.ownService.title')"
+          :open="isSetupSectionOpen('own-service')"
+          header-testid="btn-setup-section-own-service"
+          @toggle="toggleSetupSection('own-service')"
+        >
+          <template #leading>
+            <Icon icon="mdi:puzzle-plus-outline" class="w-5 h-5 txt-brand flex-shrink-0" />
+          </template>
+          <p class="text-sm txt-secondary">{{ $t('adminSetup.ownService.description') }}</p>
           <RouterLink
             :to="{ path: '/ai/models', query: { tab: 'edit' } }"
             class="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-[var(--brand)] hover:underline"
@@ -77,23 +107,26 @@
             {{ $t('adminSetup.ownService.cta') }}
             <Icon icon="mdi:arrow-right" class="w-4 h-4" aria-hidden="true" />
           </RouterLink>
-        </div>
-      </div>
+        </AccordionSection>
 
-      <div class="surface-card rounded-lg p-5 flex items-start gap-3">
-        <Icon icon="mdi:server-outline" class="w-6 h-6 shrink-0 txt-brand mt-0.5" />
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-2">
-            <h3 class="text-lg font-semibold txt-primary">
-              {{ $t('adminSetup.localAi.title') }}
-            </h3>
+        <AccordionSection
+          panel-id="setup-section-local-ai"
+          :title="$t('adminSetup.localAi.title')"
+          :open="isSetupSectionOpen('local-ai')"
+          header-testid="btn-setup-section-local-ai"
+          @toggle="toggleSetupSection('local-ai')"
+        >
+          <template #leading>
+            <Icon icon="mdi:server-outline" class="w-5 h-5 txt-brand flex-shrink-0" />
+          </template>
+          <div class="flex items-center gap-2 mb-1">
             <ProviderHelpHint
               help-id="ollama"
               url="https://ollama.com/download"
               :is-download="true"
             />
           </div>
-          <p class="text-sm txt-secondary mt-1">{{ $t('adminSetup.localAi.description') }}</p>
+          <p class="text-sm txt-secondary">{{ $t('adminSetup.localAi.description') }}</p>
           <p
             v-if="ollamaState === 'unreachable'"
             class="text-sm mt-2 text-[var(--status-warning)]"
@@ -122,8 +155,8 @@
               {{ $t('aiInfra.modelImport.importPulled') }}
             </button>
           </div>
-        </div>
-      </div>
+        </AccordionSection>
+      </AccordionStack>
     </template>
 
     <ModelImportDialog
@@ -137,14 +170,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import AccordionSection from '@/components/AccordionSection.vue'
+import AccordionStack from '@/components/AccordionStack.vue'
+import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
 import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
+import { useAccordion } from '@/composables/useAccordion'
 import { useNotification } from '@/composables/useNotification'
 import { useConfigStore } from '@/stores/config'
 import { listProviderKeys, type ProviderKeyStatus } from '@/services/api/providerKeysApi'
@@ -166,6 +203,30 @@ const importOllama = ref(false)
 const ollamaState = ref<'unknown' | 'ok' | 'unreachable'>('unknown')
 
 const chatReady = computed(() => config.setup.chatReady)
+
+const setupSectionIds = ['providers', 'own-service', 'local-ai'] as const
+const setupSectionItems = computed(() => [
+  { id: 'providers', label: t('adminSetup.cloudProviders') },
+  { id: 'own-service', label: t('adminSetup.ownService.title') },
+  { id: 'local-ai', label: t('adminSetup.localAi.title') },
+])
+const {
+  isOpen: isSetupSectionOpen,
+  toggle: toggleSetupSection,
+  open: openSetupSection,
+  expandAll: expandAllSetupSections,
+  collapseAll: collapseAllSetupSections,
+  allOpen: allSetupSectionsOpen,
+} = useAccordion(() => [...setupSectionIds], { defaultOpen: 'first' })
+
+async function jumpToSetupSection(id: string) {
+  openSetupSection(id)
+  await nextTick()
+  document.getElementById(`setup-section-${id}`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  })
+}
 
 const sortedProviders = computed(() =>
   [...providers.value].sort((a, b) => {

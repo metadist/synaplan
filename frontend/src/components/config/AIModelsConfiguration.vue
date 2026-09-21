@@ -480,10 +480,55 @@
       <EmbeddingRunsPanel ref="runsPanelRef" />
     </div>
 
-    <div v-if="authStore.isAdmin && activeTab === 'edit'" class="space-y-6">
-      <OpenAiCompatibleEndpointsPanel />
-      <AddModelForm @created="onAdminModelCreated" />
-      <AIModelsAdminPanel ref="adminPanelRef" />
+    <div v-if="authStore.isAdmin && activeTab === 'edit'" class="space-y-4">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <SectionJumpNav
+          :items="editSectionItems"
+          :nav-label="$t('admin.config.accordion.jumpTo')"
+          @select="jumpToEditSection"
+        />
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+          data-testid="btn-ai-models-edit-accordion-toggle-all"
+          @click="allEditSectionsOpen ? collapseAllEditSections() : expandAllEditSections()"
+        >
+          {{
+            allEditSectionsOpen
+              ? $t('admin.config.accordion.collapseAll')
+              : $t('admin.config.accordion.expandAll')
+          }}
+        </button>
+      </div>
+      <AccordionStack testid="ai-models-edit-accordion">
+        <AccordionSection
+          panel-id="ai-models-section-endpoints"
+          :title="$t('config.openaiEndpoints.title')"
+          :open="isEditSectionOpen('endpoints')"
+          header-testid="btn-ai-models-section-endpoints"
+          @toggle="toggleEditSection('endpoints')"
+        >
+          <OpenAiCompatibleEndpointsPanel embedded />
+        </AccordionSection>
+        <AccordionSection
+          panel-id="ai-models-section-add"
+          :title="$t('config.aiModels.admin.addForm.title')"
+          :open="isEditSectionOpen('add')"
+          header-testid="btn-ai-models-section-add"
+          @toggle="toggleEditSection('add')"
+        >
+          <AddModelForm embedded @created="onAdminModelCreated" />
+        </AccordionSection>
+        <AccordionSection
+          panel-id="ai-models-section-catalog"
+          :title="$t('config.aiModels.admin.editModels')"
+          :open="isEditSectionOpen('catalog')"
+          header-testid="btn-ai-models-section-catalog"
+          @toggle="toggleEditSection('catalog')"
+        >
+          <AIModelsAdminPanel ref="adminPanelRef" embedded />
+        </AccordionSection>
+      </AccordionStack>
     </div>
 
     <EmbeddingSwitchModal
@@ -513,10 +558,14 @@ import {
   LockClosedIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
+import AccordionSection from '@/components/AccordionSection.vue'
+import AccordionStack from '@/components/AccordionStack.vue'
+import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import AddModelForm from '@/components/config/AddModelForm.vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useAccordion } from '@/composables/useAccordion'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
@@ -554,6 +603,28 @@ const { t } = useI18n()
 
 const activeTab = ref<ModelsTabId>('choice')
 const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
+const editSectionIds = ['endpoints', 'add', 'catalog'] as const
+const editSectionItems = computed(() => [
+  { id: 'endpoints', label: t('config.openaiEndpoints.title') },
+  { id: 'add', label: t('config.aiModels.admin.addForm.title') },
+  { id: 'catalog', label: t('config.aiModels.admin.editModels') },
+])
+const {
+  isOpen: isEditSectionOpen,
+  toggle: toggleEditSection,
+  open: openEditSection,
+  expandAll: expandAllEditSections,
+  collapseAll: collapseAllEditSections,
+  allOpen: allEditSectionsOpen,
+} = useAccordion(() => [...editSectionIds], { defaultOpen: 'first' })
+
+async function jumpToEditSection(id: string) {
+  openEditSection(id)
+  await nextTick()
+  document
+    .getElementById(`ai-models-section-${id}`)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 const MODELS_TABS = ['choice', 'list', 'runs', 'edit'] as const
 
 function parseModelsTab(raw: unknown): ModelsTabId | null {
