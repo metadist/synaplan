@@ -194,7 +194,18 @@
       "shortDesc": "Descripción Corta",
       "prompt": "Prompt",
       "selectionRules": "Reglas de Selección",
-      "selectionRulesPlaceholder": "Opcional: Reglas para la selección automática de este prompt"
+      "selectionRulesPlaceholder": "Opcional: Reglas para la selección automática de este prompt",
+      "edit": "Editar",
+      "write": "Escribir",
+      "preview": "Vista previa",
+      "previewEmpty": "Todavía no hay nada que mostrar. Escriba el prompt primero.",
+      "saved": "Prompt de {topic} guardado.",
+      "saveFailed": "No se pudo guardar este prompt. Los cambios siguen en el formulario.",
+      "loadFailed": "No se pudieron cargar los prompts.",
+      "retry": "Reintentar",
+      "empty": "No hay prompts del sistema instalados en este servidor.",
+      "discardTitle": "¿Descartar los cambios sin guardar?",
+      "discardMessage": "Hay cambios sin guardar en otro prompt. Esos cambios se perderán."
     },
     "usage": {
       "title": "Estadísticas de Uso",

@@ -195,7 +195,18 @@
       "shortDesc": "Description courte",
       "prompt": "Instruction",
       "selectionRules": "Règles de sélection",
-      "selectionRulesPlaceholder": "Facultatif : règles pour la sélection automatique de cette instruction"
+      "selectionRulesPlaceholder": "Facultatif : règles pour la sélection automatique de cette instruction",
+      "edit": "Modifier",
+      "write": "Écrire",
+      "preview": "Aperçu",
+      "previewEmpty": "Rien à afficher pour le moment. Écrivez d’abord l’instruction.",
+      "saved": "Instruction pour {topic} enregistrée.",
+      "saveFailed": "Impossible d’enregistrer cette instruction. Vos modifications sont encore dans le formulaire.",
+      "loadFailed": "Impossible de charger les instructions.",
+      "retry": "Réessayer",
+      "empty": "Aucune instruction système n’est installée sur ce serveur.",
+      "discardTitle": "Abandonner les modifications ?",
+      "discardMessage": "Des modifications non enregistrées existent sur une autre instruction. Elles seront perdues."
     },
     "usage": {
       "title": "Statistiques d’utilisation",

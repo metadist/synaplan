@@ -145,105 +145,7 @@
 
         <!-- Prompts Tab -->
         <div v-if="activeTab === 'prompts'" data-testid="section-prompts">
-          <div v-if="promptsLoading" class="text-center py-12">
-            <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
-          </div>
-          <div v-else class="space-y-4">
-            <div v-for="prompt in prompts" :key="prompt.id" class="surface-card rounded-lg p-6">
-              <div class="flex items-start justify-between mb-4">
-                <div class="flex-1">
-                  <div class="flex items-center gap-3 mb-2">
-                    <h3 class="text-lg font-semibold txt-primary">{{ prompt.topic }}</h3>
-                    <span
-                      class="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
-                    >
-                      {{ prompt.language }}
-                    </span>
-                  </div>
-                  <p class="text-sm txt-secondary mb-4">{{ prompt.shortDescription }}</p>
-                </div>
-                <button
-                  class="btn-secondary px-4 py-2 rounded-lg"
-                  :data-testid="`btn-edit-prompt-${prompt.id}`"
-                  @click="togglePromptEdit(prompt.id)"
-                >
-                  <Icon
-                    :icon="editingPromptId === prompt.id ? 'mdi:close' : 'mdi:pencil'"
-                    class="w-4 h-4"
-                  />
-                </button>
-              </div>
-
-              <!-- Edit Form -->
-              <div
-                v-if="editingPromptId === prompt.id"
-                class="space-y-4 mt-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
-              >
-                <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{
-                    $t('admin.prompts.shortDesc')
-                  }}</label>
-                  <input
-                    v-model="editingPrompt.shortDescription"
-                    type="text"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                    :data-testid="`input-prompt-desc-${prompt.id}`"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{
-                    $t('admin.prompts.prompt')
-                  }}</label>
-                  <textarea
-                    v-model="editingPrompt.prompt"
-                    rows="10"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none font-mono text-sm"
-                    :data-testid="`textarea-prompt-${prompt.id}`"
-                  ></textarea>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{
-                    $t('admin.prompts.selectionRules')
-                  }}</label>
-                  <textarea
-                    v-model="editingPrompt.selectionRules"
-                    rows="4"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none font-mono text-sm"
-                    :placeholder="$t('admin.prompts.selectionRulesPlaceholder')"
-                    :data-testid="`textarea-selection-rules-${prompt.id}`"
-                  ></textarea>
-                </div>
-                <div class="flex justify-end gap-3">
-                  <button
-                    class="btn-secondary px-6 py-2.5 rounded-lg"
-                    data-testid="btn-cancel-edit-prompt"
-                    @click="cancelEditPrompt()"
-                  >
-                    {{ $t('common.cancel') }}
-                  </button>
-                  <button
-                    class="btn-primary px-6 py-2.5 rounded-lg"
-                    :disabled="promptSaving"
-                    data-testid="btn-save-prompt"
-                    @click="savePrompt(prompt.id)"
-                  >
-                    {{ $t('common.save') }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- Read-only View -->
-              <div v-else class="space-y-2">
-                <div class="bg-chat rounded-lg p-4 font-mono text-sm txt-secondary">
-                  {{ prompt.prompt }}
-                </div>
-                <div v-if="prompt.selectionRules" class="text-xs txt-secondary">
-                  <strong>{{ $t('admin.prompts.selectionRules') }}:</strong>
-                  {{ prompt.selectionRules }}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AdminPromptsPanel />
         </div>
 
         <!-- Usage Tab -->
@@ -534,11 +436,13 @@ import UsageChart from '@/components/admin/UsageChart.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import {
   adminApi,
-  type SystemPrompt,
   type UsageStats,
   type SystemOverview,
   type RegistrationAnalytics,
 } from '@/services/api/adminApi'
+const AdminPromptsPanel = defineAsyncComponent(
+  () => import('@/components/admin/AdminPromptsPanel.vue')
+)
 const AdminSubscriptionsPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSubscriptionsPanel.vue')
 )
@@ -642,13 +546,6 @@ const registrationAnalytics = ref<RegistrationAnalytics | null>(null)
 const analyticsPeriod = ref<'7d' | '30d' | '90d' | '1y' | 'all'>('30d')
 const analyticsGroupBy = ref<'day' | 'week' | 'month'>('day')
 
-// Prompts
-const prompts = ref<SystemPrompt[]>([])
-const promptsLoading = ref(false)
-const editingPromptId = ref<number | null>(null)
-const editingPrompt = ref<Partial<SystemPrompt>>({})
-const promptSaving = ref(false)
-
 // Usage Stats
 const usageStats = ref<UsageStats | null>(null)
 const usageStatsLoading = ref(false)
@@ -676,8 +573,6 @@ watch(activeTab, (newTab: string) => {
   if (newTab === 'overview') {
     if (!overview.value) loadOverview()
     if (!registrationAnalytics.value) loadRegistrationAnalytics()
-  } else if (newTab === 'prompts' && prompts.value.length === 0) {
-    loadPrompts()
   } else if (newTab === 'usage' && !usageStats.value) {
     loadUsageStats()
   }
@@ -726,18 +621,6 @@ async function updateAnalyticsGroupBy(newGroupBy: string) {
   await loadRegistrationAnalytics()
 }
 
-async function loadPrompts() {
-  promptsLoading.value = true
-  try {
-    const response = await adminApi.getSystemPrompts()
-    prompts.value = response.prompts
-  } catch (error) {
-    console.error('Failed to load prompts:', error)
-  } finally {
-    promptsLoading.value = false
-  }
-}
-
 async function loadUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week') {
   usageStatsLoading.value = true
   usageStatsPeriod.value = period
@@ -747,45 +630,6 @@ async function loadUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week')
     console.error('Failed to load usage stats:', error)
   } finally {
     usageStatsLoading.value = false
-  }
-}
-
-// Prompt actions
-function togglePromptEdit(promptId: number) {
-  if (editingPromptId.value === promptId) {
-    cancelEditPrompt()
-  } else {
-    const prompt = prompts.value.find((p: SystemPrompt) => p.id === promptId)
-    if (prompt) {
-      editingPromptId.value = promptId
-      editingPrompt.value = {
-        shortDescription: prompt.shortDescription,
-        prompt: prompt.prompt,
-        selectionRules: prompt.selectionRules || '',
-      }
-    }
-  }
-}
-
-function cancelEditPrompt() {
-  editingPromptId.value = null
-  editingPrompt.value = {}
-}
-
-async function savePrompt(promptId: number) {
-  promptSaving.value = true
-  try {
-    const response = await adminApi.updatePrompt(promptId, editingPrompt.value)
-    // Update local state
-    const index = prompts.value.findIndex((p: SystemPrompt) => p.id === promptId)
-    if (index !== -1) {
-      prompts.value[index] = response.prompt
-    }
-    cancelEditPrompt()
-  } catch (error) {
-    console.error('Failed to save prompt:', error)
-  } finally {
-    promptSaving.value = false
   }
 }
 

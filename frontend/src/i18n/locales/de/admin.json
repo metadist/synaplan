@@ -195,7 +195,18 @@
       "shortDesc": "Kurzbeschreibung",
       "prompt": "Prompt",
       "selectionRules": "Auswahlregeln",
-      "selectionRulesPlaceholder": "Optional: Regeln zur automatischen Auswahl dieses Prompts"
+      "selectionRulesPlaceholder": "Optional: Regeln zur automatischen Auswahl dieses Prompts",
+      "edit": "Bearbeiten",
+      "write": "Schreiben",
+      "preview": "Vorschau",
+      "previewEmpty": "Noch nichts zum Anzeigen. Schreiben Sie zuerst den Prompt.",
+      "saved": "Prompt für {topic} gespeichert.",
+      "saveFailed": "Dieser Prompt konnte nicht gespeichert werden. Ihre Änderungen sind noch im Formular.",
+      "loadFailed": "Die Prompts konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "empty": "Auf diesem Server sind keine System-Prompts installiert.",
+      "discardTitle": "Ungespeicherte Änderungen verwerfen?",
+      "discardMessage": "Sie haben ungespeicherte Änderungen an einem anderen Prompt. Diese Änderungen gehen verloren."
     },
     "usage": {
       "title": "Nutzungsstatistiken",
