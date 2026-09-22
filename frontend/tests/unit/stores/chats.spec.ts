@@ -715,6 +715,61 @@ describe('Chats Store', () => {
       expect(httpClientMock).toHaveBeenCalledWith('/api/v1/chats')
       expect(store.chats.map((c) => c.id)).toContain(42)
     })
+
+    it('consumes all queued local completions for the same chat', async () => {
+      const store = useChatsStore()
+      store.chats = [
+        {
+          id: 2,
+          title: 'Web chat',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          messageCount: 4,
+          source: 'web',
+        },
+      ]
+
+      store.markLocalTurnFinished(2)
+      store.markLocalTurnFinished(2)
+
+      await store.noteExternalActivity(2)
+      await store.noteExternalActivity(2)
+
+      expect(store.chats[0].messageCount).toBe(4)
+      expect(httpClientMock).not.toHaveBeenCalled()
+    })
+
+    it('keeps local completion dedupe scoped per chat', async () => {
+      const store = useChatsStore()
+      store.chats = [
+        {
+          id: 2,
+          title: 'Chat 2',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          messageCount: 1,
+          source: 'web',
+        },
+        {
+          id: 3,
+          title: 'Chat 3',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          messageCount: 2,
+          source: 'web',
+        },
+      ]
+
+      store.markLocalTurnFinished(2)
+      store.markLocalTurnFinished(3)
+
+      await store.noteExternalActivity(2)
+      await store.noteExternalActivity(3)
+
+      expect(store.chats.find((chat) => chat.id === 2)?.messageCount).toBe(1)
+      expect(store.chats.find((chat) => chat.id === 3)?.messageCount).toBe(2)
+      expect(httpClientMock).not.toHaveBeenCalled()
+    })
   })
 
   /**

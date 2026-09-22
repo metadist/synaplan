@@ -730,14 +730,14 @@ export const useChatsStore = defineStore('chats', () => {
    * @param options.firstMessagePreview Optional preview to lift an "empty" chat
    *   out of the empty-chat filter once it has real content.
    */
-  let localTurnChatId: number | null = null
+  const localTurnCompletions = new Map<number, number>()
 
   /**
    * This tab just finished its own turn and already updated the sidebar.
    * The matching realtime event must not count that message again.
    */
   function markLocalTurnFinished(chatId: number): void {
-    localTurnChatId = chatId
+    localTurnCompletions.set(chatId, (localTurnCompletions.get(chatId) ?? 0) + 1)
   }
 
   function clearLocalTurnFinished(chatId: number): void {
@@ -747,8 +747,13 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   function consumeLocalTurnFinished(chatId: number): boolean {
-    if (localTurnChatId !== chatId) return false
-    localTurnChatId = null
+    const pending = localTurnCompletions.get(chatId) ?? 0
+    if (pending <= 0) return false
+    if (pending === 1) {
+      localTurnCompletions.delete(chatId)
+    } else {
+      localTurnCompletions.set(chatId, pending - 1)
+    }
     return true
   }
 
