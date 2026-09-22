@@ -66,7 +66,7 @@ final readonly class ChatAudienceNotifier
 
         $afterId = 0;
         $sentExplicit = false;
-        do {
+        while (true) {
             $page = $this->users->findIdsAfter($afterId, self::EVERYONE_PAGE_SIZE);
             $batch = $sentExplicit ? $page : array_merge($recipients, $page);
             $sentExplicit = true;
@@ -77,6 +77,6 @@ final readonly class ChatAudienceNotifier
                 break;
             }
             $afterId = $page[array_key_last($page)];
-        } while (true);
+        }
     }
 }

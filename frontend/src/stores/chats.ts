@@ -816,6 +816,7 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   function $reset() {
+    localTurnCompletions.clear()
     chats.value = []
     conversationAccess.value = null
     conversationSource.value = null

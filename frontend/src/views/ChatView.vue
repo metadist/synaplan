@@ -4556,6 +4556,9 @@ const streamAIResponse = async (
                 historyStore.updateStreamingMessage(messageId, t('message.cancelledByUser'))
               }
               historyStore.finishStreamingMessage(messageId)
+              if (currentStreamingChatId) {
+                chatsStore.clearLocalTurnFinished(currentStreamingChatId)
+              }
 
               streamingAbortController = null
               stopStreamingFn = null
@@ -4630,6 +4633,9 @@ const streamAIResponse = async (
 
     historyStore.updateStreamingMessage(messageId, t('chatError.reason.unknown'))
     historyStore.finishStreamingMessage(messageId)
+    if (currentStreamingChatId) {
+      chatsStore.clearLocalTurnFinished(currentStreamingChatId)
+    }
     streamingAbortController = null
     stopStreamingFn = null
     currentTrackId = undefined
@@ -4788,9 +4794,10 @@ const handleUserStop = async () => {
   // #732: cancelled turns leave local history non-empty while chat list
   // metadata can still look empty — bump activity so "New chat" won't reuse
   // this thread via isChatEmpty().
-  if (streamingMessage && chatsStore.activeChatId) {
-    chatsStore.clearLocalTurnFinished(chatsStore.activeChatId)
-    chatsStore.bumpChatActivity(chatsStore.activeChatId, {
+  const bumpChatId = currentStreamingChatId ?? chatsStore.activeChatId
+  if (streamingMessage && bumpChatId) {
+    chatsStore.clearLocalTurnFinished(bumpChatId)
+    chatsStore.bumpChatActivity(bumpChatId, {
       incrementMessageCount: true,
       firstMessagePreview: streamingMessage
         ? (streamingMessage.parts?.find((p) => p.type === 'text')?.content ?? '').slice(0, 120) ||
@@ -5052,6 +5059,9 @@ function finishStreamingTurnLocally() {
       streamingMessage.taskPlan.active = false
     }
     historyStore.finishStreamingMessage(streamingMessage.id)
+  }
+  if (currentStreamingChatId) {
+    chatsStore.clearLocalTurnFinished(currentStreamingChatId)
   }
 
   streamingAbortController = null
