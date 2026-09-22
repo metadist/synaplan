@@ -146,29 +146,35 @@ readonly class WhisperService
     }
 
     /**
-     * Check if Whisper is available.
+     * Binary is executable and the default model file is on disk.
+     * Does not spawn a process.
+     *
+     * Shared libraries are not checked here — that is {@see isAvailable()},
+     * which runs `whisper --help`. The runtime config uses this method so a
+     * page load does not fork, and so a binary without its model does not
+     * turn the microphone on.
+     */
+    public function isInstalled(): bool
+    {
+        if (!$this->whisperEnabled) {
+            return false;
+        }
+
+        return is_file($this->whisperBinary)
+            && is_executable($this->whisperBinary)
+            && is_file($this->getModelPath($this->defaultModel));
+    }
+
+    /**
+     * Check if Whisper can transcribe (binary runs, default model and FFmpeg
+     * are present).
      */
     public function isAvailable(): bool
     {
-        if (!$this->whisperEnabled) {
-            $this->logger->debug('WhisperService: Disabled via WHISPER_ENABLED=false');
-
-            return false;
-        }
-
-        // Check if binary exists
-        if (!file_exists($this->whisperBinary)) {
-            $this->logger->debug('WhisperService: Binary not found', [
+        if (!$this->isInstalled()) {
+            $this->logger->debug('WhisperService: Not installed', [
                 'path' => $this->whisperBinary,
-            ]);
-
-            return false;
-        }
-
-        // Check if binary is executable
-        if (!is_executable($this->whisperBinary)) {
-            $this->logger->debug('WhisperService: Binary not executable', [
-                'path' => $this->whisperBinary,
+                'enabled' => $this->whisperEnabled,
             ]);
 
             return false;

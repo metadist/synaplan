@@ -24,7 +24,9 @@ test.describe('@ci Memories', () => {
     await test.step('Arrange: open the memories page', async () => {
       await openApp(page)
       await page.goto('/memories')
-      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      // The create button stays unmounted while the first Qdrant read runs.
+      // The page allows that read 15s; STANDARD (10s) ends during it.
+      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
     })
 
     await test.step('Act: create a memory via the advanced form', async () => {
@@ -131,7 +133,8 @@ test.describe('@ci Memories', () => {
 
     await openApp(page)
     await page.goto('/memories')
-    await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    // Same budget as the create test: the button is absent until the 15s read ends.
+    await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
     await page.locator(MEM.btnCreate).click()
     await page.locator(MEM.formModal).waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     await page.locator(MEM.btnModeAdvanced).click()

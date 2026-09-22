@@ -72,7 +72,9 @@ test.describe('i18n namespace split', () => {
     ]
     for (const [, path, title] of checks) {
       await openWithLocale(page, 'de', path)
-      await expect(page).toHaveTitle(title)
+      // goto resolves on the document load event, while the title is set in
+      // router.afterEach once the locale namespaces have loaded.
+      await expect(page).toHaveTitle(title, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator('body')).not.toContainText('pageTitles.')
     }
   })

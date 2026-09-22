@@ -528,8 +528,12 @@ class ConfigController extends AbstractController
         ];
 
         // Feature flags
-        // IMPORTANT: Qdrant check is SLOW (1s timeout), so we always report true here
-        // Frontend will check availability asynchronously via /api/v1/config/features/status
+        // IMPORTANT: Qdrant reachability and `whisper --help` do not run here.
+        // Local Whisper counts when the binary and the default model file are
+        // on disk. The speech-provider scan below skips that provider so it
+        // does not fork either. Transcription and /api/v1/config/features/status
+        // still run the full probe. A client that gives up on this response
+        // reads every missing flag as off (nav, billing, groups).
         $features = [
             'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
             'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
@@ -560,11 +564,14 @@ class ConfigController extends AbstractController
         //   - API-based providers with valid API keys (Groq Whisper, OpenAI Whisper, etc.)
         // Frontend shows microphone button when: Web Speech API supported OR speechToTextAvailable
         $whisperLocalEnabled = ($_ENV['WHISPER_ENABLED'] ?? 'true') === 'true';
-        $whisperLocalAvailable = $whisperLocalEnabled && $this->whisperService->isAvailable();
+        $whisperLocalAvailable = $whisperLocalEnabled && $this->whisperService->isInstalled();
 
-        // Check if any API-based speech-to-text providers are actually available
-        // (i.e., have valid API keys configured, not just models in DB)
-        $apiProvidersAvailable = count($this->providerRegistry->getAvailableProviders('speech_to_text', false)) > 0;
+        // API-key providers only. Local whisper is already decided above.
+        $apiProvidersAvailable = count($this->providerRegistry->getAvailableProviders(
+            'speech_to_text',
+            includeTest: false,
+            exclude: ['whisper'],
+        )) > 0;
 
         $speech = [
             'whisperEnabled' => $whisperLocalAvailable,
