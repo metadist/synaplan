@@ -296,7 +296,8 @@ test.describe('@ci Navigation journeys', () => {
     })
 
     await test.step('Highlight a memory and Back returns to the chat', async () => {
-      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      // Create stays unmounted until the first Qdrant read finishes (page budget 15s).
+      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
       await page.locator(MEM.btnCreate).click()
       await page.locator(MEM.formModal).waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
       await page.locator(MEM.btnModeAdvanced).click()

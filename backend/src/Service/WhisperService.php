@@ -146,29 +146,30 @@ readonly class WhisperService
     }
 
     /**
+     * Binary is present and executable. Does not spawn a process.
+     *
+     * The public runtime config is on every page load. {@see isAvailable()}
+     * runs `--help` (up to 5s) and must not sit on that path — a client that
+     * gives up first then treats every feature flag as off.
+     */
+    public function isInstalled(): bool
+    {
+        if (!$this->whisperEnabled) {
+            return false;
+        }
+
+        return is_file($this->whisperBinary) && is_executable($this->whisperBinary);
+    }
+
+    /**
      * Check if Whisper is available.
      */
     public function isAvailable(): bool
     {
-        if (!$this->whisperEnabled) {
-            $this->logger->debug('WhisperService: Disabled via WHISPER_ENABLED=false');
-
-            return false;
-        }
-
-        // Check if binary exists
-        if (!file_exists($this->whisperBinary)) {
-            $this->logger->debug('WhisperService: Binary not found', [
+        if (!$this->isInstalled()) {
+            $this->logger->debug('WhisperService: Not installed', [
                 'path' => $this->whisperBinary,
-            ]);
-
-            return false;
-        }
-
-        // Check if binary is executable
-        if (!is_executable($this->whisperBinary)) {
-            $this->logger->debug('WhisperService: Binary not executable', [
-                'path' => $this->whisperBinary,
+                'enabled' => $this->whisperEnabled,
             ]);
 
             return false;

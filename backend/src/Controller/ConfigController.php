@@ -528,8 +528,10 @@ class ConfigController extends AbstractController
         ];
 
         // Feature flags
-        // IMPORTANT: Qdrant check is SLOW (1s timeout), so we always report true here
-        // Frontend will check availability asynchronously via /api/v1/config/features/status
+        // IMPORTANT: Qdrant reachability and `whisper --help` are slow, so neither
+        // runs here. The frontend aborts a runtime-config fetch that outlives its
+        // budget and then reads every missing flag as off (nav, billing, groups).
+        // Health probes live on /api/v1/config/features/status.
         $features = [
             'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
             'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
@@ -560,7 +562,7 @@ class ConfigController extends AbstractController
         //   - API-based providers with valid API keys (Groq Whisper, OpenAI Whisper, etc.)
         // Frontend shows microphone button when: Web Speech API supported OR speechToTextAvailable
         $whisperLocalEnabled = ($_ENV['WHISPER_ENABLED'] ?? 'true') === 'true';
-        $whisperLocalAvailable = $whisperLocalEnabled && $this->whisperService->isAvailable();
+        $whisperLocalAvailable = $whisperLocalEnabled && $this->whisperService->isInstalled();
 
         // Check if any API-based speech-to-text providers are actually available
         // (i.e., have valid API keys configured, not just models in DB)

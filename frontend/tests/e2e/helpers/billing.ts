@@ -36,23 +36,55 @@ export function expectWebhookSuccess(result: WebhookResult, label: string): void
  *     a subscription item per `v-if="...isPro"` in SidebarV2.vue).
  *   - PRO+ user → user-menu dropdown → `btn-sidebar-v2-subscription`.
  *
- * Waits for the user-button (always rendered once the sidebar is hydrated for an
- * authenticated user) before branching, so the plan-conditional upgrade button is
- * either definitely rendered alongside it or definitely not. Without this wait,
- * `Locator.isVisible()` (which has no built-in retry) races with hydration after
- * `page.reload()` and silently picks the wrong branch.
+ * The account button is not that signal: it renders even while billing config
+ * is still loading, and a one-shot `isVisible()` on Upgrade then takes the PRO
+ * menu path. A FREE user has no subscription item there, so the wait dies.
+ * Poll until Upgrade (rail) or Subscription (open account menu) is actually there.
  */
 export async function navigateToSubscriptionViaUI(page: Page): Promise<void> {
   const userBtn = page.locator(selectors.userMenu.button)
   await expect(userBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 
   const upgradeBtn = page.locator(selectors.userMenu.upgradeBtn)
-  if (await upgradeBtn.isVisible()) {
+  const subscriptionBtn = page.locator(selectors.userMenu.subscriptionBtn)
+
+  // FREE puts Upgrade on the rail. PRO puts Subscription inside the account
+  // menu, so that item does not exist until the menu is open. The account
+  // button itself is always rendered and is not a signal that either control
+  // exists yet — billing config can still be in flight. A single isVisible()
+  // committed to the menu and then waited for a PRO-only item a FREE user
+  // never gets.
+  let route: 'upgrade' | 'subscription' | '' = ''
+  await expect
+    .poll(
+      async () => {
+        if (await upgradeBtn.isVisible()) {
+          route = 'upgrade'
+          return route
+        }
+        const menuOpen = await page.locator(selectors.userMenu.dropdown).isVisible()
+        if (!menuOpen) {
+          await userBtn.click()
+        }
+        if (await subscriptionBtn.isVisible()) {
+          route = 'subscription'
+          return route
+        }
+        // The account button sits under this overlay, so a second click on it
+        // never lands. The overlay itself closes the menu.
+        if (await page.locator(selectors.userMenu.overlay).isVisible()) {
+          await page.locator(selectors.userMenu.overlay).click({ position: { x: 8, y: 8 } })
+        }
+        route = ''
+        return route
+      },
+      { timeout: TIMEOUTS.STANDARD, intervals: [100, 250, 500] }
+    )
+    .not.toBe('')
+
+  if (route === 'upgrade') {
     await upgradeBtn.click()
   } else {
-    await userBtn.click()
-    const subscriptionBtn = page.locator(selectors.userMenu.subscriptionBtn)
-    await expect(subscriptionBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await subscriptionBtn.click()
   }
   await page.waitForSelector(selectors.subscription.page, { timeout: TIMEOUTS.STANDARD })

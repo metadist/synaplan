@@ -38,6 +38,25 @@ class WhisperServiceTest extends TestCase
         );
 
         $this->assertFalse($service->isAvailable());
+        $this->assertFalse($service->isInstalled());
+    }
+
+    public function testIsInstalledDoesNotRequireTheBinaryToRun(): void
+    {
+        $fakeBinary = $this->tempDir.'/whisper';
+        touch($fakeBinary);
+        chmod($fakeBinary, 0755);
+
+        $service = new WhisperService(
+            $this->logger,
+            $fakeBinary,
+            $this->tempDir.'/models',
+            'base',
+            '/usr/bin/ffmpeg'
+        );
+
+        $this->assertTrue($service->isInstalled());
+        $this->assertFalse($service->isAvailable());
     }
 
     public function testIsAvailableReturnsFalseWhenModelNotFound(): void

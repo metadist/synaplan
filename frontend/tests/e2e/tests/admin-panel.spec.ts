@@ -137,7 +137,9 @@ test.describe('@ci Admin panel', () => {
     }
 
     await page.goto('/admin?tab=users')
-    await expect(page).toHaveURL(/\/admin\/people/)
+    // Full reload: the address bar stays on the legacy URL until the client
+    // router redirects. That is a navigation, not a 5s UI reaction.
+    await expect(page).toHaveURL(/\/admin\/people/, { timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(selectors.pages.people)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })

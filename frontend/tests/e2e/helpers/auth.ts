@@ -170,8 +170,16 @@ export async function login(page: Page, credentials?: { user: string; pass: stri
 
   const creds = CREDENTIALS.getCredentials(credentials)
 
+  // Leave the current page first so an in-flight authenticated response cannot
+  // Set-Cookie after clearCookies and bounce /login (guest-only) away from the
+  // form. page.fill would then wait on #email until the whole test timed out.
+  await page.goto('about:blank')
   await page.context().clearCookies()
   await page.goto('/login')
+  await page.locator(selectors.login.email).waitFor({
+    state: 'visible',
+    timeout: TIMEOUTS.STANDARD,
+  })
 
   await page.fill(selectors.login.email, creds.user)
   await page.fill(selectors.login.password, creds.pass)

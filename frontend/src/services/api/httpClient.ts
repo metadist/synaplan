@@ -96,86 +96,114 @@ let configPromise: Promise<RuntimeConfig> | null = null
 let lastUnavailableProviders: string[] = []
 
 /**
+ * One attempt may outlive a cold provider probe on the server (cached ~30s).
+ * The old 2s abort fired first, the payload was discarded, and every feature
+ * gate then read the empty default as "off" for the rest of the page.
+ */
+const RUNTIME_CONFIG_ATTEMPTS = 3
+const RUNTIME_CONFIG_ATTEMPT_TIMEOUT_MS = 8_000
+
+function runtimeConfigFallback(): RuntimeConfig {
+  return {
+    recaptcha: {
+      enabled: false,
+      siteKey: '',
+    },
+    features: {
+      help: false,
+      memoryService: false,
+      officeConvertEnabled: false,
+      documentToolsEnabled: false,
+      computeEnabled: false,
+      computeWorkspacesEnabled: false,
+    },
+    googleTag: {
+      enabled: false,
+      tagId: '',
+    },
+    marketingNews: {
+      enabled: false,
+    },
+    usageTaximeter: {
+      enabled: true,
+    },
+    build: {
+      version: 'unknown',
+      ip: 'dev',
+    },
+  }
+}
+
+async function fetchRuntimeConfigOnce(): Promise<RuntimeConfig> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), RUNTIME_CONFIG_ATTEMPT_TIMEOUT_MS)
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/config/runtime`, {
+      credentials: getCredentialsMode(),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to load runtime config: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const validated = GetApiConfigRuntimeConfigResponseSchema.parse(data)
+    lastUnavailableProviders = Array.isArray(data.unavailableProviders)
+      ? data.unavailableProviders
+      : []
+    runtimeConfigRef.value = validated
+    return validated
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+/**
+ * Hit the network. A failed attempt is not written into the reactive ref, so
+ * gates keep the previous payload (or stay "unknown") instead of flipping
+ * every flag off. The next call tries again.
+ */
+async function requestRuntimeConfig(): Promise<RuntimeConfig> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < RUNTIME_CONFIG_ATTEMPTS; attempt++) {
+    try {
+      return await fetchRuntimeConfigOnce()
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  console.error('Failed to load runtime config', lastError)
+  // Do not cache the fallback. A failed load after `app:setup:reset` (backend
+  // briefly unreachable) must not permanently hide `setup.wizardRequired`.
+  return runtimeConfigRef.value ?? runtimeConfigFallback()
+}
+
+/**
  * Load runtime configuration from backend API
  * This is separate from the config store to avoid circular dependency
  */
 async function loadRuntimeConfig(): Promise<RuntimeConfig> {
-  // Return cached config if already loaded
   if (runtimeConfigRef.value) {
     return runtimeConfigRef.value
   }
 
-  // Return existing promise if already loading
   if (configPromise) {
     return configPromise
   }
 
-  // Fetch config from backend (use raw fetch to avoid circular dependency)
-  configPromise = (async () => {
-    try {
-      lastUnavailableProviders = [] // Reset before loading
-      // Add timeout to fetch to prevent hanging
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout
-
-      const response = await fetch(`${getApiBaseUrl()}/api/v1/config/runtime`, {
-        credentials: getCredentialsMode(),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        throw new Error(`Failed to load runtime config: ${response.status}`)
-      }
-
-      const data = await response.json()
-      lastUnavailableProviders = Array.isArray(data.unavailableProviders)
-        ? data.unavailableProviders
-        : []
-      const validated = GetApiConfigRuntimeConfigResponseSchema.parse(data)
-      runtimeConfigRef.value = validated
-      return validated
-    } catch (error) {
-      console.error('Failed to load runtime config:', error)
-      // Return default config on error
-      const defaultConfig: RuntimeConfig = {
-        recaptcha: {
-          enabled: false,
-          siteKey: '',
-        },
-        features: {
-          help: false,
-          memoryService: false,
-          officeConvertEnabled: false,
-          documentToolsEnabled: false,
-          computeEnabled: false,
-          computeWorkspacesEnabled: false,
-        },
-        googleTag: {
-          enabled: false,
-          tagId: '',
-        },
-        marketingNews: {
-          enabled: false,
-        },
-        usageTaximeter: {
-          enabled: true,
-        },
-        build: {
-          version: 'unknown',
-          ip: 'dev',
-        },
-      }
-      // Do not cache the fallback. A failed load after `app:setup:reset` (backend
-      // briefly unreachable) must not permanently hide `setup.wizardRequired`.
-      return defaultConfig
-    } finally {
-      configPromise = null
-    }
-  })()
+  configPromise = requestRuntimeConfig().finally(() => {
+    configPromise = null
+  })
 
   return configPromise
+}
+
+/** Drops the cached payload. Tests use this so one case cannot leak into the next. */
+export function clearRuntimeConfigCache(): void {
+  runtimeConfigRef.value = null
+  configPromise = null
 }
 
 /**
@@ -191,9 +219,10 @@ export async function getConfig(): Promise<RuntimeConfig> {
  * Call this after login to get user-specific config like plugins
  */
 export async function reloadConfig(): Promise<RuntimeConfig> {
-  runtimeConfigRef.value = null
+  // Keep the live payload until the replacement arrives. Nulling it first made
+  // every gate read the empty default for the whole round trip.
   configPromise = null
-  return loadRuntimeConfig()
+  return requestRuntimeConfig()
 }
 
 /**

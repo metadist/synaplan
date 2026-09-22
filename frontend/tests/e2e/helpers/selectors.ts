@@ -344,6 +344,8 @@ export const selectors = {
   userMenu: {
     button: '[data-testid="btn-sidebar-v2-user"]',
     dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
+    /** Full-screen catcher behind the account menu. Clicking it closes the menu. */
+    overlay: '[data-testid="overlay-sidebar-v2-user"]',
     profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
     /** Avatar menu entry for the /settings page — labeled "Preferences" since phase 2 */
     preferencesBtn: '[data-testid="btn-sidebar-v2-preferences"]',

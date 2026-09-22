@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { computed } from 'vue'
-import { reloadConfig, getConfig, getConfigSync } from '@/services/api/httpClient'
+import { reloadConfig, getConfigSync, clearRuntimeConfigCache } from '@/services/api/httpClient'
 
 /**
  * Regression guard for the in-chat usage taximeter (and every other
@@ -14,6 +14,7 @@ describe('httpClient runtime config reactivity', () => {
   let enabledValue = true
 
   beforeEach(() => {
+    clearRuntimeConfigCache()
     enabledValue = true
     vi.stubGlobal(
       'fetch',
@@ -44,7 +45,7 @@ describe('httpClient runtime config reactivity', () => {
     expect(enabled.value).toBe(false)
   })
 
-  it('retries after a failed load instead of keeping the fallback forever', async () => {
+  it('retries a failed load and does not cache the fallback', async () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new Error('offline'))
@@ -59,9 +60,31 @@ describe('httpClient runtime config reactivity', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await reloadConfig()
-    expect(getConfigSync().setup?.wizardRequired).toBeUndefined()
+    expect(getConfigSync().setup?.wizardRequired).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
 
-    await getConfig()
+  it('keeps the previous payload when every retry fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          setup: { wizardRequired: true },
+          unavailableProviders: [],
+        }),
+      }))
+    )
+    await reloadConfig()
+    expect(getConfigSync().setup?.wizardRequired).toBe(true)
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline')
+      })
+    )
+    await reloadConfig()
     expect(getConfigSync().setup?.wizardRequired).toBe(true)
   })
 })
