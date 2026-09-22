@@ -67,7 +67,11 @@ make up
 ```
 
 Compose builds the sidecar and the Python/Node runtimes from this repo,
-creates `.compute-data/`, and injects a local token. Never publish port 8080.
+creates `.compute-data/`, and injects the fixed demo token
+`synaplan-dev-compute-token-change-me-32b` when `COMPUTE_TOKEN` is unset.
+That default is part of the developer install — do not change it. A
+production host sets its own token; `deploy/` `prepare.sh` writes one
+when the value is empty. Never publish port 8080.
 Hide it with `COMPUTE_URL=disabled` or `FEATURE_COMPUTE_ENABLED=false`.
 
 A **new** install seeds `COMPUTE.ENABLED` and `COMPUTE.WORKSPACES_ENABLED`

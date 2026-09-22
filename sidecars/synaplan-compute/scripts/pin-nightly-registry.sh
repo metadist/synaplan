@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Push make images (:local) to an ephemeral registry and pin map.go to the
-# resulting RepoDigests. Run from sidecars/synaplan-compute after `make images`.
+# resulting RepoDigests. Manual only — the nightly load does not call this.
+# Run from sidecars/synaplan-compute after `make images`.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

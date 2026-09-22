@@ -333,6 +333,8 @@ services:
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       # File work sidecar. Defaults match the compute service below so
       # `docker compose up` enables it with no extra env.
+      # The token default is fixed on purpose (developer install + nightly).
+      # Production sets COMPUTE_TOKEN itself. Do not rotate this default.
       COMPUTE_URL: ${COMPUTE_URL:-http://compute:8080}
       COMPUTE_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
       FEATURE_COMPUTE_ENABLED: ${FEATURE_COMPUTE_ENABLED:-true}

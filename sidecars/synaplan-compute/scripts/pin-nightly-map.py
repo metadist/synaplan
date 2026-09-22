@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Rewrite internal/images/map.go to local-registry digest refs.
 
-Used by compute-nightly.yml after `make images` (tags :local) and a push
-to 127.0.0.1:5000. Fails if neither the published GHCR digest form nor
-the old placeholder expression is found, so a map.go shape change cannot
-silently no-op the way the inlined strings.Repeat rewrite did after the
-1.0.0 pin.
+Manual tool for exercising the production digest path. The nightly load
+does not call this: it starts the sidecar on the fixed demo token and the
+:local tags, same as `docker compose up`. `make lint` still runs --check
+so a map.go shape change cannot silently drop the published digest pins.
 """
 
 from __future__ import annotations

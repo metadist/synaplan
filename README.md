@@ -433,11 +433,23 @@ sidecar. PHP never talks to Docker.
 the Python/Node runtimes from this repo, wires a local token, and turns the
 feature on. No profile, no image pin, no extra `.env`.
 
+The local token is fixed. Do not change it:
+
+```text
+synaplan-dev-compute-token-change-me-32b
+```
+
+Compose uses that value for the app and the sidecar whenever `COMPUTE_TOKEN`
+is unset, and the nightly load uses the same value. A developer install
+must not depend on a newly generated secret. A production or shared host
+sets its own `COMPUTE_TOKEN` (`openssl rand -hex 32` in `deploy/.env`).
+`prepare.sh` writes one when that value is empty. Never reuse the demo
+token there, and never publish port `8080`.
+
 To hide it: `COMPUTE_URL=disabled make up` (or
-`FEATURE_COMPUTE_ENABLED=false`). Never publish port `8080`. Production
-self-host adds `compute` to `COMPOSE_PROFILES` in `deploy/.env` —
-`prepare.sh` writes the token. Cloud uses a **separate** gVisor box, not this
-T1 sidecar on the web nodes.
+`FEATURE_COMPUTE_ENABLED=false`). Production self-host adds `compute` to
+`COMPOSE_PROFILES` in `deploy/.env`. Cloud uses a **separate** gVisor box,
+not this T1 sidecar on the web nodes.
 
 Full guide: [docs/COMPUTE.md](docs/COMPUTE.md) ·
 [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).

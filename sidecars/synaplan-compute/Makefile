@@ -27,8 +27,8 @@ format:
 hostile:
 	$(GO) test ./tests/hostile/ ./internal/runner/ ./internal/audit/
 
-# Tag :local (compose + nightly). Do not also tag :latest — nightly
-# retags :local onto an ephemeral registry for real RepoDigests.
+# Tag :local (compose + nightly). Nightly starts the sidecar against these
+# tags. Do not also tag :latest.
 images:
 	docker build -t synaplan-compute-python:local ./images/python
 	docker build -t synaplan-compute-node:local ./images/node

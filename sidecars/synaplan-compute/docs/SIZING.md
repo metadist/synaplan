@@ -46,9 +46,10 @@ Paste the summary into the release notes of the compute tag used for GA.
 
 `.github/workflows/compute-nightly.yml` runs the T1 mix (N=32,
 concurrency 4) against a fresh sidecar on ubuntu-latest. `make images`
-tags `:local`; `scripts/pin-nightly-registry.sh` retags those onto an
-ephemeral registry so the sidecar boots on real RepoDigests of the images
-just built. The T2 leg runs only when the repo variable
+tags `:local`. `scripts/nightly-up.sh` starts the sidecar on those tags
+with the fixed local demo token and host-path scratch — the same contract
+as `docker compose up`. It does not rewrite the published digest pins.
+The T2 leg runs only when the repo variable
 `COMPUTE_T2_NIGHTLY_ENABLED` is `true` (needs a self-hosted gVisor runner)
 — until the T2 node exists, T2 evidence comes from the manual runbook
 below, not from CI.
