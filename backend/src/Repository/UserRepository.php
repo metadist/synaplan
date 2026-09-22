@@ -14,6 +14,30 @@ class UserRepository extends ServiceEntityRepository
         parent::__construct($registry, User::class);
     }
 
+    /**
+     * Next page of numeric ids, ordered, for an everyone-share fan-out.
+     * A short page means there are no further users.
+     *
+     * @return list<int>
+     */
+    public function findIdsAfter(int $afterId, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        $ids = $this->createQueryBuilder('u')
+            ->select('u.id')
+            ->andWhere('u.id > :afterId')
+            ->setParameter('afterId', $afterId)
+            ->orderBy('u.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_map(static fn (mixed $id): int => (int) $id, $ids);
+    }
+
     public function findByEmail(string $email): ?User
     {
         return $this->findOneBy(['mail' => $email]);

@@ -20,4 +20,13 @@ interface RealtimePublisherInterface
      * @param array<string, mixed> $payload arbitrary JSON-serialisable map; framework adds the standard envelope
      */
     public function publish(ChannelInterface $channel, string $eventType, array $payload): void;
+
+    /**
+     * One gateway request for many channels. Used when a finished turn has
+     * to reach every current viewer without a serial wait per person.
+     *
+     * @param list<ChannelInterface> $channels
+     * @param array<string, mixed>   $payload
+     */
+    public function publishMany(array $channels, string $eventType, array $payload): void;
 }

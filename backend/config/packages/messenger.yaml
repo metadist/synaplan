@@ -124,6 +124,10 @@ framework:
             # Public webhook → Saved Task run. Accepted on the request path,
             # executed here so proxy timeouts never trigger duplicate runs.
             'App\Message\RunSavedTaskCommand': async_ai_high
+            # Finished chat turn → realtime fan-out. Off the HTTP stream so a
+            # slow gateway cannot hold the reply, and one worker broadcast
+            # reaches the owner plus current share subjects.
+            'App\Message\PublishChatActivity': async_index
 
 when@test:
     framework:

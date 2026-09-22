@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+import { useNotification } from '@/composables/useNotification'
+import { i18n } from '@/i18n/instance'
 import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
@@ -9,6 +11,7 @@ import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
+import { chatGoneStatus } from '@/utils/chatAccessError'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { buildChatShareUrl } from '@/utils/urlHelper'
 
@@ -638,8 +641,13 @@ export const useChatsStore = defineStore('chats', () => {
         owner: parseOwner(data.chat.owner),
         sharedVia: parseSharedVia(data.chat.sharedVia),
       }
-    } catch {
+    } catch (err: unknown) {
       if (seq !== conversationAccessSeq) {
+        return
+      }
+      const gone = chatGoneStatus(err)
+      if (gone) {
+        void releaseUnavailableChat(chatId, gone)
         return
       }
       conversationAccess.value = null
@@ -722,20 +730,93 @@ export const useChatsStore = defineStore('chats', () => {
    * @param options.firstMessagePreview Optional preview to lift an "empty" chat
    *   out of the empty-chat filter once it has real content.
    */
+  const localTurnCompletions = new Map<number, number>()
+
+  /**
+   * This tab just finished its own turn and already updated the sidebar.
+   * The matching realtime event must not count that message again.
+   */
+  function markLocalTurnFinished(chatId: number): void {
+    localTurnCompletions.set(chatId, (localTurnCompletions.get(chatId) ?? 0) + 1)
+  }
+
+  function clearLocalTurnFinished(chatId: number): void {
+    localTurnCompletions.delete(chatId)
+  }
+
+  function consumeLocalTurnFinished(chatId: number): boolean {
+    const pending = localTurnCompletions.get(chatId) ?? 0
+    if (pending <= 0) return false
+    if (pending === 1) {
+      localTurnCompletions.delete(chatId)
+    } else {
+      localTurnCompletions.set(chatId, pending - 1)
+    }
+    return true
+  }
+
   async function noteExternalActivity(
     chatId: number,
     options: { firstMessagePreview?: string } = {}
   ) {
+    const ownTurn = consumeLocalTurnFinished(chatId)
     const chat = chats.value.find((c) => c.id === chatId)
-    if (chat) {
-      bumpChatActivity(chatId, { firstMessagePreview: options.firstMessagePreview })
-      return
+    if (!ownTurn) {
+      if (chat) {
+        bumpChatActivity(chatId, { firstMessagePreview: options.firstMessagePreview })
+      } else {
+        await loadChats()
+      }
     }
 
-    await loadChats()
+    // Another tab, or a person this chat is shared with, just received a
+    // finished turn. Reload the open thread unless this tab is still streaming
+    // it itself, or just finished that stream (#2057).
+    if (!ownTurn && activeChatId.value === chatId && !useHistoryStore().hasLiveStream()) {
+      void useHistoryStore().loadMessages(chatId, 0, 50, true)
+    }
+  }
+
+  const releasingChats = new Map<number, Promise<'deleted' | 'unshared'>>()
+
+  /**
+   * The open conversation answered 404 or 403. Drop the selection, stop the
+   * loaders that would keep retrying it, and say what happened (#2061).
+   */
+  function releaseUnavailableChat(
+    chatId: number,
+    status: 403 | 404
+  ): Promise<'deleted' | 'unshared'> {
+    const existing = releasingChats.get(chatId)
+    if (existing) return existing
+
+    const job = (async () => {
+      const owned = chats.value.some((chat) => chat.id === chatId)
+      const reason: 'deleted' | 'unshared' = status === 404 && owned ? 'deleted' : 'unshared'
+      chats.value = chats.value.filter((chat) => chat.id !== chatId)
+      useIncomingStore().drop(chatId)
+      if (activeChatId.value === chatId) {
+        useHistoryStore().discardMessages()
+        updateActiveChatSelection(null)
+      }
+      useNotification().info(
+        i18n.global.t(reason === 'deleted' ? 'chat.goneDeleted' : 'chat.goneUnshared')
+      )
+      await Promise.all([loadChats(), useIncomingStore().load()])
+      if (activeChatId.value === null) {
+        ensureValidActiveChat()
+      }
+      return reason
+    })().finally(() => {
+      releasingChats.delete(chatId)
+    })
+
+    releasingChats.set(chatId, job)
+    return job
   }
 
   function $reset() {
+    localTurnCompletions.clear()
     chats.value = []
     conversationAccess.value = null
     conversationSource.value = null
@@ -781,6 +862,9 @@ export const useChatsStore = defineStore('chats', () => {
     setActiveChat,
     bumpChatActivity,
     noteExternalActivity,
+    markLocalTurnFinished,
+    clearLocalTurnFinished,
+    releaseUnavailableChat,
     $reset,
   }
 })

@@ -6,7 +6,8 @@
   "usageTaximeter": {
     "sessionLabel": "Tokenlar",
     "todayTooltip": "Bugün {tokens} token",
-    "todayAria": "Bugünkü kullanım: {cost}",
+    "todayLabel": "Bugün senin",
+    "todayAria": "Bugünkü harcaman: {cost}",
     "openStats": "Kullanım istatistiklerini göster",
     "usedModels": "Kullanılan modeller",
     "promptsInSession": "Bu oturumdaki istemler",

@@ -275,7 +275,15 @@
       <!-- Usage taximeter: desktop rail + mobile ring. Gated by the admin
            master switch and authenticated (non-guest/widget) web usage; the
            two share one store and differ only by CSS breakpoint. -->
-      <template v-if="usageTaximeterStore.active && !needsProviderSetup">
+      <!-- A shared conversation must not show the viewer's own day spend as if
+           it were the cost of this chat (#2062). -->
+      <template
+        v-if="
+          usageTaximeterStore.active &&
+          !needsProviderSetup &&
+          chatsStore.conversationAccess === 'owner'
+        "
+      >
         <ConsumptionBar />
         <ConsumptionRing />
       </template>
@@ -4329,7 +4337,9 @@ const streamAIResponse = async (
               }
 
               // Bump chat activity so the sidebar reflects the assistant message
-              // landing without waiting for a full reload.
+              // landing without waiting for a full reload. The streaming
+              // bubble already marked this turn, so the matching realtime
+              // event does not count it a second time.
               chatsStore.bumpChatActivity(chatId)
             }
 
@@ -4546,6 +4556,9 @@ const streamAIResponse = async (
                 historyStore.updateStreamingMessage(messageId, t('message.cancelledByUser'))
               }
               historyStore.finishStreamingMessage(messageId)
+              if (currentStreamingChatId) {
+                chatsStore.clearLocalTurnFinished(currentStreamingChatId)
+              }
 
               streamingAbortController = null
               stopStreamingFn = null
@@ -4620,6 +4633,9 @@ const streamAIResponse = async (
 
     historyStore.updateStreamingMessage(messageId, t('chatError.reason.unknown'))
     historyStore.finishStreamingMessage(messageId)
+    if (currentStreamingChatId) {
+      chatsStore.clearLocalTurnFinished(currentStreamingChatId)
+    }
     streamingAbortController = null
     stopStreamingFn = null
     currentTrackId = undefined
@@ -4778,8 +4794,10 @@ const handleUserStop = async () => {
   // #732: cancelled turns leave local history non-empty while chat list
   // metadata can still look empty — bump activity so "New chat" won't reuse
   // this thread via isChatEmpty().
-  if (streamingMessage && chatsStore.activeChatId) {
-    chatsStore.bumpChatActivity(chatsStore.activeChatId, {
+  const bumpChatId = currentStreamingChatId ?? chatsStore.activeChatId
+  if (streamingMessage && bumpChatId) {
+    chatsStore.clearLocalTurnFinished(bumpChatId)
+    chatsStore.bumpChatActivity(bumpChatId, {
       incrementMessageCount: true,
       firstMessagePreview: streamingMessage
         ? (streamingMessage.parts?.find((p) => p.type === 'text')?.content ?? '').slice(0, 120) ||
@@ -5041,6 +5059,9 @@ function finishStreamingTurnLocally() {
       streamingMessage.taskPlan.active = false
     }
     historyStore.finishStreamingMessage(streamingMessage.id)
+  }
+  if (currentStreamingChatId) {
+    chatsStore.clearLocalTurnFinished(currentStreamingChatId)
   }
 
   streamingAbortController = null

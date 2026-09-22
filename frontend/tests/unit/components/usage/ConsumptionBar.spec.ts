@@ -41,6 +41,7 @@ describe('ConsumptionBar', () => {
     })
 
     const wrapper = mountBar()
+    expect(wrapper.find('.usage-bar__today').text()).toBe('Yours today')
     expect(wrapper.find('.usage-bar__head').text()).toContain('1.02')
     expect(wrapper.find('.usage-bar__foot').text()).toBe('Tokens')
   })

@@ -103,6 +103,8 @@
     "delete": "Supprimer le chat",
     "deleteConfirm": "Supprimer ce chat ? La conversation est supprimée définitivement. Les fichiers que vous y avez téléversés ou générés restent dans votre gestionnaire de fichiers.",
     "notFound": "Ce chat n’existe plus",
+    "goneDeleted": "Ce chat a été supprimé.",
+    "goneUnshared": "Ce chat n’est plus partagé avec vous.",
     "notFoundDesc": "Ce chat a été supprimé et n’est plus disponible.",
     "browser": {
       "title": "Tous les chats",

@@ -33,6 +33,10 @@ export const useIncomingStore = defineStore('incoming', () => {
    * still on its way (sharing on, first load pending) so we must not discard
    * it yet. With sharing off this is always false and nothing changes.
    */
+  function drop(chatId: number): void {
+    chats.value = chats.value.filter((item) => Number(item.id) !== chatId)
+  }
+
   function isOpenable(chatId: number): boolean {
     if (!isIamSharingEnabled()) return false
     return !loaded.value || chatIds.value.has(chatId)
@@ -124,6 +128,7 @@ export const useIncomingStore = defineStore('incoming', () => {
     newChats,
     chatIds,
     isOpenable,
+    drop,
     load,
     refreshUnseen,
     markSeen,

@@ -97,6 +97,8 @@
     "delete": "Sohbeti Sil",
     "deleteConfirm": "Bu sohbet silinsin mi? Konuşma kalıcı olarak kaldırılır. Bu sohbette yüklediğiniz veya oluşturduğunuz dosyalar dosya yöneticinizde kalır.",
     "notFound": "Sohbet artık mevcut değil",
+    "goneDeleted": "Bu sohbet silindi.",
+    "goneUnshared": "Bu sohbet artık sizinle paylaşılmıyor.",
     "notFoundDesc": "Bu sohbet silindi ve artık erişilemiyor.",
     "browser": {
       "title": "Tüm Sohbetler",

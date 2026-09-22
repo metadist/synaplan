@@ -6,7 +6,8 @@
   "usageTaximeter": {
     "sessionLabel": "Tokens",
     "todayTooltip": "{tokens} Tokens heute",
-    "todayAria": "Verbrauch heute: {cost}",
+    "todayLabel": "Deins heute",
+    "todayAria": "Deine Ausgaben heute: {cost}",
     "openStats": "Nutzungsstatistik anzeigen",
     "usedModels": "Verwendete Modelle",
     "promptsInSession": "Prompts in dieser Sitzung",
