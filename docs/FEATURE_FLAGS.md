@@ -110,12 +110,15 @@ everyone-shares policy, tool policies per class, approval expiry) stay on the
 `IAM.EVERYONE_SHARES` is one of those companions, not a boolean flag. It is
 `any_owner`, `admins_only`, or `disabled`. `disabled` is what a public
 instance runs: anyone can sign up, so "everyone" would be every registered
-account. With `disabled`, new shares to all accounts are refused and existing
-ones grant nothing until an operator picks another value. A missing row
-fails closed while sign-up is open. Invite-only and SSO-only installs keep
-`any_owner` unless an operator changes it. System assistants stay shared
-with every account. A plugin assistant stays shared after it is installed
-again; a share an account created does not.
+account. With `disabled`, new shares to all accounts are refused, and shares
+people created earlier grant nothing until an operator picks another value;
+they are kept, listed to the owner as not in effect, and come back when the
+value changes. A missing row fails closed while sign-up is open. Invite-only
+and SSO-only installs keep `any_owner` unless an operator changes it (a fresh
+install reads `REGISTRATION_ENABLED` at first start; turning sign-up off later
+does not move this setting). System assistants and plugin-pack assistants
+are the platform's own shares and stay shared with every account on every
+value; a share a person created does not.
 
 ## For developers
 

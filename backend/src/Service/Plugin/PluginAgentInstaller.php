@@ -228,16 +228,34 @@ final readonly class PluginAgentInstaller
         }
     }
 
+    /**
+     * Platform distribution: recorded as the platform's grant, so the
+     * assistant reaches every account on any IAM.EVERYONE_SHARES value
+     * (#2096). Sharing itself being off is the only reason to skip, and that
+     * is an operator-visible condition, not a quiet no-op.
+     */
     private function shareEveryone(User $admin, Agent $agent): void
     {
         $id = $agent->getId();
-        if (null === $id || !$this->iam->isSharingEnabled((int) $admin->getId())) {
+        if (null === $id) {
+            return;
+        }
+        if (!$this->iam->isSharingEnabled((int) $admin->getId())) {
+            $this->logger->warning('Plugin pack assistant not shared: sharing is turned off', [
+                'agent' => $id,
+                'slug' => $agent->getSlug(),
+            ]);
+
             return;
         }
         try {
             $this->shares->grantPlatformDistribution($admin, AgentKind::KEY, (string) $id, Permission::Use);
         } catch (ShareNotAllowedException|\InvalidArgumentException $e) {
-            $this->logger->info('Plugin pack share skipped', ['agent' => $id, 'error' => $e->getMessage()]);
+            $this->logger->warning('Plugin pack assistant not shared', [
+                'agent' => $id,
+                'slug' => $agent->getSlug(),
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

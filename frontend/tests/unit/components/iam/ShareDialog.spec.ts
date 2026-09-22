@@ -205,4 +205,46 @@ describe('ShareDialog', () => {
     expect(showError).toHaveBeenCalled()
     wrapper.unmount()
   })
+
+  it('keeps an inert everyone share listed, explains it, and offers only Remove', async () => {
+    vi.mocked(iamApi.listShares).mockResolvedValue([
+      {
+        id: 12,
+        kind: 'conversation',
+        resourceId: '1',
+        subjectType: 'everyone',
+        subjectId: 0,
+        permission: 'use',
+        name: '',
+        effective: false,
+      },
+      {
+        id: 13,
+        kind: 'conversation',
+        resourceId: '1',
+        subjectType: 'group',
+        subjectId: 1,
+        permission: 'use',
+        name: 'Sales',
+        effective: true,
+      },
+    ])
+
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    const inert = wrapper.get('[data-testid="iam-share-row-12"]')
+    expect(inert.text()).toContain('Everyone with an account')
+    expect(inert.text()).toContain('nobody else can use it')
+    expect(
+      (inert.get('[data-testid="btn-iam-permission"]').element as HTMLButtonElement).disabled
+    ).toBe(true)
+    expect(inert.find('[data-testid="btn-iam-share-remove-12"]').exists()).toBe(true)
+
+    const active = wrapper.get('[data-testid="iam-share-row-13"]')
+    expect(
+      (active.get('[data-testid="btn-iam-permission"]').element as HTMLButtonElement).disabled
+    ).toBe(false)
+    wrapper.unmount()
+  })
 })

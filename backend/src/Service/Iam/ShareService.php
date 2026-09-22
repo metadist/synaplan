@@ -123,10 +123,10 @@ final readonly class ShareService
         }
 
         // Platform distribution uses the same provenance as grantAsSystem
-        // (grantedBy 0). A user grant keeps the actor id, so turning the
-        // audience off makes that row inert without deleting it.
+        // (Share::PLATFORM_GRANTOR). A user grant keeps the actor id, so turning
+        // the audience off makes that row inert without deleting it.
         return $this->writeGrant(
-            $platformDistribution ? 0 : (int) $actor->getId(),
+            $platformDistribution ? Share::PLATFORM_GRANTOR : (int) $actor->getId(),
             $kindImpl,
             $resourceId,
             $subjectType,
@@ -161,7 +161,7 @@ final readonly class ShareService
             $this->assertSubjectExists($subjectType, $subjectId);
         }
 
-        return $this->writeGrant(0, $kindImpl, $resourceId, $subjectType, $subjectId, $level, '');
+        return $this->writeGrant(Share::PLATFORM_GRANTOR, $kindImpl, $resourceId, $subjectType, $subjectId, $level, '');
     }
 
     private function assertKindAllows(ShareableResourceKindInterface $kindImpl, string $resourceId, Permission $level): void
@@ -317,7 +317,7 @@ final readonly class ShareService
             if (!isset($out[$id])) {
                 $out[$id] = ['everyone' => false, 'people' => 0, 'groups' => []];
             }
-            if (Share::SUBJECT_EVERYONE === $share->getSubjectType() && $this->everyoneShareIsEffective($share)) {
+            if (Share::SUBJECT_EVERYONE === $share->getSubjectType() && $this->iamConfig->everyoneShareReaches($share)) {
                 $out[$id]['everyone'] = true;
             } elseif (Share::SUBJECT_USER === $share->getSubjectType()) {
                 ++$out[$id]['people'];
@@ -579,17 +579,11 @@ final readonly class ShareService
             'email' => $subject['email'],
             'grantedBy' => $share->getGrantedBy(),
             'created' => $share->getCreated(),
-            'effective' => Share::SUBJECT_EVERYONE !== $share->getSubjectType() || $this->everyoneShareIsEffective($share),
+            // False only for an everyone row that grants nothing right now
+            // (audience off, grant written by a person). The row stays so the
+            // owner can still revoke it.
+            'effective' => $this->iamConfig->everyoneShareReaches($share),
         ];
-    }
-
-    /**
-     * An everyone row grants access only while the audience is on, or when
-     * the platform recorded it (grantedBy 0). The row itself is kept either way.
-     */
-    private function everyoneShareIsEffective(Share $share): bool
-    {
-        return $this->iamConfig->isEveryoneAudienceEnabled() || 0 === $share->getGrantedBy();
     }
 
     /**

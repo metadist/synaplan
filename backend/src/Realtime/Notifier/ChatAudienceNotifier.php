@@ -20,7 +20,8 @@ use App\Service\Iam\ResourceKind\ConversationKind;
  * The payload never includes message text. An everyone-share is paged into
  * broadcasts of {@see self::EVERYONE_PAGE_SIZE} so nobody past a cutoff is
  * dropped and no single gateway call carries the whole user table.
- * When the everyone audience is turned off, that fan-out does not run (#2096).
+ * An everyone-share that grants nothing right now ({@see IamConfig::everyoneShareReaches()})
+ * triggers no fan-out, so an inert grant never pages the whole user table (#2096).
  */
 final readonly class ChatAudienceNotifier
 {
@@ -50,7 +51,7 @@ final readonly class ChatAudienceNotifier
                     }
                 } elseif (
                     Share::SUBJECT_EVERYONE === $share->getSubjectType()
-                    && $this->iamConfig->isEveryoneAudienceEnabled()
+                    && $this->iamConfig->everyoneShareReaches($share)
                 ) {
                     $includeEveryone = true;
                 }

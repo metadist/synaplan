@@ -156,11 +156,14 @@ class ShareRepository extends ServiceEntityRepository
     }
 
     /**
-     * Everyone-shares reach every account, unless the operator turned that
-     * audience off. Then only platform distribution still matches, and that
-     * is stored as grantedBy = 0 (grantAsSystem and grantPlatformDistribution).
-     * A user grant stays on the row and starts working again when the
-     * audience is turned back on (#2096).
+     * DQL form of {@see IamConfig::everyoneShareReaches()}: everyone-shares
+     * reach every account unless the operator turned that audience off. Then
+     * only rows the platform wrote still match ({@see Share::PLATFORM_GRANTOR},
+     * written by grantAsSystem and grantPlatformDistribution). A grant a person
+     * wrote stays on the row and works again once the audience is back on (#2096).
+     *
+     * This is the one read seam for access: AccessGate, shared-with-me, RAG
+     * scopes, shared prompts and tools all come through findForSubjects.
      */
     private function everyoneSubjectExpression(QueryBuilder $qb): Composite|string
     {
@@ -168,9 +171,11 @@ class ShareRepository extends ServiceEntityRepository
             return 's.subjectType = :everyoneType';
         }
 
+        $qb->setParameter('platformGrantor', Share::PLATFORM_GRANTOR);
+
         return $qb->expr()->andX(
             's.subjectType = :everyoneType',
-            's.grantedBy = 0',
+            's.grantedBy = :platformGrantor',
         );
     }
 

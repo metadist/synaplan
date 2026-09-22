@@ -81,8 +81,9 @@ final class ChatAudienceNotifierTest extends TestCase
                 self::assertEqualsCanonicalizing(['user:3', 'user:42'], $names);
             });
 
-        $userShare = (new Share())->setSubjectType(Share::SUBJECT_USER)->setSubjectId(42);
-        $everyone = (new Share())->setSubjectType(Share::SUBJECT_EVERYONE)->setSubjectId(0);
+        $userShare = (new Share())->setSubjectType(Share::SUBJECT_USER)->setSubjectId(42)->setGrantedBy(3);
+        // Written by the owner, not the platform: grants nothing while the audience is off.
+        $everyone = (new Share())->setSubjectType(Share::SUBJECT_EVERYONE)->setSubjectId(0)->setGrantedBy(3);
         $shares = $this->createStub(ShareRepository::class);
         $shares->method('findForResource')->willReturn([$userShare, $everyone]);
 
@@ -104,10 +105,19 @@ final class ChatAudienceNotifierTest extends TestCase
         ))->publish($chat, 'OUT');
     }
 
+    /**
+     * The notifier asks one question per share: does this everyone row still
+     * reach accounts? A person's grant follows the policy; a platform grant
+     * always reaches (mirrors {@see IamConfig::everyoneShareReaches()}).
+     */
     private function audience(bool $enabled): IamConfig
     {
         $iam = $this->createStub(IamConfig::class);
-        $iam->method('isEveryoneAudienceEnabled')->willReturn($enabled);
+        $iam->method('everyoneShareReaches')->willReturnCallback(
+            static fn (Share $share): bool => Share::SUBJECT_EVERYONE !== $share->getSubjectType()
+                || $share->isPlatformGrant()
+                || $enabled
+        );
 
         return $iam;
     }

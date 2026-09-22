@@ -2,9 +2,10 @@
   <div ref="root" class="relative" data-testid="iam-permission-select">
     <button
       type="button"
-      class="dropdown-trigger w-full justify-between border border-light-border/30 dark:border-dark-border/8 bg-[var(--bg-card)] txt-primary text-sm rounded-lg px-3 py-2 min-h-[42px]"
+      class="dropdown-trigger w-full justify-between border border-light-border/30 dark:border-dark-border/8 bg-[var(--bg-card)] txt-primary text-sm rounded-lg px-3 py-2 min-h-[42px] disabled:opacity-50 disabled:cursor-not-allowed"
       :aria-expanded="open"
       :aria-label="$t('iam.dialog.permission')"
+      :disabled="disabled"
       data-testid="btn-iam-permission"
       @click="open = !open"
     >
@@ -38,11 +39,16 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { type ShareKind, shareConsequenceKey } from '@/utils/shareCopy'
 
-const props = defineProps<{
-  modelValue: string
-  allowed: string[]
-  kind: ShareKind
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    allowed: string[]
+    kind: ShareKind
+    /** A change could not be saved right now (e.g. an inert everyone share). */
+    disabled?: boolean
+  }>(),
+  { disabled: false }
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]

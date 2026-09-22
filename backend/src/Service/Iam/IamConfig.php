@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Iam;
 
+use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Feature\FeatureFlagEnv;
@@ -51,8 +52,9 @@ final readonly class IamConfig
 
     /**
      * No user-facing audience. Existing everyone rows stay in the database
-     * and grant nothing until an operator picks another value. A grant
-     * recorded as the system (grantedBy 0) still reaches every account (#2096).
+     * and grant nothing until an operator picks another value. A grant the
+     * platform wrote ({@see Share::isPlatformGrant()}) still reaches every
+     * account (#2096).
      */
     public const EVERYONE_SHARES_DISABLED = 'disabled';
 
@@ -97,37 +99,56 @@ final readonly class IamConfig
     /**
      * Who may share a resource with every account on this instance.
      *
-     * A global {@see self::EVERYONE_SHARES_DISABLED} cannot be widened by a
-     * per-user row: one operator switch has to close the audience for everyone.
+     * The global row (owner 0) decides. A per-user row may narrow it to
+     * `admins_only` or `disabled`, but a global {@see self::EVERYONE_SHARES_DISABLED}
+     * cannot be widened by one: a single operator switch closes the audience
+     * for everyone. This is the one read behind every access decision, so it
+     * costs one query for the global row plus one when a user id is given.
      */
     public function everyoneSharesPolicy(?int $userId): string
     {
-        $global = $this->normalizeEveryoneShares(
+        $global = $this->knownEveryoneShares(
             $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES)
+        ) ?? $this->everyoneSharesFallback();
+
+        if (self::EVERYONE_SHARES_DISABLED === $global || null === $userId || $userId <= 0) {
+            return $global;
+        }
+
+        $perUser = $this->knownEveryoneShares(
+            $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES)
         );
-        if (self::EVERYONE_SHARES_DISABLED === $global) {
-            return self::EVERYONE_SHARES_DISABLED;
-        }
 
-        $value = null;
-        if (null !== $userId && $userId > 0) {
-            $value = $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES);
-        }
-        if (null === $value) {
-            $value = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES);
-        }
-
-        return $this->normalizeEveryoneShares($value);
+        return $perUser ?? $global;
     }
 
     /**
-     * Whether everyone-shares still reach signed-in accounts.
+     * Whether everyone-shares written by people still reach signed-in accounts.
      * False only for {@see self::EVERYONE_SHARES_DISABLED}. `admins_only` still
      * honours rows that already exist; it only restricts who may create them.
      */
     public function isEveryoneAudienceEnabled(): bool
     {
         return self::EVERYONE_SHARES_DISABLED !== $this->everyoneSharesPolicy(null);
+    }
+
+    /**
+     * Whether one stored everyone-share reaches other accounts right now.
+     *
+     * The single rule behind {@see \App\Repository\ShareRepository::findForSubjects()},
+     * the share list, the chat-history pill and the realtime fan-out: a grant
+     * a person wrote follows the policy; a grant the platform wrote (seeded
+     * system assistants, plugin packs — {@see Share::isPlatformGrant()}) always
+     * reaches everyone. Rows that are not everyone-shares are not this method's
+     * concern and count as reaching.
+     */
+    public function everyoneShareReaches(Share $share): bool
+    {
+        if (Share::SUBJECT_EVERYONE !== $share->getSubjectType()) {
+            return true;
+        }
+
+        return $share->isPlatformGrant() || $this->isEveryoneAudienceEnabled();
     }
 
     public function canShareWithEveryone(User $actor): bool
@@ -140,21 +161,30 @@ final readonly class IamConfig
     }
 
     /**
-     * A stored any_owner or admins_only is honoured. A missing or unrecognized
-     * value fails closed on an open-registration instance (the public case),
-     * and keeps the company default only when sign-up is explicitly off.
-     * The migration does not insert a row, so this is the gap before the seeder.
+     * The stored value when it is one of the three policies, else null.
      */
-    private function normalizeEveryoneShares(?string $value): string
+    private function knownEveryoneShares(?string $value): ?string
     {
         return match ($value) {
-            self::EVERYONE_SHARES_ADMINS_ONLY => self::EVERYONE_SHARES_ADMINS_ONLY,
-            self::EVERYONE_SHARES_DISABLED => self::EVERYONE_SHARES_DISABLED,
-            self::EVERYONE_SHARES_ANY_OWNER => self::EVERYONE_SHARES_ANY_OWNER,
-            default => ($this->registration?->isEnabled() ?? true)
-                ? self::EVERYONE_SHARES_DISABLED
-                : self::EVERYONE_SHARES_ANY_OWNER,
+            self::EVERYONE_SHARES_ANY_OWNER,
+            self::EVERYONE_SHARES_ADMINS_ONLY,
+            self::EVERYONE_SHARES_DISABLED => $value,
+            default => null,
         };
+    }
+
+    /**
+     * Policy when no usable global row exists. This is the gap between the
+     * migration (which never inserts a row) and the seeder, and the case of a
+     * hand-edited value. It fails closed where anyone can sign up — the public
+     * case — and keeps the company default only when sign-up is explicitly off.
+     * The same rule seeds a fresh install ({@see \App\Seed\IamConfigSeeder}).
+     */
+    private function everyoneSharesFallback(): string
+    {
+        return ($this->registration?->isEnabled() ?? true)
+            ? self::EVERYONE_SHARES_DISABLED
+            : self::EVERYONE_SHARES_ANY_OWNER;
     }
 
     public function isDirectorySyncEnabled(?int $userId): bool
