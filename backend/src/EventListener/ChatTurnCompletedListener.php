@@ -75,7 +75,12 @@ final class ChatTurnCompletedListener
         // status). Other updates of a finished row stay quiet.
         $becameComplete = [] === $changeSet
             || (isset($changeSet['status']) && 'complete' === $changeSet['status'][1]);
-        $textAppended = isset($changeSet['text']);
+        $textAppended = false;
+        if (isset($changeSet['text'])) {
+            $previousText = is_string($changeSet['text'][0] ?? null) ? $changeSet['text'][0] : '';
+            $currentText = is_string($changeSet['text'][1] ?? null) ? $changeSet['text'][1] : '';
+            $textAppended = mb_strlen($currentText) > mb_strlen($previousText);
+        }
         if (!$becameComplete && !$textAppended) {
             return;
         }
