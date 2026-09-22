@@ -36,6 +36,11 @@ make build
 # GET http://127.0.0.1:8080/v1/health  (unauthenticated)
 ```
 
+A checkout started with `docker compose up` does not use that command. It
+uses the fixed demo token `synaplan-dev-compute-token-change-me-32b` (see
+the root README, File work). Leave that default alone. Set your own
+`COMPUTE_TOKEN` before any shared or production host.
+
 If dockerd is unreachable, **health still works**. Runs that pass validation fail with a clean status record (`docker_unavailable`) rather than taking down the process.
 
 ### Networking

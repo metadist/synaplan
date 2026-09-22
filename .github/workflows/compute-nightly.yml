@@ -1,11 +1,12 @@
 # Compute nightly load (CS26): T1 on GitHub-hosted runners, T2 behind a flag.
 #
-# T1 builds everything from source (sidecar + run images), pushes the run
-# images to an ephemeral local registry for real RepoDigests, starts the
-# sidecar with the docker socket, and runs the mixed load scenario.
-# `make images` tags :local (the compose contract). pin-nightly-registry.sh
-# retags those onto 127.0.0.1:5000 so RequireDigests stays on the production
-# path with the images just built, not the published GHCR pins.
+# T1 builds the sidecar and the :local run images from source, then starts
+# the sidecar the same way a developer `docker compose up` does: the fixed
+# demo token, COMPUTE_ALLOW_LOCAL_IMAGES=1, and host-path scratch. It does
+# not mint a new token and it does not rewrite the published digest pins in
+# map.go. Those two moving parts are what made this job fail after an
+# unrelated pin or tag change. Production still uses its own COMPUTE_TOKEN
+# (deploy/ prepare.sh) and the digest pins; see the root README.
 #
 # T2 needs a self-hosted gVisor runner that does not exist yet: the job only
 # runs when the repo variable COMPUTE_T2_NIGHTLY_ENABLED is 'true'.
@@ -40,32 +41,8 @@ jobs:
       - name: Build run images
         run: make images
 
-      - name: Push run images to a local registry (real digests)
-        run: ./scripts/pin-nightly-registry.sh
-
       - name: Build and start sidecar
-        run: |
-          set -euo pipefail
-          docker build -t synaplan-compute:test .
-          mkdir -p /tmp/compute-nightly/scratch /tmp/compute-nightly/workspaces
-          chmod 777 /tmp/compute-nightly/scratch /tmp/compute-nightly/workspaces
-          token=$(openssl rand -hex 32)
-          echo "COMPUTE_TOKEN=$token" >> "$GITHUB_ENV"
-          docker run -d --name synaplan-compute-nightly \
-            -p 127.0.0.1:8080:8080 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v /tmp/compute-nightly/scratch:/scratch \
-            -v /tmp/compute-nightly/workspaces:/workspaces \
-            -e COMPUTE_AUTH_TOKEN="$token" \
-            -e COMPUTE_LISTEN=:8080 \
-            -e COMPUTE_MAX_CONCURRENT=4 \
-            synaplan-compute:test
-          for _ in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8080/v1/health && break
-            sleep 2
-          done
-          curl -sf http://127.0.0.1:8080/v1/health | head -c 300
-          echo
+        run: ./scripts/nightly-up.sh
 
       - name: Run load mix (N=32, concurrency 4)
         run: go run ./cmd/compute-load -url http://127.0.0.1:8080 -n 32 -concurrency 4
@@ -95,31 +72,10 @@ jobs:
       - name: Build run images
         run: make images
 
-      - name: Push run images to a local registry (real digests)
-        run: ./scripts/pin-nightly-registry.sh
-
       - name: Build and start sidecar (gVisor tier)
-        run: |
-          set -euo pipefail
-          docker build -t synaplan-compute:test .
-          mkdir -p /tmp/compute-nightly/scratch /tmp/compute-nightly/workspaces
-          chmod 777 /tmp/compute-nightly/scratch /tmp/compute-nightly/workspaces
-          token=$(openssl rand -hex 32)
-          echo "COMPUTE_TOKEN=$token" >> "$GITHUB_ENV"
-          docker run -d --name synaplan-compute-nightly \
-            -p 127.0.0.1:8080:8080 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v /tmp/compute-nightly/scratch:/scratch \
-            -v /tmp/compute-nightly/workspaces:/workspaces \
-            -e COMPUTE_AUTH_TOKEN="$token" \
-            -e COMPUTE_LISTEN=:8080 \
-            -e COMPUTE_TIER=gvisor \
-            -e COMPUTE_MAX_CONCURRENT=4 \
-            synaplan-compute:test
-          for _ in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8080/v1/health && break
-            sleep 2
-          done
+        env:
+          COMPUTE_TIER: gvisor
+        run: ./scripts/nightly-up.sh
 
       - name: Run load mix (N=32, concurrency 4)
         run: go run ./cmd/compute-load -url http://127.0.0.1:8080 -n 32 -concurrency 4
