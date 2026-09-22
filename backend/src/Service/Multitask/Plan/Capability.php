@@ -161,6 +161,44 @@ enum Capability: string
         };
     }
 
+    /**
+     * Legacy message-router handler name (`app.message.handler`), or null when
+     * a TaskRunner executes this capability and the message router must not
+     * answer it.
+     *
+     * Null is an explicit arm, not a default: a new case that is left out of
+     * this match fails at runtime instead of becoming a chat turn (#1915).
+     */
+    public function messageHandlerName(): ?string
+    {
+        return match ($this) {
+            // ChatHandler, including officemaker (document_generation is topic-based inside that handler).
+            self::Chat, self::Summarize, self::Translate, self::RagQuery, self::DocumentGeneration => 'chat',
+            self::FileAnalysis => 'file_analysis',
+            // MediaGenerationHandler is registered under the legacy name image_generation
+            // and also covers video and speech aliases.
+            self::ImageGeneration, self::VideoGeneration, self::Text2Sound => 'image_generation',
+            // Planner-only. Mapping these to chat is the defect this match exists to stop:
+            // the router would answer with a turn that only claims the work was done.
+            self::ExtractText,
+            self::WebSearch,
+            self::UrlFetch,
+            self::McpFetch,
+            self::McpAction,
+            self::EmailSearch,
+            self::DocumentExport,
+            self::DocumentCombine,
+            self::CalendarEvent,
+            self::EmailMe,
+            self::SaveToFolder,
+            self::ComposeReply,
+            self::ToolCall,
+            self::OutboundWebhook,
+            self::Condition,
+            self::CodeRun => null,
+        };
+    }
+
     public static function tryFromString(string $value): ?self
     {
         return self::tryFrom($value);

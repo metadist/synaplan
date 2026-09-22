@@ -30,6 +30,7 @@ use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\Plan\Capability;
 use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -872,7 +873,11 @@ final readonly class MessageClassifier
      * Everything else here is a deterministic ROUTING ALIAS (tool commands,
      * "again" model-tag topics, legacy single-model topics): these are not
      * product capabilities in their own right, just other spellings that
-     * resolve to the same handler, so they stay a local map.
+     * resolve to the same {@see Capability}.
+     *
+     * An unknown topic stays `chat` on purpose: user task prompts are topics,
+     * not capabilities. An intent that is not a message-router capability
+     * fails later in {@see InferenceRouter} instead of being answered as chat.
      */
     private function mapTopicToIntent(string $topic): string
     {
@@ -883,25 +888,23 @@ final readonly class MessageClassifier
 
         $aliasToIntent = [
             // Media-generation aliases (tool commands, legacy single-model topics)
-            'text2pic' => 'image_generation',
-            'text2vid' => 'image_generation',
-            'text2sound' => 'image_generation',
-            'tools:pic' => 'image_generation', // /pic command
-            'tools:vid' => 'image_generation', // /vid command
-            'tools:tts' => 'image_generation', // /tts command (audio via MediaGenerationHandler)
+            'text2pic' => Capability::ImageGeneration->value,
+            'text2vid' => Capability::ImageGeneration->value,
+            'text2sound' => Capability::ImageGeneration->value,
+            'tools:pic' => Capability::ImageGeneration->value, // /pic command
+            'tools:vid' => Capability::ImageGeneration->value, // /vid command
+            'tools:tts' => Capability::ImageGeneration->value, // /tts command (audio via MediaGenerationHandler)
 
             // File-analysis aliases
-            'pic2text' => 'file_analysis',
-            'analyze' => 'file_analysis',
-            'analyzefile' => 'file_analysis',
+            'pic2text' => Capability::FileAnalysis->value,
+            'analyze' => Capability::FileAnalysis->value,
+            'analyzefile' => Capability::FileAnalysis->value,
 
             // Chat alias
-            'chat' => 'chat',
-
-            // Add more mappings as needed
+            'chat' => Capability::Chat->value,
         ];
 
-        return $aliasToIntent[$topic] ?? 'chat'; // Default to chat
+        return $aliasToIntent[$topic] ?? Capability::Chat->value;
     }
 
     /**
