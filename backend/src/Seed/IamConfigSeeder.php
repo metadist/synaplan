@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Seed;
 
 use App\Service\Iam\IamConfig;
+use App\Service\RegistrationConfig;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -16,11 +17,15 @@ use Doctrine\DBAL\Connection;
  * configuration → Features or pin them with `FEATURE_IAM_*=false`.
  * Exception: USER_SEARCH_ENABLED seeds OFF (#2060) — the share picker must
  * not expose the user directory unless an admin opts in.
+ * EVERYONE_SHARES seeds `disabled` when anyone can sign up, and `any_owner`
+ * when registration is invite-only or SSO-only (#2096). Existing rows are
+ * never overwritten; the upgrade migration applies the public-instance default.
  */
 final readonly class IamConfigSeeder
 {
     public function __construct(
         private Connection $connection,
+        private RegistrationConfig $registration,
     ) {
     }
 
@@ -34,11 +39,23 @@ final readonly class IamConfigSeeder
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_GROUP_POLICIES_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_GROUPS_CLAIM, 'value' => IamConfig::DEFAULT_DIRECTORY_GROUPS_CLAIM],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_GROUP_NAMES, 'value' => '{}'],
-            ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_EVERYONE_SHARES, 'value' => IamConfig::EVERYONE_SHARES_ANY_OWNER],
+            ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_EVERYONE_SHARES, 'value' => $this->everyoneSharesSeedValue()],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_ADMIN_IMPERSONATION, 'value' => IamConfig::IMPERSONATION_AUDITED],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_AUDIT_RETENTION_DAYS, 'value' => (string) IamConfig::DEFAULT_AUDIT_RETENTION_DAYS],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'iam_config', $rows);
+    }
+
+    /**
+     * A public instance (open self-registration) has no organization boundary,
+     * so the seeded audience is off. An invite-only or SSO-only install keeps
+     * today's "any owner may share with everyone" behavior.
+     */
+    private function everyoneSharesSeedValue(): string
+    {
+        return $this->registration->isEnabled()
+            ? IamConfig::EVERYONE_SHARES_DISABLED
+            : IamConfig::EVERYONE_SHARES_ANY_OWNER;
     }
 }

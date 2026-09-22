@@ -107,6 +107,14 @@ The non-boolean companions (directory claim path, group display names,
 everyone-shares policy, tool policies per class, approval expiry) stay on the
 **Access → Sharing** and **Routing → Tool policies** tabs.
 
+`IAM.EVERYONE_SHARES` is one of those companions, not a boolean flag. It is
+`any_owner`, `admins_only`, or `disabled`. `disabled` is what a public
+instance runs: anyone can sign up, so "everyone" would be every registered
+account. With `disabled`, new shares to all accounts are refused and existing
+ones grant nothing until an operator picks another value. Invite-only and
+SSO-only installs keep `any_owner` unless an operator changes it. System and
+plugin assistants stay shared with every account under all three values.
+
 ## For developers
 
 - `App\Service\Feature\FeatureFlagEnv` derives the variable name

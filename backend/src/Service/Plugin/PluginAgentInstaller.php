@@ -235,7 +235,7 @@ final readonly class PluginAgentInstaller
             return;
         }
         try {
-            $this->shares->grant($admin, AgentKind::KEY, (string) $id, Share::SUBJECT_EVERYONE, 0, Permission::Use->value);
+            $this->shares->grantPlatformDistribution($admin, AgentKind::KEY, (string) $id, Permission::Use);
         } catch (ShareNotAllowedException|\InvalidArgumentException $e) {
             $this->logger->info('Plugin pack share skipped', ['agent' => $id, 'error' => $e->getMessage()]);
         }

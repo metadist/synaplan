@@ -452,9 +452,17 @@ Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
   owner).
 - RAG only includes another person's files when a share grants **Can use**
   or higher. A query never runs without an owner scope.
-- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only`) is on the same Sharing
-  page. With `admins_only`, the share dialog does not offer
-  "Everyone on this instance" to non-admins.
+- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only` | `disabled`) is on the
+  same Sharing page. It decides who may share with everyone who has an account.
+  On an instance where anyone can sign up, that is every registered account,
+  so a public instance runs `disabled`.
+  - `any_owner` — every owner may share with all accounts.
+  - `admins_only` — only administrators may create those shares. Shares that
+    already exist keep working.
+  - `disabled` — the share dialog does not offer "Everyone with an account",
+    new shares are refused, and existing ones grant nothing until you pick
+    another value. The rows stay, so switching back restores them. System and
+    plugin assistants stay available either way.
 - **Can manage** on a folder lets that person re-share it; only the owner can
   delete it. Sharing an item with yourself is rejected.
 - A copy made with "continue as copy" keeps the conversation text, but the

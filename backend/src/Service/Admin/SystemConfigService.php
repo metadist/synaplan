@@ -1445,12 +1445,12 @@ final readonly class SystemConfigService
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
                 'sensitive' => false,
-                'description' => 'Who may share a folder or chat with everyone on this instance. "any_owner" lets every owner do it; "admins_only" restricts it to administrators.',
-                'default' => IamConfig::EVERYONE_SHARES_ANY_OWNER,
+                'description' => 'Who may share with everyone who has an account. On an instance where anyone can sign up, that is every registered account. "any_owner" lets every owner do it. "admins_only" lets only administrators create those shares; shares that already exist keep working. "disabled" removes that audience: new shares are refused and existing ones grant nothing until you pick another value. Sharing is not deleted, so switching back restores it. System and plugin assistants stay available either way. A public instance should use "disabled".',
+                'default' => IamConfig::EVERYONE_SHARES_DISABLED,
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_EVERYONE_SHARES,
-                'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY],
+                'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY, IamConfig::EVERYONE_SHARES_DISABLED],
             ],
             'IAM_DIRECTORY_GROUPS_CLAIM' => [
                 'tab' => 'sharing', 'section' => 'directory', 'type' => 'text',

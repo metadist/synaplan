@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Share;
+use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AgentKind;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query\Expr\Composite;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -14,8 +18,11 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class ShareRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private IamConfig $iamConfig,
+        private AgentRepository $agents,
+    ) {
         parent::__construct($registry, Share::class);
     }
 
@@ -121,7 +128,7 @@ class ShareRepository extends ServiceEntityRepository
                 's.subjectType = :userType',
                 's.subjectId = :userId',
             ),
-            's.subjectType = :everyoneType',
+            $this->everyoneSubjectExpression($qb),
         );
         $qb->setParameter('userType', Share::SUBJECT_USER)
             ->setParameter('userId', $userId)
@@ -148,6 +155,41 @@ class ShareRepository extends ServiceEntityRepository
         $rows = $qb->orderBy('s.created', 'ASC')->getQuery()->getResult();
 
         return $rows;
+    }
+
+    /**
+     * Everyone-shares reach every account, unless the operator turned that
+     * audience off. Then only platform distribution still matches: grants
+     * recorded by the system (granted by 0) and everyone-shares of system or
+     * plugin assistants. User rows stay stored and start working again when
+     * the audience is turned back on (#2096).
+     */
+    private function everyoneSubjectExpression(QueryBuilder $qb): Composite|string
+    {
+        if ($this->iamConfig->isEveryoneAudienceEnabled()) {
+            return 's.subjectType = :everyoneType';
+        }
+
+        $platformGrant = $qb->expr()->andX(
+            's.subjectType = :everyoneType',
+            's.grantedBy = 0',
+        );
+        $ids = $this->agents->findPlatformDistributionIds();
+        if ([] === $ids) {
+            return $platformGrant;
+        }
+
+        $qb->setParameter('agentKind', AgentKind::KEY);
+        $qb->setParameter('platformAgentIds', $ids);
+
+        return $qb->expr()->orX(
+            $platformGrant,
+            $qb->expr()->andX(
+                's.subjectType = :everyoneType',
+                's.resourceKind = :agentKind',
+                's.resourceId IN (:platformAgentIds)',
+            ),
+        );
     }
 
     /**

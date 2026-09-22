@@ -48,6 +48,13 @@ final readonly class IamConfig
     public const EVERYONE_SHARES_ANY_OWNER = 'any_owner';
     public const EVERYONE_SHARES_ADMINS_ONLY = 'admins_only';
 
+    /**
+     * No user-facing audience. Existing everyone rows stay in the database
+     * and grant nothing until an operator picks another value. Platform
+     * distribution (system and plugin assistants) is unaffected (#2096).
+     */
+    public const EVERYONE_SHARES_DISABLED = 'disabled';
+
     public const IMPERSONATION_AUDITED = 'audited';
     public const IMPERSONATION_DISABLED = 'disabled';
 
@@ -86,10 +93,20 @@ final readonly class IamConfig
     }
 
     /**
-     * Who may share a resource with "everyone on this instance".
+     * Who may share a resource with every account on this instance.
+     *
+     * A global {@see self::EVERYONE_SHARES_DISABLED} cannot be widened by a
+     * per-user row: one operator switch has to close the audience for everyone.
      */
     public function everyoneSharesPolicy(?int $userId): string
     {
+        $global = $this->normalizeEveryoneShares(
+            $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES)
+        );
+        if (self::EVERYONE_SHARES_DISABLED === $global) {
+            return self::EVERYONE_SHARES_DISABLED;
+        }
+
         $value = null;
         if (null !== $userId && $userId > 0) {
             $value = $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES);
@@ -97,20 +114,36 @@ final readonly class IamConfig
         if (null === $value) {
             $value = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES);
         }
-        if (self::EVERYONE_SHARES_ADMINS_ONLY === $value) {
-            return self::EVERYONE_SHARES_ADMINS_ONLY;
-        }
 
-        return self::EVERYONE_SHARES_ANY_OWNER;
+        return $this->normalizeEveryoneShares($value);
+    }
+
+    /**
+     * Whether everyone-shares still reach signed-in accounts.
+     * False only for {@see self::EVERYONE_SHARES_DISABLED}. `admins_only` still
+     * honours rows that already exist; it only restricts who may create them.
+     */
+    public function isEveryoneAudienceEnabled(): bool
+    {
+        return self::EVERYONE_SHARES_DISABLED !== $this->everyoneSharesPolicy(null);
     }
 
     public function canShareWithEveryone(User $actor): bool
     {
-        if (self::EVERYONE_SHARES_ANY_OWNER === $this->everyoneSharesPolicy((int) $actor->getId())) {
-            return true;
-        }
+        return match ($this->everyoneSharesPolicy((int) $actor->getId())) {
+            self::EVERYONE_SHARES_DISABLED => false,
+            self::EVERYONE_SHARES_ANY_OWNER => true,
+            default => $actor->isAdmin(),
+        };
+    }
 
-        return $actor->isAdmin();
+    private function normalizeEveryoneShares(?string $value): string
+    {
+        return match ($value) {
+            self::EVERYONE_SHARES_ADMINS_ONLY => self::EVERYONE_SHARES_ADMINS_ONLY,
+            self::EVERYONE_SHARES_DISABLED => self::EVERYONE_SHARES_DISABLED,
+            default => self::EVERYONE_SHARES_ANY_OWNER,
+        };
     }
 
     public function isDirectorySyncEnabled(?int $userId): bool

@@ -678,7 +678,7 @@ with its `FEATURE_*` environment variable (see
 | `IAM.GROUPS_ENABLED` | `1` | People page, groups, audit tab (`FEATURE_IAM_GROUPS_ENABLED`) |
 | `IAM.SHARING_ENABLED` | `1` | Share dialog and “Shared with me” (requires groups; `FEATURE_IAM_SHARING_ENABLED`) |
 | `IAM.GROUP_POLICIES_ENABLED` | `1` | People → Policies and group-layer defaults (requires groups; `FEATURE_IAM_GROUP_POLICIES_ENABLED`) |
-| `IAM.EVERYONE_SHARES` | `any_owner` | Who may share with everyone (`any_owner` / `admins_only`) |
+| `IAM.EVERYONE_SHARES` | `disabled` when anyone can sign up, otherwise `any_owner` | Who may share with everyone who has an account (`any_owner` / `admins_only` / `disabled`). `disabled` removes that audience, including shares that already exist, until you pick another value. A public instance (open self-registration) runs `disabled`. System and plugin assistants stay available either way. |
 | `IAM.DIRECTORY_SYNC_ENABLED` | `1` | Put people into groups from the OIDC groups claim at sign-in (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`) |
 | `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path for directory groups |
 | `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |

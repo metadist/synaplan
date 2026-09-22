@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Agent;
 use App\Entity\ApiKey;
 use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Group;
 use App\Entity\GroupMember;
+use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Security\ApiKeyScope;
+use App\Service\Iam\AccessGate;
 use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AgentKind;
+use App\Service\Iam\ShareService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -392,11 +398,134 @@ final class ShareControllerTest extends WebTestCase
         }
     }
 
+    public function testDisabledAudienceRefusesNewGrantsAndIgnoresExistingOnes(): void
+    {
+        $this->enableSharing();
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $owner = $this->createUser('share-disabled-owner@synaplan.internal');
+        $member = $this->createUser('share-disabled-member@synaplan.internal');
+        $chat = $this->createChat((int) $owner->getId(), 'For the whole instance');
+
+        $this->authenticateClient($this->client, $owner);
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $chat->getId(),
+            'subjectType' => 'everyone',
+            'subjectId' => 0,
+            'permission' => 'read',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_DISABLED);
+        $this->em->flush();
+
+        try {
+            $this->authenticateClient($this->client, $owner);
+            $this->postJson('/api/v1/shares', [
+                'kind' => 'conversation',
+                'resource' => (string) $chat->getId(),
+                'subjectType' => 'everyone',
+                'subjectId' => 0,
+                'permission' => 'read',
+            ]);
+            self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+            $error = (string) $this->json()['error'];
+            self::assertSame('Sharing with everyone is turned off.', $error);
+            self::assertStringNotContainsString('IAM', $error);
+            self::assertStringNotContainsString('EVERYONE_SHARES', $error);
+            self::assertStringNotContainsString('subjectType', $error);
+
+            $admin = $this->createAdmin('share-disabled-admin@synaplan.internal');
+            foreach ([$owner, $admin] as $actor) {
+                $this->authenticateClient($this->client, $actor);
+                $this->client->request('GET', '/api/v1/iam/subjects');
+                $types = array_column($this->json()['subjects'], 'type');
+                self::assertNotContains('everyone', $types);
+            }
+
+            $this->authenticateClient($this->client, $member);
+            $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+            $ids = array_column($this->json()['items'], 'id');
+            self::assertNotContains((string) $chat->getId(), $ids);
+            $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
+            self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+
+            $stillThere = $this->em->getRepository(Share::class)->findOneBy([
+                'resourceKind' => 'conversation',
+                'resourceId' => (string) $chat->getId(),
+                'subjectType' => 'everyone',
+            ]);
+            self::assertInstanceOf(Share::class, $stillThere);
+
+            $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
+            $this->em->flush();
+
+            $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+            $ids = array_column($this->json()['items'], 'id');
+            self::assertContains((string) $chat->getId(), $ids);
+        } finally {
+            $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
+            $this->em->flush();
+        }
+    }
+
+    public function testPlatformEveryoneGrantsStillReachUsersWhenAudienceIsDisabled(): void
+    {
+        $this->enableSharing();
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_DISABLED);
+        $this->em->flush();
+
+        $admin = $this->createAdmin('share-platform-admin@synaplan.internal');
+        $member = $this->createUser('share-platform-member@synaplan.internal');
+        $suffix = uniqid();
+
+        $system = new Agent(0, 1, 'system-'.$suffix, 'System helper', ['schema' => 'agent.v1']);
+        $system->setSource(Agent::SOURCE_SYSTEM);
+        $system->setPublishedVersionId(1);
+        $plugin = new Agent((int) $admin->getId(), 1, 'plugin-'.$suffix, 'Plugin helper', ['schema' => 'agent.v1']);
+        $plugin->setSource(Agent::sourceForPlugin('hello'));
+        $plugin->setPublishedVersionId(1);
+        $manual = new Agent((int) $admin->getId(), 1, 'manual-'.$suffix, 'Personal helper', ['schema' => 'agent.v1']);
+        $manual->setPublishedVersionId(1);
+        $this->em->persist($system);
+        $this->em->persist($plugin);
+        $this->em->persist($manual);
+        $this->em->flush();
+
+        try {
+            $shares = static::getContainer()->get(ShareService::class);
+            $shares->grantAsSystem(AgentKind::KEY, (string) $system->getId(), Share::SUBJECT_EVERYONE, 0, Permission::Use);
+            $shares->grantPlatformDistribution($admin, AgentKind::KEY, (string) $plugin->getId(), Permission::Use);
+
+            $manualShare = new Share();
+            $manualShare->setResourceKind(AgentKind::KEY);
+            $manualShare->setResourceId((string) $manual->getId());
+            $manualShare->setSubjectType(Share::SUBJECT_EVERYONE);
+            $manualShare->setSubjectId(0);
+            $manualShare->setPermission(Permission::Use->value);
+            $manualShare->setGrantedBy((int) $admin->getId());
+            $this->em->persist($manualShare);
+            $this->em->flush();
+
+            $gate = static::getContainer()->get(AccessGate::class);
+            self::assertSame(Permission::Use, $gate->highestGranted($member, AgentKind::KEY, (string) $system->getId()));
+            self::assertSame(Permission::Use, $gate->highestGranted($member, AgentKind::KEY, (string) $plugin->getId()));
+            self::assertNull($gate->highestGranted($member, AgentKind::KEY, (string) $manual->getId()));
+        } finally {
+            $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
+            $this->em->flush();
+        }
+    }
+
     private function enableSharing(): void
     {
         $config = static::getContainer()->get(ConfigRepository::class);
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '1');
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_SHARING_ENABLED, '1');
+        // The suite assumes an owner may share with every account. A public
+        // install stores `disabled`; these tests opt back into the company default.
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
         $this->em->flush();
     }
 

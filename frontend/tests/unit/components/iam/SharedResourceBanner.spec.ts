@@ -37,7 +37,7 @@ describe('SharedResourceBanner', () => {
       })
         .get('[data-testid="text-shared-resource-source"]')
         .text()
-    ).toContain('everyone in this organization')
+    ).toContain('everyone who has an account')
 
     expect(
       mount(SharedResourceBanner, {

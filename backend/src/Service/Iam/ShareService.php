@@ -44,6 +44,31 @@ final readonly class ShareService
         string $permission,
         string $ip = '',
     ): Share {
+        return $this->grantResolved($actor, $kind, $resourceId, $subjectType, $subjectId, $permission, $ip, false);
+    }
+
+    /**
+     * Share a platform-distributed assistant with every account.
+     *
+     * Ignores the everyone-shares policy: system and plugin packs stay
+     * available when the user-facing audience is turned off (#2096). The HTTP
+     * grant path never calls this.
+     */
+    public function grantPlatformDistribution(User $actor, string $kind, string $resourceId, Permission $level, string $ip = ''): Share
+    {
+        return $this->grantResolved($actor, $kind, $resourceId, Share::SUBJECT_EVERYONE, 0, $level->value, $ip, true);
+    }
+
+    private function grantResolved(
+        User $actor,
+        string $kind,
+        string $resourceId,
+        string $subjectType,
+        int $subjectId,
+        string $permission,
+        string $ip,
+        bool $platformDistribution,
+    ): Share {
         $this->assertSharingOn($actor);
         if (!in_array($subjectType, Share::SUBJECT_TYPES, true)) {
             throw new \InvalidArgumentException('Subject must be a person, a group, or everyone.');
@@ -70,8 +95,11 @@ final readonly class ShareService
 
         if (Share::SUBJECT_EVERYONE === $subjectType) {
             $subjectId = 0;
-            if (!$this->iamConfig->canShareWithEveryone($actor)) {
-                throw new ShareNotAllowedException('Only an administrator can share with everyone on this instance.');
+            if (!$platformDistribution && !$this->iamConfig->canShareWithEveryone($actor)) {
+                $message = IamConfig::EVERYONE_SHARES_DISABLED === $this->iamConfig->everyoneSharesPolicy((int) $actor->getId())
+                    ? 'Sharing with everyone is turned off.'
+                    : 'Only an administrator can share with everyone on this instance.';
+                throw new ShareNotAllowedException($message);
             }
         }
 
