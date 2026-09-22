@@ -877,7 +877,7 @@
       "hint": "Abre un chat para verlo. Para añadir tus propios mensajes, continúalo como tu copia.",
       "owner": "de {name}",
       "sourceGroup": "Este chat pertenece a {owner}. Le llegó a través del grupo \"{name}\".",
-      "sourceEveryone": "Este chat pertenece a {owner}. Se compartió con todos en esta organización.",
+      "sourceEveryone": "Este chat pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
       "sourceDirect": "Este chat pertenece a {owner}. Se compartió con usted personalmente.",
       "emptyTitle": "Aún no hay entrantes",
       "emptyText": "Cuando alguien comparta un chat contigo o con uno de tus grupos, aparecerá aquí.",
@@ -897,7 +897,7 @@
         "groupTitle": "Compartido con el grupo «{name}»",
         "groupTitleGeneric": "Compartido con un grupo",
         "everyone": "Todos",
-        "everyoneTitle": "Compartido con todos en esta organización",
+        "everyoneTitle": "Compartido con todas las personas que tienen una cuenta",
         "direct": "Compartido contigo",
         "directTitle": "Compartido contigo personalmente",
         "from": "De {name}",
@@ -905,7 +905,7 @@
         "widgetTitle": "Una conversación de visitante de uno de tus widgets de chat"
       }
     },
-    "everyone": "Todos en esta organización",
+    "everyone": "Todas las personas con una cuenta",
     "owner": "Propietario",
     "fileUnavailable": "Este archivo ya no está disponible.",
     "kind": {
@@ -924,22 +924,22 @@
     "banner": {
       "knowledge_folder": {
         "sourceGroup": "Esta carpeta pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Esta carpeta pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceEveryone": "Esta carpeta pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
         "sourceDirect": "Esta carpeta pertenece a {owner}. Se compartió con usted personalmente."
       },
       "assistant": {
         "sourceGroup": "Este asistente pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Este asistente pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceEveryone": "Este asistente pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
         "sourceDirect": "Este asistente pertenece a {owner}. Se compartió con usted personalmente."
       },
       "saved_task": {
         "sourceGroup": "Esta tarea guardada pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Esta tarea guardada pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceEveryone": "Esta tarea guardada pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
         "sourceDirect": "Esta tarea guardada pertenece a {owner}. Se compartió con usted personalmente."
       },
       "widget": {
         "sourceGroup": "Este widget de chat pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Este widget de chat pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceEveryone": "Este widget de chat pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
         "sourceDirect": "Este widget de chat pertenece a {owner}. Se compartió con usted personalmente."
       }
     },
@@ -964,6 +964,7 @@
       "noMatches": "Ninguna persona o grupo coincide.",
       "searchFailed": "No se pudo buscar personas o grupos.",
       "tryAgain": "Intentar de nuevo",
+      "everyoneInactive": "Este uso compartido sigue guardado, pero nadie más puede usarlo mientras compartir con todas las personas está desactivado. Puede quitarlo aquí.",
       "ownerLine": "Propietario · {name}",
       "publicLink": "Enlace público",
       "publicLinkHint": "Cualquiera con el enlace puede verlo.",

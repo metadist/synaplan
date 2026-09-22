@@ -456,9 +456,27 @@ Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
   owner).
 - RAG only includes another person's files when a share grants **Can use**
   or higher. A query never runs without an owner scope.
-- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only`) is on the same Sharing
-  page. With `admins_only`, the share dialog does not offer
-  "Everyone on this instance" to non-admins.
+- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only` | `disabled`) is on the
+  same Sharing page. It decides who may share with everyone who has an account.
+  On an instance where anyone can sign up, that is every registered account,
+  so a public instance runs `disabled`.
+  - `any_owner` — every owner may share with all accounts.
+  - `admins_only` — only administrators may create those shares. Shares that
+    already exist keep working.
+  - `disabled` — the share dialog does not offer "Everyone with an account",
+    new shares are refused, and shares people created earlier grant nothing
+    until you pick another value. The people they reached lose access without
+    being told. Nothing is deleted: the owner still sees the share in the
+    Share dialog, marked as not in effect, and can remove it; switching back
+    to `any_owner` or `admins_only` restores it. System assistants and
+    plugin-pack assistants are the platform's own shares and stay available
+    to every account on every value.
+  - Which value an install has: the upgrade sets `disabled` where sign-up is
+    open (no `REGISTRATION_ENABLED=false`, no stored "off" under Access) and
+    leaves invite-only and SSO-only installs at their stored value. A fresh
+    install seeds `disabled` unless `REGISTRATION_ENABLED=false` is set before
+    the first start. Turning sign-up off later does not change this setting —
+    an install that is one organization picks `any_owner` here.
 - **Can manage** on a folder lets that person re-share it; only the owner can
   delete it. Sharing an item with yourself is rejected.
 - A copy made with "continue as copy" keeps the conversation text, but the

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Share;
+use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query\Expr\Composite;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -14,8 +17,10 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class ShareRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private IamConfig $iamConfig,
+    ) {
         parent::__construct($registry, Share::class);
     }
 
@@ -121,7 +126,7 @@ class ShareRepository extends ServiceEntityRepository
                 's.subjectType = :userType',
                 's.subjectId = :userId',
             ),
-            's.subjectType = :everyoneType',
+            $this->everyoneSubjectExpression($qb),
         );
         $qb->setParameter('userType', Share::SUBJECT_USER)
             ->setParameter('userId', $userId)
@@ -148,6 +153,30 @@ class ShareRepository extends ServiceEntityRepository
         $rows = $qb->orderBy('s.created', 'ASC')->getQuery()->getResult();
 
         return $rows;
+    }
+
+    /**
+     * DQL form of {@see IamConfig::everyoneShareReaches()}: everyone-shares
+     * reach every account unless the operator turned that audience off. Then
+     * only rows the platform wrote still match ({@see Share::PLATFORM_GRANTOR},
+     * written by grantAsSystem and grantPlatformDistribution). A grant a person
+     * wrote stays on the row and works again once the audience is back on (#2096).
+     *
+     * This is the one read seam for access: AccessGate, shared-with-me, RAG
+     * scopes, shared prompts and tools all come through findForSubjects.
+     */
+    private function everyoneSubjectExpression(QueryBuilder $qb): Composite|string
+    {
+        if ($this->iamConfig->isEveryoneAudienceEnabled()) {
+            return 's.subjectType = :everyoneType';
+        }
+
+        $qb->setParameter('platformGrantor', Share::PLATFORM_GRANTOR);
+
+        return $qb->expr()->andX(
+            's.subjectType = :everyoneType',
+            's.grantedBy = :platformGrantor',
+        );
     }
 
     /**

@@ -881,7 +881,7 @@
       "hint": "Open a chat to view it. To add your own messages, continue it as your copy.",
       "owner": "from {name}",
       "sourceGroup": "This chat belongs to {owner}. It reached you through the group \"{name}\".",
-      "sourceEveryone": "This chat belongs to {owner}. It was shared with everyone in this organization.",
+      "sourceEveryone": "This chat belongs to {owner}. It was shared with everyone who has an account.",
       "sourceDirect": "This chat belongs to {owner}. It was shared with you personally.",
       "emptyTitle": "Nothing incoming yet",
       "emptyText": "When someone shares a chat with you or one of your groups, it shows up here.",
@@ -901,7 +901,7 @@
         "groupTitle": "Shared with the group \"{name}\"",
         "groupTitleGeneric": "Shared with a group",
         "everyone": "Everyone",
-        "everyoneTitle": "Shared with everyone in this organization",
+        "everyoneTitle": "Shared with everyone who has an account",
         "direct": "Shared with you",
         "directTitle": "Shared with you personally",
         "from": "From {name}",
@@ -909,7 +909,7 @@
         "widgetTitle": "A visitor conversation from one of your chat widgets"
       }
     },
-    "everyone": "Everyone in this organization",
+    "everyone": "Everyone with an account",
     "owner": "Owner",
     "fileUnavailable": "This file is no longer available.",
     "kind": {
@@ -928,22 +928,22 @@
     "banner": {
       "knowledge_folder": {
         "sourceGroup": "This folder belongs to {owner}. It reached you through the group \"{name}\".",
-        "sourceEveryone": "This folder belongs to {owner}. It was shared with everyone in this organization.",
+        "sourceEveryone": "This folder belongs to {owner}. It was shared with everyone who has an account.",
         "sourceDirect": "This folder belongs to {owner}. It was shared with you personally."
       },
       "assistant": {
         "sourceGroup": "This assistant belongs to {owner}. It reached you through the group \"{name}\".",
-        "sourceEveryone": "This assistant belongs to {owner}. It was shared with everyone in this organization.",
+        "sourceEveryone": "This assistant belongs to {owner}. It was shared with everyone who has an account.",
         "sourceDirect": "This assistant belongs to {owner}. It was shared with you personally."
       },
       "saved_task": {
         "sourceGroup": "This saved task belongs to {owner}. It reached you through the group \"{name}\".",
-        "sourceEveryone": "This saved task belongs to {owner}. It was shared with everyone in this organization.",
+        "sourceEveryone": "This saved task belongs to {owner}. It was shared with everyone who has an account.",
         "sourceDirect": "This saved task belongs to {owner}. It was shared with you personally."
       },
       "widget": {
         "sourceGroup": "This chat widget belongs to {owner}. It reached you through the group \"{name}\".",
-        "sourceEveryone": "This chat widget belongs to {owner}. It was shared with everyone in this organization.",
+        "sourceEveryone": "This chat widget belongs to {owner}. It was shared with everyone who has an account.",
         "sourceDirect": "This chat widget belongs to {owner}. It was shared with you personally."
       }
     },
@@ -968,6 +968,7 @@
       "noMatches": "No person or group matches.",
       "searchFailed": "Couldn't search people or groups.",
       "tryAgain": "Try again",
+      "everyoneInactive": "This share is saved, but nobody else can use it while sharing with everyone is turned off. You can remove it here.",
       "ownerLine": "Owner · {name}",
       "publicLink": "Public link",
       "publicLinkHint": "Anyone with the link can view.",

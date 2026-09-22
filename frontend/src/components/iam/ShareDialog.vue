@@ -94,15 +94,27 @@
               >
                 <div class="min-w-0 flex-1">
                   <p class="txt-primary truncate font-medium">{{ rowLabel(row) }}</p>
-                  <p v-if="row.subjectType !== 'everyone'" class="text-xs txt-secondary">
+                  <p
+                    v-if="row.subjectType === 'everyone' && row.effective === false"
+                    class="text-xs txt-secondary"
+                  >
+                    {{ $t('iam.dialog.everyoneInactive') }}
+                  </p>
+                  <p v-else-if="row.subjectType !== 'everyone'" class="text-xs txt-secondary">
                     {{ $t(`iam.dialog.subjectType.${row.subjectType}`) }}
                   </p>
                 </div>
+                <!--
+                  An everyone share that grants nothing right now cannot be
+                  re-granted (the backend refuses while the audience is off),
+                  so the only offered action is Remove.
+                -->
                 <PermissionSelect
                   class="sm:w-40 shrink-0"
                   :model-value="row.permission"
                   :allowed="allowedPermissions"
                   :kind="kind"
+                  :disabled="row.effective === false"
                   @update:model-value="changePermission(row, $event)"
                 />
                 <button

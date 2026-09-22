@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Iam;
 
+use App\Entity\Share;
 use App\Repository\ConfigRepository;
 use App\Service\Iam\IamConfig;
+use App\Service\RegistrationConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -68,5 +70,139 @@ final class IamConfigTest extends TestCase
         );
 
         self::assertFalse($this->iam->isSharingEnabled(1));
+    }
+
+    public function testMissingEveryonePolicyFailsClosedWhileSignUpIsOpen(): void
+    {
+        self::assertSame(
+            IamConfig::EVERYONE_SHARES_DISABLED,
+            $this->everyonePolicy(registration: null, everyone: null),
+        );
+        self::assertSame(
+            IamConfig::EVERYONE_SHARES_DISABLED,
+            $this->everyonePolicy(registration: '1', everyone: 'yes'),
+        );
+    }
+
+    public function testMissingEveryonePolicyKeepsCompanyDefaultWhenSignUpIsClosed(): void
+    {
+        self::assertSame(
+            IamConfig::EVERYONE_SHARES_ANY_OWNER,
+            $this->everyonePolicy(registration: '0', everyone: null),
+        );
+    }
+
+    public function testStoredEveryonePolicyIsHonoured(): void
+    {
+        self::assertSame(
+            IamConfig::EVERYONE_SHARES_ANY_OWNER,
+            $this->everyonePolicy(registration: '1', everyone: IamConfig::EVERYONE_SHARES_ANY_OWNER),
+        );
+    }
+
+    public function testPerUserEveryoneRowNarrowsButNeverWidensTheGlobalPolicy(): void
+    {
+        $iam = $this->everyoneRows(
+            global: IamConfig::EVERYONE_SHARES_ANY_OWNER,
+            perUser: [4 => IamConfig::EVERYONE_SHARES_ADMINS_ONLY, 5 => 'garbage'],
+        );
+        self::assertSame(IamConfig::EVERYONE_SHARES_ADMINS_ONLY, $iam->everyoneSharesPolicy(4));
+        // An unrecognized per-user value falls back to the global row, not to the sign-up rule.
+        self::assertSame(IamConfig::EVERYONE_SHARES_ANY_OWNER, $iam->everyoneSharesPolicy(5));
+        self::assertSame(IamConfig::EVERYONE_SHARES_ANY_OWNER, $iam->everyoneSharesPolicy(9));
+        self::assertTrue($iam->isEveryoneAudienceEnabled());
+
+        $closed = $this->everyoneRows(
+            global: IamConfig::EVERYONE_SHARES_DISABLED,
+            perUser: [4 => IamConfig::EVERYONE_SHARES_ANY_OWNER],
+        );
+        self::assertSame(IamConfig::EVERYONE_SHARES_DISABLED, $closed->everyoneSharesPolicy(4));
+        self::assertFalse($closed->isEveryoneAudienceEnabled());
+    }
+
+    public function testOnlyPlatformEveryoneGrantsReachAccountsWhileTheAudienceIsOff(): void
+    {
+        $person = (new Share())->setSubjectType(Share::SUBJECT_EVERYONE)->setGrantedBy(7);
+        $platform = (new Share())->setSubjectType(Share::SUBJECT_EVERYONE)->setGrantedBy(Share::PLATFORM_GRANTOR);
+        $direct = (new Share())->setSubjectType(Share::SUBJECT_USER)->setSubjectId(3)->setGrantedBy(7);
+
+        $off = $this->everyoneRows(global: IamConfig::EVERYONE_SHARES_DISABLED, perUser: []);
+        self::assertFalse($off->everyoneShareReaches($person));
+        self::assertTrue($off->everyoneShareReaches($platform));
+        self::assertTrue($off->everyoneShareReaches($direct));
+
+        $on = $this->everyoneRows(global: IamConfig::EVERYONE_SHARES_ADMINS_ONLY, perUser: []);
+        self::assertTrue($on->everyoneShareReaches($person));
+        self::assertTrue($on->everyoneShareReaches($platform));
+    }
+
+    public function testTheListFilterReadsThePolicyOnceForAnyNumberOfRows(): void
+    {
+        $config = $this->createMock(ConfigRepository::class);
+        $config->expects(self::once())->method('getValue')->willReturn(IamConfig::EVERYONE_SHARES_DISABLED);
+        $reaches = (new IamConfig($config))->everyoneShareReachesFilter();
+
+        $person = (new Share())->setSubjectType(Share::SUBJECT_EVERYONE)->setGrantedBy(7);
+        $platform = (new Share())->setSubjectType(Share::SUBJECT_EVERYONE)->setGrantedBy(Share::PLATFORM_GRANTOR);
+        $group = (new Share())->setSubjectType(Share::SUBJECT_GROUP)->setSubjectId(2)->setGrantedBy(7);
+
+        // Platform and non-everyone rows never touch the policy at all.
+        self::assertTrue($reaches($platform));
+        self::assertTrue($reaches($group));
+        self::assertFalse($reaches($person));
+        self::assertFalse($reaches($person));
+        self::assertFalse($reaches($person));
+    }
+
+    /**
+     * @param array<int, string> $perUser
+     */
+    private function everyoneRows(string $global, array $perUser): IamConfig
+    {
+        $config = $this->createMock(ConfigRepository::class);
+        $config->method('getValue')->willReturnCallback(
+            static function (int $ownerId, string $group, string $setting) use ($global, $perUser): ?string {
+                if (IamConfig::CONFIG_GROUP !== $group || IamConfig::KEY_EVERYONE_SHARES !== $setting) {
+                    return null;
+                }
+
+                return 0 === $ownerId ? $global : ($perUser[$ownerId] ?? null);
+            }
+        );
+
+        return new IamConfig($config);
+    }
+
+    private function everyonePolicy(?string $registration, ?string $everyone): string
+    {
+        $previous = $_ENV[RegistrationConfig::ENV_VAR] ?? null;
+        unset($_ENV[RegistrationConfig::ENV_VAR]);
+        try {
+            $config = $this->createMock(ConfigRepository::class);
+            $config->method('getValue')->willReturnCallback(
+                static function (int $ownerId, string $group, string $setting) use ($registration, $everyone): ?string {
+                    if (0 !== $ownerId) {
+                        return null;
+                    }
+                    if (RegistrationConfig::CONFIG_GROUP === $group && RegistrationConfig::KEY_ENABLED === $setting) {
+                        return $registration;
+                    }
+                    if (IamConfig::CONFIG_GROUP === $group && IamConfig::KEY_EVERYONE_SHARES === $setting) {
+                        return $everyone;
+                    }
+
+                    return null;
+                }
+            );
+            $iam = new IamConfig($config, null, new RegistrationConfig($config));
+
+            return $iam->everyoneSharesPolicy(null);
+        } finally {
+            if (null === $previous) {
+                unset($_ENV[RegistrationConfig::ENV_VAR]);
+            } else {
+                $_ENV[RegistrationConfig::ENV_VAR] = $previous;
+            }
+        }
     }
 }

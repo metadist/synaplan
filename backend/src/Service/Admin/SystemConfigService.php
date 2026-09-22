@@ -1445,12 +1445,17 @@ final readonly class SystemConfigService
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
                 'sensitive' => false,
-                'description' => 'Who may share a folder or chat with everyone on this instance. "any_owner" lets every owner do it; "admins_only" restricts it to administrators.',
-                'default' => IamConfig::EVERYONE_SHARES_ANY_OWNER,
+                'description' => 'Who may share with everyone who has an account. On an instance where anyone can sign up, that is every registered account. "any_owner" lets every owner do it. "admins_only" lets only administrators create those shares; shares that already exist keep working. "disabled" removes that audience: new shares are refused, and shares people created earlier grant nothing until you pick another value — the people they reached lose access without being told. Nothing is deleted, so switching back restores those shares. System assistants and plugin-pack assistants stay available to every account on every value. A public instance should use "disabled"; an install that is one organization can use "any_owner".',
+                // Mirrors IamConfigSeeder and IamConfig::everyoneSharesFallback(): the value a
+                // fresh install gets when nothing is stored, so the UI does not claim a default
+                // the seeder would not have written here.
+                'default' => $this->registrationConfig->isEnabled()
+                    ? IamConfig::EVERYONE_SHARES_DISABLED
+                    : IamConfig::EVERYONE_SHARES_ANY_OWNER,
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_EVERYONE_SHARES,
-                'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY],
+                'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY, IamConfig::EVERYONE_SHARES_DISABLED],
             ],
             'IAM_DIRECTORY_GROUPS_CLAIM' => [
                 'tab' => 'sharing', 'section' => 'directory', 'type' => 'text',

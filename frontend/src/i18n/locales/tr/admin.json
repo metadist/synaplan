@@ -877,7 +877,7 @@
       "hint": "Görüntülemek için bir sohbeti açın. Kendi mesajlarınızı eklemek için kopyanız olarak devam ettirin.",
       "owner": "{name} tarafından",
       "sourceGroup": "Bu sohbet {owner} adlı kişiye ait. Size \"{name}\" grubu üzerinden ulaştı.",
-      "sourceEveryone": "Bu sohbet {owner} adlı kişiye ait. Bu kuruluştaki herkesle paylaşıldı.",
+      "sourceEveryone": "Bu sohbet {owner} adlı kişiye ait. Hesabı olan herkesle paylaşıldı.",
       "sourceDirect": "Bu sohbet {owner} adlı kişiye ait. Sizinle kişisel olarak paylaşıldı.",
       "emptyTitle": "Henüz gelen yok",
       "emptyText": "Biri sizinle veya gruplarınızdan biriyle bir sohbet paylaştığında burada görünür.",
@@ -897,7 +897,7 @@
         "groupTitle": "\"{name}\" grubuyla paylaşıldı",
         "groupTitleGeneric": "Bir grupla paylaşıldı",
         "everyone": "Herkes",
-        "everyoneTitle": "Bu organizasyondaki herkesle paylaşıldı",
+        "everyoneTitle": "Hesabı olan herkesle paylaşıldı",
         "direct": "Sizinle paylaşıldı",
         "directTitle": "Sizinle kişisel olarak paylaşıldı",
         "from": "{name} tarafından",
@@ -905,7 +905,7 @@
         "widgetTitle": "Sohbet widget'larınızdan birinden gelen bir ziyaretçi görüşmesi"
       }
     },
-    "everyone": "Bu kuruluştaki herkes",
+    "everyone": "Hesabı olan herkes",
     "owner": "Sahip",
     "fileUnavailable": "Bu dosya artık kullanılamıyor.",
     "kind": {
@@ -924,22 +924,22 @@
     "banner": {
       "knowledge_folder": {
         "sourceGroup": "Bu klasör {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
-        "sourceEveryone": "Bu klasör {owner} adlı kişiye aittir. Bu kuruluştaki herkesle paylaşıldı.",
+        "sourceEveryone": "Bu klasör {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
         "sourceDirect": "Bu klasör {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
       },
       "assistant": {
         "sourceGroup": "Bu asistan {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
-        "sourceEveryone": "Bu asistan {owner} adlı kişiye aittir. Bu kuruluştaki herkesle paylaşıldı.",
+        "sourceEveryone": "Bu asistan {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
         "sourceDirect": "Bu asistan {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
       },
       "saved_task": {
         "sourceGroup": "Bu kayıtlı görev {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
-        "sourceEveryone": "Bu kayıtlı görev {owner} adlı kişiye aittir. Bu kuruluştaki herkesle paylaşıldı.",
+        "sourceEveryone": "Bu kayıtlı görev {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
         "sourceDirect": "Bu kayıtlı görev {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
       },
       "widget": {
         "sourceGroup": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
-        "sourceEveryone": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Bu kuruluştaki herkesle paylaşıldı.",
+        "sourceEveryone": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
         "sourceDirect": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
       }
     },
@@ -964,6 +964,7 @@
       "noMatches": "Eşleşen kişi veya grup yok.",
       "searchFailed": "Kişi veya gruplar aranamadı.",
       "tryAgain": "Tekrar dene",
+      "everyoneInactive": "Bu paylaşım kayıtlı kalır, ancak herkesle paylaşım kapalıyken başkası bunu kullanamaz. Buradan kaldırabilirsiniz.",
       "ownerLine": "Sahip · {name}",
       "publicLink": "Herkese açık bağlantı",
       "publicLinkHint": "Bağlantısı olan herkes görüntüleyebilir.",

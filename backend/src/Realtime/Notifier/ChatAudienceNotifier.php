@@ -9,6 +9,7 @@ use App\Entity\Share;
 use App\Repository\GroupMemberRepository;
 use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
+use App\Service\Iam\IamConfig;
 use App\Service\Iam\ResourceKind\ConversationKind;
 
 /**
@@ -19,6 +20,8 @@ use App\Service\Iam\ResourceKind\ConversationKind;
  * The payload never includes message text. An everyone-share is paged into
  * broadcasts of {@see self::EVERYONE_PAGE_SIZE} so nobody past a cutoff is
  * dropped and no single gateway call carries the whole user table.
+ * An everyone-share that grants nothing right now ({@see IamConfig::everyoneShareReaches()})
+ * triggers no fan-out, so an inert grant never pages the whole user table (#2096).
  */
 final readonly class ChatAudienceNotifier
 {
@@ -29,6 +32,7 @@ final readonly class ChatAudienceNotifier
         private ShareRepository $shares,
         private GroupMemberRepository $members,
         private UserRepository $users,
+        private IamConfig $iamConfig,
     ) {
     }
 
@@ -45,7 +49,10 @@ final readonly class ChatAudienceNotifier
                     foreach ($this->members->findByGroupId($share->getSubjectId()) as $member) {
                         $ids[] = $member->getUserId();
                     }
-                } elseif (Share::SUBJECT_EVERYONE === $share->getSubjectType()) {
+                } elseif (
+                    Share::SUBJECT_EVERYONE === $share->getSubjectType()
+                    && $this->iamConfig->everyoneShareReaches($share)
+                ) {
                     $includeEveryone = true;
                 }
             }
