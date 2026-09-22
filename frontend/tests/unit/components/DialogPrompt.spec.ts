@@ -66,7 +66,7 @@ describe('Dialog prompt', () => {
     expect(document.activeElement).toBe(input)
     await expect(pending).resolves.toBe('Renamed')
     expect(clicks).toBe(0)
-    expect(wrapper?.find('[data-testid="modal-dialog"]').exists()).toBe(false)
+    expect(document.querySelector('[data-testid="modal-dialog"]')).toBeNull()
 
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(document.activeElement).toBe(opener)
