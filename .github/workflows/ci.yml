@@ -1485,7 +1485,25 @@ jobs:
 
           temporary_tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-amd64"
           docker tag "$source_tag" "$temporary_tag"
-          docker push "$temporary_tag"
+          # GHCR intermittently aborts a parallel layer upload with
+          # "unknown blob" (run 35701666361, Docker 28.0.4). Layers that
+          # already landed stay in the registry, so a later attempt mounts
+          # them and finishes. This tar is the image E2E already passed;
+          # failing here would publish nothing.
+          attempt=1
+          max_attempts=3
+          while true; do
+            if docker push "$temporary_tag"; then
+              break
+            fi
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::docker push of ${temporary_tag} failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            echo "docker push failed (attempt ${attempt}/${max_attempts}), retrying..."
+            sleep $((attempt * 10))
+            attempt=$((attempt + 1))
+          done
           digest="$(
             docker buildx imagetools inspect "$temporary_tag" \
               --format '{{ .Manifest.Digest }}'
