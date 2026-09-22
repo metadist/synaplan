@@ -76,6 +76,16 @@ All seeders are idempotent and safe to re-run any number of times:
   toggles (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`, `BSHOWWHENFREE`) are still
   excluded from the upsert UPDATE clause as a second layer of defence.
 
+  An operator disable is one of those toggles. `app:model:disable` (including
+  `--provider` and the Helm `models.providers.*` init step) sets `BACTIVE=0`
+  and `BSELECTABLE=0` and **keeps the row**. The next `app:seed` — which runs
+  on every container start — must not turn that model back on and must not
+  insert a replacement. Catalog rows are never deleted by the CLI; a missing
+  row would be re-inserted as a new model and would break `BMESSAGES` history
+  that still points at the old BID. Re-enable with `app:model:enable`.
+  Retirements (next bullet) are the only seeder path that forces those flags
+  off on purpose.
+
 - **Model retirements** are the one deliberate exception to that preservation
   rule, and they run as a separate step (`ModelRetirementSeeder`, right after
   `models`). A model the provider switched off cannot serve a request, so
