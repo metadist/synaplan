@@ -7,6 +7,7 @@ namespace App\Service\Iam;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Feature\FeatureFlagEnv;
+use App\Service\RegistrationConfig;
 
 /**
  * Feature-flag resolver for IAM (groups, sharing, directory sync, policies).
@@ -50,8 +51,8 @@ final readonly class IamConfig
 
     /**
      * No user-facing audience. Existing everyone rows stay in the database
-     * and grant nothing until an operator picks another value. Platform
-     * distribution (system and plugin assistants) is unaffected (#2096).
+     * and grant nothing until an operator picks another value. A grant
+     * recorded as the system (grantedBy 0) still reaches every account (#2096).
      */
     public const EVERYONE_SHARES_DISABLED = 'disabled';
 
@@ -67,6 +68,7 @@ final readonly class IamConfig
     public function __construct(
         private ConfigRepository $configRepository,
         private ?FeatureFlagEnv $featureFlagEnv = null,
+        private ?RegistrationConfig $registration = null,
     ) {
     }
 
@@ -137,12 +139,21 @@ final readonly class IamConfig
         };
     }
 
+    /**
+     * A stored any_owner or admins_only is honoured. A missing or unrecognized
+     * value fails closed on an open-registration instance (the public case),
+     * and keeps the company default only when sign-up is explicitly off.
+     * The migration does not insert a row, so this is the gap before the seeder.
+     */
     private function normalizeEveryoneShares(?string $value): string
     {
         return match ($value) {
             self::EVERYONE_SHARES_ADMINS_ONLY => self::EVERYONE_SHARES_ADMINS_ONLY,
             self::EVERYONE_SHARES_DISABLED => self::EVERYONE_SHARES_DISABLED,
-            default => self::EVERYONE_SHARES_ANY_OWNER,
+            self::EVERYONE_SHARES_ANY_OWNER => self::EVERYONE_SHARES_ANY_OWNER,
+            default => ($this->registration?->isEnabled() ?? true)
+                ? self::EVERYONE_SHARES_DISABLED
+                : self::EVERYONE_SHARES_ANY_OWNER,
         };
     }
 

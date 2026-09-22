@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Iam;
 
 use App\Repository\ConfigRepository;
 use App\Service\Iam\IamConfig;
+use App\Service\RegistrationConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -68,5 +69,66 @@ final class IamConfigTest extends TestCase
         );
 
         self::assertFalse($this->iam->isSharingEnabled(1));
+    }
+
+    public function testMissingEveryonePolicyFailsClosedWhileSignUpIsOpen(): void
+    {
+        self::assertSame(
+            IamConfig::EVERYONE_SHARES_DISABLED,
+            $this->everyonePolicy(registration: null, everyone: null),
+        );
+        self::assertSame(
+            IamConfig::EVERYONE_SHARES_DISABLED,
+            $this->everyonePolicy(registration: '1', everyone: 'yes'),
+        );
+    }
+
+    public function testMissingEveryonePolicyKeepsCompanyDefaultWhenSignUpIsClosed(): void
+    {
+        self::assertSame(
+            IamConfig::EVERYONE_SHARES_ANY_OWNER,
+            $this->everyonePolicy(registration: '0', everyone: null),
+        );
+    }
+
+    public function testStoredEveryonePolicyIsHonoured(): void
+    {
+        self::assertSame(
+            IamConfig::EVERYONE_SHARES_ANY_OWNER,
+            $this->everyonePolicy(registration: '1', everyone: IamConfig::EVERYONE_SHARES_ANY_OWNER),
+        );
+    }
+
+    private function everyonePolicy(?string $registration, ?string $everyone): string
+    {
+        $previous = $_ENV[RegistrationConfig::ENV_VAR] ?? null;
+        unset($_ENV[RegistrationConfig::ENV_VAR]);
+        try {
+            $config = $this->createMock(ConfigRepository::class);
+            $config->method('getValue')->willReturnCallback(
+                static function (int $ownerId, string $group, string $setting) use ($registration, $everyone): ?string {
+                    if (0 !== $ownerId) {
+                        return null;
+                    }
+                    if (RegistrationConfig::CONFIG_GROUP === $group && RegistrationConfig::KEY_ENABLED === $setting) {
+                        return $registration;
+                    }
+                    if (IamConfig::CONFIG_GROUP === $group && IamConfig::KEY_EVERYONE_SHARES === $setting) {
+                        return $everyone;
+                    }
+
+                    return null;
+                }
+            );
+            $iam = new IamConfig($config, null, new RegistrationConfig($config));
+
+            return $iam->everyoneSharesPolicy(null);
+        } finally {
+            if (null === $previous) {
+                unset($_ENV[RegistrationConfig::ENV_VAR]);
+            } else {
+                $_ENV[RegistrationConfig::ENV_VAR] = $previous;
+            }
+        }
     }
 }

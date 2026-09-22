@@ -111,9 +111,11 @@ everyone-shares policy, tool policies per class, approval expiry) stay on the
 `any_owner`, `admins_only`, or `disabled`. `disabled` is what a public
 instance runs: anyone can sign up, so "everyone" would be every registered
 account. With `disabled`, new shares to all accounts are refused and existing
-ones grant nothing until an operator picks another value. Invite-only and
-SSO-only installs keep `any_owner` unless an operator changes it. System and
-plugin assistants stay shared with every account under all three values.
+ones grant nothing until an operator picks another value. A missing row
+fails closed while sign-up is open. Invite-only and SSO-only installs keep
+`any_owner` unless an operator changes it. System assistants stay shared
+with every account. A plugin assistant stays shared after it is installed
+again; a share an account created does not.
 
 ## For developers
 

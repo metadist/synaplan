@@ -1445,7 +1445,7 @@ final readonly class SystemConfigService
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
                 'sensitive' => false,
-                'description' => 'Who may share with everyone who has an account. On an instance where anyone can sign up, that is every registered account. "any_owner" lets every owner do it. "admins_only" lets only administrators create those shares; shares that already exist keep working. "disabled" removes that audience: new shares are refused and existing ones grant nothing until you pick another value. Sharing is not deleted, so switching back restores it. System and plugin assistants stay available either way. A public instance should use "disabled".',
+                'description' => 'Who may share with everyone who has an account. On an instance where anyone can sign up, that is every registered account. "any_owner" lets every owner do it. "admins_only" lets only administrators create those shares; shares that already exist keep working. "disabled" removes that audience: new shares are refused and existing ones grant nothing until you pick another value. Sharing is not deleted, so switching back restores it. System assistants stay available. A plugin assistant stays available after it is installed again. A share an account created stays off until you turn this back on. A public instance should use "disabled".',
                 'default' => IamConfig::EVERYONE_SHARES_DISABLED,
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,

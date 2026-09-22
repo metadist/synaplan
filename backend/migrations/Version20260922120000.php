@@ -17,7 +17,9 @@ use Doctrine\Migrations\AbstractMigration;
  * installs (registration explicitly off, including an env pin) keep whatever
  * value they stored. Per-user rows are left alone; a global `disabled` cannot
  * be widened by one. No row is created — a fresh install gets its value from
- * the seeder. Existing share rows are not deleted.
+ * the seeder. Existing share rows are not deleted and are not rewritten:
+ * a grant an account created stays inert while the audience is off, and a
+ * plugin install records its own grant as a system grant (grantedBy 0).
  *
  * Registration precedence matches {@see \App\Service\RegistrationConfig}:
  * an explicit REGISTRATION_ENABLED env value wins, then ACCESS.REGISTRATION_ENABLED,
@@ -54,23 +56,6 @@ final class Version20260922120000 extends AbstractMigration
           )
         SQL;
 
-    /**
-     * Platform everyone-shares are recognized by grantedBy = 0, the same mark
-     * grantAsSystem already writes. Installer shares that predate that mark
-     * are rewritten here so they keep working after the audience is disabled.
-     * A later user grant (grantedBy other than 0) is left alone and becomes inert.
-     * Multi-table UPDATE, so the SET column must stay qualified.
-     */
-    private const MARK_PLATFORM_PROVENANCE = <<<'SQL'
-        UPDATE BSHARES AS s
-        INNER JOIN BAGENTS AS a
-          ON s.BRESOURCEKIND = 'agent' AND s.BRESOURCEID = CAST(a.BID AS CHAR)
-        SET s.BGRANTEDBY = 0
-        WHERE s.BSUBJECTTYPE = 'everyone'
-          AND s.BGRANTEDBY <> 0
-          AND (a.BSOURCE = 'system' OR a.BSOURCE LIKE 'plugin:%')
-        SQL;
-
     /** Matches nothing. A SELECT would leave an unbuffered MariaDB cursor open. */
     private const NOOP = 'UPDATE BCONFIG SET BVALUE = BVALUE WHERE 1 = 0';
 
@@ -86,8 +71,6 @@ final class Version20260922120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql(self::MARK_PLATFORM_PROVENANCE);
-
         $raw = trim((string) ($_ENV['REGISTRATION_ENABLED'] ?? ''));
         if ('' !== $raw) {
             $open = filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;

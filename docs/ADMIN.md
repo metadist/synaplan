@@ -461,8 +461,10 @@ Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
     already exist keep working.
   - `disabled` — the share dialog does not offer "Everyone with an account",
     new shares are refused, and existing ones grant nothing until you pick
-    another value. The rows stay, so switching back restores them. System and
-    plugin assistants stay available either way.
+    another value. The rows stay, so switching back restores them. System
+    assistants stay available. A plugin assistant stays available after it is
+    installed again. A share an account created stays off until you turn this
+    back on.
 - **Can manage** on a folder lets that person re-share it; only the owner can
   delete it. Sharing an item with yourself is rejected.
 - A copy made with "continue as copy" keeps the conversation text, but the
