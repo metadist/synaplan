@@ -7,7 +7,6 @@ namespace App\Repository;
 use App\Entity\Share;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
-use App\Service\Iam\ResourceKind\AgentKind;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\Query\Expr\Composite;
 use Doctrine\ORM\QueryBuilder;
@@ -21,7 +20,6 @@ class ShareRepository extends ServiceEntityRepository
     public function __construct(
         ManagerRegistry $registry,
         private IamConfig $iamConfig,
-        private AgentRepository $agents,
     ) {
         parent::__construct($registry, Share::class);
     }
@@ -159,10 +157,10 @@ class ShareRepository extends ServiceEntityRepository
 
     /**
      * Everyone-shares reach every account, unless the operator turned that
-     * audience off. Then only platform distribution still matches: grants
-     * recorded by the system (granted by 0) and everyone-shares of system or
-     * plugin assistants. User rows stay stored and start working again when
-     * the audience is turned back on (#2096).
+     * audience off. Then only platform distribution still matches, and that
+     * is stored as grantedBy = 0 (grantAsSystem and grantPlatformDistribution).
+     * A user grant stays on the row and starts working again when the
+     * audience is turned back on (#2096).
      */
     private function everyoneSubjectExpression(QueryBuilder $qb): Composite|string
     {
@@ -170,25 +168,9 @@ class ShareRepository extends ServiceEntityRepository
             return 's.subjectType = :everyoneType';
         }
 
-        $platformGrant = $qb->expr()->andX(
+        return $qb->expr()->andX(
             's.subjectType = :everyoneType',
             's.grantedBy = 0',
-        );
-        $ids = $this->agents->findPlatformDistributionIds();
-        if ([] === $ids) {
-            return $platformGrant;
-        }
-
-        $qb->setParameter('agentKind', AgentKind::KEY);
-        $qb->setParameter('platformAgentIds', $ids);
-
-        return $qb->expr()->orX(
-            $platformGrant,
-            $qb->expr()->andX(
-                's.subjectType = :everyoneType',
-                's.resourceKind = :agentKind',
-                's.resourceId IN (:platformAgentIds)',
-            ),
         );
     }
 

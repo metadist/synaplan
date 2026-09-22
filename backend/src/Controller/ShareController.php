@@ -66,6 +66,7 @@ final class ShareController extends AbstractController
                                     new OA\Property(property: 'email', type: 'string', nullable: true),
                                     new OA\Property(property: 'grantedBy', type: 'integer'),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),
+                                    new OA\Property(property: 'effective', type: 'boolean', description: 'False when an everyone share is stored but does not currently reach other accounts. The row can still be revoked.'),
                                 ]
                             )
                         ),
@@ -141,6 +142,7 @@ final class ShareController extends AbstractController
                                 new OA\Property(property: 'email', type: 'string', nullable: true),
                                 new OA\Property(property: 'grantedBy', type: 'integer'),
                                 new OA\Property(property: 'created', type: 'integer', format: 'int64'),
+                                new OA\Property(property: 'effective', type: 'boolean', description: 'False when an everyone share is stored but does not currently reach other accounts. The row can still be revoked.'),
                             ]
                         ),
                     ]

@@ -968,6 +968,7 @@
       "noMatches": "Keine Person oder Gruppe passt.",
       "searchFailed": "Personen oder Gruppen konnten nicht gesucht werden.",
       "tryAgain": "Erneut versuchen",
+      "everyoneInactive": "Diese Freigabe bleibt gespeichert, aber niemand sonst kann sie nutzen, solange das Teilen mit allen ausgeschaltet ist. Sie können sie hier entfernen.",
       "ownerLine": "Eigentümer · {name}",
       "publicLink": "Öffentlicher Link",
       "publicLinkHint": "Jeder mit dem Link kann ihn ansehen.",

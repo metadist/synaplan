@@ -968,6 +968,7 @@
       "noMatches": "No person or group matches.",
       "searchFailed": "Couldn't search people or groups.",
       "tryAgain": "Try again",
+      "everyoneInactive": "This share is saved, but nobody else can use it while sharing with everyone is turned off. You can remove it here.",
       "ownerLine": "Owner · {name}",
       "publicLink": "Public link",
       "publicLinkHint": "Anyone with the link can view.",

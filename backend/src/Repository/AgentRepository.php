@@ -122,26 +122,6 @@ class AgentRepository extends ServiceEntityRepository
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
     }
 
-    /**
-     * Assistants the platform distributes to every account: the system seed
-     * and plugin packs. User-made assistants are not included (#2096).
-     *
-     * @return list<string>
-     */
-    public function findPlatformDistributionIds(): array
-    {
-        /** @var list<int|string> $ids */
-        $ids = $this->createQueryBuilder('a')
-            ->select('a.id')
-            ->where('a.source = :system OR a.source LIKE :plugin')
-            ->setParameter('system', Agent::SOURCE_SYSTEM)
-            ->setParameter('plugin', Agent::SOURCE_PLUGIN_PREFIX.'%')
-            ->getQuery()
-            ->getSingleColumnResult();
-
-        return array_map(static fn (int|string $id): string => (string) $id, $ids);
-    }
-
     public function save(Agent $agent, bool $flush = true): void
     {
         $this->getEntityManager()->persist($agent);

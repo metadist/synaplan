@@ -32,6 +32,45 @@ final class Version20260922120000 extends AbstractMigration
         WHERE BOWNERID = 0 AND BGROUP = 'IAM' AND BSETTING = 'EVERYONE_SHARES' AND BVALUE <> 'disabled'
         SQL;
 
+    /**
+     * Same decision as DISABLE_EVERYONE, plus "registration is not explicitly
+     * closed". A missing row, an empty value, or anything unrecognized stays
+     * open. Closed spellings match filter_var(..., FILTER_VALIDATE_BOOL).
+     * The subquery is a derived table so MariaDB accepts the self-reference.
+     */
+    private const DISABLE_WHEN_OPEN = <<<'SQL'
+        UPDATE BCONFIG
+        SET BVALUE = 'disabled'
+        WHERE BOWNERID = 0
+          AND BGROUP = 'IAM'
+          AND BSETTING = 'EVERYONE_SHARES'
+          AND BVALUE <> 'disabled'
+          AND NOT EXISTS (
+            SELECT 1 FROM (
+              SELECT BVALUE FROM BCONFIG
+              WHERE BOWNERID = 0 AND BGROUP = 'ACCESS' AND BSETTING = 'REGISTRATION_ENABLED'
+            ) AS reg
+            WHERE LOWER(reg.BVALUE) IN ('0', 'false', 'off', 'no')
+          )
+        SQL;
+
+    /**
+     * Platform everyone-shares are recognized by grantedBy = 0, the same mark
+     * grantAsSystem already writes. Installer shares that predate that mark
+     * are rewritten here so they keep working after the audience is disabled.
+     * A later user grant (grantedBy other than 0) is left alone and becomes inert.
+     * Multi-table UPDATE, so the SET column must stay qualified.
+     */
+    private const MARK_PLATFORM_PROVENANCE = <<<'SQL'
+        UPDATE BSHARES AS s
+        INNER JOIN BAGENTS AS a
+          ON s.BRESOURCEKIND = 'agent' AND s.BRESOURCEID = CAST(a.BID AS CHAR)
+        SET s.BGRANTEDBY = 0
+        WHERE s.BSUBJECTTYPE = 'everyone'
+          AND s.BGRANTEDBY <> 0
+          AND (a.BSOURCE = 'system' OR a.BSOURCE LIKE 'plugin:%')
+        SQL;
+
     /** Matches nothing. A SELECT would leave an unbuffered MariaDB cursor open. */
     private const NOOP = 'UPDATE BCONFIG SET BVALUE = BVALUE WHERE 1 = 0';
 
@@ -47,6 +86,8 @@ final class Version20260922120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        $this->addSql(self::MARK_PLATFORM_PROVENANCE);
+
         $raw = trim((string) ($_ENV['REGISTRATION_ENABLED'] ?? ''));
         if ('' !== $raw) {
             $open = filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
@@ -55,26 +96,7 @@ final class Version20260922120000 extends AbstractMigration
             return;
         }
 
-        // No separate SELECT: an empty result leaves the MariaDB cursor open
-        // (SQLSTATE 2014). Closed spellings match filter_var(..., FILTER_VALIDATE_BOOL).
-        // A missing row, an empty value, or anything unrecognized stays open.
-        $this->addSql(
-            <<<'SQL'
-                UPDATE BCONFIG AS everyone
-                SET everyone.BVALUE = 'disabled'
-                WHERE everyone.BOWNERID = 0
-                  AND everyone.BGROUP = 'IAM'
-                  AND everyone.BSETTING = 'EVERYONE_SHARES'
-                  AND everyone.BVALUE <> 'disabled'
-                  AND NOT EXISTS (
-                    SELECT 1 FROM (
-                      SELECT BVALUE FROM BCONFIG
-                      WHERE BOWNERID = 0 AND BGROUP = 'ACCESS' AND BSETTING = 'REGISTRATION_ENABLED'
-                    ) AS reg
-                    WHERE LOWER(reg.BVALUE) IN ('0', 'false', 'off', 'no')
-                  )
-                SQL
-        );
+        $this->addSql(self::DISABLE_WHEN_OPEN);
     }
 
     public function down(Schema $schema): void

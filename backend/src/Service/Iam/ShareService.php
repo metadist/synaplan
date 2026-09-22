@@ -122,7 +122,18 @@ final readonly class ShareService
             throw new ShareNotAllowedException('Administrators can share on behalf of the owner, but not with themselves.');
         }
 
-        return $this->writeGrant((int) $actor->getId(), $kindImpl, $resourceId, $subjectType, $subjectId, $level, $ip);
+        // Platform distribution uses the same provenance as grantAsSystem
+        // (grantedBy 0). A user grant keeps the actor id, so turning the
+        // audience off makes that row inert without deleting it.
+        return $this->writeGrant(
+            $platformDistribution ? 0 : (int) $actor->getId(),
+            $kindImpl,
+            $resourceId,
+            $subjectType,
+            $subjectId,
+            $level,
+            $ip,
+        );
     }
 
     /**
@@ -306,7 +317,7 @@ final readonly class ShareService
             if (!isset($out[$id])) {
                 $out[$id] = ['everyone' => false, 'people' => 0, 'groups' => []];
             }
-            if (Share::SUBJECT_EVERYONE === $share->getSubjectType()) {
+            if (Share::SUBJECT_EVERYONE === $share->getSubjectType() && $this->everyoneShareIsEffective($share)) {
                 $out[$id]['everyone'] = true;
             } elseif (Share::SUBJECT_USER === $share->getSubjectType()) {
                 ++$out[$id]['people'];
@@ -568,7 +579,17 @@ final readonly class ShareService
             'email' => $subject['email'],
             'grantedBy' => $share->getGrantedBy(),
             'created' => $share->getCreated(),
+            'effective' => Share::SUBJECT_EVERYONE !== $share->getSubjectType() || $this->everyoneShareIsEffective($share),
         ];
+    }
+
+    /**
+     * An everyone row grants access only while the audience is on, or when
+     * the platform recorded it (grantedBy 0). The row itself is kept either way.
+     */
+    private function everyoneShareIsEffective(Share $share): bool
+    {
+        return $this->iamConfig->isEveryoneAudienceEnabled() || 0 === $share->getGrantedBy();
     }
 
     /**

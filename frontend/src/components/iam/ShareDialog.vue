@@ -94,7 +94,13 @@
               >
                 <div class="min-w-0 flex-1">
                   <p class="txt-primary truncate font-medium">{{ rowLabel(row) }}</p>
-                  <p v-if="row.subjectType !== 'everyone'" class="text-xs txt-secondary">
+                  <p
+                    v-if="row.subjectType === 'everyone' && row.effective === false"
+                    class="text-xs txt-secondary"
+                  >
+                    {{ $t('iam.dialog.everyoneInactive') }}
+                  </p>
+                  <p v-else-if="row.subjectType !== 'everyone'" class="text-xs txt-secondary">
                     {{ $t(`iam.dialog.subjectType.${row.subjectType}`) }}
                   </p>
                 </div>

@@ -457,6 +457,14 @@ final class ShareControllerTest extends WebTestCase
             ]);
             self::assertInstanceOf(Share::class, $stillThere);
 
+            $this->authenticateClient($this->client, $owner);
+            $this->client->request('GET', '/api/v1/shares?kind=conversation&resource='.$chat->getId());
+            self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+            $rows = $this->json()['shares'];
+            self::assertCount(1, $rows);
+            self::assertSame('everyone', $rows[0]['subjectType']);
+            self::assertFalse($rows[0]['effective']);
+
             $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
             $this->em->flush();
 
@@ -486,17 +494,31 @@ final class ShareControllerTest extends WebTestCase
         $plugin = new Agent((int) $admin->getId(), 1, 'plugin-'.$suffix, 'Plugin helper', ['schema' => 'agent.v1']);
         $plugin->setSource(Agent::sourceForPlugin('hello'));
         $plugin->setPublishedVersionId(1);
+        $userPlugin = new Agent((int) $admin->getId(), 1, 'plugin-user-'.$suffix, 'User-shared plugin', ['schema' => 'agent.v1']);
+        $userPlugin->setSource(Agent::sourceForPlugin('hello'));
+        $userPlugin->setPublishedVersionId(1);
         $manual = new Agent((int) $admin->getId(), 1, 'manual-'.$suffix, 'Personal helper', ['schema' => 'agent.v1']);
         $manual->setPublishedVersionId(1);
         $this->em->persist($system);
         $this->em->persist($plugin);
+        $this->em->persist($userPlugin);
         $this->em->persist($manual);
         $this->em->flush();
 
         try {
             $shares = static::getContainer()->get(ShareService::class);
             $shares->grantAsSystem(AgentKind::KEY, (string) $system->getId(), Share::SUBJECT_EVERYONE, 0, Permission::Use);
-            $shares->grantPlatformDistribution($admin, AgentKind::KEY, (string) $plugin->getId(), Permission::Use);
+            $platformShare = $shares->grantPlatformDistribution($admin, AgentKind::KEY, (string) $plugin->getId(), Permission::Use);
+            self::assertSame(0, $platformShare->getGrantedBy());
+
+            $userPluginShare = new Share();
+            $userPluginShare->setResourceKind(AgentKind::KEY);
+            $userPluginShare->setResourceId((string) $userPlugin->getId());
+            $userPluginShare->setSubjectType(Share::SUBJECT_EVERYONE);
+            $userPluginShare->setSubjectId(0);
+            $userPluginShare->setPermission(Permission::Use->value);
+            $userPluginShare->setGrantedBy((int) $admin->getId());
+            $this->em->persist($userPluginShare);
 
             $manualShare = new Share();
             $manualShare->setResourceKind(AgentKind::KEY);
@@ -511,6 +533,7 @@ final class ShareControllerTest extends WebTestCase
             $gate = static::getContainer()->get(AccessGate::class);
             self::assertSame(Permission::Use, $gate->highestGranted($member, AgentKind::KEY, (string) $system->getId()));
             self::assertSame(Permission::Use, $gate->highestGranted($member, AgentKind::KEY, (string) $plugin->getId()));
+            self::assertNull($gate->highestGranted($member, AgentKind::KEY, (string) $userPlugin->getId()));
             self::assertNull($gate->highestGranted($member, AgentKind::KEY, (string) $manual->getId()));
         } finally {
             $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);

@@ -964,6 +964,7 @@
       "noMatches": "Ninguna persona o grupo coincide.",
       "searchFailed": "No se pudo buscar personas o grupos.",
       "tryAgain": "Intentar de nuevo",
+      "everyoneInactive": "Este uso compartido sigue guardado, pero nadie más puede usarlo mientras compartir con todas las personas está desactivado. Puede quitarlo aquí.",
       "ownerLine": "Propietario · {name}",
       "publicLink": "Enlace público",
       "publicLinkHint": "Cualquiera con el enlace puede verlo.",

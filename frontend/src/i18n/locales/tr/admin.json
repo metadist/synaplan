@@ -964,6 +964,7 @@
       "noMatches": "Eşleşen kişi veya grup yok.",
       "searchFailed": "Kişi veya gruplar aranamadı.",
       "tryAgain": "Tekrar dene",
+      "everyoneInactive": "Bu paylaşım kayıtlı kalır, ancak herkesle paylaşım kapalıyken başkası bunu kullanamaz. Buradan kaldırabilirsiniz.",
       "ownerLine": "Sahip · {name}",
       "publicLink": "Herkese açık bağlantı",
       "publicLinkHint": "Bağlantısı olan herkes görüntüleyebilir.",
