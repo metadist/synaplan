@@ -199,16 +199,17 @@ final readonly class FeedbackExampleService
     /**
      * Delete a feedback example.
      *
-     * Tries both feedback namespaces because a feedback entry lives in
-     * exactly one of them and we don't know which. Qdrant's `points/delete`
-     * endpoint is idempotent — deleting a missing point in an existing
-     * collection is a silent no-op — so the loop simply forwards both calls.
+     * The row lives in exactly one namespace. deleteMemory loads it once,
+     * removes the SQL row, and purges that namespace. Calling it again for
+     * the other namespace finds nothing and throws "Memory not found", which
+     * the controller reports as 404 after a successful delete (#2075).
      *
      * Any Qdrant outage is surfaced as MemoryServiceUnavailableException so
      * the controller can return 503 instead of masking the outage as
      * "Feedback not found".
      *
      * @throws MemoryServiceUnavailableException When Qdrant is unreachable
+     * @throws \InvalidArgumentException         When the entry does not exist
      */
     public function deleteFeedback(User $user, int $id): void
     {
@@ -216,11 +217,7 @@ final readonly class FeedbackExampleService
             throw new MemoryServiceUnavailableException('Cannot delete feedback: memory service (Qdrant) is not reachable.');
         }
 
-        foreach ([FeedbackConstants::NAMESPACE_FALSE_POSITIVE, FeedbackConstants::NAMESPACE_POSITIVE] as $namespace) {
-            // Let MemoryServiceUnavailableException propagate: an outage on
-            // the second iteration must NOT be silently treated as success.
-            $this->memoryService->deleteMemory($id, $user, $namespace);
-        }
+        $this->memoryService->deleteMemory($id, $user);
     }
 
     /**
