@@ -48,7 +48,7 @@ describe('httpClient runtime config reactivity', () => {
   it('retries a failed load and does not cache the fallback', async () => {
     const fetchMock = vi
       .fn()
-      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new TypeError('offline'))
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -81,10 +81,60 @@ describe('httpClient runtime config reactivity', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
-        throw new Error('offline')
+        throw new TypeError('offline')
       })
     )
     await reloadConfig()
     expect(getConfigSync().setup?.wizardRequired).toBe(true)
+  })
+
+  it('retries an abort once and does not retry a deterministic failure', async () => {
+    const aborted = vi.fn().mockRejectedValue(new DOMException('aborted', 'AbortError'))
+    vi.stubGlobal('fetch', aborted)
+    await reloadConfig()
+    expect(aborted).toHaveBeenCalledTimes(2)
+    expect(getConfigSync().usageTaximeter?.enabled).toBe(true)
+
+    clearRuntimeConfigCache()
+    const rejected = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+    })
+    vi.stubGlobal('fetch', rejected)
+    await reloadConfig()
+    expect(rejected).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops a stale response that lands after a newer reload', async () => {
+    let finishStale: (value: unknown) => void = () => {}
+    const stale = new Promise((resolve) => {
+      finishStale = resolve
+    })
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => stale)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          setup: { wizardRequired: false },
+          unavailableProviders: [],
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const older = reloadConfig()
+    await reloadConfig()
+    expect(getConfigSync().setup?.wizardRequired).toBe(false)
+
+    finishStale({
+      ok: true,
+      json: async () => ({
+        setup: { wizardRequired: true },
+        unavailableProviders: [],
+      }),
+    })
+    await older
+    expect(getConfigSync().setup?.wizardRequired).toBe(false)
   })
 })

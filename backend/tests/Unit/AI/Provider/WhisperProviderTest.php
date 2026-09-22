@@ -28,12 +28,19 @@ final class WhisperProviderTest extends TestCase
         self::assertContains('speech_to_text', $this->provider->getCapabilities());
     }
 
-    public function testAvailabilityDelegatesToWhisperService(): void
+    public function testAvailabilityIsTheOnDiskInstallAndDoesNotProbeTheBinary(): void
     {
-        $this->whisperService->method('isAvailable')->willReturn(true);
+        $this->whisperService->expects(self::never())->method('isAvailable');
+        $this->whisperService->method('isInstalled')->willReturn(true);
 
         self::assertTrue($this->provider->isAvailable());
-        self::assertTrue($this->provider->getStatus()['healthy']);
+    }
+
+    public function testStatusUsesTheFullProbe(): void
+    {
+        $this->whisperService->method('isAvailable')->willReturn(false);
+
+        self::assertFalse($this->provider->getStatus()['healthy']);
     }
 
     public function testTranscribeForwardsToWhisperServiceAndDropsCatalogAlias(): void

@@ -146,11 +146,13 @@ readonly class WhisperService
     }
 
     /**
-     * Binary is present and executable. Does not spawn a process.
+     * Binary is executable and the default model file is on disk.
+     * Does not spawn a process.
      *
-     * The public runtime config is on every page load. {@see isAvailable()}
-     * runs `--help` (up to 5s) and must not sit on that path — a client that
-     * gives up first then treats every feature flag as off.
+     * Shared libraries are not checked here — that is {@see isAvailable()},
+     * which runs `whisper --help`. The runtime config uses this method so a
+     * page load does not fork, and so a binary without its model does not
+     * turn the microphone on.
      */
     public function isInstalled(): bool
     {
@@ -158,11 +160,14 @@ readonly class WhisperService
             return false;
         }
 
-        return is_file($this->whisperBinary) && is_executable($this->whisperBinary);
+        return is_file($this->whisperBinary)
+            && is_executable($this->whisperBinary)
+            && is_file($this->getModelPath($this->defaultModel));
     }
 
     /**
-     * Check if Whisper is available.
+     * Check if Whisper can transcribe (binary runs, default model and FFmpeg
+     * are present).
      */
     public function isAvailable(): bool
     {

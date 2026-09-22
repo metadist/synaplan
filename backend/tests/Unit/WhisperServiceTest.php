@@ -41,22 +41,35 @@ class WhisperServiceTest extends TestCase
         $this->assertFalse($service->isInstalled());
     }
 
-    public function testIsInstalledDoesNotRequireTheBinaryToRun(): void
+    public function testIsInstalledRequiresTheDefaultModelButNotARunningBinary(): void
     {
         $fakeBinary = $this->tempDir.'/whisper';
-        touch($fakeBinary);
+        file_put_contents($fakeBinary, "#!/bin/sh\nexit 1\n");
         chmod($fakeBinary, 0755);
 
-        $service = new WhisperService(
+        $withoutModel = new WhisperService(
             $this->logger,
             $fakeBinary,
             $this->tempDir.'/models',
             'base',
             '/usr/bin/ffmpeg'
         );
+        $this->assertFalse($withoutModel->isInstalled());
 
-        $this->assertTrue($service->isInstalled());
-        $this->assertFalse($service->isAvailable());
+        $modelsDir = $this->tempDir.'/models';
+        mkdir($modelsDir);
+        touch($modelsDir.'/ggml-base.bin');
+
+        $withModel = new WhisperService(
+            $this->logger,
+            $fakeBinary,
+            $modelsDir,
+            'base',
+            '/usr/bin/ffmpeg'
+        );
+
+        $this->assertTrue($withModel->isInstalled());
+        $this->assertFalse($withModel->isAvailable());
     }
 
     public function testIsAvailableReturnsFalseWhenModelNotFound(): void
