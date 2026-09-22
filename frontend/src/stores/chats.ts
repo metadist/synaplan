@@ -741,9 +741,7 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   function clearLocalTurnFinished(chatId: number): void {
-    if (localTurnChatId === chatId) {
-      localTurnChatId = null
-    }
+    localTurnCompletions.delete(chatId)
   }
 
   function consumeLocalTurnFinished(chatId: number): boolean {
