@@ -30,6 +30,10 @@ final class FeedbackDeleteTest extends WebTestCase
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
+        // The browser reboots the kernel after each request and drops the
+        // stub. CI has no Qdrant, so the second DELETE would then be 503
+        // instead of 404.
+        $this->client->disableReboot();
         $this->em = static::getContainer()->get('doctrine')->getManager();
 
         $qdrant = $this->createMock(QdrantClientInterface::class);
