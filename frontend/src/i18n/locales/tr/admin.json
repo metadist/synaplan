@@ -194,7 +194,18 @@
       "shortDesc": "Kısa Açıklama",
       "prompt": "Prompt",
       "selectionRules": "Seçim Kuralları",
-      "selectionRulesPlaceholder": "İsteğe bağlı: Bu promptun otomatik seçimi için kurallar"
+      "selectionRulesPlaceholder": "İsteğe bağlı: Bu promptun otomatik seçimi için kurallar",
+      "edit": "Düzenle",
+      "write": "Yaz",
+      "preview": "Önizleme",
+      "previewEmpty": "Henüz gösterilecek bir şey yok. Önce promptu yazın.",
+      "saved": "{topic} promptu kaydedildi.",
+      "saveFailed": "Bu prompt kaydedilemedi. Düzenlemeleriniz formda duruyor.",
+      "loadFailed": "Promptlar yüklenemedi.",
+      "retry": "Yeniden dene",
+      "empty": "Bu sunucuda yüklü sistem promptu yok.",
+      "discardTitle": "Kaydedilmemiş değişiklikler silinsin mi?",
+      "discardMessage": "Başka bir promptta kaydedilmemiş değişiklikler var. Bu değişiklikler silinecek."
     },
     "usage": {
       "title": "Kullanım İstatistikleri",

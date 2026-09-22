@@ -195,7 +195,18 @@
       "shortDesc": "Short Description",
       "prompt": "Prompt",
       "selectionRules": "Selection Rules",
-      "selectionRulesPlaceholder": "Optional: Rules for automatic selection of this prompt"
+      "selectionRulesPlaceholder": "Optional: Rules for automatic selection of this prompt",
+      "edit": "Edit",
+      "write": "Write",
+      "preview": "Preview",
+      "previewEmpty": "Nothing to preview yet. Write the prompt first.",
+      "saved": "Saved the prompt for {topic}.",
+      "saveFailed": "Could not save this prompt. Your edits are still in the form.",
+      "loadFailed": "Could not load the prompts.",
+      "retry": "Try again",
+      "empty": "No system prompts are installed on this server.",
+      "discardTitle": "Discard unsaved edits?",
+      "discardMessage": "You have unsaved changes on another prompt. Those edits will be dropped."
     },
     "usage": {
       "title": "Usage Statistics",
