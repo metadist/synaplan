@@ -80,7 +80,7 @@ final class FeedbackDeleteTest extends WebTestCase
             id: random_int(1_000_000_000_000, 9_000_000_000_000),
             userId: $userId,
             category: 'feedback_positive',
-            key: 'positive',
+            key: 'positive_example',
             value: 'The capital of Australia is Canberra.',
             source: UserMemory::SOURCE_USER_CREATED,
             namespace: 'feedback_positive',
