@@ -109,6 +109,29 @@
                 </option>
               </select>
             </label>
+
+            <div
+              v-if="visibleProviders.length > 1"
+              class="flex flex-wrap items-center gap-3 ml-auto"
+            >
+              <SectionJumpNav
+                :items="providerJumpItems"
+                :nav-label="$t('admin.config.accordion.jumpTo')"
+                @select="jumpToProvider"
+              />
+              <button
+                type="button"
+                class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+                data-testid="btn-model-status-toggle-all"
+                @click="allProvidersOpen ? collapseAllProviders() : expandAllProviders()"
+              >
+                {{
+                  allProvidersOpen
+                    ? $t('admin.config.accordion.collapseAll')
+                    : $t('admin.config.accordion.expandAll')
+                }}
+              </button>
+            </div>
           </div>
 
           <div
@@ -119,120 +142,135 @@
             {{ $t('adminModelStatus.noMatches') }}
           </div>
 
-          <div
-            v-for="provider in visibleProviders"
-            :key="provider.name"
-            class="space-y-3"
-            data-testid="section-provider"
-          >
-            <div class="flex items-center gap-3 px-2">
-              <h2 class="text-xl font-semibold txt-primary">{{ provider.displayName }}</h2>
-              <span
-                v-if="provider.needsAttention > 0"
-                class="px-2.5 py-1 rounded-md text-xs font-semibold"
-                :class="badgeClass('offline')"
-              >
-                {{ $t('adminModelStatus.provider.affected', { count: provider.needsAttention }) }}
-              </span>
-              <div class="h-px flex-1 bg-[var(--divider)]"></div>
-              <button
-                class="btn-secondary px-3 py-1.5 rounded-lg text-xs disabled:opacity-60"
-                :disabled="isRefreshing"
-                :aria-label="
-                  $t('adminModelStatus.actions.refreshProviderAria', {
-                    provider: provider.displayName,
-                  })
-                "
-                data-testid="btn-refresh-provider"
-                @click="refresh(provider.name)"
-              >
-                {{ $t('adminModelStatus.actions.refreshProvider') }}
-              </button>
-            </div>
-
-            <div
-              v-for="model in provider.models"
-              :key="model.id"
-              class="surface-card p-5"
-              data-testid="item-model"
+          <AccordionStack v-if="visibleProviders.length > 0" testid="model-status-accordion">
+            <AccordionSection
+              v-for="provider in visibleProviders"
+              :key="provider.name"
+              :panel-id="providerPanelId(provider.name)"
+              :title="provider.displayName"
+              :open="isProviderOpen(provider.name)"
+              testid="section-provider"
+              :header-testid="`btn-provider-${provider.name}`"
+              @toggle="toggleProvider(provider.name)"
             >
-              <div class="flex items-start justify-between gap-4">
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 class="text-base font-semibold txt-primary">{{ model.name }}</h3>
+              <template v-if="provider.needsAttention > 0" #badge>
+                <span
+                  class="px-2.5 py-1 rounded-md text-xs font-semibold"
+                  :class="badgeClass('offline')"
+                >
+                  {{ $t('adminModelStatus.provider.affected', { count: provider.needsAttention }) }}
+                </span>
+              </template>
+              <template #actions>
+                <button
+                  type="button"
+                  class="btn-secondary px-3 py-1.5 rounded-lg text-xs disabled:opacity-60"
+                  :disabled="isRefreshing"
+                  :aria-label="
+                    $t('adminModelStatus.actions.refreshProviderAria', {
+                      provider: provider.displayName,
+                    })
+                  "
+                  data-testid="btn-refresh-provider"
+                  @click="refresh(provider.name)"
+                >
+                  {{ $t('adminModelStatus.actions.refreshProvider') }}
+                </button>
+              </template>
+
+              <AccordionStack :testid="`provider-models-${provider.name}`">
+                <AccordionSection
+                  v-for="model in provider.models"
+                  :key="model.id"
+                  :panel-id="`model-status-model-${model.id}`"
+                  :title="model.name"
+                  :open="isModelOpen(String(model.id))"
+                  testid="item-model"
+                  :header-testid="`btn-model-${model.id}`"
+                  @toggle="toggleModel(String(model.id))"
+                >
+                  <template #badge>
                     <span class="pill text-xs">{{ capabilityLabel(model.capability) }}</span>
-                    <span v-if="model.autoDisabled" class="pill text-xs">
-                      {{ $t('adminModelStatus.model.autoDisabled') }}
-                    </span>
-                    <span v-else-if="!model.active" class="pill text-xs">
-                      {{ $t('adminModelStatus.model.switchedOff') }}
-                    </span>
-                    <span v-if="model.exemptUntil > 0" class="pill text-xs">
-                      {{ $t('adminModelStatus.model.exempt') }}
-                    </span>
-                  </div>
-
-                  <code class="text-xs txt-secondary font-mono opacity-70">{{
-                    model.providerId
-                  }}</code>
-
-                  <p v-if="model.reason" class="txt-secondary text-sm mt-2">{{ model.reason }}</p>
-
-                  <div class="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs txt-secondary">
-                    <span>
-                      {{ $t('adminModelStatus.model.lastSuccess') }}:
-                      {{ formatTime(model.lastSuccess) }}
-                    </span>
-                    <span v-if="model.failures > 0">
-                      {{
-                        $t('adminModelStatus.model.errorRate', {
-                          percent: model.errorRatePercent,
-                          total: model.successes + model.failures,
-                        })
-                      }}
-                    </span>
-                    <span>
-                      {{ $t('adminModelStatus.model.source') }}:
-                      {{ $t(`adminModelStatus.sources.${model.source}`) }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="flex flex-col items-end gap-2 flex-shrink-0">
-                  <span
-                    class="px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide whitespace-nowrap"
-                    :class="badgeClass(model.state)"
-                    data-testid="badge-model-state"
-                  >
-                    {{ $t(`adminModelStatus.states.${model.state}`) }}
-                  </span>
-
-                  <div class="flex gap-2">
-                    <button
-                      class="btn-secondary px-3 py-1.5 rounded-lg text-xs"
-                      data-testid="btn-reset-counters"
-                      :disabled="busyModelId === model.id"
-                      @click="resetCounters(model)"
+                    <span
+                      class="px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide whitespace-nowrap"
+                      :class="badgeClass(model.state)"
+                      data-testid="badge-model-state"
                     >
-                      {{ $t('adminModelStatus.actions.resetCounters') }}
-                    </button>
-                    <button
-                      class="btn-secondary px-3 py-1.5 rounded-lg text-xs"
-                      data-testid="btn-toggle-exempt"
-                      :disabled="busyModelId === model.id"
-                      @click="toggleExempt(model)"
-                    >
-                      {{
-                        model.exemptUntil > 0
-                          ? $t('adminModelStatus.actions.unexempt')
-                          : $t('adminModelStatus.actions.exempt')
-                      }}
-                    </button>
+                      {{ $t(`adminModelStatus.states.${model.state}`) }}
+                    </span>
+                  </template>
+
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 flex-wrap mb-1">
+                        <span v-if="model.autoDisabled" class="pill text-xs">
+                          {{ $t('adminModelStatus.model.autoDisabled') }}
+                        </span>
+                        <span v-else-if="!model.active" class="pill text-xs">
+                          {{ $t('adminModelStatus.model.switchedOff') }}
+                        </span>
+                        <span v-if="model.exemptUntil > 0" class="pill text-xs">
+                          {{ $t('adminModelStatus.model.exempt') }}
+                        </span>
+                      </div>
+
+                      <code class="text-xs txt-secondary font-mono opacity-70">{{
+                        model.providerId
+                      }}</code>
+
+                      <p v-if="model.reason" class="txt-secondary text-sm mt-2">
+                        {{ model.reason }}
+                      </p>
+
+                      <div class="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs txt-secondary">
+                        <span>
+                          {{ $t('adminModelStatus.model.lastSuccess') }}:
+                          {{ formatTime(model.lastSuccess) }}
+                        </span>
+                        <span v-if="model.failures > 0">
+                          {{
+                            $t('adminModelStatus.model.errorRate', {
+                              percent: model.errorRatePercent,
+                              total: model.successes + model.failures,
+                            })
+                          }}
+                        </span>
+                        <span>
+                          {{ $t('adminModelStatus.model.source') }}:
+                          {{ $t(`adminModelStatus.sources.${model.source}`) }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="flex gap-2 flex-shrink-0">
+                      <button
+                        type="button"
+                        class="btn-secondary px-3 py-1.5 rounded-lg text-xs"
+                        data-testid="btn-reset-counters"
+                        :disabled="busyModelId === model.id"
+                        @click="resetCounters(model)"
+                      >
+                        {{ $t('adminModelStatus.actions.resetCounters') }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-secondary px-3 py-1.5 rounded-lg text-xs"
+                        data-testid="btn-toggle-exempt"
+                        :disabled="busyModelId === model.id"
+                        @click="toggleExempt(model)"
+                      >
+                        {{
+                          model.exemptUntil > 0
+                            ? $t('adminModelStatus.actions.unexempt')
+                            : $t('adminModelStatus.actions.exempt')
+                        }}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
+                </AccordionSection>
+              </AccordionStack>
+            </AccordionSection>
+          </AccordionStack>
         </template>
       </div>
     </div>
@@ -240,11 +278,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import AccordionSection from '@/components/AccordionSection.vue'
+import AccordionStack from '@/components/AccordionStack.vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SectionJumpNav from '@/components/SectionJumpNav.vue'
+import { useAccordion } from '@/composables/useAccordion'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import {
@@ -305,6 +347,38 @@ const visibleProviders = computed(() => {
     }))
     .filter((provider) => provider.models.length > 0)
 })
+
+const providerIds = computed(() => visibleProviders.value.map((provider) => provider.name))
+const modelIds = computed(() =>
+  visibleProviders.value.flatMap((provider) => provider.models.map((model) => String(model.id)))
+)
+const providerJumpItems = computed(() =>
+  visibleProviders.value.map((provider) => ({
+    id: provider.name,
+    label: provider.displayName,
+  }))
+)
+const {
+  isOpen: isProviderOpen,
+  toggle: toggleProvider,
+  open: openProvider,
+  expandAll: expandAllProviders,
+  collapseAll: collapseAllProviders,
+  allOpen: allProvidersOpen,
+} = useAccordion(providerIds)
+const { isOpen: isModelOpen, toggle: toggleModel } = useAccordion(modelIds)
+
+function providerPanelId(name: string): string {
+  return `model-status-provider-${name.replace(/[^a-zA-Z0-9_-]+/g, '-')}`
+}
+
+async function jumpToProvider(name: string): Promise<void> {
+  openProvider(name)
+  await nextTick()
+  document
+    .getElementById(providerPanelId(name))
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 /**
  * Muted background plus the matching ink token, never white on a filled

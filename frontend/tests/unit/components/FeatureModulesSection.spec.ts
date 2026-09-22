@@ -101,7 +101,10 @@ describe('FeatureModulesSection', () => {
       module({ id: 'future', state: 'absent', label_key: 'modules.future.label' }),
     ])
 
-    expect(wrapper.get('[data-testid="item-module"] h3').text()).toBe('future')
+    const header = wrapper.get('[data-testid="btn-module-future"]')
+    expect(header.text()).toContain('future')
+    expect(header.text()).not.toContain('modules.future.label')
+    expect(wrapper.get('[data-testid="item-module"]').attributes('data-open')).toBe('false')
     expect(wrapper.get('[data-testid="badge-module-state"]').text()).toBe('Not installed')
   })
 
