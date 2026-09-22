@@ -10,31 +10,25 @@ use App\Repository\GroupMemberRepository;
 use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\ResourceKind\ConversationKind;
-use Psr\Log\LoggerInterface;
 
 /**
  * Publishes one chat.activity to the owner and to everyone the conversation is
  * shared with right now. A revoked share is absent from the live list, so the
  * token's remaining lifetime never keeps a watcher subscribed (#2057).
  *
- * The payload never includes message text. One gateway broadcast covers the
- * whole audience, including an everyone-share, up to {@see self::EVERYONE_FANOUT_LIMIT}.
+ * The payload never includes message text. An everyone-share is paged into
+ * broadcasts of {@see self::EVERYONE_PAGE_SIZE} so nobody past a cutoff is
+ * dropped and no single gateway call carries the whole user table.
  */
 final readonly class ChatAudienceNotifier
 {
-    /**
-     * Cap for an everyone-share. One broadcast request stays cheap at this
-     * size; a larger instance logs and skips the overflow rather than
-     * scanning without a bound.
-     */
-    public const EVERYONE_FANOUT_LIMIT = 1000;
+    public const EVERYONE_PAGE_SIZE = 500;
 
     public function __construct(
         private ChatActivityNotifier $activity,
         private ShareRepository $shares,
         private GroupMemberRepository $members,
         private UserRepository $users,
-        private LoggerInterface $logger,
     ) {
     }
 
@@ -57,18 +51,6 @@ final readonly class ChatAudienceNotifier
             }
         }
 
-        if ($includeEveryone) {
-            $everyoneIds = $this->users->findIds(self::EVERYONE_FANOUT_LIMIT + 1);
-            if (count($everyoneIds) > self::EVERYONE_FANOUT_LIMIT) {
-                $this->logger->warning('Chat audience fan-out stopped at the everyone-share cap', [
-                    'chat_id' => $chatId,
-                    'cap' => self::EVERYONE_FANOUT_LIMIT,
-                ]);
-                $everyoneIds = array_slice($everyoneIds, 0, self::EVERYONE_FANOUT_LIMIT);
-            }
-            array_push($ids, ...$everyoneIds);
-        }
-
         $recipients = [];
         foreach (array_unique($ids) as $id) {
             if ($id > 0) {
@@ -76,6 +58,25 @@ final readonly class ChatAudienceNotifier
             }
         }
 
-        $this->activity->publishToUsers($chat, $recipients, $direction);
+        if (!$includeEveryone) {
+            $this->activity->publishToUsers($chat, $recipients, $direction);
+
+            return;
+        }
+
+        $afterId = 0;
+        $sentExplicit = false;
+        do {
+            $page = $this->users->findIdsAfter($afterId, self::EVERYONE_PAGE_SIZE);
+            $batch = $sentExplicit ? $page : array_merge($recipients, $page);
+            $sentExplicit = true;
+            if ([] !== $batch) {
+                $this->activity->publishToUsers($chat, $batch, $direction);
+            }
+            if (count($page) < self::EVERYONE_PAGE_SIZE) {
+                break;
+            }
+            $afterId = $page[array_key_last($page)];
+        } while (true);
     }
 }

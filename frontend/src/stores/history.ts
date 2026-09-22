@@ -523,6 +523,12 @@ export const useHistoryStore = defineStore('history', () => {
     originalMessageId?: number
   ): string => {
     const id = crypto.randomUUID()
+    if ('assistant' === role) {
+      const chatId = useChatsStore().activeChatId
+      if (null !== chatId) {
+        useChatsStore().markLocalTurnFinished(chatId)
+      }
+    }
     messages.value.push({
       id,
       role,

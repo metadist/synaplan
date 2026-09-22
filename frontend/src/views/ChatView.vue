@@ -278,7 +278,11 @@
       <!-- A shared conversation must not show the viewer's own day spend as if
            it were the cost of this chat (#2062). -->
       <template
-        v-if="usageTaximeterStore.active && !needsProviderSetup && !sharedConversationLocked"
+        v-if="
+          usageTaximeterStore.active &&
+          !needsProviderSetup &&
+          chatsStore.conversationAccess === 'owner'
+        "
       >
         <ConsumptionBar />
         <ConsumptionRing />
@@ -4333,9 +4337,9 @@ const streamAIResponse = async (
               }
 
               // Bump chat activity so the sidebar reflects the assistant message
-              // landing without waiting for a full reload. Mark the turn so
-              // the matching realtime event does not count it a second time.
-              chatsStore.markLocalTurnFinished(chatId)
+              // landing without waiting for a full reload. The streaming
+              // bubble already marked this turn, so the matching realtime
+              // event does not count it a second time.
               chatsStore.bumpChatActivity(chatId)
             }
 
@@ -4785,7 +4789,7 @@ const handleUserStop = async () => {
   // metadata can still look empty — bump activity so "New chat" won't reuse
   // this thread via isChatEmpty().
   if (streamingMessage && chatsStore.activeChatId) {
-    chatsStore.markLocalTurnFinished(chatsStore.activeChatId)
+    chatsStore.clearLocalTurnFinished(chatsStore.activeChatId)
     chatsStore.bumpChatActivity(chatsStore.activeChatId, {
       incrementMessageCount: true,
       firstMessagePreview: streamingMessage

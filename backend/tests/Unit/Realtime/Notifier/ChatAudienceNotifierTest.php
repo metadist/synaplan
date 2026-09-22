@@ -48,7 +48,7 @@ final class ChatAudienceNotifierTest extends TestCase
         $members->method('findByGroupId')->willReturn([new GroupMember(7, 42), new GroupMember(7, 8)]);
 
         $users = $this->createStub(UserRepository::class);
-        $users->method('findIds')->willReturn([15]);
+        $users->method('findIdsAfter')->willReturnOnConsecutiveCalls([15], []);
 
         $chat = new Chat();
         $chat->setUserId(3);
@@ -61,7 +61,6 @@ final class ChatAudienceNotifierTest extends TestCase
             $shares,
             $members,
             $users,
-            new NullLogger(),
         ))->publish($chat, 'OUT');
 
         self::assertEqualsCanonicalizing(['user:3', 'user:42', 'user:8', 'user:15'], $published);

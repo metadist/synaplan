@@ -740,6 +740,12 @@ export const useChatsStore = defineStore('chats', () => {
     localTurnChatId = chatId
   }
 
+  function clearLocalTurnFinished(chatId: number): void {
+    if (localTurnChatId === chatId) {
+      localTurnChatId = null
+    }
+  }
+
   function consumeLocalTurnFinished(chatId: number): boolean {
     if (localTurnChatId !== chatId) return false
     localTurnChatId = null
@@ -853,6 +859,7 @@ export const useChatsStore = defineStore('chats', () => {
     bumpChatActivity,
     noteExternalActivity,
     markLocalTurnFinished,
+    clearLocalTurnFinished,
     releaseUnavailableChat,
     $reset,
   }

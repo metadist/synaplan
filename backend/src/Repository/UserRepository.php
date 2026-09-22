@@ -15,12 +15,12 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
-     * Numeric ids for a bounded everyone-share fan-out. Callers pass a cap
-     * and treat a full page as "there may be more".
+     * Next page of numeric ids, ordered, for an everyone-share fan-out.
+     * A short page means there are no further users.
      *
      * @return list<int>
      */
-    public function findIds(int $limit): array
+    public function findIdsAfter(int $afterId, int $limit): array
     {
         if ($limit < 1) {
             return [];
@@ -28,6 +28,8 @@ class UserRepository extends ServiceEntityRepository
 
         $ids = $this->createQueryBuilder('u')
             ->select('u.id')
+            ->andWhere('u.id > :afterId')
+            ->setParameter('afterId', $afterId)
             ->orderBy('u.id', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()

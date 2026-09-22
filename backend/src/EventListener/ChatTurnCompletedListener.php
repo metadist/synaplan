@@ -70,7 +70,13 @@ final class ChatTurnCompletedListener
         if (!$entity instanceof Message || 'OUT' !== $entity->getDirection() || 'complete' !== $entity->getStatus()) {
             return;
         }
-        if ([] !== $changeSet && (!isset($changeSet['status']) || 'complete' !== $changeSet['status'][1])) {
+        // A first save, a status flip to complete, or a later append onto an
+        // already-complete reply (continuations flush text without touching
+        // status). Other updates of a finished row stay quiet.
+        $becameComplete = [] === $changeSet
+            || (isset($changeSet['status']) && 'complete' === $changeSet['status'][1]);
+        $textAppended = isset($changeSet['text']);
+        if (!$becameComplete && !$textAppended) {
             return;
         }
 
