@@ -144,11 +144,27 @@ final readonly class IamConfig
      */
     public function everyoneShareReaches(Share $share): bool
     {
-        if (Share::SUBJECT_EVERYONE !== $share->getSubjectType()) {
-            return true;
-        }
+        return ($this->everyoneShareReachesFilter())($share);
+    }
 
-        return $share->isPlatformGrant() || $this->isEveryoneAudienceEnabled();
+    /**
+     * {@see self::everyoneShareReaches()} for a list: the policy row is read
+     * at most once per returned closure, however many shares pass through it.
+     *
+     * @return \Closure(Share): bool
+     */
+    public function everyoneShareReachesFilter(): \Closure
+    {
+        $audienceOn = null;
+
+        return function (Share $share) use (&$audienceOn): bool {
+            if (Share::SUBJECT_EVERYONE !== $share->getSubjectType() || $share->isPlatformGrant()) {
+                return true;
+            }
+            $audienceOn ??= $this->isEveryoneAudienceEnabled();
+
+            return $audienceOn;
+        };
     }
 
     public function canShareWithEveryone(User $actor): bool

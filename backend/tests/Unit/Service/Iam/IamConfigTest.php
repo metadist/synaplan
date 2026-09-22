@@ -136,6 +136,24 @@ final class IamConfigTest extends TestCase
         self::assertTrue($on->everyoneShareReaches($platform));
     }
 
+    public function testTheListFilterReadsThePolicyOnceForAnyNumberOfRows(): void
+    {
+        $config = $this->createMock(ConfigRepository::class);
+        $config->expects(self::once())->method('getValue')->willReturn(IamConfig::EVERYONE_SHARES_DISABLED);
+        $reaches = (new IamConfig($config))->everyoneShareReachesFilter();
+
+        $person = (new Share())->setSubjectType(Share::SUBJECT_EVERYONE)->setGrantedBy(7);
+        $platform = (new Share())->setSubjectType(Share::SUBJECT_EVERYONE)->setGrantedBy(Share::PLATFORM_GRANTOR);
+        $group = (new Share())->setSubjectType(Share::SUBJECT_GROUP)->setSubjectId(2)->setGrantedBy(7);
+
+        // Platform and non-everyone rows never touch the policy at all.
+        self::assertTrue($reaches($platform));
+        self::assertTrue($reaches($group));
+        self::assertFalse($reaches($person));
+        self::assertFalse($reaches($person));
+        self::assertFalse($reaches($person));
+    }
+
     /**
      * @param array<int, string> $perUser
      */

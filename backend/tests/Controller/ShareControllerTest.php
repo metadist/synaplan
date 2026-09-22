@@ -535,6 +535,38 @@ final class ShareControllerTest extends WebTestCase
             self::assertSame(Permission::Use, $gate->highestGranted($member, AgentKind::KEY, (string) $plugin->getId()));
             self::assertNull($gate->highestGranted($member, AgentKind::KEY, (string) $userPlugin->getId()));
             self::assertNull($gate->highestGranted($member, AgentKind::KEY, (string) $manual->getId()));
+
+            // The owner's Share dialog lists the platform row as effective and may
+            // still change its permission while the audience is off; the row stays
+            // the platform's instead of turning into a person's inert grant.
+            $this->authenticateClient($this->client, $admin);
+            $this->client->request('GET', '/api/v1/shares?kind=agent&resource='.$plugin->getId());
+            $rows = $this->json()['shares'];
+            self::assertCount(1, $rows);
+            self::assertTrue($rows[0]['effective']);
+
+            $this->postJson('/api/v1/shares', [
+                'kind' => 'agent',
+                'resource' => (string) $plugin->getId(),
+                'subjectType' => 'everyone',
+                'subjectId' => 0,
+                'permission' => 'read',
+            ]);
+            self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+            self::assertSame(0, $this->json()['share']['grantedBy']);
+            self::assertTrue($this->json()['share']['effective']);
+            $this->em->clear();
+            self::assertSame(Permission::Read, $gate->highestGranted($member, AgentKind::KEY, (string) $plugin->getId()));
+
+            // A new everyone grant on a person's assistant is still refused.
+            $this->postJson('/api/v1/shares', [
+                'kind' => 'agent',
+                'resource' => (string) $manual->getId(),
+                'subjectType' => 'everyone',
+                'subjectId' => 0,
+                'permission' => 'read',
+            ]);
+            self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
         } finally {
             $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
             $this->em->flush();

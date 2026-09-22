@@ -52,7 +52,8 @@ final readonly class ShareService
      *
      * Ignores the everyone-shares policy: system and plugin packs stay
      * available when the user-facing audience is turned off (#2096). The HTTP
-     * grant path never calls this.
+     * grant path never calls this; it can only *edit* such a row (see
+     * grantResolved), never create one.
      */
     public function grantPlatformDistribution(User $actor, string $kind, string $resourceId, Permission $level, string $ip = ''): Share
     {
@@ -95,6 +96,12 @@ final readonly class ShareService
 
         if (Share::SUBJECT_EVERYONE === $subjectType) {
             $subjectId = 0;
+            // Changing the permission of a share the platform wrote (system or
+            // plugin-pack assistant) keeps it the platform's: the audience
+            // already exists, so the people-policy is not the question, and the
+            // row must not turn into a person's grant that goes inert later.
+            $platformDistribution = $platformDistribution
+                || ($this->shareRepository->findOneForSubject($kindImpl->key(), $resourceId, $subjectType, 0)?->isPlatformGrant() ?? false);
             if (!$platformDistribution && !$this->iamConfig->canShareWithEveryone($actor)) {
                 $message = IamConfig::EVERYONE_SHARES_DISABLED === $this->iamConfig->everyoneSharesPolicy((int) $actor->getId())
                     ? 'Sharing with everyone is turned off.'
@@ -312,12 +319,13 @@ final readonly class ShareService
             $groupNames[(int) $group->getId()] = $group->getName();
         }
 
+        $reaches = $this->iamConfig->everyoneShareReachesFilter();
         foreach ($shares as $share) {
             $id = $share->getResourceId();
             if (!isset($out[$id])) {
                 $out[$id] = ['everyone' => false, 'people' => 0, 'groups' => []];
             }
-            if (Share::SUBJECT_EVERYONE === $share->getSubjectType() && $this->iamConfig->everyoneShareReaches($share)) {
+            if (Share::SUBJECT_EVERYONE === $share->getSubjectType() && $reaches($share)) {
                 $out[$id]['everyone'] = true;
             } elseif (Share::SUBJECT_USER === $share->getSubjectType()) {
                 ++$out[$id]['people'];
@@ -562,11 +570,28 @@ final readonly class ShareService
     }
 
     /**
+     * The rows of one resource's Share dialog. One policy read for the list.
+     *
+     * @param list<Share> $shares
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function serializeShares(array $shares): array
+    {
+        $reaches = $this->iamConfig->everyoneShareReachesFilter();
+
+        return array_map(fn (Share $share): array => $this->serializeShare($share, $reaches), $shares);
+    }
+
+    /**
+     * @param (\Closure(Share): bool)|null $reaches shared policy read for a list, see {@see self::serializeShares()}
+     *
      * @return array<string, mixed>
      */
-    public function serializeShare(Share $share): array
+    public function serializeShare(Share $share, ?\Closure $reaches = null): array
     {
         $subject = $this->subjectNameAndEmail($share);
+        $reaches ??= $this->iamConfig->everyoneShareReachesFilter();
 
         return [
             'id' => $share->getId(),
@@ -582,7 +607,7 @@ final readonly class ShareService
             // False only for an everyone row that grants nothing right now
             // (audience off, grant written by a person). The row stays so the
             // owner can still revoke it.
-            'effective' => $this->iamConfig->everyoneShareReaches($share),
+            'effective' => $reaches($share),
         ];
     }
 

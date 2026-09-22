@@ -95,8 +95,7 @@ final class ShareController extends AbstractController
         }
 
         return $this->json([
-            'shares' => array_map(
-                $this->shareService->serializeShare(...),
+            'shares' => $this->shareService->serializeShares(
                 $this->shareService->listForResource($kind, $resource),
             ),
         ]);
