@@ -61,7 +61,7 @@
             :placeholder="dialog.placeholder"
             class="w-full px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
             data-testid="input-dialog-prompt"
-            @keydown.enter="handleConfirm"
+            @keydown.enter.prevent="handleConfirm"
             @keydown.esc="handleCancel"
           />
 
@@ -116,6 +116,7 @@ const inputValue = ref('')
 const inputRef = ref<HTMLInputElement>()
 const panelRef = ref<HTMLElement>()
 let previouslyFocused: HTMLElement | null = null
+let restoreFocusTimer: ReturnType<typeof setTimeout> | null = null
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -128,10 +129,18 @@ function focusableInPanel(): HTMLElement[] {
 }
 
 // Reset input value when dialog opens; trap focus inside the panel.
+function clearRestoreFocus(): void {
+  if (restoreFocusTimer !== null) {
+    clearTimeout(restoreFocusTimer)
+    restoreFocusTimer = null
+  }
+}
+
 watch(
   () => dialog.value.isOpen,
   async (isOpen) => {
     if (isOpen) {
+      clearRestoreFocus()
       previouslyFocused =
         document.activeElement instanceof HTMLElement ? document.activeElement : null
       inputValue.value = dialog.value.defaultValue || ''
@@ -143,12 +152,21 @@ watch(
       }
       return
     }
-    previouslyFocused?.focus()
+    // Restoring focus inside this keydown re-activates the button that
+    // opened the prompt (Enter is still down), so the same dialog opens
+    // again (#2056). Move focus after the key event has finished.
+    const restore = previouslyFocused
     previouslyFocused = null
+    clearRestoreFocus()
+    restoreFocusTimer = setTimeout(() => {
+      restoreFocusTimer = null
+      restore?.focus()
+    }, 0)
   }
 )
 
 const handleConfirm = () => {
+  if (!dialog.value.isOpen) return
   const resolve = dialog.value.resolve
   if (resolve) {
     if (dialog.value.type === 'choice') {
@@ -226,6 +244,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearRestoreFocus()
   document.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>
