@@ -10,7 +10,6 @@ use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\FeedbackConfigService;
-use App\Service\FeedbackConstants;
 use App\Service\FeedbackExampleService;
 use App\Service\ModelConfigService;
 use App\Service\RAG\VectorSearchService;
@@ -25,13 +24,11 @@ use Psr\Log\LoggerInterface;
 /**
  * Regression tests for {@see FeedbackExampleService::deleteFeedback}.
  *
- * Focused on the namespace loop. Post-#809, UserMemoryService::deleteMemory
- * can only throw MemoryServiceUnavailableException (Qdrant's points/delete
- * is idempotent, so a missing point in an existing collection is a silent
- * no-op). The loop used to wrap every call in a blanket `catch (\Exception)`
- * which swallowed MemoryServiceUnavailableException and made Qdrant outages
- * surface as a misleading "Feedback not found" (400/404). These tests lock
- * in the fix: outages propagate; idempotent calls never throw.
+ * A feedback row lives in one namespace. deleteFeedback used to call
+ * deleteMemory once per namespace; the second call found the row already
+ * gone and threw "Memory not found", which the controller reported as 404
+ * after a successful delete (#2075). Outages must still propagate as
+ * MemoryServiceUnavailableException rather than a fake not-found.
  */
 final class FeedbackExampleServiceDeleteTest extends TestCase
 {
@@ -96,13 +93,10 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
     }
 
     /**
-     * The former `catch (\Exception)` inside the namespace loop swallowed
-     * MemoryServiceUnavailableException (which extends \RuntimeException
-     * extends \Exception). Result: both iterations failed silently and the
-     * user saw "Feedback not found". This test locks in that the outage is
-     * re-thrown instead.
+     * The former namespace loop's second deleteMemory() found the row already
+     * gone. A Qdrant outage on the single delete must still surface.
      */
-    public function testDeleteFeedbackRethrowsUnavailableFromFirstNamespace(): void
+    public function testDeleteFeedbackRethrowsUnavailable(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(42);
@@ -115,7 +109,7 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
         $this->memoryService
             ->expects($this->once())
             ->method('deleteMemory')
-            ->with(12345, $user, FeedbackConstants::NAMESPACE_FALSE_POSITIVE)
+            ->with(12345, $user)
             ->willThrowException(new MemoryServiceUnavailableException('Qdrant down mid-request'));
 
         $this->expectException(MemoryServiceUnavailableException::class);
@@ -123,13 +117,7 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
         $this->service->deleteFeedback($user, 12345);
     }
 
-    /**
-     * Qdrant's points/delete is idempotent, so UserMemoryService::deleteMemory
-     * returns normally both for "point existed and was removed" and "point
-     * never existed". The loop must forward both namespaces' calls and
-     * complete without error.
-     */
-    public function testDeleteFeedbackForwardsBothNamespacesOnSuccess(): void
+    public function testDeleteFeedbackDeletesTheRowOnce(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(42);
@@ -139,27 +127,15 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
             ->method('isAvailable')
             ->willReturn(true);
 
-        $seen = [];
         $this->memoryService
-            ->expects($this->exactly(2))
+            ->expects($this->once())
             ->method('deleteMemory')
-            ->willReturnCallback(function (int $id, User $u, ?string $ns) use (&$seen): void {
-                $seen[] = $ns;
-            });
+            ->with(12345, $user);
 
         $this->service->deleteFeedback($user, 12345);
-
-        $this->assertSame(
-            [FeedbackConstants::NAMESPACE_FALSE_POSITIVE, FeedbackConstants::NAMESPACE_POSITIVE],
-            $seen
-        );
     }
 
-    /**
-     * An outage on the *second* namespace after the first succeeded must
-     * still throw 503 — never swallow a real outage.
-     */
-    public function testDeleteFeedbackRethrowsUnavailableFromSecondNamespace(): void
+    public function testDeleteFeedbackPropagatesAMissingRow(): void
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(42);
@@ -169,18 +145,14 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
             ->method('isAvailable')
             ->willReturn(true);
 
-        $call = 0;
         $this->memoryService
-            ->expects($this->exactly(2))
+            ->expects($this->once())
             ->method('deleteMemory')
-            ->willReturnCallback(function (int $id, User $u, ?string $ns) use (&$call): void {
-                ++$call;
-                if (2 === $call) {
-                    throw new MemoryServiceUnavailableException('Qdrant down mid-request');
-                }
-            });
+            ->with(12345, $user)
+            ->willThrowException(new \InvalidArgumentException('Memory not found'));
 
-        $this->expectException(MemoryServiceUnavailableException::class);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Memory not found');
 
         $this->service->deleteFeedback($user, 12345);
     }
