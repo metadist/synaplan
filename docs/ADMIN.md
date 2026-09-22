@@ -55,9 +55,11 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
 ```
 
 The production stack starts in Cloud-AI mode by default. Configure a provider
-after login under **Admin → AI Providers**. Models of a provider with no key
-stay hidden from users and greyed in the admin catalog until that key is
-saved; see [CONFIGURATION.md — Availability](CONFIGURATION.md#availability).
+after login under **Admin → AI Providers**. Models of a key-based provider
+stay hidden from users, and greyed in the admin catalog, until that key is
+saved. Ollama depends on the model being pulled; Whisper and Piper depend on
+the local install, not a key. See
+[CONFIGURATION.md — Availability](CONFIGURATION.md#availability).
 
 To add Ollama and Whisper on a host with at least 16 GB RAM and sufficient disk,
 enable the optional profile and redeploy:

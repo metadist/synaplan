@@ -206,14 +206,14 @@ Every install seeds the full model catalog. Which rows a person can pick is deci
 
 | Who | What they see |
 | --- | --- |
-| Regular users | Only models of available providers. Everything else is hidden, including Ollama rows that are not pulled yet. |
-| Administrators | The full catalog on the admin tabs of **Manage → Assistants → Models** (`includeUnavailable=1`). Unavailable rows stay in the list, greyed, with a badge: **Provider not configured** or **Not pulled**. |
+| Regular users | Only models of available providers, from `GET /api/v1/config/models`. Everything else is hidden, including Ollama rows that are not pulled yet. |
+| Administrators | The same picker, unless `includeUnavailable=1` is passed on that config endpoint (admins only). The catalog under **Manage → Assistants → Models** is `GET /api/v1/admin/models`, which already returns every row and does not take that parameter. Unavailable rows stay in that list, greyed, with a badge: **Provider not configured** or **Not pulled**. |
 
 **Select suggested models** recommends only within the providers this installation can reach. A new account does not get frozen per-user default rows; the install-wide defaults apply until that person chooses a model.
 
 Local speech-to-text is a catalog row too (`service: Whisper`, tag `sound2text`). It is available when `WHISPER_ENABLED` is on and the whisper.cpp binary plus the `WHISPER_DEFAULT_MODEL` file are present, so an air-gapped install can bind SOUND2TEXT without a cloud key. Set `WEB_SPEECH_ENABLED=false` on those installs: Chrome's Web Speech API sends audio to Google.
 
-Operators can inspect and narrow the catalog from the CLI. Disable is a soft deactivate (`BACTIVE=0`, `BSELECTABLE=0`). The row stays, so chat history that points at it still resolves, and the next `app:seed` does not turn it back on or recreate a deleted row. There is no command that deletes catalog rows.
+Operators can inspect and narrow the catalog from the CLI. Disable is a soft deactivate (`BACTIVE=0`, `BSELECTABLE=0`). The row stays, so chat history that points at it still resolves, and the next `app:seed` does not turn it back on. There is no command that deletes catalog rows. A row that is actually missing is inserted again on the next seed, as a new id, which breaks chat history that still points at the old one. That is why a disable keeps the row.
 
 ```bash
 php bin/console app:provider:list
