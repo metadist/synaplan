@@ -730,21 +730,40 @@ export const useChatsStore = defineStore('chats', () => {
    * @param options.firstMessagePreview Optional preview to lift an "empty" chat
    *   out of the empty-chat filter once it has real content.
    */
+  let localTurnChatId: number | null = null
+
+  /**
+   * This tab just finished its own turn and already updated the sidebar.
+   * The matching realtime event must not count that message again.
+   */
+  function markLocalTurnFinished(chatId: number): void {
+    localTurnChatId = chatId
+  }
+
+  function consumeLocalTurnFinished(chatId: number): boolean {
+    if (localTurnChatId !== chatId) return false
+    localTurnChatId = null
+    return true
+  }
+
   async function noteExternalActivity(
     chatId: number,
     options: { firstMessagePreview?: string } = {}
   ) {
+    const ownTurn = consumeLocalTurnFinished(chatId)
     const chat = chats.value.find((c) => c.id === chatId)
-    if (chat) {
-      bumpChatActivity(chatId, { firstMessagePreview: options.firstMessagePreview })
-    } else {
-      await loadChats()
+    if (!ownTurn) {
+      if (chat) {
+        bumpChatActivity(chatId, { firstMessagePreview: options.firstMessagePreview })
+      } else {
+        await loadChats()
+      }
     }
 
     // Another tab, or a person this chat is shared with, just received a
     // finished turn. Reload the open thread unless this tab is still streaming
-    // it itself (#2057).
-    if (activeChatId.value === chatId && !useHistoryStore().hasLiveStream()) {
+    // it itself, or just finished that stream (#2057).
+    if (!ownTurn && activeChatId.value === chatId && !useHistoryStore().hasLiveStream()) {
       void useHistoryStore().loadMessages(chatId, 0, 50, true)
     }
   }
@@ -833,6 +852,7 @@ export const useChatsStore = defineStore('chats', () => {
     setActiveChat,
     bumpChatActivity,
     noteExternalActivity,
+    markLocalTurnFinished,
     releaseUnavailableChat,
     $reset,
   }

@@ -4333,7 +4333,9 @@ const streamAIResponse = async (
               }
 
               // Bump chat activity so the sidebar reflects the assistant message
-              // landing without waiting for a full reload.
+              // landing without waiting for a full reload. Mark the turn so
+              // the matching realtime event does not count it a second time.
+              chatsStore.markLocalTurnFinished(chatId)
               chatsStore.bumpChatActivity(chatId)
             }
 
@@ -4783,6 +4785,7 @@ const handleUserStop = async () => {
   // metadata can still look empty — bump activity so "New chat" won't reuse
   // this thread via isChatEmpty().
   if (streamingMessage && chatsStore.activeChatId) {
+    chatsStore.markLocalTurnFinished(chatsStore.activeChatId)
     chatsStore.bumpChatActivity(chatsStore.activeChatId, {
       incrementMessageCount: true,
       firstMessagePreview: streamingMessage

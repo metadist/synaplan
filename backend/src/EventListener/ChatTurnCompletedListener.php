@@ -5,26 +5,30 @@ declare(strict_types=1);
 namespace App\EventListener;
 
 use App\Entity\Message;
-use App\Realtime\Notifier\ChatAudienceNotifier;
+use App\Message\PublishChatActivity;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Events;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * A finished turn is one event, published after the row is committed, to the
- * owner and the people the chat is shared with. Streaming flushes (status
- * still processing) stay quiet so watchers reload once, not per token.
+ * A finished assistant reply is one event, queued after the row is committed.
+ * Streaming flushes (status still processing) and the inbound row of the same
+ * turn stay quiet, so watchers reload once when the answer is saved.
  */
 #[AsDoctrineListener(event: Events::onFlush)]
 #[AsDoctrineListener(event: Events::postFlush)]
 final class ChatTurnCompletedListener
 {
-    /** @var list<array{chat: \App\Entity\Chat, direction: string, preview: ?string}> */
+    /** @var list<int> */
     private array $pending = [];
 
-    public function __construct(private ChatAudienceNotifier $audience)
-    {
+    public function __construct(
+        private MessageBusInterface $bus,
+        private LoggerInterface $logger,
+    ) {
     }
 
     public function onFlush(OnFlushEventArgs $args): void
@@ -44,16 +48,17 @@ final class ChatTurnCompletedListener
             return;
         }
 
-        $batch = $this->pending;
+        $chatIds = array_values(array_unique($this->pending));
         $this->pending = [];
-        $seen = [];
-        foreach ($batch as $item) {
-            $chatId = $item['chat']->getId();
-            if (null === $chatId || isset($seen[$chatId])) {
-                continue;
+        foreach ($chatIds as $chatId) {
+            try {
+                $this->bus->dispatch(new PublishChatActivity($chatId));
+            } catch (\Throwable $e) {
+                $this->logger->warning('Chat turn activity dispatch failed (ignored)', [
+                    'chat_id' => $chatId,
+                    'error' => $e->getMessage(),
+                ]);
             }
-            $seen[$chatId] = true;
-            $this->audience->publish($item['chat'], $item['direction'], $item['preview']);
         }
     }
 
@@ -62,23 +67,18 @@ final class ChatTurnCompletedListener
      */
     private function consider(object $entity, array $changeSet): void
     {
-        if (!$entity instanceof Message || 'complete' !== $entity->getStatus()) {
+        if (!$entity instanceof Message || 'OUT' !== $entity->getDirection() || 'complete' !== $entity->getStatus()) {
             return;
         }
         if ([] !== $changeSet && (!isset($changeSet['status']) || 'complete' !== $changeSet['status'][1])) {
             return;
         }
 
-        $chat = $entity->getChat();
-        if (null === $chat) {
+        $chatId = $entity->getChatId();
+        if (null === $chatId || $chatId <= 0) {
             return;
         }
 
-        $text = trim($entity->getText());
-        $this->pending[] = [
-            'chat' => $chat,
-            'direction' => 'OUT' === $entity->getDirection() ? 'OUT' : 'IN',
-            'preview' => '' === $text ? null : mb_substr($text, 0, 240),
-        ];
+        $this->pending[] = $chatId;
     }
 }

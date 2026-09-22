@@ -854,6 +854,7 @@ export const useHistoryStore = defineStore('history', () => {
     messages.value = []
     hasMoreMessages.value = false
     activeRun.value = null
+    isLoadingMessages.value = false
   }
 
   return {
