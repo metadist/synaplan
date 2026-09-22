@@ -139,4 +139,40 @@ describe('AdminPromptsPanel', () => {
       (wrapper.get('[data-testid="textarea-prompt-7"]').element as HTMLTextAreaElement).value
     ).toBe('# Still here')
   })
+
+  it('keeps a newer draft when an older save finishes', async () => {
+    let finishSave: (value: { success: boolean; prompt: SystemPrompt }) => void = () => {}
+    updatePrompt.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve
+        })
+    )
+
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-edit-prompt-7"]').trigger('click')
+    await wrapper.get('[data-testid="textarea-prompt-7"]').setValue('# First draft')
+    const pending = wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="btn-edit-prompt-8"]').trigger('click')
+    expect(wrapper.find('[data-testid="textarea-prompt-8"]').exists()).toBe(false)
+    expect(
+      (wrapper.get('[data-testid="textarea-prompt-7"]').element as HTMLTextAreaElement).value
+    ).toBe('# First draft')
+
+    finishSave({ success: true, prompt: { ...prompts[0], prompt: '# First draft' } })
+    await pending
+    await flushPromises()
+
+    expect(updatePrompt).toHaveBeenCalledWith(7, {
+      shortDescription: 'Plain answers',
+      prompt: '# First draft',
+      selectionRules: 'Use for chat',
+    })
+    expect(wrapper.find('[data-testid="textarea-prompt-7"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="prompt-preview-7"]').html()).toContain('<h1>First draft</h1>')
+  })
 })

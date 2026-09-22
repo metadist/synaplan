@@ -143,8 +143,12 @@
           </div>
         </div>
 
-        <!-- Prompts Tab -->
-        <div v-if="activeTab === 'prompts'" data-testid="section-prompts">
+        <!-- Prompts Tab. Stays mounted after the first visit so an unsaved draft survives a tab switch. -->
+        <div
+          v-if="promptsTabMounted"
+          v-show="activeTab === 'prompts'"
+          data-testid="section-prompts"
+        >
           <AdminPromptsPanel />
         </div>
 
@@ -493,6 +497,9 @@ const tabFromQuery = (): TabId => {
 
 // Tabs
 const activeTab = ref<TabId>(tabFromQuery())
+// Once the prompts tab has been opened, keep the panel mounted so a tab
+// switch does not throw away an unsaved draft.
+const promptsTabMounted = ref(activeTab.value === 'prompts')
 const tabs = computed<AdminTab[]>(() => {
   const baseTabs: AdminTab[] = [
     { id: 'overview', label: t('admin.tabs.overview'), icon: 'mdi:view-dashboard' },
@@ -570,6 +577,9 @@ const {
 
 // Load data based on active tab
 watch(activeTab, (newTab: string) => {
+  if (newTab === 'prompts') {
+    promptsTabMounted.value = true
+  }
   if (newTab === 'overview') {
     if (!overview.value) loadOverview()
     if (!registrationAnalytics.value) loadRegistrationAnalytics()

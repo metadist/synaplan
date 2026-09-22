@@ -76,6 +76,7 @@ function isDirty(): boolean {
 }
 
 async function startEdit(prompt: SystemPrompt): Promise<void> {
+  if (saving.value) return
   if (editingId.value !== null && editingId.value !== prompt.id && isDirty()) {
     const discard = await confirm({
       title: t('admin.prompts.discardTitle'),
@@ -99,18 +100,17 @@ function cancelEdit(): void {
 }
 
 async function savePrompt(promptId: number): Promise<void> {
+  const payload: PromptDraft = { ...draft.value }
   saving.value = true
   try {
-    const response = await adminApi.updatePrompt(promptId, {
-      shortDescription: draft.value.shortDescription,
-      prompt: draft.value.prompt,
-      selectionRules: draft.value.selectionRules,
-    })
+    const response = await adminApi.updatePrompt(promptId, payload)
     const index = prompts.value.findIndex((prompt) => prompt.id === promptId)
     if (index !== -1) {
       prompts.value[index] = response.prompt
     }
-    editingId.value = null
+    if (editingId.value === promptId) {
+      editingId.value = null
+    }
     success(t('admin.prompts.saved', { topic: response.prompt.topic }))
   } catch {
     showError(t('admin.prompts.saveFailed'))
@@ -179,7 +179,8 @@ async function savePrompt(promptId: number): Promise<void> {
         <template v-if="editingId !== prompt.id" #actions>
           <button
             type="button"
-            class="btn-secondary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium"
+            class="btn-secondary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="saving"
             :data-testid="`btn-edit-prompt-${prompt.id}`"
             @click="startEdit(prompt)"
           >
