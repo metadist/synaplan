@@ -144,6 +144,7 @@ onBeforeUnmount(() => {
       @touchstart.passive="onTouchStart"
       @touchend="onTouchEnd"
     >
+      <span class="usage-bar__today txt-secondary">{{ t('usageTaximeter.todayLabel') }}</span>
       <span class="usage-bar__head txt-secondary">{{ displayCost }}</span>
       <span class="usage-bar__track">
         <span
@@ -198,6 +199,13 @@ onBeforeUnmount(() => {
   background: transparent;
   border: none;
   cursor: pointer;
+}
+
+.usage-bar__today {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .usage-bar__head {

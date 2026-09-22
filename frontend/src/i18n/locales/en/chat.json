@@ -103,6 +103,8 @@
     "delete": "Delete Chat",
     "deleteConfirm": "Delete this chat? The conversation is removed permanently. Files you uploaded or generated in it stay in your file manager.",
     "notFound": "The chat no longer exists",
+    "goneDeleted": "This chat was deleted.",
+    "goneUnshared": "This chat is no longer shared with you.",
     "notFoundDesc": "This chat has been deleted and is no longer available.",
     "browser": {
       "title": "All Chats",

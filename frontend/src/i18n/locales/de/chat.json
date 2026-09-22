@@ -98,6 +98,8 @@
     "delete": "Chat löschen",
     "deleteConfirm": "Diesen Chat löschen? Die Unterhaltung wird dauerhaft entfernt. Dateien, die du darin hochgeladen oder erzeugt hast, bleiben in deiner Dateiverwaltung.",
     "notFound": "Der Chat existiert nicht mehr",
+    "goneDeleted": "Dieser Chat wurde gelöscht.",
+    "goneUnshared": "Dieser Chat ist nicht mehr für dich freigegeben.",
     "notFoundDesc": "Dieser Chat wurde gelöscht und ist nicht mehr verfügbar.",
     "browser": {
       "title": "Alle Chats",

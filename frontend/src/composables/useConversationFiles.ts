@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { chatApi, type ConversationFileRow } from '@/services/api/chatApi'
+import { chatGoneStatus } from '@/utils/chatAccessError'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
 import { useHistoryStore } from '@/stores/history'
@@ -142,8 +143,12 @@ export function useConversationFiles() {
     try {
       const response = await chatApi.getConversationFiles(chatId)
       fromApi.value = response.files
-    } catch {
+    } catch (error) {
       fromApi.value = []
+      const gone = chatGoneStatus(error)
+      if (gone && chatsStore.activeChatId === chatId) {
+        void chatsStore.releaseUnavailableChat(chatId, gone)
+      }
     }
   }
 

@@ -275,7 +275,11 @@
       <!-- Usage taximeter: desktop rail + mobile ring. Gated by the admin
            master switch and authenticated (non-guest/widget) web usage; the
            two share one store and differ only by CSS breakpoint. -->
-      <template v-if="usageTaximeterStore.active && !needsProviderSetup">
+      <!-- A shared conversation must not show the viewer's own day spend as if
+           it were the cost of this chat (#2062). -->
+      <template
+        v-if="usageTaximeterStore.active && !needsProviderSetup && !sharedConversationLocked"
+      >
         <ConsumptionBar />
         <ConsumptionRing />
       </template>

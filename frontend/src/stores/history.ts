@@ -11,6 +11,8 @@ import {
 } from '@/utils/messageMapper'
 import { finalizeSettledInProgressTurn } from '@/utils/chatErrorDisplay'
 import { authService } from '@/services/authService'
+import { useChatsStore } from '@/stores/chats'
+import { chatGoneStatus } from '@/utils/chatAccessError'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import type { MessageUsage } from '@/stores/usageTaximeter'
@@ -726,6 +728,14 @@ export const useHistoryStore = defineStore('history', () => {
       }
     } catch (error) {
       if (myGeneration !== loadGeneration) return
+      const gone = chatGoneStatus(error)
+      if (gone) {
+        stopInProgressPolling()
+        messages.value = []
+        hasMoreMessages.value = false
+        void useChatsStore().releaseUnavailableChat(chatId, gone)
+        return
+      }
       console.error('Failed to load messages:', error)
       if (
         silent &&
@@ -834,9 +844,23 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  function hasLiveStream(): boolean {
+    return messages.value.some(isLiveStream)
+  }
+
+  function discardMessages(): void {
+    ++loadGeneration
+    stopInProgressPolling()
+    messages.value = []
+    hasMoreMessages.value = false
+    activeRun.value = null
+  }
+
   return {
     messages,
     isLoadingMessages,
+    hasLiveStream,
+    discardMessages,
     hasMoreMessages,
     activeRun,
     addMessage,

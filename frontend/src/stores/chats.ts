@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+import { useNotification } from '@/composables/useNotification'
+import { i18n } from '@/i18n/instance'
 import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
@@ -9,6 +11,7 @@ import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
+import { chatGoneStatus } from '@/utils/chatAccessError'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { buildChatShareUrl } from '@/utils/urlHelper'
 
@@ -638,8 +641,13 @@ export const useChatsStore = defineStore('chats', () => {
         owner: parseOwner(data.chat.owner),
         sharedVia: parseSharedVia(data.chat.sharedVia),
       }
-    } catch {
+    } catch (err: unknown) {
       if (seq !== conversationAccessSeq) {
+        return
+      }
+      const gone = chatGoneStatus(err)
+      if (gone) {
+        void releaseUnavailableChat(chatId, gone)
         return
       }
       conversationAccess.value = null
@@ -729,10 +737,54 @@ export const useChatsStore = defineStore('chats', () => {
     const chat = chats.value.find((c) => c.id === chatId)
     if (chat) {
       bumpChatActivity(chatId, { firstMessagePreview: options.firstMessagePreview })
-      return
+    } else {
+      await loadChats()
     }
 
-    await loadChats()
+    // Another tab, or a person this chat is shared with, just received a
+    // finished turn. Reload the open thread unless this tab is still streaming
+    // it itself (#2057).
+    if (activeChatId.value === chatId && !useHistoryStore().hasLiveStream()) {
+      void useHistoryStore().loadMessages(chatId, 0, 50, true)
+    }
+  }
+
+  const releasingChats = new Map<number, Promise<'deleted' | 'unshared'>>()
+
+  /**
+   * The open conversation answered 404 or 403. Drop the selection, stop the
+   * loaders that would keep retrying it, and say what happened (#2061).
+   */
+  function releaseUnavailableChat(
+    chatId: number,
+    status: 403 | 404
+  ): Promise<'deleted' | 'unshared'> {
+    const existing = releasingChats.get(chatId)
+    if (existing) return existing
+
+    const job = (async () => {
+      const owned = chats.value.some((chat) => chat.id === chatId)
+      const reason: 'deleted' | 'unshared' = status === 404 && owned ? 'deleted' : 'unshared'
+      chats.value = chats.value.filter((chat) => chat.id !== chatId)
+      useIncomingStore().drop(chatId)
+      if (activeChatId.value === chatId) {
+        useHistoryStore().discardMessages()
+        updateActiveChatSelection(null)
+      }
+      useNotification().info(
+        i18n.global.t(reason === 'deleted' ? 'chat.goneDeleted' : 'chat.goneUnshared')
+      )
+      await Promise.all([loadChats(), useIncomingStore().load()])
+      if (activeChatId.value === null) {
+        ensureValidActiveChat()
+      }
+      return reason
+    })().finally(() => {
+      releasingChats.delete(chatId)
+    })
+
+    releasingChats.set(chatId, job)
+    return job
   }
 
   function $reset() {
@@ -781,6 +833,7 @@ export const useChatsStore = defineStore('chats', () => {
     setActiveChat,
     bumpChatActivity,
     noteExternalActivity,
+    releaseUnavailableChat,
     $reset,
   }
 })

@@ -97,6 +97,8 @@
     "delete": "Eliminar Chat",
     "deleteConfirm": "¿Eliminar este chat? La conversación se elimina de forma permanente. Los archivos que subiste o generaste en él permanecen en tu gestor de archivos.",
     "notFound": "El chat ya no existe",
+    "goneDeleted": "Este chat se ha eliminado.",
+    "goneUnshared": "Este chat ya no está compartido contigo.",
     "notFoundDesc": "Este chat ha sido eliminado y ya no está disponible.",
     "browser": {
       "title": "Todos los Chats",
