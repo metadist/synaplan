@@ -181,4 +181,37 @@ final class EmbeddingMetadataServiceTest extends TestCase
             99,
         ));
     }
+
+    public function testDocumentChunkAtCollectionWidthIsFreshWhenCatalogDimDiffers(): void
+    {
+        // #2064: text-embedding-3-large is catalogued at 3072, but the
+        // documents collection and every stored payload use 1024 because
+        // ingest slices the vector. Those chunks must stay searchable.
+        $this->modelConfigService->method('getDefaultModel')->willReturn(88);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('text-embedding-3-large');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(3072);
+
+        $payload = ['embedding_model_id' => 88, 'vector_dim' => EmbeddingMetadataService::DEFAULT_VECTOR_DIM];
+
+        self::assertTrue($this->service->isStale($payload));
+        self::assertFalse($this->service->isStale(
+            $payload,
+            storageVectorDim: EmbeddingMetadataService::DEFAULT_VECTOR_DIM,
+        ));
+        self::assertTrue($this->service->isStale(
+            ['embedding_model_id' => 13, 'vector_dim' => EmbeddingMetadataService::DEFAULT_VECTOR_DIM],
+            storageVectorDim: EmbeddingMetadataService::DEFAULT_VECTOR_DIM,
+        ));
+
+        $filtered = $this->service->filterStaleHits(
+            [
+                ['payload' => $payload, 'score' => 0.9],
+                ['payload' => ['embedding_model_id' => 13, 'vector_dim' => 1024], 'score' => 0.2],
+            ],
+            storageVectorDim: EmbeddingMetadataService::DEFAULT_VECTOR_DIM,
+        );
+        self::assertCount(1, $filtered['fresh']);
+        self::assertSame(1, $filtered['stale_count']);
+    }
 }

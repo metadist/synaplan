@@ -123,7 +123,14 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         // with the user's VECTORIZE binding (see embedUserQuery), so filtering
         // against the global default would discard every hit for users whose
         // override differs from it.
-        $filtered = $this->embeddingMetadata->filterStaleHits($rawHits, userId: $query->userId);
+        // Document payloads record the collection width, not the model's
+        // catalog dimension. Ingest already coerced the vector to that
+        // width, so a 3072-dim catalog model is still fresh at 1024.
+        $filtered = $this->embeddingMetadata->filterStaleHits(
+            $rawHits,
+            userId: $query->userId,
+            storageVectorDim: EmbeddingMetadataService::DEFAULT_VECTOR_DIM,
+        );
         if ($filtered['stale_count'] > 0) {
             $this->logger->info('QdrantVectorStorage: Filtered stale RAG hits', [
                 'user_id' => $query->userId,
