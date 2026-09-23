@@ -82,6 +82,21 @@ describe('ShareDialog', () => {
     expect(wrapper.get('[data-testid="iam-share-empty"]').text()).toBe('Only you can see this.')
   })
 
+  it('hides the explanation lines while the suggestion list is open', async () => {
+    const wrapper = mountDialog()
+    const consequence = wrapper.get('[data-testid="iam-share-consequence"]')
+    const find = wrapper.get('[data-testid="iam-share-find"]')
+
+    expect(consequence.element.style.display).toBe('')
+    expect(find.element.style.display).toBe('')
+
+    await wrapper.get('[data-testid="input-iam-subject-search"]').trigger('focus')
+
+    expect(wrapper.get('[data-testid="list-iam-subjects"]').exists()).toBe(true)
+    expect(consequence.element.style.display).toBe('none')
+    expect(find.element.style.display).toBe('none')
+  })
+
   it('uses assistant copy and hides the public-link section', () => {
     const wrapper = mountDialog({ kind: 'assistant', resourceName: 'Contract review' })
 

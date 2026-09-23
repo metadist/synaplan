@@ -37,7 +37,13 @@
           </div>
 
           <div class="mt-4 flex flex-col sm:flex-row gap-2" data-testid="iam-share-add-row">
-            <SubjectPicker ref="picker" v-model="subject" class="sm:flex-1" :active="isOpen" />
+            <SubjectPicker
+              ref="picker"
+              v-model="subject"
+              class="sm:flex-1"
+              :active="isOpen"
+              @open="suggestionsOpen = $event"
+            />
             <PermissionSelect
               v-model="permission"
               class="sm:w-44 shrink-0"
@@ -55,10 +61,19 @@
             </button>
           </div>
 
-          <p class="mt-3 text-sm txt-primary" data-testid="iam-share-consequence">
+          <!--
+            The suggestion list is only as wide as the search field and paints
+            over these lines. Hide them while it is open so no half-sentence
+            stays visible beside the list.
+          -->
+          <p
+            v-show="!suggestionsOpen"
+            class="mt-3 text-sm txt-primary"
+            data-testid="iam-share-consequence"
+          >
             {{ $t(shareConsequenceKey(kind, permission)) }}
           </p>
-          <p class="text-sm txt-secondary" data-testid="iam-share-find">
+          <p v-show="!suggestionsOpen" class="text-sm txt-secondary" data-testid="iam-share-find">
             {{ $t(shareFindKey(kind)) }}
           </p>
 
@@ -186,6 +201,7 @@ const { t } = useI18n()
 const { confirm } = useDialog()
 const { error: showError, success: showSuccess } = useNotification()
 const subject = ref<IamSubject | null>(null)
+const suggestionsOpen = ref(false)
 const permission = ref(defaultSharePermission(props.kind))
 const shares = ref<IamShare[]>([])
 const saving = ref(false)
