@@ -135,6 +135,7 @@ x-app-environment: &app-environment
   GOOGLE_GEMINI_API_KEY: "${GOOGLE_GEMINI_API_KEY:-}"
   MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
   XAI_API_KEY: "${XAI_API_KEY:-}"
+  META_API_KEY: "${META_API_KEY:-}"
   # Operator billing. Empty keys mean open-source mode: no plans, no quotas, no
   # upgrade prompts, and every tier gate open (see docs/BILLING_SELFHOST.md).
   # Setting them turns this install into a paid product run by YOU, billed

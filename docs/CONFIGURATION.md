@@ -275,9 +275,10 @@ Chat and vision (Mistral Medium 3.5, Large 3) plus the Voxtral audio pair (trans
 XAI_API_KEY=your_key_here
 ```
 
-Long-context chat and image understanding (Grok 4.5 with a 500K window), Grok Imagine for image and
-video generation, and Grok voice for speech synthesis and transcription. Grok 4.5 always reasons at a
-fixed depth, so the Thinking toggle has no effect on it. Grok TTS reads its voice roster live from
+Long-context chat and image understanding (Grok 4.7, 4.6 and 4.5, each with a 500K window), Grok Imagine for image and
+video generation, and Grok voice for speech synthesis and transcription. Grok 4.7 accepts a reasoning
+depth (`low` / `medium` / `high` / `xhigh`); Grok 4.5 and 4.6 always reason at a
+fixed depth, so the Thinking toggle has no effect on them. Grok TTS reads its voice roster live from
 xAI (default `eve`; the five core voices eve, ara, rex, sal and leo are also available offline) and
 delivers the audio in one piece — xAI streams synthesis over a WebSocket only, which this backend
 does not speak. The realtime Speech-to-Speech API is not supported. Get a key at
@@ -307,6 +308,18 @@ Model ids are case-sensitive (MiniMax is `MiniMax-M3`). Use a pay-as-you-go key 
 subscription plans are unsuitable for a production platform key. Get a key at
 [a2agent.me](https://a2agent.me/) under **dashboard → API keys**. Integration
 guides: [a2agent.me/integrations](https://a2agent.me/integrations).
+
+### Meta (Muse Spark)
+
+```bash
+META_API_KEY=your_key_here
+```
+
+Muse Spark 1.3 (chat and image understanding, 1M context) through the Meta Model API
+at `https://api.meta.ai/v1`. Meta's own SDK reads `MODEL_API_KEY`; Synaplan stores the
+same secret as `META_API_KEY`. Create a key at [dev.meta.ai](https://dev.meta.ai/)
+under **API keys → Create API key** (the key is shown only once).
+Docs: [dev.meta.ai/docs/authentication](https://dev.meta.ai/docs/authentication).
 
 ### HuggingFace
 

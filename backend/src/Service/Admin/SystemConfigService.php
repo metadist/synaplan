@@ -199,7 +199,7 @@ final readonly class SystemConfigService
                 'label' => 'AI Services',
                 'sections' => [
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
-                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
+                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'META_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
                     'media' => ['label' => 'Image & Video Generation', 'fields' => ['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET']],
                     'embeddings' => ['label' => 'Embeddings (Cloudflare Workers AI)', 'fields' => ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'EMBEDDING_FALLBACK_PROVIDER']],
@@ -2304,6 +2304,12 @@ final readonly class SystemConfigService
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true,
                 'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
+                'default' => '', 'source' => 'database',
+            ],
+            'META_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'Meta Model API key — Muse Spark. Create it at https://dev.meta.ai/ (API keys)',
                 'default' => '', 'source' => 'database',
             ],
             'TRUSTEDTOKENS_API_KEY' => [

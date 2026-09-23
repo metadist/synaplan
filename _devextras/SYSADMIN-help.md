@@ -444,10 +444,10 @@ Two operational steps ship with the DAG follow-up release (simple "Again",
 per-task errors/retry, `email_me`, WhatsApp multi-file). Neither is handled
 by code or migrations — both are environment state.
 
-## 1. Default image model → Nano Banana 2 (BID 190)
+## 1. Default image model → Nano Banana 2 (BID 371)
 
 `DefaultModelConfigSeeder` already points fresh installs at
-`google:gemini-3.1-flash-image-preview:text2pic` ("Nano Banana 2", BID 190)
+`google:gemini-3.1-flash-image:text2pic` ("Nano Banana 2", BID 371)
 for `TEXT2PIC` and `PIC2PIC`. The seeder **never overwrites existing rows**
 (by design — it must not clobber operator tuning), so environments seeded
 before this release still route DAG "generate image" nodes at the old,
@@ -459,7 +459,7 @@ Run once on the production DB:
 -- Global platform default ONLY (BOWNERID = 0).
 -- Do NOT drop the owner filter: per-user overrides share this table
 -- with BOWNERID = <userId> and must keep the user's own choice.
-UPDATE BCONFIG SET BVALUE = '190'
+UPDATE BCONFIG SET BVALUE = '371'
 WHERE BOWNERID = 0
   AND BGROUP = 'DEFAULTMODEL'
   AND BSETTING IN ('TEXT2PIC', 'PIC2PIC');

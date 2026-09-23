@@ -300,26 +300,37 @@ class ModelCatalog
         // Google deprecated all Imagen 4 IDs on 2026-06-15 and hard-shut them
         // down on 2026-08-17; direct GET now answers 404, so the availability
         // check confirms them Gone. Nano Banana is the vendor-named successor;
-        // gemini-3.1-flash-image-preview (BID 190) is already the TEXT2PIC
-        // default, so all three tiers point at it rather than at the flat/ultra
-        // Gemini image variants we do not carry.
+        // The stable Nano Banana 2 id is BID 371 (gemini-3.1-flash-image).
+        // The preview id (BID 190) was itself shut down on 2026-06-25.
         115 => [
             'providerId' => 'imagen-4.0-generate-001',
             'retiredOn' => '2026-08-17',
-            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
-            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+            'successor' => 'google:gemini-3.1-flash-image:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana 2 (gemini-3.1-flash-image).',
         ],
         230 => [
             'providerId' => 'imagen-4.0-fast-generate-001',
             'retiredOn' => '2026-08-17',
-            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
-            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+            'successor' => 'google:gemini-3.1-flash-image:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana 2 (gemini-3.1-flash-image).',
         ],
         231 => [
             'providerId' => 'imagen-4.0-ultra-generate-001',
             'retiredOn' => '2026-08-17',
-            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
-            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+            'successor' => 'google:gemini-3.1-flash-image:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana 2 (gemini-3.1-flash-image).',
+        ],
+        190 => [
+            'providerId' => 'gemini-3.1-flash-image-preview',
+            'retiredOn' => '2026-06-25',
+            'successor' => 'google:gemini-3.1-flash-image:text2pic',
+            'reason' => 'Preview shut down by Google on 2026-06-25; the stable id is gemini-3.1-flash-image.',
+        ],
+        228 => [
+            'providerId' => 'nano-banana-pro-preview',
+            'retiredOn' => '2026-06-25',
+            'successor' => 'google:gemini-3-pro-image:text2pic',
+            'reason' => 'Preview id replaced by the stable Gemini 3 Pro Image model (gemini-3-pro-image).',
         ],
 
         // --- 2026-09-08 (TrustedTokens dropped the undated V4 Flash id) ---
@@ -2640,8 +2651,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Nano Banana 2 (3.1 Flash Image)',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google shut the preview id down on 2026-06-25.
+            // See ModelCatalog::RETIREMENTS[190]. Stable id is BID 371.
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.1-flash-image-preview',
             'priceIn' => 0,
             'inUnit' => 'perImage',
@@ -2660,6 +2673,52 @@ class ModelCatalog
                 'mode_prices' => ['output_cost_per_image' => 0.067],
                 'params' => ['model' => 'gemini-3.1-flash-image-preview'],
                 'features' => ['image', 'pic2pic'],
+                'meta' => ['max_reference_images' => 14],
+            ],
+        ],
+        [
+            'id' => 371,
+            'service' => 'Google',
+            'name' => 'Nano Banana 2',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.1-flash-image',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.067,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Nano Banana 2 (gemini-3.1-flash-image) - image generation and editing. 1K image is $0.067. Successor to the shut-down preview id.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.067],
+                'params' => ['model' => 'gemini-3.1-flash-image'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => ['max_reference_images' => 14],
+            ],
+        ],
+        [
+            'id' => 372,
+            'service' => 'Google',
+            'name' => 'Nano Banana Pro',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3-pro-image',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.134,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Nano Banana Pro (gemini-3-pro-image) - higher-fidelity image generation and editing. 1K and 2K images are $0.134; 4K is $0.24.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.134],
+                'params' => ['model' => 'gemini-3-pro-image'],
+                'features' => ['image', 'pic2pic', 'text_rendering'],
                 'meta' => ['max_reference_images' => 14],
             ],
         ],
@@ -2954,8 +3013,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Nano Banana Pro',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: the preview nickname is not the stable API id.
+            // See ModelCatalog::RETIREMENTS[228]. Stable id is BID 372.
+            'selectable' => 0,
+            'active' => 0,
             // Gemini-native image model — GoogleProvider routes anything
             // matching /^gemini-.*-image/ via generateImageWithGemini(); for
             // nano-banana-pro-preview the routing lookup uses the catalog's
@@ -4578,10 +4639,69 @@ class ModelCatalog
         // ==================== xAI (GROK) ====================
         // Snapshot 2026-07-29 from https://docs.x.ai/developers/pricing;
         // Grok 4.6 rows added from the 2026-08-20 snapshot.
+        // Grok 4.7 rows added 2026-09-23 from https://docs.x.ai/developers/grok-4-7
+        // ($2 / $6 per 1M, 500K context). That page publishes no cached-input
+        // discount and no >200k tier, unlike 4.5 / 4.6.
         // Chat rows are covered by the LiteLLM sync (keys `xai/<providerId>`);
         // the Grok Imagine rows are not and must be verified manually.
         // Above 200K prompt tokens xAI bills the whole request at 2x — encoded
         // in self::CONTEXT_PRICING, not here.
+        [
+            'id' => 367,
+            'service' => 'xAI',
+            'name' => 'Grok 4.7',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.7',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.7 - flagship model for coding, agents and professional work with a 500K context window. Text and image input. Reasoning depth is configurable (low, medium, high, xhigh).',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'grok-4.7'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                // The 2026-09-21 model page lists input and output only. Billing
+                // cache reads at the input rate avoids the 50% fallback discount.
+                'cache_read_price_per_1M' => 2.00,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '500000',
+                    'max_output' => '32768',
+                    'regions' => 'us-east-1, us-west-2',
+                ],
+            ],
+        ],
+        [
+            'id' => 368,
+            'service' => 'xAI',
+            'name' => 'Grok 4.7 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.7',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.7 image understanding - describe images and extract text (OCR-style) via the chat endpoint. Max 20 MiB per image, JPEG/PNG only.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'grok-4.7'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 2.00,
+                'meta' => [
+                    'supports_images' => true,
+                    'max_image_bytes' => '20971520',
+                ],
+            ],
+        ],
         [
             'id' => 326,
             'service' => 'xAI',
@@ -4892,6 +5012,69 @@ class ModelCatalog
                 'pricing_mode' => 'per_second',
                 'params' => ['model' => 'grok-stt'],
                 'features' => ['timestamps', 'diarization', 'multilingual'],
+            ],
+        ],
+        // ==================== META (Muse Spark) ====================
+        // Snapshot 2026-09-23 from https://developer.meta.com/ai/models/muse-spark/
+        // and https://dev.meta.ai/docs/api-reference/ (USD per 1M).
+        // OpenAI-compatible Chat Completions at https://api.meta.ai/v1.
+        // Standard tier only: muse-spark-1.3 is not used to improve Meta's
+        // products. The contributor id (muse-spark-1.3-contributor) is cheaper
+        // and is excluded on purpose.
+        [
+            'id' => 369,
+            'service' => 'Meta',
+            'name' => 'Muse Spark 1.3',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-spark-1.3',
+            'priceIn' => 1.25,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Spark 1.3 — long-horizon coding and agentic work with a 1M context window. Text, image and document input. Reasoning depth is configurable. Prompts are processed by Meta.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'muse-spark-1.3'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.15,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '1000000',
+                    'max_output' => '32768',
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 370,
+            'service' => 'Meta',
+            'name' => 'Muse Spark 1.3 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-spark-1.3',
+            'priceIn' => 1.25,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Spark 1.3 image understanding — describe images and extract text (OCR-style) via the chat endpoint. Prompts are processed by Meta.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'muse-spark-1.3'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.15,
+                'meta' => [
+                    'supports_images' => true,
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
             ],
         ],
         [

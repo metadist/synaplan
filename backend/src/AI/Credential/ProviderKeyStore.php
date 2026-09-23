@@ -61,6 +61,7 @@ final class ProviderKeyStore
         'mistral',
         'trustedtokens',
         'a2agent',
+        'meta',
         'huggingface',
         'xai',
         'perplexity',

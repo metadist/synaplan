@@ -657,6 +657,10 @@
       "title": "Clé API A2Agent",
       "message": "Créez une clé API en paiement à l’usage chez A2Agent (tableau de bord → clés API), puis collez-la ici. Les invites sont traitées par des fournisseurs de modèles de Chine continentale (Qwen, DeepSeek, MiniMax) via cette passerelle. A2Agent s’adresse aux utilisateurs hors de Chine continentale. Les opérateurs qui traitent des données personnelles de l’UE décident selon leur DPA."
     },
+    "meta": {
+      "title": "Clé API Meta",
+      "message": "Créez une clé API dans le tableau de bord Meta Model API (API keys), puis collez-la ici. Cela active Muse Spark. Les invites sont traitées par Meta."
+    },
     "huggingface": {
       "title": "Jeton API HuggingFace",
       "message": "Créez un jeton d’accès dans vos réglages HuggingFace, puis collez-le ici pour utiliser les modèles HuggingFace Inference."

@@ -53,8 +53,8 @@ final readonly class DefaultModelConfigSeeder
         // ModelCatalog row id 220 ("Memory extraction model") which is a
         // system-only clone of Groq gpt-oss-120b — fast and cheap.
         ['group' => 'DEFAULTMODEL', 'setting' => 'MEM',        'modelKey' => 'groq:openai/gpt-oss-120b:mem'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'modelKey' => 'google:gemini-3.1-flash-image-preview:text2pic'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'modelKey' => 'google:gemini-3.1-flash-image-preview:text2pic'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'modelKey' => 'google:gemini-3.1-flash-image:text2pic'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'modelKey' => 'google:gemini-3.1-flash-image:text2pic'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID',   'modelKey' => 'google:veo-3.1-generate-preview:text2vid'],
         // IMG2VID (animate an attached image). Defaults to Higgsfield DoP
         // Standard — an image-to-video model. Shares the text2vid BTAG (see

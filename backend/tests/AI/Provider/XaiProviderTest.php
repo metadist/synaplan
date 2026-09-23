@@ -210,16 +210,45 @@ class XaiProviderTest extends TestCase
     }
 
     /**
-     * xAI documents `reasoning_effort` for grok-4.3 only, so no signal — not
-     * even an explicit one — may leak the parameter onto another model.
+     * grok-4.5 and grok-4.6 reason at a fixed depth. No signal — not even an
+     * explicit one — may leak the parameter onto them.
      */
     public function testReasoningEffortIsNeverSentForModelsThatDoNotSupportIt(): void
     {
-        foreach ([['reasoning' => true], ['reasoning' => false], ['reasoning_effort' => 'high']] as $options) {
-            $request = $this->buildChatOptions([], ['model' => 'grok-4.5', ...$options], false);
+        foreach (['grok-4.5', 'grok-4.6'] as $model) {
+            foreach ([['reasoning' => true], ['reasoning' => false], ['reasoning_effort' => 'high']] as $options) {
+                $request = $this->buildChatOptions([], ['model' => $model, ...$options], false);
 
-            $this->assertArrayNotHasKey('reasoning_effort', $request);
+                $this->assertArrayNotHasKey('reasoning_effort', $request);
+            }
         }
+    }
+
+    public function testGrok47ThinkingOffUsesTheCheapestDocumentedEffort(): void
+    {
+        $request = $this->buildChatOptions([], ['model' => 'grok-4.7', 'reasoning' => false], false);
+
+        $this->assertSame('low', $request['reasoning_effort']);
+    }
+
+    public function testGrok47ThinkingOnUsesTheCatalogDefault(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'grok-4.7',
+            'reasoning' => true,
+            'modelConfig' => ['reasoning_effort_default' => 'high'],
+        ], false);
+
+        $this->assertSame('high', $request['reasoning_effort']);
+    }
+
+    public function testGrok47AcceptsXhighAndDropsNone(): void
+    {
+        $xhigh = $this->buildChatOptions([], ['model' => 'grok-4.7', 'reasoning_effort' => 'xhigh'], false);
+        $this->assertSame('xhigh', $xhigh['reasoning_effort']);
+
+        $none = $this->buildChatOptions([], ['model' => 'grok-4.7', 'reasoning_effort' => 'none'], false);
+        $this->assertArrayNotHasKey('reasoning_effort', $none);
     }
 
     public function testThinkingToggleUsesCatalogDefault(): void

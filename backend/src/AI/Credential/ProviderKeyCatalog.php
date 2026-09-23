@@ -142,6 +142,18 @@ final class ProviderKeyCatalog
                 'headers' => ['Authorization' => 'Bearer {key}'],
             ],
         ],
+        'meta' => [
+            'displayName' => 'Meta',
+            'envVar' => 'META_API_KEY',
+            'consoleUrl' => 'https://dev.meta.ai/',
+            'freeTier' => false,
+            'recommended' => false,
+            'validation' => [
+                'method' => 'GET',
+                'url' => 'https://api.meta.ai/v1/models',
+                'headers' => ['Authorization' => 'Bearer {key}'],
+            ],
+        ],
         'xai' => [
             'displayName' => 'xAI',
             'envVar' => 'XAI_API_KEY',

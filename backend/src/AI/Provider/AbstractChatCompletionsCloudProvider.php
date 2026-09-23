@@ -19,7 +19,7 @@ use Psr\Log\LoggerInterface;
  * Shared client, chat, stream and vision path for fixed-URL OpenAI-compatible
  * cloud providers (key store + one base URI).
  *
- * TrustedTokens and A2Agent are the current subclasses. Mistral, Groq and xAI
+ * TrustedTokens, A2Agent and Meta are the current subclasses. Mistral, Groq and xAI
  * are candidates later — they carry provider-specific extras (audio, media,
  * per-endpoint clients) that this base does not model.
  */
