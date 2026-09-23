@@ -78,6 +78,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: IamSubject | null]
+  open: [value: boolean]
 }>()
 
 const { t } = useI18n()
@@ -90,6 +91,8 @@ const root = ref<HTMLElement | null>(null)
 let timer: ReturnType<typeof setTimeout> | null = null
 
 const panelOpen = computed(() => focused.value && (props.active === undefined || props.active))
+
+watch(panelOpen, (open) => emit('open', open))
 
 const load = async () => {
   try {
