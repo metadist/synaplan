@@ -97,6 +97,21 @@ describe('ShareDialog', () => {
     expect(display('iam-share-find')).toContain('display: none')
   })
 
+  it('shows the explanations again after the dialog is reopened', async () => {
+    const wrapper = mountDialog()
+    const display = (testId: string) =>
+      wrapper.get(`[data-testid="${testId}"]`).attributes('style') ?? ''
+
+    await wrapper.get('[data-testid="input-iam-subject-search"]').trigger('focus')
+    expect(display('iam-share-consequence')).toContain('display: none')
+
+    await wrapper.setProps({ isOpen: false })
+    await wrapper.setProps({ isOpen: true })
+
+    expect(display('iam-share-consequence')).not.toContain('display: none')
+    expect(display('iam-share-find')).not.toContain('display: none')
+  })
+
   it('uses assistant copy and hides the public-link section', () => {
     const wrapper = mountDialog({ kind: 'assistant', resourceName: 'Contract review' })
 

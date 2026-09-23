@@ -239,12 +239,14 @@ const load = async () => {
 watch(
   () => [props.isOpen, props.kind, props.resourceId],
   () => {
-    if (props.isOpen) {
-      subject.value = null
-      permission.value = defaultSharePermission(props.kind)
-      picker.value?.resetQuery()
-      void load()
-    }
+    // The picker unmounts with the dialog and cannot emit open:false.
+    // Clear the flag here so a later open does not keep the explanations hidden.
+    suggestionsOpen.value = false
+    if (!props.isOpen) return
+    subject.value = null
+    permission.value = defaultSharePermission(props.kind)
+    picker.value?.resetQuery()
+    void load()
   },
   { immediate: true }
 )
