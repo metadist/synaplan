@@ -565,6 +565,7 @@ import {
 import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { canComposeChat, isSharedConversationLocked } from '@/utils/sharedConversationLock'
 import SharedConversationBanner from '@/components/iam/SharedConversationBanner.vue'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
@@ -742,8 +743,8 @@ const isDragging = ref(false)
 const dragCounter = ref(0)
 const historyStore = useHistoryStore()
 const chatsStore = useChatsStore()
-const sharedConversationLocked = computed(
-  () => chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
+const sharedConversationLocked = computed(() =>
+  isSharedConversationLocked(chatsStore.conversationAccess, incognitoStore.active)
 )
 const sharedConversationAccess = computed(() =>
   chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
@@ -753,18 +754,14 @@ const sharedConversationAccess = computed(() =>
 const sharedConversationOwnerName = computed(
   () => chatsStore.conversationSource?.owner?.name?.trim() || null
 )
-const canComposeSharedChat = computed(() => {
-  if (isGuestMode.value) {
-    return true
-  }
-  if (sharedConversationLocked.value) {
-    return false
-  }
-  if (chatsStore.conversationAccess === 'owner') {
-    return true
-  }
-  return !isIamSharingEnabled()
-})
+const canComposeSharedChat = computed(() =>
+  canComposeChat({
+    guest: isGuestMode.value,
+    incognito: incognitoStore.active,
+    access: chatsStore.conversationAccess,
+    sharingEnabled: isIamSharingEnabled(),
+  })
+)
 // Owner-only writes (Again, Retry, Stop, task-plan controls). Unresolved
 // access stays null while the lookup is in flight or has failed, so it must
 // not count as owner — same rule as the composer.
