@@ -113,8 +113,9 @@ export const useIncomingStore = defineStore('incoming', () => {
     if (!item?.isNew) return
     try {
       await iamApi.markSharedItemSeen(INCOMING_KIND, id)
-      chats.value = chats.value.map((chat) => (chat.id === id ? { ...chat, isNew: false } : chat))
-      unseenCount.value = await iamApi.countUnseenShared(INCOMING_KIND)
+      // Both the row marker and the count come back from the server.
+      if (inFlight) await inFlight
+      await load()
     } catch {
       // Leave the badge. The next refresh reads the server again.
     }

@@ -377,7 +377,7 @@ final class ShareController extends AbstractController
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
         $lastSeenAt = $this->sharedInbox->lastSeenAt($userId, $kind);
-        $opened = $this->sharedInbox->openedIds($userId, $kind);
+        $opened = $this->sharedInbox->openedMarks($userId, $kind);
 
         return $this->json([
             'items' => array_map(

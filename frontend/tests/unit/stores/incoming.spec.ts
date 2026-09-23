@@ -139,6 +139,7 @@ describe('incoming store', () => {
     await flushPromises()
 
     countUnseenShared.mockResolvedValue(1)
+    listSharedWithMe.mockResolvedValue([sharedChat('13', false), sharedChat('14', true)])
     await store.markChatOpened(13)
 
     expect(markSharedItemSeen).toHaveBeenCalledWith(INCOMING_KIND, '13')
