@@ -284,10 +284,9 @@ final readonly class AgainHandler
         $message->setMeta('ai_chat_provider', $metadata['provider'] ?? 'unknown');
         $message->setMeta('ai_chat_model', $metadata['model'] ?? 'unknown');
 
-        if ($selectedModelId) {
-            $message->setMeta('ai_chat_model_id', (string) $selectedModelId);
-        } elseif (!empty($metadata['model_id'])) {
-            $message->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
+        $persistedModelId = ChatModelId::persisted($metadata['model_id'] ?? null, $selectedModelId);
+        if (null !== $persistedModelId) {
+            $message->setMeta('ai_chat_model_id', $persistedModelId);
         }
 
         if (!empty($metadata['usage'])) {
