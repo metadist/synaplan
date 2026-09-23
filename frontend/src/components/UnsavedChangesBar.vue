@@ -95,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{
@@ -110,11 +110,35 @@ const emit = defineEmits<{
 }>()
 
 const isSaving = ref(false)
+const instance = getCurrentInstance()
 
+type SaveListener = () => void | Promise<void>
+
+function saveListeners(): SaveListener[] {
+  const raw = instance?.vnode.props?.onSave
+  if (typeof raw === 'function') return [raw as SaveListener]
+  if (Array.isArray(raw)) {
+    return raw.filter((listener): listener is SaveListener => typeof listener === 'function')
+  }
+  return []
+}
+
+// emit() drops the listener's promise, so a failed save left isSaving true
+// until the bar hid and both buttons stayed disabled. Call the listener and
+// release the bar when it is still open after the attempt.
 const handleSave = async () => {
   if (isSaving.value) return
   isSaving.value = true
-  emit('save')
+  try {
+    await Promise.all(saveListeners().map((listener) => Promise.resolve(listener())))
+  } catch {
+    // The page shows the failure. The bar only has to end the attempt.
+  } finally {
+    await nextTick()
+    if (props.show) {
+      isSaving.value = false
+    }
+  }
 }
 
 const handleDiscard = () => {
@@ -160,11 +184,5 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
-})
-
-defineExpose({
-  resetSaving: () => {
-    isSaving.value = false
-  },
 })
 </script>
