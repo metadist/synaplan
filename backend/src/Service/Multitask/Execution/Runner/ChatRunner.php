@@ -182,16 +182,31 @@ final readonly class ChatRunner implements TaskRunner
     {
         $selected = $context->classification['model_id'] ?? null;
         if (is_numeric($selected) && (int) $selected > 0) {
-            return (int) $selected;
+            return $this->usableModelId((int) $selected, $capabilityTag, $context);
         }
 
         $override = $context->classification['override_model_id'] ?? null;
         if (is_numeric($override) && (int) $override > 0) {
-            return (int) $override;
+            return $this->usableModelId((int) $override, $capabilityTag, $context);
         }
 
         if (null !== $topicModelId && $topicModelId > 0) {
-            return $topicModelId;
+            return $this->usableModelId($topicModelId, $capabilityTag, $context);
+        }
+
+        return $this->modelConfigService->getDefaultModel($capabilityTag, $context->userId)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $context->userId);
+    }
+
+    /**
+     * An explicit id still has to be one this member may use. A disallowed id
+     * is replaced the same way the single-step chat path does.
+     */
+    private function usableModelId(int $modelId, string $capabilityTag, NodeContext $context): ?int
+    {
+        $usable = $this->modelConfigService->resolveUsableModelId($modelId, $capabilityTag, $context->userId);
+        if (null !== $usable && $usable > 0) {
+            return $usable;
         }
 
         return $this->modelConfigService->getDefaultModel($capabilityTag, $context->userId)

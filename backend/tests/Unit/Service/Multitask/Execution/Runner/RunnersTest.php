@@ -232,6 +232,7 @@ final class RunnersTest extends TestCase
         });
 
         $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('resolveUsableModelId')->willReturnArgument(0);
         // The user explicitly picked a model — the runner must NOT consult the
         // capability/system default at all.
         $modelConfig->expects(self::never())->method('getDefaultModel');
@@ -251,6 +252,36 @@ final class RunnersTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertSame(999, $result->metadata['model_id'] ?? null);
+    }
+
+    public function testChatRunnerReplacesAModelTheMemberMayNotUse(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('pong');
+
+            return ['provider' => 'groq', 'model' => 'openai/gpt-oss-120b'];
+        });
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('resolveUsableModelId')->with(324, 'CHAT', 1)->willReturn(76);
+        $modelConfig->expects(self::never())->method('getDefaultModel');
+        $modelConfig->method('getProviderForModel')->with(76)->willReturn('groq');
+        $modelConfig->method('getModelName')->with(76)->willReturn('openai/gpt-oss-120b');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'alpha']);
+        $context = new NodeContext(
+            $this->message('alpha'),
+            [],
+            1,
+            ['language' => 'en', 'model_id' => 324],
+        );
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(76, $result->metadata['model_id'] ?? null);
     }
 
     /**
@@ -344,6 +375,7 @@ final class RunnersTest extends TestCase
         ]);
 
         $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('resolveUsableModelId')->willReturnArgument(0);
         $modelConfig->expects(self::never())->method('getDefaultModel');
         $modelConfig->expects(self::once())->method('getProviderForModel')->with(42)->willReturn('ollama');
         $modelConfig->expects(self::once())->method('getModelName')->with(42)->willReturn('pinned-model');
