@@ -220,6 +220,99 @@ describe('History Store', () => {
       expect(store.messages.at(-1)?.isStreaming).toBe(true)
     })
 
+    /**
+     * Impersonation cold-starts the chat: the history GET is issued while the
+     * answer is already streaming (ChatView waits for the model catalog first)
+     * and returns after TestProvider has finished. The snapshot only has the
+     * user row. Guarding only `isStreaming` at apply time deletes the reply.
+     */
+    it('keeps a finished answer when the history load started during the stream', async () => {
+      vi.resetModules()
+      let resolveLoad!: (value: unknown) => void
+      const getChatMessages = vi.fn(
+        () =>
+          new Promise<unknown>((resolve) => {
+            resolveLoad = resolve
+          })
+      )
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      const assistantId = store.addStreamingMessage('assistant')
+      store.updateStreamingMessage(assistantId, 'Stub reply')
+
+      const loading = store.loadMessages(42)
+      await vi.waitFor(() => expect(getChatMessages).toHaveBeenCalledOnce())
+
+      const assistant = store.messages.find((message) => message.id === assistantId)
+      expect(assistant).toBeTruthy()
+      assistant!.backendMessageId = 9
+      store.finishStreamingMessage(assistantId)
+
+      resolveLoad({
+        success: true,
+        messages: [{ id: 3, direction: 'IN', text: 'Hello', timestamp: 1700000002 }],
+        pagination: { hasMore: false },
+      })
+      await loading
+
+      expect(store.messages.map((message) => message.parts[0].content)).toEqual([
+        'Hello',
+        'Stub reply',
+      ])
+      expect(store.messages.at(-1)?.id).toBe(assistantId)
+      expect(store.messages.at(-1)?.isStreaming).toBe(false)
+    })
+
+    it('keeps an answer that finished while a history load was already in flight', async () => {
+      const { store, loading, resolve } = await startDeferredLoad()
+
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      const assistantId = store.addStreamingMessage('assistant')
+      store.updateStreamingMessage(assistantId, 'Stub reply')
+      store.finishStreamingMessage(assistantId)
+
+      resolve({
+        success: true,
+        messages: [{ id: 3, direction: 'IN', text: 'Hello', timestamp: 1700000002 }],
+        pagination: { hasMore: false },
+      })
+      await loading
+
+      expect(store.messages.map((message) => message.parts[0].content)).toEqual([
+        'Hello',
+        'Stub reply',
+      ])
+      expect(store.messages.at(-1)?.id).toBe(assistantId)
+      expect(store.messages.at(-1)?.isStreaming).toBe(false)
+    })
+
+    it('adopts the server snapshot when the load starts after the turn finished', async () => {
+      vi.resetModules()
+      const getChatMessages = vi.fn().mockResolvedValue({
+        success: true,
+        messages: [
+          { id: 3, direction: 'IN', text: 'Hello', timestamp: 1700000002 },
+          { id: 9, direction: 'OUT', text: 'Stub reply', timestamp: 1700000003 },
+        ],
+        pagination: { hasMore: false },
+      })
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      const assistantId = store.addStreamingMessage('assistant')
+      store.updateStreamingMessage(assistantId, 'Stub reply')
+      store.finishStreamingMessage(assistantId)
+
+      await store.loadMessages(42)
+
+      expect(store.messages.map((message) => message.id)).toEqual(['backend-3', 'backend-9'])
+    })
+
     it('does not duplicate the just-sent user message already persisted in the snapshot', async () => {
       const { store, loading, resolve } = await startDeferredLoad()
 

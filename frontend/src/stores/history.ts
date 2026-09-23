@@ -351,6 +351,38 @@ function isLiveStream(message: Message): boolean {
   return true === message.isStreaming && message.id !== IN_PROGRESS_TURN_ID
 }
 
+/** Client-owned row (uuid). Server rows use `backend-<id>`; the synthetic in-progress bubble does not. */
+function isLocalTurnId(id: string): boolean {
+  return id !== IN_PROGRESS_TURN_ID && !id.startsWith('backend-')
+}
+
+/**
+ * Turns this response must not overwrite.
+ *
+ * - Still streaming, or streaming when the request was sent (the answer can
+ *   finish before a slow GET returns).
+ * - Created while the request was in flight (local uuid), even if it already
+ *   finished. Hydrated `backend-*` rows are not included, so a load-more that
+ *   lands in the same window does not pin the whole list.
+ */
+function protectedTurnIds(
+  current: Message[],
+  idsAtFetch: ReadonlySet<string>,
+  liveIdsAtFetch: ReadonlySet<string>
+): Set<string> {
+  const protectedIds = new Set<string>()
+  for (const message of current) {
+    if (liveIdsAtFetch.has(message.id)) {
+      protectedIds.add(message.id)
+      continue
+    }
+    if (!idsAtFetch.has(message.id) && isLocalTurnId(message.id)) {
+      protectedIds.add(message.id)
+    }
+  }
+  return protectedIds
+}
+
 /** Concatenated text content of a message, used for duplicate detection. */
 function messageTextContent(message: Message): string {
   return message.parts
@@ -381,12 +413,17 @@ function messageTextContent(message: Message): string {
  */
 export function mergeHydrationWithStreamingTail(
   snapshot: Message[],
-  current: Message[]
+  current: Message[],
+  protectedIds?: ReadonlySet<string>
 ): Message[] {
-  const firstStreamingIndex = current.findIndex(isLiveStream)
-  if (firstStreamingIndex === -1) return snapshot
-
-  let tailStart = firstStreamingIndex
+  // A live stream anchors the tail. So does a turn that was live when this
+  // request started and has since finished: the snapshot was read before the
+  // answer was stored, and dropping it leaves the user prompt with no reply.
+  let tailStart = current.findIndex(isLiveStream)
+  if (tailStart === -1 && protectedIds && protectedIds.size > 0) {
+    tailStart = current.findIndex((message) => protectedIds.has(message.id))
+  }
+  if (tailStart === -1) return snapshot
   while (
     tailStart > 0 &&
     current[tailStart - 1].role === 'user' &&
@@ -669,6 +706,14 @@ export const useHistoryStore = defineStore('history', () => {
     }
 
     try {
+      // Captured before the request, not when the response lands. A fast stream
+      // (TestProvider after impersonation) finishes before this GET returns;
+      // `isStreaming` is already false by then, so the apply-time check alone
+      // replaces the finished answer with the mid-turn snapshot.
+      const idsAtFetch = new Set(messages.value.map((message) => message.id))
+      const liveIdsAtFetch = new Set(
+        messages.value.filter(isLiveStream).map((message) => message.id)
+      )
       const { chatApi } = await import('@/services/api')
       const response = (await chatApi.getChatMessages(chatId, offset, limit)) as {
         success?: boolean
@@ -723,8 +768,19 @@ export const useHistoryStore = defineStore('history', () => {
           // visibly stopped streaming mid-answer. Drop recovery is unaffected:
           // ChatView calls finishStreamingMessage() before recoverInterruptedTurn(),
           // so its silent reloads never see an active stream to preserve.
-          if (messages.value.some(isLiveStream)) {
-            messages.value = mergeHydrationWithStreamingTail(loadedMessages, messages.value)
+          //
+          // A load that was already in flight does. Impersonation cold-starts
+          // the chat and waits for the model catalog before this GET, so the
+          // send overlaps it. The answer is stored after the snapshot was
+          // read; applying that snapshot once `isStreaming` has flipped off
+          // deletes the reply and leaves the prompt alone.
+          const protectedIds = protectedTurnIds(messages.value, idsAtFetch, liveIdsAtFetch)
+          if (messages.value.some(isLiveStream) || protectedIds.size > 0) {
+            messages.value = mergeHydrationWithStreamingTail(
+              loadedMessages,
+              messages.value,
+              protectedIds
+            )
           } else {
             messages.value = loadedMessages
           }
