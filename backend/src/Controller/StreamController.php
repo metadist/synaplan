@@ -43,6 +43,7 @@ use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\ChatErrorNotifier;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ChatErrorView;
+use App\Service\Message\ChatModelId;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -1870,17 +1871,14 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMeta('ai_chat_provider', $response['metadata']['provider'] ?? 'unknown');
                 $outgoingMessage->setMeta('ai_chat_model', $response['metadata']['model'] ?? 'unknown');
 
-                // Store CHAT model_id if available (from user selection or resolved by ChatHandler)
-                if (!empty($modelId)) {
-                    $outgoingMessage->setMeta('ai_chat_model_id', (string) $modelId);
-                    $this->logger->info('StreamController: Storing chat model ID from user selection', [
-                        'model_id' => $modelId,
-                    ]);
-                } elseif (!empty($response['metadata']['model_id'])) {
-                    $outgoingMessage->setMeta('ai_chat_model_id', (string) $response['metadata']['model_id']);
-                    $this->logger->info('StreamController: Storing chat model ID from response', [
-                        'model_id' => $response['metadata']['model_id'],
-                    ]);
+                // The handler reports the model that actually ran. The request id
+                // is only the fallback when that report is missing.
+                $persistedModelId = ChatModelId::persisted(
+                    $response['metadata']['model_id'] ?? null,
+                    $modelId,
+                );
+                if (null !== $persistedModelId) {
+                    $outgoingMessage->setMeta('ai_chat_model_id', $persistedModelId);
                 }
 
                 if (!empty($response['metadata']['usage'])) {
