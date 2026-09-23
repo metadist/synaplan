@@ -59,6 +59,8 @@ describe('DesktopConfiguration', () => {
     const wrapper = await mountPage()
     expect(wrapper.find('[data-testid="page-config-desktop"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-pair"]').exists()).toBe(false)
+    expect(mockReload).not.toHaveBeenCalled()
+    expect(mockListJobs).not.toHaveBeenCalled()
   })
 
   it('links to the public desktop repository and its releases as a beta', async () => {

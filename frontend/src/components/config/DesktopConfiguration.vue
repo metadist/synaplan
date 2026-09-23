@@ -450,6 +450,11 @@ const formatLastSeen = (lastSeen: number): string => {
 const waitingCount = (deviceId: number): number => waitingByDevice.value[deviceId] ?? 0
 
 const loadAll = async () => {
+  if (!isDesktopAgentEnabled()) {
+    loading.value = false
+    error.value = null
+    return
+  }
   loading.value = true
   error.value = null
   try {
