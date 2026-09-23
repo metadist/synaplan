@@ -34,6 +34,7 @@ import {
 import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
+import { desktopRouteGuard, savedTasksRouteGuard } from '@/router/featureSurfaceGuards'
 import { aiAccountsRouteGuard } from '@/composables/useAiAccounts'
 import { adminUsersTabRedirect, groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -370,6 +371,7 @@ const router = createRouter({
       name: 'channels-saved-tasks',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.savedTasks', i18n: ['config'] },
+      beforeEnter: savedTasksRouteGuard,
     },
     {
       path: '/channels/approvals',
@@ -388,6 +390,7 @@ const router = createRouter({
       name: 'channels-desktop',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.desktop', i18n: ['config'] },
+      beforeEnter: desktopRouteGuard,
     },
     {
       path: '/channels/platform-links',

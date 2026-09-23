@@ -3,9 +3,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import DesktopConfiguration from '@/components/config/DesktopConfiguration.vue'
 
-const { mockListJobs, mockReload } = vi.hoisted(() => ({
+const { mockListJobs, mockReload, desktopOn } = vi.hoisted(() => ({
   mockListJobs: vi.fn(),
   mockReload: vi.fn(),
+  desktopOn: { value: true },
 }))
 
 vi.mock('@/services/api/desktopApi', () => ({
@@ -29,6 +30,10 @@ vi.mock('@/composables/useDialog', () => ({
   useDialog: () => ({ confirm: vi.fn() }),
 }))
 
+vi.mock('@/composables/useDesktopAgentFeature', () => ({
+  isDesktopAgentEnabled: () => desktopOn.value,
+}))
+
 const REPO = 'https://github.com/metadist/synaplan-desktop'
 
 const mountPage = async () => {
@@ -44,8 +49,18 @@ const mountPage = async () => {
 describe('DesktopConfiguration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    desktopOn.value = true
     mockListJobs.mockResolvedValue([])
     mockReload.mockResolvedValue(undefined)
+  })
+
+  it('is absent when desktop is off', async () => {
+    desktopOn.value = false
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="page-config-desktop"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-pair"]').exists()).toBe(false)
+    expect(mockReload).not.toHaveBeenCalled()
+    expect(mockListJobs).not.toHaveBeenCalled()
   })
 
   it('links to the public desktop repository and its releases as a beta', async () => {

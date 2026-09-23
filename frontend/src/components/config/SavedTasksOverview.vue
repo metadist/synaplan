@@ -11,6 +11,7 @@ import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { iamApi, type IamSharedItem } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { isAgentsEnabled } from '@/composables/useAgentsFeature'
+import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
 
 type OverviewTab = 'tasks' | 'watches'
 
@@ -62,6 +63,12 @@ const onWatchesUnavailable = () => {
 }
 
 const load = async () => {
+  if (!isSavedTasksEnabled()) {
+    tasks.value = []
+    sharedItems.value = []
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
     tasks.value = await savedTasksApi.list()
@@ -123,7 +130,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6" data-testid="page-saved-tasks">
+  <div v-if="isSavedTasksEnabled()" class="space-y-6" data-testid="page-saved-tasks">
     <PageHeader
       :title="$t('config.savedTasks.overviewTitle')"
       :subtitle="$t('config.savedTasks.overviewSubtitle')"
