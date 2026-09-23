@@ -101,6 +101,26 @@ export const useIncomingStore = defineStore('incoming', () => {
     }
   }
 
+  /**
+   * The user opened one shared conversation from history. The server drops
+   * that item from the unseen count; the count shown here is the one the
+   * server returns, and the other rows stay new.
+   */
+  async function markChatOpened(chatId: number): Promise<void> {
+    if (!isIamSharingEnabled()) return
+    const id = String(chatId)
+    const item = chats.value.find((chat) => chat.id === id)
+    if (!item?.isNew) return
+    try {
+      await iamApi.markSharedItemSeen(INCOMING_KIND, id)
+      // Both the row marker and the count come back from the server.
+      if (inFlight) await inFlight
+      await load()
+    } catch {
+      // Leave the badge. The next refresh reads the server again.
+    }
+  }
+
   function reset(): void {
     chats.value = []
     unseenCount.value = 0
@@ -132,6 +152,7 @@ export const useIncomingStore = defineStore('incoming', () => {
     load,
     refreshUnseen,
     markSeen,
+    markChatOpened,
     reset,
   }
 })

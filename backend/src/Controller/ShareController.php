@@ -377,10 +377,14 @@ final class ShareController extends AbstractController
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
         $lastSeenAt = $this->sharedInbox->lastSeenAt($userId, $kind);
+        $opened = $this->sharedInbox->openedMarks($userId, $kind);
 
         return $this->json([
             'items' => array_map(
-                fn (array $row) => $this->shareService->serializeSharedItem($row, $userId, $lastSeenAt),
+                fn (array $row) => $this->shareService->serializeSharedItem(
+                    $row,
+                    $this->sharedInbox->rowIsNew($row, $userId, $lastSeenAt, $opened),
+                ),
                 $rows,
             ),
         ]);
@@ -490,6 +494,63 @@ final class ShareController extends AbstractController
         }
 
         return $this->json(['success' => true, 'lastSeenAt' => $lastSeenAt]);
+    }
+
+    #[Route('/api/v1/me/shared/opened', name: 'me_shared_opened', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/me/shared/opened',
+        operationId: 'markSharedItemSeen',
+        summary: 'Mark one shared item as opened without clearing the rest of the incoming list',
+        tags: ['IAM Sharing'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['kind', 'resourceId'],
+                properties: [
+                    new OA\Property(property: 'kind', type: 'string', example: 'conversation'),
+                    new OA\Property(property: 'resourceId', type: 'string', example: '42'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'That item is no longer new',
+                content: new OA\JsonContent(
+                    required: ['success'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'kind or resourceId is missing, unknown, or invalid'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function markSharedItemSeen(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+        $payload = json_decode((string) $request->getContent(), true);
+        $kind = is_array($payload) ? (string) ($payload['kind'] ?? '') : '';
+        $resourceId = is_array($payload) ? (string) ($payload['resourceId'] ?? '') : '';
+        if ('' === $kind || '' === $resourceId) {
+            return $this->json(['error' => 'kind and resourceId are required.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $this->sharedInbox->markItemSeen((int) $user->getId(), $kind, $resourceId);
+        } catch (UnknownResourceKindException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json(['success' => true]);
     }
 
     private function guard(?User $user): ?JsonResponse

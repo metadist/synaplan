@@ -613,13 +613,13 @@ final readonly class ShareService
 
     /**
      * One "shared with me" list entry: the resource card plus how and when it
-     * reached the user, and whether it arrived after they last looked.
+     * reached the user, and whether it is still new for them.
      *
      * @param array{card: ResourceCard, permission: string, ownerId: int|null, share: Share, sharedAt: int} $row
      *
      * @return array<string, mixed>
      */
-    public function serializeSharedItem(array $row, int $viewerId, int $lastSeenAt): array
+    public function serializeSharedItem(array $row, bool $isNew): array
     {
         $share = $row['share'];
         $item = $this->serializeSharedCard($row['card'], $row['permission'], $row['ownerId']);
@@ -628,7 +628,7 @@ final readonly class ShareService
             'name' => $this->sharedViaName($share),
         ];
         $item['sharedAt'] = $row['sharedAt'];
-        $item['isNew'] = $share->getGrantedBy() !== $viewerId && $row['sharedAt'] > $lastSeenAt;
+        $item['isNew'] = $isNew;
 
         return $item;
     }

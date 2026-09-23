@@ -279,6 +279,72 @@ final class ShareControllerTest extends WebTestCase
         self::assertFalse($items[0]['isNew']);
     }
 
+    public function testOpeningOneSharedChatLeavesTheOthersNew(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('opened-owner@synaplan.internal');
+        $member = $this->createUser('opened-member@synaplan.internal');
+        $group = $this->createGroup('Opened');
+        $this->addMember($group, (int) $member->getId());
+        $first = $this->createChat((int) $owner->getId(), 'First notes');
+        $second = $this->createChat((int) $owner->getId(), 'Second notes');
+
+        $this->authenticateClient($this->client, $owner);
+        foreach ([$first, $second] as $chat) {
+            $this->postJson('/api/v1/shares', [
+                'kind' => 'conversation',
+                'resource' => (string) $chat->getId(),
+                'subjectType' => 'group',
+                'subjectId' => (int) $group->getId(),
+                'permission' => 'use',
+            ]);
+            self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        }
+
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        $before = $this->json()['count'];
+        self::assertGreaterThanOrEqual(2, $before);
+
+        $this->postJson('/api/v1/me/shared/opened', [
+            'kind' => 'conversation',
+            'resourceId' => (string) $first->getId(),
+        ]);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertSame($before - 1, $this->json()['count']);
+
+        $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+        $byId = [];
+        foreach ($this->json()['items'] as $item) {
+            $byId[$item['id']] = $item['isNew'];
+        }
+        self::assertFalse($byId[(string) $first->getId()]);
+        self::assertTrue($byId[(string) $second->getId()]);
+
+        $this->postJson('/api/v1/me/shared/seen', ['kind' => 'conversation']);
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertSame(0, $this->json()['count']);
+
+        // sharedAt and the watermark are unix seconds. A share in the same
+        // second as "mark seen" is not after that visit.
+        sleep(1);
+        $third = $this->createChat((int) $owner->getId(), 'Third notes');
+        $this->authenticateClient($this->client, $owner);
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $third->getId(),
+            'subjectType' => 'group',
+            'subjectId' => (int) $group->getId(),
+            'permission' => 'use',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertGreaterThanOrEqual(1, $this->json()['count']);
+    }
+
     public function testGroupGrantNamesTheGroupEvenWhenEveryoneHasTheSamePermission(): void
     {
         $this->enableSharing();
