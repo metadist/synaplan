@@ -943,6 +943,63 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * xAI Grok 4.7 — chat + vision added 2026-09-23. Same $2/$6 headline as
+     * 4.6. The 2026-09-21 model page publishes no cache discount and no
+     * >200k tier, and reasoning depth is configurable (default high).
+     */
+    public function testGrok47ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $grok47 = ModelCatalog::find('xai:grok-4.7');
+
+        $this->assertCount(2, $grok47, 'Expected grok-4.7 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($grok47, 'tag'));
+        $this->assertSame(367, ModelCatalog::findBidByKey('xai:grok-4.7:chat'));
+        $this->assertSame(368, ModelCatalog::findBidByKey('xai:grok-4.7:pic2text'));
+
+        foreach ($grok47 as $variant) {
+            $this->assertSame('xAI', $variant['service']);
+            $this->assertSame('grok-4.7', $variant['providerId']);
+            $this->assertSame('grok-4.7', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(6.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(2.0, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+
+        $chat = ModelCatalog::find('xai:grok-4.7:chat')[0];
+        $this->assertSame('high', $chat['json']['reasoning_effort_default'] ?? null);
+        $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+        $this->assertNull(ModelCatalog::contextPricing('grok-4.7'));
+    }
+
+    /**
+     * Meta Muse Spark 1.3 — standard tier only (BIDs 369–370). The contributor
+     * id is cheaper and is used to improve Meta's products, so it stays out.
+     */
+    public function testMuseSparkModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $spark = ModelCatalog::find('meta:muse-spark-1.3');
+
+        $this->assertCount(2, $spark, 'Expected muse-spark-1.3 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($spark, 'tag'));
+        $this->assertSame(369, ModelCatalog::findBidByKey('meta:muse-spark-1.3:chat'));
+        $this->assertSame(370, ModelCatalog::findBidByKey('meta:muse-spark-1.3:pic2text'));
+
+        foreach ($spark as $variant) {
+            $this->assertSame('Meta', $variant['service']);
+            $this->assertSame('muse-spark-1.3', $variant['providerId']);
+            $this->assertSame('muse-spark-1.3', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(1.25, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(4.25, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.15, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('US', $variant['json']['meta']['jurisdiction'] ?? null);
+            $this->assertSame('api.meta.ai', $variant['json']['meta']['host'] ?? null);
+        }
+
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $this->assertNotContains('muse-spark-1.3-contributor', $providerIds);
+    }
+
+    /**
      * Kimi K3 via the HF router — like every Kimi row, pinned to DeepInfra
      * (`:deepinfra` suffix) so the billed price is deterministic and matches
      * the catalog rate (DeepInfra snapshot 2026-08-20). K3 outputs text only,
@@ -1220,6 +1277,39 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('per_image', $imagen[0]['json']['pricing_mode'] ?? null);
         $this->assertSame('perImage', $imagen[0]['outUnit'] ?? null);
         $this->assertEqualsWithDelta(0.04, (float) ($imagen[0]['priceOut'] ?? 0.0), 1e-9);
+    }
+
+    /**
+     * Google shut the Nano Banana preview ids down on 2026-06-25. The stable
+     * ids are the ones new installs and the image default bind to.
+     */
+    public function testStableGoogleImageModelsAreActiveAndReplaceThePreviews(): void
+    {
+        $banana2 = ModelCatalog::find('google:gemini-3.1-flash-image:text2pic');
+        $pro = ModelCatalog::find('google:gemini-3-pro-image:text2pic');
+
+        $this->assertCount(1, $banana2);
+        $this->assertCount(1, $pro);
+        $this->assertSame(371, $banana2[0]['id']);
+        $this->assertSame(372, $pro[0]['id']);
+        $this->assertSame(1, $banana2[0]['active']);
+        $this->assertSame(1, $banana2[0]['selectable']);
+        $this->assertSame(1, $pro[0]['active']);
+        $this->assertSame(1, $pro[0]['selectable']);
+        $this->assertEqualsWithDelta(0.067, (float) $banana2[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.134, (float) $pro[0]['priceOut'], 1e-9);
+        $this->assertSame('gemini-3.1-flash-image', $banana2[0]['json']['params']['model'] ?? null);
+        $this->assertSame('gemini-3-pro-image', $pro[0]['json']['params']['model'] ?? null);
+
+        $this->assertTrue(ModelCatalog::isRetired(190));
+        $this->assertTrue(ModelCatalog::isRetired(228));
+        $this->assertSame(371, ModelCatalog::successorBid(190));
+        $this->assertSame(372, ModelCatalog::successorBid(228));
+        $this->assertSame(371, ModelCatalog::successorBid(115));
+
+        $preview = ModelCatalog::find('google:gemini-3.1-flash-image-preview:text2pic');
+        $this->assertSame(0, $preview[0]['active']);
+        $this->assertSame(0, $preview[0]['selectable']);
     }
 
     /**

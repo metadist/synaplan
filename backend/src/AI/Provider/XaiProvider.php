@@ -75,18 +75,29 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
     private const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
     private const SUPPORTED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png'];
 
+    /**
+     * grok-4.3 accepts `none`. grok-4.7 does not — its documented set is
+     * low / medium / high (default) / xhigh, and `none` is a 400.
+     *
+     * @var list<string>
+     */
     private const REASONING_EFFORTS = ['none', 'low', 'medium', 'high'];
 
     /**
-     * Model families that accept `reasoning_effort`. xAI documents the parameter
-     * for grok-4.3 only — every other Grok model reasons at a fixed depth, so
-     * sending it there would be an unsupported field. No shipped catalog row
-     * uses grok-4.3 today; the gate exists so an operator who points a model row
-     * at it gets the correct request shape.
-     *
-     * @see https://docs.x.ai/developers/rest-api-reference/inference/chat
+     * @var list<string>
      */
-    private const REASONING_EFFORT_MODELS = ['grok-4.3'];
+    private const REASONING_EFFORTS_47 = ['low', 'medium', 'high', 'xhigh'];
+
+    /**
+     * Model families that accept `reasoning_effort`. grok-4.5 and grok-4.6
+     * reason at a fixed depth, so the parameter is an unsupported field there.
+     * grok-4.3 is not a catalog row; the gate stays so an operator who points
+     * a model at it still gets the correct request shape. grok-4.7 is the
+     * shipped model that takes the knob.
+     *
+     * @see https://docs.x.ai/developers/grok-4-7
+     */
+    private const REASONING_EFFORT_MODELS = ['grok-4.3', 'grok-4.7'];
 
     private const IMAGE_MIME_FALLBACK = 'image/png';
     private const MAX_IMAGES_PER_REQUEST = 10;
@@ -1247,8 +1258,8 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
      *   1. A model that does not accept the parameter → null.
      *   2. Explicit `reasoning_effort` string wins.
      *   3. The Thinking toggle (`reasoning` bool): true → the catalog's
-     *      `reasoning_effort_default` (or `high`), false → `none`, which is
-     *      cheaper than xAI's server-side default of `low`.
+     *      `reasoning_effort_default` (or `high`), false → `none` on grok-4.3
+     *      and `low` on grok-4.7 (`none` is not a documented 4.7 value).
      *   4. No signal, or a model row that does not advertise reasoning → null,
      *      so nothing is sent.
      *
@@ -1260,8 +1271,9 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
             return null;
         }
 
+        $allowed = $this->allowedReasoningEfforts($model);
         $explicit = $options['reasoning_effort'] ?? null;
-        if (is_string($explicit) && in_array(strtolower($explicit), self::REASONING_EFFORTS, true)) {
+        if (is_string($explicit) && in_array(strtolower($explicit), $allowed, true)) {
             return strtolower($explicit);
         }
 
@@ -1277,11 +1289,12 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
         }
 
         if (!$options['reasoning']) {
-            return 'none';
+            return $this->reasoningOffValue($model);
         }
 
+        $allowed = $this->allowedReasoningEfforts($model);
         $default = $this->modelConfigFromOptions($options)['reasoning_effort_default'] ?? null;
-        if (is_string($default) && in_array($default, self::REASONING_EFFORTS, true)) {
+        if (is_string($default) && in_array($default, $allowed, true)) {
             return $default;
         }
 
@@ -1297,6 +1310,30 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
         }
 
         return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function allowedReasoningEfforts(string $model): array
+    {
+        if (str_starts_with($model, 'grok-4.7')) {
+            return self::REASONING_EFFORTS_47;
+        }
+
+        return self::REASONING_EFFORTS;
+    }
+
+    /**
+     * Cheapest documented "thinking off" value. grok-4.7 rejects `none`.
+     */
+    private function reasoningOffValue(string $model): string
+    {
+        if (str_starts_with($model, 'grok-4.7')) {
+            return 'low';
+        }
+
+        return 'none';
     }
 
     /**

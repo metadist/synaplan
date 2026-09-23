@@ -121,6 +121,15 @@ final readonly class ProviderDefaultsService
             'SUMMARIZE' => 'a2agent:qwen3.8-flash:chat',
             'PIC2TEXT' => 'a2agent:qwen3.8-flash:pic2text',
         ],
+        'meta' => [
+            'CHAT' => 'meta:muse-spark-1.3:chat',
+            'TOOLS' => 'meta:muse-spark-1.3:chat',
+            'ANALYZE' => 'meta:muse-spark-1.3:chat',
+            'SORT' => 'meta:muse-spark-1.3:chat',
+            'PLAN' => 'meta:muse-spark-1.3:chat',
+            'SUMMARIZE' => 'meta:muse-spark-1.3:chat',
+            'PIC2TEXT' => 'meta:muse-spark-1.3:pic2text',
+        ],
         // NB: colons inside a catalog providerId are normalized to dashes by
         // ModelCatalog::modelKey() — hence "Kimi-K2.6-deepinfra", not ":deepinfra".
         'huggingface' => [
@@ -182,6 +191,7 @@ final readonly class ProviderDefaultsService
         'huggingface',
         'xai',
         'a2agent',
+        'meta',
         'ollama',
     ];
 

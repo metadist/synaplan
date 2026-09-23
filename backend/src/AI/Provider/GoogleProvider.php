@@ -680,7 +680,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         // Nano Banana 2, the successor ModelCatalog::RETIREMENTS[115] records for
         // Imagen 4.0: Google shut the Imagen 4 endpoints down on 2026-08-17, so
         // the previous default 404'd for every caller that passed no model.
-        $model = $options['model'] ?? 'gemini-3.1-flash-image-preview';
+        $model = $options['model'] ?? 'gemini-3.1-flash-image';
         $inputImages = $options['images'] ?? [];
 
         if (null === $this->resolveApiKey()) {
@@ -791,7 +791,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     /**
      * Pic2pic: generate an image from input images + text using Gemini native API.
      *
-     * @param string   $model      Gemini image model (e.g. gemini-3.1-flash-image-preview)
+     * @param string   $model      Gemini image model (e.g. gemini-3.1-flash-image)
      * @param string   $prompt     Text instruction
      * @param string[] $imagePaths Absolute paths to input images
      *

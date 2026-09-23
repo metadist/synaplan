@@ -299,6 +299,7 @@ ANTHROPIC_API_KEY=$(setting anthropic-api-key)
 GOOGLE_GEMINI_API_KEY=$(setting google-gemini-api-key)
 MISTRAL_API_KEY=$(setting mistral-api-key)
 XAI_API_KEY=$(setting xai-api-key)
+META_API_KEY=$(setting meta-api-key)
 
 # Optional: bill your own users through your own Stripe account. Empty means
 # open-source mode — no plans, no quotas, every feature open. Full setup in

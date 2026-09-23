@@ -1543,7 +1543,7 @@ class ModelConfigServiceTest extends TestCase
             'anthropic:claude-sonnet-5:chat' => 'Anthropic',
             'groq:openai/gpt-oss-120b:chat' => 'Groq',
             'groq:openai/gpt-oss-120b:mem' => 'Groq',
-            'google:gemini-3.1-flash-image-preview:text2pic' => 'Google',
+            'google:gemini-3.1-flash-image:text2pic' => 'Google',
             'google:veo-3.1-generate-preview:text2vid' => 'Google',
             'higgsfield:higgsfield-ai/dop/standard:text2vid' => 'Higgsfield',
             'google:gemini-2.5-flash-preview-tts:text2sound' => 'Google',

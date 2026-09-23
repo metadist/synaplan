@@ -142,11 +142,13 @@ Google deprecated all three Imagen 4 IDs on 2026-06-15 and **hard-shut them down
 
 | BID | Model | `providerId` | Successor |
 | --- | ----- | ------------ | --------- |
-| 115 | Imagen 4.0 | `imagen-4.0-generate-001` | `google:gemini-3.1-flash-image-preview:text2pic` (Nano Banana 2, BID 190) |
+| 115 | Imagen 4.0 | `imagen-4.0-generate-001` | `google:gemini-3.1-flash-image:text2pic` (Nano Banana 2, BID 371) |
 | 230 | Imagen 4.0 Fast | `imagen-4.0-fast-generate-001` | same |
 | 231 | Imagen 4.0 Ultra | `imagen-4.0-ultra-generate-001` | same |
+| 190 | Nano Banana 2 preview | `gemini-3.1-flash-image-preview` | `google:gemini-3.1-flash-image:text2pic` (BID 371) |
+| 228 | Nano Banana Pro preview | `nano-banana-pro-preview` | `google:gemini-3-pro-image:text2pic` (BID 372) |
 
-Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the three catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. Nano Banana 2 (`gemini-3.1-flash-image-preview`, BID 190) is already the seeded `DEFAULTMODEL.TEXT2PIC`/`PIC2PIC`, so no default binding is orphaned; all three tiers point at it because we do not carry the flat `gemini-3.1-flash-image` / `gemini-3-pro-image` variants Google's migration table names per tier. Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) is the authority for the shutdown date.
+Imagen 4 was retired via the registry. The preview image ids were shut down on 2026-06-25; `Version20260923190000` inserts the stable rows as active, deactivates BIDs 190 and 228, and repoints image bindings. Stable prices (1K): Nano Banana 2 $0.067/image, Nano Banana Pro $0.134/image. Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) is the authority for the shutdown date.
 
 ### TrustedTokens DeepSeek V4 Flash shutdown (2026-09-08)
 
@@ -209,15 +211,17 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
 | **TrustedTokens** | ✅ verified 2026-09-17 (V4 Flash, Flash-0731 and V4 Pro retired) | https://trustedtokens.eu/api/billing/models |
 | **A2Agent** | ✅ verified 2026-09-14 (public group rate) | https://a2agent.me/models |
+| **Meta** | ✅ verified 2026-09-23 (Muse Spark 1.3 standard tier) | https://developer.meta.com/ai/models/muse-spark/ |
 | **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
-### xAI / Grok (verified 2026-07-29; Grok 4.6 rows added 2026-08-20)
+### xAI / Grok (verified 2026-07-29; Grok 4.6 rows added 2026-08-20; Grok 4.7 rows added 2026-09-23)
 
 OpenAI-compatible chat/vision at `https://api.x.ai/v1`, plus the Grok Imagine media endpoints and the voice endpoints (`/v1/tts`, `/v1/stt` — note: NOT OpenAI's `/v1/audio/*`). Catalog stores **USD per 1M tokens** for the token rows; cache-read rates live in `json.cache_read_price_per_1M`.
 
 | BID | Model | Catalog in/out | Official (cache) | Long context (> 200k) | Context |
 | --- | ----- | -------------- | ---------------- | --------------------- | ------- |
+| 367 / 368 | `grok-4.7` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (no cache discount published) | none published | 500k |
 | 326 / 327 | `grok-4.6` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.50) | $4.00 / $12.00 | 500k |
 | 313 / 315 | `grok-4.5` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.30) | $4.00 / $12.00 | 500k |
 | 316 | `grok-imagine-image` | — / $0.02 per image | $0.02 (1k and 2k identical) | n/a | n/a |
@@ -241,7 +245,7 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **Images are billed from `default_resolution`, not from the request.** The image path never passes a resolution into `calculateMediaCost()`, so `resolveResolution()` falls back to the catalog's `default_resolution` — and `XaiProvider::generateImage()` sends that same value to xAI. Changing `default_resolution` on BID 318 therefore moves the request AND the price together; changing only `priceOut` would desync them.
 - **`grok-imagine-video-1.5` is image-to-video only.** It carries `features: ['image2video']` + `requires_reference_image`, so `MediaGenerationHandler` explains the missing reference image instead of leaking a provider 400. It is reachable through the IMG2VID default-model slot, which shares the `text2vid` BTAG. Because `XaiProvider` implements `SupportsInlineReferenceImage`, the handler passes the local upload path and the provider inlines it as a data URI — so image-to-video works on xAI without an internet-reachable `APP_URL`, unlike Higgsfield and Veo.
 - **No refund on cancel.** xAI has no cancel endpoint for deferred video renders, so `cancelVideoOperation()` only stops our polling; the render completes upstream and stays billable.
-- **`reasoning_effort` is a grok-4.3-only parameter**, and grok-4.3 is not in the catalog. xAI documents the knob for that model alone (`none` / `low` (default) / `medium` / `high`), so `XaiProvider::REASONING_EFFORT_MODELS` gates it. The reasoning depth of `grok-4.5` and `grok-4.6` — and therefore their output token volume — is not controllable, so a Thinking toggle cannot reduce their cost.
+- **`reasoning_effort` is accepted by grok-4.3 and grok-4.7.** grok-4.3 is not a catalog row (`none` / `low` / `medium` / `high`). grok-4.7 (BIDs 367–368) documents `low` / `medium` / `high` (default) / `xhigh` and rejects `none`, so Thinking off sends `low`. The 2026-09-21 page publishes no cached-input discount and no >200k tier, so cache reads bill at the $2 input rate and `CONTEXT_PRICING` has no `grok-4.7` entry. grok-4.5 and grok-4.6 still reason at a fixed depth.
 - **The voice rows MUST keep their `pricing_mode`.** BID 320 needs `pricing_mode: per_character` and BID 321 needs `per_second`; without it the cost path falls through to per-token and records $0.00 for every call (issue #886b). BID 321 is authored in `$/hour`, which `CostCalculationService` normalises to per-second, so the clip length must never be pre-divided.
 - **Only the REST transcription rate is reachable.** xAI charges $0.20/hour for the streaming STT WebSocket, but `XaiProvider` implements the `POST /v1/stt` REST path only, so no request can be billed at the higher rate. If streaming STT is ever added it needs its own catalog row.
 - **TTS has no per-request cap beyond the character limit.** `/v1/tts` rejects text over 15,000 characters, and the provider checks that locally so the user gets a readable message instead of a 400. Longer texts must be split by the caller — each chunk is billed separately.
@@ -279,6 +283,14 @@ The gateway resells each model under **its upstream vendor's own id**, so `deeps
 | 363 | `deepseek-v4-flash` | $0.14 / $0.28 | $0.14 / $0.28 | 1M |
 | 364 | `MiniMax-M3` | $0.30 / $1.20 | $0.30 / $1.20 | 1M |
 | 365 / 366 | `qwen3.8-flash` (chat + vision) | $0.15 / $0.47 | $0.15 / $0.47 | 1M |
+
+### Meta (verified 2026-09-23)
+
+OpenAI-compatible Chat Completions at `https://api.meta.ai/v1`. Catalog stores the **standard** Muse Spark 1.3 rate from https://developer.meta.com/ai/models/muse-spark/ (not used to improve Meta's products). The contributor id `muse-spark-1.3-contributor` ($0.10 / $0.20, prompts used to improve Meta's products) is intentionally absent. Cache reads are $0.15 / 1M. `reasoning_effort` values are `minimal` / `low` / `medium` / `high` / `xhigh` / `max`; `none` returns HTTP 400, so Thinking off sends `minimal`. Not in LiteLLM → `unmatched` bucket. Keys are created at https://dev.meta.ai/ (API keys). Synaplan's env var is `META_API_KEY` (Meta's SDK calls the same secret `MODEL_API_KEY`).
+
+| BID | Model | Catalog in/out | Official (cache) | Context |
+| --- | ----- | -------------- | ---------------- | ------- |
+| 369 / 370 | `muse-spark-1.3` (chat + vision) | $1.25 / $4.25 | $1.25 / $4.25 (cache $0.15) | 1M |
 
 ### TheHive (verified 2026-07-13)
 

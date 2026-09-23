@@ -11,6 +11,7 @@ export type ProviderHelpId =
   | 'mistral'
   | 'trustedtokens'
   | 'a2agent'
+  | 'meta'
   | 'huggingface'
   | 'xai'
   | 'perplexity'
@@ -32,6 +33,7 @@ const BY_PROVIDER: Record<string, ProviderHelpMeta> = {
   mistral: { id: 'mistral', url: 'https://console.mistral.ai/api-keys' },
   trustedtokens: { id: 'trustedtokens', url: 'https://trustedtokens.eu/' },
   a2agent: { id: 'a2agent', url: 'https://a2agent.me/' },
+  meta: { id: 'meta', url: 'https://dev.meta.ai/' },
   huggingface: { id: 'huggingface', url: 'https://huggingface.co/settings/tokens' },
   xai: { id: 'xai', url: 'https://console.x.ai/' },
   perplexity: { id: 'perplexity', url: 'https://www.perplexity.ai/account/api' },
@@ -47,6 +49,7 @@ const BY_ENV_VAR: Record<string, ProviderHelpMeta> = {
   MISTRAL_API_KEY: BY_PROVIDER.mistral,
   TRUSTEDTOKENS_API_KEY: BY_PROVIDER.trustedtokens,
   A2AGENT_API_KEY: BY_PROVIDER.a2agent,
+  META_API_KEY: BY_PROVIDER.meta,
   HUGGINGFACE_API_KEY: BY_PROVIDER.huggingface,
   XAI_API_KEY: BY_PROVIDER.xai,
   PERPLEXITY_API_KEY: BY_PROVIDER.perplexity,

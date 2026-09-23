@@ -61,6 +61,11 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('trusted tokens')).toBe('mdi:shield-check')
   })
 
+  it('should return the Meta icon for Meta', () => {
+    expect(getProviderIcon('Meta')).toBe('logos:meta-icon')
+    expect(getProviderIcon('meta')).toBe('logos:meta-icon')
+  })
+
   it('should return a gateway icon for A2Agent', () => {
     expect(getProviderIcon('A2Agent')).toBe('mdi:transit-connection-variant')
     expect(getProviderIcon('a2agent')).toBe('mdi:transit-connection-variant')
@@ -98,6 +103,11 @@ describe('Provider Flag Utility', () => {
     expect(getProviderFlag('TrustedTokens')).toBe('circle-flags:de')
     expect(getProviderFlag('trustedtokens')).toBe('circle-flags:de')
     expect(getProviderFlag('trusted-tokens')).toBe('circle-flags:de')
+  })
+
+  it('should return the US flag for Meta', () => {
+    expect(getProviderFlag('Meta')).toBe('circle-flags:us')
+    expect(getProviderFlag('meta')).toBe('circle-flags:us')
   })
 
   it('should return the Chinese flag for A2Agent', () => {

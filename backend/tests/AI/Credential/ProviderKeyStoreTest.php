@@ -473,4 +473,14 @@ final class ProviderKeyStoreTest extends TestCase
         self::assertFalse($meta['freeTier']);
         self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
     }
+
+    public function testMetaCatalogPointsAtTheModelApiDashboard(): void
+    {
+        $meta = ProviderKeyCatalog::get('meta');
+
+        self::assertSame('META_API_KEY', $meta['envVar']);
+        self::assertSame('https://dev.meta.ai/', $meta['consoleUrl']);
+        self::assertSame('https://api.meta.ai/v1/models', $meta['validation']['url']);
+        self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
+    }
 }

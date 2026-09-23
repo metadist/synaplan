@@ -653,6 +653,10 @@
       "title": "A2Agent API anahtarı",
       "message": "A2Agent'ta (pano → API anahtarları) kullanıma göre ücretlendirilen bir API anahtarı oluşturun ve buraya yapıştırın. İstemler, bu ağ geçidi üzerinden Çin anakarasındaki model sağlayıcıları (Qwen, DeepSeek, MiniMax) tarafından işlenir. A2Agent, Çin anakarası dışındaki kullanıcılara hizmet verir. AB kişisel verisi işleyen işletmeciler bunu kendi DPA'larına göre kararlaştırmalıdır."
     },
+    "meta": {
+      "title": "Meta API anahtarı",
+      "message": "Meta Model API panelinde (API keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, Muse Spark'ı açar. İstemleri Meta işler."
+    },
     "huggingface": {
       "title": "HuggingFace API jetonu",
       "message": "HuggingFace ayarlarında bir erişim jetonu oluşturun ve HuggingFace Inference modellerini kullanmak için buraya yapıştırın."

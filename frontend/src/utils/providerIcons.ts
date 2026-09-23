@@ -105,6 +105,7 @@ export const getProviderFlag = (provider: string): string => {
     p.includes('google') ||
     p.includes('groq') ||
     p.includes('xai') ||
+    p.includes('meta') ||
     p.includes('thehive') ||
     p.includes('the hive')
   ) {

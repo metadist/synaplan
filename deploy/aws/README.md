@@ -88,7 +88,7 @@ and an operator changing something afterwards writes an **SSM parameter** at
 `/synaplan/<instance-id>/config/<key>` and reboots. The tag wins.
 
 Recognised keys: `domain`, `admin-email`, `ai-provider`, `<provider>-api-key`
-(`groq`, `openai`, `anthropic`, `google-gemini`, `mistral`, `xai`),
+(`groq`, `openai`, `anthropic`, `google-gemini`, `mistral`, `xai`, `meta`),
 `registration-enabled`, `mailer-dsn`, `sender-email`, and `stripe-secret-key`,
 `stripe-webhook-secret`, `stripe-price-pro`, `stripe-price-team`,
 `stripe-price-business`.

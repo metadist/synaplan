@@ -657,6 +657,10 @@
       "title": "A2Agent API key",
       "message": "Create a pay-as-you-go API key at A2Agent (dashboard → API keys), then paste it here. Prompts are processed by mainland-China model vendors (Qwen, DeepSeek, MiniMax) through this gateway. A2Agent serves users outside mainland China. Operators handling EU personal data should decide per their DPA."
     },
+    "meta": {
+      "title": "Meta API key",
+      "message": "Create an API key in the Meta Model API dashboard (API keys), then paste it here. This unlocks Muse Spark. Prompts are processed by Meta."
+    },
     "huggingface": {
       "title": "HuggingFace API token",
       "message": "Create an access token in your HuggingFace settings, then paste it here to use HuggingFace Inference models."

@@ -30,6 +30,7 @@ final class ChatCompletionsUpstreams
         'huggingface' => 'https://router.huggingface.co/v1/chat/completions',
         'trustedtokens' => 'https://api.trustedtokens.eu/v1/chat/completions',
         'a2agent' => 'https://a2agent.me/v1/chat/completions',
+        'meta' => 'https://api.meta.ai/v1/chat/completions',
         'perplexity' => 'https://api.perplexity.ai/chat/completions',
     ];
 

@@ -653,6 +653,10 @@
       "title": "Clave API de A2Agent",
       "message": "Crea una clave API de pago por uso en A2Agent (panel → claves API) y pégala aquí. Los prompts los procesan proveedores de modelos de China continental (Qwen, DeepSeek, MiniMax) a través de este gateway. A2Agent atiende a usuarios fuera de China continental. Quien trate datos personales de la UE debe decidirlo según su DPA."
     },
+    "meta": {
+      "title": "Clave API de Meta",
+      "message": "Crea una clave API en el panel de Meta Model API (API keys) y pégala aquí. Así se activa Muse Spark. Los prompts los procesa Meta."
+    },
     "huggingface": {
       "title": "Token API de HuggingFace",
       "message": "Crea un token de acceso en la configuración de HuggingFace y pégalo aquí para usar los modelos de HuggingFace Inference."

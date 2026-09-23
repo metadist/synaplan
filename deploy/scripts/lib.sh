@@ -206,6 +206,7 @@ SYNAPLAN_ROUNDTRIP_KEYS=(
     GOOGLE_GEMINI_API_KEY
     MISTRAL_API_KEY
     XAI_API_KEY
+    META_API_KEY
 )
 
 # The value exactly as the FILE spells it: everything after the first "=", with

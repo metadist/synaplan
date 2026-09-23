@@ -87,6 +87,7 @@ final class ModuleOwnershipTest extends TestCase
             'A2AGENT_API_KEY',
             'HUGGINGFACE_API_KEY',
             'XAI_API_KEY',
+            'META_API_KEY',
             'PERPLEXITY_API_KEY',
             // Speech provider key managed by ProviderKeyStore (Models & keys);
             // no module of its own until an ElevenLabs TTS provider ships.
