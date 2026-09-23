@@ -84,17 +84,17 @@ describe('ShareDialog', () => {
 
   it('hides the explanation lines while the suggestion list is open', async () => {
     const wrapper = mountDialog()
-    const consequence = wrapper.get('[data-testid="iam-share-consequence"]')
-    const find = wrapper.get('[data-testid="iam-share-find"]')
+    const display = (testId: string) =>
+      wrapper.get(`[data-testid="${testId}"]`).attributes('style') ?? ''
 
-    expect(consequence.element.style.display).toBe('')
-    expect(find.element.style.display).toBe('')
+    expect(display('iam-share-consequence')).not.toContain('display: none')
+    expect(display('iam-share-find')).not.toContain('display: none')
 
     await wrapper.get('[data-testid="input-iam-subject-search"]').trigger('focus')
 
-    expect(wrapper.get('[data-testid="list-iam-subjects"]').exists()).toBe(true)
-    expect(consequence.element.style.display).toBe('none')
-    expect(find.element.style.display).toBe('none')
+    expect(wrapper.find('[data-testid="list-iam-subjects"]').exists()).toBe(true)
+    expect(display('iam-share-consequence')).toContain('display: none')
+    expect(display('iam-share-find')).toContain('display: none')
   })
 
   it('uses assistant copy and hides the public-link section', () => {
