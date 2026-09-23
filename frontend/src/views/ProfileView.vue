@@ -639,6 +639,7 @@ import { countries, languages, timezones, type UserProfile } from '@/mocks/profi
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { profileApi } from '@/services/api'
+import { ApiError } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isNativeApp } from '@/services/api/nativeRuntime'
@@ -814,6 +815,12 @@ onUnmounted(() => {
   cleanupGuard?.()
 })
 
+function isWrongCurrentPassword(err: unknown): boolean {
+  return (
+    err instanceof ApiError && err.status === 403 && err.message === 'Current password is incorrect'
+  )
+}
+
 const handleSave = saveChanges(async () => {
   // Validate password if provided (only for local auth users)
   if (canChangePassword.value && passwordData.value.new) {
@@ -828,11 +835,14 @@ const handleSave = saveChanges(async () => {
     }
   }
 
+  let profileSaved = false
+  let passwordFailureShown = false
   try {
     loading.value = true
 
     // Update profile
     await profileApi.updateProfile(formData.value)
+    profileSaved = true
 
     // Refresh /auth/me to propagate updated flags (e.g. memoriesEnabled)
     await authStore.refreshUser()
@@ -844,14 +854,32 @@ const handleSave = saveChanges(async () => {
 
     // Change password if provided and allowed
     if (canChangePassword.value && passwordData.value.current && passwordData.value.new) {
-      await profileApi.changePassword(passwordData.value.current, passwordData.value.new)
-      passwordData.value = { current: '', new: '', confirm: '' }
-      passwordTouchedByUser.value = false
+      try {
+        await profileApi.changePassword(passwordData.value.current, passwordData.value.new)
+        passwordData.value = { current: '', new: '', confirm: '' }
+        passwordTouchedByUser.value = false
+      } catch (passwordErr: unknown) {
+        // The profile write already committed. Keep those fields clean so
+        // Discard cannot revert them, and leave the password fields dirty.
+        originalData.value = { ...formData.value }
+        passwordFailureShown = true
+        error(
+          isWrongCurrentPassword(passwordErr)
+            ? t('profile.changePassword.profileSavedPasswordRejected')
+            : t('profile.changePassword.profileSavedPasswordFailed')
+        )
+        throw passwordErr
+      }
     }
 
     originalData.value = { ...formData.value }
   } catch (err: unknown) {
-    error(getErrorMessage(err) || 'Failed to update profile')
+    if (!passwordFailureShown) {
+      if (profileSaved) {
+        originalData.value = { ...formData.value }
+      }
+      error(getErrorMessage(err) || t('profile.saveFailed'))
+    }
     throw err
   } finally {
     loading.value = false

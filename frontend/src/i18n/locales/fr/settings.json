@@ -272,7 +272,9 @@
       "confirmPasswordHint": "Doit correspondre au nouveau mot de passe",
       "externalAuth": "Vous vous connectez avec {provider}. La gestion du mot de passe se fait là-bas.",
       "mismatch": "Les mots de passe ne correspondent pas",
-      "tooShort": "Le mot de passe doit contenir au moins 8 caractères"
+      "tooShort": "Le mot de passe doit contenir au moins 8 caractères",
+      "profileSavedPasswordRejected": "Votre profil a été enregistré. Le mot de passe n'a pas été modifié, car le mot de passe actuel est incorrect.",
+      "profileSavedPasswordFailed": "Votre profil a été enregistré. Le mot de passe n'a pas été modifié."
     },
     "appSecurity": {
       "title": "Sécurité de l’application",
@@ -312,6 +314,7 @@
       "deleting": "Suppression…"
     },
     "privacyNotice": "Toutes les données sont stockées de façon sécurisée et utilisées uniquement à des fins de facturation conformément au droit allemand (DSGVO).",
+    "saveFailed": "Le profil n'a pas pu être enregistré.",
     "saveChanges": "Enregistrer les modifications",
     "cancel": "Annuler"
   },

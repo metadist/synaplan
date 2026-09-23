@@ -272,7 +272,9 @@
       "confirmPasswordHint": "Must match new password",
       "externalAuth": "You're using {provider} to sign in. Password management is handled there.",
       "mismatch": "Passwords do not match",
-      "tooShort": "Password must be at least 8 characters"
+      "tooShort": "Password must be at least 8 characters",
+      "profileSavedPasswordRejected": "Your profile was saved. The password was not changed, because the current password is wrong.",
+      "profileSavedPasswordFailed": "Your profile was saved. The password was not changed."
     },
     "appSecurity": {
       "title": "App Security",
@@ -312,6 +314,7 @@
       "deleting": "Deleting..."
     },
     "privacyNotice": "All data is stored securely and used only for invoicing purposes according to German law (DSGVO).",
+    "saveFailed": "Could not save your profile.",
     "saveChanges": "Save Changes",
     "cancel": "Cancel"
   },

@@ -71,7 +71,9 @@
       "confirmPasswordHint": "Debe coincidir con la nueva contraseña",
       "externalAuth": "Inicias sesión con {provider}. La contraseña se gestiona allí.",
       "mismatch": "Las contraseñas no coinciden",
-      "tooShort": "La contraseña debe tener al menos 8 caracteres"
+      "tooShort": "La contraseña debe tener al menos 8 caracteres",
+      "profileSavedPasswordRejected": "Tu perfil se ha guardado. La contraseña no se ha cambiado, porque la contraseña actual es incorrecta.",
+      "profileSavedPasswordFailed": "Tu perfil se ha guardado. La contraseña no se ha cambiado."
     },
     "appSecurity": {
       "title": "Seguridad de la app",
@@ -111,6 +113,7 @@
       "deleting": "Eliminando..."
     },
     "privacyNotice": "Todos los datos se almacenan de forma segura y se usan solo para propósitos de facturación según la ley alemana (RGPD).",
+    "saveFailed": "No se ha podido guardar el perfil.",
     "saveChanges": "Guardar Cambios",
     "cancel": "Cancelar"
   },

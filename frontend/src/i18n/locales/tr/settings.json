@@ -71,7 +71,9 @@
       "confirmPasswordHint": "Yeni şifreyle eşleşmeli",
       "externalAuth": "{provider} ile giriş yapıyorsunuz. Parola orada yönetilir.",
       "mismatch": "Parolalar eşleşmiyor",
-      "tooShort": "Parola en az 8 karakter olmalı"
+      "tooShort": "Parola en az 8 karakter olmalı",
+      "profileSavedPasswordRejected": "Profiliniz kaydedildi. Parola değiştirilmedi, çünkü geçerli parola yanlış.",
+      "profileSavedPasswordFailed": "Profiliniz kaydedildi. Parola değiştirilmedi."
     },
     "appSecurity": {
       "title": "Uygulama güvenliği",
@@ -111,6 +113,7 @@
       "deleting": "Siliniyor..."
     },
     "privacyNotice": "Tüm veriler güvenli bir şekilde saklanır ve yalnızca Alman yasalarına (GDPR) uygun olarak fatura amaçları için kullanılır.",
+    "saveFailed": "Profil kaydedilemedi.",
     "saveChanges": "Değişiklikleri Kaydet",
     "cancel": "İptal"
   },
