@@ -97,6 +97,22 @@ describe('ShareDialog', () => {
     expect(display('iam-share-find')).toContain('display: none')
   })
 
+  it('shows the explanations again when the suggestion list closes', async () => {
+    const wrapper = mountDialog()
+    const display = (testId: string) =>
+      wrapper.get(`[data-testid="${testId}"]`).attributes('style') ?? ''
+
+    await wrapper.get('[data-testid="input-iam-subject-search"]').trigger('focus')
+    expect(display('iam-share-consequence')).toContain('display: none')
+
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="list-iam-subjects"]').exists()).toBe(false)
+    expect(display('iam-share-consequence')).not.toContain('display: none')
+    expect(display('iam-share-find')).not.toContain('display: none')
+  })
+
   it('shows the explanations again after the dialog is reopened', async () => {
     const wrapper = mountDialog()
     const display = (testId: string) =>
