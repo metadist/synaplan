@@ -3,9 +3,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import type { SavedTask } from '@/services/api/savedTasksApi'
 
-const { mockList, mockAgentsEnabled } = vi.hoisted(() => ({
+const { mockList, mockAgentsEnabled, savedTasksOn } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockAgentsEnabled: vi.fn(() => false),
+  savedTasksOn: { value: true },
 }))
 
 vi.mock('@/services/api/savedTasksApi', () => ({
@@ -22,6 +23,10 @@ vi.mock('@/composables/useIamFeature', () => ({
 
 vi.mock('@/composables/useAgentsFeature', () => ({
   isAgentsEnabled: () => mockAgentsEnabled(),
+}))
+
+vi.mock('@/composables/useSavedTasksFeature', () => ({
+  isSavedTasksEnabled: () => savedTasksOn.value,
 }))
 
 vi.mock('@/services/api/iamApi', () => ({
@@ -91,6 +96,15 @@ const mountPage = async () => {
 describe('SavedTasksOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    savedTasksOn.value = true
+    mockAgentsEnabled.mockReturnValue(false)
+  })
+
+  it('is absent and does not load when saved tasks are off', async () => {
+    savedTasksOn.value = false
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="page-saved-tasks"]').exists()).toBe(false)
+    expect(mockList).not.toHaveBeenCalled()
   })
 
   it('shows the empty state when nothing is saved', async () => {
