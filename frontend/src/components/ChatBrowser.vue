@@ -950,6 +950,8 @@ watch([searchQuery, selectedType, selectedDateRange, sortBy], () => {
 })
 
 const openChat = (id: number) => {
+  const shared = sharedChats.value.find((chat) => chat.id === id)
+  if (shared?.isNew) void incomingStore.markChatOpened(id)
   chatsStore.setActiveChat(id)
   router.push('/')
 }

@@ -20,6 +20,11 @@ final readonly class SharedInbox
 {
     public const SETTING_PREFIX = 'SHARED_SEEN_AT_';
 
+    /** Resource ids opened from history since the last incoming-list visit. */
+    public const OPENED_PREFIX = 'SHARED_OPENED_';
+
+    private const MAX_OPENED = 100;
+
     public function __construct(
         private ConfigRepository $configRepository,
         private ShareService $shareService,
@@ -44,8 +49,54 @@ final readonly class SharedInbox
         $this->registry->get($kind);
         $at ??= time();
         $this->configRepository->setValue($userId, IamConfig::CONFIG_GROUP, self::settingFor($kind), (string) $at);
+        $this->configRepository->deleteValue($userId, IamConfig::CONFIG_GROUP, self::openedSettingFor($kind));
 
         return $at;
+    }
+
+    /**
+     * Records one resource as opened. Does not move the incoming-list watermark,
+     * so other unseen items of the same kind stay new.
+     *
+     * @throws UnknownResourceKindException
+     * @throws \InvalidArgumentException    when the resource id is not a safe token
+     */
+    public function markItemSeen(int $userId, string $kind, string $resourceId): void
+    {
+        $this->registry->get($kind);
+        if (1 !== preg_match('/^[A-Za-z0-9_-]{1,64}$/', $resourceId)) {
+            throw new \InvalidArgumentException('resourceId is invalid.');
+        }
+        $ids = $this->openedIds($userId, $kind);
+        $ids[$resourceId] = true;
+        if (\count($ids) > self::MAX_OPENED) {
+            $ids = \array_slice($ids, -self::MAX_OPENED, null, true);
+        }
+        $this->configRepository->setValue(
+            $userId,
+            IamConfig::CONFIG_GROUP,
+            self::openedSettingFor($kind),
+            implode(',', array_keys($ids)),
+        );
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    public function openedIds(int $userId, string $kind): array
+    {
+        $value = $this->configRepository->getValue($userId, IamConfig::CONFIG_GROUP, self::openedSettingFor($kind));
+        if (null === $value || '' === $value) {
+            return [];
+        }
+        $ids = [];
+        foreach (explode(',', $value) as $id) {
+            if ('' !== $id) {
+                $ids[$id] = true;
+            }
+        }
+
+        return $ids;
     }
 
     /**
@@ -56,12 +107,10 @@ final readonly class SharedInbox
     public function countUnseen(int $userId, string $kind): int
     {
         $lastSeenAt = $this->lastSeenAt($userId, $kind);
+        $opened = $this->openedIds($userId, $kind);
         $count = 0;
         foreach ($this->shareService->listSharedWith($userId, $kind) as $row) {
-            if ($row['share']->getGrantedBy() === $userId) {
-                continue;
-            }
-            if ($row['sharedAt'] > $lastSeenAt) {
+            if ($this->rowIsNew($row, $userId, $lastSeenAt, $opened)) {
                 ++$count;
             }
         }
@@ -69,8 +118,29 @@ final readonly class SharedInbox
         return $count;
     }
 
+    /**
+     * @param array{card: ResourceKind\ResourceCard, share: \App\Entity\Share, sharedAt: int} $row
+     * @param array<string, true>                                                             $opened
+     */
+    public function rowIsNew(array $row, int $userId, int $lastSeenAt, array $opened): bool
+    {
+        if ($row['share']->getGrantedBy() === $userId) {
+            return false;
+        }
+        if ($row['sharedAt'] <= $lastSeenAt) {
+            return false;
+        }
+
+        return !isset($opened[$row['card']->id]);
+    }
+
     private static function settingFor(string $kind): string
     {
         return self::SETTING_PREFIX.$kind;
+    }
+
+    private static function openedSettingFor(string $kind): string
+    {
+        return self::OPENED_PREFIX.$kind;
     }
 }

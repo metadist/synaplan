@@ -1127,6 +1127,8 @@ const handleNewChat = async () => {
 }
 
 const handleChatSelect = (chatId: number) => {
+  const chat = chatList.value.find((row) => row.id === chatId)
+  if (chat?.isNew) void incomingStore.markChatOpened(chatId)
   chatsStore.setActiveChat(chatId)
   if (route.path !== '/') router.push('/')
   chatModalOpen.value = false

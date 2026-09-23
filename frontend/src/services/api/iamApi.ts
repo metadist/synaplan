@@ -19,6 +19,7 @@ import {
   ListSharedWithMeResponseSchema,
   CountUnseenSharedResponseSchema,
   MarkSharedSeenResponseSchema,
+  MarkSharedItemSeenResponseSchema,
   ContinueSharedChatResponseSchema,
   ListAdminAuditResponseSchema,
   GetAdminGroupConfigResponseSchema,
@@ -254,6 +255,15 @@ export const iamApi = {
       method: 'POST',
       body: JSON.stringify({ kind }),
       schema: MarkSharedSeenResponseSchema,
+    })
+  },
+
+  /** Marks one shared item opened. Other unseen items of that kind stay new. */
+  async markSharedItemSeen(kind: string, resourceId: string): Promise<void> {
+    await httpClient('/api/v1/me/shared/opened', {
+      method: 'POST',
+      body: JSON.stringify({ kind, resourceId }),
+      schema: MarkSharedItemSeenResponseSchema,
     })
   },
 

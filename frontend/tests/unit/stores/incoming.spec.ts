@@ -18,13 +18,16 @@ vi.mock('@/composables/useIamFeature', () => ({
   isIamGroupsEnabled: () => true,
 }))
 
-const { listSharedWithMe, countUnseenShared, markSharedSeen } = vi.hoisted(() => ({
-  listSharedWithMe: vi.fn(),
-  countUnseenShared: vi.fn(),
-  markSharedSeen: vi.fn(),
-}))
+const { listSharedWithMe, countUnseenShared, markSharedSeen, markSharedItemSeen } = vi.hoisted(
+  () => ({
+    listSharedWithMe: vi.fn(),
+    countUnseenShared: vi.fn(),
+    markSharedSeen: vi.fn(),
+    markSharedItemSeen: vi.fn(),
+  })
+)
 vi.mock('@/services/api/iamApi', () => ({
-  iamApi: { listSharedWithMe, countUnseenShared, markSharedSeen },
+  iamApi: { listSharedWithMe, countUnseenShared, markSharedSeen, markSharedItemSeen },
 }))
 
 import { useIncomingStore, INCOMING_KIND } from '@/stores/incoming'
@@ -50,6 +53,7 @@ describe('incoming store', () => {
     listSharedWithMe.mockResolvedValue([sharedChat('13', true), sharedChat('14', false)])
     countUnseenShared.mockResolvedValue(1)
     markSharedSeen.mockResolvedValue(undefined)
+    markSharedItemSeen.mockResolvedValue(undefined)
   })
 
   // The store watches the shared `authed` ref; stop each instance so a
@@ -125,6 +129,23 @@ describe('incoming store', () => {
     expect(store.unseenCount).toBe(0)
     expect(store.hasNew).toBe(false)
     expect(store.chats.find((c) => c.id === '13')?.isNew).toBe(true)
+  })
+
+  it('markChatOpened records that chat and keeps the server count for the rest', async () => {
+    listSharedWithMe.mockResolvedValue([sharedChat('13', true), sharedChat('14', true)])
+    countUnseenShared.mockResolvedValue(2)
+    const store = useIncomingStore()
+    authed.value = true
+    await flushPromises()
+
+    countUnseenShared.mockResolvedValue(1)
+    await store.markChatOpened(13)
+
+    expect(markSharedItemSeen).toHaveBeenCalledWith(INCOMING_KIND, '13')
+    expect(markSharedSeen).not.toHaveBeenCalled()
+    expect(store.chats.find((c) => c.id === '13')?.isNew).toBe(false)
+    expect(store.chats.find((c) => c.id === '14')?.isNew).toBe(true)
+    expect(store.unseenCount).toBe(1)
   })
 
   it('isOpenable accepts incoming ids, and any id while the first load is pending', async () => {
