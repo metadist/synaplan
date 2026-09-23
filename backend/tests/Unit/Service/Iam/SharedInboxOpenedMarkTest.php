@@ -20,6 +20,7 @@ final class SharedInboxOpenedMarkTest extends TestCase
 {
     public function testNumericConversationIdSurvivesTheConfigRoundTrip(): void
     {
+        /** @var array<string, string> $values */
         $values = [];
         $config = $this->createMock(ConfigRepository::class);
         $config->method('getValue')->willReturnCallback(
@@ -50,7 +51,9 @@ final class SharedInboxOpenedMarkTest extends TestCase
 
         $registry = $this->createMock(ResourceKindRegistry::class);
         $registry->method('get')->willReturn($this->createMock(ShareableResourceKindInterface::class));
-        $inbox = new SharedInbox($config, $shares, $registry, new LockFactory(new FlockStore(sys_get_temp_dir())));
+        $lockDir = '/tmp/synaplan-opened-mark-'.bin2hex(random_bytes(4));
+        mkdir($lockDir, 0700, true);
+        $inbox = new SharedInbox($config, $shares, $registry, new LockFactory(new FlockStore($lockDir)));
 
         $inbox->markItemSeen(4, 'conversation', '13');
 
