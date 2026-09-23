@@ -23,8 +23,6 @@ final readonly class SharedInbox
     /** Resource ids opened from history since the last incoming-list visit. */
     public const OPENED_PREFIX = 'SHARED_OPENED_';
 
-    private const MAX_OPENED = 100;
-
     public function __construct(
         private ConfigRepository $configRepository,
         private ShareService $shareService,
@@ -69,9 +67,7 @@ final readonly class SharedInbox
         }
         $ids = $this->openedIds($userId, $kind);
         $ids[$resourceId] = true;
-        if (\count($ids) > self::MAX_OPENED) {
-            $ids = \array_slice($ids, -self::MAX_OPENED, null, true);
-        }
+        $ids = $this->stillNewOpenedIds($userId, $kind, $ids);
         $this->configRepository->setValue(
             $userId,
             IamConfig::CONFIG_GROUP,
@@ -97,6 +93,37 @@ final readonly class SharedInbox
         }
 
         return $ids;
+    }
+
+    /**
+     * Drop opened ids that can no longer count as new. Every id that is still
+     * new is kept, so opening many chats cannot make an older opened chat new again.
+     *
+     * @param array<string, true> $opened
+     *
+     * @return array<string, true>
+     */
+    private function stillNewOpenedIds(int $userId, string $kind, array $opened): array
+    {
+        $lastSeenAt = $this->lastSeenAt($userId, $kind);
+        $stillNew = [];
+        foreach ($this->shareService->listSharedWith($userId, $kind) as $row) {
+            if ($row['share']->getGrantedBy() === $userId) {
+                continue;
+            }
+            if ($row['sharedAt'] <= $lastSeenAt) {
+                continue;
+            }
+            $stillNew[$row['card']->id] = true;
+        }
+        $kept = [];
+        foreach ($opened as $id => $_) {
+            if (isset($stillNew[$id])) {
+                $kept[$id] = true;
+            }
+        }
+
+        return $kept;
     }
 
     /**
