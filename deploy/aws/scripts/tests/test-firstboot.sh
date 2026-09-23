@@ -486,6 +486,7 @@ done
 
 assert_env AI_DEFAULT_PROVIDER groq
 assert_env GROQ_API_KEY ''
+assert_env META_API_KEY ''
 assert_env MAILER_DSN 'null://null'
 assert_env BOOTSTRAP_ADMIN_EMAIL admin@example.com
 

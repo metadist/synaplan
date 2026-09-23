@@ -145,7 +145,7 @@ Parameters:
   AiProvider:
     Type: String
     Default: groq
-    AllowedValues: [groq, openai, anthropic, google, mistral, xai]
+    AllowedValues: [groq, openai, anthropic, google, mistral, xai, meta]
     Description: >-
       Which provider Synaplan uses by default. The API key is deliberately not a
       stack parameter - add it after signing in, under Admin then AI Providers,
@@ -213,6 +213,7 @@ Mappings:
     google: {Name: google-gemini-api-key}
     mistral: {Name: mistral-api-key}
     xai: {Name: xai-api-key}
+    meta: {Name: meta-api-key}
 
 Resources:
   SecurityGroup:

@@ -446,32 +446,22 @@ by code or migrations — both are environment state.
 
 ## 1. Default image model → Nano Banana 2 (BID 371)
 
-`DefaultModelConfigSeeder` already points fresh installs at
-`google:gemini-3.1-flash-image:text2pic` ("Nano Banana 2", BID 371)
-for `TEXT2PIC` and `PIC2PIC`. The seeder **never overwrites existing rows**
-(by design — it must not clobber operator tuning), so environments seeded
-before this release still route DAG "generate image" nodes at the old,
-slower default.
+`Version20260923190000` already moves `TEXT2PIC` and `PIC2PIC` bindings that
+still point at the shut-down preview rows (BID 190 and BID 228) onto the
+stable models. Fresh installs are seeded at
+`google:gemini-3.1-flash-image:text2pic` ("Nano Banana 2", BID 371).
+Do not run a blanket `UPDATE` to 371: an operator who already chose another
+live image model would lose that choice.
 
-Run once on the production DB:
+After the upgrade, check that no binding is still on a preview id:
 
 ```sql
--- Global platform default ONLY (BOWNERID = 0).
--- Do NOT drop the owner filter: per-user overrides share this table
--- with BOWNERID = <userId> and must keep the user's own choice.
-UPDATE BCONFIG SET BVALUE = '371'
-WHERE BOWNERID = 0
-  AND BGROUP = 'DEFAULTMODEL'
-  AND BSETTING IN ('TEXT2PIC', 'PIC2PIC');
-
--- Verify:
 SELECT BOWNERID, BSETTING, BVALUE FROM BCONFIG
 WHERE BGROUP = 'DEFAULTMODEL' AND BSETTING IN ('TEXT2PIC', 'PIC2PIC');
 ```
 
-Users can still pick any other model via Settings → AI Models (per-user
-`DEFAULTMODEL` override) and the "Again with…" / failed-task "Retry with…"
-controls — this only changes what the platform falls back to.
+A value of `190` or `228` means the migration did not run. Any other value
+is an intentional choice and should stay.
 
 ## 2. WhatsApp media delivery requires a publicly reachable APP_URL
 
