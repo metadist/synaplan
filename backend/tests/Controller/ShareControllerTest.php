@@ -327,6 +327,9 @@ final class ShareControllerTest extends WebTestCase
         $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
         self::assertSame(0, $this->json()['count']);
 
+        // sharedAt and the watermark are unix seconds. A share in the same
+        // second as "mark seen" is not after that visit.
+        sleep(1);
         $third = $this->createChat((int) $owner->getId(), 'Third notes');
         $this->authenticateClient($this->client, $owner);
         $this->postJson('/api/v1/shares', [
