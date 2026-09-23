@@ -337,8 +337,10 @@
       </div>
       <!-- Boxed to the composer width (max-w-4xl mx-auto) so the paperclip
            aligns with the chat box instead of sitting in a full-width stripe. -->
+      <!-- The shared chat stays selected during incognito, so its files must
+           not become attachable or deletable from this session. -->
       <div
-        v-if="!needsProviderSetup && conversationFiles.length > 0"
+        v-if="!needsProviderSetup && !incognitoStore.active && conversationFiles.length > 0"
         class="max-w-4xl mx-auto w-full px-3 md:px-4"
       >
         <ConversationFilesBar
