@@ -130,9 +130,14 @@ const handleSave = async () => {
   if (isSaving.value) return
   isSaving.value = true
   try {
-    await Promise.all(saveListeners().map((listener) => Promise.resolve(listener())))
-  } catch {
-    // The page shows the failure. The bar only has to end the attempt.
+    for (const listener of saveListeners()) {
+      try {
+        await listener()
+      } catch {
+        // One listener failing must not skip the others, and must not
+        // leave the bar on Saving. The page shows the failure.
+      }
+    }
   } finally {
     await nextTick()
     if (props.show) {
