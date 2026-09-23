@@ -105,10 +105,15 @@ final readonly class SharedInbox
         }
         $marks = [];
         foreach ($decoded as $row) {
-            if (!is_array($row) || !isset($row['id'], $row['at']) || !is_string($row['id'])) {
+            if (!is_array($row) || !isset($row['id'], $row['at'])) {
                 continue;
             }
-            $marks[$row['id']] = (int) $row['at'];
+            if (!is_string($row['id']) && !is_int($row['id'])) {
+                continue;
+            }
+            // Numeric ids are stored as JSON numbers when PHP casts the array
+            // key to int. Accept both so a saved mark is still found on read.
+            $marks[(string) $row['id']] = (int) $row['at'];
         }
 
         return $marks;
@@ -159,7 +164,7 @@ final readonly class SharedInbox
     {
         $rows = [];
         foreach ($marks as $id => $at) {
-            $rows[] = ['id' => $id, 'at' => $at];
+            $rows[] = ['id' => (string) $id, 'at' => $at];
         }
         $this->configRepository->setValue(
             $userId,
