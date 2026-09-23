@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\AI\Import\ModelImportApplier;
 use App\Entity\User;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -193,5 +194,48 @@ final class ConfigControllerModelsTest extends WebTestCase
                 sprintf('Model "%s" is visible although its provider "%s" reports unavailable.', $row['name'], $service)
             );
         }
+    }
+
+    public function testImportedFreeChatModelAppearsInAdminPicker(): void
+    {
+        // #2110: a self-imported chat model carries no per-token price and must
+        // still reach the capability pickers. The admin full view shows every
+        // row regardless of provider availability, so this fails only when the
+        // free-model filter wrongly hides the import.
+        $providerId = 'itest-2110/Imported-Chat-Model';
+        $container = static::getContainer();
+        $applier = $container->get(ModelImportApplier::class);
+        $em = $container->get(EntityManagerInterface::class);
+
+        $this->deleteImportedTestRow($em, $providerId);
+        try {
+            $applied = $applier->apply('openai_compatible:itest-2110-endpoint', [
+                ['providerId' => $providerId, 'name' => 'Imported Chat Model', 'tags' => ['chat']],
+            ]);
+            self::assertSame(1, $applied['created']);
+
+            $this->loginAs('admin@synaplan.com');
+            $data = $this->fetchModels('?includeUnavailable=1');
+
+            $chatProviderIds = array_map(
+                static fn (array $row): string => (string) $row['providerId'],
+                $data['models']['CHAT'] ?? []
+            );
+            self::assertContains(
+                $providerId,
+                $chatProviderIds,
+                'An imported free chat model must appear in the CHAT picker.'
+            );
+        } finally {
+            $this->deleteImportedTestRow($em, $providerId);
+        }
+    }
+
+    private function deleteImportedTestRow(EntityManagerInterface $em, string $providerId): void
+    {
+        $em->createQuery('DELETE FROM App\Entity\Model m WHERE m.providerId = :pid')
+            ->setParameter('pid', $providerId)
+            ->execute();
+        $em->clear();
     }
 }

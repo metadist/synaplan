@@ -15,8 +15,8 @@ use Doctrine\ORM\EntityManagerInterface;
  * Idempotent by contract (C6): a row is created only when no
  * (service, tag, providerId) row exists, and existing rows are never
  * re-toggled or re-priced — only their `meta.import.lastSeenAt` is refreshed.
- * Operator decisions (BSELECTABLE / BACTIVE / BISDEFAULT) therefore survive a
- * re-import, exactly like the catalog seeder.
+ * Operator decisions (BSELECTABLE / BACTIVE / BISDEFAULT / BSHOWWHENFREE)
+ * therefore survive a re-import, exactly like the catalog seeder.
  */
 final readonly class ModelImportApplier
 {
@@ -127,6 +127,11 @@ final readonly class ModelImportApplier
             ->setSelectable(1)
             ->setActive(1)
             ->setIsDefault(0)
+            // Imported rows are self-hosted and free by nature (no per-token
+            // price), so without this opt-in isHiddenBecauseFree() would strip
+            // them from /config/models — the chat dropdown and the Chat-Default
+            // picker (#2110). Same default as the seeded Ollama rows.
+            ->setShowWhenFree(1)
             ->setJson($json);
     }
 
