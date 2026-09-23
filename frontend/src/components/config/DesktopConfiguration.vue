@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6" data-testid="page-config-desktop">
+  <div v-if="isDesktopAgentEnabled()" class="space-y-6" data-testid="page-config-desktop">
     <PageHeader
       :title="$t('config.desktop.title')"
       :subtitle="$t('config.desktop.description')"
@@ -393,6 +393,7 @@ import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { desktopPairingAddress } from '@/utils/desktopPairingAddress'
+import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
 
 const { t } = useI18n()
 const dialog = useDialog()
