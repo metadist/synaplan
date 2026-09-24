@@ -101,6 +101,22 @@ final class UserMemoryServiceTest extends TestCase
         $this->assertFalse($result);
     }
 
+    public function testIsReachableNowTrustsACachedPositive(): void
+    {
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->expects($this->never())->method('refreshHealth');
+
+        $this->assertTrue($this->service->isReachableNow());
+    }
+
+    public function testIsReachableNowReprobesACachedNegative(): void
+    {
+        $this->qdrantClient->method('isAvailable')->willReturn(false);
+        $this->qdrantClient->expects($this->once())->method('refreshHealth')->willReturn(true);
+
+        $this->assertTrue($this->service->isReachableNow());
+    }
+
     public function testGetQdrantClientReturnsClient(): void
     {
         $client = $this->service->getQdrantClient();
