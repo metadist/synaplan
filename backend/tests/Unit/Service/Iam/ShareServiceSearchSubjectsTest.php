@@ -53,14 +53,13 @@ final class ShareServiceSearchSubjectsTest extends TestCase
         $users = $this->createMock(UserRepository::class);
         $users->expects(self::once())
             ->method('searchByEmailOrName')
-            ->with('sa', 20, [7])
             ->willReturn([$account]);
 
         $groups = $this->createMock(GroupRepository::class);
         $groups->method('searchByName')->willReturn([]);
 
         $members = $this->createMock(GroupMemberRepository::class);
-        $members->method('findCoMemberUserIds')->with(3)->willReturn([7]);
+        $members->method('findCoMemberUserIds')->willReturn([7]);
 
         $service = $this->service($users, $groups, userSearchOn: false, everyoneAllowed: false, members: $members);
 

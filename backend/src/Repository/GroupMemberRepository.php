@@ -164,7 +164,7 @@ class GroupMemberRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleColumnResult();
 
-        return array_values(array_map(static fn (int|string $id): int => (int) $id, $ids));
+        return array_map(static fn (int|string $id): int => (int) $id, $ids);
     }
 
     public function deleteByUserId(int $userId): void
