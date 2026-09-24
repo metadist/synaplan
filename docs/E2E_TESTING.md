@@ -77,6 +77,7 @@ fixtures) is fixed instead.
   - `workspace-tab.spec.ts` "flag off": compute is on in the dev stack.
 - **Tests that reset mid-test after a file under `frontend/` was saved** during the run: Vite HMR reloaded the page (the trace shows module requests with `?t=<timestamp>`). Never save frontend files while Playwright runs against `:5173`; rerun the affected specs.
 - **`Generated API schemas do not match the backend OpenAPI spec`** from `globalSetup`: the backend spec changed since the frontend generated `src/generated/api-schemas.ts`. Run `make -C frontend generate-schemas`. The Vite dev server also regenerates them on a page load (at most every 30 s).
+- **`layout.spec.ts` "login page has no overflow and reachable submit" (chromium-mobile): `login submit: clipped bottom`.** The local login page shows the fresh-demo card above the form, which pushes Sign In below a ~664 px viewport. CI does not render that card. The same page's axe checks still pass.
 
 ---
 
