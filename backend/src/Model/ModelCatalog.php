@@ -4279,6 +4279,9 @@ class ModelCatalog
                 'description' => 'Mistral Medium 3.5 - frontier-class multimodal model optimised for agentic and coding use cases. OpenAI-compatible chat endpoint.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'mistral-medium-latest'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
                 'meta' => ['context_window' => '262144', 'max_output' => '8192'],
                 'features' => ['tool_use'],
             ],
@@ -4301,6 +4304,9 @@ class ModelCatalog
                 'description' => 'Mistral Large 3 - state-of-the-art, open-weight, general-purpose multimodal model. OpenAI-compatible chat endpoint.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'mistral-large-latest'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.05,
                 'meta' => ['context_window' => '262144', 'max_output' => '8192'],
                 'features' => ['tool_use'],
             ],
@@ -4374,6 +4380,9 @@ class ModelCatalog
                 'max_tokens' => 2048,
                 'params' => ['model' => 'mistral-medium-latest'],
                 'features' => ['vision', 'ocr', 'multilingual'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
             ],
         ],
         // ==================== TRUSTEDTOKENS (TNG, Germany) ====================

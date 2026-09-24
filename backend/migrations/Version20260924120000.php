@@ -8,8 +8,8 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Author Google Gemini Flash context-caching rates and correct xAI grok-4.7
- * cached-input / long-context pricing on existing installs (#2160).
+ * Author Google Gemini Flash and Mistral cached-input rates and correct xAI
+ * grok-4.7 cached-input / long-context pricing on existing installs (#2160).
  *
  * Verified 2026-09-24 against the official pages:
  *
@@ -23,6 +23,12 @@ use Doctrine\Migrations\AbstractMigration;
  *     These ten rows authored no `cache_read_price_per_1M`, so
  *     CostCalculationService fell back to CACHE_READ_DISCOUNT_DEFAULT (0.5x
  *     input) and overcharged every cache hit 5x.
+ *
+ *   - Mistral (https://docs.mistral.ai/inference/pricing, "Cached input"
+ *     column, Standard tier):
+ *       Mistral Medium 3.5 (mistral-medium-latest, BIDs 244/248)  $0.15 / 1M
+ *       Mistral Large 3    (mistral-large-latest, BID 245)        $0.05 / 1M
+ *     Same missing key and the same 5x overcharge as the Gemini rows.
  *
  *   - xAI (https://docs.x.ai/docs/models, Text API pricing table):
  *       grok-4.7 (<200k)  input $2.00, cached input $0.50, output $6.00
@@ -40,10 +46,10 @@ use Doctrine\Migrations\AbstractMigration;
  *
  * Guarded on the OLD state so an operator who deliberately re-priced a row in
  * the admin UI keeps their value, exactly as a re-seed would leave it:
- *   - Gemini: BJSON still has no `cache_read_price_per_1M` (the overcharging
- *     fallback state).
+ *   - Gemini and Mistral: BJSON still has no `cache_read_price_per_1M` (the
+ *     overcharging fallback state).
  *   - grok-4.7: `cache_read_price_per_1M` is still the wrong 2.00.
- *   - Both: BPRICEIN / BPRICEOUT still equal the catalog rate. The snapshot
+ *   - All: BPRICEIN / BPRICEOUT still equal the catalog rate. The snapshot
  *     writes every catalog-owned column, so without this an operator's own
  *     input/output price would be reset to the catalog value.
  *
@@ -62,8 +68,8 @@ final class Version20260924120000 extends AbstractMigration
 
     public function getDescription(): string
     {
-        return 'Author Gemini Flash context-caching rates and correct grok-4.7 '
-            .'cached-input pricing (BIDs 170/171/191/192/223/224/225/226/227/237/367/368) '
+        return 'Author Gemini Flash and Mistral cached-input rates and correct grok-4.7 '
+            .'cached-input pricing (BIDs 170/171/191/192/223/224/225/226/227/237/244/245/248/367/368) '
             .'with matching BJSON fingerprints (#2160).';
     }
 
@@ -160,7 +166,7 @@ final class Version20260924120000 extends AbstractMigration
     }
 
     /**
-     * Snapshots of the twelve rows exactly as authored in ModelCatalog on
+     * Snapshots of the fifteen rows exactly as authored in ModelCatalog on
      * 2026-09-24 — values AND json key order, because the fingerprint hashes
      * the encoded payload.
      *
@@ -396,6 +402,74 @@ final class Version20260924120000 extends AbstractMigration
                     'features' => ['vision'],
                     'cache_read_price_per_1M' => 0.01,
                     'meta' => ['supports_images' => true, 'supports_video' => true],
+                ],
+            ],
+            [
+                'id' => 244,
+                'service' => 'Mistral',
+                'name' => 'Mistral Medium 3.5',
+                'tag' => 'chat',
+                'selectable' => 1,
+                'active' => 1,
+                'providerId' => 'mistral-medium-latest',
+                'priceIn' => 1.50,
+                'inUnit' => 'per1M',
+                'priceOut' => 7.50,
+                'outUnit' => 'per1M',
+                'quality' => 9,
+                'rating' => 3,
+                'json' => [
+                    'description' => 'Mistral Medium 3.5 - frontier-class multimodal model optimised for agentic and coding use cases. OpenAI-compatible chat endpoint.',
+                    'max_tokens' => 8192,
+                    'params' => ['model' => 'mistral-medium-latest'],
+                    'cache_read_price_per_1M' => 0.15,
+                    'meta' => ['context_window' => '262144', 'max_output' => '8192'],
+                    'features' => ['tool_use'],
+                ],
+            ],
+            [
+                'id' => 245,
+                'service' => 'Mistral',
+                'name' => 'Mistral Large 3',
+                'tag' => 'chat',
+                'selectable' => 1,
+                'active' => 1,
+                'providerId' => 'mistral-large-latest',
+                'priceIn' => 0.50,
+                'inUnit' => 'per1M',
+                'priceOut' => 1.50,
+                'outUnit' => 'per1M',
+                'quality' => 9,
+                'rating' => 3,
+                'json' => [
+                    'description' => 'Mistral Large 3 - state-of-the-art, open-weight, general-purpose multimodal model. OpenAI-compatible chat endpoint.',
+                    'max_tokens' => 8192,
+                    'params' => ['model' => 'mistral-large-latest'],
+                    'cache_read_price_per_1M' => 0.05,
+                    'meta' => ['context_window' => '262144', 'max_output' => '8192'],
+                    'features' => ['tool_use'],
+                ],
+            ],
+            [
+                'id' => 248,
+                'service' => 'Mistral',
+                'name' => 'Mistral Medium 3.5 (Vision)',
+                'tag' => 'pic2text',
+                'selectable' => 1,
+                'active' => 1,
+                'providerId' => 'mistral-medium-latest',
+                'priceIn' => 1.50,
+                'inUnit' => 'per1M',
+                'priceOut' => 7.50,
+                'outUnit' => 'per1M',
+                'quality' => 9,
+                'rating' => 2,
+                'json' => [
+                    'description' => 'Mistral Medium 3.5 multimodal vision - describe images and extract text (OCR-style) via the chat endpoint.',
+                    'max_tokens' => 2048,
+                    'params' => ['model' => 'mistral-medium-latest'],
+                    'features' => ['vision', 'ocr', 'multilingual'],
+                    'cache_read_price_per_1M' => 0.15,
                 ],
             ],
             [

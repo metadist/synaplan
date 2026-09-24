@@ -591,6 +591,8 @@ class ModelCatalogTest extends TestCase
             'gemini-3.1-flash-lite' => ['google:gemini-3.1-flash-lite', 0.025],
             'gemini-3.5-flash' => ['google:gemini-3.5-flash', 0.15],
             'gemini-3-flash-preview' => ['google:gemini-3-flash-preview', 0.05],
+            'mistral-medium-3.5' => ['mistral:mistral-medium-latest', 0.15],
+            'mistral-large-3' => ['mistral:mistral-large-latest', 0.05],
             'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
             'gemini-3.7-flash' => ['google:gemini-3.7-flash', 0.075],
             'gemini-3.6-flash' => ['google:gemini-3.6-flash', 0.075],
