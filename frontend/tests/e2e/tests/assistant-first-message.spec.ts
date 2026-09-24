@@ -45,7 +45,10 @@ test.describe('@ci Assistants first chat message', () => {
 
     try {
       await page.goto(`/?agentId=${agentId}`)
-      await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      const providerSetup = page.locator('[data-testid="state-provider-setup"]')
+      const textInput = page.locator(CHAT.textInput)
+      await expect(providerSetup.or(textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      test.skip(await providerSetup.isVisible(), 'No AI provider is configured for chat')
       await expect(page.locator('[data-testid="banner-pinned-assistant"]')).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
