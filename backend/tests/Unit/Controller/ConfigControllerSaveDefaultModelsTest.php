@@ -17,6 +17,9 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\DemoLoginHint;
+use App\Service\Config\LayeredConfigResolver;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
@@ -317,6 +320,77 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
         );
 
         $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+    }
+
+    public function testRejectsAModelOutsideTheAllowList(): void
+    {
+        $iam = $this->createMock(IamConfig::class);
+        $iam->method('isGroupPoliciesEnabled')->willReturn(true);
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('isLocked')->willReturn(false);
+        $policy = $this->createMock(GroupPolicyService::class);
+        $policy->method('isModelAllowed')->willReturn(false);
+
+        $controller = new ConfigController(
+            $this->em,
+            $this->configRepository,
+            $this->modelRepository,
+            $this->createStub(ProviderRegistry::class),
+            $this->createStub(WhisperService::class),
+            $this->createStub(PluginManager::class),
+            $this->createStub(BillingService::class),
+            $this->createStub(UserMemoryService::class),
+            $this->embeddingChangeGuard,
+            $this->embeddingMetadata,
+            $this->createStub(ModelConfigService::class),
+            new ClientContextResolver(),
+            $this->createStub(BrandingService::class),
+            $this->createStub(MobileVersionService::class),
+            $this->createStub(MarketingNewsConfig::class),
+            $this->createStub(UsageTaximeterConfig::class),
+            $this->createStub(ProgressNarrationConfig::class),
+            $this->createStub(RegistrationConfig::class),
+            $this->createStub(GuestChatConfig::class),
+            $this->createStub(WebSpeechConfig::class),
+            $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
+            $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
+            $this->createStub(\App\Service\Agent\AgentConfig::class),
+            $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
+            $iam,
+            $this->createStub(ChatReadinessService::class),
+            new DemoLoginHint(
+                $this->createStub(UserRepository::class),
+                $this->createStub(UserPasswordHasherInterface::class),
+                'test',
+            ),
+            $this->createStub(SetupStateService::class),
+            $this->createStub(AiProviderDisclosure::class),
+            $this->createStub(LocalAiDownloadStatusService::class),
+            new MailerConfig(),
+            new CapabilityService(),
+            $this->createStub(FeatureStatusReporter::class),
+            $this->createStub(ModuleRegistry::class),
+            $this->createStub(ModuleGateConfig::class),
+            'http://qdrant.example',
+            null,
+            null,
+            $resolver,
+            $policy,
+        );
+        $controller->setContainer(new Container());
+
+        $this->em->expects($this->never())->method('persist');
+        $this->em->expects($this->never())->method('flush');
+
+        $response = $controller->saveDefaultModels(
+            $this->makeRequest(['defaults' => ['CHAT' => 324]]),
+            $this->makeUser(7),
+        );
+
+        $this->assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+        $body = $this->decode($response);
+        $this->assertSame('iam.modelNotAllowed', $body['code']);
+        $this->assertSame('CHAT', $body['capability']);
     }
 
     /**

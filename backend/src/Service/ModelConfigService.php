@@ -715,47 +715,46 @@ final readonly class ModelConfigService
     }
 
     /**
-     * The default the settings screen should name: the same allow-list rule
-     * as {@see getDefaultModel()}. A locked instance value wins even when the
-     * member's allow-list excludes it. Otherwise a stored id outside the
-     * allow-list is skipped, so the screen and the next reply name one model.
-     *
-     * Does not apply the "first usable by quality" fallback. Null means
-     * nothing configured is both active and allowed.
+     * The default the settings screen should name. The id is exactly
+     * {@see getDefaultModel()}: allow-list, a locked instance value, a dead
+     * provider, a catalog successor, and the last-resort usable model.
      *
      * @return array{id: int|null, source: string|null, locked: bool}
      */
     public function reportedDefault(string $capability, int $userId): array
     {
-        if (null === $this->layeredConfigResolver) {
-            return ['id' => null, 'source' => null, 'locked' => false];
-        }
-
         $setting = strtoupper($capability);
         $locked = $this->isDefaultLocked($userId, $setting);
+        $id = $this->getDefaultModel($capability, $userId);
+
+        return [
+            'id' => $id,
+            'source' => null === $id ? null : ($locked ? 'admin' : $this->sourceForEffectiveModel($userId, $setting, $id)),
+            'locked' => $locked,
+        ];
+    }
+
+    /**
+     * Which configured layer produced the id generation will use.
+     * A last-resort pick that is not on the chain has no layer.
+     */
+    private function sourceForEffectiveModel(int $userId, string $setting, int $effectiveId): ?string
+    {
+        if (null === $this->layeredConfigResolver) {
+            return null;
+        }
+
         foreach ($this->layeredConfigResolver->chain($userId, 'DEFAULTMODEL', $setting) as $raw) {
             $modelId = $this->interpretStoredModelId($raw);
-            if (null === $modelId) {
+            if (null === $modelId || !$this->isAllowedModel($userId, $modelId)) {
                 continue;
             }
-            if (!$locked && !$this->isAllowedModel($userId, $modelId)) {
-                continue;
-            }
-
-            $model = $this->modelRepository->find($modelId);
-            if ($model instanceof Model && 1 === $model->getActive()) {
-                return [
-                    'id' => $modelId,
-                    'source' => $this->layeredConfigResolver->sourceForValue($userId, 'DEFAULTMODEL', $setting, $raw),
-                    'locked' => $locked,
-                ];
-            }
-            if ($locked) {
-                break;
+            if ($modelId === $effectiveId || $this->usableSuccessorOf($modelId, $userId) === $effectiveId) {
+                return $this->layeredConfigResolver->sourceForValue($userId, 'DEFAULTMODEL', $setting, $raw);
             }
         }
 
-        return ['id' => null, 'source' => null, 'locked' => $locked];
+        return null;
     }
 
     private function readDefaultModel(int $ownerId, string $setting): ?int

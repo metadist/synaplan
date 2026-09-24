@@ -1101,8 +1101,10 @@ class ConfigController extends AbstractController
         usort($providers, static fn (array $a, array $b): int => strcasecmp($a['displayName'], $b['displayName']));
 
         if (null !== $this->groupPolicyService && !$this->isGranted('ROLE_ADMIN')) {
+            $userId = (int) $user->getId();
             foreach ($grouped as $capability => $rows) {
-                $grouped[$capability] = $this->groupPolicyService->filterModelsByAllowList($user->getId(), $rows);
+                $filtered = $this->groupPolicyService->filterModelsByAllowList($userId, $rows);
+                $grouped[$capability] = $this->withLockedDefaultVisible($filtered, $rows, $capability, $userId);
             }
         }
 
@@ -1111,6 +1113,42 @@ class ConfigController extends AbstractController
             'models' => $grouped,
             'providers' => $providers,
         ]);
+    }
+
+    /**
+     * A locked instance default is the model that answers, even when the
+     * allow-list would hide it. Put that row back so the settings screen
+     * can name it.
+     *
+     * @param list<array<string, mixed>> $filtered
+     * @param list<array<string, mixed>> $unfiltered
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function withLockedDefaultVisible(array $filtered, array $unfiltered, string $capability, int $userId): array
+    {
+        if (null === $this->layeredConfigResolver || !$this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId)) {
+            return $filtered;
+        }
+
+        $lockedId = $this->modelConfigService->reportedDefault($capability, $userId)['id'];
+        if (null === $lockedId) {
+            return $filtered;
+        }
+        foreach ($filtered as $row) {
+            if ((int) ($row['id'] ?? 0) === $lockedId) {
+                return $filtered;
+            }
+        }
+        foreach ($unfiltered as $row) {
+            if ((int) ($row['id'] ?? 0) === $lockedId) {
+                $filtered[] = $row;
+
+                return $filtered;
+            }
+        }
+
+        return $filtered;
     }
 
     /**

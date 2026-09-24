@@ -372,6 +372,44 @@ class ModelConfigServiceTest extends TestCase
     }
 
     /**
+     * An allowed personal default whose provider has no key is not the model
+     * that answers. The settings payload names the fallback, not the stored id.
+     */
+    public function testReportedDefaultFollowsAnUnusableProvider(): void
+    {
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('isLocked')->willReturn(false);
+        $resolver->method('chain')->willReturn(['249', '9']);
+        $resolver->method('sourceForValue')->willReturnCallback(
+            static fn (?int $userId, string $group, string $setting, string $value): string => '9' === $value ? 'admin' : 'user',
+        );
+        $policy = $this->createMock(GroupPolicyService::class);
+        $policy->method('isModelAllowed')->willReturn(true);
+        $policy->method('modelIdFromStored')->willReturnCallback(
+            static fn (string $raw): ?int => is_numeric($raw) ? (int) $raw : null,
+        );
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+            $policy,
+        );
+        $this->givenModels([249 => 'Anthropic', 9 => 'Groq']);
+        $this->givenUsableProviders(['groq']);
+
+        self::assertSame(
+            ['id' => 9, 'source' => 'admin', 'locked' => false],
+            $this->service->reportedDefault('CHAT', 1),
+        );
+    }
+
+    /**
      * @param list<int>    $allowedIds
      * @param list<string> $chain
      */
