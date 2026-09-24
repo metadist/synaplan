@@ -118,6 +118,62 @@ describe('Chats Store', () => {
     })
   })
 
+  describe('findOrCreateEmptyChat', () => {
+    function deferredCreate(): (id: number | null) => void {
+      let settle: (id: number | null) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          settle = (id) => (id === null ? reject(new Error('offline')) : resolve(chatPayload(id)))
+        })
+      )
+      return settle
+    }
+
+    it('reuses the chat a pending boot create is adding instead of creating a second one', async () => {
+      const store = useChatsStore()
+      const settleBoot = deferredCreate()
+      const bootCreate = store.createChat('New Chat')
+
+      const clicked = store.findOrCreateEmptyChat()
+      settleBoot(12)
+      await bootCreate
+
+      expect((await clicked)?.id).toBe(12)
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
+      expect(store.chats.map((c) => c.id)).toEqual([12])
+      expect(store.activeChatId).toBe(12)
+    })
+
+    it('shares one create between two New Chat clicks while the first is pending', async () => {
+      const store = useChatsStore()
+      const settle = deferredCreate()
+
+      const first = store.findOrCreateEmptyChat()
+      const second = store.findOrCreateEmptyChat()
+      settle(7)
+
+      expect((await first)?.id).toBe(7)
+      expect((await second)?.id).toBe(7)
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
+      expect(store.chats.map((c) => c.id)).toEqual([7])
+    })
+
+    it('creates its own chat when the pending create fails', async () => {
+      const store = useChatsStore()
+      const settleBoot = deferredCreate()
+      const bootCreate = store.createChat('New Chat')
+
+      httpClientMock.mockResolvedValueOnce(chatPayload(9))
+      const clicked = store.findOrCreateEmptyChat()
+      settleBoot(null)
+      await bootCreate
+
+      expect((await clicked)?.id).toBe(9)
+      expect(httpClientMock).toHaveBeenCalledTimes(2)
+      expect(store.activeChatId).toBe(9)
+    })
+  })
+
   describe('loadChats / ensureValidActiveChat', () => {
     function widgetChat(id: number) {
       return {
