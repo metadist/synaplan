@@ -170,14 +170,15 @@ Real failure modes that have caused red CI more than once:
   ```
 
 - **Frontend tests need Pinia + i18n + `useMarkdown` set up.** Stub heavy dependencies (`stubs: { MessageText: { template: '...', props: [...] } }`) instead of pulling the full app context into a unit test.
-- **Docker-restart cache permissions.** After `docker compose down`, `backend/var/cache/test` can lose write perms and every kernel-booting test fails with `Unable to write in the "cache" directory`. Fix, then re-run:
+- **`Unable to write in the "cache" directory (…/var/cache/test)`.** PHPUnit's `DG\BypassFinals` stream wrapper makes PHP judge `is_writable()` by mode bits, so root cannot write a `www-data:775` test cache. The dev backend entrypoint removes `var/cache/test` on start so PHPUnit recreates it as root; a backend restart fixes it, or directly:
 
   ```bash
-  docker compose exec -T backend sh -c 'rm -rf var/cache/test && mkdir -p var/cache/test && chmod -R 777 var/cache/test'
+  docker compose exec -T backend rm -rf var/cache/test
   ```
 
 - **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults a code path OFF, new logic there passes tests and is still a no-op in prod. Check the `BCONFIG` default and confirm the path is reachable before claiming a fix.
 - **`make ci-local` ≠ green CI.** It does not run Playwright. A page that unit-tests green can still fail `saved-task-roundtrip` or layout. Run `make test-e2e` before push.
+- **Flaky E2E: timeline before hypothesis.** Build the timeline from the trace first — `python3 _devextras/e2e/playwright-trace-timeline.py path/to/trace.zip` puts actions, errors, console and API calls on one clock. A fix that only raises a timeout is not a fix; the timeline shows what was waited for and why it took that long. Failed CI E2E jobs carry the backend container logs (warnings included) under `backend-logs/` in the Playwright results artifact.
 - **GitHub E2E died before any test ran.** If every E2E job fails at `Unable to download artifact` (the `docker-image` tarball), that is Actions infra — re-run the workflow. Do not “fix” product code.
 - **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.63.0-noble` image with `--network host`.
 - **Playwright is headless by default** (`frontend/tests/e2e/playwright.config.ts`). Never set `HEADED=1` or pass `--headed` unless the user explicitly asks to watch the browser. Headed + 4 workers opens a window per worker.
@@ -186,8 +187,6 @@ Real failure modes that have caused red CI more than once:
 
 These fail on the local dev stack and pass in CI. Confirm the failure matches the entry, then move on — do not "fix" product code for them:
 
-- **Migration tests** (`backend/tests/Migration/Version20260819080000Test`, `…20260820120000Test`, `…20260923190000Test`) fail with `test database has no user to attach fixtures to`: CI runs `doctrine:fixtures:load` on the test DB, the local gate does not.
-- **`ConfigControllerTest::testRuntimeConfigIncludesMemoryServiceFeature`** fails on `computeEnabled`: `docker-compose.yml` defaults `FEATURE_COMPUTE_ENABLED=true`, the test expects compute off as in CI.
 - **E2E specs that need the test stack** (`docker-compose.test.yml`) fail under `make test-e2e` on the dev stack:
   - Mail specs (`email`, `registration`, `guest-registration`, `admin-panel`): the runner defaults to MailHog `:8026` (test stack); run with `MAILHOG_URL=http://localhost:8025`.
   - `@whatsapp` specs: the WhatsApp stub on `:3999` only runs in the test stack.
@@ -498,5 +497,5 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 The whole stack runs in Docker (`docker compose up -d`, standard file — see README/`docs/DEVELOPMENT.md` for URLs and the seeded login `demo@synaplan.com` / `demo123`). The startup script only ensures the Docker **daemon** is running; you still bring the app up yourself with `docker compose up -d`. All lint/test/build commands run inside containers via the `make` targets — see the pre-commit gate above; nothing extra is needed on the host. Non-obvious caveats discovered in this sandbox:
 
 - **`frontend-widgets` cannot start here (optional, ignore it).** It is the only service with a `mem_limit`, and the memory cgroup controller is not delegatable in this VM, so it fails with `cannot enter cgroupv2 "/sys/fs/cgroup/docker" ... threaded mode`. Every other service (frontend, backend, worker, db, redis, centrifugo, qdrant, ollama, tika, mailhog, phpmyadmin) runs fine. If `docker compose up -d` aborts partway with that error, just run it again — the rest come up. It is the dev widget-build watcher only; rebuild the widget on demand with `make -C frontend build-widget`.
-- **PHPStan needs the gRPC stubs generated first.** The dev `composer install` runs with `--no-scripts` (see `_devextras/backend/docker-entrypoint.d/10-composer-install.sh`), so `backend/lib/grpc/` stays empty and `make -C backend phpstan` reports ~52 `class.notFound` errors for `Inference\*`. Fix once (after the stack is up): `docker compose exec -T backend composer proto:generate`. The stubs are gitignored and must be regenerated whenever the backend container is rebuilt.
+- **PHPStan needs the gRPC stubs.** `backend/lib/grpc/` is gitignored; the dev backend entrypoint (`_devextras/backend/docker-entrypoint.d/10-composer-install.sh`) generates the stubs on start when they are missing. If `make -C backend phpstan` still reports ~52 `class.notFound` errors for `Inference\*`, run `docker compose exec -T backend composer proto:generate`.
 - **Local AI text generation (Ollama) segfaults here; embeddings work.** The pinned `ollama/ollama` image's `llama-server` crashes with a segfault on any chat/generate model in this sandbox (even with `OLLAMA_FLASH_ATTENTION=0`), so local chat is unavailable. Embeddings (`bge-m3`) work, so **RAG document ingestion + semantic search (`/files`, `/files/search`), and Qdrant vector features work fully with no API key.** To use chat/generation, add a cloud provider key (e.g. `GROQ_API_KEY=...` in `backend/.env`, then `docker compose restart backend worker`) — the seeded default chat model is Anthropic, so also set/select a provider you have a key for.
