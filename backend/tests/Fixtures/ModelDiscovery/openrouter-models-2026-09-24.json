@@ -1,0 +1,3948 @@
+{
+  "data": [
+    {
+      "id": "openai/gpt-6-luna-pro",
+      "canonical_slug": "openai/gpt-6-luna-pro-20260922",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Luna Pro",
+      "created": 1790100791,
+      "description": "GPT-6 Luna Pro is the same underlying model as [GPT-6 Luna](https://openrouter.ai/openai/gpt-6-luna), served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks.\n\nLearn more in OpenAI's docs: https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001",
+        "input_cache_write": "0.000000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002",
+            "completion": "0.00000075",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.00000025"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-luna-pro-20260922/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "openai/gpt-6-luna",
+      "canonical_slug": "openai/gpt-6-luna-20260922",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Luna",
+      "created": 1790100786,
+      "description": "GPT-6 Luna is the fast, cost-efficient model in OpenAI's GPT-6 series, positioned below GPT-6 Sol. It is suited for high-volume and latency-sensitive workloads such as chat, classification, and lightweight agentic...",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001",
+        "input_cache_write": "0.000000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002",
+            "completion": "0.00000075",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.00000025"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-luna-20260922/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 37.3,
+          "coding_index": null,
+          "agentic_index": null
+        }
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "openai/gpt-6-sol-pro",
+      "canonical_slug": "openai/gpt-6-sol-pro-20260922",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Sol Pro",
+      "created": 1790100781,
+      "description": "GPT-6 Sol Pro is the same underlying model as [GPT-6 Sol](https://openrouter.ai/openai/gpt-6-sol), served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks.\n\nLearn more in OpenAI's docs: https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-sol-pro-20260922/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "openai/gpt-6-sol",
+      "canonical_slug": "openai/gpt-6-sol-20260922",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Sol",
+      "created": 1790100775,
+      "description": "GPT-6 Sol is the cost-efficient high-end model in OpenAI's GPT-6 series, positioned below the flagship GPT-6 Astra and above the fast GPT-6 Luna tier. It is suited for demanding professional...",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-sol-20260922/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 47.5,
+          "coding_index": null,
+          "agentic_index": null
+        }
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-5.5",
+      "canonical_slug": "anthropic/claude-opus-5.5-20260921",
+      "hugging_face_id": null,
+      "name": "Anthropic: Claude Opus 5.5",
+      "created": 1790094732,
+      "description": "Claude Opus 5.5 is Anthropic's flagship model for demanding reasoning, coding, and long-horizon agentic work, succeeding Claude Opus 5. It is particularly strong at multi-step changes in large codebases, code...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.000005",
+        "input_cache_write_1h": "0.000008"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/anthropic/claude-opus-5.5-20260921/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 57.6,
+          "coding_index": null,
+          "agentic_index": null
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "x-ai/grok-4.7",
+      "canonical_slug": "x-ai/grok-4.7-20260916",
+      "hugging_face_id": null,
+      "name": "SpaceXAI: Grok 4.7",
+      "created": 1790007541,
+      "description": "Grok 4.7 is SpaceXAI's flagship model for coding, agentic tasks, and knowledge work, succeeding Grok 4.6. It is particularly strong at long-running software engineering tasks, verifying its own work, and...",
+      "context_length": 500000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Grok",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000016",
+        "completion": "0.0000048",
+        "web_search": "0.005",
+        "input_cache_read": "0.0000004",
+        "overrides": [
+          {
+            "min_prompt_tokens": 200000,
+            "prompt": "0.0000032",
+            "completion": "0.0000096",
+            "input_cache_read": "0.0000008"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 500000,
+        "max_completion_tokens": 450000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": 0.7,
+        "top_p": 0.95
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/x-ai/grok-4.7-20260916/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 46.4,
+          "coding_index": null,
+          "agentic_index": null
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "openai/gpt-6-astra",
+      "canonical_slug": "openai/gpt-6-astra-20260903",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Astra",
+      "created": 1788552838,
+      "description": "GPT-6 Astra is OpenAI's flagship model for demanding end-to-end work. It is suited for advanced analysis, software engineering, deep research, scientific work, and document creation, with particular strengths in long-horizon...",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.000001",
+        "input_cache_write": "0.0000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00002",
+            "completion": "0.000075",
+            "input_cache_read": "0.000002",
+            "input_cache_write": "0.000025"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-astra-20260903/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 52.7,
+          "coding_index": 76.9,
+          "agentic_index": 51
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "openai/gpt-6-astra-pro",
+      "canonical_slug": "openai/gpt-6-astra-pro-20260903",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Astra Pro",
+      "created": 1788552835,
+      "description": "GPT-6 Astra Pro is the same underlying model as [GPT-6 Astra](https://openrouter.ai/openai/gpt-6-astra), served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks.\n\nLearn more in OpenAI's docs: https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.000001",
+        "input_cache_write": "0.0000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00002",
+            "completion": "0.000075",
+            "input_cache_read": "0.000002",
+            "input_cache_write": "0.000025"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-astra-pro-20260903/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "google/gemini-3.8-flash",
+      "canonical_slug": "google/gemini-3.8-flash-20260902",
+      "hugging_face_id": null,
+      "name": "Google: Gemini 3.8 Flash",
+      "created": 1788362056,
+      "description": "Gemini 3.8 Flash is Google's most intelligent Flash model with significant gains from 3.7 Flash across software engineering, agentic tasks, and multi-step reasoning.",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "video",
+          "file",
+          "audio"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.00000375",
+        "image": "0.00000075",
+        "audio": "0.00000075",
+        "input_audio_cache": "0.000000075",
+        "web_search": "0.014",
+        "internal_reasoning": "0.00000375",
+        "input_cache_read": "0.000000075",
+        "input_cache_write": "0.0000000416666666666667"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/google/gemini-3.8-flash-20260902/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "agents",
+            "category": "fullstack",
+            "elo": 1239,
+            "win_rate": 48.2,
+            "rank": 11
+          },
+          {
+            "arena": "agents",
+            "category": "godotgamedev",
+            "elo": 1275,
+            "win_rate": 53.2,
+            "rank": 4
+          },
+          {
+            "arena": "agents",
+            "category": "mobileapps",
+            "elo": 1255,
+            "win_rate": 55.4,
+            "rank": 6
+          },
+          {
+            "arena": "agents",
+            "category": "python-pptxslides",
+            "elo": 1176,
+            "win_rate": 39.5,
+            "rank": 19
+          },
+          {
+            "arena": "agents",
+            "category": "webapps",
+            "elo": 1245,
+            "win_rate": 46.3,
+            "rank": 11
+          },
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1324,
+            "win_rate": 51.4,
+            "rank": 13
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1316,
+            "win_rate": 52.9,
+            "rank": 10
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1274,
+            "win_rate": 50.7,
+            "rank": 21
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1328,
+            "win_rate": 53.9,
+            "rank": 9
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1334,
+            "win_rate": 54.1,
+            "rank": 8
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1308,
+            "win_rate": 52.4,
+            "rank": 9
+          }
+        ],
+        "artificial_analysis": {
+          "intelligence_index": 40.9,
+          "coding_index": 76.3,
+          "agentic_index": 40.2
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "anthropic/claude-fable-5.1",
+      "canonical_slug": "anthropic/claude-fable-5.1-20260831",
+      "hugging_face_id": null,
+      "name": "Anthropic: Claude Fable 5.1",
+      "created": 1788285838,
+      "description": "Claude Fable 5.1 improves on Claude Fable 5 across the board, with the biggest gains in agentic coding, long-running agentic workflows, and knowledge work: long code refactors, front-end and visual...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.0000125",
+        "input_cache_write_1h": "0.00002"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/anthropic/claude-fable-5.1-20260831/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "agents",
+            "category": "fullstack",
+            "elo": 1323,
+            "win_rate": 57.3,
+            "rank": 1
+          },
+          {
+            "arena": "agents",
+            "category": "godotgamedev",
+            "elo": 1330,
+            "win_rate": 61.2,
+            "rank": 1
+          },
+          {
+            "arena": "agents",
+            "category": "python-pptxslides",
+            "elo": 1328,
+            "win_rate": 62.6,
+            "rank": 1
+          },
+          {
+            "arena": "agents",
+            "category": "webapps",
+            "elo": 1323,
+            "win_rate": 56.1,
+            "rank": 1
+          },
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1421,
+            "win_rate": 68.2,
+            "rank": 2
+          },
+          {
+            "arena": "models",
+            "category": "asciiart",
+            "elo": 1339,
+            "win_rate": 65.9,
+            "rank": 2
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1343,
+            "win_rate": 59.1,
+            "rank": 3
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1359,
+            "win_rate": 62.3,
+            "rank": 2
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1395,
+            "win_rate": 65.4,
+            "rank": 1
+          },
+          {
+            "arena": "models",
+            "category": "svg",
+            "elo": 1340,
+            "win_rate": 62.9,
+            "rank": 1
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1350,
+            "win_rate": 59.8,
+            "rank": 5
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1319,
+            "win_rate": 56.2,
+            "rank": 4
+          }
+        ],
+        "artificial_analysis": {
+          "intelligence_index": 53.4,
+          "coding_index": 81.6,
+          "agentic_index": 57.9
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "google/gemini-3.7-flash",
+      "canonical_slug": "google/gemini-3.7-flash-20260813",
+      "hugging_face_id": null,
+      "name": "Google: Gemini 3.7 Flash",
+      "created": 1786640581,
+      "description": "Gemini 3.7 Flash is a multimodal model from Google for fast agentic workflows, coding, and complex multi-step reasoning. It is designed for tasks that require responsive performance and reliable multi-step...",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "video",
+          "file",
+          "audio"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.00000375",
+        "image": "0.00000075",
+        "audio": "0.00000075",
+        "input_audio_cache": "0.000000075",
+        "web_search": "0.014",
+        "internal_reasoning": "0.00000375",
+        "input_cache_read": "0.000000075",
+        "input_cache_write": "0.0000000416666666666667"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/google/gemini-3.7-flash-20260813/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "agents",
+            "category": "agenticgamedev",
+            "elo": 1235,
+            "win_rate": 52.1,
+            "rank": 5
+          },
+          {
+            "arena": "agents",
+            "category": "androidnative",
+            "elo": 1255,
+            "win_rate": 53.2,
+            "rank": 6
+          },
+          {
+            "arena": "agents",
+            "category": "fullstack",
+            "elo": 1203,
+            "win_rate": 43.3,
+            "rank": 16
+          },
+          {
+            "arena": "agents",
+            "category": "godotgamedev",
+            "elo": 1262,
+            "win_rate": 50.6,
+            "rank": 6
+          },
+          {
+            "arena": "agents",
+            "category": "mobileapps",
+            "elo": 1258,
+            "win_rate": 53.2,
+            "rank": 5
+          },
+          {
+            "arena": "agents",
+            "category": "webapps",
+            "elo": 1226,
+            "win_rate": 46.8,
+            "rank": 15
+          },
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1333,
+            "win_rate": 55.4,
+            "rank": 11
+          },
+          {
+            "arena": "models",
+            "category": "asciiart",
+            "elo": 1273,
+            "win_rate": 53.4,
+            "rank": 12
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1317,
+            "win_rate": 56.1,
+            "rank": 9
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1324,
+            "win_rate": 56.4,
+            "rank": 8
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1340,
+            "win_rate": 56,
+            "rank": 7
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1310,
+            "win_rate": 51.5,
+            "rank": 13
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1311,
+            "win_rate": 56.2,
+            "rank": 7
+          }
+        ],
+        "artificial_analysis": {
+          "intelligence_index": 39.1,
+          "coding_index": 76.1,
+          "agentic_index": 35.2
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "x-ai/grok-4.6",
+      "canonical_slug": "x-ai/grok-4.6-20260810",
+      "hugging_face_id": null,
+      "name": "SpaceXAI: Grok 4.6",
+      "created": 1786548957,
+      "description": "Grok 4.6 is a model from SpaceXAI with frontier performance on coding, knowledge work, and STEM. It is succeeded by [Grok 4.7](/x-ai/grok-4.7).",
+      "context_length": 500000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Grok",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000006",
+        "web_search": "0.005",
+        "input_cache_read": "0.0000005",
+        "overrides": [
+          {
+            "min_prompt_tokens": 200000,
+            "prompt": "0.000004",
+            "completion": "0.000012",
+            "input_cache_read": "0.000001"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 500000,
+        "max_completion_tokens": 450000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/x-ai/grok-4.6-20260810/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "agents",
+            "category": "agenticgamedev",
+            "elo": 1210,
+            "win_rate": 47.2,
+            "rank": 9
+          },
+          {
+            "arena": "agents",
+            "category": "androidnative",
+            "elo": 1302,
+            "win_rate": 61,
+            "rank": 1
+          },
+          {
+            "arena": "agents",
+            "category": "fullstack",
+            "elo": 1260,
+            "win_rate": 54.9,
+            "rank": 7
+          },
+          {
+            "arena": "agents",
+            "category": "godotgamedev",
+            "elo": 1271,
+            "win_rate": 52.2,
+            "rank": 5
+          },
+          {
+            "arena": "agents",
+            "category": "htmlslides",
+            "elo": 1253,
+            "win_rate": 60.3,
+            "rank": 3
+          },
+          {
+            "arena": "agents",
+            "category": "mobileapps",
+            "elo": 1264,
+            "win_rate": 57.3,
+            "rank": 4
+          },
+          {
+            "arena": "agents",
+            "category": "python-pptxslides",
+            "elo": 1242,
+            "win_rate": 52.7,
+            "rank": 11
+          },
+          {
+            "arena": "agents",
+            "category": "webapps",
+            "elo": 1253,
+            "win_rate": 56.1,
+            "rank": 9
+          },
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1302,
+            "win_rate": 52.6,
+            "rank": 15
+          },
+          {
+            "arena": "models",
+            "category": "asciiart",
+            "elo": 1289,
+            "win_rate": 58.5,
+            "rank": 7
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1303,
+            "win_rate": 52.9,
+            "rank": 11
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1298,
+            "win_rate": 52,
+            "rank": 12
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1312,
+            "win_rate": 54.4,
+            "rank": 11
+          },
+          {
+            "arena": "models",
+            "category": "svg",
+            "elo": 1255,
+            "win_rate": 50.4,
+            "rank": 12
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1305,
+            "win_rate": 53.7,
+            "rank": 15
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1300,
+            "win_rate": 52.7,
+            "rank": 12
+          }
+        ],
+        "artificial_analysis": {
+          "intelligence_index": 44.3,
+          "coding_index": 76.8,
+          "agentic_index": 53
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "openai/gpt-6-luna-pro:batch",
+      "canonical_slug": "openai/gpt-6-luna-pro-20260922",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Luna Pro (batch)",
+      "created": 1790100791,
+      "description": "GPT-6 Luna Pro is the same underlying model as [GPT-6 Luna](https://openrouter.ai/openai/gpt-6-luna), served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks.\n\nLearn more in OpenAI's docs: https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.00000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000005",
+        "input_cache_write": "0.0000000625",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000001",
+            "completion": "0.000000375",
+            "input_cache_read": "0.00000001",
+            "input_cache_write": "0.000000125"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-luna-pro-20260922/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "openai/gpt-6-luna:batch",
+      "canonical_slug": "openai/gpt-6-luna-20260922",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Luna (batch)",
+      "created": 1790100786,
+      "description": "GPT-6 Luna is the fast, cost-efficient model in OpenAI's GPT-6 series, positioned below GPT-6 Sol. It is suited for high-volume and latency-sensitive workloads such as chat, classification, and lightweight agentic...",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000005",
+        "completion": "0.00000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000005",
+        "input_cache_write": "0.0000000625",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000001",
+            "completion": "0.000000375",
+            "input_cache_read": "0.00000001",
+            "input_cache_write": "0.000000125"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-luna-20260922/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 37.3,
+          "coding_index": null,
+          "agentic_index": null
+        }
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "openai/gpt-6-sol-pro:batch",
+      "canonical_slug": "openai/gpt-6-sol-pro-20260922",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Sol Pro (batch)",
+      "created": 1790100781,
+      "description": "GPT-6 Sol Pro is the same underlying model as [GPT-6 Sol](https://openrouter.ai/openai/gpt-6-sol), served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks.\n\nLearn more in OpenAI's docs: https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002",
+            "completion": "0.0000075",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.0000025"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-sol-pro-20260922/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "openai/gpt-6-sol:batch",
+      "canonical_slug": "openai/gpt-6-sol-20260922",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Sol (batch)",
+      "created": 1790100775,
+      "description": "GPT-6 Sol is the cost-efficient high-end model in OpenAI's GPT-6 series, positioned below the flagship GPT-6 Astra and above the fast GPT-6 Luna tier. It is suited for demanding professional...",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000002",
+            "completion": "0.0000075",
+            "input_cache_read": "0.0000002",
+            "input_cache_write": "0.0000025"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-sol-20260922/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 47.5,
+          "coding_index": null,
+          "agentic_index": null
+        }
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "anthropic/claude-opus-5.5:batch",
+      "canonical_slug": "anthropic/claude-opus-5.5-20260921",
+      "hugging_face_id": null,
+      "name": "Anthropic: Claude Opus 5.5 (batch)",
+      "created": 1790094732,
+      "description": "Claude Opus 5.5 is Anthropic's flagship model for demanding reasoning, coding, and long-horizon agentic work, succeeding Claude Opus 5. It is particularly strong at multi-step changes in large codebases, code...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.0000025",
+        "input_cache_write_1h": "0.000004"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/anthropic/claude-opus-5.5-20260921/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 57.6,
+          "coding_index": null,
+          "agentic_index": null
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "openai/gpt-6-astra:batch",
+      "canonical_slug": "openai/gpt-6-astra-20260903",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Astra (batch)",
+      "created": 1788552838,
+      "description": "GPT-6 Astra is OpenAI's flagship model for demanding end-to-end work. It is suited for advanced analysis, software engineering, deep research, scientific work, and document creation, with particular strengths in long-horizon...",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00001",
+            "completion": "0.0000375",
+            "input_cache_read": "0.000001",
+            "input_cache_write": "0.0000125"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-astra-20260903/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": 52.7,
+          "coding_index": 76.9,
+          "agentic_index": 51
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "openai/gpt-6-astra-pro:batch",
+      "canonical_slug": "openai/gpt-6-astra-pro-20260903",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-6 Astra Pro (batch)",
+      "created": 1788552835,
+      "description": "GPT-6 Astra Pro is the same underlying model as [GPT-6 Astra](https://openrouter.ai/openai/gpt-6-astra), served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks.\n\nLearn more in OpenAI's docs: https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00001",
+            "completion": "0.0000375",
+            "input_cache_read": "0.000001",
+            "input_cache_write": "0.0000125"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-astra-pro-20260903/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "google/gemini-3.8-flash:batch",
+      "canonical_slug": "google/gemini-3.8-flash-20260902",
+      "hugging_face_id": null,
+      "name": "Google: Gemini 3.8 Flash (batch)",
+      "created": 1788362056,
+      "description": "Gemini 3.8 Flash is Google's most intelligent Flash model with significant gains from 3.7 Flash across software engineering, agentic tasks, and multi-step reasoning.",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "video",
+          "file",
+          "audio"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000000375",
+        "completion": "0.000001875",
+        "image": "0.000000375",
+        "audio": "0.000000375",
+        "input_audio_cache": "0.0000000375",
+        "web_search": "0.014",
+        "internal_reasoning": "0.000001875",
+        "input_cache_read": "0.0000000375",
+        "input_cache_write": "0.0000000416666666666667"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/google/gemini-3.8-flash-20260902/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "agents",
+            "category": "fullstack",
+            "elo": 1239,
+            "win_rate": 48.2,
+            "rank": 11
+          },
+          {
+            "arena": "agents",
+            "category": "godotgamedev",
+            "elo": 1275,
+            "win_rate": 53.2,
+            "rank": 4
+          },
+          {
+            "arena": "agents",
+            "category": "mobileapps",
+            "elo": 1255,
+            "win_rate": 55.4,
+            "rank": 6
+          },
+          {
+            "arena": "agents",
+            "category": "python-pptxslides",
+            "elo": 1176,
+            "win_rate": 39.5,
+            "rank": 19
+          },
+          {
+            "arena": "agents",
+            "category": "webapps",
+            "elo": 1245,
+            "win_rate": 46.3,
+            "rank": 11
+          },
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1324,
+            "win_rate": 51.4,
+            "rank": 13
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1316,
+            "win_rate": 52.9,
+            "rank": 10
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1274,
+            "win_rate": 50.7,
+            "rank": 21
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1328,
+            "win_rate": 53.9,
+            "rank": 9
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1334,
+            "win_rate": 54.1,
+            "rank": 8
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1308,
+            "win_rate": 52.4,
+            "rank": 9
+          }
+        ],
+        "artificial_analysis": {
+          "intelligence_index": 40.9,
+          "coding_index": 76.3,
+          "agentic_index": 40.2
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "anthropic/claude-fable-5.1:batch",
+      "canonical_slug": "anthropic/claude-fable-5.1-20260831",
+      "hugging_face_id": null,
+      "name": "Anthropic: Claude Fable 5.1 (batch)",
+      "created": 1788285838,
+      "description": "Claude Fable 5.1 improves on Claude Fable 5 across the board, with the biggest gains in agentic coding, long-running agentic workflows, and knowledge work: long code refactors, front-end and visual...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000005",
+        "completion": "0.000025",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000125",
+        "input_cache_write": "0.00000625",
+        "input_cache_write_1h": "0.00001"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/anthropic/claude-fable-5.1-20260831/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "agents",
+            "category": "fullstack",
+            "elo": 1323,
+            "win_rate": 57.3,
+            "rank": 1
+          },
+          {
+            "arena": "agents",
+            "category": "godotgamedev",
+            "elo": 1330,
+            "win_rate": 61.2,
+            "rank": 1
+          },
+          {
+            "arena": "agents",
+            "category": "python-pptxslides",
+            "elo": 1328,
+            "win_rate": 62.6,
+            "rank": 1
+          },
+          {
+            "arena": "agents",
+            "category": "webapps",
+            "elo": 1323,
+            "win_rate": 56.1,
+            "rank": 1
+          },
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1421,
+            "win_rate": 68.2,
+            "rank": 2
+          },
+          {
+            "arena": "models",
+            "category": "asciiart",
+            "elo": 1339,
+            "win_rate": 65.9,
+            "rank": 2
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1343,
+            "win_rate": 59.1,
+            "rank": 3
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1359,
+            "win_rate": 62.3,
+            "rank": 2
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1395,
+            "win_rate": 65.4,
+            "rank": 1
+          },
+          {
+            "arena": "models",
+            "category": "svg",
+            "elo": 1340,
+            "win_rate": 62.9,
+            "rank": 1
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1350,
+            "win_rate": 59.8,
+            "rank": 5
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1319,
+            "win_rate": 56.2,
+            "rank": 4
+          }
+        ],
+        "artificial_analysis": {
+          "intelligence_index": 53.4,
+          "coding_index": 81.6,
+          "agentic_index": 57.9
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "google/gemini-3.7-flash:batch",
+      "canonical_slug": "google/gemini-3.7-flash-20260813",
+      "hugging_face_id": null,
+      "name": "Google: Gemini 3.7 Flash (batch)",
+      "created": 1786640581,
+      "description": "Gemini 3.7 Flash is a multimodal model from Google for fast agentic workflows, coding, and complex multi-step reasoning. It is designed for tasks that require responsive performance and reliable multi-step...",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "video",
+          "file",
+          "audio"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Gemini",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000000375",
+        "completion": "0.000001875",
+        "image": "0.000000375",
+        "audio": "0.000000375",
+        "input_audio_cache": "0.0000000375",
+        "web_search": "0.014",
+        "internal_reasoning": "0.000001875",
+        "input_cache_read": "0.0000000375",
+        "input_cache_write": "0.0000000416666666666667"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/google/gemini-3.7-flash-20260813/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "agents",
+            "category": "agenticgamedev",
+            "elo": 1235,
+            "win_rate": 52.1,
+            "rank": 5
+          },
+          {
+            "arena": "agents",
+            "category": "androidnative",
+            "elo": 1255,
+            "win_rate": 53.2,
+            "rank": 6
+          },
+          {
+            "arena": "agents",
+            "category": "fullstack",
+            "elo": 1203,
+            "win_rate": 43.3,
+            "rank": 16
+          },
+          {
+            "arena": "agents",
+            "category": "godotgamedev",
+            "elo": 1262,
+            "win_rate": 50.6,
+            "rank": 6
+          },
+          {
+            "arena": "agents",
+            "category": "mobileapps",
+            "elo": 1258,
+            "win_rate": 53.2,
+            "rank": 5
+          },
+          {
+            "arena": "agents",
+            "category": "webapps",
+            "elo": 1226,
+            "win_rate": 46.8,
+            "rank": 15
+          },
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1333,
+            "win_rate": 55.4,
+            "rank": 11
+          },
+          {
+            "arena": "models",
+            "category": "asciiart",
+            "elo": 1273,
+            "win_rate": 53.4,
+            "rank": 12
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1317,
+            "win_rate": 56.1,
+            "rank": 9
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1324,
+            "win_rate": 56.4,
+            "rank": 8
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1340,
+            "win_rate": 56,
+            "rank": 7
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1310,
+            "win_rate": 51.5,
+            "rank": 13
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1311,
+            "win_rate": 56.2,
+            "rank": 7
+          }
+        ],
+        "artificial_analysis": {
+          "intelligence_index": 39.1,
+          "coding_index": 76.1,
+          "agentic_index": 35.2
+        }
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "~openai/gpt-astra-latest",
+      "canonical_slug": "~openai/gpt-astra-latest",
+      "alias_target": {
+        "name": "OpenAI: GPT-6 Astra",
+        "slug": "openai/gpt-6-astra"
+      },
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT Astra Latest",
+      "created": 1789130932,
+      "description": "This model always redirects to the latest model in the GPT Astra family.",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.000001",
+        "input_cache_write": "0.0000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.00002",
+            "completion": "0.000075",
+            "input_cache_read": "0.000002",
+            "input_cache_write": "0.000025"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~openai/gpt-astra-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "~openai/gpt-sol-latest",
+      "canonical_slug": "~openai/gpt-sol-latest",
+      "alias_target": {
+        "name": "OpenAI: GPT-6 Sol",
+        "slug": "openai/gpt-6-sol"
+      },
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT Sol Latest",
+      "created": 1789130928,
+      "description": "This model always redirects to the latest model in the GPT Sol family.",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000015",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~openai/gpt-sol-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "~openai/gpt-terra-latest",
+      "canonical_slug": "~openai/gpt-terra-latest",
+      "alias_target": {
+        "name": "OpenAI: GPT-5.6 Terra",
+        "slug": "openai/gpt-5.6-terra"
+      },
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT Terra Latest",
+      "created": 1789130925,
+      "description": "This model always redirects to the latest model in the GPT Terra family.",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.000004",
+            "completion": "0.000018",
+            "input_cache_read": "0.0000004",
+            "input_cache_write": "0.000005"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": "2026-02-16",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~openai/gpt-terra-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "~openai/gpt-luna-latest",
+      "canonical_slug": "~openai/gpt-luna-latest",
+      "alias_target": {
+        "name": "OpenAI: GPT-6 Luna",
+        "slug": "openai/gpt-6-luna"
+      },
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT Luna Latest",
+      "created": 1789130922,
+      "description": "This model always redirects to the latest model in the GPT Luna family.",
+      "context_length": 1050000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000001",
+        "completion": "0.0000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000001",
+        "input_cache_write": "0.000000125",
+        "overrides": [
+          {
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002",
+            "completion": "0.00000075",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.00000025"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1050000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~openai/gpt-luna-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "~x-ai/grok-latest",
+      "canonical_slug": "~x-ai/grok-latest",
+      "alias_target": {
+        "name": "SpaceXAI: Grok 4.7",
+        "slug": "x-ai/grok-4.7"
+      },
+      "hugging_face_id": null,
+      "name": "xAI: Grok Latest",
+      "created": 1783519360,
+      "description": "This model always redirects to the latest Grok model from xAI.",
+      "context_length": 500000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000016",
+        "completion": "0.0000048",
+        "web_search": "0.005",
+        "input_cache_read": "0.0000004",
+        "overrides": [
+          {
+            "min_prompt_tokens": 200000,
+            "prompt": "0.0000032",
+            "completion": "0.0000096",
+            "input_cache_read": "0.0000008"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 500000,
+        "max_completion_tokens": 450000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": 0.7,
+        "top_p": 0.95
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~x-ai/grok-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "~anthropic/claude-fable-latest",
+      "canonical_slug": "~anthropic/claude-fable-latest",
+      "alias_target": {
+        "name": "Anthropic: Claude Fable 5.1",
+        "slug": "anthropic/claude-fable-5.1"
+      },
+      "hugging_face_id": null,
+      "name": "Anthropic: Claude Fable Latest",
+      "created": 1781029944,
+      "description": "This model always redirects to the latest model in the Claude Fable family.",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00001",
+        "completion": "0.00005",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000025",
+        "input_cache_write": "0.0000125",
+        "input_cache_write_1h": "0.00002"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~anthropic/claude-fable-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "~anthropic/claude-haiku-latest",
+      "canonical_slug": "~anthropic/claude-haiku-latest",
+      "alias_target": {
+        "name": "Anthropic: Claude Haiku 4.5",
+        "slug": "anthropic/claude-haiku-4.5"
+      },
+      "hugging_face_id": null,
+      "name": "Anthropic: Claude Haiku Latest",
+      "created": 1777318492,
+      "description": "This model always redirects to the latest model in the Claude Haiku family.",
+      "context_length": 200000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000005",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000001",
+        "input_cache_write": "0.00000125",
+        "input_cache_write_1h": "0.000002"
+      },
+      "top_provider": {
+        "context_length": 200000,
+        "max_completion_tokens": 64000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~anthropic/claude-haiku-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false
+      }
+    },
+    {
+      "id": "~openai/gpt-mini-latest",
+      "canonical_slug": "~openai/gpt-mini-latest",
+      "alias_target": {
+        "name": "OpenAI: GPT-5.4 Mini",
+        "slug": "openai/gpt-5.4-mini"
+      },
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT Mini Latest",
+      "created": 1777318471,
+      "description": "This model always redirects to the latest model in the GPT Mini family.",
+      "context_length": 400000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.0000045",
+        "web_search": "0.01",
+        "input_cache_read": "0.000000075"
+      },
+      "top_provider": {
+        "context_length": 400000,
+        "max_completion_tokens": 128000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": "2025-08-31",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~openai/gpt-mini-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": false,
+        "supported_efforts": [
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "~google/gemini-pro-latest",
+      "canonical_slug": "~google/gemini-pro-latest",
+      "alias_target": {
+        "name": "Google: Gemini 3.1 Pro Preview",
+        "slug": "google/gemini-3.1-pro-preview"
+      },
+      "hugging_face_id": null,
+      "name": "Google: Gemini Pro Latest",
+      "created": 1777318451,
+      "description": "This model always redirects to the latest model in the Gemini Pro family.",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": [
+          "audio",
+          "file",
+          "image",
+          "text",
+          "video"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000012",
+        "image": "0.000002",
+        "audio": "0.000002",
+        "input_audio_cache": "0.0000002",
+        "web_search": "0.014",
+        "internal_reasoning": "0.000012",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.000000375",
+        "overrides": [
+          {
+            "min_prompt_tokens": 200000,
+            "prompt": "0.000004",
+            "completion": "0.000018",
+            "audio": "0.000004",
+            "input_audio_cache": "0.0000004",
+            "input_cache_read": "0.0000004"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~google/gemini-pro-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "supported_efforts": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "~google/gemini-flash-latest",
+      "canonical_slug": "~google/gemini-flash-latest",
+      "alias_target": {
+        "name": "Google: Gemini 3.8 Flash",
+        "slug": "google/gemini-3.8-flash"
+      },
+      "hugging_face_id": null,
+      "name": "Google: Gemini Flash Latest",
+      "created": 1777318398,
+      "description": "This model always redirects to the latest model in the Gemini Flash family.",
+      "context_length": 1048576,
+      "architecture": {
+        "modality": "text+image+file+audio+video->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "video",
+          "file",
+          "audio"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000075",
+        "completion": "0.00000375",
+        "image": "0.00000075",
+        "audio": "0.00000075",
+        "input_audio_cache": "0.000000075",
+        "web_search": "0.014",
+        "internal_reasoning": "0.00000375",
+        "input_cache_read": "0.000000075",
+        "input_cache_write": "0.0000000416666666666667"
+      },
+      "top_provider": {
+        "context_length": 1048576,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~google/gemini-flash-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "medium"
+      }
+    },
+    {
+      "id": "~anthropic/claude-sonnet-latest",
+      "canonical_slug": "~anthropic/claude-sonnet-latest",
+      "alias_target": {
+        "name": "Anthropic: Claude Sonnet 5",
+        "slug": "anthropic/claude-sonnet-5"
+      },
+      "hugging_face_id": null,
+      "name": "Anthropic: Claude Sonnet Latest",
+      "created": 1777318368,
+      "description": "This model always redirects to the latest model in the Claude Sonnet family.",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.00001",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.0000025",
+        "input_cache_write_1h": "0.000004"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~anthropic/claude-sonnet-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "~anthropic/claude-opus-latest",
+      "canonical_slug": "~anthropic/claude-opus-latest",
+      "alias_target": {
+        "name": "Anthropic: Claude Opus 5.5",
+        "slug": "anthropic/claude-opus-5.5"
+      },
+      "hugging_face_id": "",
+      "name": "Anthropic: Claude Opus Latest",
+      "created": 1776795361,
+      "description": "This model always redirects to the latest model in the Claude Opus family.",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Router",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000004",
+        "completion": "0.00002",
+        "web_search": "0.01",
+        "input_cache_read": "0.0000002",
+        "input_cache_write": "0.000005",
+        "input_cache_write_1h": "0.000008"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 128000,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/~anthropic/claude-opus-latest/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low"
+        ],
+        "default_effort": "high"
+      }
+    },
+    {
+      "id": "anthropic/claude-3-haiku",
+      "canonical_slug": "anthropic/claude-3-haiku",
+      "hugging_face_id": null,
+      "name": "Anthropic: Claude 3 Haiku",
+      "created": 1710288000,
+      "description": "Claude 3 Haiku is Anthropic's fastest and most compact model for\nnear-instant responsiveness. Quick and accurate targeted performance.\n\nSee the launch announcement and benchmark results [here](https://www.anthropic.com/news/claude-3-haiku)\n\n#multimodal",
+      "context_length": 200000,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.00000125",
+        "web_search": "0.01",
+        "input_cache_read": "0.00000003",
+        "input_cache_write": "0.0000003",
+        "input_cache_write_1h": "0.0000005"
+      },
+      "top_provider": {
+        "context_length": 200000,
+        "max_completion_tokens": 4096,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "max_tokens",
+        "stop",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": "2023-08-31",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/anthropic/claude-3-haiku/endpoints"
+      }
+    },
+    {
+      "id": "openai/gpt-3.5-turbo",
+      "canonical_slug": "openai/gpt-3.5-turbo",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-3.5 Turbo",
+      "created": 1685232000,
+      "description": "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks.\n\nTraining data up to Sep 2021.",
+      "context_length": 16385,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000005",
+        "completion": "0.0000015"
+      },
+      "top_provider": {
+        "context_length": 16385,
+        "max_completion_tokens": 4096,
+        "is_moderated": true
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": "2021-09-30",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-3.5-turbo/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [],
+        "artificial_analysis": {
+          "intelligence_index": null,
+          "coding_index": 10.7,
+          "agentic_index": null
+        }
+      }
+    },
+    {
+      "id": "google/gemma-2-27b-it",
+      "canonical_slug": "google/gemma-2-27b-it",
+      "hugging_face_id": "google/gemma-2-27b-it",
+      "name": "Google: Gemma 2 27B",
+      "created": 1720828800,
+      "description": "Gemma 2 27B by Google is an open model built from the same research and technology used to create the [Gemini models](/models?q=gemini). Gemma models are well-suited for a variety of...",
+      "context_length": 8192,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Gemini",
+        "instruct_type": "gemma"
+      },
+      "pricing": {
+        "prompt": "0.00000065",
+        "completion": "0.00000065"
+      },
+      "top_provider": {
+        "context_length": 8192,
+        "max_completion_tokens": 2048,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "max_tokens",
+        "presence_penalty",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": "2024-06-30",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/google/gemma-2-27b-it/endpoints"
+      }
+    },
+    {
+      "id": "x-ai/grok-4.20",
+      "canonical_slug": "x-ai/grok-4.20-20260309",
+      "hugging_face_id": "",
+      "name": "SpaceXAI: Grok 4.20",
+      "created": 1774979019,
+      "description": "Grok 4.20 is a reasoning model from SpaceXAI with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherance, delivering...",
+      "context_length": 2000000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Grok",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.00000125",
+        "completion": "0.0000025",
+        "web_search": "0.005",
+        "input_cache_read": "0.0000002",
+        "overrides": [
+          {
+            "min_prompt_tokens": 200000,
+            "prompt": "0.0000025",
+            "completion": "0.000005",
+            "input_cache_read": "0.0000004"
+          }
+        ]
+      },
+      "top_provider": {
+        "context_length": 2000000,
+        "max_completion_tokens": 1800000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "reasoning",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": null,
+        "top_p": null,
+        "top_k": null,
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": "2025-09-01",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/x-ai/grok-4.20-20260309/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "agents",
+            "category": "androidnative",
+            "elo": 1059,
+            "win_rate": 35,
+            "rank": 34
+          },
+          {
+            "arena": "agents",
+            "category": "fullstack",
+            "elo": 1050,
+            "win_rate": 41,
+            "rank": 34
+          },
+          {
+            "arena": "agents",
+            "category": "godotgamedev",
+            "elo": 1089,
+            "win_rate": 38.5,
+            "rank": 31
+          },
+          {
+            "arena": "agents",
+            "category": "htmlslides",
+            "elo": 1180,
+            "win_rate": 45.7,
+            "rank": 12
+          },
+          {
+            "arena": "agents",
+            "category": "mobileapps",
+            "elo": 1119,
+            "win_rate": 45.4,
+            "rank": 37
+          },
+          {
+            "arena": "agents",
+            "category": "webapps",
+            "elo": 1150,
+            "win_rate": 49.7,
+            "rank": 27
+          },
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1220,
+            "win_rate": 52.1,
+            "rank": 42
+          },
+          {
+            "arena": "models",
+            "category": "asciiart",
+            "elo": 1187,
+            "win_rate": 48.2,
+            "rank": 26
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1230,
+            "win_rate": 51.8,
+            "rank": 43
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1228,
+            "win_rate": 52,
+            "rank": 43
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1208,
+            "win_rate": 50.1,
+            "rank": 46
+          },
+          {
+            "arena": "models",
+            "category": "svg",
+            "elo": 1180,
+            "win_rate": 52.4,
+            "rank": 35
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1213,
+            "win_rate": 48.9,
+            "rank": 49
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1237,
+            "win_rate": 51.8,
+            "rank": 42
+          }
+        ]
+      },
+      "reasoning": {
+        "mandatory": false,
+        "default_enabled": false
+      }
+    },
+    {
+      "id": "mistralai/mistral-large",
+      "canonical_slug": "mistralai/mistral-large",
+      "hugging_face_id": null,
+      "name": "Mistral Large",
+      "created": 1708905600,
+      "description": "This is Mistral AI's flagship model, Mistral Large 2 (version `mistral-large-2407`). It's a proprietary weights-available model and excels at reasoning, code, JSON, chat, and more. Read the launch announcement [here](https://mistral.ai/news/mistral-large-2407/)....",
+      "context_length": 128000,
+      "architecture": {
+        "modality": "text+file->text",
+        "input_modalities": [
+          "text",
+          "file"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Mistral",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000002",
+        "completion": "0.000006",
+        "input_cache_read": "0.0000002"
+      },
+      "top_provider": {
+        "context_length": 128000,
+        "max_completion_tokens": 102400,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "max_tokens",
+        "presence_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "default_parameters": {
+        "temperature": 0.3
+      },
+      "supported_voices": null,
+      "knowledge_cutoff": "2024-11-30",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/mistralai/mistral-large/endpoints"
+      }
+    },
+    {
+      "id": "deepseek/deepseek-chat-v3.1",
+      "canonical_slug": "deepseek/deepseek-chat-v3.1",
+      "hugging_face_id": "deepseek-ai/DeepSeek-V3.1",
+      "name": "DeepSeek: DeepSeek V3.1",
+      "created": 1755779628,
+      "description": "DeepSeek-V3.1 is a large hybrid reasoning model (671B parameters, 37B active) that supports both thinking and non-thinking modes via prompt templates. It extends the DeepSeek-V3 base with a two-phase long-context...",
+      "context_length": 163840,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "DeepSeek",
+        "instruct_type": "deepseek-v3.1"
+      },
+      "pricing": {
+        "prompt": "0.00000025",
+        "completion": "0.00000095",
+        "input_cache_read": "0.00000013"
+      },
+      "top_provider": {
+        "context_length": 163840,
+        "max_completion_tokens": 32768,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": "2025-03-31",
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/deepseek/deepseek-chat-v3.1/endpoints"
+      },
+      "benchmarks": {
+        "design_arena": [
+          {
+            "arena": "models",
+            "category": "3d",
+            "elo": 1104,
+            "win_rate": 47.9,
+            "rank": 87
+          },
+          {
+            "arena": "models",
+            "category": "codecategories",
+            "elo": 1121,
+            "win_rate": 47.8,
+            "rank": 88
+          },
+          {
+            "arena": "models",
+            "category": "dataviz",
+            "elo": 1106,
+            "win_rate": 46.2,
+            "rank": 92
+          },
+          {
+            "arena": "models",
+            "category": "gamedev",
+            "elo": 1100,
+            "win_rate": 47.1,
+            "rank": 87
+          },
+          {
+            "arena": "models",
+            "category": "svg",
+            "elo": 982,
+            "win_rate": 38.2,
+            "rank": 85
+          },
+          {
+            "arena": "models",
+            "category": "uicomponent",
+            "elo": 1099,
+            "win_rate": 47.1,
+            "rank": 88
+          },
+          {
+            "arena": "models",
+            "category": "website",
+            "elo": 1130,
+            "win_rate": 48,
+            "rank": 88
+          }
+        ]
+      },
+      "reasoning": {
+        "mandatory": false
+      }
+    },
+    {
+      "id": "qwen/qwen3.8-max-prime",
+      "canonical_slug": "qwen/qwen3.8-max-prime-20260923",
+      "hugging_face_id": null,
+      "name": "Qwen: Qwen3.8 Max Prime",
+      "created": 1790191228,
+      "description": "Qwen3.8 Max Prime is a higher-throughput variant of Qwen3.8 Max from Alibaba's Qwen team, served as a separate SKU at a higher price point. It accepts text, image, and video...",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image+video->text",
+        "input_modalities": [
+          "text",
+          "image",
+          "video"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Qwen",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000004",
+        "completion": "0.000012",
+        "input_cache_read": "0.0000005"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 131072,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "default_parameters": {},
+      "supported_voices": null,
+      "knowledge_cutoff": null,
+      "expiration_date": null,
+      "links": {
+        "details": "/api/v1/models/qwen/qwen3.8-max-prime-20260923/endpoints"
+      },
+      "reasoning": {
+        "mandatory": true,
+        "default_enabled": true,
+        "supported_efforts": [
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "minimal"
+        ],
+        "default_effort": "xhigh"
+      }
+    }
+  ]
+}

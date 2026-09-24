@@ -104,6 +104,34 @@ Same DeepInfra pin. HF partners serving K3 on 08-20: DeepInfra, Together, Firewo
 | **DeepInfra (PINNED)** | $2.85 / $14.25 | cache-read $0.285, native MXFP4 |
 | Together / Fireworks / Novita | $3.00 / $15.00 | Moonshot first-party list price |
 
+## New model detection — `app:models:discover`
+
+Providers ship new models without telling us. Until a human adds catalog rows, Synaplan cannot offer or bill them. This command finds candidates first.
+
+```bash
+docker compose exec -T -e COLUMNS=120 backend php bin/console app:models:discover --fail-on-new; echo $?
+```
+
+**Source:** OpenRouter's public model list `GET https://openrouter.ai/api/v1/models` (no API key). OpenRouter is a **reseller hint source only** — never a price authority. Its ids differ from provider ids (`anthropic/claude-opus-5.5` vs our `claude-opus-5-5`), it lists variants the first-party `/v1/models` does not serve (e.g. `openai/gpt-6-sol-pro`), and it carries `:batch` / `:free` / `:thinking` suffixes plus `~vendor/...-latest` aliases. Catalog prices always come from the official provider page after a human verifies them.
+
+**Matching rules** (pure, no DB writes):
+
+- Only first-party vendors we map: `anthropic`→Anthropic, `openai`→OpenAI, `google`→Google, `x-ai`→xAI, `mistralai`→Mistral. Every other vendor prefix is skipped.
+- Skip ids containing `:` and ids starting with `~`.
+- Only models with `created` within the window (default **30 days**, `--window-days`) are candidates.
+- Comparison key (never shown as a suggested provider id): strip `vendor/`, lowercase, replace `.` with `-`, strip a trailing `-YYYYMMDD` or `-YYYY-MM-DD`. Same normalisation on catalog `providerId`s, compared within the mapped service only.
+- A catalog row counts as known regardless of active/selectable/retired state (a retired model must never reappear as "new"). The code catalog (`ModelCatalog::all()`) is the reference, not the database.
+
+**Ignore list:** `ModelDiscoveryIgnoreList::ENTRIES` — exact OpenRouter ids only (never a pattern), each with `reason` and `decidedOn`. Use it for OpenRouter-only variants a human decided not to carry.
+
+Exit codes match the sibling pricing commands: `0` nothing new, `1` the check could not run (source unavailable/malformed — a broken source must never look like "nothing new"), `2` new models found (only with `--fail-on-new`). Obsolete ignore entries are listed but never change the exit code.
+
+**When the GitHub issue opens** ("New AI models not in the catalog — review"): verify each finding on the official provider price page; add catalog rows + tests (example PR #2157) or a reasoned ignore entry. Do not copy OpenRouter prices into the catalog.
+
+**Blind spots:** image/video/audio models are rarely listed on OpenRouter; gateway providers (TrustedTokens, A2Agent, HuggingFace/Kimi) and vendors outside the map are not covered. This command is an ops check for the maintainers' workflow — it is **not** on the container scheduler.
+
+The daily `.github/workflows/price-drift.yml` run also executes discovery after the LiteLLM drift check, posts a `New models` field to Discord, and opens/updates the issue above when exit code 2 is reported (signature-deduped like the drift issue).
+
 ## Discontinuation detection — `app:models:check-availability`
 
 Providers retire models without telling us, and until now we found out when a user hit a provider error. This command finds it first.
@@ -192,6 +220,7 @@ Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalo
 
 **Tooling / cross-checks:**
 
+- OpenRouter public model list (hint source for `app:models:discover` — never a price authority): https://openrouter.ai/api/v1/models
 - LiteLLM price DB (used by `app:sync-model-prices`): https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json
 - HF inference partners: https://huggingface.co/inference/get-started
 - HF provider routing policy (`auto`=`:fastest`, `:cheapest`, `:preferred`): https://huggingface.co/docs/inference-providers/en/index

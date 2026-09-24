@@ -9,6 +9,11 @@ name: Price Drift Check
 # `pricing_mode` mismatch, which is listed in the report but never fails the run
 # because the two sides measure different things and can never reconcile.
 #
+# The same job then runs `app:models:discover --fail-on-new` against OpenRouter's
+# public model list (hint source only) to surface newly listed first-party models
+# our catalog does not carry yet. Discovery is informational: the step always
+# exits 0 and reports via outputs; new findings open a separate GitHub issue.
+#
 # Every run posts its report to Discord (#report-logs) so the channel carries a
 # daily record. On drift it also opens (or comments on) a GitHub issue so a human
 # can verify against the official price page and update the catalog; an unchanged
@@ -147,6 +152,36 @@ jobs:
 
           exit "$code"
 
+      - name: Check for new upstream models
+        id: discover
+        if: always()
+        working-directory: backend
+        env:
+          # Same COLUMNS rationale as the drift step — SymfonyStyle wraps at 120.
+          COLUMNS: 120
+        run: |
+          set +e
+          php bin/console app:models:discover --fail-on-new 2>&1 | tee discover-report.txt
+          code=${PIPESTATUS[0]}
+
+          # Just the new-model bullet lines (SymfonyStyle listing prefix " * ").
+          # Section title comes from DiscoverModelsCommand.
+          awk '
+            /^New upstream models/ { section = 1; next }
+            /^Ignored |^Obsolete ignore entries/ { section = 0 }
+            section && /^ \* / { print }
+          ' discover-report.txt > discover-flagged.txt
+
+          {
+            echo "exit_code=$code"
+            # Order-independent hash of the new-model set, so a daily run can tell
+            # "same findings as yesterday" from "a different set to review".
+            echo "signature=$(sort discover-flagged.txt | sha256sum | cut -d' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
+
+          # Informational only — outcome travels via outputs; never fail the job.
+          exit 0
+
       # Daily record of the check in #report-logs, drift or not. Runs even when a
       # setup step above broke, because a monitor that silently stops reporting is
       # worse than a noisy one. Optional: no webhook configured → no post.
@@ -155,6 +190,7 @@ jobs:
         env:
           HOOK: ${{ secrets.DISCORD_REPORT_LOGS_WEBHOOK }}
           CODE: ${{ steps.drift.outputs.exit_code }}
+          DISCOVER_CODE: ${{ steps.discover.outputs.exit_code }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -166,11 +202,38 @@ jobs:
             *) title="❌ Price drift check could not run"; colour=15158332 ;;
           esac
 
+          # When drift is clean but discovery found models to review, keep the
+          # drift title and append a review hint; yellow draws the eye without
+          # pretending prices drifted.
+          if [ "${DISCOVER_CODE:-}" = "2" ] && [ "${CODE:-}" = "0" ]; then
+            new_count=$(grep -c '^ \* ' backend/discover-flagged.txt 2>/dev/null || true)
+            new_count=${new_count:-0}
+            if [ "$new_count" -gt 0 ]; then
+              title="${title} · ${new_count} new model(s) to review"
+              colour=16776960
+            fi
+          elif [ "${DISCOVER_CODE:-}" != "0" ] && [ "${CODE:-}" = "0" ]; then
+            title="${title} · new-model check could not run"
+            colour=16776960
+          fi
+
           summary="$(cat backend/drift-summary.txt 2>/dev/null || true)"
           [ -n "$summary" ] || summary="No report produced — the check broke before it could compare prices."
 
           flagged="$(cat backend/drift-flagged.txt 2>/dev/null || true)"
           [ -n "$flagged" ] || flagged="none"
+
+          # Only exit 0 means "nothing new"; any other code (a PHP fatal after a
+          # broken setup, a skipped step) must never read as an all-clear.
+          case "${DISCOVER_CODE:-}" in
+            0) new_models="none" ;;
+            1) new_models="Could not check — OpenRouter list unavailable" ;;
+            2)
+              new_models="$(cat backend/discover-flagged.txt 2>/dev/null || true)"
+              [ -n "$new_models" ] || new_models="none"
+              ;;
+            *) new_models="Could not check — the discovery step did not finish (see the run log)" ;;
+          esac
 
           # Match DiscordNotificationService embed shape (title/fields/footer/timestamp).
           # Field values max 1024; the full report stays in the run log and, on
@@ -179,6 +242,7 @@ jobs:
             --arg title "$title" \
             --arg summary "$summary" \
             --arg flagged "$flagged" \
+            --arg new_models "$new_models" \
             --arg run "$RUN_URL" \
             --argjson colour "$colour" \
             --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -189,6 +253,7 @@ jobs:
                 fields: [
                   { name: "Summary", value: ("```\n" + ($summary | .[0:900]) + "\n```"), inline: false },
                   { name: "Flagged models", value: ("```\n" + ($flagged | .[0:900]) + "\n```"), inline: false },
+                  { name: "New models", value: ("```\n" + ($new_models | .[0:900]) + "\n```"), inline: false },
                   { name: "Workflow", value: ("[Open run](" + $run + ")"), inline: true }
                 ],
                 footer: { text: "Synaplan price drift" },
@@ -246,4 +311,50 @@ jobs:
           else
             echo "Opening new drift issue"
             gh issue create --title "$TITLE" --label "prio:2" --body-file drift-body.md
+          fi
+
+      - name: Open or update new-models issue
+        if: always() && steps.discover.outputs.exit_code == '2'
+        working-directory: backend
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SIGNATURE: ${{ steps.discover.outputs.signature }}
+        run: |
+          TITLE="New AI models not in the catalog — review"
+          {
+            echo "The daily model-discovery check found first-party models on OpenRouter that \`ModelCatalog\` does not carry yet. OpenRouter is a **hint source only** — a reseller list, never a price authority. Its ids and own variants can differ from what the provider serves."
+            echo ""
+            echo "**What to do:** for every model under \`New upstream models\`,"
+            echo "1. Verify it on the **official provider price page** (see Maintenance links in \`docs/PRICING_MAINTENANCE.md\`)."
+            echo "2. If we should offer it: add catalog rows + tests (example: https://github.com/metadist/synaplan/pull/2157)."
+            echo "3. If it is an OpenRouter-only variant or otherwise out of scope: add a reasoned entry to \`ModelDiscoveryIgnoreList\` (exact OpenRouter id, reason, \`decidedOn\`)."
+            echo ""
+            echo "_Nothing is auto-written. Obsolete ignore entries in the report mean delete those keys from the ignore list._"
+            echo ""
+            echo "<details><summary>Discovery report ($(date -u +%Y-%m-%dT%H:%MZ))</summary>"
+            echo ""
+            echo '```'
+            cat discover-report.txt
+            echo '```'
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "<!-- discovery-signature: $SIGNATURE -->"
+          } > discover-body.md
+
+          EXISTING=$(gh issue list --state open --search "in:title \"New AI models not in the catalog\"" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            if gh issue view "$EXISTING" --json body,comments \
+                 --jq '[.body] + [.comments[].body] | join("\n")' \
+                 | grep -qF "discovery-signature: $SIGNATURE"; then
+              echo "Same new models as the last report on #$EXISTING — not commenting again."
+              exit 0
+            fi
+            echo "Commenting on existing new-models issue #$EXISTING"
+            gh issue comment "$EXISTING" --body-file discover-body.md
+          else
+            echo "Opening new new-models issue"
+            gh issue create --title "$TITLE" --label "prio:2" --body-file discover-body.md
           fi
