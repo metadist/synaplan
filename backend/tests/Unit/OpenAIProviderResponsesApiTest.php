@@ -508,9 +508,12 @@ class OpenAIProviderResponsesApiTest extends TestCase
             'o3' => ['o3',                       'low'],
             'o3-mini' => ['o3-mini',                  'low'],
             'o4-mini' => ['o4-mini',                  'low'],
-            // gpt-6 — no none/minimal skip tier; lowest published is 'low'
+            // gpt-6-astra — no none/minimal skip tier; lowest published is 'low'
             'gpt-6-astra' => ['gpt-6-astra',              'low'],
             'gpt-6 with date suffix' => ['gpt-6-astra-2026-09-04',   'low'],
+            // gpt-6-sol / gpt-6-luna — publish `none` as the skip tier
+            'gpt-6-sol' => ['gpt-6-sol',                'none'],
+            'gpt-6-luna' => ['gpt-6-luna',               'none'],
         ];
     }
 

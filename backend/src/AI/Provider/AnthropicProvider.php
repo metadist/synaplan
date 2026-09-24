@@ -41,10 +41,10 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * declared tools are dropped
  * ({@see ToolCallingCapability::conflictsWithStructuredOutput()}).
  *
- * Note on Claude Fable 5.1 / Claude Mythos 5.1: those models reject forced
- * tool_choice ({"type": "any"} or {"type": "tool", "name": ...}) with a 400
- * invalid_request_error — only "auto" (default) and "none" are accepted.
- * That rules out the structured-output dialect for them, so
+ * Note on Claude Fable 5.1 / Claude Mythos 5.1 / Claude Opus 5.5: those models
+ * reject forced tool_choice ({"type": "any"} or {"type": "tool", "name": ...})
+ * with a 400 invalid_request_error — only "auto" (default) and "none" are
+ * accepted. That rules out the structured-output dialect for them, so
  * {@see StructuredOutputCapability} reports it as unsupported and callers
  * fall back to the prose-instruction path. Ordinary tool declarations are
  * unaffected: they send tool_choice `auto`. For `required` / named tools
@@ -74,6 +74,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-4-8',
         'claude-sonnet-4-6',
         'claude-opus-5',
+        'claude-opus-5-5',
         'claude-sonnet-5',
         'claude-haiku-4-5',
         'claude-fable-5',
@@ -87,6 +88,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-4-8',
         'claude-sonnet-4-6',
         'claude-opus-5',
+        'claude-opus-5-5',
         'claude-sonnet-5',
         'claude-fable-5',
         'claude-fable-5-1',
@@ -103,6 +105,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-4-7',
         'claude-opus-4-8',
         'claude-opus-5',
+        'claude-opus-5-5',
         'claude-sonnet-5',
         'claude-fable-5',
         'claude-fable-5-1',

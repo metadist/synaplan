@@ -416,6 +416,12 @@ class ModelCatalog
         // Official OpenAI pricing 2026-09-04: base $10/$50, >272k is 2x input
         // and 1.5x output for the full request (https://developers.openai.com/api/docs/models/gpt-6-astra).
         'gpt-6-astra' => ['threshold_tokens' => 272000, 'price_in_above' => 20.0, 'price_out_above' => 75.0, 'cache_price_in_above' => 2.00],
+        // Official OpenAI pricing 2026-09-24: base $2/$10, >272k is 2x input
+        // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-sol).
+        'gpt-6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.40],
+        // Official OpenAI pricing 2026-09-24: base $0.10/$0.50, >272k is 2x input
+        // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-luna).
+        'gpt-6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.20, 'price_out_above' => 0.75, 'cache_price_in_above' => 0.02],
         'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.25],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 0.60],
@@ -1978,6 +1984,150 @@ class ModelCatalog
                 ],
             ],
         ],
+        // ----------------------------------------------------------------
+        // GPT-6 Sol — released 2026-09-22. Sibling of GPT-6 Astra for complex
+        // coding and agentic workflows. Responses API; image input;
+        // reasoning.effort supports none / low / medium / high / xhigh / max
+        // (Chat Completions function calling requires none; prefer Responses).
+        // Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6-sol
+        // (verified 2026-09-24): $2 in / $10 out, cached input $0.20,
+        // cache writes $2.50. Long-context (>272k) in CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 375,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Sol',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Sol - built for complex coding and agentic workflows. Fast, with a very large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6-sol'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.20/1M (0.1x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.20,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-20',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 376,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Sol (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Sol for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6-sol'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.20,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-20',
+                ],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // GPT-6 Luna — released 2026-09-22. Efficient GPT-6 sibling for
+        // focused, high-volume tasks. Responses API; image input;
+        // reasoning.effort supports none / low / medium / high / xhigh / max
+        // (Chat Completions function calling requires none; prefer Responses).
+        // Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6-luna
+        // (verified 2026-09-24): $0.10 in / $0.50 out, cached input $0.01,
+        // cache writes $0.125. Long-context (>272k) in CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 377,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Luna',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-luna',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Luna - OpenAI\'s most efficient GPT-6 model for focused, high-volume tasks. Large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6-luna'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.01/1M (0.1x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.01,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-05-18',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 378,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Luna (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-luna',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Luna for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6-luna'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.01,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-05-18',
+                ],
+            ],
+        ],
         [
             'id' => 151,
             'service' => 'OpenAI',
@@ -2406,6 +2556,62 @@ class ModelCatalog
                 'params' => ['model' => 'claude-opus-5'],
                 'features' => ['vision'],
                 'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
+            // Snapshot 2026-09-24 (https://platform.claude.com/docs/en/models/opus-5-5/overview
+            // and https://platform.claude.com/docs/en/about-claude/pricing).
+            // Claude Opus 5.5 — released 2026-09-22. Successor-tier to Opus 5
+            // for long-running agentic coding and knowledge work. Adaptive
+            // thinking always on (cannot be disabled), `effort` defaults to
+            // medium, no `temperature`. Cache reads are 0.05x base input
+            // ($0.20/1M), NOT the Anthropic-wide 0.1x — overridden below via
+            // `cache_read_price_per_1M`. Rejects forced tool_choice
+            // ({"type": "any"} / {"type": "tool", ...}) like Fable 5.1 —
+            // see AnthropicProvider / StructuredOutputCapability.
+            'id' => 373,
+            'service' => 'Anthropic',
+            'name' => 'Claude Opus 5.5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-opus-5-5',
+            'priceIn' => 4,
+            'inUnit' => 'per1M',
+            'priceOut' => 20,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Opus 5.5 - Anthropic\'s model for long-running agentic coding and knowledge work. Adaptive thinking (always on). 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-opus-5-5'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30'],
+                'cache_read_price_per_1M' => 0.20,
+            ],
+        ],
+        [
+            'id' => 374,
+            'service' => 'Anthropic',
+            'name' => 'Claude Opus 5.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-opus-5-5',
+            'priceIn' => 4,
+            'inUnit' => 'per1M',
+            'priceOut' => 20,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Opus 5.5 for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-opus-5-5'],
+                'features' => ['vision'],
+                'meta' => ['supports_images' => true],
+                'cache_read_price_per_1M' => 0.20,
             ],
         ],
         [

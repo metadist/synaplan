@@ -432,20 +432,23 @@ You can run the same check locally: `docker compose exec -T backend php bin/cons
 - **GPT-5.6 Sol — re-verify on/after 2026-11-22 (#1561).** OpenAI's 2026-08-21 cut to $4/$20 (long-context $8/$30, cached $0.40) is labelled promotional "at least through 2026-11-21"; OpenAI has published no rate for after that, and third-party trackers flag a possible lapse back to $5/$30. On or after 2026-11-22, re-check the [official pricing page](https://openai.com/api/pricing/): if it reverted, roll the old rate back into `ModelCatalog.php` (rows 251/252 + `CONTEXT_PRICING`) + a data migration; if the promo was extended/made permanent, just refresh this note. The daily drift check is blind to a time-boxed revert (it only diffs against LiteLLM), so this reminder is the only guard.
 - _(cancelled)_ — the Claude Sonnet 5 "revert to $3/$15 after 2026-08-31" reminder was **cancelled** on 2026-08-12 (Anthropic made the $2/$10 rate permanent; see the drift-log note below). Do not reintroduce it.
 
-## Anthropic catalog generations (snapshot 2026-09-02)
+## Anthropic catalog generations (snapshot 2026-09-24)
 
-Source: https://platform.claude.com/docs/en/about-claude/models/overview
+Source: https://platform.claude.com/docs/en/about-claude/models/overview · pricing https://platform.claude.com/docs/en/about-claude/pricing
 
 | Model | BIDs (chat / vision) | Price in/out per 1M | Cache read per 1M |
 | ----- | -------------------- | ------------------- | ----------------- |
 | Claude Fable 5.1 | 338 / 339 | $10 / $50 | $0.25 (0.025x base — override, see below) |
 | Claude Fable 5 | 240 / 241 | $10 / $50 | $1.00 (0.1x base — Anthropic-wide default) |
+| Claude Opus 5.5 | 373 / 374 | $4 / $20 | $0.20 (0.05x base — override, see below) |
 | Claude Opus 5 | 257 / 258 | $5 / $25 | $0.50 (0.1x base — Anthropic-wide default) |
 | Claude Sonnet 5 | 249 / 250 (+ 222 MEM) | $2 / $10 (permanent — see 2026-08-12 note) | $0.20 (0.1x base — Anthropic-wide default) |
 | Claude Opus 4.8 | 238 / 239 | $5 / $25 | $0.50 (0.1x base — Anthropic-wide default) |
 | Claude Haiku 4.5 | 162 / 235 | $1 / $5 | $0.10 (0.1x base — Anthropic-wide default) |
 
-Claude Fable 5.1 succeeds Claude Fable 5 at the same input/output price, but Anthropic cut cache-read pricing to a quarter of Fable 5's rate (0.025x base vs the 0.1x every other Anthropic model gets from `CostCalculationService::CACHE_READ_DISCOUNT_ANTHROPIC`). The catalog rows (`ModelCatalog.php` 338/339) carry an explicit `cache_read_price_per_1M: 0.25` override, which `CostCalculationService::getPriceSnapshot()` picks up ahead of the provider-wide discount — see `ModelCatalogTest::testClaudeFable51ModelsAreAvailableWithExpectedApiIds`. Claude Fable 5.1 and Claude Mythos 5.1 also reject forced `tool_choice` (`{"type": "any"}` / `{"type": "tool", ...}`) with a 400; only `"auto"`/`"none"` work — see the note in `AnthropicProvider`'s class docblock (the internal chat pipeline never sends `tool_choice`, so this only bites Messages Gateway clients that force it, and Anthropic's own 400 surfaces the mismatch through the verbatim passthrough).
+Claude Opus 5.5 (released 2026-09-22) sits between Opus 5 and Sonnet 5 on price ($4/$20). Cache reads are 0.05x base input ($0.20/1M), not the Anthropic-wide 0.1x — the catalog rows (BIDs 373/374) carry an explicit `cache_read_price_per_1M: 0.20` override. Adaptive thinking is always on (cannot be disabled); default effort is `medium`. Like Claude Fable 5.1, it rejects forced `tool_choice` (`{"type": "any"}` / `{"type": "tool", ...}`) with a 400 — see `AnthropicProvider` / `StructuredOutputCapability`.
+
+Claude Fable 5.1 succeeds Claude Fable 5 at the same input/output price, but Anthropic cut cache-read pricing to a quarter of Fable 5's rate (0.025x base vs the 0.1x every other Anthropic model gets from `CostCalculationService::CACHE_READ_DISCOUNT_ANTHROPIC`). The catalog rows (`ModelCatalog.php` 338/339) carry an explicit `cache_read_price_per_1M: 0.25` override, which `CostCalculationService::getPriceSnapshot()` picks up ahead of the provider-wide discount — see `ModelCatalogTest::testClaudeFable51ModelsAreAvailableWithExpectedApiIds`. Claude Fable 5.1, Claude Mythos 5.1 and Claude Opus 5.5 also reject forced `tool_choice` (`{"type": "any"}` / `{"type": "tool", ...}`) with a 400; only `"auto"`/`"none"` work — see the note in `AnthropicProvider`'s class docblock (the internal chat pipeline never sends `tool_choice`, so this only bites Messages Gateway clients that force it, and Anthropic's own 400 surfaces the mismatch through the verbatim passthrough).
 
 #### Cache-write pricing: 5-minute vs. 1-hour TTL (fixed 2026-09-02)
 
@@ -455,9 +458,9 @@ Anthropic bills prompt-cache **writes** at two different multipliers of the base
 | ---------------- | ---------- | ------------------------------------- |
 | 5-minute cache write (default) | 1.25x | `CACHE_WRITE_MULTIPLIER_ANTHROPIC` |
 | 1-hour cache write (opt-in, `cache_control: {"type": "ephemeral", "ttl": "1h"}`, needs the client `anthropic-beta: extended-cache-ttl-2025-04-11` header) | 2.0x | `CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H` |
-| Cache read (hit) | 0.1x base (0.025x on Claude Fable 5.1 / Claude Mythos 5.1, see above) | `CACHE_READ_DISCOUNT_ANTHROPIC` |
+| Cache read (hit) | 0.1x base (0.025x on Claude Fable 5.1 / Claude Mythos 5.1; 0.05x on Claude Opus 5.5, see above) | `CACHE_READ_DISCOUNT_ANTHROPIC` |
 
-Both multipliers are **provider-wide constants**, not per-model catalog fields — Anthropic's pricing page confirms every current model (Fable 5.1, Fable 5, Opus 5, Opus 4.8, Sonnet 5, Haiku 4.5) uses the same 1.25x / 2.0x cache-write split; only cache-*read* pricing varies per model.
+Both multipliers are **provider-wide constants**, not per-model catalog fields — Anthropic's pricing page confirms every current model (Fable 5.1, Fable 5, Opus 5.5, Opus 5, Opus 4.8, Sonnet 5, Haiku 4.5) uses the same 1.25x / 2.0x cache-write split; only cache-*read* pricing varies per model.
 
 Before this fix, `CostCalculationService` applied the 1.25x multiplier to **every** cache-creation token regardless of TTL, under-billing any 1-hour-TTL write by 37.5% (2.0x actual vs. 1.25x charged). Anthropic's `usage` response breaks the aggregate `cache_creation_input_tokens` down by TTL in a nested `cache_creation: {ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}` object; `MessagesUsage::extractCacheCreation1hTokens()` is the single parsing helper shared by every Anthropic usage-parsing call site (`AnthropicProvider` chat + stream, `AnthropicPassthroughTranslator` complete + both stream paths, `GatewayToolLoop`'s tool-loop stream collector), so the 1h slice flows through to `CostCalculationService::calculateCost()`'s new `$cacheCreation1hTokens` parameter and gets billed at 2.0x while the remainder stays at 1.25x. No `BUSELOG` schema change was needed — only the token *aggregate* is persisted (`BCACHE_CREATION_TOKENS`), and the row's `BCOST` now reflects the correctly blended multiplier.
 
@@ -609,6 +612,8 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 | gpt-5.5-pro | 272k | 30 / 180 (30 — no discount) | 60 / 270 (60) |
 | gpt-5.6-luna | 272k | 0.20 / 1.20 (0.02) | 0.40 / 1.80 (0.04) |
 | gpt-6-astra | 272k | 10.00 / 50 (1.00) | 20.00 / 75 (2.00) |
+| gpt-6-sol | 272k | 2.00 / 10 (0.20) | 4.00 / 15 (0.40) |
+| gpt-6-luna | 272k | 0.10 / 0.50 (0.01) | 0.20 / 0.75 (0.02) |
 | gemini-2.5-pro | 200k | 1.25 / 10 (0.125) | 2.50 / 15 (0.25) |
 | gemini-3.1-pro-preview | 200k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
 | grok-4.5 | 200k | 2.00 / 6.00 (0.30) | 4.00 / 12.00 (0.60) |
@@ -619,7 +624,7 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 Cache billing has three independent knobs, and getting any of them wrong is invisible in normal testing because a cache hit needs a repeated prefix:
 
 1. **Cache-read rate** — `json.cache_read_price_per_1M` on the model row. When a row authors nothing, `CostCalculationService` falls back to `CACHE_READ_DISCOUNT_DEFAULT` (50%), which is right for the GPT-4o generation but **5× too expensive for everything from GPT-5 up and for Gemini Pro**, where reads are 0.1× the input rate. Author the explicit price on every new row; `ModelCatalogTest::testCachedInputRateIsAuthoredOnEveryVariant()` pins the current lineup. A model sold with **no** cached-input discount (`gpt-5.5-pro`) gets its plain input rate authored as the cache rate — the fallback cuts in on a *missing* key, not on a missing discount, so leaving it blank would under-bill by 2× instead.
-2. **Cache-write multiplier** — `json.cache_write_multiplier`. OpenAI began charging for cache *writes* with GPT-5.6 (1.25× the uncached input rate); GPT-5.5 and earlier incur "no additional cache-write charge", so the field belongs only on the GPT-5.6 family and GPT-6. Anthropic keeps its provider-wide 1.25× / 2.0× (1-hour TTL) constants.
+2. **Cache-write multiplier** — `json.cache_write_multiplier`. OpenAI began charging for cache *writes* with GPT-5.6 (1.25× the uncached input rate); GPT-5.5 and earlier incur "no additional cache-write charge", so the field belongs only on the GPT-5.6 family and GPT-6 (Astra / Sol / Luna). Anthropic keeps its provider-wide 1.25× / 2.0× (1-hour TTL) constants.
 3. **Long-context cache rate** — `cache_price_in_above` in `CONTEXT_PRICING`, see the table above.
 
 The provider must also report the token counts, and the field names differ: OpenAI's Responses API returns `usage.input_tokens_details.cached_tokens` and `…cache_write_tokens`, Chat Completions uses `prompt_tokens_details`, Anthropic uses `cache_read_input_tokens` / `cache_creation_input_tokens`. The internal pipeline normalises all of them to `cached_tokens` / `cache_creation_tokens` — so an internal key that *looks* right can still be reading a provider key that never exists. `OpenAIProvider` did exactly that (`cache_creation_tokens` instead of `cache_write_tokens`), which kept written tokens at 0 and billed them as ordinary input. When adding a provider, verify the key against the provider's own cost-calculation example, not against our internal name.
