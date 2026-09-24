@@ -586,7 +586,12 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
-import { shouldOpenFreshAssistantChat, usePinnedAssistant } from '@/composables/usePinnedAssistant'
+import { isAgentsEnabled } from '@/composables/useAgentsFeature'
+import {
+  capturePinnedAgentForSend,
+  shouldOpenFreshAssistantChat,
+  usePinnedAssistant,
+} from '@/composables/usePinnedAssistant'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
@@ -907,6 +912,18 @@ const {
   greeting: pinnedAssistantGreeting,
   starterPrompts: pinnedStarterPrompts,
 } = usePinnedAssistant()
+
+function captureOutgoingAgentId(): number | null {
+  return capturePinnedAgentForSend(isAgentsEnabled(), queryAgentId.value, historyStore.messages)
+}
+
+function outgoingAgentId(explicit?: number | null): number | undefined {
+  if (explicit && explicit > 0) {
+    return explicit
+  }
+  return captureOutgoingAgentId() ?? undefined
+}
+
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
@@ -2421,7 +2438,7 @@ const handleContinueResponse = async (message: Message) => {
     trackId,
     language: locale.value,
     continueMessageId: message.backendMessageId,
-    agentId: pinnedAgentId.value ?? undefined,
+    agentId: outgoingAgentId(),
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
         fullContent += data.chunk
@@ -2525,7 +2542,22 @@ const matchPluginChatCommand = (content: string): PluginChatRoute | null => {
  * the AI message pipeline, so no classifier/characterization change is needed.
  */
 const runPluginChatCommand = async (route: PluginChatRoute, text: string): Promise<void> => {
-  historyStore.addMessage('user', [{ type: 'text' as const, content: text }])
+  const pinnedForTurn = captureOutgoingAgentId()
+  historyStore.addMessage(
+    'user',
+    [{ type: 'text' as const, content: text }],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    null,
+    null,
+    null,
+    null,
+    pinnedForTurn
+  )
   const userId = authStore.user?.id
   if (!userId) {
     return
@@ -2561,6 +2593,8 @@ const handleSendMessage = async (
     quotedText?: string
     quotedMessageId?: number
     language?: string
+    /** Assistant captured before the optimistic user message is appended. */
+    agentId?: number | null
   }
 ) => {
   if (needsProviderSetup.value) {
@@ -2697,6 +2731,10 @@ const handleSendMessage = async (
     }
   }
 
+  // Capture before addMessage. The optimistic row has no assistant yet, and
+  // resolvePinnedAgentId() treats any unstamped message as "this thread is
+  // not an assistant chat", which drops the ?agentId= pin on the first send.
+  const pinnedForTurn = options?.agentId ?? captureOutgoingAgentId()
   historyStore.addMessage(
     'user',
     optimisticParts,
@@ -2709,7 +2747,8 @@ const handleSendMessage = async (
     webSearchData, // webSearch
     toolData, // tool
     options?.quotedText ?? null, // quotedText
-    options?.quotedMessageId ?? null // quotedMessageId
+    options?.quotedMessageId ?? null, // quotedMessageId
+    pinnedForTurn
   )
 
   // Lift the active chat to the top of the sidebar lists right away so the
@@ -2730,7 +2769,7 @@ const handleSendMessage = async (
   promoTips.onMessageSent()
 
   // Stream to backend - use backendContent which may differ from displayContent
-  await streamAIResponse(backendContent, options)
+  await streamAIResponse(backendContent, { ...options, agentId: pinnedForTurn })
 }
 
 /**
@@ -2847,6 +2886,8 @@ const streamAIResponse = async (
     quotedText?: string
     quotedMessageId?: number
     language?: string
+    /** Assistant for this turn, captured before the optimistic user row exists. */
+    agentId?: number | null
     /**
      * Re-attach to a turn already generating on the server instead of starting
      * a new one. `userMessage` is then irrelevant — nothing is sent, the client
@@ -3498,7 +3539,7 @@ const streamAIResponse = async (
         ragGroupKey: options?.ragGroupKey,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        agentId: pinnedAgentId.value ?? undefined,
+        agentId: outgoingAgentId(options?.agentId),
         onUpdate: (data: StreamUpdatePayload) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {

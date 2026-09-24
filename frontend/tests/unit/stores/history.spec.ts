@@ -30,6 +30,29 @@ describe('History Store', () => {
     expect(store.messages).toHaveLength(1)
     expect(store.messages[0].role).toBe('user')
     expect(store.messages[0].parts[0].content).toBe('Hello')
+    expect(store.messages[0].agentId).toBeNull()
+  })
+
+  it('stamps a positive assistant id on the outgoing message', () => {
+    const store = useHistoryStore()
+
+    store.addMessage(
+      'user',
+      [{ type: 'text', content: 'Who are you?' }],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      null,
+      null,
+      null,
+      null,
+      2
+    )
+
+    expect(store.messages[0].agentId).toBe(2)
   })
 
   it('should clear all messages', () => {

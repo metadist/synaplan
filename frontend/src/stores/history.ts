@@ -494,7 +494,8 @@ export const useHistoryStore = defineStore('history', () => {
     } | null,
     tool?: { command: string; label: string; icon: string } | null,
     quotedText?: string | null,
-    quotedMessageId?: number | null
+    quotedMessageId?: number | null,
+    agentId?: number | null
   ) => {
     messages.value.push({
       id: crypto.randomUUID(),
@@ -511,6 +512,7 @@ export const useHistoryStore = defineStore('history', () => {
       tool,
       quotedText,
       quotedMessageId,
+      agentId: agentId && agentId > 0 ? agentId : null,
     })
   }
 
