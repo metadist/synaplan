@@ -128,6 +128,22 @@ Reporting rules that keep it trustworthy:
 
 Exit codes match `app:sync-model-prices`: `0` clean, `1` the command broke, `2` confirmed findings (only with `--fail-on-drift`). The scheduler role runs it daily with `--notify`, which posts to Discord when `DISCORD_WEBHOOK_URL` is set. Installs without cloud keys make no outbound request at all.
 
+## New model detection — `app:models:discover`
+
+Finds newly listed upstream models early, with a human in the loop. Uses each provider's **own** model list (same `ProviderModelInventory` as the availability check) and the API keys this install already has — no third-party list, no keys in GitHub.
+
+```bash
+docker compose exec -T -e MODEL_DISCOVERY_ENABLED=1 backend php bin/console app:models:discover
+```
+
+**Opt-in.** `MODEL_DISCOVERY_ENABLED` defaults to `false`. Self-hosted installs must leave it off; when disabled the command prints one note and exits 0 with no outbound request. Not a FeatureModule — ops check only. The production scheduler calls it daily after `app:models:check-availability`; the command itself enforces the flag.
+
+**Baseline.** The first successful listing of a provider (including a key added months later) records every current id in `BCONFIG` (`MODEL_DISCOVERY`) and reports none of them — so enable it only after every model you already mean to add is in `BMODELS`, or that model is baselined and never reported. New ids after that baseline are **pending** and are reported **every daily run** until this install has a matching `BMODELS` row (including inactive/retired) or a reasoned `ModelDiscoveryIgnoreList` entry. If the provider stops listing a pending id, it is dropped silently. Matching normalises case, strips Google's `models/` prefix, and strips trailing date snapshots (`-YYYYMMDD` / `-YYYY-MM-DD`).
+
+**Resolve a pending id:** add it to `ModelCatalog` via the normal playbook above (then seed), **or** add an exact `provider:id` entry to `ModelDiscoveryIgnoreList` with `reason` + `decidedOn`. Obsolete ignore entries (gone upstream, or now in `BMODELS`) are printed to the console only.
+
+**Discord** (`--notify` + `DISCORD_WEBHOOK_URL`): posts when there is at least one pending id, a provider that has a key but whose listing failed ("could not check …"), or a baseline that was just recorded. At most one post per calendar day across all nodes (atomic `BCONFIG` claim). A "could not check" line means the key is present but the listing request failed — not the same as no key / no listing endpoint (those stay silent).
+
 ### First run against live APIs (2026-08-19)
 
 Six confirmed retirements, each re-verified by hand: Groq dropped `llama-3.3-70b-versatile` (BID 9), `llama-3.1-8b-instant` (236), `qwen/qwen3-32b` (53) and `meta-llama/llama-4-scout-17b-16e-instruct` (17 — the Groq `PIC2TEXT` default), xAI dropped `grok-stt` (321 — the xAI `SOUND2TEXT` default) and `grok-tts` (320). Groq's current list is 13 models; `whisper-large-v3` and `openai/gpt-oss-*` are unaffected.

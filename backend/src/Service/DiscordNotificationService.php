@@ -834,6 +834,100 @@ final readonly class DiscordNotificationService
     }
 
     /**
+     * Notify that providers listed models this install does not yet offer.
+     *
+     * Advisory only — nothing was written. At most one post per calendar day
+     * is enforced by the caller (BCONFIG claim), not here.
+     *
+     * @param list<string> $pendingModels   human-readable pending lines
+     * @param list<string> $failedProviders "could not check …" lines
+     * @param list<string> $baselineLines   baseline-recorded lines (often one)
+     */
+    public function notifyNewModelDiscovery(
+        array $pendingModels,
+        array $failedProviders,
+        array $baselineLines,
+    ): void {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        if ([] === $pendingModels && [] === $failedProviders && [] === $baselineLines) {
+            return;
+        }
+
+        $fields = [];
+
+        if ([] !== $pendingModels) {
+            $fields[] = [
+                'name' => sprintf('New upstream models (%d)', count($pendingModels)),
+                'value' => $this->bulletList($pendingModels, self::MAX_DRIFT_ENTRIES),
+                'inline' => false,
+            ];
+        }
+
+        if ([] !== $failedProviders) {
+            $fields[] = [
+                'name' => 'Could not check',
+                'value' => $this->bulletList($failedProviders, self::MAX_DRIFT_ENTRIES),
+                'inline' => false,
+            ];
+        }
+
+        if ([] !== $baselineLines) {
+            $fields[] = [
+                'name' => 'Baseline',
+                'value' => $this->bulletList($baselineLines, self::MAX_DRIFT_ENTRIES),
+                'inline' => false,
+            ];
+        }
+
+        if ([] !== $pendingModels) {
+            $fields[] = [
+                'name' => 'Action required',
+                'value' => 'Add the model to ModelCatalog (docs/PRICING_MAINTENANCE.md) or record a reasoned entry in ModelDiscoveryIgnoreList.',
+                'inline' => false,
+            ];
+        }
+
+        $title = match (true) {
+            [] !== $pendingModels => '🆕 New AI models detected',
+            [] !== $failedProviders => '⚠️ New-model check: some providers could not be checked',
+            default => '✅ New-model check is active',
+        };
+
+        $this->sendEmbed(
+            title: $title,
+            color: [] !== $pendingModels || [] !== $failedProviders ? self::COLOR_WARNING : self::COLOR_SUCCESS,
+            fields: $fields,
+            footer: 'Synaplan model discovery · daily · at most one post per day',
+        );
+    }
+
+    /**
+     * The discovery command itself threw before it could finish.
+     */
+    public function notifyNewModelDiscoveryFailure(string $reason): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $this->sendEmbed(
+            title: '⚠️ New-model check could not run',
+            color: self::COLOR_ERROR,
+            fields: [
+                [
+                    'name' => 'Reason',
+                    'value' => '```'.$this->truncate($reason, self::MAX_ERROR).'```',
+                    'inline' => false,
+                ],
+            ],
+            footer: 'Synaplan model discovery · daily · at most one post per day',
+        );
+    }
+
+    /**
      * Report AI models that stopped working, or that started working again.
      *
      * Distinct from {@see self::notifyModelAvailabilityDrift()} on purpose: that
