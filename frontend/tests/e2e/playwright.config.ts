@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { TIMEOUTS } from './config/config'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -24,6 +25,15 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    // Without these an untimed click / fill / goto waits out the whole test
+    // timeout and the report says "Test timeout of 60000ms" instead of
+    // naming the element that never showed up.
+    actionTimeout: TIMEOUTS.LONG,
+    navigationTimeout: TIMEOUTS.VERY_LONG,
+    // Playwright's guidance for suites that use page.route() (the billing
+    // helper mocks checkout): a service worker can take requests off the
+    // page target, and routing no longer sees them.
+    serviceWorkers: 'block',
     headless: !headed,
     ignoreHTTPSErrors: true, // Keycloak uses self-signed cert in dev/test
     screenshot: 'only-on-failure',

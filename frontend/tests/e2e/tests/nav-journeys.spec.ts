@@ -291,15 +291,14 @@ test.describe('@ci Navigation journeys', () => {
       await openApp(page)
       await page.locator(USR.button).click()
       await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await page.locator(USR.memoriesBtn).click()
+      await page.locator(USR.memoriesBtn).click({ timeout: TIMEOUTS.STANDARD })
       await expect(page).toHaveURL(/\/memories/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(MEM.page)).toBeVisible()
       await expect(page.locator('[data-testid="modal-memories-dialog"]')).toHaveCount(0)
     })
 
     await test.step('Highlight a memory and Back returns to the chat', async () => {
-      // Create stays unmounted until the first Qdrant read finishes (page budget 15s).
-      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await page.locator(MEM.btnCreate).click()
       await page.locator(MEM.formModal).waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
       await page.locator(MEM.btnModeAdvanced).click()
@@ -330,7 +329,9 @@ test.describe('@ci Navigation journeys', () => {
       await expect(page.locator(NAV.mobileDrawer)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await page.locator(NAV.mobileMore).click()
       await expect(page.locator(NAV.mobileMoreSheet)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await page.locator('[data-testid="btn-mobile-more-memories"]').click()
+      await page.locator('[data-testid="btn-mobile-more-memories"]').click({
+        timeout: TIMEOUTS.STANDARD,
+      })
       await expect(page).toHaveURL(/\/memories/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(MEM.page)).toBeVisible()
       await expect(page.locator('[data-testid="modal-memories-dialog"]')).toHaveCount(0)
