@@ -308,10 +308,6 @@
     "privacy": "Privacy",
     "terms": "Terms"
   },
-  "header": {
-    "switchToV2": "Switch to V2 design",
-    "switchToV1": "Switch to classic design"
-  },
   "system": {
     "missingApiKeys": "Some API keys are missing — the following providers are disabled: {providers}"
   },

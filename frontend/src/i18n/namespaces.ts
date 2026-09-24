@@ -49,7 +49,6 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'cookies',
     'error',
     'forceUpdate',
-    'header',
     'iap',
     'loading',
     'models',
