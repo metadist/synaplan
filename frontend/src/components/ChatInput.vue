@@ -531,6 +531,12 @@ interface Props {
    * md+ where the banner is a compact centered pill on the flat top edge.
    */
   bannerVisible?: boolean
+  /**
+   * The thread this message would land in is still being chosen (for example
+   * Start chat is opening an empty chat for the assistant). Keep Send off
+   * until that finishes so the message is not written into the previous chat.
+   */
+  sendLocked?: boolean
 }
 
 const props = defineProps<Props>()
@@ -922,6 +928,9 @@ const emit = defineEmits<{
 }>()
 
 const canSend = computed(() => {
+  if (props.sendLocked) {
+    return false
+  }
   const trimmedMessage = message.value.trim()
   const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0

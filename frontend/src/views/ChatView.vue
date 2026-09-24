@@ -355,6 +355,7 @@
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
         :is-streaming="isStreaming"
+        :send-locked="!assistantThreadReady"
         :is-guest-mode="isGuestMode"
         :banner-visible="
           showPendingPurchaseBanner ||
@@ -586,7 +587,12 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
-import { shouldOpenFreshAssistantChat, usePinnedAssistant } from '@/composables/usePinnedAssistant'
+import { isAgentsEnabled } from '@/composables/useAgentsFeature'
+import {
+  capturePinnedAgentForSend,
+  shouldOpenFreshAssistantChat,
+  usePinnedAssistant,
+} from '@/composables/usePinnedAssistant'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
@@ -907,6 +913,51 @@ const {
   greeting: pinnedAssistantGreeting,
   starterPrompts: pinnedStarterPrompts,
 } = usePinnedAssistant()
+
+// Start chat (?agentId=) may still be leaving the previous thread. Send stays
+// off until that empty chat is the one on screen, so the first message cannot
+// land in the last conversation.
+const assistantThreadReady = ref(queryAgentId.value == null || !isAgentsEnabled())
+let assistantChatBootstrapped = assistantThreadReady.value
+let suppressNextChatHistoryLoad = false
+
+async function openFreshAssistantChatIfNeeded(): Promise<void> {
+  if (!queryAgentId.value || !isAgentsEnabled() || !authStore.isAuthenticated) {
+    assistantThreadReady.value = true
+    return
+  }
+  if (!shouldOpenFreshAssistantChat(queryAgentId.value, historyStore.messages)) {
+    assistantThreadReady.value = true
+    return
+  }
+  assistantThreadReady.value = false
+  const previousChatId = chatsStore.activeChatId
+  suppressNextChatHistoryLoad = true
+  try {
+    const chat = await chatsStore.findOrCreateEmptyChat()
+    const chatId = chat?.id ?? chatsStore.activeChatId
+    if (chatId && chatId !== previousChatId) {
+      await historyStore.loadMessages(chatId)
+    }
+  } finally {
+    if (chatsStore.activeChatId === previousChatId) {
+      suppressNextChatHistoryLoad = false
+    }
+    assistantThreadReady.value = true
+  }
+}
+
+function captureOutgoingAgentId(): number | null {
+  return capturePinnedAgentForSend(isAgentsEnabled(), queryAgentId.value, historyStore.messages)
+}
+
+function outgoingAgentId(explicit?: number | null): number | undefined {
+  if (explicit && explicit > 0) {
+    return explicit
+  }
+  return captureOutgoingAgentId() ?? undefined
+}
+
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
@@ -1416,6 +1467,8 @@ onMounted(async () => {
     window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
     window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
     maybeRemindAboutUpgrade()
+    assistantThreadReady.value = true
+    assistantChatBootstrapped = true
     return
   }
 
@@ -1467,11 +1520,15 @@ onMounted(async () => {
 
   // Start chat from an assistant must not reopen an unrelated last thread.
   // A ?chat= deep link (Saved Tasks) keeps that thread even if agentId is set.
-  if (
-    !openedSpecificChat &&
-    shouldOpenFreshAssistantChat(queryAgentId.value, historyStore.messages)
-  ) {
-    await chatsStore.findOrCreateEmptyChat()
+  // Send stays disabled until this returns, including when the decision is
+  // "stay on this chat".
+  try {
+    if (!openedSpecificChat) {
+      await openFreshAssistantChatIfNeeded()
+    }
+  } finally {
+    assistantThreadReady.value = true
+    assistantChatBootstrapped = true
   }
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
@@ -1802,7 +1859,13 @@ watch(
       // Note: Don't call historyStore.clear() here!
       // loadMessages() replaces messages when offset=0, making clear() redundant.
       // Calling clear() first causes empty chat if loadMessages() fails silently.
-      await historyStore.loadMessages(newChatId)
+      // Start chat loads this history itself and keeps Send locked until it
+      // finishes; skipping the second load avoids wiping the first message.
+      if (suppressNextChatHistoryLoad) {
+        suppressNextChatHistoryLoad = false
+      } else {
+        await historyStore.loadMessages(newChatId)
+      }
 
       // Coming back to a chat whose turn is still generating: keep watching it
       // live. A different chat means a different run, so the previous
@@ -1830,12 +1893,14 @@ watch(
 )
 
 watch(queryAgentId, async (id) => {
-  if (!id || !authStore.isAuthenticated) {
+  if (!assistantChatBootstrapped) {
     return
   }
-  if (shouldOpenFreshAssistantChat(id, historyStore.messages)) {
-    await chatsStore.findOrCreateEmptyChat()
+  if (!id || !authStore.isAuthenticated) {
+    assistantThreadReady.value = true
+    return
   }
+  await openFreshAssistantChatIfNeeded()
 })
 
 const userTextBefore = (messageId: string | number): string => {
@@ -2421,7 +2486,7 @@ const handleContinueResponse = async (message: Message) => {
     trackId,
     language: locale.value,
     continueMessageId: message.backendMessageId,
-    agentId: pinnedAgentId.value ?? undefined,
+    agentId: outgoingAgentId(),
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
         fullContent += data.chunk
@@ -2525,7 +2590,22 @@ const matchPluginChatCommand = (content: string): PluginChatRoute | null => {
  * the AI message pipeline, so no classifier/characterization change is needed.
  */
 const runPluginChatCommand = async (route: PluginChatRoute, text: string): Promise<void> => {
-  historyStore.addMessage('user', [{ type: 'text' as const, content: text }])
+  const pinnedForTurn = captureOutgoingAgentId()
+  historyStore.addMessage(
+    'user',
+    [{ type: 'text' as const, content: text }],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    null,
+    null,
+    null,
+    null,
+    pinnedForTurn
+  )
   const userId = authStore.user?.id
   if (!userId) {
     return
@@ -2561,6 +2641,8 @@ const handleSendMessage = async (
     quotedText?: string
     quotedMessageId?: number
     language?: string
+    /** Assistant captured before the optimistic user message is appended. */
+    agentId?: number | null
   }
 ) => {
   if (needsProviderSetup.value) {
@@ -2697,6 +2779,10 @@ const handleSendMessage = async (
     }
   }
 
+  // Capture before addMessage. The optimistic row has no assistant yet, and
+  // resolvePinnedAgentId() treats any unstamped message as "this thread is
+  // not an assistant chat", which drops the ?agentId= pin on the first send.
+  const pinnedForTurn = options?.agentId ?? captureOutgoingAgentId()
   historyStore.addMessage(
     'user',
     optimisticParts,
@@ -2709,7 +2795,8 @@ const handleSendMessage = async (
     webSearchData, // webSearch
     toolData, // tool
     options?.quotedText ?? null, // quotedText
-    options?.quotedMessageId ?? null // quotedMessageId
+    options?.quotedMessageId ?? null, // quotedMessageId
+    pinnedForTurn
   )
 
   // Lift the active chat to the top of the sidebar lists right away so the
@@ -2730,7 +2817,7 @@ const handleSendMessage = async (
   promoTips.onMessageSent()
 
   // Stream to backend - use backendContent which may differ from displayContent
-  await streamAIResponse(backendContent, options)
+  await streamAIResponse(backendContent, { ...options, agentId: pinnedForTurn })
 }
 
 /**
@@ -2847,6 +2934,8 @@ const streamAIResponse = async (
     quotedText?: string
     quotedMessageId?: number
     language?: string
+    /** Assistant for this turn, captured before the optimistic user row exists. */
+    agentId?: number | null
     /**
      * Re-attach to a turn already generating on the server instead of starting
      * a new one. `userMessage` is then irrelevant — nothing is sent, the client
@@ -3498,7 +3587,7 @@ const streamAIResponse = async (
         ragGroupKey: options?.ragGroupKey,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        agentId: pinnedAgentId.value ?? undefined,
+        agentId: outgoingAgentId(options?.agentId),
         onUpdate: (data: StreamUpdatePayload) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
