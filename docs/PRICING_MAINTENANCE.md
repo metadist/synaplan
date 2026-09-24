@@ -207,21 +207,21 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | Kimi/HuggingFace | ✅ done — pinned DeepInfra (see above) | deepinfra.com |
 | **TheHive** | ✅ verified 2026-07-13 | https://thehive.ai/pricing |
 | Higgsfield | ⚠️ NOT publicly verifiable — see below | dashboard only |
-| **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
+| **Mistral** | ✅ verified 2026-09-24 (cached-input rates added) | https://mistral.ai/pricing/api/ · https://docs.mistral.ai/inference/pricing |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
 | **TrustedTokens** | ✅ verified 2026-09-17 (V4 Flash, Flash-0731 and V4 Pro retired) | https://trustedtokens.eu/api/billing/models |
 | **A2Agent** | ✅ verified 2026-09-14 (public group rate) | https://a2agent.me/models |
 | **Meta** | ✅ verified 2026-09-23 (Muse Spark 1.3 standard tier) | https://developer.meta.com/ai/models/muse-spark/ |
-| **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
+| **xAI Grok Imagine + voice** | ✅ verified 2026-09-24 (chat rows are synced; grok-4.7 cache + long-context corrected) | https://docs.x.ai/docs/models · https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
-### xAI / Grok (verified 2026-07-29; Grok 4.6 rows added 2026-08-20; Grok 4.7 rows added 2026-09-23)
+### xAI / Grok (verified 2026-09-24; Grok 4.6 rows added 2026-08-20; Grok 4.7 rows added 2026-09-23)
 
 OpenAI-compatible chat/vision at `https://api.x.ai/v1`, plus the Grok Imagine media endpoints and the voice endpoints (`/v1/tts`, `/v1/stt` — note: NOT OpenAI's `/v1/audio/*`). Catalog stores **USD per 1M tokens** for the token rows; cache-read rates live in `json.cache_read_price_per_1M`.
 
 | BID | Model | Catalog in/out | Official (cache) | Long context (> 200k) | Context |
 | --- | ----- | -------------- | ---------------- | --------------------- | ------- |
-| 367 / 368 | `grok-4.7` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (no cache discount published) | none published | 500k |
+| 367 / 368 | `grok-4.7` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.50) | $4.00 / $12.00 (cache $1.00) | 500k |
 | 326 / 327 | `grok-4.6` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.50) | $4.00 / $12.00 | 500k |
 | 313 / 315 | `grok-4.5` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.30) | $4.00 / $12.00 | 500k |
 | 316 | `grok-imagine-image` | — / $0.02 per image | $0.02 (1k and 2k identical) | n/a | n/a |
@@ -245,7 +245,7 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **Images are billed from `default_resolution`, not from the request.** The image path never passes a resolution into `calculateMediaCost()`, so `resolveResolution()` falls back to the catalog's `default_resolution` — and `XaiProvider::generateImage()` sends that same value to xAI. Changing `default_resolution` on BID 318 therefore moves the request AND the price together; changing only `priceOut` would desync them.
 - **`grok-imagine-video-1.5` is image-to-video only.** It carries `features: ['image2video']` + `requires_reference_image`, so `MediaGenerationHandler` explains the missing reference image instead of leaking a provider 400. It is reachable through the IMG2VID default-model slot, which shares the `text2vid` BTAG. Because `XaiProvider` implements `SupportsInlineReferenceImage`, the handler passes the local upload path and the provider inlines it as a data URI — so image-to-video works on xAI without an internet-reachable `APP_URL`, unlike Higgsfield and Veo.
 - **No refund on cancel.** xAI has no cancel endpoint for deferred video renders, so `cancelVideoOperation()` only stops our polling; the render completes upstream and stays billable.
-- **`reasoning_effort` is accepted by grok-4.3 and grok-4.7.** grok-4.3 is not a catalog row (`none` / `low` / `medium` / `high`). grok-4.7 (BIDs 367–368) documents `low` / `medium` / `high` (default) / `xhigh` and rejects `none`, so Thinking off sends `low`. The 2026-09-21 page publishes no cached-input discount and no >200k tier, so cache reads bill at the $2 input rate and `CONTEXT_PRICING` has no `grok-4.7` entry. grok-4.5 and grok-4.6 still reason at a fixed depth.
+- **`reasoning_effort` is accepted by grok-4.3 and grok-4.7.** grok-4.3 is not a catalog row (`none` / `low` / `medium` / `high`). grok-4.7 (BIDs 367–368) documents `low` / `medium` / `high` (default) / `xhigh` and rejects `none`, so Thinking off sends `low`. The Text API pricing table (verified 2026-09-24 at https://docs.x.ai/docs/models) lists cached input at $0.50 (<200k) / $1.00 (>=200k) and the same >200k 2× tier as 4.5 / 4.6 — authored as `cache_read_price_per_1M: 0.50` plus a `CONTEXT_PRICING` entry. grok-4.5 and grok-4.6 still reason at a fixed depth.
 - **The voice rows MUST keep their `pricing_mode`.** BID 320 needs `pricing_mode: per_character` and BID 321 needs `per_second`; without it the cost path falls through to per-token and records $0.00 for every call (issue #886b). BID 321 is authored in `$/hour`, which `CostCalculationService` normalises to per-second, so the clip length must never be pre-divided.
 - **Only the REST transcription rate is reachable.** xAI charges $0.20/hour for the streaming STT WebSocket, but `XaiProvider` implements the `POST /v1/stt` REST path only, so no request can be billed at the higher rate. If streaming STT is ever added it needs its own catalog row.
 - **TTS has no per-request cap beyond the character limit.** `/v1/tts` rejects text over 15,000 characters, and the provider checks that locally so the user gets a readable message instead of a 400. Longer texts must be split by the caller — each chunk is billed separately.
@@ -323,7 +323,7 @@ Current catalog values are labelled "approximate (credits → USD)" and were lef
 
 Positive: cancel/refund path is sound — FAQ confirms failed/NSFW/cancelled requests are auto-refunded, and our provider sends a cancel on Stop (`cancelRemote`).
 
-### Mistral (verified 2026-07-13 — all correct, no change)
+### Mistral (verified 2026-07-13; cached-input rates added 2026-09-24)
 
 Use the **API** price page https://mistral.ai/pricing/api/ (the plain /pricing page is JS-rendered consumer Le Chat plans). All 5 catalog entries already match:
 
@@ -335,7 +335,7 @@ Use the **API** price page https://mistral.ai/pricing/api/ (the plain /pricing p
 | 246 | Voxtral Mini Transcribe (`voxtral-mini-latest`) | $0.003 permin | $0.003/min |
 | 247 | Voxtral TTS (`voxtral-mini-tts-2603`) | $0.000016 perChar | $0.016/1k chars |
 
-**Billing mechanics:** per-token for chat/vision (in/out separate), Voxtral STT per audio-minute, Voxtral TTS per character. 50% batch discount + 90% cached-input discount exist (we don't use them). Our provider sends no price-changing params. Note: FAQ on the consumer page quotes "Large $2/$6" — that's the OLD Large 2411, not Large 3. Voxtral Transcribe (per-min) now carries `pricing_mode: per_second` and is metered via the shared duration path (#1314 fixed).
+**Billing mechanics:** per-token for chat/vision (in/out separate), Voxtral STT per audio-minute, Voxtral TTS per character. 50% batch discount exists (we don't use it). Cached input bills at 10% of the input rate — $0.15 for Medium 3.5, $0.05 for Large 3 — authored as `cache_read_price_per_1M`; the per-model figures are only in the "Cached input" column of https://docs.mistral.ai/inference/pricing, not on the API price page. Our provider sends no price-changing params. Note: FAQ on the consumer page quotes "Large $2/$6" — that's the OLD Large 2411, not Large 3. Voxtral Transcribe (per-min) now carries `pricing_mode: per_second` and is metered via the shared duration path (#1314 fixed).
 
 ### Cloudflare Workers AI (verified 2026-07-13 — all correct, no change)
 
@@ -412,6 +412,8 @@ Since the check is daily, the *absence* of a Discord post is itself a signal: th
 Two traps that already cost a broken run: the report file is written under `backend/` (the check step's `working-directory`), so any step reading it must set the same `working-directory` or use the explicit `backend/` prefix — otherwise `cat drift-report.txt` fails with `No such file or directory` and the step dies under `bash -e`. And the drift step sets `COLUMNS: 120` because Symfony's `Terminal` reads that variable while `SymfonyStyle` caps a block at its own `MAX_LINE_LENGTH` of 120: without it the report wraps at the CI default of 80 and the counter block breaks mid-sentence. 120 is the ceiling — the counter line is longer than that and will always occupy two lines, which is why the workflow extracts it as a block instead of grepping for one line.
 
 You can run the same check locally: `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run --fail-on-drift; echo $?` (0 = no drift, 2 = drift).
+
+> Resolved drift (2026-09-24, #2160): the new cache / long-context drift check flagged catalog rows that either authored no `cache_read_price_per_1M` or authored the wrong one. **No LiteLLM input/output price moved** — only cache-read and one missing long-context tier. Official sources: [Google Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing) ("Context caching price" row, text/image/video, Standard paid tier), [Mistral pricing](https://docs.mistral.ai/inference/pricing) ("Cached input" column, Standard tier) and [xAI models / Text API pricing](https://docs.x.ai/docs/models). **Google Gemini Flash family — cache-hit overcharge 5×** (missing key → `CostCalculationService::CACHE_READ_DISCOUNT_DEFAULT` = 0.5× input): `gemini-2.5-flash` BIDs 170/171 (none → **$0.03**, row since #503 / 2026-03-04), `gemini-2.5-flash-lite` BIDs 226/227 (none → **$0.01**, since 2026-05-27), `gemini-3.1-flash-lite` BIDs 191/192 (none → **$0.025**, since #622 / 2026-03-25 as preview id; stable id later), `gemini-3.5-flash` BIDs 237/223 (none → **$0.15**, since 2026-05-27), `gemini-3-flash-preview` BIDs 224/225 (none → **$0.05**, since 2026-05-27). Audio and per-hour storage rates were not modelled. **xAI grok-4.7 BIDs 367/368 — cache-hit overcharge 4×** (`cache_read_price_per_1M` **2.00 → 0.50**) and **long-context undercharge** (no `CONTEXT_PRICING` entry → prompts ≥200k billed at half; added `4.00 / 12.00` with `cache_price_in_above` **1.00**). Wrong since the row was added in #2120 (2026-09-23), when the then-current model page listed input/output only. Rolled out by `Version20260924120000` (full row + fingerprint; Gemini and Mistral guarded on the missing cache key, grok-4.7 on the old 2.00, all on unchanged input/output prices so an operator's own price survives). **Mistral — cache-hit overcharge 5×** (same missing key): `mistral-medium-latest` BIDs 244/248 (none → **$0.15**) and `mistral-large-latest` BID 245 (none → **$0.05**), rows since #1102 / 2026-06-16. After this correction every Google/Mistral/xAI text/chat catalog row that the official pages price for context caching / cached input authors an explicit rate.
 
 > Resolved drift (2026-09-14): the daily check flagged three rows and **no provider had moved a price — no catalog price changed, so there is no migration.** **A2Agent DeepSeek V4 Pro (BID 362, in 0.435 → 1.32, out 0.87 → 3.96) and V4 Flash (BID 363, in 0.14 → 0.30, out 0.28 → 1.20) were false alarms from a cross-vendor id collision.** Both rows are the A2Agent gateway, and the catalog matches its official page exactly (`DeepSeek V4 Pro … $0.435 $0.870`, `DeepSeek V4 Flash … $0.140 $0.280`, server-rendered at https://a2agent.me/models, read 2026-09-14); LiteLLM's numbers are DeepSeek's **first-party** rate (`deepseek-v4-pro`, `litellm_provider: deepseek`, source api-docs.deepseek.com) for a model the gateway resells under the same id. `findLiteLLMKey()` matched the bare id without looking at the vendor, so a 3× upstream rate read as drift on a correct row — and applying it would have overcharged every gateway call by ~200%. Fixed in the matcher, not the data: a bare id now needs LiteLLM to attribute it to our own vendor, which returns both rows to `unmatched` as this document already specified. The A2Agent section's other four rows collide with no bare LiteLLM key; a sweep of every matched row found this the only cross-vendor pair (all others already align, e.g. `jina` → `jina_ai`, `google` → `vertex_ai-*`). **Jina Reranker v2 Multilingual (BID 345) was the expected retirement:** LiteLLM now lists `input_cost_per_token: 5e-08` = our $0.05/1M (output 0), so the `LITELLM_DEVIATIONS` entry pinning 0.018 became obsolete and was deleted — the registry is now empty. The catalog price was already correct and did not change.
 
@@ -618,6 +620,7 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 | gemini-3.1-pro-preview | 200k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
 | grok-4.5 | 200k | 2.00 / 6.00 (0.30) | 4.00 / 12.00 (0.60) |
 | grok-4.6 | 200k | 2.00 / 6.00 (0.50) | 4.00 / 12.00 (1.00) |
+| grok-4.7 | 200k | 2.00 / 6.00 (0.50) | 4.00 / 12.00 (1.00) |
 
 ## Prompt-cache mechanics — read before touching a cache rate
 

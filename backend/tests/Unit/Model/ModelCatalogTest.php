@@ -586,6 +586,13 @@ class ModelCatalogTest extends TestCase
             'gpt-5.4-nano' => ['openai:gpt-5.4-nano', 0.02],
             'gemini-2.5-pro' => ['google:gemini-2.5-pro', 0.125],
             'gemini-3.1-pro' => ['google:gemini-3.1-pro-preview', 0.20],
+            'gemini-2.5-flash' => ['google:gemini-2.5-flash', 0.03],
+            'gemini-2.5-flash-lite' => ['google:gemini-2.5-flash-lite', 0.01],
+            'gemini-3.1-flash-lite' => ['google:gemini-3.1-flash-lite', 0.025],
+            'gemini-3.5-flash' => ['google:gemini-3.5-flash', 0.15],
+            'gemini-3-flash-preview' => ['google:gemini-3-flash-preview', 0.05],
+            'mistral-medium-3.5' => ['mistral:mistral-medium-latest', 0.15],
+            'mistral-large-3' => ['mistral:mistral-large-latest', 0.05],
             'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
             'gemini-3.7-flash' => ['google:gemini-3.7-flash', 0.075],
             'gemini-3.6-flash' => ['google:gemini-3.6-flash', 0.075],
@@ -1034,8 +1041,9 @@ class ModelCatalogTest extends TestCase
 
     /**
      * xAI Grok 4.7 — chat + vision added 2026-09-23. Same $2/$6 headline as
-     * 4.6. The 2026-09-21 model page publishes no cache discount and no
-     * >200k tier, and reasoning depth is configurable (default high).
+     * 4.6, with a $0.50/1M cache-read rate and the >200k long-context 2x tier
+     * (verified against https://docs.x.ai/docs/models on 2026-09-24). Reasoning
+     * depth is configurable (default high).
      */
     public function testGrok47ModelsAreAvailableWithExpectedApiIds(): void
     {
@@ -1052,13 +1060,19 @@ class ModelCatalogTest extends TestCase
             $this->assertSame('grok-4.7', $variant['json']['params']['model'] ?? null);
             $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
             $this->assertEqualsWithDelta(6.0, (float) $variant['priceOut'], 1e-9);
-            $this->assertEqualsWithDelta(2.0, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertEqualsWithDelta(0.50, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
         }
 
         $chat = ModelCatalog::find('xai:grok-4.7:chat')[0];
         $this->assertSame('high', $chat['json']['reasoning_effort_default'] ?? null);
         $this->assertContains('tool_use', $chat['json']['features'] ?? []);
-        $this->assertNull(ModelCatalog::contextPricing('grok-4.7'));
+
+        $tier = ModelCatalog::contextPricing('grok-4.7');
+        $this->assertNotNull($tier);
+        $this->assertSame(200000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(12.0, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(1.0, $tier['cache_price_in_above'], 1e-9);
     }
 
     /**

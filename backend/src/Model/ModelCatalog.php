@@ -426,6 +426,9 @@ class ModelCatalog
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 0.60],
         'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
+        // Official xAI Text API pricing 2026-09-24: >=200k is 2x input/output
+        // and cached input ($4/$12, cache $1.00) — https://docs.x.ai/docs/models.
+        'grok-4.7' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
     ];
 
     /**
@@ -2985,6 +2988,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-2.5-flash'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.03,
                 'meta' => ['context_window' => '1000000', 'max_output' => '65536'],
             ],
         ],
@@ -3009,6 +3015,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-2.5-flash'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.03,
             ],
         ],
         [
@@ -3079,6 +3088,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3.1-flash-lite'],
                 'features' => ['vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.025,
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
@@ -3101,6 +3113,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-3.1-flash-lite'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.025,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],
@@ -3135,6 +3150,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3.5-flash'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
                 'meta' => ['context_window' => '1000000', 'max_output' => '65536'],
             ],
         ],
@@ -3157,6 +3175,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-3.5-flash'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],
@@ -3179,6 +3200,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3-flash-preview'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.05,
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
@@ -3201,6 +3225,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-3-flash-preview'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.05,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],
@@ -3223,6 +3250,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-2.5-flash-lite'],
                 'features' => ['vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.01,
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
@@ -3245,6 +3275,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-2.5-flash-lite'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.01,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],
@@ -4280,6 +4313,9 @@ class ModelCatalog
                 'description' => 'Mistral Medium 3.5 - frontier-class multimodal model optimised for agentic and coding use cases. OpenAI-compatible chat endpoint.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'mistral-medium-latest'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
                 'meta' => ['context_window' => '262144', 'max_output' => '8192'],
                 'features' => ['tool_use'],
             ],
@@ -4302,6 +4338,9 @@ class ModelCatalog
                 'description' => 'Mistral Large 3 - state-of-the-art, open-weight, general-purpose multimodal model. OpenAI-compatible chat endpoint.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'mistral-large-latest'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.05,
                 'meta' => ['context_window' => '262144', 'max_output' => '8192'],
                 'features' => ['tool_use'],
             ],
@@ -4375,6 +4414,9 @@ class ModelCatalog
                 'max_tokens' => 2048,
                 'params' => ['model' => 'mistral-medium-latest'],
                 'features' => ['vision', 'ocr', 'multilingual'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
             ],
         ],
         // ==================== TRUSTEDTOKENS (TNG, Germany) ====================
@@ -4879,9 +4921,8 @@ class ModelCatalog
         // ==================== xAI (GROK) ====================
         // Snapshot 2026-07-29 from https://docs.x.ai/developers/pricing;
         // Grok 4.6 rows added from the 2026-08-20 snapshot.
-        // Grok 4.7 rows added 2026-09-23 from https://docs.x.ai/developers/grok-4-7
-        // ($2 / $6 per 1M, 500K context). That page publishes no cached-input
-        // discount and no >200k tier, unlike 4.5 / 4.6.
+        // Grok 4.7 rows added 2026-09-23; Text API pricing (incl. cached input
+        // and >200k tier) verified 2026-09-24 from https://docs.x.ai/docs/models.
         // Chat rows are covered by the LiteLLM sync (keys `xai/<providerId>`);
         // the Grok Imagine rows are not and must be verified manually.
         // Above 200K prompt tokens xAI bills the whole request at 2x — encoded
@@ -4905,9 +4946,9 @@ class ModelCatalog
                 'max_tokens' => 32768,
                 'params' => ['model' => 'grok-4.7'],
                 'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
-                // The 2026-09-21 model page lists input and output only. Billing
-                // cache reads at the input rate avoids the 50% fallback discount.
-                'cache_read_price_per_1M' => 2.00,
+                // Official Text API pricing (<200k): cached input $0.50/1M —
+                // https://docs.x.ai/docs/models (2026-09-24).
+                'cache_read_price_per_1M' => 0.50,
                 'reasoning_effort_default' => 'high',
                 'meta' => [
                     'context_window' => '500000',
@@ -4935,7 +4976,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'grok-4.7'],
                 'features' => ['vision', 'ocr', 'multilingual'],
-                'cache_read_price_per_1M' => 2.00,
+                // Official Text API pricing (<200k): cached input $0.50/1M —
+                // https://docs.x.ai/docs/models (2026-09-24).
+                'cache_read_price_per_1M' => 0.50,
                 'meta' => [
                     'supports_images' => true,
                     'max_image_bytes' => '20971520',
