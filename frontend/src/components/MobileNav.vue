@@ -701,9 +701,7 @@ const handleNewChat = async () => {
     await chatsStore.findOrCreateEmptyChat()
     if (route.path !== '/') router.push('/')
   } finally {
-    setTimeout(() => {
-      isCreatingChat.value = false
-    }, 300)
+    isCreatingChat.value = false
   }
 }
 
