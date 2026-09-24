@@ -5,7 +5,7 @@ import { iamApi } from '@/services/api/iamApi'
 
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
-    searchSubjects: vi.fn().mockResolvedValue([]),
+    searchSubjects: vi.fn().mockResolvedValue({ subjects: [], personScope: 'shared-group' }),
   },
 }))
 
@@ -16,7 +16,10 @@ const mountPicker = () =>
 
 describe('SubjectPicker', () => {
   it('says when no person or group matches', async () => {
-    vi.mocked(iamApi.searchSubjects).mockResolvedValueOnce([])
+    vi.mocked(iamApi.searchSubjects).mockResolvedValueOnce({
+      subjects: [],
+      personScope: 'shared-group',
+    })
     vi.useFakeTimers()
     try {
       const wrapper = mountPicker()
@@ -26,7 +29,7 @@ describe('SubjectPicker', () => {
       await flushPromises()
 
       expect(wrapper.get('[data-testid="text-iam-no-matches"]').text()).toBe(
-        'No person or group matches.'
+        'No one in a group you share, and no group, matches that name.'
       )
       wrapper.unmount()
     } finally {
@@ -46,9 +49,10 @@ describe('SubjectPicker', () => {
       expect(wrapper.get('[data-testid="text-iam-search-failed"]').text()).toContain(
         "Couldn't search people or groups."
       )
-      vi.mocked(iamApi.searchSubjects).mockResolvedValueOnce([
-        { type: 'group', id: 2, name: 'Sales', pinned: true },
-      ])
+      vi.mocked(iamApi.searchSubjects).mockResolvedValueOnce({
+        subjects: [{ type: 'group', id: 2, name: 'Sales', pinned: true }],
+        personScope: 'shared-group',
+      })
       await wrapper.get('[data-testid="btn-iam-search-retry"]').trigger('click')
       await flushPromises()
 

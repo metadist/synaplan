@@ -267,6 +267,12 @@ final class ShareController extends AbstractController
                     required: ['subjects'],
                     properties: [
                         new OA\Property(
+                            property: 'personScope',
+                            type: 'string',
+                            enum: ['shared-group', 'everyone'],
+                            description: 'shared-group: people who share a group with the actor. everyone: any account, because user search is on.',
+                        ),
+                        new OA\Property(
                             property: 'subjects',
                             type: 'array',
                             items: new OA\Items(
@@ -302,6 +308,7 @@ final class ShareController extends AbstractController
         }
 
         return $this->json([
+            'personScope' => $this->iamConfig->isUserSearchEnabled((int) $user->getId()) ? 'everyone' : 'shared-group',
             'subjects' => $this->shareService->searchSubjects($user, (string) $request->query->get('q', '')),
         ]);
     }

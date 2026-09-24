@@ -21,11 +21,10 @@ use PHPUnit\Framework\TestCase;
 final class ShareServiceSearchSubjectsTest extends TestCase
 {
     /**
-     * Issue #2060: with user search off (the default), a picker query must
-     * not touch the user directory at all — no accounts, no mailboxes.
-     * Groups stay searchable.
+     * Issue #2106: with user search off and no shared group, a query returns
+     * groups only. The directory search is not run.
      */
-    public function testUserSearchOffHidesAccountsButKeepsGroups(): void
+    public function testUserSearchOffWithoutASharedGroupReturnsGroupsOnly(): void
     {
         $users = $this->createMock(UserRepository::class);
         $users->expects(self::never())->method('searchByEmailOrName');
@@ -42,6 +41,33 @@ final class ShareServiceSearchSubjectsTest extends TestCase
 
         self::assertSame([
             ['type' => Share::SUBJECT_GROUP, 'id' => 11, 'name' => 'Sales', 'email' => null, 'pinned' => false],
+        ], $subjects);
+    }
+
+    public function testUserSearchOffReturnsPeopleWhoShareAGroup(): void
+    {
+        $account = $this->createStub(User::class);
+        $account->method('getId')->willReturn(7);
+        $account->method('getMail')->willReturn('sam@example.com');
+        $account->method('getDisplayName')->willReturn('Sam');
+        $users = $this->createMock(UserRepository::class);
+        $users->expects(self::once())
+            ->method('searchByEmailOrName')
+            ->with('sa', 20, [7])
+            ->willReturn([$account]);
+
+        $groups = $this->createMock(GroupRepository::class);
+        $groups->method('searchByName')->willReturn([]);
+
+        $members = $this->createMock(GroupMemberRepository::class);
+        $members->method('findCoMemberUserIds')->with(3)->willReturn([7]);
+
+        $service = $this->service($users, $groups, userSearchOn: false, everyoneAllowed: false, members: $members);
+
+        $subjects = $service->searchSubjects($this->actor(), 'sa');
+
+        self::assertSame([
+            ['type' => Share::SUBJECT_USER, 'id' => 7, 'name' => 'Sam', 'email' => 'sam@example.com', 'pinned' => false],
         ], $subjects);
     }
 
@@ -95,6 +121,7 @@ final class ShareServiceSearchSubjectsTest extends TestCase
         GroupRepository $groups,
         bool $userSearchOn,
         bool $everyoneAllowed,
+        ?GroupMemberRepository $members = null,
     ): ShareService {
         $iamConfig = $this->createMock(IamConfig::class);
         $iamConfig->method('isUserSearchEnabled')->willReturn($userSearchOn);
@@ -103,7 +130,7 @@ final class ShareServiceSearchSubjectsTest extends TestCase
         return new ShareService(
             $this->createMock(ShareRepository::class),
             $groups,
-            $this->createMock(GroupMemberRepository::class),
+            $members ?? $this->createMock(GroupMemberRepository::class),
             $users,
             $this->createMock(ResourceKindRegistry::class),
             $this->createMock(AccessGate::class),

@@ -12,7 +12,7 @@ const { showSuccess, showError } = vi.hoisted(() => ({
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
     listShares: vi.fn().mockResolvedValue([]),
-    searchSubjects: vi.fn().mockResolvedValue([]),
+    searchSubjects: vi.fn().mockResolvedValue({ subjects: [], personScope: 'shared-group' }),
     grantShare: vi.fn(),
     revokeShare: vi.fn(),
   },
@@ -60,7 +60,10 @@ describe('ShareDialog', () => {
     showSuccess.mockReset()
     showError.mockReset()
     vi.mocked(iamApi.listShares).mockResolvedValue([])
-    vi.mocked(iamApi.searchSubjects).mockResolvedValue([])
+    vi.mocked(iamApi.searchSubjects).mockResolvedValue({
+      subjects: [],
+      personScope: 'shared-group',
+    })
   })
 
   it('does not render when closed', () => {
@@ -162,9 +165,10 @@ describe('ShareDialog', () => {
   })
 
   it('names the recipient path after a successful share', async () => {
-    vi.mocked(iamApi.searchSubjects).mockResolvedValue([
-      { type: 'group', id: 1, name: 'Sales', pinned: false },
-    ])
+    vi.mocked(iamApi.searchSubjects).mockResolvedValue({
+      subjects: [{ type: 'group', id: 1, name: 'Sales', pinned: false }],
+      personScope: 'shared-group',
+    })
     vi.mocked(iamApi.grantShare).mockResolvedValue({
       id: 9,
       kind: 'conversation',

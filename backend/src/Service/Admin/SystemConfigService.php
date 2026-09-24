@@ -1319,7 +1319,7 @@ final readonly class SystemConfigService
             'FEATURE_IAM_USER_SEARCH_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'User search in the share picker: let anyone search user accounts by name or email when sharing. Keep this OFF on instances with self-registration — when on, every account in the database can be found and mailed by name. Groups are always searchable.',
+                'description' => 'User search in the share picker. Off: an owner can share with people in a group they share, and with a group. On: an owner can share with any account on the instance. Groups are always searchable. Adding a member under People → Groups still searches every account.',
                 'default' => 'false',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
