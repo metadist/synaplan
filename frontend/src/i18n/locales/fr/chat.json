@@ -42,20 +42,21 @@
     }
   },
   "companionLinks": {
-    "tagline": "Synaplan — pense libre",
-    "ask": "Dis-moi ce que tu peux faire",
+    "tagline": "En quoi puis-je vous aider ?",
     "opensInNewTab": "S’ouvre dans un nouvel onglet",
-    "desktop": {
-      "title": "Client bureau",
-      "blurb": "Gardez vos recherches en local, employez des agents partout."
+    "choice": {
+      "title": "Votre modèle et votre assistant",
+      "blurb": "Vous pouvez changer l’un ou l’autre dans cette conversation."
     },
     "mobile": {
-      "title": "Applications mobiles",
-      "blurb": "Emportez vos utilisateurs sur la route, librement configurable."
+      "title": "iPhone et Android",
+      "blurb": "L’app Synaplan sur votre téléphone.",
+      "appStore": "App Store",
+      "playStore": "Google Play"
     },
-    "outlook": {
-      "title": "Complément Outlook",
-      "blurb": "Parce que les systèmes fermés devraient aussi avoir des documents locaux."
+    "source": {
+      "title": "Code source",
+      "blurb": "Lisez-le sur GitHub et faites tourner Synaplan vous-même."
     }
   },
   "chats": {

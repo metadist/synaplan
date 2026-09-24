@@ -14,24 +14,33 @@ function mountLinks() {
 }
 
 describe('CompanionLinks', () => {
-  it('renders three GitHub cards that open in a new tab', () => {
+  it('explains model choice and links to the stores and the source', () => {
     const wrapper = mountLinks()
 
-    const desktop = wrapper.get('[data-testid="link-companion-desktop"]')
-    const mobile = wrapper.get('[data-testid="link-companion-mobile"]')
-    const outlook = wrapper.get('[data-testid="link-companion-outlook"]')
+    expect(wrapper.get('[data-testid="card-companion-choice"]').text()).toContain(
+      'Your model and assistant'
+    )
 
-    expect(desktop.attributes('href')).toBe('https://github.com/metadist/synaplan-desktop')
-    expect(mobile.attributes('href')).toBe('https://github.com/metadist/synaplan-apps')
-    expect(outlook.attributes('href')).toBe('https://github.com/metadist/Synamail')
+    const appStore = wrapper.get('[data-testid="link-companion-app-store"]')
+    const playStore = wrapper.get('[data-testid="link-companion-play-store"]')
+    const source = wrapper.get('[data-testid="link-companion-source"]')
 
-    for (const link of [desktop, mobile, outlook]) {
+    expect(appStore.attributes('href')).toBe(
+      'https://apps.apple.com/app/id6784278288?ct=app-welcome'
+    )
+    expect(playStore.attributes('href')).toBe(
+      'https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dapp-welcome'
+    )
+    expect(source.attributes('href')).toBe('https://github.com/metadist/synaplan')
+
+    for (const link of [appStore, playStore, source]) {
       expect(link.attributes('target')).toBe('_blank')
       expect(link.attributes('rel')).toContain('noopener')
     }
 
-    expect(wrapper.text()).toContain('Desktop Client')
-    expect(wrapper.text()).toContain('Mobile Apps')
-    expect(wrapper.text()).toContain('Outlook add-in')
+    expect(wrapper.text()).toContain('iPhone and Android')
+    expect(wrapper.text()).toContain('App Store')
+    expect(wrapper.text()).toContain('Google Play')
+    expect(wrapper.text()).toContain('Source code')
   })
 })

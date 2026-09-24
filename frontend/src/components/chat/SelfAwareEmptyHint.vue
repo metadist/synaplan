@@ -6,7 +6,7 @@
       data-testid="btn-self-aware-empty-hint"
       @click="emit('ask', question)"
     >
-      {{ $t('companionLinks.ask') }}
+      {{ question }}
     </button>
   </div>
 </template>

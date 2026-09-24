@@ -31,7 +31,7 @@
   "selfAware": {
     "emptyHint": "Nicht sicher, was hier möglich ist? Frag mich, was ich tun kann.",
     "emptyHintQuestion": "Was kannst du hier tun?",
-    "examplePrompt": "Was kannst du tun?",
+    "examplePrompt": "Was kannst du?",
     "helpCommand": {
       "label": "Hilfe",
       "description": "Fragen, was dieser KI-Assistent hier tun kann"
@@ -42,20 +42,21 @@
     }
   },
   "companionLinks": {
-    "tagline": "Synaplan — denk frei",
-    "ask": "Sag mir, was du kannst",
+    "tagline": "Wobei kann ich dir helfen?",
     "opensInNewTab": "Öffnet in einem neuen Tab",
-    "desktop": {
-      "title": "Desktop-Client",
-      "blurb": "Forschung bleibt lokal — Agenten arbeiten überall."
+    "choice": {
+      "title": "Dein Modell und dein Assistent",
+      "blurb": "Du kannst beides in diesem Chat jederzeit wechseln."
     },
     "mobile": {
-      "title": "Mobile Apps",
-      "blurb": "Bring deine Nutzer unterwegs mit — frei konfigurierbar."
+      "title": "iPhone und Android",
+      "blurb": "Die Synaplan-App auf deinem Handy.",
+      "appStore": "App Store",
+      "playStore": "Google Play"
     },
-    "outlook": {
-      "title": "Outlook-Add-in",
-      "blurb": "Weil geschlossene Systeme trotzdem lokale Dokumente brauchen."
+    "source": {
+      "title": "Quellcode",
+      "blurb": "Lies ihn auf GitHub und betreibe Synaplan selbst."
     }
   },
   "chats": {
