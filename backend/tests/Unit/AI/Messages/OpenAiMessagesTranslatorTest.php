@@ -7,6 +7,7 @@ namespace App\Tests\Unit\AI\Messages;
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Translator\OpenAiMessagesTranslator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -213,6 +214,43 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame('call_1', $payload['input'][1]['call_id']);
         $this->assertSame('function_call_output', $payload['input'][2]['type']);
         $this->assertSame('hit', $payload['input'][2]['output']);
+    }
+
+    /**
+     * @param ?string $expectedEffort null means no reasoning block
+     */
+    #[DataProvider('lowestResponsesEffortProvider')]
+    public function testLowestResponsesEffort(string $model, ?string $expectedEffort): void
+    {
+        $this->assertSame($expectedEffort, OpenAiMessagesTranslator::lowestResponsesEffort($model));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: ?string}>
+     */
+    public static function lowestResponsesEffortProvider(): array
+    {
+        return [
+            'gpt-6-sol' => ['gpt-6-sol', 'none'],
+            'openai:gpt-6-luna' => ['openai:gpt-6-luna', 'none'],
+            'gpt-6-astra' => ['gpt-6-astra', 'low'],
+            'gpt-5.5-pro' => ['gpt-5.5-pro', 'medium'],
+            'gpt-5' => ['gpt-5', 'minimal'],
+            'o3' => ['o3', 'low'],
+            'gpt-4o' => ['gpt-4o', null],
+        ];
+    }
+
+    public function testToResponsesRequestSendsNoneForGpt6Sol(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toResponsesRequest([
+            'model' => 'gpt-6-sol',
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => 'hi']],
+        ], stream: false);
+
+        $this->assertSame(['effort' => 'none'], $payload['reasoning']);
     }
 
     public function testToResponsesRequestKeepsNonAutoImageDetail(): void

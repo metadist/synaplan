@@ -8,6 +8,7 @@ use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
+use App\AI\Provider\OpenAiReasoningEffort;
 use App\AI\Tool\OpenAiToolShapes;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -386,8 +387,8 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
     }
 
     /**
-     * Cheapest Responses `reasoning.effort` the family accepts. gpt-6 has no
-     * skip tier (`none` 400s); Chat Completions is the wrong API entirely.
+     * Cheapest Responses `reasoning.effort` the family accepts.
+     * Non-reasoning models return null (no `reasoning` block).
      */
     public static function lowestResponsesEffort(string $model): ?string
     {
@@ -399,20 +400,8 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         if (!self::usesCompletionTokens($model)) {
             return null;
         }
-        if (str_starts_with($model, 'gpt-6')) {
-            return 'low';
-        }
-        if (str_starts_with($model, 'gpt-5.5-pro')) {
-            return 'medium';
-        }
-        if (str_starts_with($model, 'gpt-5.4') || str_starts_with($model, 'gpt-5.5') || str_starts_with($model, 'gpt-5.6')) {
-            return 'none';
-        }
-        if (str_starts_with($model, 'gpt-5')) {
-            return 'minimal';
-        }
 
-        return 'low';
+        return OpenAiReasoningEffort::lowest($model);
     }
 
     /**
