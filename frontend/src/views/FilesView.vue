@@ -700,10 +700,14 @@
                           : `folder-card-${folder.name}`
                       "
                       @click="onFolderCardClick(folder)"
-                      @dragenter.prevent="folder.shared ? undefined : onFolderDragEnter(folder.name)"
+                      @dragenter.prevent="
+                        folder.shared ? undefined : onFolderDragEnter(folder.name)
+                      "
                       @dragover.prevent
                       @dragleave="folder.shared ? undefined : onFolderDragLeave(folder.name)"
-                      @drop.prevent.stop="folder.shared ? undefined : onFolderDrop($event, folder.name)"
+                      @drop.prevent.stop="
+                        folder.shared ? undefined : onFolderDrop($event, folder.name)
+                      "
                     >
                       <div class="relative">
                         <Icon
