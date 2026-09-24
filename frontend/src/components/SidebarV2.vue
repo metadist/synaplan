@@ -911,9 +911,7 @@ const handleQuickNewChat = async () => {
     if (route.path !== '/') router.push('/')
     if (sheetWasOpen) chatModalOpen.value = false
   } finally {
-    setTimeout(() => {
-      isCreatingChat.value = false
-    }, 300)
+    isCreatingChat.value = false
   }
 }
 
@@ -1123,9 +1121,7 @@ const handleNewChat = async () => {
     if (route.path !== '/') router.push('/')
     chatModalOpen.value = false
   } finally {
-    setTimeout(() => {
-      isCreatingChat.value = false
-    }, 300)
+    isCreatingChat.value = false
   }
 }
 
