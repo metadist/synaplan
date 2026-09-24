@@ -203,6 +203,7 @@
     "introCta": "Füge Dateien zu Deinen Quellen hinzu…",
     "useInChat": "Im Chat nutzen",
     "startedChatWithFolder": "Neuer Chat mit {folder} gestartet.",
+    "startChatFailed": "Ein neuer Chat konnte nicht gestartet werden. Es wurde nichts geöffnet.",
     "openInChat": "Im Chat öffnen",
     "terms": {
       "vectorized": "KI-durchsuchbar",

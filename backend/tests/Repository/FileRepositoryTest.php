@@ -103,6 +103,22 @@ class FileRepositoryTest extends KernelTestCase
         $this->assertSame([$mine->getId()], $ids);
     }
 
+    public function testFindByUserPaginatedKeepsAFolderNamedZero(): void
+    {
+        $user = $this->createUser('folder-zero');
+        $inZero = $this->createFile($user, 'in-zero.pdf');
+        $inZero->setGroupKey('0');
+        $inOther = $this->createFile($user, 'in-other.pdf');
+        $inOther->setGroupKey('notes');
+        $this->em->flush();
+
+        $found = $this->repository->findByUserPaginated((int) $user->getId(), '0', 0, 50);
+        $ids = $this->idsOf($found['files']);
+
+        $this->assertSame([$inZero->getId()], $ids);
+        $this->assertSame(1, $found['total']);
+    }
+
     public function testFindFilesByChatIdRespectsLimitNewestFirst(): void
     {
         $user = $this->createUser('files-chat-limit');

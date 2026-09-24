@@ -30,8 +30,9 @@
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
 
-        <!-- Compact Upload Bar -->
+        <!-- Compact Upload Bar. Hidden while a shared folder is open: uploads stay in the viewer's own library. -->
         <div
+          v-if="!openSharedFolder"
           class="surface-card p-4 sm:p-5 relative"
           data-testid="section-upload-form"
           @dragenter.prevent="handleDragEnter"
@@ -1628,12 +1629,12 @@ async function useFolderInChat(folder: DisplayedFolder | string): Promise<void> 
         ? `shared:${folder.resourceId}`
         : folder.name
   const chat = await chatsStore.createChat()
-  const query: Record<string, string> = { folder: key }
-  if (chat?.id) {
-    query.chat = String(chat.id)
+  if (!chat?.id) {
+    showError(t('files.startChatFailed'))
+    return
   }
   showSuccess(t('files.startedChatWithFolder', { folder: name }))
-  await router.push({ path: '/', query })
+  await router.push({ path: '/', query: { folder: key, chat: String(chat.id) } })
 }
 
 function openInChat(file: FileItem): void {
@@ -1931,6 +1932,7 @@ const allSelected = computed(() => {
 })
 
 const handleFileSelect = (event: Event) => {
+  if (openSharedFolder.value) return
   const target = event.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
     const newFiles = Array.from(target.files)
@@ -1951,7 +1953,7 @@ const smartButtonLabel = computed(() => {
 })
 
 const smartUploadAction = () => {
-  if (isUploading.value) return
+  if (openSharedFolder.value || isUploading.value) return
   if (selectedFiles.value.length > 0) {
     uploadFiles()
   } else {
@@ -1967,13 +1969,10 @@ const removeSelectedFile = (index: number) => {
 }
 
 // Folder picker helpers — auto-target the open folder
-const activeUploadFolder = computed(
-  () =>
-    selectedGroup.value ||
-    groupKeyword.value ||
-    (openSharedFolder.value ? '' : openFolder.value) ||
-    ''
-)
+const activeUploadFolder = computed(() => {
+  if (openSharedFolder.value) return ''
+  return selectedGroup.value || groupKeyword.value || openFolder.value || ''
+})
 
 const selectExistingFolder = (name: string) => {
   if (selectedGroup.value === name) {
@@ -2116,6 +2115,7 @@ const getFileColorClass = (): string => previewBadgeClass()
 
 // Drag & Drop handlers
 const handleDragEnter = (event: DragEvent) => {
+  if (openSharedFolder.value) return
   // Check if dragging files
   if (event.dataTransfer?.types.includes('Files')) {
     dragCounter.value++
@@ -2140,6 +2140,7 @@ const handleDragLeave = () => {
 const handleDrop = async (event: DragEvent) => {
   dragCounter.value = 0
   isDragging.value = false
+  if (openSharedFolder.value) return
 
   const droppedFiles = event.dataTransfer?.files
   if (droppedFiles && droppedFiles.length > 0) {
@@ -2245,6 +2246,7 @@ const rowActions = (file: FileItem): FileRowAction[] => {
 }
 
 const uploadFiles = async () => {
+  if (openSharedFolder.value) return
   if (selectedFiles.value.length === 0) {
     showError('Please select files to upload')
     return
@@ -2341,7 +2343,10 @@ const buildDateTimestamp = (dateStr: string, end = false): number | undefined =>
   return Math.floor(d.getTime() / 1000)
 }
 
+let loadFilesSeq = 0
+
 const loadFiles = async (page = currentPage.value) => {
+  const seq = ++loadFilesSeq
   isLoading.value = true
 
   try {
@@ -2359,11 +2364,14 @@ const loadFiles = async (page = currentPage.value) => {
       limit: itemsPerPage,
     })
 
+    if (seq !== loadFilesSeq) return
+
     files.value = response.files
     sharedFolderCanEdit.value = response.shared?.canEdit === true
     totalCount.value = response.pagination.total
     currentPage.value = response.pagination.page
   } catch (error: unknown) {
+    if (seq !== loadFilesSeq) return
     console.error('Failed to load files:', error)
 
     const msg = getErrorMessage(error) ?? ''
@@ -2374,7 +2382,9 @@ const loadFiles = async (page = currentPage.value) => {
       showError('Failed to load files')
     }
   } finally {
-    isLoading.value = false
+    if (seq === loadFilesSeq) {
+      isLoading.value = false
+    }
   }
 }
 

@@ -215,6 +215,7 @@
     "introCta": "Dosyaları kaynaklarınıza ekleyin…",
     "useInChat": "Sohbette kullan",
     "startedChatWithFolder": "{folder} ile yeni bir sohbet başlatıldı.",
+    "startChatFailed": "Yeni bir sohbet başlatılamadı. Hiçbir şey açılmadı.",
     "openInChat": "Sohbette aç",
     "status_error": "Hata",
     "terms": {

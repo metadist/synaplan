@@ -48,7 +48,8 @@ class FileRepository extends ServiceEntityRepository
             ->andWhere('mf.ephemeral = false')
             ->setParameter('userId', $userId);
 
-        if ($groupKey) {
+        // "0" is a legal folder name. A truthy check would drop the filter.
+        if (null !== $groupKey && '' !== $groupKey) {
             if (!empty($vectorFileIds)) {
                 $qb->andWhere('(mf.groupKey = :groupKey OR mf.id IN (:vectorFileIds))')
                     ->setParameter('groupKey', $groupKey)

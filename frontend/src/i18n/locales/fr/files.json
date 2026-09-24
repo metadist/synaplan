@@ -162,6 +162,7 @@
     "introCta": "Ajouter des fichiers à vos sources…",
     "useInChat": "Utiliser dans le chat",
     "startedChatWithFolder": "Nouvelle discussion démarrée avec {folder}.",
+    "startChatFailed": "Impossible de démarrer une nouvelle discussion. Rien n'a été ouvert.",
     "openInChat": "Ouvrir dans le chat",
     "terms": {
       "vectorized": "recherchable par l’IA",
