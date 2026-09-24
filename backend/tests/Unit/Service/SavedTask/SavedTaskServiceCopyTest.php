@@ -218,11 +218,11 @@ final class SavedTaskServiceCopyTest extends TestCase
         );
 
         $prompts = $this->createMock(PromptRepository::class);
-        $prompts->method('find')->with(21)->willReturn($prompt);
+        $prompts->expects(self::any())->method('find')->with(21)->willReturn($prompt);
         $prompts->expects(self::never())->method('findFirstUsableForUser');
 
         $agents = $this->createMock(AgentRepository::class);
-        $agents->method('findByPromptIdAndOwner')->with(21, 9)->willReturn($agent);
+        $agents->expects(self::any())->method('findByPromptIdAndOwner')->with(21, 9)->willReturn($agent);
 
         $tasks = $this->createMock(SavedTaskRepository::class);
         $tasks->expects(self::once())->method('save');
@@ -244,9 +244,11 @@ final class SavedTaskServiceCopyTest extends TestCase
 
         $result = $service->copyForOwner($source, $user);
 
+        $config = $result->task->getTriggerConfig();
+        self::assertIsArray($config);
         self::assertSame(21, $result->task->getPromptId());
-        self::assertSame(1, $result->task->getTriggerConfig()['agentId'] ?? null);
-        self::assertArrayNotHasKey('agentTrigger', $result->task->getTriggerConfig() ?? []);
+        self::assertSame(1, $config['agentId'] ?? null);
+        self::assertArrayNotHasKey('agentTrigger', $config);
         self::assertSame([], $result->checklist);
     }
 
@@ -275,7 +277,7 @@ final class SavedTaskServiceCopyTest extends TestCase
         );
 
         $prompts = $this->createMock(PromptRepository::class);
-        $prompts->method('find')->with(21)->willReturn($prompt);
+        $prompts->expects(self::any())->method('find')->with(21)->willReturn($prompt);
         $prompts->expects(self::never())->method('findFirstUsableForUser');
 
         $agents = $this->createMock(AgentRepository::class);

@@ -348,14 +348,15 @@ const onRunCopy = async () => {
     }
   } catch (err) {
     const message = err instanceof ApiError ? err.message : ''
-    const assistant = err instanceof ApiError && typeof err.details?.assistant === 'string'
-      ? err.details.assistant
-      : ''
+    const assistant =
+      err instanceof ApiError && typeof err.details?.assistant === 'string'
+        ? err.details.assistant
+        : ''
     showError(
       message === 'iam.assistantNotShared'
-        ? (assistant !== ''
+        ? assistant !== ''
           ? t('iam.assistantNotSharedNamed', { name: assistant })
-          : t('iam.assistantNotShared'))
+          : t('iam.assistantNotShared')
         : t('config.savedTasks.runFailed')
     )
   } finally {
