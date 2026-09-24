@@ -179,8 +179,23 @@ Real failure modes that have caused red CI more than once:
 - **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults a code path OFF, new logic there passes tests and is still a no-op in prod. Check the `BCONFIG` default and confirm the path is reachable before claiming a fix.
 - **`make ci-local` ≠ green CI.** It does not run Playwright. A page that unit-tests green can still fail `saved-task-roundtrip` or layout. Run `make test-e2e` before push.
 - **GitHub E2E died before any test ran.** If every E2E job fails at `Unable to download artifact` (the `docker-image` tarball), that is Actions infra — re-run the workflow. Do not “fix” product code.
-- **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.62.1-noble` image with `--network host`.
+- **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.63.0-noble` image with `--network host`.
 - **Playwright is headless by default** (`frontend/tests/e2e/playwright.config.ts`). Never set `HEADED=1` or pass `--headed` unless the user explicitly asks to watch the browser. Headed + 4 workers opens a window per worker.
+
+### Known local-only failures (not caused by your change)
+
+These fail on the local dev stack and pass in CI. Confirm the failure matches the entry, then move on — do not "fix" product code for them:
+
+- **Migration tests** (`backend/tests/Migration/Version20260819080000Test`, `…20260820120000Test`, `…20260923190000Test`) fail with `test database has no user to attach fixtures to`: CI runs `doctrine:fixtures:load` on the test DB, the local gate does not.
+- **`ConfigControllerTest::testRuntimeConfigIncludesMemoryServiceFeature`** fails on `computeEnabled`: `docker-compose.yml` defaults `FEATURE_COMPUTE_ENABLED=true`, the test expects compute off as in CI.
+- **E2E specs that need the test stack** (`docker-compose.test.yml`) fail under `make test-e2e` on the dev stack:
+  - Mail specs (`email`, `registration`, `guest-registration`, `admin-panel`): the runner defaults to MailHog `:8026` (test stack); run with `MAILHOG_URL=http://localhost:8025`.
+  - `@whatsapp` specs: the WhatsApp stub on `:3999` only runs in the test stack.
+  - `subscription*.spec.ts`: need the fake Stripe secret and price IDs from `backend/.env.test`; real Stripe values in `backend/.env` fail the webhook signature or the level mapping.
+  - `memories.spec.ts` "memorizable fact": the dev stack uses the real extraction model, which stores a paraphrase.
+  - `workspace-tab.spec.ts` "flag off": compute is on in the dev stack.
+- **E2E tests that reset mid-test after you saved a file under `frontend/`** during the run: Vite HMR reloaded the page (the trace shows module requests with `?t=<timestamp>`). Never save frontend files while Playwright runs against `:5173`; rerun the affected specs.
+- **`Generated API schemas do not match the backend OpenAPI spec`** from Playwright `globalSetup`: the backend spec changed since the frontend generated `src/generated/api-schemas.ts`. Run `make -C frontend generate-schemas`. The Vite dev server also regenerates them on a page load (at most every 30 s).
 
 ### Mobile App Compatibility
 
