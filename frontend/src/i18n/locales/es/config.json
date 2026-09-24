@@ -292,6 +292,7 @@
       "loadingModels": "Cargando modelos...",
       "system": "Sistema",
       "selectModel": "-- Seleccionar Modelo --",
+      "groupLimitsModels": "Su grupo limita los modelos que puede usar aquí.",
       "systemModelsInfo": "Los modelos del sistema están bloqueados automáticamente y no pueden cambiarse. Estos son modelos principales requeridos para funcionalidades específicas.",
       "modelsPurposesTitle": "Modelos y Propósitos",
       "allModels": "Todos los Modelos",

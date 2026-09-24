@@ -106,6 +106,13 @@
             >
               {{ $t('config.fromGroup') }}
             </span>
+            <span
+              v-if="restrictedCapabilities.includes(capability)"
+              class="basis-full text-xs font-normal txt-secondary"
+              data-testid="hint-group-model-limit"
+            >
+              {{ $t('config.aiModels.groupLimitsModels') }}
+            </span>
           </label>
           <div class="relative">
             <button
@@ -723,6 +730,7 @@ const loading = ref(false)
 const saving = ref(false)
 const resetting = ref(false)
 const availableModels = ref<ModelsData>({})
+const restrictedCapabilities = ref<string[]>([])
 const providers = ref<ProviderAvailability[]>([])
 
 // "Select suggested models" applies the seeded recommendation, which spans
@@ -936,6 +944,7 @@ const loadData = async () => {
     if (modelsRes.success) {
       availableModels.value = modelsRes.models
       providers.value = modelsRes.providers ?? []
+      restrictedCapabilities.value = modelsRes.restricted ?? []
     }
 
     if (defaultsRes.success) {

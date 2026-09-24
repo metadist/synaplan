@@ -921,6 +921,12 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'restricted',
+                    type: 'array',
+                    description: 'Capabilities a group allow-list limits for this member. A capability that is not listed stays unrestricted.',
+                    items: new OA\Items(type: 'string', example: 'CHAT')
+                ),
+                new OA\Property(
                     property: 'providers',
                     type: 'array',
                     description: 'Availability of every registered AI provider on this installation (internal test provider excluded).',
@@ -1100,9 +1106,13 @@ class ConfigController extends AbstractController
         }
         usort($providers, static fn (array $a, array $b): int => strcasecmp($a['displayName'], $b['displayName']));
 
+        $restricted = [];
         if (null !== $this->groupPolicyService && !$this->isGranted('ROLE_ADMIN')) {
             $userId = (int) $user->getId();
             foreach ($grouped as $capability => $rows) {
+                if ($this->groupPolicyService->rowsAreRestricted($userId, $rows)) {
+                    $restricted[] = $capability;
+                }
                 $filtered = $this->groupPolicyService->filterModelsByAllowList($userId, $rows);
                 $grouped[$capability] = $this->withLockedDefaultVisible($filtered, $rows, $capability, $userId);
             }
@@ -1112,6 +1122,7 @@ class ConfigController extends AbstractController
             'success' => true,
             'models' => $grouped,
             'providers' => $providers,
+            'restricted' => $restricted,
         ]);
     }
 
@@ -1217,19 +1228,23 @@ class ConfigController extends AbstractController
         $sources = [];
 
         foreach ($capabilities as $capability) {
+            $groupPolicies = null !== $this->layeredConfigResolver
+                && $this->iamConfig->isGroupPoliciesEnabled($userId);
             // VECTORIZE is system-wide (single Qdrant collection,
             // single dimension). Skip the per-user lookup entirely so
             // the dropdown can never disagree with what the indexer
             // actually uses — see saveDefaultModels for the matching
-            // write-side guard.
-            if ('VECTORIZE' === $capability) {
+            // write-side guard. Group policies are the exception: the
+            // indexer already resolves through the allow-list, so the
+            // dropdown must follow that same model.
+            if ('VECTORIZE' === $capability && !$groupPolicies) {
                 $config = $this->configRepository->findOneBy([
                     'ownerId' => 0,
                     'group' => 'DEFAULTMODEL',
                     'setting' => 'VECTORIZE',
                 ]);
                 $source = null !== $config ? 'admin' : null;
-            } elseif (null !== $this->layeredConfigResolver && $this->iamConfig->isGroupPoliciesEnabled($userId)) {
+            } elseif ($groupPolicies) {
                 // Same allow-list rule as generation: a personal or group
                 // default outside the allow-list is not the effective default,
                 // and a locked instance default wins even when it is (#2103, #2104).

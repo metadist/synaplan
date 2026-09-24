@@ -103,6 +103,15 @@
             </h3>
             <p class="txt-secondary text-sm mb-4">{{ $t('people.policies.allowedHelper') }}</p>
             <p
+              v-if="limitedCapabilityNames.length > 0"
+              class="txt-secondary text-sm mb-4"
+              data-testid="hint-allowed-limits"
+            >
+              {{
+                $t('people.policies.allowedLimits', { names: limitedCapabilityNames.join(', ') })
+              }}
+            </p>
+            <p
               v-if="isLocked('MODELS.ALLOWED')"
               class="txt-secondary text-sm mb-4"
               data-testid="hint-policy-lock-ignored"
@@ -110,7 +119,7 @@
               {{ $t('people.policies.lockIgnored') }}
             </p>
             <div class="max-h-64 overflow-y-auto space-y-4" data-testid="list-allowed-models">
-              <template v-for="cap in defaultCapabilities" :key="cap">
+              <template v-for="cap in allowListCapabilities" :key="cap">
                 <div v-if="modelsFor(cap).length > 0" class="space-y-2">
                   <p class="text-xs font-medium txt-secondary">
                     {{ $t(`people.policies.capability.${cap}`) }}
@@ -223,6 +232,20 @@ const { t } = useI18n()
 const { success, error } = useNotification()
 
 const defaultCapabilities = ['CHAT', 'VECTORIZE', 'PIC2TEXT', 'SOUND2TEXT', 'MEM', 'TOOLS'] as const
+const allowListCapabilities = [
+  'CHAT',
+  'SORT',
+  'ANALYZE',
+  'MEM',
+  'VECTORIZE',
+  'PIC2TEXT',
+  'TEXT2PIC',
+  'PIC2PIC',
+  'TEXT2VID',
+  'IMG2VID',
+  'SOUND2TEXT',
+  'TEXT2SOUND',
+] as const satisfies readonly Capability[]
 const featureKeys = [
   'SAVEDTASKS.ENABLED',
   'DESKTOP_AGENT.ENABLED',
@@ -379,6 +402,20 @@ function catalogKey(model: AIModel): string {
 function modelsFor(cap: string): AIModel[] {
   return modelsByCap.value[cap as Capability] ?? []
 }
+
+const limitedCapabilityNames = computed(() => {
+  const selectedTags = new Set(
+    allowedKeys.value.map((key) => key.split(':').at(-1)?.toLowerCase() ?? '')
+  )
+  if (selectedTags.size === 0) {
+    return []
+  }
+  return allowListCapabilities
+    .filter((cap) =>
+      modelsFor(cap).some((model) => selectedTags.has((model.tag ?? '').toLowerCase()))
+    )
+    .map((cap) => t(`people.policies.capability.${cap}`))
+})
 
 function featureI18nKey(key: string): string {
   return key.replaceAll('.', '_')

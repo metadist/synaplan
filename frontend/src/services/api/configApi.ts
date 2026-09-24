@@ -7,6 +7,8 @@ export interface ModelsResponse {
   models: Partial<Record<Capability, AIModel[]>>
   /** Provider-level availability of this installation (key/URL configured). */
   providers: ProviderAvailability[]
+  /** Capabilities a group allow-list limits for this member. */
+  restricted?: string[]
 }
 
 export interface DefaultsResponse {
