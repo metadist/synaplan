@@ -1213,6 +1213,16 @@ jobs:
             npm run ${{ matrix.npm_script }}
           fi
 
+      # Written into test-results/ so the existing artifact keeps its layout;
+      # e2e-flaky-notify reads reports/results.json at a fixed relative path.
+      - name: Collect backend logs
+        if: failure()
+        run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ${{ matrix.compose_overlay }}"
+          PROFILE="${{ matrix.compose_profiles }}"
+          mkdir -p frontend/tests/e2e/test-results/backend-logs
+          $COMPOSE $PROFILE logs --no-color --timestamps > frontend/tests/e2e/test-results/backend-logs/containers.log 2>&1 || true
+
       - name: Upload Playwright test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

@@ -62,6 +62,7 @@ parameters:
     default_log_format: 'json'
     log_level_default: 'info'     # Production: less verbose
     log_level_dev: 'debug'        # Development: show everything
+    log_level_test: 'error'       # Tests: errors only (the CI E2E stack raises it)
 
     # Optional API keys — empty string default means "not configured"
     env(ANTHROPIC_API_KEY): ''
