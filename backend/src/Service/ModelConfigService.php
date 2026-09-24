@@ -422,9 +422,12 @@ final readonly class ModelConfigService
     {
         $setting = strtoupper($capability);
         $preferred = null;
+        // A locked instance default is the only value the member may use.
+        // The allow-list must not replace it with another model (#2103).
+        $locked = $this->isDefaultLocked($userId, $setting);
 
         foreach ($this->eachDefaultModelId($userId, $setting) as $modelId) {
-            if (!$this->isAllowedModel($userId, $modelId)) {
+            if (!$locked && !$this->isAllowedModel($userId, $modelId)) {
                 continue;
             }
 
@@ -464,11 +467,13 @@ final readonly class ModelConfigService
      */
     public function getConfiguredDefaultModel(string $capability, ?int $userId = null): ?int
     {
-        foreach ($this->eachDefaultModelId($userId, strtoupper($capability)) as $modelId) {
+        $setting = strtoupper($capability);
+        $locked = $this->isDefaultLocked($userId, $setting);
+        foreach ($this->eachDefaultModelId($userId, $setting) as $modelId) {
             if ($modelId < 1) {
                 continue;
             }
-            if (!$this->isAllowedModel($userId, $modelId)) {
+            if (!$locked && !$this->isAllowedModel($userId, $modelId)) {
                 continue;
             }
 
@@ -701,6 +706,56 @@ final readonly class ModelConfigService
     private function isAllowedModel(?int $userId, int $modelId): bool
     {
         return null === $this->groupPolicyService || $this->groupPolicyService->isModelAllowed($userId, $modelId);
+    }
+
+    private function isDefaultLocked(?int $userId, string $setting): bool
+    {
+        return null !== $this->layeredConfigResolver
+            && $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $setting, $userId);
+    }
+
+    /**
+     * The default the settings screen should name: the same allow-list rule
+     * as {@see getDefaultModel()}. A locked instance value wins even when the
+     * member's allow-list excludes it. Otherwise a stored id outside the
+     * allow-list is skipped, so the screen and the next reply name one model.
+     *
+     * Does not apply the "first usable by quality" fallback. Null means
+     * nothing configured is both active and allowed.
+     *
+     * @return array{id: int|null, source: string|null, locked: bool}
+     */
+    public function reportedDefault(string $capability, int $userId): array
+    {
+        if (null === $this->layeredConfigResolver) {
+            return ['id' => null, 'source' => null, 'locked' => false];
+        }
+
+        $setting = strtoupper($capability);
+        $locked = $this->isDefaultLocked($userId, $setting);
+        foreach ($this->layeredConfigResolver->chain($userId, 'DEFAULTMODEL', $setting) as $raw) {
+            $modelId = $this->interpretStoredModelId($raw);
+            if (null === $modelId) {
+                continue;
+            }
+            if (!$locked && !$this->isAllowedModel($userId, $modelId)) {
+                continue;
+            }
+
+            $model = $this->modelRepository->find($modelId);
+            if ($model instanceof Model && 1 === $model->getActive()) {
+                return [
+                    'id' => $modelId,
+                    'source' => $this->layeredConfigResolver->sourceForValue($userId, 'DEFAULTMODEL', $setting, $raw),
+                    'locked' => $locked,
+                ];
+            }
+            if ($locked) {
+                break;
+            }
+        }
+
+        return ['id' => null, 'source' => null, 'locked' => $locked];
     }
 
     private function readDefaultModel(int $ownerId, string $setting): ?int
