@@ -276,6 +276,11 @@ final class QdrantClientMock implements QdrantClientInterface
         return false;
     }
 
+    public function refreshHealth(): bool
+    {
+        return false;
+    }
+
     public function getCollectionInfo(): array
     {
         return ['status' => 'mock', 'points_count' => 0, 'vectors_count' => 0];

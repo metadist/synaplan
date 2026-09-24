@@ -87,52 +87,41 @@ export const useMemoriesStore = defineStore('memories', () => {
     return Array.from(new Set(memories.value.map((m) => m.category)))
   })
 
+  // Bumps on every list fetch. An older response — the chat view starts one
+  // in the background, the memories page starts another — must not overwrite
+  // the newer list or commit the outage screen.
+  let listFetchSeq = 0
+
   // Actions
-  async function fetchMemories(
-    category?: string,
-    options: { timeoutMs?: number; silent?: boolean } = {}
-  ) {
+  async function fetchMemories(category?: string, options: { silent?: boolean } = {}) {
+    const seq = ++listFetchSeq
     loading.value = true
     error.value = null
-    const timeoutMs = options.timeoutMs ?? 1500
     const silent = options.silent ?? false
 
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
     try {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(() => reject(new Error('Memory service timeout')), timeoutMs)
-      })
-
-      const fetchPromise = getMemories(category)
-
-      memories.value = (await Promise.race([fetchPromise, timeoutPromise])) as UserMemory[]
+      const result = await getMemories(category)
+      if (seq !== listFetchSeq) return
+      memories.value = result
     } catch (err) {
+      if (seq !== listFetchSeq) return
       const errorMsg = err instanceof Error ? err.message : 'Failed to load memories'
       error.value = errorMsg
 
       // Silent fail if service unavailable - don't show notification on page load
       if (!silent) {
-        if (
-          !errorMsg.includes('timeout') &&
-          !errorMsg.includes('503') &&
-          !errorMsg.includes('unavailable')
-        ) {
+        if (!errorMsg.includes('503') && !errorMsg.includes('unavailable')) {
           const { error: showError } = getNotifications()
           showError(formatErrorMessage('memories.loadError', errorMsg))
         } else {
-          console.warn(
-            '⚠️ Memory service unavailable (timeout or down), continuing without memories'
-          )
+          console.warn('⚠️ Memory service unavailable, continuing without memories')
         }
       }
 
       // Set empty array so page can continue
       memories.value = []
     } finally {
-      // Clear the race timer so a resolved fetch doesn't leave a dangling
-      // (now up to 15s) timeout pending.
-      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle)
-      loading.value = false
+      if (seq === listFetchSeq) loading.value = false
     }
   }
 
@@ -276,15 +265,8 @@ export const useMemoriesStore = defineStore('memories', () => {
     error.value = null
   }
 
-  // Initialize
-  //
-  // `timeoutMs` is forwarded to `fetchMemories`. The default there (1500ms) is
-  // a deliberate fast-fail for the chat badge sidebar, where a slow Qdrant must
-  // not stall the chat. The dedicated /memories page has no such constraint and
-  // must NOT flip to the "service unavailable" branch just because the first
-  // Qdrant read is slow under load, so it passes a generous timeout instead.
-  async function init(options: { timeoutMs?: number } = {}) {
-    await Promise.all([fetchMemories(undefined, options), fetchCategories()])
+  async function init() {
+    await Promise.all([fetchMemories(), fetchCategories()])
   }
 
   // Track IDs we've already tried to fetch individually (to avoid repeated requests)

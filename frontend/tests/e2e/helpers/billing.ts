@@ -174,8 +174,17 @@ export async function activateProViaUi(
 
   try {
     await page.locator(selectors.subscription.btnSelectPro).click()
+    // The plan cards are already on screen, so a selector wait can return
+    // before the POST reaches the route; unrouting then lets it through to
+    // the real Stripe call.
+    await expect.poll(() => checkoutIntercepted, { timeout: TIMEOUTS.STANDARD }).toBe(true)
+    // The mock URL reloads the page, and page.unroute() hangs while that
+    // document load is still pending.
+    await page.waitForURL(/checkout_intercepted=true/, {
+      waitUntil: 'domcontentloaded',
+      timeout: TIMEOUTS.STANDARD,
+    })
     await page.waitForSelector(selectors.subscription.cardPlan, { timeout: TIMEOUTS.STANDARD })
-    expect(checkoutIntercepted).toBe(true)
   } finally {
     await page.unroute('**/api/v1/subscription/checkout')
   }

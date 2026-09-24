@@ -141,7 +141,7 @@ class ConfigController extends AbstractController
     public function checkMemoryService(): JsonResponse
     {
         $configured = '' !== trim($this->qdrantUrl);
-        $available = $configured && $this->memoryService->isAvailable();
+        $available = $configured && $this->memoryService->isReachableNow();
 
         return $this->json([
             'available' => $available,
