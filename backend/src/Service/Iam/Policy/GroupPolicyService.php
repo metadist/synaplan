@@ -241,7 +241,9 @@ final readonly class GroupPolicyService
         if (!$model instanceof Model) {
             return false;
         }
-        $tag = self::tagForCapability($capability) ?? strtolower($model->getTag());
+        // The allow-list stores the model's real tag (VISION, TTS, …), not the
+        // capability bucket that groups those aliases in the picker.
+        $tag = strtolower($model->getTag());
         if (!$this->tagIsRestricted($scope, $tag)) {
             return true;
         }
@@ -258,6 +260,32 @@ final readonly class GroupPolicyService
         }
 
         return false;
+    }
+
+    /**
+     * Which stored layer still names this model after a disallowed default was replaced.
+     * Null when the id is a synthesized fallback, not a saved binding.
+     */
+    public function sourceOfStoredModel(int $userId, string $capability, int $modelId): ?string
+    {
+        $userRaw = $this->configRepository->getValue($userId, 'DEFAULTMODEL', $capability);
+        if (null !== $userRaw && $this->modelIdFromStored($userRaw) === $modelId) {
+            return 'user';
+        }
+
+        $globalRaw = $this->configRepository->getValue(0, 'DEFAULTMODEL', $capability);
+        foreach ($this->resolver->chain($userId, 'DEFAULTMODEL', $capability) as $raw) {
+            if ($this->modelIdFromStored($raw) !== $modelId) {
+                continue;
+            }
+            if (null !== $globalRaw && $globalRaw === $raw) {
+                return 'admin';
+            }
+
+            return 'group';
+        }
+
+        return null;
     }
 
     /**

@@ -339,6 +339,58 @@ final class GroupPolicyServiceTest extends TestCase
         self::assertTrue($service->isModelAllowed(5, 9, 'TEXT2PIC'));
     }
 
+    public function testAliasTagIsLimitedByTheModelsOwnTag(): void
+    {
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('allowedCatalogKeys')->willReturn([
+            'openai:gpt-4o:vision',
+        ]);
+        $vision = (new Model())->setService('openai')->setProviderId('gpt-4o-mini')->setTag('vision');
+        $ref = new \ReflectionProperty(Model::class, 'id');
+        $ref->setValue($vision, 11);
+        $models = $this->createMock(ModelRepository::class);
+        $models->method('find')->willReturn($vision);
+
+        $service = new GroupPolicyService(
+            $resolver,
+            $this->createStub(GroupConfigRepository::class),
+            $this->createStub(ConfigRepository::class),
+            $models,
+            $this->createStub(AuditLogWriter::class),
+        );
+
+        self::assertFalse($service->isModelAllowed(5, 11, 'PIC2TEXT'));
+    }
+
+    public function testFallbackSourceIsTheLayerThatStillNamesTheModel(): void
+    {
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('chain')->with(5, 'DEFAULTMODEL', 'CHAT')->willReturn(['42']);
+        $configs = $this->createMock(ConfigRepository::class);
+        $configs->method('getValue')->willReturnCallback(
+            static function (int $ownerId, string $group, string $setting): string {
+                self::assertSame('DEFAULTMODEL', $group);
+                self::assertSame('CHAT', $setting);
+                if (5 === $ownerId) {
+                    return '7';
+                }
+
+                return '3';
+            },
+        );
+
+        $service = new GroupPolicyService(
+            $resolver,
+            $this->createStub(GroupConfigRepository::class),
+            $configs,
+            $this->createStub(ModelRepository::class),
+            $this->createStub(AuditLogWriter::class),
+        );
+
+        self::assertSame('group', $service->sourceOfStoredModel(5, 'CHAT', 42));
+        self::assertNull($service->sourceOfStoredModel(5, 'CHAT', 99999));
+    }
+
     private function serviceWith(
         ConfigRepository $configRepository,
         AuditLogWriter $audit,

@@ -1190,19 +1190,23 @@ class ConfigController extends AbstractController
         $sources = [];
 
         foreach ($capabilities as $capability) {
+            $groupPolicies = null !== $this->layeredConfigResolver
+                && $this->iamConfig->isGroupPoliciesEnabled($userId);
             // VECTORIZE is system-wide (single Qdrant collection,
             // single dimension). Skip the per-user lookup entirely so
             // the dropdown can never disagree with what the indexer
             // actually uses — see saveDefaultModels for the matching
-            // write-side guard.
-            if ('VECTORIZE' === $capability) {
+            // write-side guard. Group policies are the exception: the
+            // indexer already resolves through the allow-list, so the
+            // dropdown must follow that same model.
+            if ('VECTORIZE' === $capability && !$groupPolicies) {
                 $config = $this->configRepository->findOneBy([
                     'ownerId' => 0,
                     'group' => 'DEFAULTMODEL',
                     'setting' => 'VECTORIZE',
                 ]);
                 $source = null !== $config ? 'admin' : null;
-            } elseif (null !== $this->layeredConfigResolver && $this->iamConfig->isGroupPoliciesEnabled($userId)) {
+            } elseif ($groupPolicies) {
                 $raw = $this->layeredConfigResolver->resolve($userId, 'DEFAULTMODEL', $capability);
                 $modelId = null !== $raw && null !== $this->groupPolicyService
                     ? $this->groupPolicyService->modelIdFromStored($raw)
@@ -1216,7 +1220,9 @@ class ConfigController extends AbstractController
                     && !$this->groupPolicyService->isModelAllowed($userId, $resolvedId, $capability)
                 ) {
                     $resolvedId = $this->modelConfigService->getDefaultModel($capability, $userId);
-                    $source = null !== $resolvedId ? 'group' : $source;
+                    $source = null !== $resolvedId
+                        ? $this->groupPolicyService->sourceOfStoredModel($userId, $capability, $resolvedId)
+                        : null;
                 }
                 $defaults[$capability] = $resolvedId;
                 $locked[$capability] = $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);

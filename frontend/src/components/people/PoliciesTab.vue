@@ -245,7 +245,6 @@ const allowListCapabilities = [
   'IMG2VID',
   'SOUND2TEXT',
   'TEXT2SOUND',
-  'TOOLS',
 ] as const satisfies readonly Capability[]
 const featureKeys = [
   'SAVEDTASKS.ENABLED',
