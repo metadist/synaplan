@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { spawn } from 'node:child_process'
 import { fileURLToPath, URL } from 'node:url'
 
 /**
@@ -31,6 +32,41 @@ export function gitkeepPlugin(): Plugin {
   }
 }
 
+/**
+ * Dev server only: regenerate src/generated/api-schemas.ts when the backend
+ * OpenAPI spec changed (pull, branch switch, edited annotations); Vite reloads
+ * the page when the file changes. Runs on full page loads and at most once per
+ * interval instead of polling: the dev backend rebuilds the spec on every
+ * request (~1s of CPU).
+ */
+export function openapiSchemaSyncPlugin(): Plugin {
+  const CHECK_INTERVAL_MS = 30_000
+  let root = ''
+  let lastCheck = 0
+  let running = false
+
+  return {
+    name: 'openapi-schema-sync',
+    apply: 'serve',
+    configResolved(config) {
+      root = config.root
+    },
+    transformIndexHtml() {
+      const now = Date.now()
+      if (running || now - lastCheck < CHECK_INTERVAL_MS) return
+      lastCheck = now
+      running = true
+      const child = spawn(process.execPath, ['scripts/generate-schemas.js', '--if-changed'], {
+        cwd: root,
+        stdio: 'inherit',
+      })
+      child.once('exit', () => {
+        running = false
+      })
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const basePath = env.VITE_BASE_PATH || '/'
@@ -53,7 +89,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: basePath,
-    plugins: [vue(), gitkeepPlugin()],
+    plugins: [vue(), gitkeepPlugin(), openapiSchemaSyncPlugin()],
     build: {
       outDir: 'dist',
       emptyOutDir: true,

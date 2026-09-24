@@ -4,25 +4,69 @@
  */
 
 import { execFileSync } from 'child_process'
-import { readFileSync, writeFileSync } from 'fs'
+import { createHash } from 'crypto'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
 
 // Check if we should skip the fetch step (for CI)
 const skipFetch = process.argv.includes('--skip-fetch')
+// Leave the file untouched when it was generated from the spec the backend serves now
+const ifChanged = process.argv.includes('--if-changed')
+
+const filePath = 'src/generated/api-schemas.ts'
+// First line of the generated file. tests/e2e/global-setup.ts compares it with
+// the live backend spec, so the format must stay in sync with that check.
+const SPEC_HASH_PREFIX = '// openapi-spec-sha256: '
+
+async function loadSpec(source) {
+  if (!/^https?:\/\//.test(source)) return readFileSync(source, 'utf-8')
+  const response = await fetch(source)
+  if (!response.ok) throw new Error(`HTTP ${response.status} from ${source}`)
+  return response.text()
+}
+
+let specHash = null
+// openapi-zod-client output before post-processing; in CI it is written to filePath
+let rawPath = filePath
+let workDir = null
 
 if (!skipFetch) {
-  // Step 1: Generate schemas using openapi-zod-client
-  console.log('🔄 Generating schemas from OpenAPI spec...')
   const source = process.env.OPENAPI_SPEC || 'http://backend/api/doc.json'
+  let spec
+  try {
+    spec = await loadSpec(source)
+  } catch (error) {
+    console.error(`❌ Could not load the OpenAPI spec: ${error.message}`)
+    process.exit(1)
+  }
+  specHash = createHash('sha256').update(spec).digest('hex')
+
+  if (
+    ifChanged &&
+    existsSync(filePath) &&
+    readFileSync(filePath, 'utf-8').startsWith(SPEC_HASH_PREFIX + specHash)
+  ) {
+    process.exit(0)
+  }
+
+  // Step 1: Generate schemas using openapi-zod-client. The raw output goes to a temp
+  // file so the dev server sees filePath change once, with the final content.
+  console.log('🔄 Generating schemas from OpenAPI spec...')
+  workDir = mkdtempSync(join(tmpdir(), 'synaplan-schemas-'))
+  const specPath = join(workDir, 'openapi-spec.json')
+  rawPath = join(workDir, 'api-schemas.raw.ts')
+  writeFileSync(specPath, spec)
   execFileSync(
     'openapi-zod-client',
-    [source, '-o', 'src/generated/api-schemas.ts', '--template', 'schema-template.hbs'],
+    [specPath, '-o', rawPath, '--template', 'schema-template.hbs'],
     { stdio: 'inherit' }
   )
 }
 
 // Step 2: Read the generated file
-const filePath = 'src/generated/api-schemas.ts'
-let content = readFileSync(filePath, 'utf-8')
+let content = readFileSync(rawPath, 'utf-8')
+if (workDir) rmSync(workDir, { recursive: true, force: true })
 
 // Step 3: Fix Zod v4 compatibility issues
 console.log('🔧 Fixing Zod v4 compatibility...')
@@ -73,6 +117,10 @@ if (aliases.length > 0) {
   content += '\n// ============================================'
   content += aliases.join('\n')
   content += '\n'
+}
+
+if (specHash) {
+  content = `${SPEC_HASH_PREFIX}${specHash}\n${content}`
 }
 
 // Step 4: Write back
