@@ -13,7 +13,6 @@ import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
 import ManagedKeysStatusCard from '@/components/admin/ManagedKeysStatusCard.vue'
 import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
-import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
@@ -608,7 +607,6 @@ onBeforeUnmount(() => {
 
         <!-- Release notice: informs and links to the guide, never updates anything -->
         <UpdatePanel v-if="updatesStore.canRead" class="mb-6" />
-        <ExportImportPanel scope="instance" class="mb-6" />
 
         <!-- Loading State -->
         <div v-if="loading" class="flex items-center justify-center py-20">

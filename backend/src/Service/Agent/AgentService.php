@@ -311,6 +311,46 @@ final readonly class AgentService
         return $agent;
     }
 
+    /**
+     * Replace the draft of an assistant that already uses this slug.
+     * The published version and its shares stay as they are until publish.
+     *
+     * @param array<string, mixed> $draft
+     */
+    public function replaceImportedDraft(
+        User $owner,
+        string $slug,
+        string $name,
+        array $draft,
+        ?string $instruction,
+        ?string $description,
+        ?string $icon,
+    ): Agent {
+        $ownerId = (int) $owner->getId();
+        $agent = $this->agents->findOneBy(['ownerId' => $ownerId, 'slug' => $slug]);
+        if (!$agent instanceof Agent) {
+            throw new \InvalidArgumentException(sprintf('No assistant with slug "%s"', $slug));
+        }
+        $definition = $this->validator->validate($draft);
+        $agent->setName($name);
+        $agent->setDraft($definition->toArray());
+        if (null !== $description && '' !== trim($description)) {
+            $agent->setDescription(trim($description));
+        }
+        if (null !== $icon && '' !== $icon) {
+            $this->assertIcon($icon);
+            $agent->setIcon($icon);
+        }
+        $prompt = $this->prompts->find($agent->getPromptId());
+        if ($prompt instanceof Prompt && null !== $instruction && '' !== trim($instruction)) {
+            $prompt->setPrompt(trim($instruction));
+            $this->em->persist($prompt);
+        }
+        $this->agents->save($agent);
+
+        return $agent;
+    }
+
     public function publishedVersionNumber(Agent $agent): ?int
     {
         return $this->publishedVersion($agent)?->getVersion();

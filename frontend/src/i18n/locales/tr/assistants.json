@@ -65,7 +65,7 @@
     "cloneSuccess": "Yeni taslak olarak kopyalandı",
     "startChatFailed": "Sohbet başlatılamadı",
     "delete": "Sil",
-    "deleteConfirm": "Bu taslak asistan silinsin mi? Dosyaları ve paylaşımları da kaldırılır.",
+    "deleteConfirm": "Bu taslak AI asistanı silinsin mi? Dosyaları, paylaşımları ve kayıtlı görevleri de silinir.",
     "deleteArchivedConfirm": "Bu arşivlenmiş asistan kalıcı olarak silinsin mi? Dosyaları ve paylaşımları da kaldırılır.",
     "deletePublishedConfirm": "Bu asistan yayınlanmış. Önce arşivlenecek, sonra dosyaları ve paylaşımlarıyla birlikte kalıcı olarak silinecek.",
     "deleteSuccess": "Asistan silindi",
@@ -229,7 +229,7 @@
     "emptyChecklist": "Eksik bir şey yok. Şimdi içe aktarabilirsiniz.",
     "overwriteExisting": "Zaten var olan öğelerin üzerine yaz",
     "importAction": "İçe aktar",
-    "imported": "Taslak olarak içe aktarıldı.",
+    "imported": "Taslak olarak içe aktarıldı. Asistanlar Asistanlar altında, zamanlamalar Kayıtlı görevler altındadır.",
     "importFailed": "Dosya içe aktarılamadı.",
     "loading": "Yükleniyor…",
     "resultCreated": "{count} oluşturuldu",
@@ -238,7 +238,9 @@
     "kind": {
       "agents": "Asistanlar",
       "prompts": "Yönergeler",
-      "saved_tasks": "Kayıtlı görevler"
+      "saved_tasks": "Kayıtlı görevler",
+      "custom_tools": "Özel araçlar",
+      "mcp_servers": "Bağlantılar"
     },
     "check": {
       "needsAssistant": "Bir AI asistanı gerekli — içe aktardıktan sonra seçin ({key})",
@@ -255,6 +257,7 @@
       "droppedFolders": "Paylaşılan klasörler dahil edilmedi ({key})",
       "conflict": "Zaten var — değiştirmezseniz atlanır ({key})",
       "skipped": "Atlandı ({key})"
-    }
+    },
+    "publishedOnly": "Yalnızca yayınlanmış asistanlar dahildir. Taslaklar bu hesapta kalır."
   }
 }

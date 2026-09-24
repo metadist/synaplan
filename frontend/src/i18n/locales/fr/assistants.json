@@ -65,7 +65,7 @@
     "cloneSuccess": "Copié comme nouveau brouillon",
     "startChatFailed": "Impossible de démarrer le chat",
     "delete": "Supprimer",
-    "deleteConfirm": "Supprimer ce brouillon ? Ses fichiers et partages sont aussi retirés.",
+    "deleteConfirm": "Supprimer ce brouillon d'assistant IA ? Ses fichiers, partages et tâches enregistrées sont aussi supprimés.",
     "deleteArchivedConfirm": "Supprimer définitivement cet assistant archivé ? Ses fichiers et partages sont aussi retirés.",
     "deletePublishedConfirm": "Cet assistant est publié. Il sera d’abord archivé, puis définitivement supprimé, y compris ses fichiers et partages.",
     "deleteSuccess": "Assistant supprimé",
@@ -229,7 +229,7 @@
     "emptyChecklist": "Rien ne manque. Vous pouvez importer.",
     "overwriteExisting": "Remplacer les éléments déjà présents",
     "importAction": "Importer",
-    "imported": "Importé sous forme de brouillons.",
+    "imported": "Importé comme brouillons. Les assistants sont sous Assistants, les planifications sous Tâches enregistrées.",
     "importFailed": "Le fichier n’a pas pu être importé.",
     "loading": "Chargement…",
     "resultCreated": "{count} créés",
@@ -238,7 +238,9 @@
     "kind": {
       "agents": "Assistants",
       "prompts": "Consignes",
-      "saved_tasks": "Tâches enregistrées"
+      "saved_tasks": "Tâches enregistrées",
+      "custom_tools": "Outils personnalisés",
+      "mcp_servers": "Connexions"
     },
     "check": {
       "needsAssistant": "Il manque un assistant IA — choisissez-en un après l’import ({key})",
@@ -255,6 +257,7 @@
       "droppedFolders": "Les dossiers partagés n’étaient pas inclus ({key})",
       "conflict": "Existe déjà — sera ignoré sauf si vous remplacez ({key})",
       "skipped": "Ignoré ({key})"
-    }
+    },
+    "publishedOnly": "Seuls les assistants publiés sont inclus. Les brouillons restent sur ce compte."
   }
 }

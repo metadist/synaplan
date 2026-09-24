@@ -65,7 +65,7 @@
     "cloneSuccess": "Copiado como un borrador nuevo",
     "startChatFailed": "No se pudo empezar el chat",
     "delete": "Eliminar",
-    "deleteConfirm": "¿Eliminar este borrador? También se quitan sus archivos y usos compartidos.",
+    "deleteConfirm": "¿Eliminar este borrador de asistente de IA? También se eliminan sus archivos, recursos compartidos y tareas guardadas.",
     "deleteArchivedConfirm": "¿Eliminar definitivamente este asistente archivado? También se quitan sus archivos y usos compartidos.",
     "deletePublishedConfirm": "Este asistente está publicado. Se archivará y luego se eliminará definitivamente, incluidos archivos y usos compartidos.",
     "deleteSuccess": "Asistente eliminado",
@@ -229,7 +229,7 @@
     "emptyChecklist": "No falta nada. Ya puede importar.",
     "overwriteExisting": "Reemplazar elementos que ya existen",
     "importAction": "Importar",
-    "imported": "Importado como borradores.",
+    "imported": "Importado como borradores. Los asistentes están en Asistentes y los horarios en Tareas guardadas.",
     "importFailed": "No se pudo importar el archivo.",
     "loading": "Cargando…",
     "resultCreated": "{count} creados",
@@ -238,7 +238,9 @@
     "kind": {
       "agents": "Asistentes",
       "prompts": "Instrucciones",
-      "saved_tasks": "Tareas guardadas"
+      "saved_tasks": "Tareas guardadas",
+      "custom_tools": "Herramientas personalizadas",
+      "mcp_servers": "Conexiones"
     },
     "check": {
       "needsAssistant": "Necesita un asistente de IA — elija uno después de importar ({key})",
@@ -255,6 +257,7 @@
       "droppedFolders": "Las carpetas compartidas no se incluyeron ({key})",
       "conflict": "Ya existe — se omitirá salvo que lo reemplace ({key})",
       "skipped": "Omitido ({key})"
-    }
+    },
+    "publishedOnly": "Solo se incluyen los asistentes publicados. Los borradores se quedan en esta cuenta."
   }
 }

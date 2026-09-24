@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Bundle;
 
+use App\Bundle\Section\SavedTasksBundleSection;
 use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class BundleImporter
@@ -22,9 +23,13 @@ final readonly class BundleImporter
     {
         $envelope = $this->validator->parse($json, $this->registry->registeredKinds());
         $scope = BundleScope::from($envelope['scope']);
+        $fileTopics = $this->agentTopics($envelope['sections']);
         $previews = [];
         foreach ($this->orderedSections($envelope['sections'], $userId, $scope) as [$section, $items]) {
-            $previews[] = $section->preview($items, $userId)->toArray();
+            $preview = $section instanceof SavedTasksBundleSection
+                ? $section->preview($items, $userId, $fileTopics)
+                : $section->preview($items, $userId);
+            $previews[] = $preview->toArray();
         }
 
         return [
@@ -47,11 +52,14 @@ final readonly class BundleImporter
     {
         $envelope = $this->validator->parse($json, $this->registry->registeredKinds());
         $scope = BundleScope::from($envelope['scope']);
+        $fileTopics = $this->agentTopics($envelope['sections']);
         $results = [];
         foreach ($this->orderedSections($envelope['sections'], $userId, $scope) as [$section, $items]) {
             $this->em->beginTransaction();
             try {
-                $result = $section->apply($items, $userId, $options);
+                $result = $section instanceof SavedTasksBundleSection
+                    ? $section->apply($items, $userId, $options, $fileTopics)
+                    : $section->apply($items, $userId, $options);
                 $this->em->flush();
                 $this->em->commit();
                 $results[] = $result->toArray();
@@ -87,5 +95,28 @@ final readonly class BundleImporter
         }
 
         return $pairs;
+    }
+
+    /**
+     * @param list<array{kind: string, version: int, items: list<array<string, mixed>>}> $sections
+     *
+     * @return list<string>
+     */
+    private function agentTopics(array $sections): array
+    {
+        $topics = [];
+        foreach ($sections as $section) {
+            if ('agents' !== ($section['kind'] ?? null)) {
+                continue;
+            }
+            foreach ($section['items'] as $item) {
+                $key = is_string($item['key'] ?? null) ? $item['key'] : '';
+                if ('' !== $key) {
+                    $topics[] = 'agent:'.$key;
+                }
+            }
+        }
+
+        return $topics;
     }
 }

@@ -65,7 +65,7 @@
     "cloneSuccess": "Als neuer Entwurf kopiert",
     "startChatFailed": "Der Chat konnte nicht gestartet werden",
     "delete": "Löschen",
-    "deleteConfirm": "Diesen Entwurf löschen? Dateien und Freigaben werden ebenfalls entfernt.",
+    "deleteConfirm": "Diesen Entwurf des KI-Assistenten löschen? Dateien, Freigaben und gespeicherte Aufgaben werden mitgelöscht.",
     "deleteArchivedConfirm": "Diesen archivierten Assistenten endgültig löschen? Dateien und Freigaben werden ebenfalls entfernt.",
     "deletePublishedConfirm": "Dieser Assistent ist veröffentlicht. Er wird zuerst archiviert und dann endgültig gelöscht, einschließlich Dateien und Freigaben.",
     "deleteSuccess": "Assistent gelöscht",
@@ -229,7 +229,7 @@
     "emptyChecklist": "Es fehlt nichts. Sie können jetzt importieren.",
     "overwriteExisting": "Vorhandene Einträge ersetzen",
     "importAction": "Importieren",
-    "imported": "Als Entwürfe importiert.",
+    "imported": "Als Entwürfe importiert. Neue KI-Assistenten finden Sie unter Assistenten, Zeitpläne unter Gespeicherte Aufgaben.",
     "importFailed": "Die Datei konnte nicht importiert werden.",
     "loading": "Wird geladen…",
     "resultCreated": "{count} erstellt",
@@ -238,7 +238,9 @@
     "kind": {
       "agents": "Assistenten",
       "prompts": "Anweisungen",
-      "saved_tasks": "Gespeicherte Aufgaben"
+      "saved_tasks": "Gespeicherte Aufgaben",
+      "custom_tools": "Eigene Werkzeuge",
+      "mcp_servers": "Verbindungen"
     },
     "check": {
       "needsAssistant": "Braucht einen KI-Assistenten — nach dem Import einen wählen ({key})",
@@ -255,6 +257,7 @@
       "droppedFolders": "Geteilte Ordner waren nicht enthalten ({key})",
       "conflict": "Existiert bereits — wird übersprungen, außer Sie ersetzen ({key})",
       "skipped": "Übersprungen ({key})"
-    }
+    },
+    "publishedOnly": "Nur veröffentlichte KI-Assistenten sind enthalten. Entwürfe bleiben auf diesem Konto."
   }
 }
