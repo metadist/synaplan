@@ -15,6 +15,7 @@ use Doctrine\DBAL\Connection;
  *   {
  *     "openai": {
  *       "baselineRecorded": true,
+ *       "baselineAnnounced": false,
  *       "baselineIds": ["gpt-4o", …],
  *       "seen": { "gpt-4o": "2026-09-24", "new-id": "2026-09-25" }
  *     }
@@ -25,11 +26,12 @@ use Doctrine\DBAL\Connection;
  * Daily Discord claim (setting {@see SETTING_NOTIFY_CLAIM}): BVALUE holds the
  * Y-m-d of the day that already posted. {@see claimNotifyDay()} wins with a
  * conditional UPDATE (value must differ) or an INSERT IGNORE when the row is
- * absent; losers see 0 affected rows and skip the post. Galera: every web node
- * shares one BCONFIG; the UNIQUE(BOWNERID, BGROUP, BSETTING) index makes the
- * INSERT IGNORE race-safe across nodes, and the WHERE BVALUE <> :day UPDATE
- * is certified the same way any other single-row write is — exactly one
- * certification winner per day.
+ * absent; losers see 0 affected rows and skip the post. {@see releaseNotifyDay()}
+ * clears the claim only when BVALUE still equals our day (failed post retry).
+ * Galera: every web node shares one BCONFIG; the UNIQUE(BOWNERID, BGROUP,
+ * BSETTING) index makes the INSERT IGNORE race-safe across nodes, and the
+ * WHERE BVALUE <> :day UPDATE is certified the same way any other single-row
+ * write is — exactly one certification winner per day.
  */
 final readonly class ModelDiscoveryStateStore
 {
@@ -45,6 +47,7 @@ final readonly class ModelDiscoveryStateStore
     /**
      * @return array<string, array{
      *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
      *     baselineIds: list<string>,
      *     seen: array<string, string>
      * }>
@@ -80,6 +83,7 @@ final readonly class ModelDiscoveryStateStore
     /**
      * @param array<string, array{
      *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
      *     baselineIds: list<string>,
      *     seen: array<string, string>
      * }> $providers
@@ -126,9 +130,31 @@ final readonly class ModelDiscoveryStateStore
     }
 
     /**
+     * Clear today's Discord claim only if we still own it (failed post retry).
+     */
+    public function releaseNotifyDay(string $day): void
+    {
+        $this->connection->executeStatement(
+            'UPDATE BCONFIG SET BVALUE = \'\'
+             WHERE BOWNERID = 0 AND BGROUP = :group AND BSETTING = :setting
+               AND BVALUE = :day',
+            [
+                'day' => $day,
+                'group' => self::CONFIG_GROUP,
+                'setting' => self::SETTING_NOTIFY_CLAIM,
+            ],
+        );
+    }
+
+    /**
      * @param array<mixed> $state
      *
-     * @return array{baselineRecorded: bool, baselineIds: list<string>, seen: array<string, string>}
+     * @return array{
+     *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
+     *     baselineIds: list<string>,
+     *     seen: array<string, string>
+     * }
      */
     private function normaliseProviderState(array $state): array
     {
@@ -148,6 +174,7 @@ final readonly class ModelDiscoveryStateStore
 
         return [
             'baselineRecorded' => (bool) ($state['baselineRecorded'] ?? false),
+            'baselineAnnounced' => (bool) ($state['baselineAnnounced'] ?? false),
             'baselineIds' => array_values(array_unique($baselineIds)),
             'seen' => $seen,
         ];

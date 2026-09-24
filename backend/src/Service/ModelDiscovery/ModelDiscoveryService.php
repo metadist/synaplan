@@ -21,8 +21,11 @@ use Psr\Clock\ClockInterface;
  * findings are advisory until a human adds a catalog row or an ignore entry.
  *
  * Per-provider silent baseline: the first successful listing records every
- * current id and reports none. Pending ids (seen after baseline, not in
- * BMODELS, not ignored) are reported every run until resolved or unlisted.
+ * current id and reports none as pending. The baseline stays in
+ * {@see ModelDiscoveryReport::$baselinesRecorded} until Discord (or a
+ * `--notify` run with Discord disabled) marks it announced. Pending ids (seen
+ * after baseline, not known via {@see ModelDiscoveryIdNormalizer::isKnown()},
+ * not ignored) are reported every run until resolved or unlisted.
  */
 final readonly class ModelDiscoveryService
 {
@@ -58,7 +61,6 @@ final readonly class ModelDiscoveryService
         $providers = [];
         $pending = [];
         $failedProviders = [];
-        $baselinesRecorded = [];
         /** @var array<string, list<string>> */
         $okListedByProvider = [];
 
@@ -95,16 +97,13 @@ final readonly class ModelDiscoveryService
 
             $providerState = $state[$provider] ?? [
                 'baselineRecorded' => false,
+                'baselineAnnounced' => false,
                 'baselineIds' => [],
                 'seen' => [],
             ];
 
             if (!$providerState['baselineRecorded']) {
                 $state[$provider] = $this->recordBaseline($listedIds, $today);
-                $baselinesRecorded[] = [
-                    'provider' => $provider,
-                    'idCount' => count($listedIds),
-                ];
                 continue;
             }
 
@@ -125,6 +124,16 @@ final readonly class ModelDiscoveryService
         }
 
         $this->stateStore->saveProviders($state);
+
+        $baselinesRecorded = [];
+        foreach ($state as $provider => $providerState) {
+            if ($providerState['baselineRecorded'] && !$providerState['baselineAnnounced']) {
+                $baselinesRecorded[] = [
+                    'provider' => $provider,
+                    'idCount' => count($providerState['baselineIds']),
+                ];
+            }
+        }
 
         $obsoleteIgnores = $this->findObsoleteIgnores($okListedByProvider, $knownByProvider);
 
@@ -149,9 +158,52 @@ final readonly class ModelDiscoveryService
     }
 
     /**
+     * Release today's Discord claim after a failed post so the next run can retry.
+     */
+    public function releaseNotifyDay(): void
+    {
+        $this->stateStore->releaseNotifyDay($this->clock->now()->format('Y-m-d'));
+    }
+
+    /**
+     * Mark the given providers' baselines as announced (successful Discord post,
+     * or `--notify` with Discord disabled so the console does not repeat forever).
+     *
+     * @param list<string> $providers
+     */
+    public function markBaselinesAnnounced(array $providers): void
+    {
+        if ([] === $providers) {
+            return;
+        }
+
+        $state = $this->stateStore->loadProviders();
+        $changed = false;
+        foreach ($providers as $provider) {
+            if (!isset($state[$provider])) {
+                continue;
+            }
+            if ($state[$provider]['baselineAnnounced']) {
+                continue;
+            }
+            $state[$provider]['baselineAnnounced'] = true;
+            $changed = true;
+        }
+
+        if ($changed) {
+            $this->stateStore->saveProviders($state);
+        }
+    }
+
+    /**
      * @param list<string> $listedIds
      *
-     * @return array{baselineRecorded: bool, baselineIds: list<string>, seen: array<string, string>}
+     * @return array{
+     *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
+     *     baselineIds: list<string>,
+     *     seen: array<string, string>
+     * }
      */
     private function recordBaseline(array $listedIds, string $today): array
     {
@@ -162,16 +214,27 @@ final readonly class ModelDiscoveryService
 
         return [
             'baselineRecorded' => true,
+            'baselineAnnounced' => false,
             'baselineIds' => $listedIds,
             'seen' => $seen,
         ];
     }
 
     /**
-     * @param array{baselineRecorded: bool, baselineIds: list<string>, seen: array<string, string>} $state
-     * @param list<string>                                                                          $listedIds
+     * @param array{
+     *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
+     *     baselineIds: list<string>,
+     *     seen: array<string, string>
+     * }               $state
+     * @param list<string> $listedIds
      *
-     * @return array{baselineRecorded: bool, baselineIds: list<string>, seen: array<string, string>}
+     * @return array{
+     *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
+     *     baselineIds: list<string>,
+     *     seen: array<string, string>
+     * }
      */
     private function advanceSeen(array $state, array $listedIds, string $today): array
     {
@@ -190,15 +253,21 @@ final readonly class ModelDiscoveryService
 
         return [
             'baselineRecorded' => true,
+            'baselineAnnounced' => $state['baselineAnnounced'],
             'baselineIds' => $state['baselineIds'],
             'seen' => $seen,
         ];
     }
 
     /**
-     * @param list<string>                                                                          $listedIds
-     * @param array<string, true>                                                                   $knownKeys
-     * @param array{baselineRecorded: bool, baselineIds: list<string>, seen: array<string, string>} $state
+     * @param list<string>        $listedIds
+     * @param array<string, true> $knownKeys
+     * @param array{
+     *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
+     *     baselineIds: list<string>,
+     *     seen: array<string, string>
+     * }                          $state
      *
      * @return list<array{provider: string, id: string, firstSeen: string, daysPending: int}>
      */
@@ -219,7 +288,7 @@ final readonly class ModelDiscoveryService
             if ($this->isIgnored($provider, $id)) {
                 continue;
             }
-            if (isset($knownKeys[ModelDiscoveryIdNormalizer::normalize($id)])) {
+            if (ModelDiscoveryIdNormalizer::isKnown($id, $knownKeys)) {
                 continue;
             }
 
@@ -252,8 +321,7 @@ final readonly class ModelDiscoveryService
             $provider = substr($key, 0, $colon);
             $id = substr($key, $colon + 1);
 
-            $norm = ModelDiscoveryIdNormalizer::normalize($id);
-            if (isset(($knownByProvider[$provider] ?? [])[$norm])) {
+            if (ModelDiscoveryIdNormalizer::isKnown($id, $knownByProvider[$provider] ?? [])) {
                 $obsolete[] = [
                     'key' => $key,
                     'reason' => $entry['reason'],

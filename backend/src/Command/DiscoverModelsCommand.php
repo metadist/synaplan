@@ -192,6 +192,7 @@ final class DiscoverModelsCommand extends Command
     {
         if (!$this->discord->isEnabled()) {
             $io->note('Discord notifications are disabled (no DISCORD_WEBHOOK_URL); reported to the console only.');
+            $this->discovery->markBaselinesAnnounced($this->baselineProviders($report));
 
             return;
         }
@@ -202,11 +203,19 @@ final class DiscoverModelsCommand extends Command
             return;
         }
 
-        $this->discord->notifyNewModelDiscovery(
+        $posted = $this->discord->notifyNewModelDiscovery(
             $this->pendingLines($report),
             $this->failedLines($report),
             $this->baselineLines($report),
         );
+        if (!$posted) {
+            $this->discovery->releaseNotifyDay();
+            $io->warning('Discord post failed; today stays unclaimed so the next run retries.');
+
+            return;
+        }
+
+        $this->discovery->markBaselinesAnnounced($this->baselineProviders($report));
         $io->note('Discord alert sent.');
     }
 
@@ -222,8 +231,28 @@ final class DiscoverModelsCommand extends Command
             return;
         }
 
-        $this->discord->notifyNewModelDiscoveryFailure($reason);
+        $posted = $this->discord->notifyNewModelDiscoveryFailure($reason);
+        if (!$posted) {
+            $this->discovery->releaseNotifyDay();
+            $io->warning('Discord post failed; today stays unclaimed so the next run retries.');
+
+            return;
+        }
+
         $io->note('Discord failure alert sent.');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function baselineProviders(ModelDiscoveryReport $report): array
+    {
+        $providers = [];
+        foreach ($report->baselinesRecorded as $event) {
+            $providers[] = $event['provider'];
+        }
+
+        return $providers;
     }
 
     /**

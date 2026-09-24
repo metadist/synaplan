@@ -74,6 +74,7 @@ final class ModelDiscoveryStateStoreTest extends TestCase
         $payload = [
             'openai' => [
                 'baselineRecorded' => true,
+                'baselineAnnounced' => false,
                 'baselineIds' => ['gpt-4o'],
                 'seen' => ['gpt-4o' => '2026-09-24'],
             ],
@@ -83,11 +84,28 @@ final class ModelDiscoveryStateStoreTest extends TestCase
         $this->assertSame($payload, json_decode((string) $saved, true, 512, \JSON_THROW_ON_ERROR));
     }
 
+    public function testLoadDefaultsBaselineAnnouncedToFalse(): void
+    {
+        $payload = [
+            'openai' => [
+                'baselineRecorded' => true,
+                'baselineIds' => ['gpt-4o'],
+                'seen' => ['gpt-4o' => '2026-09-24'],
+            ],
+        ];
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn(json_encode($payload, \JSON_THROW_ON_ERROR));
+
+        $loaded = (new ModelDiscoveryStateStore($connection))->loadProviders();
+        $this->assertFalse($loaded['openai']['baselineAnnounced']);
+    }
+
     public function testLoadKeepsUpstreamIdsVerbatim(): void
     {
         $payload = [
             'groq' => [
                 'baselineRecorded' => true,
+                'baselineAnnounced' => true,
                 'baselineIds' => ['meta-llama/Llama-4-Scout'],
                 'seen' => ['meta-llama/Llama-4-Scout' => '2026-09-24'],
             ],
@@ -98,5 +116,25 @@ final class ModelDiscoveryStateStoreTest extends TestCase
         // The service compares these against the provider's raw list, so a
         // case change here would re-report every baselined mixed-case id.
         $this->assertSame($payload, (new ModelDiscoveryStateStore($connection))->loadProviders());
+    }
+
+    public function testReleaseNotifyDayOnlyMatchesOwnDay(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())->method('executeStatement')
+            ->with(
+                $this->logicalAnd(
+                    $this->stringContains('UPDATE BCONFIG SET BVALUE'),
+                    $this->stringContains('AND BVALUE = :day'),
+                ),
+                $this->callback(static function (array $params): bool {
+                    return '2026-09-24' === ($params['day'] ?? null)
+                        && ModelDiscoveryStateStore::CONFIG_GROUP === ($params['group'] ?? null)
+                        && ModelDiscoveryStateStore::SETTING_NOTIFY_CLAIM === ($params['setting'] ?? null);
+                }),
+            )
+            ->willReturn(1);
+
+        (new ModelDiscoveryStateStore($connection))->releaseNotifyDay('2026-09-24');
     }
 }

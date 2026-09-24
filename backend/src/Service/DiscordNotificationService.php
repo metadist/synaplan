@@ -260,7 +260,7 @@ final readonly class DiscordNotificationService
         string $footer = '',
         ?string $description = null,
         bool $mentionEveryone = false,
-    ): void {
+    ): bool {
         $embed = [
             'title' => $title,
             'color' => $color,
@@ -286,15 +286,27 @@ final readonly class DiscordNotificationService
         }
 
         try {
-            $this->httpClient->request('POST', $this->webhookUrl, [
+            $response = $this->httpClient->request('POST', $this->webhookUrl, [
                 'json' => $payload,
                 'timeout' => 5,
             ]);
+            $status = $response->getStatusCode();
+            if ($status < 200 || $status >= 300) {
+                $this->logger->warning('Discord notification failed', [
+                    'status' => $status,
+                ]);
+
+                return false;
+            }
+
+            return true;
         } catch (\Throwable $e) {
             // Don't let Discord errors affect WhatsApp processing
             $this->logger->warning('Discord notification failed', [
                 'error' => $e->getMessage(),
             ]);
+
+            return false;
         }
     }
 
@@ -847,13 +859,13 @@ final readonly class DiscordNotificationService
         array $pendingModels,
         array $failedProviders,
         array $baselineLines,
-    ): void {
+    ): bool {
         if (!$this->isEnabled()) {
-            return;
+            return false;
         }
 
         if ([] === $pendingModels && [] === $failedProviders && [] === $baselineLines) {
-            return;
+            return false;
         }
 
         $fields = [];
@@ -896,7 +908,7 @@ final readonly class DiscordNotificationService
             default => '✅ New-model check is active',
         };
 
-        $this->sendEmbed(
+        return $this->sendEmbed(
             title: $title,
             color: [] !== $pendingModels || [] !== $failedProviders ? self::COLOR_WARNING : self::COLOR_SUCCESS,
             fields: $fields,
@@ -907,13 +919,13 @@ final readonly class DiscordNotificationService
     /**
      * The discovery command itself threw before it could finish.
      */
-    public function notifyNewModelDiscoveryFailure(string $reason): void
+    public function notifyNewModelDiscoveryFailure(string $reason): bool
     {
         if (!$this->isEnabled()) {
-            return;
+            return false;
         }
 
-        $this->sendEmbed(
+        return $this->sendEmbed(
             title: '⚠️ New-model check could not run',
             color: self::COLOR_ERROR,
             fields: [
