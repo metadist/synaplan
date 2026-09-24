@@ -96,6 +96,36 @@ final class SavedTasksBundleSectionTest extends TestCase
         self::assertInstanceOf(\DateTimeImmutable::class, $saved->getNextRunAt());
     }
 
+    public function testApplyRefusesAFileAssistantThatWasNotImported(): void
+    {
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(4);
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn($user);
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('findByTopicAndUser')->willReturn(null);
+        $prompts->expects(self::never())->method('findFirstUsableForUser');
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->expects(self::never())->method('save');
+
+        $result = $this->section($tasks, $prompts, $users)->apply([
+            [
+                'key' => 'monday-digest',
+                'name' => 'Monday digest',
+                'prompt' => 'agent:ping',
+                'triggerType' => SavedTask::TRIGGER_MANUAL,
+                'triggerConfig' => null,
+                'graph' => null,
+                'settings' => ['allowUnattended' => false],
+            ],
+        ], 4, new ImportOptions(), ['agent:ping']);
+
+        self::assertSame([], $result->toArray()['created']);
+        self::assertSame([['key' => 'monday-digest', 'reason' => 'Needs an assistant']], $result->toArray()['failed']);
+    }
+
     public function testDependsOnIncludesMcpServers(): void
     {
         $section = $this->section(
@@ -103,7 +133,7 @@ final class SavedTasksBundleSectionTest extends TestCase
             $this->createStub(PromptRepository::class),
         );
 
-        self::assertSame(['prompts', 'mcp_servers'], $section->dependsOn());
+        self::assertSame(['prompts', 'agents', 'mcp_servers'], $section->dependsOn());
     }
 
     public function testExportStripsInboundAccountId(): void
@@ -226,7 +256,7 @@ final class SavedTasksBundleSectionTest extends TestCase
         PromptRepository $prompts,
         ?UserRepository $users = null,
     ): SavedTasksBundleSection {
-        $config = $this->createMock(SavedTaskConfig::class);
+        $config = $this->createStub(SavedTaskConfig::class);
         $config->method('isEnabled')->willReturn(true);
 
         return new SavedTasksBundleSection(

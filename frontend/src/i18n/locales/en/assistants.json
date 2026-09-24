@@ -65,7 +65,7 @@
     "cloneSuccess": "Copied as a new draft",
     "startChatFailed": "Could not start the chat",
     "delete": "Delete",
-    "deleteConfirm": "Delete this draft assistant? Its files and shares are removed too.",
+    "deleteConfirm": "Delete this draft assistant? Its files, shares, and saved tasks are removed too.",
     "deleteArchivedConfirm": "Permanently delete this archived assistant? Its files and shares are removed too.",
     "deletePublishedConfirm": "This assistant is published. It will be archived and then permanently deleted, including files and shares.",
     "deleteSuccess": "Assistant deleted",
@@ -229,7 +229,8 @@
     "emptyChecklist": "Nothing is missing. You can import now.",
     "overwriteExisting": "Replace items that already exist",
     "importAction": "Import",
-    "imported": "Imported as drafts.",
+    "imported": "Imported as drafts. Open Assistants for new assistants and Saved tasks for schedules.",
+    "publishedOnly": "Only published assistants are included. Drafts stay on this account.",
     "importFailed": "The file could not be imported.",
     "loading": "Loading…",
     "resultCreated": "{count} created",
@@ -238,7 +239,9 @@
     "kind": {
       "agents": "Assistants",
       "prompts": "Instructions",
-      "saved_tasks": "Saved tasks"
+      "saved_tasks": "Saved tasks",
+      "custom_tools": "Custom tools",
+      "mcp_servers": "Connections"
     },
     "check": {
       "needsAssistant": "Needs an AI assistant — pick one after import ({key})",

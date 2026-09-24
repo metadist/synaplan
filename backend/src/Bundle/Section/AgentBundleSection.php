@@ -150,6 +150,10 @@ final readonly class AgentBundleSection implements BundleSectionInterface
             if ([] !== $schedules) {
                 $rows[] = new ChecklistItem('schedulesOff', $key, null);
             }
+            if ('' !== $key && $this->agents->slugTaken($userId, $key)) {
+                $label = is_string($item['name'] ?? null) && '' !== trim($item['name']) ? trim($item['name']) : $key;
+                $rows[] = new ChecklistItem('conflict', $key, $label);
+            }
             $knowledge = is_array($definition['knowledge'] ?? null) ? $definition['knowledge'] : [];
             if (!empty($knowledge['droppedFolders'])) {
                 $rows[] = new ChecklistItem('droppedFolders', $key, null);
@@ -176,14 +180,33 @@ final readonly class AgentBundleSection implements BundleSectionInterface
                 $prepared = $this->prepareForImport($definition, $userId);
                 $validated = $this->validator->validate($prepared)->toArray();
                 $instruction = is_string($item['instruction'] ?? null) ? $item['instruction'] : null;
+                $description = is_string($item['description'] ?? null) ? $item['description'] : null;
+                $icon = is_string($item['icon'] ?? null) ? $item['icon'] : null;
+                if ('' !== $key && $this->agents->slugTaken($userId, $key)) {
+                    if (ImportOptions::CONFLICT_OVERWRITE !== $options->conflict) {
+                        $skipped[] = $key;
+                        continue;
+                    }
+                    $this->agentService->replaceImportedDraft(
+                        $owner,
+                        $key,
+                        $name,
+                        $validated,
+                        $instruction,
+                        $description,
+                        $icon,
+                    );
+                    $created[] = $key;
+                    continue;
+                }
                 $this->agentService->importDraft(
                     $owner,
                     $name,
                     $key,
                     $validated,
                     $instruction,
-                    is_string($item['description'] ?? null) ? $item['description'] : null,
-                    is_string($item['icon'] ?? null) ? $item['icon'] : null,
+                    $description,
+                    $icon,
                 );
                 $created[] = $key;
             } catch (\Throwable $e) {

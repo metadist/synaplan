@@ -19,6 +19,9 @@
         {{ sectionLabel(section.kind) }}
         <span class="txt-secondary">({{ section.itemCount }})</span>
       </label>
+      <p v-if="selectedKinds.includes('agents')" class="txt-secondary text-sm">
+        {{ $t('bundle.publishedOnly') }}
+      </p>
     </fieldset>
 
     <div class="flex flex-wrap gap-2">

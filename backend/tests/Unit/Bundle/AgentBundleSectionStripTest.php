@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Bundle;
 
+use App\Bundle\ImportOptions;
 use App\Bundle\Section\AgentBundleSection;
 use App\Entity\McpServerConfig;
+use App\Entity\User;
 use App\Repository\AgentRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentService;
+use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
 use PHPUnit\Framework\TestCase;
 
@@ -58,5 +61,57 @@ final class AgentBundleSectionStripTest extends TestCase
         $json = json_encode($stripped, JSON_THROW_ON_ERROR);
         self::assertStringNotContainsString('sk_', $json);
         self::assertStringNotContainsString('"4:12"', $json);
+    }
+
+    public function testSkipDoesNotCreateASecondAssistant(): void
+    {
+        $agents = $this->createMock(AgentRepository::class);
+        $agents->expects(self::once())->method('slugTaken')->with(4, 'ping')->willReturn(true);
+        $service = $this->createMock(AgentService::class);
+        $service->expects(self::never())->method('importDraft');
+        $service->expects(self::never())->method('replaceImportedDraft');
+
+        $result = $this->section($agents, $service)->apply(
+            [['key' => 'ping', 'name' => 'Ping', 'definition' => AgentDefinition::defaults()->toArray()]],
+            4,
+            new ImportOptions(ImportOptions::CONFLICT_SKIP),
+        );
+
+        self::assertSame(['ping'], $result->toArray()['skipped']);
+        self::assertSame([], $result->toArray()['created']);
+    }
+
+    public function testOverwriteReplacesTheDraftInsteadOfCreatingOne(): void
+    {
+        $agents = $this->createMock(AgentRepository::class);
+        $agents->expects(self::once())->method('slugTaken')->with(4, 'ping')->willReturn(true);
+        $service = $this->createMock(AgentService::class);
+        $service->expects(self::never())->method('importDraft');
+        $service->expects(self::once())->method('replaceImportedDraft');
+
+        $result = $this->section($agents, $service)->apply(
+            [['key' => 'ping', 'name' => 'Ping', 'definition' => AgentDefinition::defaults()->toArray()]],
+            4,
+            new ImportOptions(ImportOptions::CONFLICT_OVERWRITE),
+        );
+
+        self::assertSame(['ping'], $result->toArray()['created']);
+    }
+
+    private function section(AgentRepository $agents, AgentService $service): AgentBundleSection
+    {
+        $users = $this->createMock(UserRepository::class);
+        $owner = $this->createStub(User::class);
+        $owner->method('getId')->willReturn(4);
+        $users->expects(self::once())->method('find')->with(4)->willReturn($owner);
+
+        return new AgentBundleSection(
+            $agents,
+            $service,
+            $this->createStub(AgentConfig::class),
+            new AgentDefinitionValidator(),
+            $this->createStub(McpServerConfigRepository::class),
+            $users,
+        );
     }
 }

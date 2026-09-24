@@ -53,7 +53,7 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
 
     public function dependsOn(): array
     {
-        return ['prompts', 'mcp_servers'];
+        return ['prompts', 'agents', 'mcp_servers'];
     }
 
     public function export(int $userId, BundleScope $scope, array $include = []): array
@@ -75,16 +75,23 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
         return $items;
     }
 
-    public function preview(array $items, int $userId): SectionPreview
+    /**
+     * @param list<string> $fileTopics topics of assistants in the same file (`agent:<slug>`)
+     */
+    public function preview(array $items, int $userId, array $fileTopics = []): SectionPreview
     {
         $rows = [];
+        $seen = [];
         foreach ($items as $item) {
-            $key = (string) ($item['key'] ?? $item['name'] ?? '');
+            $base = (string) ($item['key'] ?? $item['name'] ?? '');
+            $seen[$base] = ($seen[$base] ?? 0) + 1;
+            $key = $seen[$base] > 1 ? $base.'-'.$seen[$base] : $base;
             foreach ($this->portability->unknownItemKeys($item) as $unknown) {
                 $rows[] = new ChecklistItem('unknownKey', $key, $unknown);
             }
             $topic = is_string($item['prompt'] ?? null) ? $item['prompt'] : '';
-            if ('' !== $topic && !$this->portability->usablePromptByTopic($topic, $userId) instanceof Prompt) {
+            $inFile = '' !== $topic && in_array($topic, $fileTopics, true);
+            if ('' !== $topic && !$inFile && !$this->portability->usablePromptByTopic($topic, $userId) instanceof Prompt) {
                 $rows[] = new ChecklistItem('needsAssistant', $key, $topic);
             }
             $trigger = is_string($item['triggerType'] ?? null) ? $item['triggerType'] : SavedTask::TRIGGER_MANUAL;
@@ -115,7 +122,7 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
         return new SectionPreview($this->kind(), $rows, count($items));
     }
 
-    public function apply(array $items, int $userId, ImportOptions $options): SectionResult
+    public function apply(array $items, int $userId, ImportOptions $options, array $fileTopics = []): SectionResult
     {
         $user = $this->users->find($userId);
         if (!$user instanceof User) {
@@ -131,8 +138,13 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
                 $failed[] = ['key' => $key, 'reason' => 'Unknown fields: '.implode(', ', $unknown)];
                 continue;
             }
+            $existingName = is_string($item['name'] ?? null) ? trim($item['name']) : '';
+            if ('' !== $existingName && $this->tasks->findOneBy(['ownerId' => $userId, 'name' => $existingName]) instanceof SavedTask) {
+                $skipped[] = $key;
+                continue;
+            }
             try {
-                $this->importOne($item, $userId);
+                $this->importOne($item, $userId, $fileTopics);
                 $created[] = $key;
             } catch (\InvalidArgumentException $e) {
                 if (ImportOptions::CONFLICT_SKIP === $options->conflict && str_contains($e->getMessage(), 'already exists')) {
@@ -150,12 +162,16 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
 
     /**
      * @param array<string, mixed> $item
+     * @param list<string>         $fileTopics
      */
-    private function importOne(array $item, int $userId): void
+    private function importOne(array $item, int $userId, array $fileTopics = []): void
     {
         $name = is_string($item['name'] ?? null) && '' !== trim($item['name']) ? trim($item['name']) : 'Imported task';
         $topic = is_string($item['prompt'] ?? null) ? $item['prompt'] : '';
         $prompt = '' !== $topic ? $this->portability->usablePromptByTopic($topic, $userId) : null;
+        if (!$prompt instanceof Prompt && in_array($topic, $fileTopics, true)) {
+            throw new \InvalidArgumentException('Needs an assistant');
+        }
         if (!$prompt instanceof Prompt) {
             $prompt = $this->prompts->findFirstUsableForUser($userId);
         }
