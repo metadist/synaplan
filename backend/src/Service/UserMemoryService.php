@@ -86,6 +86,17 @@ final readonly class UserMemoryService
     }
 
     /**
+     * Answer for the once-per-session UI check. isAvailable() can return a
+     * negative result another request cached up to a minute ago, and the UI
+     * hides Memories for the whole session on false, so a negative is probed
+     * again before it is reported.
+     */
+    public function isReachableNow(): bool
+    {
+        return $this->qdrantClient->isAvailable() || $this->qdrantClient->refreshHealth();
+    }
+
+    /**
      * Get the Qdrant client instance.
      * Used by ConfigController to fetch service info.
      */

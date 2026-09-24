@@ -1353,6 +1353,8 @@ const saveConfiguration = async () => {
     // and `httpClient.ApiError` now exposes both the message and the code.
     if (err instanceof ApiError && 409 === err.status) {
       showError(t('config.setByAdmin'))
+    } else if (err instanceof ApiError && 'iam.modelNotAllowed' === err.code) {
+      showError(t('config.aiModels.saveErrorNotAllowed'))
     } else if (err instanceof ApiError && 403 === err.status) {
       const reason =
         'requires_premium' === err.code

@@ -29,6 +29,7 @@
       "noModelsAvailable": "Keine Modelle für diesen Verwendungszweck verfügbar",
       "saveSuccess": "Modellkonfiguration gespeichert",
       "saveError": "Modellkonfiguration konnte nicht gespeichert werden",
+      "saveErrorNotAllowed": "Dieses Modell ist für dein Konto nicht erlaubt. Wähle eines aus der Liste.",
       "saveErrorPremiumRequired": "{reason} Bitte aktualisiere deinen Tarif oder wähle ein anderes Modell.",
       "resetDefaults": "Empfohlene Modelle auswählen",
       "resetDefaultsConfirm": "Die empfohlene Modellauswahl übernehmen? Deine persönlichen Änderungen werden durch die empfohlenen Standards ersetzt.",

@@ -31,6 +31,20 @@ export function resolvePinnedAgentId(
   return queryAgentId
 }
 
+/**
+ * Pin to send with the next turn. Call this before appending the optimistic
+ * user message: once that message exists without an assistant id, the query
+ * pin is no longer the active assistant.
+ */
+export function capturePinnedAgentForSend(
+  enabled: boolean,
+  queryAgentId: number | null,
+  messages: Array<{ agentId?: number | null }>
+): number | null {
+  const pinned = resolvePinnedAgentId(enabled, queryAgentId, messages)
+  return pinned && pinned > 0 ? pinned : null
+}
+
 /** True when ?agentId= points at an assistant this thread is not already using. */
 export function shouldOpenFreshAssistantChat(
   queryAgentId: number | null,

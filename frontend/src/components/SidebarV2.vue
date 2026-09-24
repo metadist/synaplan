@@ -902,11 +902,14 @@ watch(
 const handleQuickNewChat = async () => {
   if (isCreatingChat.value) return
   isCreatingChat.value = true
+  // Only close a sheet that was open at click time: History opened while the
+  // create is still in flight must stay open when it resolves.
+  const sheetWasOpen = sidebarStore.chatSheetOpen
   closeFlyout()
   try {
     await chatsStore.findOrCreateEmptyChat()
     if (route.path !== '/') router.push('/')
-    chatModalOpen.value = false
+    if (sheetWasOpen) chatModalOpen.value = false
   } finally {
     setTimeout(() => {
       isCreatingChat.value = false

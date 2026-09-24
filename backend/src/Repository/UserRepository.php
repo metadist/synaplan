@@ -60,12 +60,18 @@ class UserRepository extends ServiceEntityRepository
     /**
      * People picker: match the email address or one of the name fields.
      *
+     * @param list<int>|null $onlyUserIds when set, only these accounts can match.
+     *                                    An empty list matches nobody.
+     *
      * @return list<User>
      */
-    public function searchByEmailOrName(string $query, int $limit = 20): array
+    public function searchByEmailOrName(string $query, int $limit = 20, ?array $onlyUserIds = null): array
     {
         $query = trim($query);
         if (mb_strlen($query) < self::SEARCH_MIN_LENGTH) {
+            return [];
+        }
+        if (null !== $onlyUserIds && [] === $onlyUserIds) {
             return [];
         }
 
@@ -74,9 +80,14 @@ class UserRepository extends ServiceEntityRepository
         foreach (self::SEARCHABLE_NAME_KEYS as $key) {
             $nameMatches[] = sprintf("JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.%s')) LIKE :q ESCAPE '!'", $key);
         }
+        $idClause = '';
+        if (null !== $onlyUserIds) {
+            $idClause = ' AND BID IN ('.implode(',', array_map(static fn (int $id): string => (string) $id, $onlyUserIds)).')';
+        }
         $sql = sprintf(
-            "SELECT BID FROM BUSER WHERE BMAIL LIKE :q ESCAPE '!' OR %s ORDER BY BMAIL ASC LIMIT %d",
+            "SELECT BID FROM BUSER WHERE (BMAIL LIKE :q ESCAPE '!' OR %s)%s ORDER BY BMAIL ASC LIMIT %d",
             implode(' OR ', $nameMatches),
+            $idClause,
             max(1, $limit),
         );
 

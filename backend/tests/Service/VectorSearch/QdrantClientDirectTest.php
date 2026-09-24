@@ -9,6 +9,8 @@ use App\Service\VectorSearch\QdrantPointId;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\HttpClient\Exception\TimeoutException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -612,6 +614,75 @@ final class QdrantClientDirectTest extends TestCase
 
         $this->assertFalse($client->healthCheck());
         $this->assertFalse($client->isAvailable());
+    }
+
+    public function testHealthCheckCachesARealOutage(): void
+    {
+        $attempts = 0;
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient(function () use (&$attempts): MockResponse {
+                ++$attempts;
+
+                return new MockResponse('nope', ['http_code' => 503]);
+            }),
+            qdrantUrl: self::QDRANT_URL,
+            logger: new NullLogger(),
+            cache: new ArrayAdapter(),
+        );
+
+        $this->assertFalse($client->healthCheck());
+        $this->assertFalse($client->healthCheck());
+        $this->assertSame(1, $attempts);
+    }
+
+    public function testHealthCheckTimeoutSkipsQdrantOnlyBriefly(): void
+    {
+        $attempts = 0;
+        $cache = new ArrayAdapter();
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient(function () use (&$attempts): MockResponse {
+                ++$attempts;
+                if (1 === $attempts) {
+                    throw new TimeoutException('Idle timeout reached for "http://localhost:6333/healthz".');
+                }
+
+                return new MockResponse('', ['http_code' => 200]);
+            }),
+            qdrantUrl: self::QDRANT_URL,
+            logger: new NullLogger(),
+            cache: $cache,
+        );
+
+        $this->assertFalse($client->healthCheck(), 'a hung Qdrant must not be called for this request');
+        $this->assertFalse($client->healthCheck(), 'nor for the next few seconds');
+        $this->assertSame(1, $attempts);
+
+        $expiries = (new \ReflectionProperty(ArrayAdapter::class, 'expiries'))->getValue($cache);
+        $expiry = $expiries['qdrant.health.'.sha1(self::QDRANT_URL)] ?? null;
+        $this->assertIsFloat($expiry);
+        $this->assertLessThanOrEqual(5.5, $expiry - microtime(true), 'a timeout must not be cached like an outage');
+    }
+
+    public function testRefreshHealthReplacesACachedNegative(): void
+    {
+        $attempts = 0;
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient(function () use (&$attempts): MockResponse {
+                ++$attempts;
+
+                return 1 === $attempts
+                    ? new MockResponse('busy', ['http_code' => 503])
+                    : new MockResponse('', ['http_code' => 200]);
+            }),
+            qdrantUrl: self::QDRANT_URL,
+            logger: new NullLogger(),
+            cache: new ArrayAdapter(),
+        );
+
+        $this->assertFalse($client->isAvailable());
+        $this->assertTrue($client->refreshHealth());
+        $this->assertTrue($client->isAvailable(), 'the fresh result replaces the cached negative');
+        $this->assertSame(2, $attempts);
     }
 
     public function testCollectionNameGettersExposeConfiguredNames(): void

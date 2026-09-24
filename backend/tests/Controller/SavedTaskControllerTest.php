@@ -167,6 +167,7 @@ final class SavedTaskControllerTest extends WebTestCase
         $config = static::getContainer()->get(ConfigRepository::class);
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '1');
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_SHARING_ENABLED, '1');
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_USER_SEARCH_ENABLED, '1');
         $config->setValue(0, \App\Service\SavedTask\SavedTaskConfig::CONFIG_GROUP, \App\Service\SavedTask\SavedTaskConfig::KEY_ENABLED, '1');
         $this->em->flush();
     }

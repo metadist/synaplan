@@ -365,6 +365,13 @@ interface QdrantClientInterface
     public function isAvailable(): bool;
 
     /**
+     * Probe Qdrant now and replace the cached health result. For a caller
+     * that acts on a negative answer for a long time; the per-request hot
+     * path keeps using the cached isAvailable().
+     */
+    public function refreshHealth(): bool;
+
+    /**
      * Get collection info (point count, status, etc.).
      */
     public function getCollectionInfo(): array;

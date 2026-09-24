@@ -308,6 +308,7 @@
       "noModelsAvailable": "No hay modelos disponibles para este propósito",
       "saveSuccess": "Configuración de modelos guardada",
       "saveError": "No se pudo guardar la configuración de modelos",
+      "saveErrorNotAllowed": "Ese modelo no está permitido para tu cuenta. Elige uno de la lista.",
       "saveErrorPremiumRequired": "{reason} Mejora tu plan o elige otro modelo.",
       "resetDefaults": "Seleccionar modelos sugeridos",
       "resetDefaultsConfirm": "¿Aplicar la selección de modelos sugerida? Tus ajustes personales se reemplazarán por los valores predeterminados recomendados.",
