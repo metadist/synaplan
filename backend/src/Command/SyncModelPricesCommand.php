@@ -9,6 +9,7 @@ use App\Entity\ModelPriceHistory;
 use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
+use App\Service\CachePriceResolver;
 use App\Service\CostCalculationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -28,8 +29,9 @@ class SyncModelPricesCommand extends Command
 {
     /**
      * Exit code returned when --fail-on-drift is set and price drift was
-     * detected — either a per-token price or a same-mode non-per-token price
-     * (a headline rate or a single resolution tier) that differs from LiteLLM.
+     * detected — either a per-token price, a same-mode non-per-token price
+     * (a headline rate or a single resolution tier), or a cache-read /
+     * cache-write / long-context tier rate that differs from LiteLLM.
      * Distinct from Command::FAILURE (1, generic error) so CI can tell
      * "provider prices moved" apart from "the command itself broke".
      *
@@ -39,6 +41,11 @@ class SyncModelPricesCommand extends Command
      * recorded in ModelCatalog::LITELLM_DEVIATIONS and no longer count.
      */
     private const EXIT_DRIFT_DETECTED = 2;
+
+    /**
+     * Absolute tolerance for per-token USD/1M compares (in/out and cache/tier).
+     */
+    private const TOKEN_PRICE_EPSILON = 0.000001;
 
     /**
      * Pricing mode reported for LiteLLM `rerank` entries that bill per request
@@ -100,7 +107,19 @@ class SyncModelPricesCommand extends Command
     ];
 
     /**
-     * @var array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     * @var array<string, array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * }>
      */
     private readonly array $litellmDeviations;
 
@@ -108,7 +127,19 @@ class SyncModelPricesCommand extends Command
      * $litellmDeviations replaces ModelCatalog::LITELLM_DEVIATIONS; only tests
      * pass it, so they never depend on the live registry.
      *
-     * @param array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>|null $litellmDeviations
+     * @param array<string, array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * }>|null $litellmDeviations
      */
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -117,6 +148,7 @@ class SyncModelPricesCommand extends Command
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         ?array $litellmDeviations = null,
+        private CachePriceResolver $cachePriceResolver = new CachePriceResolver(),
     ) {
         parent::__construct();
         $this->litellmDeviations = $litellmDeviations ?? ModelCatalog::litellmDeviations();
@@ -128,7 +160,7 @@ class SyncModelPricesCommand extends Command
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show changes without applying')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Override admin-set prices')
             ->addOption('provider', null, InputOption::VALUE_REQUIRED, 'Only sync a specific provider')
-            ->addOption('fail-on-drift', null, InputOption::VALUE_NONE, 'Exit with code 2 if any price drift is detected — per-token, or same-mode non-per-token including individual resolution tiers (for the scheduled CI drift check; use with --dry-run)');
+            ->addOption('fail-on-drift', null, InputOption::VALUE_NONE, 'Exit with code 2 if any price drift is detected — per-token, same-mode non-per-token including resolution tiers, or cache/long-context rates (for the scheduled CI drift check; use with --dry-run)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -159,12 +191,14 @@ class SyncModelPricesCommand extends Command
         $nullPriceSkipped = 0;
         $modeMismatch = 0;
         $nonTokenDrift = 0;
+        $cacheTierDrift = 0;
         $knownDeviation = 0;
         $notMatched = 0;
         $unmatchedList = [];
         $nullPriceList = [];
         $modeMismatchList = [];
         $nonTokenDriftList = [];
+        $cacheTierDriftList = [];
         $knownDeviationList = [];
         $obsoleteDeviationList = [];
 
@@ -215,15 +249,15 @@ class SyncModelPricesCommand extends Command
 
             // Known deviation — a human already verified this row against the
             // official page and found LiteLLM wrong (ModelCatalog::LITELLM_DEVIATIONS).
-            // The entry pins the LiteLLM value we disagree with, so it silences
-            // exactly that value and nothing else: LiteLLM moving to our rate makes
-            // the entry obsolete (reported so it gets deleted), LiteLLM moving
-            // anywhere else is a fresh drift and falls through to the normal check.
+            // In/out pins silence exactly that pair; optional cache/tier pins are
+            // applied later per dimension. LiteLLM moving to our rate makes an
+            // entry obsolete; a third value is fresh drift.
             $deviation = $this->litellmDeviations[ModelCatalog::litellmDeviationKey($service, $model->getProviderId())] ?? null;
-            if (null !== $deviation) {
-                $verdict = $this->deviationVerdict($deviation, $pricing, $this->pricesInLiteLLMUnits($model, $currentMode));
+            $inOutVerdict = null;
+            if (null !== $deviation && $this->hasInOutPins($deviation)) {
+                $inOutVerdict = $this->deviationVerdict($deviation, $pricing, $this->pricesInLiteLLMUnits($model, $currentMode));
 
-                if ('pinned' === $verdict) {
+                if ('pinned' === $inOutVerdict) {
                     ++$knownDeviation;
                     $knownDeviationList[] = sprintf(
                         '%s/%s (ID %d) — catalog keeps in=%.6f out=%.6f, LiteLLM says in=%.6f out=%.6f | verified %s against %s | %s',
@@ -238,11 +272,7 @@ class SyncModelPricesCommand extends Command
                         $deviation['source'],
                         $deviation['reason'],
                     );
-                    continue;
-                }
-
-                if ('obsolete' === $verdict) {
-                    ++$unchanged;
+                } elseif ('obsolete' === $inOutVerdict) {
                     $obsoleteDeviationList[] = sprintf(
                         '%s/%s (ID %d) — LiteLLM now agrees with the catalog (in=%.6f out=%.6f); delete the LITELLM_DEVIATIONS entry',
                         $service,
@@ -251,19 +281,20 @@ class SyncModelPricesCommand extends Command
                         $pricing['price_in'],
                         $pricing['price_out'],
                     );
-                    continue;
                 }
             }
 
             // Case 2 — same non-per-token mode on both sides (per_second, per_image,
-            // per_character, per_request). The prices ARE comparable once normalised to a single
-            // unit, so we DETECT drift here (this is what makes whisper/tts/veo/imagen
-            // checkable at all, #1318). Resolution-tiered rows are compared tier by
-            // tier, because a provider can reprice 1080p or 4K while the headline
-            // rate stays put. We do not auto-write: these catalog rows are
-            // hand-authored with unit conventions and tier JSON the flat sync can't
-            // reproduce. A human updates ModelCatalog.php after verifying the source.
+            // per_character, per_request). Media rows have no cache/tier check.
             if ('per_token' !== $currentMode) {
+                if ('pinned' === $inOutVerdict) {
+                    continue;
+                }
+                if ('obsolete' === $inOutVerdict) {
+                    ++$unchanged;
+                    continue;
+                }
+
                 $tierDrift = $this->driftedResolutionTiers($model, $pricing);
 
                 if ($this->nonTokenPriceDrifted($model, $pricing) || [] !== $tierDrift) {
@@ -293,7 +324,8 @@ class SyncModelPricesCommand extends Command
                 continue;
             }
 
-            // Case 3 — per_token on both sides: the sync may write (below).
+            // Case 3 — per_token on both sides: the sync may write (below). A
+            // cache or tier difference alone is reported, never written.
             if ($this->isNullPriceRisk($model, $pricing['price_in'], $pricing['price_out'])) {
                 ++$nullPriceSkipped;
                 $nullPriceList[] = sprintf(
@@ -312,52 +344,65 @@ class SyncModelPricesCommand extends Command
                 continue;
             }
 
-            if (!$force) {
-                $currentHistory = $this->priceHistoryRepository->findCurrentPrice($model);
-                if ($currentHistory && 'admin' === $currentHistory->getSource()) {
-                    ++$skipped;
-                    continue;
+            $cacheResult = $this->collectCacheAndTierDrift($model, $litellmModel, $deviation);
+            foreach ($cacheResult['known'] as $line) {
+                ++$knownDeviation;
+                $knownDeviationList[] = $line;
+            }
+            foreach ($cacheResult['obsolete'] as $line) {
+                $obsoleteDeviationList[] = $line;
+            }
+            foreach ($cacheResult['drift'] as $line) {
+                ++$cacheTierDrift;
+                $cacheTierDriftList[] = $line;
+            }
+
+            $inOutSilenced = 'pinned' === $inOutVerdict || 'obsolete' === $inOutVerdict;
+            $priceChanged = !$inOutSilenced && (
+                abs($model->getPriceIn() - $pricing['price_in']) > self::TOKEN_PRICE_EPSILON
+                || abs($model->getPriceOut() - $pricing['price_out']) > self::TOKEN_PRICE_EPSILON
+            );
+
+            if ($priceChanged) {
+                if (!$force) {
+                    $currentHistory = $this->priceHistoryRepository->findCurrentPrice($model);
+                    if ($currentHistory && 'admin' === $currentHistory->getSource()) {
+                        ++$skipped;
+                        continue;
+                    }
                 }
-            }
 
-            // Both sides are per_token here (guaranteed by the mode guard above),
-            // so only the numeric price can differ.
-            $priceChanged = abs($model->getPriceIn() - $pricing['price_in']) > 0.000001
-                || abs($model->getPriceOut() - $pricing['price_out']) > 0.000001;
+                if ($dryRun) {
+                    $io->text(sprintf(
+                        '[DRY-RUN] %s (%s): in %.6f -> %.6f, out %.6f -> %.6f%s',
+                        $model->getProviderId(),
+                        $pricing['in_unit'],
+                        $model->getPriceIn(),
+                        $pricing['price_in'],
+                        $model->getPriceOut(),
+                        $pricing['price_out'],
+                        $this->sourceSuffix($litellmModel),
+                    ));
+                    ++$updated;
+                } else {
+                    $this->updateModelPrice($model, $pricing);
+                    ++$updated;
 
-            if (!$priceChanged) {
+                    $io->text(sprintf(
+                        'Updated %s (%s): in %.6f -> %.6f, out %.6f -> %.6f',
+                        $model->getProviderId(),
+                        $pricing['in_unit'],
+                        $model->getPriceIn(),
+                        $pricing['price_in'],
+                        $model->getPriceOut(),
+                        $pricing['price_out'],
+                    ));
+                }
+            } elseif ([] === $cacheResult['drift']
+                && [] === $cacheResult['known']
+                && 'pinned' !== $inOutVerdict) {
                 ++$unchanged;
-                continue;
             }
-
-            if ($dryRun) {
-                $unit = $pricing['in_unit'];
-                $io->text(sprintf(
-                    '[DRY-RUN] %s (%s): in %.6f -> %.6f, out %.6f -> %.6f%s',
-                    $model->getProviderId(),
-                    $unit,
-                    $model->getPriceIn(),
-                    $pricing['price_in'],
-                    $model->getPriceOut(),
-                    $pricing['price_out'],
-                    $this->sourceSuffix($litellmModel),
-                ));
-                ++$updated;
-                continue;
-            }
-
-            $this->updateModelPrice($model, $pricing);
-            ++$updated;
-
-            $io->text(sprintf(
-                'Updated %s (%s): in %.6f -> %.6f, out %.6f -> %.6f',
-                $model->getProviderId(),
-                $pricing['in_unit'],
-                $model->getPriceIn(),
-                $pricing['price_in'],
-                $model->getPriceOut(),
-                $pricing['price_out'],
-            ));
         }
 
         if (!$dryRun) {
@@ -372,6 +417,11 @@ class SyncModelPricesCommand extends Command
         if ([] !== $nonTokenDriftList) {
             $io->section(sprintf('Non-per-token price drift — verify & update ModelCatalog.php (%d)', count($nonTokenDriftList)));
             $io->listing($nonTokenDriftList);
+        }
+
+        if ([] !== $cacheTierDriftList) {
+            $io->section(sprintf('Cache / long-context price drift (%d)', count($cacheTierDriftList)));
+            $io->listing($cacheTierDriftList);
         }
 
         // Section titles below are matched by .github/workflows/price-drift.yml to
@@ -396,14 +446,15 @@ class SyncModelPricesCommand extends Command
             $io->listing($unmatchedList);
         }
 
-        $totalDrift = $updated + $nonTokenDrift;
+        $totalDrift = $updated + $nonTokenDrift + $cacheTierDrift;
 
         // "unmatched" must stay the last word: the workflow reads the wrapped
         // summary block up to the line containing it.
         $io->success(sprintf(
-            'Price sync complete: %d updated, %d non-per-token drift, %d unchanged, %d skipped (admin), %d mode-mismatch, %d null-price protected, %d known-deviation, %d unmatched',
+            'Price sync complete: %d updated, %d non-per-token drift, %d cache/tier drift, %d unchanged, %d skipped (admin), %d mode-mismatch, %d null-price protected, %d known-deviation, %d unmatched',
             $updated,
             $nonTokenDrift,
+            $cacheTierDrift,
             $unchanged,
             $skipped,
             $modeMismatch,
@@ -415,6 +466,7 @@ class SyncModelPricesCommand extends Command
         $this->logger->info('Price sync completed', [
             'updated' => $updated,
             'non_token_drift' => $nonTokenDrift,
+            'cache_tier_drift' => $cacheTierDrift,
             'unchanged' => $unchanged,
             'skipped' => $skipped,
             'mode_mismatch' => $modeMismatch,
@@ -426,9 +478,10 @@ class SyncModelPricesCommand extends Command
 
         if ($failOnDrift && $totalDrift > 0) {
             $io->warning(sprintf(
-                'Price drift detected: %d per-token model(s) + %d non-per-token model(s) differ from LiteLLM. This is a signal to verify, not a value to copy: check each model against the official provider page (the LiteLLM "source" URL above is a starting point), then either correct ModelCatalog.php or record a LiteLLM error in ModelCatalog::LITELLM_DEVIATIONS. Procedure: docs/PRICING_MAINTENANCE.md.',
+                'Price drift detected: %d per-token model(s) + %d non-per-token model(s) + %d cache/tier finding(s) differ from LiteLLM. This is a signal to verify, not a value to copy: check each model against the official provider page (the LiteLLM "source" URL above is a starting point), then either correct ModelCatalog.php or record a LiteLLM error in ModelCatalog::LITELLM_DEVIATIONS. Procedure: docs/PRICE_DRIFT_PROCEDURE.md.',
                 $updated,
                 $nonTokenDrift,
+                $cacheTierDrift,
             ));
 
             return self::EXIT_DRIFT_DETECTED;
@@ -482,6 +535,298 @@ class SyncModelPricesCommand extends Command
     }
 
     /**
+     * @param array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * } $deviation
+     */
+    private function hasInOutPins(array $deviation): bool
+    {
+        return isset($deviation['litellm_in'], $deviation['litellm_out']);
+    }
+
+    /**
+     * Detects cache-read / cache-write / long-context drift for a matched per_token
+     * row. Compares the effective rates billing charges (via CachePriceResolver),
+     * not only authored JSON keys — so a missing Anthropic override that falls
+     * back to 0.1x is flagged when LiteLLM says 0.05x.
+     *
+     * Never writes. Dimension pins in $deviation silence exactly that LiteLLM
+     * value; obsolete pins are reported for deletion.
+     *
+     * @param array<string, mixed> $litellmModel
+     * @param array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * }|null $deviation
+     *
+     * @return array{drift: list<string>, known: list<string>, obsolete: list<string>}
+     */
+    private function collectCacheAndTierDrift(Model $model, array $litellmModel, ?array $deviation): array
+    {
+        $drift = [];
+        $known = [];
+        $obsolete = [];
+        $label = sprintf('%s/%s (ID %d)', $model->getService(), $model->getProviderId(), $model->getId());
+        $source = $this->sourceSuffix($litellmModel);
+        $provider = ModelCatalog::normalizeProvider($model->getService());
+
+        $llCacheRead = $this->extractPricePerMillion($litellmModel, 'cache_read_input_token_cost');
+        if ($llCacheRead > 0.0) {
+            $effective = $this->cachePriceResolver->effectiveCacheReadPer1M($model);
+            $how = $effective['authored']
+                ? 'authored'
+                : sprintf('fallback %sx', $this->formatMultiplierLabel($effective['discount']));
+            $this->classifyDimension(
+                pinned: isset($deviation['litellm_cache_read']) ? (float) $deviation['litellm_cache_read'] : null,
+                ours: $effective['rate'],
+                litellm: $llCacheRead,
+                driftLine: sprintf('%s — cache read: catalog %.6f (effective, %s) vs litellm %.6f%s', $label, $effective['rate'], $how, $llCacheRead, $source),
+                knownLine: sprintf(
+                    '%s — cache read: catalog keeps %.6f, LiteLLM says %.6f | verified %s against %s | %s',
+                    $label,
+                    $effective['rate'],
+                    $llCacheRead,
+                    $deviation['verifiedOn'] ?? '',
+                    $deviation['source'] ?? '',
+                    $deviation['reason'] ?? '',
+                ),
+                obsoleteLine: sprintf('%s — LiteLLM now agrees on cache read (%.6f); remove litellm_cache_read from LITELLM_DEVIATIONS', $label, $llCacheRead),
+                drift: $drift,
+                known: $known,
+                obsolete: $obsolete,
+            );
+        }
+
+        $llCacheWrite = $this->extractPricePerMillion($litellmModel, 'cache_creation_input_token_cost');
+        if ($llCacheWrite > 0.0) {
+            $ours = $this->cachePriceResolver->effectiveCacheWritePer1M($model);
+            $mult = $this->cachePriceResolver->cacheWriteMultiplier($provider, $model);
+            $this->classifyDimension(
+                pinned: isset($deviation['litellm_cache_write']) ? (float) $deviation['litellm_cache_write'] : null,
+                ours: $ours,
+                litellm: $llCacheWrite,
+                driftLine: sprintf(
+                    '%s — cache write: catalog %.6f (effective, %sx) vs litellm %.6f%s',
+                    $label,
+                    $ours,
+                    $this->formatMultiplierLabel($mult),
+                    $llCacheWrite,
+                    $source,
+                ),
+                knownLine: sprintf(
+                    '%s — cache write: catalog keeps %.6f, LiteLLM says %.6f | verified %s against %s | %s',
+                    $label,
+                    $ours,
+                    $llCacheWrite,
+                    $deviation['verifiedOn'] ?? '',
+                    $deviation['source'] ?? '',
+                    $deviation['reason'] ?? '',
+                ),
+                obsoleteLine: sprintf('%s — LiteLLM now agrees on cache write (%.6f); remove litellm_cache_write from LITELLM_DEVIATIONS', $label, $llCacheWrite),
+                drift: $drift,
+                known: $known,
+                obsolete: $obsolete,
+            );
+        }
+
+        $llCacheWrite1h = $this->extractPricePerMillion($litellmModel, 'cache_creation_input_token_cost_above_1hr');
+        if ($llCacheWrite1h > 0.0 && 'anthropic' === $provider) {
+            $ours = $this->cachePriceResolver->effectiveCacheWrite1hPer1M($model);
+            $mult = $this->cachePriceResolver->cacheWriteMultiplier1h($provider);
+            $this->classifyDimension(
+                pinned: isset($deviation['litellm_cache_write_1h']) ? (float) $deviation['litellm_cache_write_1h'] : null,
+                ours: $ours,
+                litellm: $llCacheWrite1h,
+                driftLine: sprintf(
+                    '%s — cache write 1h: catalog %.6f (effective, %sx) vs litellm %.6f%s',
+                    $label,
+                    $ours,
+                    $this->formatMultiplierLabel($mult),
+                    $llCacheWrite1h,
+                    $source,
+                ),
+                knownLine: sprintf(
+                    '%s — cache write 1h: catalog keeps %.6f, LiteLLM says %.6f | verified %s against %s | %s',
+                    $label,
+                    $ours,
+                    $llCacheWrite1h,
+                    $deviation['verifiedOn'] ?? '',
+                    $deviation['source'] ?? '',
+                    $deviation['reason'] ?? '',
+                ),
+                obsoleteLine: sprintf('%s — LiteLLM now agrees on cache write 1h (%.6f); remove litellm_cache_write_1h from LITELLM_DEVIATIONS', $label, $llCacheWrite1h),
+                drift: $drift,
+                known: $known,
+                obsolete: $obsolete,
+            );
+        }
+
+        $tier = ModelCatalog::contextPricing($model->getProviderId());
+        if (null !== $tier) {
+            $suffix = $this->contextTierFieldSuffix($tier['threshold_tokens']);
+            /** @var array<string, array{ll_key: string, pin: string, label: string}> $tierDims */
+            $tierDims = [
+                'price_in_above' => [
+                    'll_key' => 'input_cost_per_token_'.$suffix,
+                    'pin' => 'litellm_in_above',
+                    'label' => sprintf('long-context in (%s)', $suffix),
+                ],
+                'price_out_above' => [
+                    'll_key' => 'output_cost_per_token_'.$suffix,
+                    'pin' => 'litellm_out_above',
+                    'label' => sprintf('long-context out (%s)', $suffix),
+                ],
+            ];
+            if (isset($tier['cache_price_in_above'])) {
+                $tierDims['cache_price_in_above'] = [
+                    'll_key' => 'cache_read_input_token_cost_'.$suffix,
+                    'pin' => 'litellm_cache_read_above',
+                    'label' => sprintf('long-context cache read (%s)', $suffix),
+                ];
+            }
+
+            foreach ($tierDims as $catalogKey => $meta) {
+                $ll = $this->extractPricePerMillion($litellmModel, $meta['ll_key']);
+                if ($ll <= 0.0) {
+                    // Catalog tier LiteLLM lacks is informational only — not drift.
+                    continue;
+                }
+                $ours = (float) $tier[$catalogKey];
+                $pinKey = $meta['pin'];
+                $this->classifyDimension(
+                    pinned: isset($deviation[$pinKey]) ? (float) $deviation[$pinKey] : null,
+                    ours: $ours,
+                    litellm: $ll,
+                    driftLine: sprintf('%s — %s: catalog %.6f vs litellm %.6f%s', $label, $meta['label'], $ours, $ll, $source),
+                    knownLine: sprintf(
+                        '%s — %s: catalog keeps %.6f, LiteLLM says %.6f | verified %s against %s | %s',
+                        $label,
+                        $meta['label'],
+                        $ours,
+                        $ll,
+                        $deviation['verifiedOn'] ?? '',
+                        $deviation['source'] ?? '',
+                        $deviation['reason'] ?? '',
+                    ),
+                    obsoleteLine: sprintf(
+                        '%s — LiteLLM now agrees on %s (%.6f); remove %s from LITELLM_DEVIATIONS',
+                        $label,
+                        $meta['label'],
+                        $ll,
+                        $pinKey,
+                    ),
+                    drift: $drift,
+                    known: $known,
+                    obsolete: $obsolete,
+                );
+            }
+        } elseif ($this->litellmHasContextTier($litellmModel)) {
+            $drift[] = sprintf(
+                '%s — missing long-context tier (LiteLLM has above_Nk, catalog none)%s',
+                $label,
+                $source,
+            );
+        }
+
+        return ['drift' => $drift, 'known' => $known, 'obsolete' => $obsolete];
+    }
+
+    /**
+     * @param list<string> $drift
+     * @param list<string> $known
+     * @param list<string> $obsolete
+     */
+    private function classifyDimension(
+        ?float $pinned,
+        float $ours,
+        float $litellm,
+        string $driftLine,
+        string $knownLine,
+        string $obsoleteLine,
+        array &$drift,
+        array &$known,
+        array &$obsolete,
+    ): void {
+        if (null !== $pinned) {
+            if (!$this->tokenPricesDiffer($litellm, $pinned)) {
+                $known[] = $knownLine;
+
+                return;
+            }
+            if (!$this->tokenPricesDiffer($litellm, $ours)) {
+                $obsolete[] = $obsoleteLine;
+
+                return;
+            }
+        }
+
+        if ($this->tokenPricesDiffer($ours, $litellm)) {
+            $drift[] = $driftLine;
+        }
+    }
+
+    private function tokenPricesDiffer(float $a, float $b): bool
+    {
+        return abs($a - $b) > self::TOKEN_PRICE_EPSILON;
+    }
+
+    private function formatMultiplierLabel(float $value): string
+    {
+        $formatted = rtrim(rtrim(sprintf('%.4f', $value), '0'), '.');
+
+        return '' === $formatted ? '0' : $formatted;
+    }
+
+    /** 200000 → above_200k_tokens; 272000 → above_272k_tokens. */
+    private function contextTierFieldSuffix(int $thresholdTokens): string
+    {
+        return sprintf('above_%dk_tokens', intdiv($thresholdTokens, 1000));
+    }
+
+    /**
+     * True when LiteLLM publishes a long-context above_Nk input/output/cache-read
+     * tier we sell (ignores _flex / _priority / _batches variants).
+     *
+     * @param array<string, mixed> $litellmModel
+     */
+    private function litellmHasContextTier(array $litellmModel): bool
+    {
+        foreach ($litellmModel as $key => $value) {
+            if (!is_numeric($value) || (float) $value <= 0.0) {
+                continue;
+            }
+            if (str_contains($key, '_flex') || str_contains($key, '_priority') || str_contains($key, '_batches')) {
+                continue;
+            }
+            if (1 === preg_match('/^(?:input|output)_cost_per_token_above_\d+k_tokens$/', $key)
+                || 1 === preg_match('/^cache_read_input_token_cost_above_\d+k_tokens$/', $key)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Classifies LiteLLM's current value against a recorded deviation.
      *
      *  - `pinned`:   LiteLLM still says exactly what the entry recorded — the
@@ -491,9 +836,9 @@ class SyncModelPricesCommand extends Command
      *  - `moved`:    LiteLLM changed to a third value — nobody has verified that
      *                one, so it is ordinary drift.
      *
-     * Both prices are pinned, never just one, so an entry can only ever silence
-     * the exact pair a human looked at. $ours is the catalog in/out pair in the
-     * same unit as $pricing ({@see pricesInLiteLLMUnits}).
+     * Both prices are pinned when present, never just one, so an entry can only
+     * ever silence the exact pair a human looked at. $ours is the catalog in/out
+     * pair in the same unit as $pricing ({@see pricesInLiteLLMUnits}).
      *
      * @param array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}                                                            $deviation
      * @param array{pricing_mode: string, price_in: float, price_out: float, in_unit: string, out_unit: string, cache_price_in: float, mode_prices: array<string, float>} $pricing

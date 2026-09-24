@@ -38,6 +38,7 @@ Only two sections require action. Everything else is steady state and reported e
 | --- | --- | --- |
 | `[DRY-RUN] <model>: in a -> b, out c -> d` | per-token rate differs from LiteLLM | **verify (Step 2)** |
 | `Non-per-token price drift` | per_second / per_image / per_character rate or a single resolution tier differs | **verify (Step 2)** |
+| `Cache / long-context price drift` | effective cache-read / cache-write / long-context tier rate differs from LiteLLM (or LiteLLM has a tier the catalog lacks) | **verify (Step 2)** |
 | `Known LiteLLM deviations` | verified LiteLLM error recorded in `ModelCatalog::LITELLM_DEVIATIONS` | none |
 | `Obsolete LiteLLM deviations` | LiteLLM now agrees with the catalog | delete that registry entry (Path B, last bullet) |
 | `Pricing-mode mismatch` | structurally not comparable (e.g. gpt-image per_image vs LiteLLM per_token, Cohere rerank per request) | none |
@@ -96,10 +97,15 @@ enforces this).
 ## Path B — LiteLLM is wrong
 
 1. Add an entry to `ModelCatalog::LITELLM_DEVIATIONS`, keyed
-   `<lowercase service>:<providerId>`, pinning **both** `litellm_in` and `litellm_out`
-   exactly as the report prints them (per 1M tokens for per_token rows, per billable unit
-   for media rows), plus `source` (the URL you verified against), `verifiedOn` and a
-   `reason` naming what LiteLLM got wrong. Tiered rows cannot be pinned.
+   `<lowercase service>:<providerId>`, pinning the LiteLLM value(s) you disagree
+   with: **both** `litellm_in` and `litellm_out` for an in/out mismatch (per 1M
+   tokens for per_token rows, per billable unit for media rows), and/or optional
+   per-dimension keys (`litellm_cache_read`, `litellm_cache_write`,
+   `litellm_cache_write_1h`, `litellm_in_above`, `litellm_out_above`,
+   `litellm_cache_read_above`) that silence exactly one cache or long-context
+   dimension at exactly that LiteLLM value. Plus `source` (the URL you verified
+   against), `verifiedOn` and a `reason` naming what LiteLLM got wrong. Tiered
+   media rows (`resolution_prices`) cannot be pinned.
 2. Re-run Step 0: the row must now appear under `Known LiteLLM deviations` and the exit
    code must be 0.
 3. File the correction upstream in BerriAI/litellm (`model_prices_and_context_window.json`)

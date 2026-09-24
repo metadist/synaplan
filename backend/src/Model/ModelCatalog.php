@@ -452,16 +452,19 @@ class ModelCatalog
      * drift.
      *
      * The entry pins the LiteLLM VALUE we disagree with — not the row. It
-     * therefore silences exactly the pair a human verified and nothing else:
-     * when LiteLLM moves to the catalog rate the sync reports the entry as
-     * obsolete (delete it), when LiteLLM moves to a third value the row drifts
-     * again like any other. No date-based expiry — that would only re-create
-     * the noise the entry removes; LiteLLM's own movement is the expiry.
+     * therefore silences exactly the pair (or single cache/tier dimension) a
+     * human verified and nothing else: when LiteLLM moves to the catalog rate
+     * the sync reports the entry as obsolete (delete it), when LiteLLM moves
+     * to a third value the row drifts again like any other. No date-based
+     * expiry — that would only re-create the noise the entry removes; LiteLLM's
+     * own movement is the expiry.
      *
      * Prices are in the unit the sync compares in: USD per 1M tokens for
      * per_token rows, USD per billable unit (second / image / character) for
-     * media rows. Both sides are always pinned; a row with resolution tiers is
-     * not covered (tiers are compared individually and cannot be pinned here).
+     * media rows. In/out pins cover both sides when present; optional cache and
+     * long-context keys (`litellm_cache_read`, …) silence one dimension each.
+     * A row with resolution tiers is not covered (tiers are compared
+     * individually and cannot be pinned here).
      *
      * Adding an entry is the LAST step of a verification, never a shortcut past
      * one: the official page must show the catalog value, the source must be a
@@ -470,17 +473,36 @@ class ModelCatalog
      * can retire — every entry here is a fork of the source of truth we chose.
      *
      * Fields:
-     *   litellm_in / litellm_out — LiteLLM's current (wrong) values.
+     *   litellm_in / litellm_out — LiteLLM's current (wrong) in/out values (optional
+     *                             when only a cache/tier dimension is pinned).
+     *   litellm_cache_read / litellm_cache_write / litellm_cache_write_1h /
+     *   litellm_in_above / litellm_out_above / litellm_cache_read_above
+     *                             — optional pins for a single cache or long-context
+     *                             dimension; silence exactly that LiteLLM value.
      *   source                    — official page or API the catalog value was read from.
      *   verifiedOn                — date of that verification (YYYY-MM-DD).
      *   reason                    — what LiteLLM got wrong, plus the upstream fix if filed.
      *
-     * @var array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     * @var array<string, array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * }>
      */
     private const LITELLM_DEVIATIONS = [
         // Empty: LiteLLM currently agrees with every catalog price. The Jina
         // reranker entry (LiteLLM 0.018 against our verified 0.05) retired on
         // 2026-09-14 — the upstream fix landed and LiteLLM now lists 0.05.
+        // Per-dimension cache and long-context pins follow the same rule: only
+        // after the official page proved LiteLLM wrong (PRICING_MAINTENANCE.md).
     ];
 
     /**
@@ -496,7 +518,19 @@ class ModelCatalog
     /**
      * Every recorded LiteLLM deviation, keyed by {@see litellmDeviationKey()}.
      *
-     * @return array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     * @return array<string, array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * }>
      */
     public static function litellmDeviations(): array
     {

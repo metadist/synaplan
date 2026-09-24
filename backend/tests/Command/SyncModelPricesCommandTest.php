@@ -40,7 +40,19 @@ class SyncModelPricesCommandTest extends TestCase
     }
 
     /**
-     * @param array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}> $deviations
+     * @param array<string, array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * }> $deviations
      */
     private function buildCommandTester(array $deviations): CommandTester
     {
@@ -963,6 +975,343 @@ class SyncModelPricesCommandTest extends TestCase
         ];
     }
 
+    public function testMissingCacheReadOverrideDetectedViaEffectiveRate(): void
+    {
+        // Opus-5.5-like: Anthropic row with no authored cache_read_price_per_1M
+        // falls back to 0.1x input ($0.50 on $5). LiteLLM says 0.05x ($0.25) → drift.
+        $model = $this->createModelMock('Anthropic', 'claude-opus-test', 5.0, 25.0, id: 373);
+
+        $this->mockLiteLLMResponse([
+            'anthropic/claude-opus-test' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.000005,
+                'output_cost_per_token' => 0.000025,
+                'cache_read_input_token_cost' => 0.00000025,
+                'source' => 'https://example.com/anthropic',
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Cache / long-context price drift', $output);
+        $this->assertStringContainsString('cache read: catalog 0.500000 (effective, fallback 0.1x) vs litellm 0.250000', $output);
+        $this->assertStringContainsString('cache/tier drift', $output);
+        $plain = preg_replace('/\x1b\[[0-9;]*m/', '', $output) ?? '';
+        $this->assertMatchesRegularExpression('/cache\/tier drift.*unmatched/s', $plain);
+    }
+
+    public function testAuthoredCacheReadMatchingLiteLLMIsNotDrift(): void
+    {
+        $model = $this->createModelMock('Anthropic', 'claude-opus-test', 5.0, 25.0, id: 373, json: [
+            'cache_read_price_per_1M' => 0.25,
+        ]);
+
+        $this->mockLiteLLMResponse([
+            'anthropic/claude-opus-test' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.000005,
+                'output_cost_per_token' => 0.000025,
+                'cache_read_input_token_cost' => 0.00000025,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringNotContainsString('Cache / long-context price drift', $this->commandTester->getDisplay());
+    }
+
+    public function testCacheWriteMismatchIsDetected(): void
+    {
+        $model = $this->createModelMock('OpenAI', 'gpt-cache-write', 10.0, 30.0, id: 400, json: [
+            'cache_write_multiplier' => 1.25,
+        ]);
+
+        $this->mockLiteLLMResponse([
+            'gpt-cache-write' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.00001,
+                'output_cost_per_token' => 0.00003,
+                'cache_creation_input_token_cost' => 0.000015,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('cache write: catalog 12.500000 (effective, 1.25x) vs litellm 15.000000', $this->commandTester->getDisplay());
+    }
+
+    public function testAnthropicCacheWrite1hMismatchIsDetected(): void
+    {
+        $model = $this->createModelMock('Anthropic', 'claude-write-1h', 5.0, 25.0, id: 401);
+
+        $this->mockLiteLLMResponse([
+            'anthropic/claude-write-1h' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.000005,
+                'output_cost_per_token' => 0.000025,
+                'cache_creation_input_token_cost' => 0.00000625,
+                'cache_creation_input_token_cost_above_1hr' => 0.000008,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('cache write 1h: catalog 10.000000 (effective, 2x) vs litellm 8.000000', $this->commandTester->getDisplay());
+    }
+
+    public function testLongContextTierPriceMismatchIsDetected(): void
+    {
+        // gpt-5.4 has CONTEXT_PRICING: above 272k in=5.0. LiteLLM says 4.0 → drift.
+        $model = $this->createModelMock('OpenAI', 'gpt-5.4', 2.5, 15.0, id: 250, json: [
+            'cache_read_price_per_1M' => 0.25,
+        ]);
+
+        $this->mockLiteLLMResponse([
+            'gpt-5.4' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.0000025,
+                'output_cost_per_token' => 0.000015,
+                'cache_read_input_token_cost' => 0.00000025,
+                'input_cost_per_token_above_272k_tokens' => 0.000004,
+                'output_cost_per_token_above_272k_tokens' => 0.0000225,
+                'cache_read_input_token_cost_above_272k_tokens' => 0.0000005,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('long-context in (above_272k_tokens): catalog 5.000000 vs litellm 4.000000', $this->commandTester->getDisplay());
+    }
+
+    public function testMissingLongContextTierIsDrift(): void
+    {
+        $model = $this->createModelMock('OpenAI', 'gpt-no-tier', 2.0, 8.0, id: 402);
+
+        $this->mockLiteLLMResponse([
+            'gpt-no-tier' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.000002,
+                'output_cost_per_token' => 0.000008,
+                'input_cost_per_token_above_272k_tokens' => 0.000004,
+                'output_cost_per_token_above_272k_tokens' => 0.000016,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('missing long-context tier (LiteLLM has above_Nk, catalog none)', $this->commandTester->getDisplay());
+    }
+
+    public function testCatalogTierWithoutLiteLLMTierIsNotDrift(): void
+    {
+        $model = $this->createModelMock('OpenAI', 'gpt-5.4', 2.5, 15.0, id: 250, json: [
+            'cache_read_price_per_1M' => 0.25,
+        ]);
+
+        $this->mockLiteLLMResponse([
+            'gpt-5.4' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.0000025,
+                'output_cost_per_token' => 0.000015,
+                'cache_read_input_token_cost' => 0.00000025,
+                // No above_272k fields — catalog tier LiteLLM lacks is informational only.
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringNotContainsString('Cache / long-context price drift', $this->commandTester->getDisplay());
+    }
+
+    public function testFlexPriorityBatchesContextTiersAreIgnored(): void
+    {
+        $model = $this->createModelMock('OpenAI', 'gpt-flex-only', 2.0, 8.0, id: 403);
+
+        $this->mockLiteLLMResponse([
+            'gpt-flex-only' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.000002,
+                'output_cost_per_token' => 0.000008,
+                'input_cost_per_token_above_272k_tokens_flex' => 0.000004,
+                'input_cost_per_token_above_272k_tokens_priority' => 0.000005,
+                'input_cost_per_token_above_272k_tokens_batches' => 0.000001,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringNotContainsString('missing long-context tier', $this->commandTester->getDisplay());
+    }
+
+    public function testPinnedCacheReadDeviationSilencesExactlyThatDimension(): void
+    {
+        $model = $this->createModelMock('xAI', 'grok-4.5', 2.0, 6.0, id: 310, json: [
+            'cache_read_price_per_1M' => 0.30,
+        ]);
+        $tester = $this->buildCommandTester([
+            'xai:grok-4.5' => [
+                'litellm_cache_read' => 0.50,
+                'source' => 'https://docs.x.ai/developers/models/grok-4-5',
+                'verifiedOn' => '2026-09-04',
+                'reason' => 'LiteLLM lists $0.50 cache-read; official is $0.30.',
+            ],
+        ]);
+
+        $this->mockLiteLLMResponse([
+            'xai/grok-4.5' => [
+                'mode' => 'chat',
+                'litellm_provider' => 'xai',
+                'input_cost_per_token' => 0.000002,
+                'output_cost_per_token' => 0.000006,
+                'cache_read_input_token_cost' => 0.0000005,
+                'input_cost_per_token_above_200k_tokens' => 0.000004,
+                'output_cost_per_token_above_200k_tokens' => 0.000012,
+                'cache_read_input_token_cost_above_200k_tokens' => 0.0000006,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $output = $tester->getDisplay();
+        $this->assertStringContainsString('Known LiteLLM deviations', $output);
+        $this->assertStringContainsString('cache read: catalog keeps 0.300000', $output);
+        $this->assertStringNotContainsString('Cache / long-context price drift', $output);
+    }
+
+    public function testObsoletePinnedCacheDeviationIsReported(): void
+    {
+        $model = $this->createModelMock('xAI', 'grok-cache-pin', 2.0, 6.0, id: 404, json: [
+            'cache_read_price_per_1M' => 0.30,
+        ]);
+        $tester = $this->buildCommandTester([
+            'xai:grok-cache-pin' => [
+                'litellm_cache_read' => 0.50,
+                'source' => 'https://docs.x.ai/',
+                'verifiedOn' => '2026-09-04',
+                'reason' => 'was wrong at 0.50',
+            ],
+        ]);
+
+        $this->mockLiteLLMResponse([
+            'xai/grok-cache-pin' => [
+                'mode' => 'chat',
+                'litellm_provider' => 'xai',
+                'input_cost_per_token' => 0.000002,
+                'output_cost_per_token' => 0.000006,
+                'cache_read_input_token_cost' => 0.0000003,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $this->assertStringContainsString('Obsolete LiteLLM deviations', $tester->getDisplay());
+        $this->assertStringContainsString('remove litellm_cache_read', $tester->getDisplay());
+    }
+
+    public function testApplyPathDoesNotWriteWhenOnlyCacheDiffers(): void
+    {
+        $model = $this->createModelMock('Anthropic', 'claude-cache-only', 5.0, 25.0, id: 406);
+
+        $this->mockLiteLLMResponse([
+            'anthropic/claude-cache-only' => [
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.000005,
+                'output_cost_per_token' => 0.000025,
+                'cache_read_input_token_cost' => 0.00000025,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+        $this->em->expects($this->once())->method('flush');
+
+        $this->commandTester->execute([]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('Cache / long-context price drift', $this->commandTester->getDisplay());
+    }
+
+    public function testSummaryLineEndsWithUnmatchedAndIncludesCacheTierCounter(): void
+    {
+        $this->mockLiteLLMResponse([]);
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([]);
+
+        $this->commandTester->execute([]);
+
+        $plain = preg_replace('/\x1b\[[0-9;]*m/', '', $this->commandTester->getDisplay()) ?? '';
+        $this->assertMatchesRegularExpression(
+            '/Price sync complete:.*cache\/tier drift.*unmatched/s',
+            $plain,
+        );
+        $this->assertMatchesRegularExpression('/unmatched\s*$/m', $plain);
+    }
+
     public function testModeMismatchImageIsReportedNotDrift(): void
     {
         // dall-e-3 is per_token in the catalog, LiteLLM flat per_image → mode
@@ -1184,8 +1533,17 @@ class SyncModelPricesCommandTest extends TestCase
         $this->httpClient->method('request')->willReturn($response);
     }
 
-    private function createModelMock(string $service, string $providerId, float $priceIn, float $priceOut, int $id = 1): Model
-    {
+    /**
+     * @param array<string, mixed> $json
+     */
+    private function createModelMock(
+        string $service,
+        string $providerId,
+        float $priceIn,
+        float $priceOut,
+        int $id = 1,
+        array $json = [],
+    ): Model {
         $model = $this->createMock(Model::class);
         $model->method('getId')->willReturn($id);
         $model->method('getService')->willReturn($service);
@@ -1194,7 +1552,7 @@ class SyncModelPricesCommandTest extends TestCase
         $model->method('getPriceOut')->willReturn($priceOut);
         $model->method('getInUnit')->willReturn('per1M');
         $model->method('getOutUnit')->willReturn('per1M');
-        $model->method('getJson')->willReturn([]);
+        $model->method('getJson')->willReturn($json);
 
         return $model;
     }

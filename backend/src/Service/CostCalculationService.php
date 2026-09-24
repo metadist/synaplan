@@ -13,26 +13,11 @@ use Psr\Log\LoggerInterface;
 
 final readonly class CostCalculationService
 {
-    private const CACHE_READ_DISCOUNT_ANTHROPIC = 0.10;
-    // Default TTL (5 minutes) cache write, per https://platform.claude.com/docs/en/build-with-claude/prompt-caching.
-    private const CACHE_WRITE_MULTIPLIER_ANTHROPIC = 1.25;
-    // Opt-in 1-hour TTL cache write (`cache_control: {"type": "ephemeral", "ttl": "1h"}`) — billed
-    // at 2x base input price, not the 1.25x default. Applies uniformly across the whole Anthropic
-    // lineup (Anthropic docs footnote: only cache *reads* vary per model, e.g. Fable 5.1's 0.025x).
-    private const CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H = 2.0;
-    // Last-resort cache-read rate for rows that author no `cache_read_price_per_1M`.
-    // It matches the GPT-4o generation (gpt-4o-mini: $0.075 on $0.15) but NOT the
-    // GPT-5+ / Gemini Pro lines, which read at 0.1x — those author an explicit
-    // price, because falling back to 50% here overcharged them 5x (#1319 follow-up).
-    // It cuts in on a MISSING rate, not on a missing discount: a model billing
-    // cached tokens at full price (gpt-5.5-pro) must author its input rate here,
-    // otherwise this default halves its bill.
-    private const CACHE_READ_DISCOUNT_DEFAULT = 0.50;
-
     public function __construct(
         private ModelRepository $modelRepository,
         private ModelPriceHistoryRepository $priceHistoryRepository,
         private LoggerInterface $logger,
+        private CachePriceResolver $cachePriceResolver = new CachePriceResolver(),
     ) {
     }
 
@@ -116,10 +101,12 @@ final readonly class CostCalculationService
         // Determine cache discount based on provider. Normalized via
         // ModelCatalog::normalizeProvider so a CamelCase catalog name
         // ('Anthropic') never silently misses the provider-specific rate (#1313).
+        // Rates come from CachePriceResolver so the drift check compares the
+        // same effective figures billing charges.
         $provider = ModelCatalog::normalizeProvider($model->getService());
-        $cacheReadDiscount = $this->getCacheReadDiscount($provider);
-        $cacheWriteMultiplier = $this->getCacheWriteMultiplier($provider, $model);
-        $cacheWriteMultiplier1h = $this->getCacheWriteMultiplier1h($provider);
+        $cacheReadDiscount = $this->cachePriceResolver->cacheReadDiscount($provider);
+        $cacheWriteMultiplier = $this->cachePriceResolver->cacheWriteMultiplier($provider, $model);
+        $cacheWriteMultiplier1h = $this->cachePriceResolver->cacheWriteMultiplier1h($provider);
 
         // Override with explicit cache price if available
         $cacheReadPricePerToken = null !== $cachePriceIn
@@ -494,44 +481,6 @@ final readonly class CostCalculationService
             'per1' => $price,
             default => $price / 1_000_000,
         };
-    }
-
-    /** @param string $provider canonical provider key (see ModelCatalog::normalizeProvider) */
-    private function getCacheReadDiscount(string $provider): float
-    {
-        return 'anthropic' === $provider
-            ? self::CACHE_READ_DISCOUNT_ANTHROPIC
-            : self::CACHE_READ_DISCOUNT_DEFAULT;
-    }
-
-    /**
-     * Multiplier applied to the input rate for tokens WRITTEN to the cache.
-     *
-     * Whether a cache write is billed at all is a per-model property, not a
-     * per-provider one: OpenAI started charging 1.25x with the GPT-5.6 family
-     * (and GPT-6), while GPT-5.5 and earlier incur "no additional cache-write
-     * charge". So the catalog value wins, and the Anthropic-wide rate stays as
-     * the fallback for rows that don't author one.
-     *
-     * @param string $provider canonical provider key (see ModelCatalog::normalizeProvider)
-     */
-    private function getCacheWriteMultiplier(string $provider, Model $model): float
-    {
-        $authored = $model->getJson()['cache_write_multiplier'] ?? null;
-        if (is_numeric($authored)) {
-            return (float) $authored;
-        }
-
-        return 'anthropic' === $provider
-            ? self::CACHE_WRITE_MULTIPLIER_ANTHROPIC
-            : 1.0;
-    }
-
-    private function getCacheWriteMultiplier1h(string $provider): float
-    {
-        return 'anthropic' === $provider
-            ? self::CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H
-            : 1.0;
     }
 
     private function zeroCostResult(): CostResult

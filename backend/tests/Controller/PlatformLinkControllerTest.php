@@ -8,6 +8,7 @@ use App\Entity\ApiKey;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Security\ApiKeyScope;
+use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,6 +24,8 @@ final class PlatformLinkControllerTest extends WebTestCase
 {
     use AuthenticatedTestTrait;
 
+    private const CLIENT_IP = '127.0.0.1';
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -31,6 +34,12 @@ final class PlatformLinkControllerTest extends WebTestCase
         self::ensureKernelShutdown();
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine')->getManager();
+
+        // The per-IP counters live in Redis and outlive a PHPUnit run, so
+        // back-to-back local runs would otherwise hit the hourly limits.
+        $redis = static::getContainer()->get(RedisService::class);
+        $redis->delete('platform_link:register_attempt:'.sha1(self::CLIENT_IP));
+        $redis->delete('platform_link:exchange_attempt:'.sha1(self::CLIENT_IP));
     }
 
     private function enableFlag(): void
