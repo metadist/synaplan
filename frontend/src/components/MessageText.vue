@@ -272,7 +272,7 @@ async function scheduleSlowRetry(): Promise<void> {
     if (missingReferencedMemoryIds.value.length === 0) return
     if (isMemoryServiceDefinitelyUnavailable.value) return
 
-    await memoriesStore.fetchMemories(undefined, { timeoutMs: 8000, silent: true }).catch(() => {})
+    await memoriesStore.fetchMemories(undefined, { silent: true }).catch(() => {})
 
     if (missingReferencedMemoryIds.value.length === 0) {
       return
@@ -312,7 +312,7 @@ async function fetchMemoriesWithRetryBestEffort(): Promise<void> {
     if (isMemoryServiceDefinitelyUnavailable.value) return
 
     // First try bulk fetch
-    await memoriesStore.fetchMemories(undefined, { timeoutMs: 8000, silent: true }).catch(() => {})
+    await memoriesStore.fetchMemories(undefined, { silent: true }).catch(() => {})
 
     // If still missing, try to fetch individual memories by ID
     const stillMissing = missingReferencedMemoryIds.value
