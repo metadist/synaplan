@@ -309,10 +309,6 @@
     "privacy": "Datenschutz",
     "terms": "AGB"
   },
-  "header": {
-    "switchToV2": "Zum V2-Design wechseln",
-    "switchToV1": "Zum klassischen Design wechseln"
-  },
   "system": {
     "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
   },

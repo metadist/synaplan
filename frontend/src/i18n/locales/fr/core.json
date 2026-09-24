@@ -308,10 +308,6 @@
     "privacy": "Confidentialité",
     "terms": "Conditions"
   },
-  "header": {
-    "switchToV2": "Passer au design V2",
-    "switchToV1": "Passer au design classique"
-  },
   "system": {
     "missingApiKeys": "Certaines clés API manquent — les fournisseurs suivants sont désactivés : {providers}"
   },

@@ -402,16 +402,6 @@
       inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
   }
 
-  .sidebar-subitem--active {
-    background: rgba(0, 0, 0, 0.08) !important;
-    color: var(--brand) !important;
-    font-weight: 600;
-  }
-  .dark .sidebar-subitem--active {
-    background: rgba(255, 255, 255, 0.08) !important;
-    color: var(--brand-light) !important;
-  }
-
   /* Chat-Bubbles */
   .bubble-ai {
     background: #f5f5f6 !important;

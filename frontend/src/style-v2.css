@@ -1,6 +1,6 @@
 /* ============================================================
    Synaplan V2 Glass Design — Override Layer
-   All rules scoped under .design-v2 so V1 stays untouched.
+   App design on top of the base styles. The widget uses the base styles alone.
    Works with both light and dark modes.
    ============================================================ */
 
