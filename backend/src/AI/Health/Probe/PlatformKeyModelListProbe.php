@@ -7,6 +7,7 @@ namespace App\AI\Health\Probe;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Health\FailureKind;
+use App\AI\Service\ModelListPageCursor;
 use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderModelInventoryInterface;
 use Psr\Log\LoggerInterface;
@@ -90,9 +91,8 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
         $url = $check['url'];
         $pagesLeft = self::MAX_PAGES;
 
-        // Google's model list is paginated and defaults to a page size well
-        // below its catalog, so a single request silently omits whole model
-        // families — and an omitted model looks exactly like a retired one.
+        // Google and Anthropic paginate; a single request silently omits models
+        // that then look exactly like retirements.
         do {
             try {
                 $response = $this->httpClient->request($check['method'], $url, [
@@ -119,13 +119,7 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
             }
 
             $modelIds = array_merge($modelIds, self::extractModelIds($body));
-
-            $nextPage = is_string($body['nextPageToken'] ?? null) && '' !== $body['nextPageToken']
-                ? $body['nextPageToken']
-                : null;
-            $url = null === $nextPage
-                ? null
-                : $check['url'].(str_contains($check['url'], '?') ? '&' : '?').'pageToken='.rawurlencode($nextPage);
+            $url = ModelListPageCursor::nextUrl($check['url'], $body);
         } while (null !== $url && --$pagesLeft > 0);
 
         $modelIds = array_values(array_unique($modelIds));

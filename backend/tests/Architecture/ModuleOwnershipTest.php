@@ -178,6 +178,7 @@ final class ModuleOwnershipTest extends TestCase
             'GMAIL_USERNAME',
             'GMAIL_PASSWORD',
             'DISCORD_WEBHOOK_URL',
+            'MODEL_DISCOVERY_ENABLED',
         ],
         // Anthropic-compatible Messages gateway upstream (desktop client path).
         'messages_gateway' => [

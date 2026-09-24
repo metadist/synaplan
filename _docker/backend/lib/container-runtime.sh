@@ -403,6 +403,13 @@ run_scheduler_role() {
                 runtime_log "Model availability check failed; it will be retried on the next daily interval." >&2
             fi
 
+            # New-model detection. Opt-in via MODEL_DISCOVERY_ENABLED (command
+            # is a no-op when false). Read-only: reports pending upstream ids
+            # to Discord, never writes BMODELS.
+            if ! run_scheduler_command bin/console --env="$env" app:models:discover --notify --no-interaction; then
+                runtime_log "Model discovery check failed; it will be retried on the next daily interval." >&2
+            fi
+
             # Message digest: out-of-band deep-memory indexing of new user
             # messages (self-locking, per-user cost caps). A failure is
             # harmless — the per-user cursor means the next run resumes

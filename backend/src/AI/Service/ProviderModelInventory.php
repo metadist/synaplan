@@ -22,11 +22,17 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Both are read on every response rather than switched per provider, so a
  * provider that changes shape degrades to "unreachable" instead of silently
  * reporting an empty catalog.
+ *
+ * Google and Anthropic paginate; every page is fetched and merged. A partial
+ * list must never be returned — discovery baselines whatever we report.
  */
 final readonly class ProviderModelInventory implements ProviderModelInventoryInterface
 {
     private const TIMEOUT_SECONDS = 20;
     private const PROBE_TIMEOUT_SECONDS = 10;
+
+    /** Safety stop so a broken cursor cannot loop forever. */
+    private const MAX_PAGES = 10;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -61,16 +67,31 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
         }
 
         try {
-            $response = $this->httpClient->request($listing['method'], $listing['url'], [
-                'headers' => $headers,
-                'timeout' => self::TIMEOUT_SECONDS,
-            ]);
-            $status = $response->getStatusCode();
-            if ($status < 200 || $status >= 300) {
-                return ProviderModelListing::unreachable(sprintf('The provider API returned HTTP %d.', $status));
+            $modelIds = [];
+            $baseUrl = $listing['url'];
+            $url = $baseUrl;
+            $pagesLeft = self::MAX_PAGES;
+
+            do {
+                $response = $this->httpClient->request($listing['method'], $url, [
+                    'headers' => $headers,
+                    'timeout' => self::TIMEOUT_SECONDS,
+                ]);
+                $status = $response->getStatusCode();
+                if ($status < 200 || $status >= 300) {
+                    return ProviderModelListing::unreachable(sprintf('The provider API returned HTTP %d.', $status));
+                }
+
+                $body = $response->toArray(false);
+                $modelIds = array_merge($modelIds, $this->extractModelIds($body));
+                $url = ModelListPageCursor::nextUrl($baseUrl, $body);
+            } while (null !== $url && --$pagesLeft > 0);
+
+            if (null !== $url) {
+                return ProviderModelListing::unreachable('The provider model list has more pages than this check reads.');
             }
 
-            $modelIds = $this->extractModelIds($response->toArray(false));
+            $modelIds = array_values(array_unique($modelIds));
         } catch (\Throwable $e) {
             $this->logger->warning('Model availability listing failed', [
                 'provider' => $provider,

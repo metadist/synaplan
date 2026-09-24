@@ -132,6 +132,95 @@ final class ProviderModelInventoryTest extends TestCase
         );
     }
 
+    public function testGooglePaginationMergesPages(): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+            if (!str_contains($url, 'pageToken=')) {
+                return new MockResponse(json_encode([
+                    'models' => [['name' => 'models/gemini-a']],
+                    'nextPageToken' => 'page2',
+                ], \JSON_THROW_ON_ERROR));
+            }
+
+            return new MockResponse(json_encode([
+                'models' => [['name' => 'models/gemini-b']],
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $listing = $this->inventoryWithClient($client, 'google')->fetch('google');
+
+        $this->assertTrue($listing->isConclusive());
+        $this->assertTrue($listing->serves('gemini-a'));
+        $this->assertTrue($listing->serves('gemini-b'));
+        $this->assertCount(2, $requested);
+        $this->assertStringContainsString('pageToken=page2', $requested[1]);
+    }
+
+    public function testAnthropicPaginationMergesPagesAndUsesAfterId(): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+            if (!str_contains($url, 'after_id=')) {
+                return new MockResponse(json_encode([
+                    'data' => [['id' => 'claude-a']],
+                    'has_more' => true,
+                    'last_id' => 'claude-a',
+                ], \JSON_THROW_ON_ERROR));
+            }
+
+            return new MockResponse(json_encode([
+                'data' => [['id' => 'claude-b']],
+                'has_more' => false,
+                'last_id' => 'claude-b',
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $listing = $this->inventoryWithClient($client, 'anthropic')->fetch('anthropic');
+
+        $this->assertTrue($listing->isConclusive());
+        $this->assertTrue($listing->serves('claude-a'));
+        $this->assertTrue($listing->serves('claude-b'));
+        $this->assertCount(2, $requested);
+        $this->assertStringContainsString('after_id=claude-a', $requested[1]);
+    }
+
+    public function testSecondPageHttpErrorIsUnreachableWithoutPartialList(): void
+    {
+        $client = new MockHttpClient([
+            new MockResponse(json_encode([
+                'models' => [['name' => 'models/gemini-a']],
+                'nextPageToken' => 'page2',
+            ], \JSON_THROW_ON_ERROR)),
+            new MockResponse('{"error":"nope"}', ['http_code' => 500]),
+        ]);
+
+        $listing = $this->inventoryWithClient($client, 'google')->fetch('google');
+
+        $this->assertFalse($listing->isConclusive());
+        $this->assertSame(ProviderModelListing::STATUS_UNREACHABLE, $listing->status);
+        $this->assertSame([], $listing->modelIds);
+    }
+
+    public function testPaginationSafetyStopIsUnreachable(): void
+    {
+        $client = new MockHttpClient(static function (): MockResponse {
+            return new MockResponse(json_encode([
+                'models' => [['name' => 'models/gemini-a']],
+                'nextPageToken' => 'forever',
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $listing = $this->inventoryWithClient($client, 'google')->fetch('google');
+
+        $this->assertFalse($listing->isConclusive());
+        $this->assertSame(ProviderModelListing::STATUS_UNREACHABLE, $listing->status);
+        $this->assertStringContainsString('more pages', (string) $listing->detail);
+        $this->assertSame([], $listing->modelIds);
+    }
+
     private function inventory(MockResponse $response, string $provider = 'groq'): ProviderModelInventory
     {
         return $this->inventoryWithClient(new MockHttpClient($response), $provider);

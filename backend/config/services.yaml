@@ -94,6 +94,9 @@ parameters:
     env(VOYAGE_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''
+    # Ops-only new-model detection (app:models:discover). Default off so
+    # self-hosted installs never contact providers or Discord for this.
+    env(MODEL_DISCOVERY_ENABLED): 'false'
     env(GMAIL_USERNAME): ''
     env(GMAIL_PASSWORD): ''
     env(TIKA_HTTP_USER): ''
@@ -668,6 +671,11 @@ services:
     App\Service\DiscordNotificationService:
         arguments:
             $webhookUrl: '%env(DISCORD_WEBHOOK_URL)%'
+
+    # New-model discovery (opt-in; default off — not a FeatureModule)
+    App\Service\ModelDiscovery\ModelDiscoveryService:
+        arguments:
+            $enabled: '%env(bool:MODEL_DISCOVERY_ENABLED)%'
 
     # WhatsApp Business API Service - Fully Dynamic Multi-Number Support
     # Uses cache + lock for atomic duplicate message detection (WhatsApp webhook retries)
