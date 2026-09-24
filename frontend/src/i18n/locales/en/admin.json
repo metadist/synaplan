@@ -924,6 +924,7 @@
     "runCopy": "Run as my copy",
     "runCopyConfirm": "Create your own copy of this saved task? It will run only when you start it.",
     "assistantNotShared": "This task's AI assistant is not shared with you.",
+    "assistantNotSharedNamed": "The AI assistant “{name}” is not shared with you. Ask the owner to share it, then try again.",
     "sharedBy": "From {name}",
     "continueAsCopy": "Continue as my copy",
     "continueFailed": "Couldn't create your copy. Please try again.",

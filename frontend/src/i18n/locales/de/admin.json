@@ -924,6 +924,7 @@
     "runCopy": "Als meine Kopie ausführen",
     "runCopyConfirm": "Eine eigene Kopie dieser gespeicherten Aufgabe anlegen? Sie läuft nur, wenn Sie sie starten.",
     "assistantNotShared": "Der KI-Assistent dieser Aufgabe ist nicht mit Ihnen geteilt.",
+    "assistantNotSharedNamed": "Der KI-Assistent „{name}“ ist nicht mit Ihnen geteilt. Bitten Sie die Person, die ihn besitzt, ihn zu teilen, und versuchen Sie es erneut.",
     "sharedBy": "Von {name}",
     "continueAsCopy": "Als meine Kopie fortsetzen",
     "continueFailed": "Ihre Kopie konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",

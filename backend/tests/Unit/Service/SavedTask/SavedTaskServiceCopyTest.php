@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\SavedTask;
 
+use App\Entity\Agent;
 use App\Entity\Prompt;
 use App\Entity\SavedTask;
 use App\Entity\User;
+use App\Repository\AgentRepository;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Service\Iam\AccessGate;
 use App\Service\Iam\Exception\AssistantNotSharedException;
 use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AgentKind;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\SavedTask\Graph\SavedTaskGraphCapture;
 use App\Service\SavedTask\Graph\SavedTaskGraphPortability;
@@ -182,6 +185,124 @@ final class SavedTaskServiceCopyTest extends TestCase
         $this->expectException(AssistantNotSharedException::class);
         $this->expectExceptionMessage('iam.assistantNotShared');
         $service->copyForOwner($source, $user);
+    }
+
+    public function testCopyOfAssistantTaskKeepsThatInstructionWhenUseIsGranted(): void
+    {
+        $source = new SavedTask(9, 21, 'Reply');
+        $source->setTrigger(SavedTask::TRIGGER_SCHEDULE, [
+            'kind' => 'daily',
+            'at' => '07:00',
+            'agentId' => 1,
+            'agentTrigger' => 'new-assistant:sch-1',
+        ]);
+        (new \ReflectionProperty(SavedTask::class, 'id'))->setValue($source, 11);
+
+        $prompt = new Prompt();
+        $prompt->setOwnerId(9);
+        $prompt->setTopic('agent:new-assistant');
+        $prompt->setPrompt('Reply with ping.');
+        (new \ReflectionProperty(Prompt::class, 'id'))->setValue($prompt, 21);
+
+        $agent = new Agent(9, 21, 'new-assistant', 'Ping bot', []);
+        (new \ReflectionProperty(Agent::class, 'id'))->setValue($agent, 1);
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(3);
+
+        $gate = $this->createMock(AccessGate::class);
+        $gate->method('decide')->willReturnCallback(
+            static function (User $_user, string $kind, string $id, Permission $_perm): bool {
+                return SavedTaskKind::KEY === $kind || (AgentKind::KEY === $kind && '1' === $id);
+            }
+        );
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->with(21)->willReturn($prompt);
+        $prompts->expects(self::never())->method('findFirstUsableForUser');
+
+        $agents = $this->createMock(AgentRepository::class);
+        $agents->method('findByPromptIdAndOwner')->with(21, 9)->willReturn($agent);
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->expects(self::once())->method('save');
+
+        $service = new SavedTaskService(
+            $tasks,
+            $this->createStub(SavedTaskRunRepository::class),
+            $prompts,
+            $this->createStub(SavedTaskGraphValidator::class),
+            $this->createStub(ScheduleParser::class),
+            $gate,
+            $this->createStub(SavedTaskGraphCapture::class),
+            null,
+            null,
+            null,
+            null,
+            $agents,
+        );
+
+        $result = $service->copyForOwner($source, $user);
+
+        self::assertSame(21, $result->task->getPromptId());
+        self::assertSame(1, $result->task->getTriggerConfig()['agentId'] ?? null);
+        self::assertArrayNotHasKey('agentTrigger', $result->task->getTriggerConfig() ?? []);
+        self::assertSame([], $result->checklist);
+    }
+
+    public function testCopyOfAssistantTaskRefusesAForeignPrompt(): void
+    {
+        $source = new SavedTask(9, 21, 'Reply');
+        (new \ReflectionProperty(SavedTask::class, 'id'))->setValue($source, 11);
+
+        $prompt = new Prompt();
+        $prompt->setOwnerId(9);
+        $prompt->setTopic('agent:new-assistant');
+        $prompt->setPrompt('Reply with ping.');
+        (new \ReflectionProperty(Prompt::class, 'id'))->setValue($prompt, 21);
+
+        $agent = new Agent(9, 21, 'new-assistant', 'Ping bot', []);
+        (new \ReflectionProperty(Agent::class, 'id'))->setValue($agent, 1);
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(3);
+
+        $gate = $this->createMock(AccessGate::class);
+        $gate->method('decide')->willReturnCallback(
+            static function (User $_user, string $kind, string $_id, Permission $_perm): bool {
+                return SavedTaskKind::KEY === $kind;
+            }
+        );
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->with(21)->willReturn($prompt);
+        $prompts->expects(self::never())->method('findFirstUsableForUser');
+
+        $agents = $this->createMock(AgentRepository::class);
+        $agents->method('findByPromptIdAndOwner')->willReturn($agent);
+
+        $service = new SavedTaskService(
+            $this->createStub(SavedTaskRepository::class),
+            $this->createStub(SavedTaskRunRepository::class),
+            $prompts,
+            $this->createStub(SavedTaskGraphValidator::class),
+            $this->createStub(ScheduleParser::class),
+            $gate,
+            $this->createStub(SavedTaskGraphCapture::class),
+            null,
+            null,
+            null,
+            null,
+            $agents,
+        );
+
+        $this->expectException(AssistantNotSharedException::class);
+        try {
+            $service->copyForOwner($source, $user);
+        } catch (AssistantNotSharedException $e) {
+            self::assertSame('Ping bot', $e->assistantName);
+            throw $e;
+        }
     }
 
     public function testCopyRequiresUseOnTheTask(): void

@@ -365,8 +365,11 @@ final class SavedTaskController extends AbstractController
             $result = $this->service->copyForOwner($task, $user);
         } catch (SavedTaskNotFoundException) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
-        } catch (AssistantNotSharedException) {
-            return $this->json(['error' => 'iam.assistantNotShared'], Response::HTTP_CONFLICT);
+        } catch (AssistantNotSharedException $e) {
+            return $this->json([
+                'error' => 'iam.assistantNotShared',
+                'assistant' => $e->assistantName,
+            ], Response::HTTP_CONFLICT);
         }
 
         return $this->json([
