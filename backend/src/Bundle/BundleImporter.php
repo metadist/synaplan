@@ -23,7 +23,7 @@ final readonly class BundleImporter
     {
         $envelope = $this->validator->parse($json, $this->registry->registeredKinds());
         $scope = BundleScope::from($envelope['scope']);
-        $fileTopics = $this->agentTopics($envelope['sections']);
+        $fileTopics = $this->agentTopics($envelope['sections'], $userId, $scope);
         $previews = [];
         foreach ($this->orderedSections($envelope['sections'], $userId, $scope) as [$section, $items]) {
             $preview = $section instanceof SavedTasksBundleSection
@@ -52,7 +52,7 @@ final readonly class BundleImporter
     {
         $envelope = $this->validator->parse($json, $this->registry->registeredKinds());
         $scope = BundleScope::from($envelope['scope']);
-        $fileTopics = $this->agentTopics($envelope['sections']);
+        $fileTopics = $this->agentTopics($envelope['sections'], $userId, $scope);
         $results = [];
         foreach ($this->orderedSections($envelope['sections'], $userId, $scope) as [$section, $items]) {
             $this->em->beginTransaction();
@@ -102,8 +102,19 @@ final readonly class BundleImporter
      *
      * @return list<string>
      */
-    private function agentTopics(array $sections): array
+    private function agentTopics(array $sections, int $userId, BundleScope $scope): array
     {
+        $agentsAvailable = false;
+        foreach ($this->registry->available($userId, $scope) as $handler) {
+            if ('agents' === $handler->kind()) {
+                $agentsAvailable = true;
+                break;
+            }
+        }
+        if (!$agentsAvailable) {
+            return [];
+        }
+
         $topics = [];
         foreach ($sections as $section) {
             if ('agents' !== ($section['kind'] ?? null)) {

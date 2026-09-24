@@ -229,7 +229,7 @@
     "emptyChecklist": "Eksik bir şey yok. Şimdi içe aktarabilirsiniz.",
     "overwriteExisting": "Zaten var olan öğelerin üzerine yaz",
     "importAction": "İçe aktar",
-    "imported": "Taslak olarak içe aktarıldı. Asistanlar Asistanlar altında, zamanlamalar Kayıtlı görevler altındadır.",
+    "imported": "Taslak olarak içe aktarıldı. Yeni asistanlar Asistanlar altında, zamanlamalar Kayıtlı görevler altındadır.",
     "importFailed": "Dosya içe aktarılamadı.",
     "loading": "Yükleniyor…",
     "resultCreated": "{count} oluşturuldu",

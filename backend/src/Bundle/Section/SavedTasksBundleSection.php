@@ -162,20 +162,15 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
 
     /**
      * @param array<string, mixed> $item
-     */
-    /**
-     * @param list<string> $fileTopics
+     * @param list<string>         $fileTopics
      */
     private function importOne(array $item, int $userId, array $fileTopics = []): void
     {
         $name = is_string($item['name'] ?? null) && '' !== trim($item['name']) ? trim($item['name']) : 'Imported task';
         $topic = is_string($item['prompt'] ?? null) ? $item['prompt'] : '';
         $prompt = '' !== $topic ? $this->portability->usablePromptByTopic($topic, $userId) : null;
-        if (!$prompt instanceof Prompt && in_array($topic, $fileTopics, true) && str_starts_with($topic, 'agent:')) {
-            $prompt = $this->prompts->findOneBy([
-                'ownerId' => $userId,
-                'topic' => $topic,
-            ]);
+        if (!$prompt instanceof Prompt && in_array($topic, $fileTopics, true)) {
+            throw new \InvalidArgumentException('Needs an assistant');
         }
         if (!$prompt instanceof Prompt) {
             $prompt = $this->prompts->findFirstUsableForUser($userId);
@@ -219,9 +214,7 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
         $slug = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $task->getName()));
         $slug = trim($slug, '-');
 
-        $base = '' !== $slug ? $slug : 'task';
-
-        return $base.'-'.(string) $task->getId();
+        return '' !== $slug ? $slug : 'task-'.(string) $task->getId();
     }
 
     private function randomToken(): string

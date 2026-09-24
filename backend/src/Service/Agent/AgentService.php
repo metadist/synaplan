@@ -332,14 +332,15 @@ final readonly class AgentService
             throw new \InvalidArgumentException(sprintf('No assistant with slug "%s"', $slug));
         }
         $definition = $this->validator->validate($draft);
-        $agent->setName($name);
         $agent->setDraft($definition->toArray());
-        if (null !== $description && '' !== trim($description)) {
-            $agent->setDescription(trim($description));
-        }
-        if (null !== $icon && '' !== $icon) {
-            $this->assertIcon($icon);
-            $agent->setIcon($icon);
+        if (null === $agent->getPublishedVersionId()) {
+            $agent->setName($name);
+            $agent->setDescription(null !== $description && '' !== trim($description) ? trim($description) : null);
+            $nextIcon = $icon ?? '';
+            if ('' !== $nextIcon) {
+                $this->assertIcon($nextIcon);
+            }
+            $agent->setIcon($nextIcon);
         }
         $prompt = $this->prompts->find($agent->getPromptId());
         if ($prompt instanceof Prompt && null !== $instruction && '' !== trim($instruction)) {
