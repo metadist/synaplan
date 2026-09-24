@@ -107,7 +107,9 @@
               class="txt-secondary text-sm mb-4"
               data-testid="hint-allowed-limits"
             >
-              {{ $t('people.policies.allowedLimits', { names: limitedCapabilityNames.join(', ') }) }}
+              {{
+                $t('people.policies.allowedLimits', { names: limitedCapabilityNames.join(', ') })
+              }}
             </p>
             <p
               v-if="isLocked('MODELS.ALLOWED')"
