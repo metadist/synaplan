@@ -211,6 +211,15 @@ Import from `config/config.ts`:
 | `TIMEOUTS.VERY_LONG` | 30 s | Full AI stream, heavy processing |
 | `TIMEOUTS.EXTREME` | 60 s | Only with explicit justification |
 
+`playwright.config.ts` sets global budgets: an action without its own timeout
+fails after `TIMEOUTS.LONG`, a navigation after `TIMEOUTS.VERY_LONG`, and the
+error names the element. A genuinely long wait (AI answer, job, upload) gets
+its own timeout on that wait — never raise the global values.
+
+Service workers are blocked (`serviceWorkers: 'block'`) so `page.route()` sees
+every request. A test that needs the service worker opts in with
+`test.use({ serviceWorkers: 'allow' })` and cannot rely on `page.route()`.
+
 ### DO
 
 * Default to `SHORT` / `STANDARD` (fail fast).
