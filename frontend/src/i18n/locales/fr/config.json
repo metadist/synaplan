@@ -13,6 +13,7 @@
       "loadingModels": "Chargement des modèles…",
       "system": "Système",
       "selectModel": "-- Sélectionner un modèle --",
+      "groupLimitsModels": "Votre groupe limite les modèles que vous pouvez utiliser ici.",
       "systemModelsInfo": "Les modèles système sont automatiquement verrouillés et ne peuvent pas être modifiés. Ce sont des modèles essentiels requis pour des fonctions précises.",
       "modelsPurposesTitle": "Modèles et usages",
       "allModels": "Tous les modèles",

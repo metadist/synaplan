@@ -424,7 +424,7 @@ final readonly class ModelConfigService
         $preferred = null;
 
         foreach ($this->eachDefaultModelId($userId, $setting) as $modelId) {
-            if (!$this->isAllowedModel($userId, $modelId)) {
+            if (!$this->isAllowedModel($userId, $modelId, $setting)) {
                 continue;
             }
 
@@ -432,7 +432,7 @@ final readonly class ModelConfigService
                 return $modelId;
             }
 
-            $successor = $this->usableSuccessorOf($modelId, $userId);
+            $successor = $this->usableSuccessorOf($modelId, $userId, $setting);
             if (null !== $successor) {
                 $this->logSuccessorSwap($modelId, $successor, $setting);
 
@@ -464,11 +464,12 @@ final readonly class ModelConfigService
      */
     public function getConfiguredDefaultModel(string $capability, ?int $userId = null): ?int
     {
-        foreach ($this->eachDefaultModelId($userId, strtoupper($capability)) as $modelId) {
+        $setting = strtoupper($capability);
+        foreach ($this->eachDefaultModelId($userId, $setting) as $modelId) {
             if ($modelId < 1) {
                 continue;
             }
-            if (!$this->isAllowedModel($userId, $modelId)) {
+            if (!$this->isAllowedModel($userId, $modelId, $setting)) {
                 continue;
             }
 
@@ -504,7 +505,7 @@ final readonly class ModelConfigService
                 // findByTag() orders by quality DESC, id ASC.
                 foreach ($this->modelRepository->findByTag($tag, $selectableOnly) as $model) {
                     $modelId = (int) $model->getId();
-                    if (!$this->isAllowedModel($userId, $modelId)) {
+                    if (!$this->isAllowedModel($userId, $modelId, $setting)) {
                         continue;
                     }
                     if (!$this->isModelUsable($model)) {
@@ -581,12 +582,12 @@ final readonly class ModelConfigService
             return $modelId;
         }
 
-        if (!$this->isAllowedModel($userId, $modelId)) {
+        if (!$this->isAllowedModel($userId, $modelId, $capability)) {
             return $this->getDefaultModel($capability, $userId);
         }
 
         if (!$this->isModelProviderUsable($modelId)) {
-            $successor = $this->usableSuccessorOf($modelId, $userId);
+            $successor = $this->usableSuccessorOf($modelId, $userId, $capability);
             if (null !== $successor) {
                 $this->logSuccessorSwap($modelId, $successor, $capability);
 
@@ -666,7 +667,7 @@ final readonly class ModelConfigService
      * forbids self-successors, but a BID an operator edited in the admin UI is
      * not under that test.
      */
-    private function usableSuccessorOf(int $modelId, ?int $userId): ?int
+    private function usableSuccessorOf(int $modelId, ?int $userId, string $capability): ?int
     {
         $visited = [$modelId => true];
         $current = $this->modelRepository->find($modelId);
@@ -679,7 +680,7 @@ final readonly class ModelConfigService
 
             $visited[$successorId] = true;
 
-            if ($this->isAllowedModel($userId, $successorId) && $this->isModelProviderUsable($successorId)) {
+            if ($this->isAllowedModel($userId, $successorId, $capability) && $this->isModelProviderUsable($successorId)) {
                 return $successorId;
             }
 
@@ -698,9 +699,9 @@ final readonly class ModelConfigService
         ]);
     }
 
-    private function isAllowedModel(?int $userId, int $modelId): bool
+    private function isAllowedModel(?int $userId, int $modelId, ?string $capability = null): bool
     {
-        return null === $this->groupPolicyService || $this->groupPolicyService->isModelAllowed($userId, $modelId);
+        return null === $this->groupPolicyService || $this->groupPolicyService->isModelAllowed($userId, $modelId, $capability);
     }
 
     private function readDefaultModel(int $ownerId, string $setting): ?int

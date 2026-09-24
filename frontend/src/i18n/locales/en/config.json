@@ -15,6 +15,7 @@
       "loadingModels": "Loading models...",
       "system": "System",
       "selectModel": "-- Select Model --",
+      "groupLimitsModels": "Your group limits which models you can use here.",
       "systemModelsInfo": "System models are automatically locked and cannot be changed. These are core models required for specific functionality.",
       "modelsPurposesTitle": "Models & Purposes",
       "allModels": "All Models",

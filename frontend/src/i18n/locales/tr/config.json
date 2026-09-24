@@ -292,6 +292,7 @@
       "loadingModels": "Modeller yükleniyor...",
       "system": "Sistem",
       "selectModel": "-- Model Seç --",
+      "groupLimitsModels": "Grubunuz burada kullanabileceğiniz modelleri sınırlar.",
       "systemModelsInfo": "Sistem modelleri otomatik olarak kilitlenir ve değiştirilemez. Bunlar belirli işlevler için gerekli çekirdek modellerdir.",
       "modelsPurposesTitle": "Modeller ve Amaçlar",
       "allModels": "Tüm Modeller",

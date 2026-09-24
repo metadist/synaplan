@@ -189,26 +189,19 @@ final readonly class GroupPolicyService
     public function filterModelsByAllowList(?int $userId, array $models): array
     {
         $allowed = $this->resolver->allowedCatalogKeys($userId);
-        if ([] === $allowed) {
+        $scope = $this->allowScope($allowed);
+        if ($scope['open']) {
             return $models;
         }
-        $allowedSet = [];
-        foreach ($allowed as $key) {
-            $allowedSet[strtolower($key)] = true;
-            $bid = ModelCatalog::findBidByKey($key);
-            if (null !== $bid) {
-                $allowedSet['id:'.$bid] = true;
-            }
-        }
+        $allowedSet = $this->allowedSet($allowed);
         $kept = [];
         foreach ($models as $model) {
-            $id = isset($model['id']) ? (int) $model['id'] : 0;
-            $service = (string) ($model['service'] ?? '');
-            $providerId = (string) ($model['providerId'] ?? '');
-            $tag = (string) ($model['tag'] ?? '');
-            $catalogKey = strtolower(self::catalogKey($service, $providerId, $tag));
-            $shortKey = strtolower(self::shortCatalogKey($service, $providerId));
-            if (isset($allowedSet[$catalogKey]) || isset($allowedSet[$shortKey]) || isset($allowedSet['id:'.$id])) {
+            $tag = strtolower((string) ($model['tag'] ?? ''));
+            if (!$this->tagIsRestricted($scope, $tag)) {
+                $kept[] = $model;
+                continue;
+            }
+            if ($this->modelRowMatchesAllowList($model, $allowedSet)) {
                 $kept[] = $model;
             }
         }
@@ -216,15 +209,41 @@ final readonly class GroupPolicyService
         return $kept;
     }
 
-    public function isModelAllowed(?int $userId, int $modelId): bool
+    /**
+     * True when this capability's rows are limited by the allow-list.
+     *
+     * @param list<array<string, mixed>> $models
+     */
+    public function rowsAreRestricted(?int $userId, array $models): bool
+    {
+        $scope = $this->allowScope($this->resolver->allowedCatalogKeys($userId));
+        if ($scope['open'] || [] === $models) {
+            return false;
+        }
+        foreach ($models as $model) {
+            $tag = strtolower((string) ($model['tag'] ?? ''));
+            if ($this->tagIsRestricted($scope, $tag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function isModelAllowed(?int $userId, int $modelId, ?string $capability = null): bool
     {
         $allowed = $this->resolver->allowedCatalogKeys($userId);
-        if ([] === $allowed) {
+        $scope = $this->allowScope($allowed);
+        if ($scope['open']) {
             return true;
         }
         $model = $this->modelRepository->find($modelId);
         if (!$model instanceof Model) {
             return false;
+        }
+        $tag = self::tagForCapability($capability) ?? strtolower($model->getTag());
+        if (!$this->tagIsRestricted($scope, $tag)) {
+            return true;
         }
         $catalogKey = strtolower(self::catalogKey($model->getService(), $model->getProviderId(), $model->getTag()));
         $shortKey = strtolower(self::shortCatalogKey($model->getService(), $model->getProviderId()));
@@ -239,6 +258,113 @@ final readonly class GroupPolicyService
         }
 
         return false;
+    }
+
+    /**
+     * Tag a catalog key limits, or null when the key has no tag and applies everywhere.
+     */
+    public static function tagFromCatalogKey(string $key): ?string
+    {
+        $parts = explode(':', strtolower(trim($key)));
+        if (count($parts) < 3) {
+            return null;
+        }
+        $tag = $parts[array_key_last($parts)];
+
+        return '' === $tag ? null : $tag;
+    }
+
+    public static function tagForCapability(?string $capability): ?string
+    {
+        if (null === $capability || '' === $capability) {
+            return null;
+        }
+
+        return match (strtoupper($capability)) {
+            'ANALYZE', 'CHAT', 'PLAN', 'SORT', 'SUMMARIZE', 'TOOLS' => 'chat',
+            'MEM' => 'mem',
+            'EMBEDDING', 'SYNAPSE_VECTORIZE', 'VECTORIZE' => 'vectorize',
+            'PIC2TEXT' => 'pic2text',
+            'PIC2PIC', 'TEXT2PIC' => 'text2pic',
+            'IMG2VID', 'TEXT2VID' => 'text2vid',
+            'SOUND2TEXT' => 'sound2text',
+            'TEXT2SOUND' => 'text2sound',
+            default => strtolower($capability),
+        };
+    }
+
+    /**
+     * @param list<string> $allowed
+     *
+     * @return array{open: bool, global: bool, tags: array<string, true>}
+     */
+    private function allowScope(array $allowed): array
+    {
+        if ([] === $allowed) {
+            return ['open' => true, 'global' => false, 'tags' => []];
+        }
+        $tags = [];
+        $global = false;
+        foreach ($allowed as $key) {
+            $tag = self::tagFromCatalogKey($key);
+            if (null === $tag) {
+                $global = true;
+                continue;
+            }
+            $tags[$tag] = true;
+        }
+
+        return ['open' => false, 'global' => $global, 'tags' => $tags];
+    }
+
+    /**
+     * @param list<string> $allowed
+     *
+     * @return array<string, true>
+     */
+    private function allowedSet(array $allowed): array
+    {
+        $allowedSet = [];
+        foreach ($allowed as $key) {
+            $allowedSet[strtolower($key)] = true;
+            $bid = ModelCatalog::findBidByKey($key);
+            if (null !== $bid) {
+                $allowedSet['id:'.$bid] = true;
+            }
+        }
+
+        return $allowedSet;
+    }
+
+    /**
+     * @param array{open: bool, global: bool, tags: array<string, true>} $scope
+     */
+    private function tagIsRestricted(array $scope, string $tag): bool
+    {
+        if ($scope['open'] || '' === $tag) {
+            return false;
+        }
+        if ($scope['global']) {
+            return true;
+        }
+
+        return isset($scope['tags'][strtolower($tag)]);
+    }
+
+    /**
+     * @param array<string, mixed> $model
+     * @param array<string, true>  $allowedSet
+     */
+    private function modelRowMatchesAllowList(array $model, array $allowedSet): bool
+    {
+        $id = isset($model['id']) ? (int) $model['id'] : 0;
+        $service = (string) ($model['service'] ?? '');
+        $providerId = (string) ($model['providerId'] ?? '');
+        $tag = (string) ($model['tag'] ?? '');
+        $catalogKey = strtolower(self::catalogKey($service, $providerId, $tag));
+        $shortKey = strtolower(self::shortCatalogKey($service, $providerId));
+
+        return isset($allowedSet[$catalogKey]) || isset($allowedSet[$shortKey]) || isset($allowedSet['id:'.$id]);
     }
 
     public function catalogKeyForModelId(int $modelId): ?string

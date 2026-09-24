@@ -921,6 +921,12 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'restricted',
+                    type: 'array',
+                    description: 'Capabilities a group allow-list limits for this member. A capability that is not listed stays unrestricted.',
+                    items: new OA\Items(type: 'string', example: 'CHAT')
+                ),
+                new OA\Property(
                     property: 'providers',
                     type: 'array',
                     description: 'Availability of every registered AI provider on this installation (internal test provider excluded).',
@@ -1100,8 +1106,12 @@ class ConfigController extends AbstractController
         }
         usort($providers, static fn (array $a, array $b): int => strcasecmp($a['displayName'], $b['displayName']));
 
+        $restricted = [];
         if (null !== $this->groupPolicyService && !$this->isGranted('ROLE_ADMIN')) {
             foreach ($grouped as $capability => $rows) {
+                if ($this->groupPolicyService->rowsAreRestricted($user->getId(), $rows)) {
+                    $restricted[] = $capability;
+                }
                 $grouped[$capability] = $this->groupPolicyService->filterModelsByAllowList($user->getId(), $rows);
             }
         }
@@ -1110,6 +1120,7 @@ class ConfigController extends AbstractController
             'success' => true,
             'models' => $grouped,
             'providers' => $providers,
+            'restricted' => $restricted,
         ]);
     }
 
@@ -1197,9 +1208,19 @@ class ConfigController extends AbstractController
                     ? $this->groupPolicyService->modelIdFromStored($raw)
                     : (is_numeric((string) $raw) ? (int) $raw : null);
                 $model = null !== $modelId ? $this->modelRepository->find($modelId) : null;
-                $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
+                $resolvedId = ($model && 1 === $model->getActive()) ? $modelId : null;
+                $source = $this->layeredConfigResolver->source($userId, 'DEFAULTMODEL', $capability);
+                if (
+                    null !== $resolvedId
+                    && null !== $this->groupPolicyService
+                    && !$this->groupPolicyService->isModelAllowed($userId, $resolvedId, $capability)
+                ) {
+                    $resolvedId = $this->modelConfigService->getDefaultModel($capability, $userId);
+                    $source = null !== $resolvedId ? 'group' : $source;
+                }
+                $defaults[$capability] = $resolvedId;
                 $locked[$capability] = $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
-                $sources[$capability] = $this->layeredConfigResolver->source($userId, 'DEFAULTMODEL', $capability);
+                $sources[$capability] = $source;
                 continue;
             } else {
                 // Try user-specific config first
