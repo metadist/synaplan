@@ -401,6 +401,7 @@ for (let i = 0; i < optionCount; i++) {
 * E2E tests only for critical user flows. Prefer component/unit tests for UI details.
 * Fewer stable smoke tests > many fragile ones.
 * **Tests must be independent** — never rely on execution order or state from a previous test.
+* The CI test stack has no `centrifugo` (realtime push) and no `collabora` (office conversion). A spec must not depend on either; check that something arrived via reload or navigation.
 * Use `test.describe.configure({ mode: 'serial' })` only when tests share expensive setup (e.g. login + data creation) and document why.
 
 ---
