@@ -117,7 +117,7 @@ final readonly class BundleImporter
 
         $topics = [];
         foreach ($sections as $section) {
-            if ('agents' !== ($section['kind'] ?? null)) {
+            if ('agents' !== $section['kind']) {
                 continue;
             }
             foreach ($section['items'] as $item) {
