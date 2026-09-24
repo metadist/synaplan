@@ -29,6 +29,7 @@ use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\ProcessModelHints;
 use App\Service\File\UploadOptions;
 use App\Service\Iam\KnowledgeFolderShareCleanup;
+use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
 use App\Service\Iam\SharedFileAccess;
 use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
@@ -938,6 +939,7 @@ class FileController extends AbstractController
         tags: ['Files'],
         parameters: [
             new OA\Parameter(name: 'group_key', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'shared_folder', in: 'query', required: false, description: 'Knowledge-folder resource id (ownerId:groupKey) shared with the caller. Lists that folder instead of the caller\'s own files.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
             new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
@@ -962,6 +964,20 @@ class FileController extends AbstractController
         }
 
         $groupKey = $request->query->get('group_key');
+        $sharedFolder = $request->query->get('shared_folder');
+        $listUserId = (int) $user->getId();
+        $sharedMeta = null;
+        if (is_string($sharedFolder) && '' !== $sharedFolder) {
+            $parsed = KnowledgeFolderKind::parseId($sharedFolder);
+            if (null === $parsed || !$this->sharedFileAccess->canReadFolder($user, $sharedFolder)) {
+                return $this->json(['error' => 'Folder not found'], Response::HTTP_NOT_FOUND);
+            }
+            [$listUserId, $groupKey] = $parsed;
+            $sharedMeta = [
+                'resourceId' => $sharedFolder,
+                'canEdit' => $this->sharedFileAccess->canEditFolder($user, $sharedFolder),
+            ];
+        }
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
@@ -978,11 +994,12 @@ class FileController extends AbstractController
             'date_to' => $request->query->getInt('date_to') ?: null,
         ];
 
-        $result = $this->fileListService->buildListing($user->getId(), $groupKey, $offset, $limit, $filters);
+        $result = $this->fileListService->buildListing($listUserId, is_string($groupKey) ? $groupKey : null, $offset, $limit, $filters);
 
         return $this->json([
             'success' => true,
             'files' => $result['files'],
+            'shared' => $sharedMeta,
             'pagination' => [
                 'page' => $page,
                 'limit' => $limit,
@@ -1229,12 +1246,22 @@ class FileController extends AbstractController
         }
 
         $file = $this->fileRepository->find($id);
-        if (!$file || $file->getUserId() !== $user->getId()) {
+        if (!$file) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        $ownerId = $file->getUserId();
+        if ($ownerId !== $user->getId()) {
+            $groupKey = $file->getGroupKey();
+            $folderId = null !== $groupKey && '' !== $groupKey
+                ? KnowledgeFolderKind::resourceId($ownerId, $groupKey)
+                : '';
+            if ('' === $folderId || !$this->sharedFileAccess->canEditFolder($user, $folderId)) {
+                return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+            }
         }
 
         $this->documentRevisionService->deleteForFile($file);
-        $this->vectorStorageFacade->deleteByFile($user->getId(), $file->getId());
+        $this->vectorStorageFacade->deleteByFile($ownerId, $file->getId());
 
         if ($file->getFilePath()) {
             $this->storageService->deleteFile($file->getFilePath());
@@ -1242,7 +1269,7 @@ class FileController extends AbstractController
 
         $groupKey = $file->getGroupKey();
         $this->fileRepository->delete($file);
-        $this->folderShareCleanup->forgetIfEmpty($user->getId(), $groupKey);
+        $this->folderShareCleanup->forgetIfEmpty($ownerId, $groupKey);
 
         return $this->json(['success' => true, 'message' => 'File deleted successfully']);
     }

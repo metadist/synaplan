@@ -30,8 +30,9 @@
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
 
-        <!-- Compact Upload Bar -->
+        <!-- Compact Upload Bar. Hidden while a shared folder is open: uploads stay in the viewer's own library. -->
         <div
+          v-if="!openSharedFolder"
           class="surface-card p-4 sm:p-5 relative"
           data-testid="section-upload-form"
           @dragenter.prevent="handleDragEnter"
@@ -700,10 +701,14 @@
                           : `folder-card-${folder.name}`
                       "
                       @click="onFolderCardClick(folder)"
-                      @dragenter.prevent="onFolderDragEnter(folder.name)"
+                      @dragenter.prevent="
+                        folder.shared ? undefined : onFolderDragEnter(folder.name)
+                      "
                       @dragover.prevent
-                      @dragleave="onFolderDragLeave(folder.name)"
-                      @drop.prevent.stop="onFolderDrop($event, folder.name)"
+                      @dragleave="folder.shared ? undefined : onFolderDragLeave(folder.name)"
+                      @drop.prevent.stop="
+                        folder.shared ? undefined : onFolderDrop($event, folder.name)
+                      "
                     >
                       <div class="relative">
                         <Icon
@@ -1107,12 +1112,22 @@
                 class="w-4 h-4 text-[var(--brand)] shrink-0"
               />
               <span class="text-sm font-medium txt-primary truncate">{{ openFolder }}</span>
+              <SharedResourceBanner
+                v-if="openSharedFolder"
+                class="ml-2 min-w-0"
+                compact
+                kind="knowledge_folder"
+                :owner-name="openSharedFolder.ownerName ?? null"
+                :shared-via="openSharedFolder.sharedVia"
+                :permission="openSharedFolder.permission"
+              />
               <span
                 class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--brand)]/10 text-[var(--brand)]"
               >
                 {{ totalCount }}
               </span>
               <button
+                v-if="!openSharedFolder"
                 type="button"
                 class="ml-auto shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
                 data-testid="btn-delete-current-folder"
@@ -1123,10 +1138,13 @@
               </button>
             </div>
 
-            <!-- Bulk actions -->
-            <div v-if="selectedFileIds.length > 0" class="mb-4 flex flex-wrap items-center gap-3">
+            <!-- Bulk actions. A shared folder only offers delete, and only with edit. -->
+            <div
+              v-if="selectedFileIds.length > 0 && (canChangeOpenFolder || !openSharedFolder)"
+              class="mb-4 flex flex-wrap items-center gap-3"
+            >
               <button
-                v-if="canCombineSelected"
+                v-if="canCombineSelected && !openSharedFolder"
                 type="button"
                 class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
                 data-testid="btn-combine-selected"
@@ -1135,7 +1153,7 @@
                 {{ $t('files.combinePdf') }} ({{ combinableSelectedIds.length }})
               </button>
               <button
-                v-if="canCombineOfficeSelected"
+                v-if="canCombineOfficeSelected && !openSharedFolder"
                 type="button"
                 class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
                 data-testid="btn-combine-office-selected"
@@ -1145,6 +1163,8 @@
                 ({{ combinableOfficeSelectedIds.length }})
               </button>
               <button
+                v-if="canChangeOpenFolder"
+                type="button"
                 class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
                 data-testid="btn-delete-selected"
                 @click="deleteSelected"
@@ -1252,6 +1272,7 @@
                   </div>
                   <div class="flex items-center gap-0 shrink-0">
                     <FolderMoveMenu
+                      v-if="!openSharedFolder"
                       :open="folderMenuOpen === file.id"
                       :folders="displayedFolders"
                       :current-folder="openFolder"
@@ -1261,6 +1282,7 @@
                       @remove="removeFileFromFolder(file.id)"
                     />
                     <FileMakeSearchableButton
+                      v-if="!openSharedFolder"
                       :file="file"
                       :busy="isDescribing(file.id)"
                       @activate="describeAndSort(file)"
@@ -1361,6 +1383,7 @@
                         class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                       >
                         <FolderMoveMenu
+                          v-if="!openSharedFolder"
                           :open="folderMenuOpen === file.id"
                           :folders="displayedFolders"
                           :current-folder="openFolder"
@@ -1370,6 +1393,7 @@
                           @remove="removeFileFromFolder(file.id)"
                         />
                         <FileMakeSearchableButton
+                          v-if="!openSharedFolder"
                           :file="file"
                           :busy="isDescribing(file.id)"
                           @activate="describeAndSort(file)"
@@ -1595,15 +1619,22 @@ type DisplayedFolder = {
   permission?: string
 }
 
-/** §4.8 #2: open a chat with this knowledge folder preselected (chat-input picker). */
-function useFolderInChat(folder: DisplayedFolder | string): void {
+/** §4.8 #2: start a new chat with this knowledge folder preselected. */
+async function useFolderInChat(folder: DisplayedFolder | string): Promise<void> {
+  const name = typeof folder === 'string' ? folder : folder.name
   const key =
     typeof folder === 'string'
       ? folder
       : folder.shared && folder.resourceId
         ? `shared:${folder.resourceId}`
         : folder.name
-  router.push({ path: '/', query: { folder: key } })
+  const chat = await chatsStore.createChat()
+  if (!chat?.id) {
+    showError(t('files.startChatFailed'))
+    return
+  }
+  showSuccess(t('files.startedChatWithFolder', { folder: name }))
+  await router.push({ path: '/', query: { folder: key, chat: String(chat.id) } })
 }
 
 function openInChat(file: FileItem): void {
@@ -1617,11 +1648,7 @@ function sharedFolderPill(folder: DisplayedFolder) {
 }
 
 function onFolderCardClick(folder: DisplayedFolder): void {
-  if (folder.shared) {
-    useFolderInChat(folder)
-    return
-  }
-  enterFolder(folder.name)
+  enterFolder(folder)
 }
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
 const { confirm } = useDialog()
@@ -1640,6 +1667,12 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const filterGroup = ref('')
 const openFolder = ref<string | null>(null)
+const openSharedFolder = ref<DisplayedFolder | null>(null)
+/** True only after the shared-folder listing says this person may change files. */
+const sharedFolderCanEdit = ref(false)
+const canChangeOpenFolder = computed(
+  () => openSharedFolder.value === null || sharedFolderCanEdit.value
+)
 const folderMenuOpen = ref<number | null>(null)
 const files = ref<FileItem[]>([])
 const fileGroups = ref<Array<{ name: string; count: number }>>([])
@@ -1899,6 +1932,7 @@ const allSelected = computed(() => {
 })
 
 const handleFileSelect = (event: Event) => {
+  if (openSharedFolder.value) return
   const target = event.target as HTMLInputElement
   if (target.files && target.files.length > 0) {
     const newFiles = Array.from(target.files)
@@ -1919,7 +1953,7 @@ const smartButtonLabel = computed(() => {
 })
 
 const smartUploadAction = () => {
-  if (isUploading.value) return
+  if (openSharedFolder.value || isUploading.value) return
   if (selectedFiles.value.length > 0) {
     uploadFiles()
   } else {
@@ -1935,9 +1969,10 @@ const removeSelectedFile = (index: number) => {
 }
 
 // Folder picker helpers — auto-target the open folder
-const activeUploadFolder = computed(
-  () => selectedGroup.value || groupKeyword.value || openFolder.value || ''
-)
+const activeUploadFolder = computed(() => {
+  if (openSharedFolder.value) return ''
+  return selectedGroup.value || groupKeyword.value || openFolder.value || ''
+})
 
 const selectExistingFolder = (name: string) => {
   if (selectedGroup.value === name) {
@@ -1963,15 +1998,31 @@ const clearFolderSelection = () => {
 }
 
 // Folder navigation (file list)
-const enterFolder = (name: string) => {
-  openFolder.value = name
-  filterGroup.value = name
+const enterFolder = (folder: DisplayedFolder | string) => {
+  sharedFolderCanEdit.value = false
+  selectedFileIds.value = []
+  if (typeof folder === 'string') {
+    openSharedFolder.value = null
+    openFolder.value = folder
+    filterGroup.value = folder
+  } else if (folder.shared && folder.resourceId) {
+    openSharedFolder.value = folder
+    openFolder.value = folder.name
+    filterGroup.value = ''
+  } else {
+    openSharedFolder.value = null
+    openFolder.value = folder.name
+    filterGroup.value = folder.name
+  }
   currentPage.value = 1
   loadFiles(1)
 }
 
 const exitFolder = () => {
   openFolder.value = null
+  openSharedFolder.value = null
+  sharedFolderCanEdit.value = false
+  selectedFileIds.value = []
   filterGroup.value = ''
   currentPage.value = 1
   loadFiles(1)
@@ -2064,6 +2115,7 @@ const getFileColorClass = (): string => previewBadgeClass()
 
 // Drag & Drop handlers
 const handleDragEnter = (event: DragEvent) => {
+  if (openSharedFolder.value) return
   // Check if dragging files
   if (event.dataTransfer?.types.includes('Files')) {
     dragCounter.value++
@@ -2088,6 +2140,7 @@ const handleDragLeave = () => {
 const handleDrop = async (event: DragEvent) => {
   dragCounter.value = 0
   isDragging.value = false
+  if (openSharedFolder.value) return
 
   const droppedFiles = event.dataTransfer?.files
   if (droppedFiles && droppedFiles.length > 0) {
@@ -2159,7 +2212,7 @@ const getFileIcon = (filename: string): string => previewIconForName(filename)
 // the mobile card and the desktop table via FileRowActions (U9/U12).
 const rowActions = (file: FileItem): FileRowAction[] => {
   const actions: FileRowAction[] = []
-  if (file.chat_id) {
+  if (file.chat_id && openSharedFolder.value === null) {
     actions.push({
       id: 'openInChat',
       title: t('files.openInChat'),
@@ -2179,18 +2232,21 @@ const rowActions = (file: FileItem): FileRowAction[] => {
       title: t('files.download'),
       testid: 'btn-download',
       onSelect: () => downloadFile(file.id, file.filename),
-    },
-    {
+    }
+  )
+  if (canChangeOpenFolder.value) {
+    actions.push({
       id: 'delete',
       title: t('files.delete'),
       testid: 'btn-delete',
       onSelect: () => deleteFile(file.id),
-    }
-  )
+    })
+  }
   return actions
 }
 
 const uploadFiles = async () => {
+  if (openSharedFolder.value) return
   if (selectedFiles.value.length === 0) {
     showError('Please select files to upload')
     return
@@ -2287,12 +2343,16 @@ const buildDateTimestamp = (dateStr: string, end = false): number | undefined =>
   return Math.floor(d.getTime() / 1000)
 }
 
+let loadFilesSeq = 0
+
 const loadFiles = async (page = currentPage.value) => {
+  const seq = ++loadFilesSeq
   isLoading.value = true
 
   try {
     const response = await filesService.listFiles({
-      groupKey: filterGroup.value || undefined,
+      groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
+      sharedFolder: openSharedFolder.value?.resourceId,
       search: searchQuery.value || undefined,
       fileType: filterFileType.value || undefined,
       source: filterSource.value || undefined,
@@ -2304,10 +2364,14 @@ const loadFiles = async (page = currentPage.value) => {
       limit: itemsPerPage,
     })
 
+    if (seq !== loadFilesSeq) return
+
     files.value = response.files
+    sharedFolderCanEdit.value = response.shared?.canEdit === true
     totalCount.value = response.pagination.total
     currentPage.value = response.pagination.page
   } catch (error: unknown) {
+    if (seq !== loadFilesSeq) return
     console.error('Failed to load files:', error)
 
     const msg = getErrorMessage(error) ?? ''
@@ -2318,7 +2382,9 @@ const loadFiles = async (page = currentPage.value) => {
       showError('Failed to load files')
     }
   } finally {
-    isLoading.value = false
+    if (seq === loadFilesSeq) {
+      isLoading.value = false
+    }
   }
 }
 
@@ -2397,7 +2463,8 @@ const toggleSelectAll = async () => {
   } else {
     try {
       const response = await filesService.listFiles({
-        groupKey: filterGroup.value || undefined,
+        groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
+        sharedFolder: openSharedFolder.value?.resourceId,
         search: searchQuery.value || undefined,
         fileType: filterFileType.value || undefined,
         dateFrom: buildDateTimestamp(filterDateFrom.value),

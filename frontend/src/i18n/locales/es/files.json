@@ -214,6 +214,8 @@
     "intro": "Los archivos que subes se convierten en conocimiento consultable para tus chats.",
     "introCta": "Añade archivos a tus fuentes…",
     "useInChat": "Usar en el chat",
+    "startedChatWithFolder": "Se inició un chat nuevo con {folder}.",
+    "startChatFailed": "No se pudo iniciar un chat nuevo. No se abrió nada.",
     "openInChat": "Abrir en el chat",
     "status_error": "Error",
     "terms": {

@@ -36,7 +36,8 @@ final readonly class FileListService
     public function buildListing(int $userId, ?string $groupKey, int $offset, int $limit, array $filters): array
     {
         $vectorFileIds = [];
-        if ($groupKey) {
+        // "0" is a legal folder name. A truthy check would drop it and list every file.
+        if (null !== $groupKey && '' !== $groupKey) {
             try {
                 $vectorFileIds = $this->vectorStorageFacade->getFileIdsByGroupKey($userId, $groupKey);
             } catch (\Throwable $e) {

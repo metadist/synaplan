@@ -57,6 +57,24 @@ final readonly class SharedFileAccess
         return false;
     }
 
+    public function canReadFolder(User $user, string $resourceId): bool
+    {
+        if (!$this->iamConfig->isSharingEnabled((int) $user->getId())) {
+            return false;
+        }
+
+        return $this->accessGate->decide($user, KnowledgeFolderKind::KEY, $resourceId, Permission::Read);
+    }
+
+    public function canEditFolder(User $user, string $resourceId): bool
+    {
+        if (!$this->iamConfig->isSharingEnabled((int) $user->getId())) {
+            return false;
+        }
+
+        return $this->accessGate->decide($user, KnowledgeFolderKind::KEY, $resourceId, Permission::Edit);
+    }
+
     /**
      * @return list<int>
      */
