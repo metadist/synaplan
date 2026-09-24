@@ -28,6 +28,7 @@
       "noModelsAvailable": "Aucun modèle disponible pour cet usage",
       "saveSuccess": "Configuration des modèles enregistrée",
       "saveError": "Échec de l’enregistrement de la configuration des modèles",
+      "saveErrorNotAllowed": "Ce modèle n’est pas autorisé pour votre compte. Choisissez-en un dans la liste.",
       "saveErrorPremiumRequired": "{reason} Veuillez passer à une formule supérieure, ou choisir un autre modèle.",
       "resetDefaults": "Sélectionner les modèles suggérés",
       "resetDefaultsConfirm": "Appliquer la sélection de modèles suggérée ? Vos réglages personnels seront remplacés par les valeurs recommandées.",

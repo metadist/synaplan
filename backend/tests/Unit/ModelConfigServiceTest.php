@@ -338,6 +338,111 @@ class ModelConfigServiceTest extends TestCase
     }
 
     /**
+     * #2103: a locked instance chat default answers even when the member's
+     * allow-list does not contain it. The settings payload names that same id.
+     */
+    public function testLockedDefaultWinsOverTheAllowList(): void
+    {
+        $this->wireAllowList(locked: true, allowedIds: [76, 257], chain: ['249'], source: 'admin');
+        $this->givenModels([249 => 'Anthropic', 76 => 'Groq']);
+        $this->givenUsableProviders(['anthropic', 'groq']);
+
+        self::assertSame(249, $this->service->getDefaultModel('CHAT', 1));
+        self::assertSame(
+            ['id' => 249, 'source' => 'admin', 'locked' => true],
+            $this->service->reportedDefault('CHAT', 1),
+        );
+    }
+
+    /**
+     * #2104: a personal default outside the allow-list is not the effective
+     * default. Generation and the settings payload both name the next allowed id.
+     */
+    public function testPersonalDefaultOutsideTheAllowListIsSkipped(): void
+    {
+        $this->wireAllowList(locked: false, allowedIds: [76, 257], chain: ['324', '76'], source: 'group');
+        $this->givenModels([324 => 'Groq', 76 => 'Groq']);
+        $this->givenUsableProviders(['groq']);
+
+        self::assertSame(76, $this->service->getDefaultModel('CHAT', 1));
+        self::assertSame(
+            ['id' => 76, 'source' => 'group', 'locked' => false],
+            $this->service->reportedDefault('CHAT', 1),
+        );
+    }
+
+    /**
+     * An allowed personal default whose provider has no key is not the model
+     * that answers. The settings payload names the fallback, not the stored id.
+     */
+    public function testReportedDefaultFollowsAnUnusableProvider(): void
+    {
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('isLocked')->willReturn(false);
+        $resolver->method('chain')->willReturn(['249', '9']);
+        $resolver->method('sourceForValue')->willReturnCallback(
+            static fn (?int $userId, string $group, string $setting, string $value): string => '9' === $value ? 'admin' : 'user',
+        );
+        $policy = $this->createMock(GroupPolicyService::class);
+        $policy->method('isModelAllowed')->willReturn(true);
+        $policy->method('modelIdFromStored')->willReturnCallback(
+            static fn (string $raw): ?int => is_numeric($raw) ? (int) $raw : null,
+        );
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+            $policy,
+        );
+        $this->givenModels([249 => 'Anthropic', 9 => 'Groq']);
+        $this->givenUsableProviders(['groq']);
+
+        self::assertSame(
+            ['id' => 9, 'source' => 'admin', 'locked' => false],
+            $this->service->reportedDefault('CHAT', 1),
+        );
+    }
+
+    /**
+     * @param list<int>    $allowedIds
+     * @param list<string> $chain
+     */
+    private function wireAllowList(bool $locked, array $allowedIds, array $chain, string $source): void
+    {
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('isLocked')->willReturn($locked);
+        $resolver->method('chain')->willReturn($chain);
+        $resolver->method('sourceForValue')->willReturn($source);
+
+        $policy = $this->createMock(GroupPolicyService::class);
+        $policy->method('isModelAllowed')->willReturnCallback(
+            static fn (?int $userId, int $modelId): bool => in_array($modelId, $allowedIds, true),
+        );
+        $policy->method('modelIdFromStored')->willReturnCallback(
+            static fn (string $raw): ?int => is_numeric($raw) ? (int) $raw : null,
+        );
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+            $policy,
+        );
+    }
+
+    /**
      * A positive BID with no row is a deleted model, not a placeholder. Passing
      * it on leaves the caller with a model id but no provider and no model
      * name, so the registry quietly answers from its own default — the user

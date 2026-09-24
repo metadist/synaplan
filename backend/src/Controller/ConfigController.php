@@ -1101,8 +1101,10 @@ class ConfigController extends AbstractController
         usort($providers, static fn (array $a, array $b): int => strcasecmp($a['displayName'], $b['displayName']));
 
         if (null !== $this->groupPolicyService && !$this->isGranted('ROLE_ADMIN')) {
+            $userId = (int) $user->getId();
             foreach ($grouped as $capability => $rows) {
-                $grouped[$capability] = $this->groupPolicyService->filterModelsByAllowList($user->getId(), $rows);
+                $filtered = $this->groupPolicyService->filterModelsByAllowList($userId, $rows);
+                $grouped[$capability] = $this->withLockedDefaultVisible($filtered, $rows, $capability, $userId);
             }
         }
 
@@ -1111,6 +1113,42 @@ class ConfigController extends AbstractController
             'models' => $grouped,
             'providers' => $providers,
         ]);
+    }
+
+    /**
+     * A locked instance default is the model that answers, even when the
+     * allow-list would hide it. Put that row back so the settings screen
+     * can name it.
+     *
+     * @param list<array<string, mixed>> $filtered
+     * @param list<array<string, mixed>> $unfiltered
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function withLockedDefaultVisible(array $filtered, array $unfiltered, string $capability, int $userId): array
+    {
+        if (null === $this->layeredConfigResolver || !$this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId)) {
+            return $filtered;
+        }
+
+        $lockedId = $this->modelConfigService->reportedDefault($capability, $userId)['id'];
+        if (null === $lockedId) {
+            return $filtered;
+        }
+        foreach ($filtered as $row) {
+            if ((int) ($row['id'] ?? 0) === $lockedId) {
+                return $filtered;
+            }
+        }
+        foreach ($unfiltered as $row) {
+            if ((int) ($row['id'] ?? 0) === $lockedId) {
+                $filtered[] = $row;
+
+                return $filtered;
+            }
+        }
+
+        return $filtered;
     }
 
     /**
@@ -1192,14 +1230,13 @@ class ConfigController extends AbstractController
                 ]);
                 $source = null !== $config ? 'admin' : null;
             } elseif (null !== $this->layeredConfigResolver && $this->iamConfig->isGroupPoliciesEnabled($userId)) {
-                $raw = $this->layeredConfigResolver->resolve($userId, 'DEFAULTMODEL', $capability);
-                $modelId = null !== $raw && null !== $this->groupPolicyService
-                    ? $this->groupPolicyService->modelIdFromStored($raw)
-                    : (is_numeric((string) $raw) ? (int) $raw : null);
-                $model = null !== $modelId ? $this->modelRepository->find($modelId) : null;
-                $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
-                $locked[$capability] = $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
-                $sources[$capability] = $this->layeredConfigResolver->source($userId, 'DEFAULTMODEL', $capability);
+                // Same allow-list rule as generation: a personal or group
+                // default outside the allow-list is not the effective default,
+                // and a locked instance default wins even when it is (#2103, #2104).
+                $reported = $this->modelConfigService->reportedDefault($capability, $userId);
+                $defaults[$capability] = $reported['id'];
+                $locked[$capability] = $reported['locked'];
+                $sources[$capability] = $reported['source'];
                 continue;
             } else {
                 // Try user-specific config first
@@ -1295,6 +1332,17 @@ class ConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid request body')]
+    #[OA\Response(
+        response: 422,
+        description: 'The model is outside the member allow-list',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'That model is not allowed for your account.'),
+                new OA\Property(property: 'code', type: 'string', example: 'iam.modelNotAllowed'),
+                new OA\Property(property: 'capability', type: 'string', example: 'CHAT'),
+            ]
+        )
+    )]
     #[OA\Response(
         response: 409,
         description: 'A locked default cannot be overridden',
@@ -1404,6 +1452,16 @@ class ConfigController extends AbstractController
                         'code' => 'iam.settingLocked',
                         'capability' => $capability,
                     ], Response::HTTP_CONFLICT);
+                }
+                if (is_numeric($modelId)
+                    && null !== $this->groupPolicyService
+                    && !$this->groupPolicyService->isModelAllowed((int) $user->getId(), (int) $modelId)
+                ) {
+                    return $this->json([
+                        'error' => 'That model is not allowed for your account.',
+                        'code' => 'iam.modelNotAllowed',
+                        'capability' => $capability,
+                    ], Response::HTTP_UNPROCESSABLE_ENTITY);
                 }
             }
         }
