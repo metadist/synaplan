@@ -345,7 +345,23 @@ final class SavedTaskController extends AbstractController
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
-            new OA\Response(response: 409, description: 'Assistant is not shared'),
+            new OA\Response(
+                response: 409,
+                description: 'Assistant is not shared',
+                content: new OA\JsonContent(
+                    required: ['error'],
+                    properties: [
+                        new OA\Property(property: 'error', type: 'string', example: 'iam.assistantNotShared'),
+                        new OA\Property(
+                            property: 'assistant',
+                            type: 'string',
+                            nullable: true,
+                            example: 'Ping bot',
+                            description: 'Display name of the AI assistant the recipient needs access to.',
+                        ),
+                    ],
+                ),
+            ),
         ]
     )]
     public function copy(int $id, #[CurrentUser] ?User $user): JsonResponse

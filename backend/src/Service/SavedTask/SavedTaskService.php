@@ -114,13 +114,13 @@ final readonly class SavedTaskService
             $config = $source->getTriggerConfig();
             if (is_array($config)) {
                 unset(
-                $config['token'],
-                $config['hmacSecret'],
-                $config['hmacConfigured'],
-                $config['accountId'],
-                $config['agentId'],
-                $config['agentTrigger'],
-            );
+                    $config['token'],
+                    $config['hmacSecret'],
+                    $config['hmacConfigured'],
+                    $config['accountId'],
+                    $config['agentId'],
+                    $config['agentTrigger'],
+                );
             }
             if (SavedTask::TRIGGER_INBOUND_EMAIL === $triggerType) {
                 $checklist[] = ['code' => 'needsMailbox', 'itemKey' => 'inbound_email', 'detail' => 'inbound_email'];
