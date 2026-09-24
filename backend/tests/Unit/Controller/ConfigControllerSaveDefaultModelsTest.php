@@ -17,9 +17,6 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\DemoLoginHint;
-use App\Service\Config\LayeredConfigResolver;
-use App\Service\Iam\IamConfig;
-use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
@@ -27,10 +24,13 @@ use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
 use App\Service\Config\FeatureStatusReporter;
+use App\Service\Config\LayeredConfigResolver;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\GuestChatConfig;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MailerConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
@@ -105,7 +105,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
             $this->createStub(\App\Service\Agent\AgentConfig::class),
             $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
-            $this->createStub(\App\Service\Iam\IamConfig::class),
+            $this->createStub(IamConfig::class),
             $this->createStub(ChatReadinessService::class),
             new DemoLoginHint(
                 $this->createStub(UserRepository::class),
