@@ -104,7 +104,12 @@ final class SavedTaskGraphPortabilityTest extends TestCase
 
         self::assertSame(
             ['folder' => 'INBOX'],
-            $port->exportTriggerConfig(['accountId' => 77, 'folder' => 'INBOX']),
+            $port->exportTriggerConfig([
+                'accountId' => 77,
+                'folder' => 'INBOX',
+                'agentId' => 1,
+                'agentTrigger' => 'new-assistant:sch-1',
+            ]),
         );
     }
 

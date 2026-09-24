@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\Entity\Agent;
 use App\Entity\Message;
 use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\MessageRepository;
@@ -1653,7 +1654,9 @@ final readonly class MessageProcessor
         if (empty($options['agentId'])) {
             return $options;
         }
-        if ($hasFixedPrompt || !$this->agentConfig->isEnabled($message->getUserId())) {
+        $fixedTopic = $options['fixed_task_prompt'] ?? null;
+        $assistantPrompt = is_string($fixedTopic) && str_starts_with($fixedTopic, Agent::TOPIC_PREFIX);
+        if ((!$assistantPrompt && $hasFixedPrompt) || !$this->agentConfig->isEnabled($message->getUserId())) {
             unset($options['agentId'], $options['agentDraft']);
         }
 

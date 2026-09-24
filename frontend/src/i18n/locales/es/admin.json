@@ -920,6 +920,7 @@
     "runCopy": "Ejecutar como mi copia",
     "runCopyConfirm": "¿Crear tu propia copia de esta tarea guardada? Se ejecutará solo cuando tú la inicies.",
     "assistantNotShared": "El asistente de IA de esta tarea no está compartido contigo.",
+    "assistantNotSharedNamed": "El asistente de IA «{name}» no está compartido contigo. Pide a quien lo tiene que lo comparta y vuelve a intentarlo.",
     "sharedBy": "De {name}",
     "continueAsCopy": "Continuar como mi copia",
     "continueFailed": "No se pudo crear su copia. Inténtelo de nuevo.",

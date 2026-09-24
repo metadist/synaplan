@@ -920,6 +920,7 @@
     "runCopy": "Kendi kopyam olarak çalıştır",
     "runCopyConfirm": "Bu kayıtlı görevin kendi kopyanızı oluşturulsun mu? Yalnızca siz başlattığınızda çalışır.",
     "assistantNotShared": "Bu görevin AI asistanı sizinle paylaşılmamış.",
+    "assistantNotSharedNamed": "“{name}” AI asistanı sizinle paylaşılmamış. Sahibinden paylaşmasını isteyin, sonra yeniden deneyin.",
     "sharedBy": "{name} tarafından",
     "continueAsCopy": "Kendi kopyam olarak devam et",
     "continueFailed": "Kopyanız oluşturulamadı. Lütfen tekrar deneyin.",

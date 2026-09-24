@@ -58,7 +58,14 @@ final readonly class SavedTaskGraphPortability
         if (null === $config) {
             return null;
         }
-        unset($config['token'], $config['hmacSecret'], $config['hmacConfigured'], $config['accountId']);
+        unset(
+            $config['token'],
+            $config['hmacSecret'],
+            $config['hmacConfigured'],
+            $config['accountId'],
+            $config['agentId'],
+            $config['agentTrigger'],
+        );
 
         return $config;
     }
