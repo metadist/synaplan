@@ -37,6 +37,31 @@ describe('SubjectPicker', () => {
     }
   })
 
+  it('names every account when user search is on', async () => {
+    vi.mocked(iamApi.searchSubjects).mockResolvedValueOnce({
+      subjects: [],
+      personScope: 'everyone',
+    })
+    vi.useFakeTimers()
+    try {
+      const wrapper = mountPicker()
+      await wrapper.get('[data-testid="input-iam-subject-search"]').setValue('zzz')
+      await wrapper.get('[data-testid="input-iam-subject-search"]').trigger('focus')
+      await vi.advanceTimersByTimeAsync(250)
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="input-iam-subject-search"]').attributes('placeholder')).toBe(
+        'Search a person or group…'
+      )
+      expect(wrapper.get('[data-testid="text-iam-no-matches"]').text()).toBe(
+        'No person or group matches.'
+      )
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shows try again when search fails', async () => {
     vi.mocked(iamApi.searchSubjects).mockRejectedValueOnce(new Error('network'))
     vi.useFakeTimers()

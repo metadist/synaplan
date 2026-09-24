@@ -114,15 +114,16 @@ final readonly class ShareService
             throw new \InvalidArgumentException('You already have full access to your own item.');
         }
         $this->assertSubjectExists($subjectType, $subjectId);
+
+        if (!$this->accessGate->decide($actor, $kind, $resourceId, Permission::Manage)) {
+            throw new ShareNotAllowedException('Only the owner or someone who can manage this item may share it.');
+        }
+
         if (Share::SUBJECT_USER === $subjectType
             && !$this->iamConfig->isUserSearchEnabled((int) $actor->getId())
             && !in_array($subjectId, $this->groupMemberRepository->findCoMemberUserIds((int) $actor->getId()), true)
         ) {
             throw new ShareNotAllowedException('You can share with people in a group you share, or with a group.');
-        }
-
-        if (!$this->accessGate->decide($actor, $kind, $resourceId, Permission::Manage)) {
-            throw new ShareNotAllowedException('Only the owner or someone who can manage this item may share it.');
         }
 
         // An administrator manages shares on the owner's behalf without holding

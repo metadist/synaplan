@@ -264,7 +264,7 @@ final class ShareController extends AbstractController
                 response: 200,
                 description: 'People, groups, and everyone',
                 content: new OA\JsonContent(
-                    required: ['subjects'],
+                    required: ['subjects', 'personScope'],
                     properties: [
                         new OA\Property(
                             property: 'personScope',
