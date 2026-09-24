@@ -50,9 +50,9 @@ describe('SubjectPicker', () => {
       await vi.advanceTimersByTimeAsync(250)
       await flushPromises()
 
-      expect(wrapper.get('[data-testid="input-iam-subject-search"]').attributes('placeholder')).toBe(
-        'Search a person or group…'
-      )
+      expect(
+        wrapper.get('[data-testid="input-iam-subject-search"]').attributes('placeholder')
+      ).toBe('Search a person or group…')
       expect(wrapper.get('[data-testid="text-iam-no-matches"]').text()).toBe(
         'No person or group matches.'
       )
