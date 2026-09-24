@@ -214,6 +214,7 @@
     "intro": "Yüklediğiniz dosyalar sohbetleriniz için aranabilir bilgiye dönüşür.",
     "introCta": "Dosyaları kaynaklarınıza ekleyin…",
     "useInChat": "Sohbette kullan",
+    "startedChatWithFolder": "{folder} ile yeni bir sohbet başlatıldı.",
     "openInChat": "Sohbette aç",
     "status_error": "Hata",
     "terms": {

@@ -254,6 +254,13 @@ export type FileFacets = z.infer<typeof fileFacetsSchema>
 export const fileListResponseSchema = z.object({
   success: z.boolean(),
   files: z.array(fileItemSchema),
+  shared: z
+    .object({
+      resourceId: z.string(),
+      canEdit: z.boolean(),
+    })
+    .nullable()
+    .optional(),
   pagination: z.object({
     page: z.number(),
     limit: z.number(),
@@ -683,6 +690,8 @@ export interface FileListOptions {
   dateTo?: number
   page?: number
   limit?: number
+  /** Shared knowledge-folder id (`ownerId:groupKey`) to list instead of the caller's files. */
+  sharedFolder?: string
 }
 
 /**
@@ -704,6 +713,7 @@ export const listFiles = async (options: FileListOptions = {}): Promise<FileList
   if (options.sort) params.sort = options.sort
   if (options.dateFrom) params.date_from = options.dateFrom
   if (options.dateTo) params.date_to = options.dateTo
+  if (options.sharedFolder) params.shared_folder = options.sharedFolder
 
   const response = await api.get('/api/v1/files', { params })
   // Validate at runtime: the schema is the same definition the FileListResponse

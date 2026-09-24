@@ -13,6 +13,7 @@ use App\Service\Iam\AccessGate;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\ConversationKind;
+use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
 use App\Service\Iam\SharedFileAccess;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -66,6 +67,31 @@ final class SharedFileAccessTest extends TestCase
         $this->meta->expects(self::never())->method('userHasSharedFileRef');
 
         self::assertFalse($this->access->canRead($this->user(3), $this->file(9)));
+    }
+
+    public function testSharingOffDeniesFolderReadAndEdit(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(false);
+        $this->gate->expects(self::never())->method('decide');
+
+        $user = $this->user(3);
+        self::assertFalse($this->access->canReadFolder($user, '9:Q3'));
+        self::assertFalse($this->access->canEditFolder($user, '9:Q3'));
+    }
+
+    public function testFolderReadAndEditFollowTheShare(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
+        $user = $this->user(3);
+        $this->gate->method('decide')->willReturnCallback(
+            static fn (User $actor, string $kind, string $id, Permission $level): bool => $actor === $user
+                && KnowledgeFolderKind::KEY === $kind
+                && '9:Q3' === $id
+                && Permission::Read === $level,
+        );
+
+        self::assertTrue($this->access->canReadFolder($user, '9:Q3'));
+        self::assertFalse($this->access->canEditFolder($user, '9:Q3'));
     }
 
     public function testConversationShareReachesFileThroughMessageLink(): void
