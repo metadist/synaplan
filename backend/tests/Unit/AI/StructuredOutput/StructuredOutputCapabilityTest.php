@@ -94,6 +94,8 @@ final class StructuredOutputCapabilityTest extends TestCase
             'fable 5.1' => ['claude-fable-5-1'],
             'fable 5.1 dated alias' => ['claude-fable-5-1-20260812'],
             'mythos 5.1' => ['claude-mythos-5-1'],
+            'opus 5.5' => ['claude-opus-5-5'],
+            'opus 5.5 dated alias' => ['claude-opus-5-5-20260922'],
         ];
     }
 

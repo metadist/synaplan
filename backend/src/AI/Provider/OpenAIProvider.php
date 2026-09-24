@@ -42,6 +42,10 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * @var array<string, list<string>>
      */
     private const REASONING_EFFORT_TIERS = [
+        // Sol / Luna publish a `none` skip tier; Astra does not. Longer
+        // prefixes must precede the bare `gpt-6` fallback.
+        'gpt-6-sol' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+        'gpt-6-luna' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
         'gpt-6' => ['low', 'medium', 'high', 'xhigh', 'max'],
         'gpt-5.6' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
         // Pro reasons hard by design: no skip tier, default 'high'.
@@ -576,8 +580,9 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     /**
      * Cheapest `reasoning.effort` tier the given model accepts — `'none'` on
-     * most of the gpt-5.x line, `'minimal'` on the original gpt-5, `'low'` on
-     * gpt-6 and the o-series, `'medium'` on gpt-5.5-pro.
+     * most of the gpt-5.x line and on gpt-6-sol / gpt-6-luna, `'minimal'` on
+     * the original gpt-5, `'low'` on gpt-6-astra and the o-series, `'medium'`
+     * on gpt-5.5-pro.
      */
     private function lowestEffortTier(string $model): string
     {
