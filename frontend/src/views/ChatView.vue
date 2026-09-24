@@ -355,6 +355,7 @@
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
         :is-streaming="isStreaming"
+        :send-locked="!assistantThreadReady"
         :is-guest-mode="isGuestMode"
         :banner-visible="
           showPendingPurchaseBanner ||
@@ -913,6 +914,39 @@ const {
   starterPrompts: pinnedStarterPrompts,
 } = usePinnedAssistant()
 
+// Start chat (?agentId=) may still be leaving the previous thread. Send stays
+// off until that empty chat is the one on screen, so the first message cannot
+// land in the last conversation.
+const assistantThreadReady = ref(queryAgentId.value == null || !isAgentsEnabled())
+let assistantChatBootstrapped = assistantThreadReady.value
+let suppressNextChatHistoryLoad = false
+
+async function openFreshAssistantChatIfNeeded(): Promise<void> {
+  if (!queryAgentId.value || !isAgentsEnabled() || !authStore.isAuthenticated) {
+    assistantThreadReady.value = true
+    return
+  }
+  if (!shouldOpenFreshAssistantChat(queryAgentId.value, historyStore.messages)) {
+    assistantThreadReady.value = true
+    return
+  }
+  assistantThreadReady.value = false
+  const previousChatId = chatsStore.activeChatId
+  suppressNextChatHistoryLoad = true
+  try {
+    const chat = await chatsStore.findOrCreateEmptyChat()
+    const chatId = chat?.id ?? chatsStore.activeChatId
+    if (chatId && chatId !== previousChatId) {
+      await historyStore.loadMessages(chatId)
+    }
+  } finally {
+    if (chatsStore.activeChatId === previousChatId) {
+      suppressNextChatHistoryLoad = false
+    }
+    assistantThreadReady.value = true
+  }
+}
+
 function captureOutgoingAgentId(): number | null {
   return capturePinnedAgentForSend(isAgentsEnabled(), queryAgentId.value, historyStore.messages)
 }
@@ -1433,6 +1467,8 @@ onMounted(async () => {
     window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
     window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
     maybeRemindAboutUpgrade()
+    assistantThreadReady.value = true
+    assistantChatBootstrapped = true
     return
   }
 
@@ -1484,11 +1520,15 @@ onMounted(async () => {
 
   // Start chat from an assistant must not reopen an unrelated last thread.
   // A ?chat= deep link (Saved Tasks) keeps that thread even if agentId is set.
-  if (
-    !openedSpecificChat &&
-    shouldOpenFreshAssistantChat(queryAgentId.value, historyStore.messages)
-  ) {
-    await chatsStore.findOrCreateEmptyChat()
+  // Send stays disabled until this returns, including when the decision is
+  // "stay on this chat".
+  try {
+    if (!openedSpecificChat) {
+      await openFreshAssistantChatIfNeeded()
+    }
+  } finally {
+    assistantThreadReady.value = true
+    assistantChatBootstrapped = true
   }
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
@@ -1819,7 +1859,13 @@ watch(
       // Note: Don't call historyStore.clear() here!
       // loadMessages() replaces messages when offset=0, making clear() redundant.
       // Calling clear() first causes empty chat if loadMessages() fails silently.
-      await historyStore.loadMessages(newChatId)
+      // Start chat loads this history itself and keeps Send locked until it
+      // finishes; skipping the second load avoids wiping the first message.
+      if (suppressNextChatHistoryLoad) {
+        suppressNextChatHistoryLoad = false
+      } else {
+        await historyStore.loadMessages(newChatId)
+      }
 
       // Coming back to a chat whose turn is still generating: keep watching it
       // live. A different chat means a different run, so the previous
@@ -1847,12 +1893,14 @@ watch(
 )
 
 watch(queryAgentId, async (id) => {
-  if (!id || !authStore.isAuthenticated) {
+  if (!assistantChatBootstrapped) {
     return
   }
-  if (shouldOpenFreshAssistantChat(id, historyStore.messages)) {
-    await chatsStore.findOrCreateEmptyChat()
+  if (!id || !authStore.isAuthenticated) {
+    assistantThreadReady.value = true
+    return
   }
+  await openFreshAssistantChatIfNeeded()
 })
 
 const userTextBefore = (messageId: string | number): string => {

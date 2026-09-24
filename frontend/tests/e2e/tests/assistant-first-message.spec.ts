@@ -54,12 +54,14 @@ test.describe('@ci Assistants first chat message', () => {
       })
 
       await page.locator(CHAT.textInput).fill('Who are you?')
+      await expect(page.locator(CHAT.sendBtn)).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
       await page.locator(CHAT.sendBtn).click()
       await expect.poll(() => seen.length, { timeout: TIMEOUTS.STANDARD }).toBe(1)
       expect(seen[0]).toBe(String(agentId))
       await expect(page.locator('[data-testid="banner-pinned-assistant"]')).toBeVisible()
 
       await page.locator(CHAT.textInput).fill('And now?')
+      await expect(page.locator(CHAT.sendBtn)).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
       await page.locator(CHAT.sendBtn).click()
       await expect.poll(() => seen.length, { timeout: TIMEOUTS.STANDARD }).toBe(2)
       expect(seen[1]).toBe(String(agentId))
