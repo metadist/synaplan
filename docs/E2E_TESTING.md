@@ -60,6 +60,24 @@ If the dev stack's Ollama already occupies host port 11434, remap the stub
 (`OLLAMA_STUB_URL=http://localhost:11435` plus a compose port override) — the
 backend reaches it container-to-container either way.
 
+### Known local-only failures
+
+These fail on the local dev stack and pass in CI. Confirm the failure matches
+an entry, then move on — do not "fix" product code for them. A new
+environment-only failure (fails the same on `main`) is added here with its
+cause; a cause that can be fixed (a test depending on the local env or on
+fixtures) is fixed instead.
+
+- **Specs that need the test stack** (`docker-compose.test.yml`) fail under `make test-e2e` on the dev stack:
+  - Mail specs (`email`, `registration`, `guest-registration`, `admin-panel`): the runner defaults to MailHog `:8026` (test stack); run with `MAILHOG_URL=http://localhost:8025`.
+  - Guest specs (`guest-chat`, `guest-registration`): the dev stack allows 5 guest sessions per IP (`GUEST_MAX_SESSIONS_PER_IP`, test stack: 100), so after a few runs the API answers `Too many guest sessions` and the guest banner never renders.
+  - `@whatsapp` specs: the WhatsApp stub on `:3999` only runs in the test stack.
+  - `subscription*.spec.ts`: need the fake Stripe secret and price IDs from `backend/.env.test`; real Stripe values in `backend/.env` fail the webhook signature or the level mapping.
+  - `memories.spec.ts` "memorizable fact": the dev stack uses the real extraction model, which stores a paraphrase.
+  - `workspace-tab.spec.ts` "flag off": compute is on in the dev stack.
+- **Tests that reset mid-test after a file under `frontend/` was saved** during the run: Vite HMR reloaded the page (the trace shows module requests with `?t=<timestamp>`). Never save frontend files while Playwright runs against `:5173`; rerun the affected specs.
+- **`Generated API schemas do not match the backend OpenAPI spec`** from `globalSetup`: the backend spec changed since the frontend generated `src/generated/api-schemas.ts`. Run `make -C frontend generate-schemas`. The Vite dev server also regenerates them on a page load (at most every 30 s).
+
 ---
 
 ## 0. Tags & CI Matrix
@@ -192,6 +210,15 @@ Import from `config/config.ts`:
 | `TIMEOUTS.LONG` | 15 s | First AI token, file upload |
 | `TIMEOUTS.VERY_LONG` | 30 s | Full AI stream, heavy processing |
 | `TIMEOUTS.EXTREME` | 60 s | Only with explicit justification |
+
+`playwright.config.ts` sets global budgets: an action without its own timeout
+fails after `TIMEOUTS.LONG`, a navigation after `TIMEOUTS.VERY_LONG`, and the
+error names the element. A genuinely long wait (AI answer, job, upload) gets
+its own timeout on that wait — never raise the global values.
+
+Service workers are blocked (`serviceWorkers: 'block'`) so `page.route()` sees
+every request. A test that needs the service worker opts in with
+`test.use({ serviceWorkers: 'allow' })` and cannot rely on `page.route()`.
 
 ### DO
 
@@ -374,6 +401,7 @@ for (let i = 0; i < optionCount; i++) {
 * E2E tests only for critical user flows. Prefer component/unit tests for UI details.
 * Fewer stable smoke tests > many fragile ones.
 * **Tests must be independent** — never rely on execution order or state from a previous test.
+* The CI test stack has no `centrifugo` (realtime push) and no `collabora` (office conversion). A spec must not depend on either; check that something arrived via reload or navigation.
 * Use `test.describe.configure({ mode: 'serial' })` only when tests share expensive setup (e.g. login + data creation) and document why.
 
 ---

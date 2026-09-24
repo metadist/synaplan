@@ -48,7 +48,7 @@ final class Version20260923190000Test extends KernelTestCase
         $this->givenPreviewRowsAreLive();
         $this->deleteStableRows();
 
-        $ownerId = $this->anyUserId();
+        $ownerId = $this->givenOwner();
         $this->givenDefaultModelBinding($ownerId, 'TEXT2PIC', self::PREVIEW_BANANA_BID);
         $this->givenDefaultModelBinding($ownerId, 'PIC2PIC', self::PREVIEW_PRO_BID);
         $promptId = $this->givenPromptWithModelOverride($ownerId, self::PREVIEW_BANANA_BID);
@@ -73,7 +73,7 @@ final class Version20260923190000Test extends KernelTestCase
         $this->givenPreviewRowsAreLive();
         $this->deleteStableRows();
 
-        $ownerId = $this->anyUserId();
+        $ownerId = $this->givenOwner();
         $widgetId = $this->givenWidgetWithModelOverride($ownerId, self::PREVIEW_BANANA_BID);
 
         $this->runUp();
@@ -96,7 +96,7 @@ final class Version20260923190000Test extends KernelTestCase
         $this->givenPreviewRowsAreLive();
         $this->deleteStableRows();
 
-        $ownerId = $this->anyUserId();
+        $ownerId = $this->givenOwner();
         $widgetId = $this->givenWidgetWithModelOverride($ownerId, 1);
 
         $this->runUp();
@@ -143,12 +143,25 @@ final class Version20260923190000Test extends KernelTestCase
         $this->connection->executeStatement('DELETE FROM BMODELS WHERE BID IN (371, 372)');
     }
 
-    private function anyUserId(): int
+    /**
+     * The test database may or may not carry fixtures, so each case brings its
+     * own owner. Raw INSERT keeps the row on this test's rolled-back connection.
+     */
+    private function givenOwner(): int
     {
-        $userId = $this->connection->fetchOne('SELECT BID FROM BUSER ORDER BY BID ASC LIMIT 1');
-        self::assertNotFalse($userId, 'test database has no user to attach fixtures to');
+        $this->connection->executeStatement(
+            'INSERT INTO BUSER (BCREATED, BMAIL, BPROVIDERID, BUSERLEVEL, BUSERDETAILS, BPAYMENTDETAILS)
+             VALUES (:created, :mail, :provider, :level, :details, :details)',
+            [
+                'created' => date('YmdHis'),
+                'mail' => 'migration-owner-'.bin2hex(random_bytes(4)).'@example.com',
+                'provider' => 'local',
+                'level' => 'NEW',
+                'details' => '{}',
+            ]
+        );
 
-        return (int) $userId;
+        return (int) $this->connection->lastInsertId();
     }
 
     private function givenDefaultModelBinding(int $ownerId, string $setting, int $modelId): void

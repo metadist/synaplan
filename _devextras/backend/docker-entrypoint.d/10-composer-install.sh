@@ -52,3 +52,11 @@ if [ ! -d vendor ] || [ ! -f vendor/autoload.php ] || [ "$LOCK_HASH" != "$STORED
 else
     echo "✅ [dev] Composer dependencies up to date"
 fi
+
+# lib/grpc/ is gitignored and the install above skips scripts, so a fresh checkout
+# has no Triton stubs and PHPStan reports class.notFound for Inference\*.
+if [ ! -d lib/grpc/Inference ]; then
+    echo "🔧 [dev] Generating gRPC stubs..."
+    mkdir -p lib/grpc
+    composer proto:generate || echo "⚠️  [dev] gRPC stub generation failed; run: composer proto:generate"
+fi

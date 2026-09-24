@@ -20,6 +20,11 @@ services:
 
     volumes: !reset []
 
+    # Warnings carry the degradations (e.g. "Qdrant health check timed out")
+    # that explain a failed E2E run; CI collects these logs on failure.
+    environment:
+      LOG_LEVEL: warning
+
   ollama_test:
     profiles: !override
       - disabled
