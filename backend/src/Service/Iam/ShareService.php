@@ -119,6 +119,13 @@ final readonly class ShareService
             throw new ShareNotAllowedException('Only the owner or someone who can manage this item may share it.');
         }
 
+        if (Share::SUBJECT_USER === $subjectType
+            && !$this->iamConfig->isUserSearchEnabled((int) $actor->getId())
+            && !in_array($subjectId, $this->groupMemberRepository->findCoMemberUserIds((int) $actor->getId()), true)
+        ) {
+            throw new ShareNotAllowedException('You can share with people in a group you share, or with a group.');
+        }
+
         // An administrator manages shares on the owner's behalf without holding
         // a grant of their own. That power must not become a way to read the
         // content: a subject that includes the actor (themselves, a group they
@@ -504,9 +511,9 @@ final readonly class ShareService
     /**
      * People and groups the actor may share with. "Everyone" is pinned first
      * only when {@see IamConfig::canShareWithEveryone()} allows this actor.
-     * User accounts are searchable only when
-     * {@see IamConfig::isUserSearchEnabled()} is on — otherwise the picker
-     * would expose every registered account on a public instance (#2060).
+     * With user search on, every account matches. With it off, only people
+     * who share a group with the actor match (#2106). Groups stay searchable
+     * either way.
      *
      * @return list<array<string, mixed>>
      */
@@ -527,19 +534,21 @@ final readonly class ShareService
         $usersVisible = $this->iamConfig->isUserSearchEnabled($actorId);
 
         if ('' !== $query) {
-            if ($usersVisible) {
-                foreach ($this->userRepository->searchByEmailOrName($query, $limit) as $user) {
-                    if ((int) $user->getId() === $actorId) {
-                        continue;
-                    }
-                    $out[] = [
-                        'type' => Share::SUBJECT_USER,
-                        'id' => (int) $user->getId(),
-                        'name' => $this->displayName($user),
-                        'email' => $user->getMail(),
-                        'pinned' => false,
-                    ];
+            $onlyUserIds = $usersVisible ? null : $this->groupMemberRepository->findCoMemberUserIds($actorId);
+            $matchedUsers = (null !== $onlyUserIds && [] === $onlyUserIds)
+                ? []
+                : $this->userRepository->searchByEmailOrName($query, $limit, $onlyUserIds);
+            foreach ($matchedUsers as $user) {
+                if ((int) $user->getId() === $actorId) {
+                    continue;
                 }
+                $out[] = [
+                    'type' => Share::SUBJECT_USER,
+                    'id' => (int) $user->getId(),
+                    'name' => $this->displayName($user),
+                    'email' => $user->getMail(),
+                    'pinned' => false,
+                ];
             }
             foreach ($this->groupRepository->searchByName($query, $limit) as $group) {
                 $out[] = [

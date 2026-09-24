@@ -644,6 +644,7 @@ final class ShareControllerTest extends WebTestCase
         $config = static::getContainer()->get(ConfigRepository::class);
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '1');
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_SHARING_ENABLED, '1');
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_USER_SEARCH_ENABLED, '1');
         // The suite assumes an owner may share with every account. A public
         // install stores `disabled`; these tests opt back into the company default.
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);

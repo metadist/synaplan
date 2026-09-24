@@ -221,13 +221,19 @@ export const iamApi = {
     })
   },
 
-  async searchSubjects(q: string): Promise<IamSubject[]> {
+  async searchSubjects(q: string): Promise<{
+    subjects: IamSubject[]
+    personScope: 'shared-group' | 'everyone'
+  }> {
     const data = await httpClient('/api/v1/iam/subjects', {
       method: 'GET',
       params: { q },
       schema: SearchIamSubjectsResponseSchema,
     })
-    return data.subjects ?? []
+    return {
+      subjects: data.subjects ?? [],
+      personScope: data.personScope === 'everyone' ? 'everyone' : 'shared-group',
+    }
   },
 
   async listSharedWithMe(kind: string): Promise<IamSharedItem[]> {

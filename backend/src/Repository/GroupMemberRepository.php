@@ -139,6 +139,34 @@ class GroupMemberRepository extends ServiceEntityRepository
             ->execute();
     }
 
+    /**
+     * Accounts that share at least one group with this user, excluding the user.
+     *
+     * @return list<int>
+     */
+    public function findCoMemberUserIds(int $userId): array
+    {
+        $groupIds = array_map(
+            static fn (GroupMember $member): int => $member->getGroupId(),
+            $this->findByUserId($userId),
+        );
+        if ([] === $groupIds) {
+            return [];
+        }
+
+        /** @var list<int|string> $ids */
+        $ids = $this->createQueryBuilder('m')
+            ->select('DISTINCT m.userId')
+            ->where('m.groupId IN (:groupIds)')
+            ->andWhere('m.userId != :userId')
+            ->setParameter('groupIds', $groupIds)
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_map(static fn (int|string $id): int => (int) $id, $ids);
+    }
+
     public function deleteByUserId(int $userId): void
     {
         $this->createQueryBuilder('m')
