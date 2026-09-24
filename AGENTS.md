@@ -189,6 +189,7 @@ These fail on the local dev stack and pass in CI. Confirm the failure matches th
 
 - **E2E specs that need the test stack** (`docker-compose.test.yml`) fail under `make test-e2e` on the dev stack:
   - Mail specs (`email`, `registration`, `guest-registration`, `admin-panel`): the runner defaults to MailHog `:8026` (test stack); run with `MAILHOG_URL=http://localhost:8025`.
+  - Guest specs (`guest-chat`, `guest-registration`): the dev stack allows 5 guest sessions per IP (`GUEST_MAX_SESSIONS_PER_IP`, test stack: 100), so after a few runs the API answers `Too many guest sessions` and the guest banner never renders.
   - `@whatsapp` specs: the WhatsApp stub on `:3999` only runs in the test stack.
   - `subscription*.spec.ts`: need the fake Stripe secret and price IDs from `backend/.env.test`; real Stripe values in `backend/.env` fail the webhook signature or the level mapping.
   - `memories.spec.ts` "memorizable fact": the dev stack uses the real extraction model, which stores a paraphrase.
