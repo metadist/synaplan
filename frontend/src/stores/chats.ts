@@ -111,6 +111,12 @@ export const useChatsStore = defineStore('chats', () => {
   /** Ids `createChat()` added that a snapshot started beforehand cannot list. */
   const locallyCreatedIds = new Set<number>()
   /**
+   * In-flight creates of chats that start empty. Their chat is not in `chats`
+   * yet, so `findOrCreateEmptyChat()` waits for them instead of creating a
+   * second empty chat (boot auto-create + "New Chat", or a double click).
+   */
+  const pendingEmptyCreates = new Set<Promise<Chat | null>>()
+  /**
    * Live generating marks, keyed by chat id → `chatsLoadSeq` at mark time.
    * Applied only to loads that were already in flight (`epoch >= loadSeq`) so
    * a later snapshot can turn the marker off after the user walked away.
@@ -368,7 +374,16 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
-  async function createChat(title?: string): Promise<Chat | null> {
+  function createChat(title?: string): Promise<Chat | null> {
+    const request = postNewChat(title)
+    if (title === undefined || isDefaultChatTitle(title)) {
+      pendingEmptyCreates.add(request)
+      void request.finally(() => pendingEmptyCreates.delete(request))
+    }
+    return request
+  }
+
+  async function postNewChat(title?: string): Promise<Chat | null> {
     if (!checkAuthOrRedirect()) return null
 
     loading.value = true
@@ -439,6 +454,10 @@ export const useChatsStore = defineStore('chats', () => {
     const incognitoStore = useIncognitoStore()
     if (incognitoStore.active) {
       void incognitoStore.endSession()
+    }
+
+    if (pendingEmptyCreates.size > 0) {
+      await Promise.all(pendingEmptyCreates)
     }
 
     // Find all empty chats (not widget sessions, no messages, default title).
