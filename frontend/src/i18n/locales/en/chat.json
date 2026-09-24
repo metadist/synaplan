@@ -42,20 +42,21 @@
     }
   },
   "companionLinks": {
-    "tagline": "Synaplan — think free",
-    "ask": "Tell me what you can do",
+    "tagline": "What can I help you with?",
     "opensInNewTab": "Opens in a new tab",
-    "desktop": {
-      "title": "Desktop Client",
-      "blurb": "Keep your research local, employ Agents anywhere."
+    "choice": {
+      "title": "Your model and assistant",
+      "blurb": "You can switch either one in this chat."
     },
     "mobile": {
-      "title": "Mobile Apps",
-      "blurb": "Get your users on the road, freely configurable."
+      "title": "iPhone and Android",
+      "blurb": "The Synaplan app on your phone.",
+      "appStore": "App Store",
+      "playStore": "Google Play"
     },
-    "outlook": {
-      "title": "Outlook add-in",
-      "blurb": "Because closed systems should have local documents."
+    "source": {
+      "title": "Source code",
+      "blurb": "Read it on GitHub and run Synaplan yourself."
     }
   },
   "chats": {

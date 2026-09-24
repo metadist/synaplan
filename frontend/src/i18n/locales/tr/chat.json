@@ -42,20 +42,21 @@
     }
   },
   "companionLinks": {
-    "tagline": "Synaplan — özgür düşün",
-    "ask": "Bana neler yapabildiğini söyle",
+    "tagline": "Sana nasıl yardımcı olabilirim?",
     "opensInNewTab": "Yeni sekmede açılır",
-    "desktop": {
-      "title": "Masaüstü istemcisi",
-      "blurb": "Araştırmanı yerelde tut, ajanları her yerde kullan."
+    "choice": {
+      "title": "Modelin ve asistanın",
+      "blurb": "İkisini de bu sohbette istediğin zaman değiştirebilirsin."
     },
     "mobile": {
-      "title": "Mobil uygulamalar",
-      "blurb": "Kullanıcılarını yola çıkar, özgürce yapılandırılabilir."
+      "title": "iPhone ve Android",
+      "blurb": "Synaplan uygulaması telefonunda.",
+      "appStore": "App Store",
+      "playStore": "Google Play"
     },
-    "outlook": {
-      "title": "Outlook eklentisi",
-      "blurb": "Çünkü kapalı sistemlerin de yerel belgelere ihtiyacı var."
+    "source": {
+      "title": "Kaynak kodu",
+      "blurb": "GitHub’da oku ve Synaplan’ı kendin çalıştır."
     }
   },
   "chats": {

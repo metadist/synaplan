@@ -18,17 +18,18 @@ test.describe('@ci Chat empty landing', () => {
     await chat.startNewChat()
 
     await expect(page.locator(CHAT.companionLinks)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expect(page.locator(CHAT.companionDesktop)).toHaveAttribute(
+    await expect(page.locator(CHAT.companionChoice)).toBeVisible()
+    await expect(page.locator(CHAT.companionAppStore)).toHaveAttribute(
       'href',
-      'https://github.com/metadist/synaplan-desktop'
+      'https://apps.apple.com/app/id6784278288?ct=app-welcome'
     )
-    await expect(page.locator(CHAT.companionMobile)).toHaveAttribute(
+    await expect(page.locator(CHAT.companionPlayStore)).toHaveAttribute(
       'href',
-      'https://github.com/metadist/synaplan-apps'
+      'https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dapp-welcome'
     )
-    await expect(page.locator(CHAT.companionOutlook)).toHaveAttribute(
+    await expect(page.locator(CHAT.companionSource)).toHaveAttribute(
       'href',
-      'https://github.com/metadist/Synamail'
+      'https://github.com/metadist/synaplan'
     )
 
     const ask = page.locator(CHAT.selfAwareEmptyHintBtn)
