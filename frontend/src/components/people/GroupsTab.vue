@@ -163,10 +163,30 @@ async function renameGroup(group: IamGroup) {
   }
 }
 
+async function groupDeleteMessage(group: IamGroup): Promise<string> {
+  try {
+    const [shares, config] = await Promise.all([
+      iamApi.listGroupShares(group.id),
+      iamApi.getGroupConfig(group.id),
+    ])
+    const shareCount = shares.length
+    const policyCount = Object.values(config.settings).filter(
+      (row) => row.source === 'group'
+    ).length
+    return t('people.groups.deleteConfirm', {
+      name: group.name,
+      shares: t('people.groups.deleteConfirmShares', shareCount),
+      policies: t('people.groups.deleteConfirmPolicies', policyCount),
+    })
+  } catch {
+    return t('people.groups.deleteConfirmUnknown', { name: group.name })
+  }
+}
+
 async function deleteGroup(group: IamGroup) {
   const confirmed = await confirm({
     title: t('people.groups.delete'),
-    message: t('people.groups.deleteConfirm', { name: group.name }),
+    message: await groupDeleteMessage(group),
     danger: true,
   })
   if (!confirmed) return
