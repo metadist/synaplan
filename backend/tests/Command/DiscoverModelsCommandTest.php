@@ -41,35 +41,44 @@ final class DiscoverModelsCommandTest extends TestCase
 
     public function testSuccessWithPendingDoesNotFail(): void
     {
-        $discovery = $this->createMock(ModelDiscoveryService::class);
-        $discovery->method('isEnabled')->willReturn(true);
-        $discovery->method('run')->willReturn(new ModelDiscoveryReport(
+        $report = $this->report(
+            pending: [[
+                'provider' => 'openai',
+                'id' => 'gpt-brand-new',
+                'firstSeen' => '2026-09-20',
+                'daysPending' => 4,
+                'label' => 'New family',
+            ]],
+            newPending: [[
+                'provider' => 'openai',
+                'id' => 'gpt-brand-new',
+                'firstSeen' => '2026-09-20',
+                'daysPending' => 4,
+                'label' => 'New family',
+            ]],
             providers: [[
                 'provider' => 'openai',
                 'status' => ProviderModelListing::STATUS_OK,
                 'detail' => null,
                 'listedCount' => 2,
                 'pendingCount' => 1,
+                'silencedByClass' => 0,
             ]],
-            pending: [[
-                'provider' => 'openai',
-                'id' => 'gpt-brand-new',
-                'firstSeen' => '2026-09-20',
-                'daysPending' => 4,
-            ]],
-            failedProviders: [],
-            baselinesRecorded: [],
-            obsoleteIgnores: [],
             shouldNotify: true,
-        ));
+        );
+
+        $discovery = $this->createMock(ModelDiscoveryService::class);
+        $discovery->method('isEnabled')->willReturn(true);
+        $discovery->method('run')->willReturn($report);
         $discovery->method('claimNotifyDay')->willReturn(true);
-        $discovery->expects($this->once())->method('markBaselinesAnnounced')->with([]);
+        $discovery->expects($this->once())->method('markDiscoveriesAnnounced')->with($report);
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
         $tester->execute(['--notify' => true]);
 
         $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
         $this->assertStringContainsString('gpt-brand-new', $tester->getDisplay());
+        $this->assertStringContainsString('New family', $tester->getDisplay());
         $this->assertStringContainsString('Discord alert sent', $tester->getDisplay());
         $this->assertCount(1, $this->webhookBodies);
         $body = json_decode($this->webhookBodies[0], true, 512, \JSON_THROW_ON_ERROR);
@@ -78,23 +87,19 @@ final class DiscoverModelsCommandTest extends TestCase
         $this->assertStringContainsString('ModelCatalog', json_encode($body, \JSON_THROW_ON_ERROR));
     }
 
-    public function testWebhook404ReleasesClaimAndDoesNotMarkBaselines(): void
+    public function testWebhook404ReleasesClaimAndDoesNotMarkAnnounced(): void
     {
+        $report = $this->report(
+            baselinesRecorded: [['provider' => 'openai', 'idCount' => 12]],
+            shouldNotify: true,
+        );
+
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
-        $discovery->method('run')->willReturn(new ModelDiscoveryReport(
-            providers: [],
-            pending: [],
-            failedProviders: [],
-            baselinesRecorded: [
-                ['provider' => 'openai', 'idCount' => 12],
-            ],
-            obsoleteIgnores: [],
-            shouldNotify: true,
-        ));
+        $discovery->method('run')->willReturn($report);
         $discovery->method('claimNotifyDay')->willReturn(true);
         $discovery->expects($this->once())->method('releaseNotifyDay');
-        $discovery->expects($this->never())->method('markBaselinesAnnounced');
+        $discovery->expects($this->never())->method('markDiscoveriesAnnounced');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook', webhookStatus: 404);
         $tester->execute(['--notify' => true]);
@@ -106,24 +111,21 @@ final class DiscoverModelsCommandTest extends TestCase
         $this->assertCount(1, $this->webhookBodies);
     }
 
-    public function testWebhook204MarksBaselinesAnnounced(): void
+    public function testWebhook204MarksDiscoveriesAnnounced(): void
     {
-        $discovery = $this->createMock(ModelDiscoveryService::class);
-        $discovery->method('isEnabled')->willReturn(true);
-        $discovery->method('run')->willReturn(new ModelDiscoveryReport(
-            providers: [],
-            pending: [],
-            failedProviders: [],
+        $report = $this->report(
             baselinesRecorded: [
                 ['provider' => 'openai', 'idCount' => 12],
                 ['provider' => 'anthropic', 'idCount' => 8],
             ],
-            obsoleteIgnores: [],
             shouldNotify: true,
-        ));
+        );
+
+        $discovery = $this->createMock(ModelDiscoveryService::class);
+        $discovery->method('isEnabled')->willReturn(true);
+        $discovery->method('run')->willReturn($report);
         $discovery->method('claimNotifyDay')->willReturn(true);
-        $discovery->expects($this->once())->method('markBaselinesAnnounced')
-            ->with(['openai', 'anthropic']);
+        $discovery->expects($this->once())->method('markDiscoveriesAnnounced')->with($report);
         $discovery->expects($this->never())->method('releaseNotifyDay');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook', webhookStatus: 204);
@@ -133,22 +135,18 @@ final class DiscoverModelsCommandTest extends TestCase
         $this->assertStringContainsString('Discord alert sent', $tester->getDisplay());
     }
 
-    public function testNotifyWithoutWebhookMarksBaselinesAnnounced(): void
+    public function testNotifyWithoutWebhookMarksAnnounced(): void
     {
+        $report = $this->report(
+            baselinesRecorded: [['provider' => 'openai', 'idCount' => 3]],
+            shouldNotify: true,
+        );
+
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
-        $discovery->method('run')->willReturn(new ModelDiscoveryReport(
-            providers: [],
-            pending: [],
-            failedProviders: [],
-            baselinesRecorded: [
-                ['provider' => 'openai', 'idCount' => 3],
-            ],
-            obsoleteIgnores: [],
-            shouldNotify: true,
-        ));
+        $discovery->method('run')->willReturn($report);
         $discovery->expects($this->never())->method('claimNotifyDay');
-        $discovery->expects($this->once())->method('markBaselinesAnnounced')->with(['openai']);
+        $discovery->expects($this->once())->method('markDiscoveriesAnnounced')->with($report);
 
         $tester = $this->tester($discovery, webhookUrl: null);
         $tester->execute(['--notify' => true]);
@@ -158,25 +156,64 @@ final class DiscoverModelsCommandTest extends TestCase
         $this->assertSame([], $this->webhookBodies);
     }
 
-    public function testSecondNotifySameDayDoesNotPost(): void
+    public function testRunWithoutNotifyMarksNothing(): void
     {
-        $discovery = $this->createMock(ModelDiscoveryService::class);
-        $discovery->method('isEnabled')->willReturn(true);
-        $discovery->method('run')->willReturn(new ModelDiscoveryReport(
-            providers: [],
+        $report = $this->report(
+            newPending: [[
+                'provider' => 'openai',
+                'id' => 'gpt-brand-new',
+                'firstSeen' => '2026-09-20',
+                'daysPending' => 1,
+                'label' => 'New family',
+            ]],
             pending: [[
                 'provider' => 'openai',
                 'id' => 'gpt-brand-new',
                 'firstSeen' => '2026-09-20',
                 'daysPending' => 1,
+                'label' => 'New family',
             ]],
-            failedProviders: [],
-            baselinesRecorded: [],
-            obsoleteIgnores: [],
             shouldNotify: true,
-        ));
+        );
+
+        $discovery = $this->createMock(ModelDiscoveryService::class);
+        $discovery->method('isEnabled')->willReturn(true);
+        $discovery->method('run')->willReturn($report);
+        $discovery->expects($this->never())->method('markDiscoveriesAnnounced');
+        $discovery->expects($this->never())->method('claimNotifyDay');
+
+        $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
+        $tester->execute([]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $this->assertSame([], $this->webhookBodies);
+    }
+
+    public function testSecondNotifySameDayDoesNotPost(): void
+    {
+        $report = $this->report(
+            pending: [[
+                'provider' => 'openai',
+                'id' => 'gpt-brand-new',
+                'firstSeen' => '2026-09-20',
+                'daysPending' => 1,
+                'label' => 'New family',
+            ]],
+            newPending: [[
+                'provider' => 'openai',
+                'id' => 'gpt-brand-new',
+                'firstSeen' => '2026-09-20',
+                'daysPending' => 1,
+                'label' => 'New family',
+            ]],
+            shouldNotify: true,
+        );
+
+        $discovery = $this->createMock(ModelDiscoveryService::class);
+        $discovery->method('isEnabled')->willReturn(true);
+        $discovery->method('run')->willReturn($report);
         $discovery->method('claimNotifyDay')->willReturn(false);
-        $discovery->expects($this->never())->method('markBaselinesAnnounced');
+        $discovery->expects($this->never())->method('markDiscoveriesAnnounced');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
         $tester->execute(['--notify' => true]);
@@ -206,22 +243,19 @@ final class DiscoverModelsCommandTest extends TestCase
 
     public function testBaselineOnlyNotifyPayload(): void
     {
-        $discovery = $this->createMock(ModelDiscoveryService::class);
-        $discovery->method('isEnabled')->willReturn(true);
-        $discovery->method('run')->willReturn(new ModelDiscoveryReport(
-            providers: [],
-            pending: [],
-            failedProviders: [],
+        $report = $this->report(
             baselinesRecorded: [
                 ['provider' => 'openai', 'idCount' => 12],
                 ['provider' => 'anthropic', 'idCount' => 8],
             ],
-            obsoleteIgnores: [],
             shouldNotify: true,
-        ));
+        );
+
+        $discovery = $this->createMock(ModelDiscoveryService::class);
+        $discovery->method('isEnabled')->willReturn(true);
+        $discovery->method('run')->willReturn($report);
         $discovery->method('claimNotifyDay')->willReturn(true);
-        $discovery->expects($this->once())->method('markBaselinesAnnounced')
-            ->with(['openai', 'anthropic']);
+        $discovery->expects($this->once())->method('markDiscoveriesAnnounced')->with($report);
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
         $tester->execute(['--notify' => true]);
@@ -233,6 +267,73 @@ final class DiscoverModelsCommandTest extends TestCase
         $this->assertStringContainsString('Baseline recorded for openai, anthropic: 20 ids', $encoded);
         $this->assertStringContainsString('from tomorrow', $encoded);
         $this->assertStringNotContainsString('Action required', $encoded);
+    }
+
+    public function testMondayReminderPostsOpenItems(): void
+    {
+        $report = $this->report(
+            openPending: [[
+                'provider' => 'openai',
+                'id' => 'gpt-brand-new',
+                'firstSeen' => '2026-09-10',
+                'daysPending' => 11,
+                'label' => 'New family',
+            ]],
+            pending: [[
+                'provider' => 'openai',
+                'id' => 'gpt-brand-new',
+                'firstSeen' => '2026-09-10',
+                'daysPending' => 11,
+                'label' => 'New family',
+            ]],
+            shouldNotify: true,
+            isMondayReminder: true,
+        );
+
+        $discovery = $this->createMock(ModelDiscoveryService::class);
+        $discovery->method('isEnabled')->willReturn(true);
+        $discovery->method('run')->willReturn($report);
+        $discovery->method('claimNotifyDay')->willReturn(true);
+        $discovery->expects($this->once())->method('markDiscoveriesAnnounced');
+
+        $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
+        $tester->execute(['--notify' => true]);
+
+        $body = json_decode($this->webhookBodies[0], true, 512, \JSON_THROW_ON_ERROR);
+        $this->assertSame('🔁 Weekly reminder: models still open', $body['embeds'][0]['title']);
+        $this->assertStringContainsString('Still open', json_encode($body, \JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param list<array{provider: string, status: string, detail: string|null, listedCount: int, pendingCount: int, silencedByClass: int}> $providers
+     * @param list<array{provider: string, id: string, firstSeen: string, daysPending: int, label: string}>                                 $pending
+     * @param list<array{provider: string, id: string, firstSeen: string, daysPending: int, label: string}>                                 $newPending
+     * @param list<array{provider: string, id: string, firstSeen: string, daysPending: int, label: string}>                                 $openPending
+     * @param list<array{provider: string, detail: string, failingSince: string, isNew: bool}>                                              $failedProviders
+     * @param list<array{provider: string, idCount: int}>                                                                                   $baselinesRecorded
+     */
+    private function report(
+        array $providers = [],
+        array $pending = [],
+        array $newPending = [],
+        array $openPending = [],
+        array $failedProviders = [],
+        array $baselinesRecorded = [],
+        bool $shouldNotify = false,
+        bool $isMondayReminder = false,
+    ): ModelDiscoveryReport {
+        return new ModelDiscoveryReport(
+            providers: $providers,
+            pending: $pending,
+            newPending: $newPending,
+            openPending: $openPending,
+            failedProviders: $failedProviders,
+            baselinesRecorded: $baselinesRecorded,
+            obsoleteIgnores: [],
+            silencedByClass: [],
+            shouldNotify: $shouldNotify,
+            isMondayReminder: $isMondayReminder,
+        );
     }
 
     private function tester(

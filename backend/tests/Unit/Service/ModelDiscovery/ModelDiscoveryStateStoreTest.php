@@ -21,7 +21,6 @@ final class ModelDiscoveryStateStoreTest extends TestCase
                     return 0; // row absent
                 }
                 if (str_contains($sql, 'INSERT IGNORE')) {
-                    // First claim inserts; second would be 0 — emulate via call count
                     $inserts = count(array_filter(
                         $calls,
                         static fn (array $c): bool => str_contains($c['sql'], 'INSERT IGNORE'),
@@ -77,6 +76,9 @@ final class ModelDiscoveryStateStoreTest extends TestCase
                 'baselineAnnounced' => false,
                 'baselineIds' => ['gpt-4o'],
                 'seen' => ['gpt-4o' => '2026-09-24'],
+                'announced' => ['gpt-new' => '2026-09-25'],
+                'failingSince' => null,
+                'failureAnnounced' => false,
             ],
         ];
         $store->saveProviders($payload);
@@ -84,7 +86,7 @@ final class ModelDiscoveryStateStoreTest extends TestCase
         $this->assertSame($payload, json_decode((string) $saved, true, 512, \JSON_THROW_ON_ERROR));
     }
 
-    public function testLoadDefaultsBaselineAnnouncedToFalse(): void
+    public function testLoadDefaultsAnnouncedAndFailureFields(): void
     {
         $payload = [
             'openai' => [
@@ -98,9 +100,12 @@ final class ModelDiscoveryStateStoreTest extends TestCase
 
         $loaded = (new ModelDiscoveryStateStore($connection))->loadProviders();
         $this->assertFalse($loaded['openai']['baselineAnnounced']);
+        $this->assertSame([], $loaded['openai']['announced']);
+        $this->assertNull($loaded['openai']['failingSince']);
+        $this->assertFalse($loaded['openai']['failureAnnounced']);
     }
 
-    public function testLoadKeepsUpstreamIdsVerbatim(): void
+    public function testLoadKeepsUpstreamIdsVerbatimIncludingAnnounced(): void
     {
         $payload = [
             'groq' => [
@@ -108,13 +113,14 @@ final class ModelDiscoveryStateStoreTest extends TestCase
                 'baselineAnnounced' => true,
                 'baselineIds' => ['meta-llama/Llama-4-Scout'],
                 'seen' => ['meta-llama/Llama-4-Scout' => '2026-09-24'],
+                'announced' => ['meta-llama/Llama-4-Scout-New' => '2026-09-25'],
+                'failingSince' => null,
+                'failureAnnounced' => false,
             ],
         ];
         $connection = $this->createMock(Connection::class);
         $connection->method('fetchOne')->willReturn(json_encode($payload, \JSON_THROW_ON_ERROR));
 
-        // The service compares these against the provider's raw list, so a
-        // case change here would re-report every baselined mixed-case id.
         $this->assertSame($payload, (new ModelDiscoveryStateStore($connection))->loadProviders());
     }
 

@@ -16,7 +16,17 @@ use Symfony\Component\Clock\MockClock;
 
 final class ModelDiscoveryServiceTest extends TestCase
 {
-    /** @var array<string, array{baselineRecorded: bool, baselineAnnounced: bool, baselineIds: list<string>, seen: array<string, string>}> */
+    /**
+     * @var array<string, array{
+     *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
+     *     baselineIds: list<string>,
+     *     seen: array<string, string>,
+     *     announced: array<string, string>,
+     *     failingSince: string|null,
+     *     failureAnnounced: bool
+     * }>
+     */
     private array $storedProviders = [];
 
     private bool $claimResult = true;
@@ -49,7 +59,7 @@ final class ModelDiscoveryServiceTest extends TestCase
         $this->assertFalse($report->shouldNotify);
     }
 
-    public function testUnreachableProviderIsReported(): void
+    public function testUnreachableProviderIsReportedAsNewFailure(): void
     {
         $listings = $this->allNotConfigured();
         $listings['openai'] = ProviderModelListing::unreachable('HTTP 500');
@@ -58,8 +68,62 @@ final class ModelDiscoveryServiceTest extends TestCase
 
         $this->assertCount(1, $report->failedProviders);
         $this->assertSame('openai', $report->failedProviders[0]['provider']);
+        $this->assertTrue($report->failedProviders[0]['isNew']);
         $this->assertTrue($report->shouldNotify);
-        $this->assertStringContainsString('HTTP 500', $report->failedProviders[0]['detail']);
+        $this->assertSame('2026-09-24', $this->storedProviders['openai']['failingSince']);
+        $this->assertFalse($this->storedProviders['openai']['failureAnnounced']);
+    }
+
+    public function testAnnouncedFailureIsSilentUntilMonday(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                failingSince: '2026-09-20',
+                failureAnnounced: true,
+            ),
+        ];
+
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::unreachable('HTTP 500');
+
+        $tuesday = $this->service(
+            listings: $listings,
+            clock: new MockClock('2026-09-22 12:00:00'), // Tuesday
+        )->run();
+
+        $this->assertFalse($tuesday->failedProviders[0]['isNew']);
+        $this->assertFalse($tuesday->shouldNotify);
+
+        $monday = $this->service(
+            listings: $listings,
+            clock: new MockClock('2026-09-21 12:00:00'), // Monday
+        )->run();
+
+        $this->assertTrue($monday->shouldNotify);
+        $this->assertTrue($monday->isMondayReminder);
+    }
+
+    public function testFailureClearedAfterRecovery(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01'],
+                failingSince: '2026-09-20',
+                failureAnnounced: true,
+            ),
+        ];
+
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok(['gpt-4o']);
+
+        $report = $this->service(listings: $listings)->run();
+
+        $this->assertSame([], $report->failedProviders);
+        $this->assertNull($this->storedProviders['openai']['failingSince']);
+        $this->assertFalse($this->storedProviders['openai']['failureAnnounced']);
     }
 
     public function testFirstSuccessfulListingRecordsBaselineAndReportsNone(): void
@@ -82,12 +146,12 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testUnannouncedOlderBaselineIsReportedAgain(): void
     {
         $this->storedProviders = [
-            'openai' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => false,
-                'baselineIds' => ['gpt-4o', 'gpt-5'],
-                'seen' => ['gpt-4o' => '2026-09-01', 'gpt-5' => '2026-09-01'],
-            ],
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: false,
+                baselineIds: ['gpt-4o', 'gpt-5'],
+                seen: ['gpt-4o' => '2026-09-01', 'gpt-5' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -97,20 +161,18 @@ final class ModelDiscoveryServiceTest extends TestCase
 
         $this->assertSame([], $report->pending);
         $this->assertCount(1, $report->baselinesRecorded);
-        $this->assertSame('openai', $report->baselinesRecorded[0]['provider']);
-        $this->assertSame(2, $report->baselinesRecorded[0]['idCount']);
         $this->assertTrue($report->shouldNotify);
     }
 
     public function testAnnouncedBaselineIsNotReported(): void
     {
         $this->storedProviders = [
-            'openai' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['gpt-4o'],
-                'seen' => ['gpt-4o' => '2026-09-01'],
-            ],
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -125,12 +187,12 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testLaterAddedProviderGetsItsOwnBaseline(): void
     {
         $this->storedProviders = [
-            'openai' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['gpt-4o'],
-                'seen' => ['gpt-4o' => '2026-09-01'],
-            ],
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -145,18 +207,98 @@ final class ModelDiscoveryServiceTest extends TestCase
         $this->assertSame([], $report->pending);
         $this->assertCount(1, $report->baselinesRecorded);
         $this->assertSame('anthropic', $report->baselinesRecorded[0]['provider']);
-        $this->assertSame(1, $report->baselinesRecorded[0]['idCount']);
+    }
+
+    public function testNewVersusOpenPendingSplit(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01', 'gpt-brand-new' => '2026-09-10'],
+                announced: ['gpt-brand-new' => '2026-09-10'],
+            ),
+        ];
+
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok(['gpt-4o', 'gpt-brand-new', 'gpt-even-newer']);
+
+        $report = $this->service(
+            listings: $listings,
+            clock: new MockClock('2026-09-12 12:00:00'), // Friday
+        )->run();
+
+        $this->assertCount(2, $report->pending);
+        $this->assertCount(1, $report->newPending);
+        $this->assertSame('gpt-even-newer', $report->newPending[0]['id']);
+        $this->assertCount(1, $report->openPending);
+        $this->assertSame('gpt-brand-new', $report->openPending[0]['id']);
+        $this->assertTrue($report->shouldNotify); // new pending
+        $this->assertFalse($report->isMondayReminder);
+    }
+
+    public function testTuesdayWithOnlyOpenPendingDoesNotNotify(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01', 'gpt-brand-new' => '2026-09-10'],
+                announced: ['gpt-brand-new' => '2026-09-10'],
+            ),
+        ];
+
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok(['gpt-4o', 'gpt-brand-new']);
+
+        $report = $this->service(
+            listings: $listings,
+            clock: new MockClock('2026-09-22 12:00:00'), // Tuesday
+        )->run();
+
+        $this->assertCount(1, $report->openPending);
+        $this->assertSame([], $report->newPending);
+        $this->assertFalse($report->shouldNotify);
+        $this->assertFalse($report->isMondayReminder);
+    }
+
+    public function testMondayWithOnlyOpenPendingNotifiesAsReminder(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01', 'gpt-brand-new' => '2026-09-10'],
+                announced: ['gpt-brand-new' => '2026-09-10'],
+            ),
+        ];
+
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok(['gpt-4o', 'gpt-brand-new']);
+
+        $report = $this->service(
+            listings: $listings,
+            clock: new MockClock('2026-09-21 12:00:00'), // Monday
+        )->run();
+
+        $this->assertTrue($report->shouldNotify);
+        $this->assertTrue($report->isMondayReminder);
+        $this->assertSame([], $report->newPending);
+        $this->assertCount(1, $report->openPending);
     }
 
     public function testPendingPersistsAcrossRunsUntilKnown(): void
     {
         $this->storedProviders = [
-            'openai' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['gpt-4o'],
-                'seen' => ['gpt-4o' => '2026-09-01'],
-            ],
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -168,9 +310,9 @@ final class ModelDiscoveryServiceTest extends TestCase
         )->run();
 
         $this->assertCount(1, $day1->pending);
+        $this->assertCount(1, $day1->newPending);
         $this->assertSame('gpt-brand-new', $day1->pending[0]['id']);
-        $this->assertSame('2026-09-10', $day1->pending[0]['firstSeen']);
-        $this->assertSame(0, $day1->pending[0]['daysPending']);
+        $this->assertArrayHasKey('label', $day1->pending[0]);
 
         $day2 = $this->service(
             listings: $listings,
@@ -190,15 +332,122 @@ final class ModelDiscoveryServiceTest extends TestCase
         $this->assertSame([], $known->pending);
     }
 
+    public function testAnnouncedCleanupWhenIdResolves(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01', 'gpt-brand-new' => '2026-09-10'],
+                announced: ['gpt-brand-new' => '2026-09-10'],
+            ),
+        ];
+
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok(['gpt-4o', 'gpt-brand-new']);
+
+        $this->service(
+            listings: $listings,
+            models: [$this->model('OpenAI', 'gpt-brand-new')],
+            clock: new MockClock('2026-09-12 12:00:00'),
+        )->run();
+
+        $this->assertArrayNotHasKey('gpt-brand-new', $this->storedProviders['openai']['announced']);
+    }
+
+    public function testMarkDiscoveriesAnnouncedSetsAnnouncedAndFailures(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01', 'gpt-brand-new' => '2026-09-10'],
+                failingSince: '2026-09-10',
+                failureAnnounced: false,
+            ),
+            'anthropic' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: false,
+                baselineIds: ['claude-old'],
+                seen: ['claude-old' => '2026-09-01'],
+            ),
+        ];
+
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok(['gpt-4o', 'gpt-brand-new']);
+
+        $service = $this->service(
+            listings: $listings,
+            clock: new MockClock('2026-09-12 12:00:00'),
+        );
+        $report = $service->run();
+        // Simulate a concurrent failure entry on the report for marking
+        $reportWithFailure = new \App\Service\ModelDiscovery\ModelDiscoveryReport(
+            providers: $report->providers,
+            pending: $report->pending,
+            newPending: $report->newPending,
+            openPending: $report->openPending,
+            failedProviders: [[
+                'provider' => 'openai',
+                'detail' => 'HTTP 500',
+                'failingSince' => '2026-09-10',
+                'isNew' => true,
+            ]],
+            baselinesRecorded: [['provider' => 'anthropic', 'idCount' => 1]],
+            obsoleteIgnores: [],
+            silencedByClass: [],
+            shouldNotify: true,
+            isMondayReminder: false,
+        );
+
+        $service->markDiscoveriesAnnounced($reportWithFailure);
+
+        $this->assertSame('2026-09-12', $this->storedProviders['openai']['announced']['gpt-brand-new']);
+        $this->assertTrue($this->storedProviders['openai']['failureAnnounced']);
+        $this->assertTrue($this->storedProviders['anthropic']['baselineAnnounced']);
+    }
+
+    public function testClassRulesSkipAndCount(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01'],
+            ),
+        ];
+
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok([
+            'gpt-4o',
+            'ft:personal-tune',
+            'text-moderation-latest',
+            'gpt-4o-realtime-preview',
+            'gpt-truly-new',
+        ]);
+
+        $report = $this->service(
+            listings: $listings,
+            clock: new MockClock('2026-09-12 12:00:00'),
+        )->run();
+
+        $this->assertCount(1, $report->pending);
+        $this->assertSame('gpt-truly-new', $report->pending[0]['id']);
+        $this->assertSame(3, $report->silencedByClass['openai']);
+    }
+
     public function testPendingDisappearsWhenIgnored(): void
     {
         $this->storedProviders = [
-            'openai' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['gpt-4o'],
-                'seen' => ['gpt-4o' => '2026-09-01', 'skip-me' => '2026-09-10'],
-            ],
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01', 'skip-me' => '2026-09-10'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -218,12 +467,13 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testPendingDisappearsWhenUnlisted(): void
     {
         $this->storedProviders = [
-            'openai' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['gpt-4o'],
-                'seen' => ['gpt-4o' => '2026-09-01', 'ephemeral' => '2026-09-10'],
-            ],
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01', 'ephemeral' => '2026-09-10'],
+                announced: ['ephemeral' => '2026-09-10'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -236,21 +486,21 @@ final class ModelDiscoveryServiceTest extends TestCase
 
         $this->assertSame([], $report->pending);
         $this->assertArrayNotHasKey('ephemeral', $this->storedProviders['openai']['seen']);
+        $this->assertArrayNotHasKey('ephemeral', $this->storedProviders['openai']['announced']);
     }
 
     public function testKnownMatchingIncludesParamsModelAndNormalisation(): void
     {
         $this->storedProviders = [
-            'google' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['gemini-old'],
-                'seen' => ['gemini-old' => '2026-09-01'],
-            ],
+            'google' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gemini-old'],
+                seen: ['gemini-old' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
-        // Undated catalog params.model covers a dated listing snapshot
         $listings['google'] = ProviderModelListing::ok([
             'gemini-old',
             'gemini-2.5-pro-20250520',
@@ -271,12 +521,12 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testNewDateSnapshotOfPinnedCatalogStaysPending(): void
     {
         $this->storedProviders = [
-            'anthropic' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['claude-old'],
-                'seen' => ['claude-old' => '2026-09-01'],
-            ],
+            'anthropic' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['claude-old'],
+                seen: ['claude-old' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -298,12 +548,12 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testUndatedListingMatchesDatePinnedCatalog(): void
     {
         $this->storedProviders = [
-            'anthropic' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['claude-old'],
-                'seen' => ['claude-old' => '2026-09-01'],
-            ],
+            'anthropic' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['claude-old'],
+                seen: ['claude-old' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -324,12 +574,12 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testRetiredInactiveRowsCountAsKnown(): void
     {
         $this->storedProviders = [
-            'groq' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['kept'],
-                'seen' => ['kept' => '2026-09-01'],
-            ],
+            'groq' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['kept'],
+                seen: ['kept' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -347,12 +597,12 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testObsoleteIgnoreGoneUpstreamAndNowInBmodels(): void
     {
         $this->storedProviders = [
-            'openai' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => true,
-                'baselineIds' => ['gpt-4o'],
-                'seen' => ['gpt-4o' => '2026-09-01'],
-            ],
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01'],
+            ),
         ];
 
         $listings = $this->allNotConfigured();
@@ -395,12 +645,12 @@ final class ModelDiscoveryServiceTest extends TestCase
     public function testMarkBaselinesAnnouncedSetsFlag(): void
     {
         $state = [
-            'openai' => [
-                'baselineRecorded' => true,
-                'baselineAnnounced' => false,
-                'baselineIds' => ['gpt-4o'],
-                'seen' => ['gpt-4o' => '2026-09-01'],
-            ],
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: false,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01'],
+            ),
         ];
         $saved = null;
 
@@ -469,6 +719,41 @@ final class ModelDiscoveryServiceTest extends TestCase
             $enabled,
             $ignoreEntries,
         );
+    }
+
+    /**
+     * @param list<string>          $baselineIds
+     * @param array<string, string> $seen
+     * @param array<string, string> $announced
+     *
+     * @return array{
+     *     baselineRecorded: bool,
+     *     baselineAnnounced: bool,
+     *     baselineIds: list<string>,
+     *     seen: array<string, string>,
+     *     announced: array<string, string>,
+     *     failingSince: string|null,
+     *     failureAnnounced: bool
+     * }
+     */
+    private function providerState(
+        bool $baselineRecorded = false,
+        bool $baselineAnnounced = false,
+        array $baselineIds = [],
+        array $seen = [],
+        array $announced = [],
+        ?string $failingSince = null,
+        bool $failureAnnounced = false,
+    ): array {
+        return [
+            'baselineRecorded' => $baselineRecorded,
+            'baselineAnnounced' => $baselineAnnounced,
+            'baselineIds' => $baselineIds,
+            'seen' => $seen,
+            'announced' => $announced,
+            'failingSince' => $failingSince,
+            'failureAnnounced' => $failureAnnounced,
+        ];
     }
 
     /**

@@ -17,9 +17,16 @@ use Doctrine\DBAL\Connection;
  *       "baselineRecorded": true,
  *       "baselineAnnounced": false,
  *       "baselineIds": ["gpt-4o", …],
- *       "seen": { "gpt-4o": "2026-09-24", "new-id": "2026-09-25" }
+ *       "seen": { "gpt-4o": "2026-09-24", "new-id": "2026-09-25" },
+ *       "announced": { "new-id": "2026-09-25" },
+ *       "failingSince": null,
+ *       "failureAnnounced": false
  *     }
  *   }
+ *
+ * `announced` maps pending listing ids (verbatim) to the Y-m-d they were first
+ * posted. `failingSince` is set on the first UNREACHABLE run and cleared on the
+ * next OK listing; `failureAnnounced` tracks whether that outage was posted.
  *
  * No migration and no Schema API — rows appear on first write via INSERT.
  *
@@ -49,7 +56,10 @@ final readonly class ModelDiscoveryStateStore
      *     baselineRecorded: bool,
      *     baselineAnnounced: bool,
      *     baselineIds: list<string>,
-     *     seen: array<string, string>
+     *     seen: array<string, string>,
+     *     announced: array<string, string>,
+     *     failingSince: string|null,
+     *     failureAnnounced: bool
      * }>
      */
     public function loadProviders(): array
@@ -85,7 +95,10 @@ final readonly class ModelDiscoveryStateStore
      *     baselineRecorded: bool,
      *     baselineAnnounced: bool,
      *     baselineIds: list<string>,
-     *     seen: array<string, string>
+     *     seen: array<string, string>,
+     *     announced: array<string, string>,
+     *     failingSince: string|null,
+     *     failureAnnounced: bool
      * }> $providers
      */
     public function saveProviders(array $providers): void
@@ -153,7 +166,10 @@ final readonly class ModelDiscoveryStateStore
      *     baselineRecorded: bool,
      *     baselineAnnounced: bool,
      *     baselineIds: list<string>,
-     *     seen: array<string, string>
+     *     seen: array<string, string>,
+     *     announced: array<string, string>,
+     *     failingSince: string|null,
+     *     failureAnnounced: bool
      * }
      */
     private function normaliseProviderState(array $state): array
@@ -172,11 +188,26 @@ final readonly class ModelDiscoveryStateStore
             }
         }
 
+        $announced = [];
+        foreach ($state['announced'] ?? [] as $id => $date) {
+            if (is_string($id) && '' !== $id && is_string($date) && '' !== $date) {
+                $announced[$id] = $date;
+            }
+        }
+
+        $failingSince = $state['failingSince'] ?? null;
+        if (!is_string($failingSince) || '' === $failingSince) {
+            $failingSince = null;
+        }
+
         return [
             'baselineRecorded' => (bool) ($state['baselineRecorded'] ?? false),
             'baselineAnnounced' => (bool) ($state['baselineAnnounced'] ?? false),
             'baselineIds' => array_values(array_unique($baselineIds)),
             'seen' => $seen,
+            'announced' => $announced,
+            'failingSince' => $failingSince,
+            'failureAnnounced' => (bool) ($state['failureAnnounced'] ?? false),
         ];
     }
 

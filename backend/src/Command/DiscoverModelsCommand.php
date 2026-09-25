@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\AI\Service\ProviderModelListing;
 use App\Service\DiscordNotificationService;
+use App\Service\ModelDiscovery\ModelDiscoveryDigest;
 use App\Service\ModelDiscovery\ModelDiscoveryReport;
 use App\Service\ModelDiscovery\ModelDiscoveryService;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -79,12 +80,16 @@ final class DiscoverModelsCommand extends Command
         $this->renderFailed($io, $report);
         $this->renderObsolete($io, $report);
 
+        $silenced = array_sum($report->silencedByClass);
         $io->success(sprintf(
-            'Model discovery complete: %d pending, %d baseline(s) recorded, %d unreachable, %d obsolete ignore(s)',
+            'Model discovery complete: %d pending (%d new, %d open), %d baseline(s) recorded, %d unreachable, %d obsolete ignore(s), %d silenced by class',
             count($report->pending),
+            count($report->newPending),
+            count($report->openPending),
             count($report->baselinesRecorded),
             count($report->failedProviders),
             count($report->obsoleteIgnores),
+            $silenced,
         ));
 
         if ($input->getOption('notify') && $report->shouldNotify) {
@@ -98,19 +103,20 @@ final class DiscoverModelsCommand extends Command
     {
         $rows = [];
         foreach ($report->providers as $state) {
-            $rows[] = [
-                $state['provider'],
-                match ($state['status']) {
-                    ProviderModelListing::STATUS_OK => sprintf(
-                        'ok — %d listed, %d pending',
-                        $state['listedCount'],
-                        $state['pendingCount'],
-                    ),
-                    ProviderModelListing::STATUS_NOT_CONFIGURED => 'skipped — no API key',
-                    ProviderModelListing::STATUS_NO_LISTING_ENDPOINT => 'skipped — no listing endpoint',
-                    default => 'unreachable — '.($state['detail'] ?? 'error'),
-                },
-            ];
+            $status = match ($state['status']) {
+                ProviderModelListing::STATUS_OK => sprintf(
+                    'ok — %d listed, %d pending',
+                    $state['listedCount'],
+                    $state['pendingCount'],
+                ),
+                ProviderModelListing::STATUS_NOT_CONFIGURED => 'skipped — no API key',
+                ProviderModelListing::STATUS_NO_LISTING_ENDPOINT => 'skipped — no listing endpoint',
+                default => 'unreachable — '.($state['detail'] ?? 'error'),
+            };
+            if ($state['silencedByClass'] > 0) {
+                $status .= sprintf(', %d silenced by class', $state['silencedByClass']);
+            }
+            $rows[] = [$state['provider'], $status];
         }
 
         $io->table(['Provider', 'Status'], $rows);
@@ -146,7 +152,8 @@ final class DiscoverModelsCommand extends Command
         $lines = [];
         foreach ($report->pending as $item) {
             $lines[] = sprintf(
-                '%s `%s` — first seen %s (%d day%s pending)',
+                '[%s] %s `%s` — first seen %s (%d day%s pending)',
+                $item['label'],
                 $item['provider'],
                 $item['id'],
                 $item['firstSeen'],
@@ -166,7 +173,13 @@ final class DiscoverModelsCommand extends Command
         $io->section('Could not check');
         $lines = [];
         foreach ($report->failedProviders as $fail) {
-            $lines[] = sprintf('could not check %s: %s', $fail['provider'], $fail['detail']);
+            $lines[] = sprintf(
+                'could not check %s: %s (since %s%s)',
+                $fail['provider'],
+                $fail['detail'],
+                $fail['failingSince'],
+                $fail['isNew'] ? ', new' : '',
+            );
         }
         $io->listing($lines);
     }
@@ -192,7 +205,7 @@ final class DiscoverModelsCommand extends Command
     {
         if (!$this->discord->isEnabled()) {
             $io->note('Discord notifications are disabled (no DISCORD_WEBHOOK_URL); reported to the console only.');
-            $this->discovery->markBaselinesAnnounced($this->baselineProviders($report));
+            $this->discovery->markDiscoveriesAnnounced($report);
 
             return;
         }
@@ -203,11 +216,8 @@ final class DiscoverModelsCommand extends Command
             return;
         }
 
-        $posted = $this->discord->notifyNewModelDiscovery(
-            $this->pendingLines($report),
-            $this->failedLines($report),
-            $this->baselineLines($report),
-        );
+        $digest = ModelDiscoveryDigest::fromReport($report);
+        $posted = $this->discord->notifyNewModelDiscovery($digest);
         if (!$posted) {
             $this->discovery->releaseNotifyDay();
             $io->warning('Discord post failed; today stays unclaimed so the next run retries.');
@@ -215,7 +225,7 @@ final class DiscoverModelsCommand extends Command
             return;
         }
 
-        $this->discovery->markBaselinesAnnounced($this->baselineProviders($report));
+        $this->discovery->markDiscoveriesAnnounced($report);
         $io->note('Discord alert sent.');
     }
 
@@ -240,74 +250,5 @@ final class DiscoverModelsCommand extends Command
         }
 
         $io->note('Discord failure alert sent.');
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function baselineProviders(ModelDiscoveryReport $report): array
-    {
-        $providers = [];
-        foreach ($report->baselinesRecorded as $event) {
-            $providers[] = $event['provider'];
-        }
-
-        return $providers;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function pendingLines(ModelDiscoveryReport $report): array
-    {
-        $lines = [];
-        foreach ($report->pending as $item) {
-            $lines[] = sprintf(
-                '%s `%s` — first seen %s (%d day%s)',
-                $item['provider'],
-                $item['id'],
-                $item['firstSeen'],
-                $item['daysPending'],
-                1 === $item['daysPending'] ? '' : 's',
-            );
-        }
-
-        return $lines;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function failedLines(ModelDiscoveryReport $report): array
-    {
-        $lines = [];
-        foreach ($report->failedProviders as $fail) {
-            $lines[] = sprintf('could not check %s: %s', $fail['provider'], $fail['detail']);
-        }
-
-        return $lines;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function baselineLines(ModelDiscoveryReport $report): array
-    {
-        if ([] === $report->baselinesRecorded) {
-            return [];
-        }
-
-        $parts = [];
-        $total = 0;
-        foreach ($report->baselinesRecorded as $event) {
-            $parts[] = $event['provider'];
-            $total += $event['idCount'];
-        }
-
-        return [sprintf(
-            'Baseline recorded for %s: %d ids; new models will be reported from tomorrow',
-            implode(', ', $parts),
-            $total,
-        )];
     }
 }

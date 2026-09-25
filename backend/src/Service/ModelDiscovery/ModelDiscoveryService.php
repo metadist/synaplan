@@ -23,15 +23,32 @@ use Psr\Clock\ClockInterface;
  * Per-provider silent baseline: the first successful listing records every
  * current id and reports none as pending. The baseline stays in
  * {@see ModelDiscoveryReport::$baselinesRecorded} until Discord (or a
- * `--notify` run with Discord disabled) marks it announced. Pending ids (seen
- * after baseline, not known via {@see ModelDiscoveryIdNormalizer::isKnown()},
- * not ignored) are reported every run until resolved or unlisted.
+ * `--notify` run with Discord disabled) marks it announced.
+ *
+ * Pending ids (seen after baseline, not known via
+ * {@see ModelDiscoveryIdNormalizer::isKnown()}, not ignored / class-silenced)
+ * split into `newPending` (not yet announced) and `openPending` (announced
+ * earlier). Discord posts new ids once, summarises open ones, and reminds
+ * fully every Monday. Provider listing failures follow the same once + Monday
+ * cadence via `failingSince` / `failureAnnounced`.
+ *
+ * @phpstan-type ProviderState array{
+ *     baselineRecorded: bool,
+ *     baselineAnnounced: bool,
+ *     baselineIds: list<string>,
+ *     seen: array<string, string>,
+ *     announced: array<string, string>,
+ *     failingSince: string|null,
+ *     failureAnnounced: bool
+ * }
  */
 final readonly class ModelDiscoveryService
 {
     /**
-     * @param array<string, array{reason: string, decidedOn: string}>|null $ignoreEntries
-     *                                                                                    test seam; production leaves null to use ModelDiscoveryIgnoreList
+     * @param array<string, array{reason: string, decidedOn: string}>|null                                                     $ignoreEntries
+     *                                                                                                                                        test seam; production leaves null to use ModelDiscoveryIgnoreList
+     * @param list<array{provider: string, match: 'prefix'|'contains', value: string, reason: string, decidedOn: string}>|null $classRules
+     *                                                                                                                                        test seam; production leaves null to use ModelDiscoveryIgnoreList::classRules()
      */
     public function __construct(
         private ProviderModelInventoryInterface $inventory,
@@ -40,6 +57,7 @@ final readonly class ModelDiscoveryService
         private ClockInterface $clock,
         private bool $enabled,
         private ?array $ignoreEntries = null,
+        private ?array $classRules = null,
     ) {
     }
 
@@ -55,12 +73,16 @@ final readonly class ModelDiscoveryService
         }
 
         $today = $this->clock->now()->format('Y-m-d');
+        $isMonday = '1' === $this->clock->now()->format('N');
         $knownByProvider = $this->indexKnownModels();
         $state = $this->stateStore->loadProviders();
 
         $providers = [];
         $pending = [];
+        $newPending = [];
+        $openPending = [];
         $failedProviders = [];
+        $silencedByClass = [];
         /** @var array<string, list<string>> */
         $okListedByProvider = [];
 
@@ -73,6 +95,7 @@ final readonly class ModelDiscoveryService
                 'detail' => $listing->detail,
                 'listedCount' => count($listing->modelIds),
                 'pendingCount' => 0,
+                'silencedByClass' => 0,
             ];
 
             if (ProviderModelListing::STATUS_NOT_CONFIGURED === $listing->status
@@ -81,9 +104,20 @@ final readonly class ModelDiscoveryService
             }
 
             if (ProviderModelListing::STATUS_UNREACHABLE === $listing->status) {
+                $providerState = $state[$provider] ?? $this->emptyProviderState();
+                $wasFailing = null !== $providerState['failingSince'];
+                if (!$wasFailing) {
+                    $providerState['failingSince'] = $today;
+                    $providerState['failureAnnounced'] = false;
+                }
+                $state[$provider] = $providerState;
+
+                $isNew = !$providerState['failureAnnounced'];
                 $failedProviders[] = [
                     'provider' => $provider,
                     'detail' => $listing->detail ?? 'unreachable',
+                    'failingSince' => $providerState['failingSince'] ?? $today,
+                    'isNew' => $isNew,
                 ];
                 continue;
             }
@@ -95,32 +129,39 @@ final readonly class ModelDiscoveryService
             $listedIds = $listing->modelIds;
             $okListedByProvider[$provider] = $listedIds;
 
-            $providerState = $state[$provider] ?? [
-                'baselineRecorded' => false,
-                'baselineAnnounced' => false,
-                'baselineIds' => [],
-                'seen' => [],
-            ];
+            $providerState = $state[$provider] ?? $this->emptyProviderState();
+            if (null !== $providerState['failingSince'] || $providerState['failureAnnounced']) {
+                $providerState['failingSince'] = null;
+                $providerState['failureAnnounced'] = false;
+            }
 
             if (!$providerState['baselineRecorded']) {
                 $state[$provider] = $this->recordBaseline($listedIds, $today);
+
                 continue;
             }
 
             $updated = $this->advanceSeen($providerState, $listedIds, $today);
-            $state[$provider] = $updated;
-
-            $providerPending = $this->collectPending(
+            $collected = $this->collectPending(
                 $provider,
                 $listedIds,
                 $updated,
                 $knownByProvider[$provider] ?? [],
                 $today,
             );
-            $pending = array_merge($pending, $providerPending);
+            $updated['announced'] = $this->pruneAnnounced($updated['announced'], $collected['pending']);
+            $state[$provider] = $updated;
+
+            $pending = array_merge($pending, $collected['pending']);
+            $newPending = array_merge($newPending, $collected['newPending']);
+            $openPending = array_merge($openPending, $collected['openPending']);
 
             $last = count($providers) - 1;
-            $providers[$last]['pendingCount'] = count($providerPending);
+            $providers[$last]['pendingCount'] = count($collected['pending']);
+            $providers[$last]['silencedByClass'] = $collected['silencedByClass'];
+            if ($collected['silencedByClass'] > 0) {
+                $silencedByClass[$provider] = $collected['silencedByClass'];
+            }
         }
 
         $this->stateStore->saveProviders($state);
@@ -137,15 +178,38 @@ final readonly class ModelDiscoveryService
 
         $obsoleteIgnores = $this->findObsoleteIgnores($okListedByProvider, $knownByProvider);
 
-        usort($pending, static fn (array $a, array $b): int => [$a['provider'], $a['id']] <=> [$b['provider'], $b['id']]);
+        $sortPending = static fn (array $a, array $b): int => [$a['provider'], $a['id']] <=> [$b['provider'], $b['id']];
+        usort($pending, $sortPending);
+        usort($newPending, $sortPending);
+        usort($openPending, $sortPending);
+
+        $hasNewFailure = false;
+        $hasOpenFailure = false;
+        foreach ($failedProviders as $fail) {
+            if ($fail['isNew']) {
+                $hasNewFailure = true;
+            } else {
+                $hasOpenFailure = true;
+            }
+        }
+
+        $isMondayReminder = $isMonday && ([] !== $openPending || $hasOpenFailure);
+        $shouldNotify = [] !== $newPending
+            || $hasNewFailure
+            || [] !== $baselinesRecorded
+            || $isMondayReminder;
 
         return new ModelDiscoveryReport(
             providers: $providers,
             pending: $pending,
+            newPending: $newPending,
+            openPending: $openPending,
             failedProviders: $failedProviders,
             baselinesRecorded: $baselinesRecorded,
             obsoleteIgnores: $obsoleteIgnores,
-            shouldNotify: [] !== $pending || [] !== $failedProviders || [] !== $baselinesRecorded,
+            silencedByClass: $silencedByClass,
+            shouldNotify: $shouldNotify,
+            isMondayReminder: $isMondayReminder,
         );
     }
 
@@ -196,14 +260,76 @@ final readonly class ModelDiscoveryService
     }
 
     /**
+     * After a successful Discord post (or `--notify` with Discord disabled),
+     * mark reported newPending ids and reported failures as announced.
+     */
+    public function markDiscoveriesAnnounced(ModelDiscoveryReport $report): void
+    {
+        $today = $this->clock->now()->format('Y-m-d');
+        $state = $this->stateStore->loadProviders();
+        $changed = false;
+
+        foreach ($report->newPending as $item) {
+            $provider = $item['provider'];
+            if (!isset($state[$provider])) {
+                $state[$provider] = $this->emptyProviderState();
+            }
+            if (!isset($state[$provider]['announced'][$item['id']])) {
+                $state[$provider]['announced'][$item['id']] = $today;
+                $changed = true;
+            }
+        }
+
+        foreach ($report->failedProviders as $fail) {
+            $include = $fail['isNew'] || $report->isMondayReminder;
+            if (!$include) {
+                continue;
+            }
+            $provider = $fail['provider'];
+            if (!isset($state[$provider])) {
+                continue;
+            }
+            if ($state[$provider]['failureAnnounced']) {
+                continue;
+            }
+            $state[$provider]['failureAnnounced'] = true;
+            $changed = true;
+        }
+
+        foreach ($report->baselinesRecorded as $event) {
+            $provider = $event['provider'];
+            if (!isset($state[$provider]) || $state[$provider]['baselineAnnounced']) {
+                continue;
+            }
+            $state[$provider]['baselineAnnounced'] = true;
+            $changed = true;
+        }
+
+        if ($changed) {
+            $this->stateStore->saveProviders($state);
+        }
+    }
+
+    /**
+     * @return ProviderState
+     */
+    private function emptyProviderState(): array
+    {
+        return [
+            'baselineRecorded' => false,
+            'baselineAnnounced' => false,
+            'baselineIds' => [],
+            'seen' => [],
+            'announced' => [],
+            'failingSince' => null,
+            'failureAnnounced' => false,
+        ];
+    }
+
+    /**
      * @param list<string> $listedIds
      *
-     * @return array{
-     *     baselineRecorded: bool,
-     *     baselineAnnounced: bool,
-     *     baselineIds: list<string>,
-     *     seen: array<string, string>
-     * }
+     * @return ProviderState
      */
     private function recordBaseline(array $listedIds, string $today): array
     {
@@ -217,24 +343,17 @@ final readonly class ModelDiscoveryService
             'baselineAnnounced' => false,
             'baselineIds' => $listedIds,
             'seen' => $seen,
+            'announced' => [],
+            'failingSince' => null,
+            'failureAnnounced' => false,
         ];
     }
 
     /**
-     * @param array{
-     *     baselineRecorded: bool,
-     *     baselineAnnounced: bool,
-     *     baselineIds: list<string>,
-     *     seen: array<string, string>
-     * }               $state
-     * @param list<string> $listedIds
+     * @param ProviderState $state
+     * @param list<string>  $listedIds
      *
-     * @return array{
-     *     baselineRecorded: bool,
-     *     baselineAnnounced: bool,
-     *     baselineIds: list<string>,
-     *     seen: array<string, string>
-     * }
+     * @return ProviderState
      */
     private function advanceSeen(array $state, array $listedIds, string $today): array
     {
@@ -256,20 +375,23 @@ final readonly class ModelDiscoveryService
             'baselineAnnounced' => $state['baselineAnnounced'],
             'baselineIds' => $state['baselineIds'],
             'seen' => $seen,
+            'announced' => $state['announced'],
+            'failingSince' => null,
+            'failureAnnounced' => false,
         ];
     }
 
     /**
      * @param list<string>        $listedIds
      * @param array<string, true> $knownKeys
-     * @param array{
-     *     baselineRecorded: bool,
-     *     baselineAnnounced: bool,
-     *     baselineIds: list<string>,
-     *     seen: array<string, string>
-     * }                          $state
+     * @param ProviderState       $state
      *
-     * @return list<array{provider: string, id: string, firstSeen: string, daysPending: int}>
+     * @return array{
+     *     pending: list<array{provider: string, id: string, firstSeen: string, daysPending: int, label: string}>,
+     *     newPending: list<array{provider: string, id: string, firstSeen: string, daysPending: int, label: string}>,
+     *     openPending: list<array{provider: string, id: string, firstSeen: string, daysPending: int, label: string}>,
+     *     silencedByClass: int
+     * }
      */
     private function collectPending(
         string $provider,
@@ -280,12 +402,19 @@ final readonly class ModelDiscoveryService
     ): array {
         $baselineSet = array_fill_keys($state['baselineIds'], true);
         $pending = [];
+        $newPending = [];
+        $openPending = [];
+        $silencedByClass = 0;
 
         foreach ($listedIds as $id) {
             if (isset($baselineSet[$id])) {
                 continue;
             }
-            if ($this->isIgnored($provider, $id)) {
+            if ($this->matchesClassRule($provider, $id)) {
+                ++$silencedByClass;
+                continue;
+            }
+            if ($this->isExactIgnored($provider, $id)) {
                 continue;
             }
             if (ModelDiscoveryIdNormalizer::isKnown($id, $knownKeys)) {
@@ -293,15 +422,51 @@ final readonly class ModelDiscoveryService
             }
 
             $firstSeen = $state['seen'][$id] ?? $today;
-            $pending[] = [
+            $classified = ModelFamilyClassifier::classify($id, $knownKeys, $provider);
+            $item = [
                 'provider' => $provider,
                 'id' => $id,
                 'firstSeen' => $firstSeen,
                 'daysPending' => $this->daysBetween($firstSeen, $today),
+                'label' => $classified['label'],
             ];
+            $pending[] = $item;
+            if (isset($state['announced'][$id])) {
+                $openPending[] = $item;
+            } else {
+                $newPending[] = $item;
+            }
         }
 
-        return $pending;
+        return [
+            'pending' => $pending,
+            'newPending' => $newPending,
+            'openPending' => $openPending,
+            'silencedByClass' => $silencedByClass,
+        ];
+    }
+
+    /**
+     * @param array<string, string>                                                                         $announced
+     * @param list<array{provider: string, id: string, firstSeen: string, daysPending: int, label: string}> $pending
+     *
+     * @return array<string, string>
+     */
+    private function pruneAnnounced(array $announced, array $pending): array
+    {
+        $pendingIds = [];
+        foreach ($pending as $item) {
+            $pendingIds[$item['id']] = true;
+        }
+
+        $kept = [];
+        foreach ($announced as $id => $date) {
+            if (isset($pendingIds[$id])) {
+                $kept[$id] = $date;
+            }
+        }
+
+        return $kept;
     }
 
     /**
@@ -392,8 +557,32 @@ final readonly class ModelDiscoveryService
         return $this->ignoreEntries ?? ModelDiscoveryIgnoreList::entries();
     }
 
-    private function isIgnored(string $provider, string $modelId): bool
+    private function isExactIgnored(string $provider, string $modelId): bool
     {
         return isset($this->ignoreEntries()[ModelDiscoveryIgnoreList::key($provider, $modelId)]);
+    }
+
+    private function matchesClassRule(string $provider, string $modelId): bool
+    {
+        if (null !== $this->classRules) {
+            $providerKey = strtolower(trim($provider));
+            $id = strtolower(trim($modelId));
+            foreach ($this->classRules as $rule) {
+                if ($rule['provider'] !== $providerKey) {
+                    continue;
+                }
+                $hits = match ($rule['match']) {
+                    'prefix' => str_starts_with($id, $rule['value']),
+                    'contains' => str_contains($id, $rule['value']),
+                };
+                if ($hits) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return null !== ModelDiscoveryIgnoreList::matchingClassRule($provider, $modelId);
     }
 }
