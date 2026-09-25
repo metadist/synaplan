@@ -5,6 +5,7 @@ namespace App\Service;
 use App\AI\Health\ModelHealthAlert;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\ModelDiscovery\ModelDiscoveryDigest;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -849,52 +850,57 @@ final readonly class DiscordNotificationService
      * Notify that providers listed models this install does not yet offer.
      *
      * Advisory only — nothing was written. At most one post per calendar day
-     * is enforced by the caller (BCONFIG claim), not here.
-     *
-     * @param list<string> $pendingModels   human-readable pending lines
-     * @param list<string> $failedProviders "could not check …" lines
-     * @param list<string> $baselineLines   baseline-recorded lines (often one)
+     * is enforced by the caller (BCONFIG claim), not here. Field lines come
+     * from {@see ModelDiscoveryDigest}.
      */
-    public function notifyNewModelDiscovery(
-        array $pendingModels,
-        array $failedProviders,
-        array $baselineLines,
-    ): bool {
+    public function notifyNewModelDiscovery(ModelDiscoveryDigest $digest): bool
+    {
         if (!$this->isEnabled()) {
             return false;
         }
 
-        if ([] === $pendingModels && [] === $failedProviders && [] === $baselineLines) {
+        if ([] === $digest->newLines
+            && [] === $digest->stillOpenLines
+            && [] === $digest->failedLines
+            && [] === $digest->baselineLines) {
             return false;
         }
 
         $fields = [];
 
-        if ([] !== $pendingModels) {
+        if ([] !== $digest->newLines) {
             $fields[] = [
-                'name' => sprintf('New upstream models (%d)', count($pendingModels)),
-                'value' => $this->bulletList($pendingModels, self::MAX_DRIFT_ENTRIES),
+                'name' => 'New',
+                'value' => $this->bulletList($digest->newLines, self::MAX_DRIFT_ENTRIES),
                 'inline' => false,
             ];
         }
 
-        if ([] !== $failedProviders) {
+        if ([] !== $digest->stillOpenLines) {
+            $fields[] = [
+                'name' => 'Still open',
+                'value' => $this->bulletList($digest->stillOpenLines, self::MAX_DRIFT_ENTRIES),
+                'inline' => false,
+            ];
+        }
+
+        if ([] !== $digest->failedLines) {
             $fields[] = [
                 'name' => 'Could not check',
-                'value' => $this->bulletList($failedProviders, self::MAX_DRIFT_ENTRIES),
+                'value' => $this->bulletList($digest->failedLines, self::MAX_DRIFT_ENTRIES),
                 'inline' => false,
             ];
         }
 
-        if ([] !== $baselineLines) {
+        if ([] !== $digest->baselineLines) {
             $fields[] = [
                 'name' => 'Baseline',
-                'value' => $this->bulletList($baselineLines, self::MAX_DRIFT_ENTRIES),
+                'value' => $this->bulletList($digest->baselineLines, self::MAX_DRIFT_ENTRIES),
                 'inline' => false,
             ];
         }
 
-        if ([] !== $pendingModels) {
+        if ($digest->actionRequired) {
             $fields[] = [
                 'name' => 'Action required',
                 'value' => 'Add the model to ModelCatalog (docs/PRICING_MAINTENANCE.md) or record a reasoned entry in ModelDiscoveryIgnoreList.',
@@ -902,17 +908,15 @@ final readonly class DiscordNotificationService
             ];
         }
 
-        $title = match (true) {
-            [] !== $pendingModels => '🆕 New AI models detected',
-            [] !== $failedProviders => '⚠️ New-model check: some providers could not be checked',
-            default => '✅ New-model check is active',
-        };
+        $hasWarning = [] !== $digest->newLines
+            || [] !== $digest->stillOpenLines
+            || [] !== $digest->failedLines;
 
         return $this->sendEmbed(
-            title: $title,
-            color: [] !== $pendingModels || [] !== $failedProviders ? self::COLOR_WARNING : self::COLOR_SUCCESS,
+            title: $digest->title,
+            color: $hasWarning ? self::COLOR_WARNING : self::COLOR_SUCCESS,
             fields: $fields,
-            footer: 'Synaplan model discovery · daily · at most one post per day',
+            footer: 'Synaplan model discovery · new once · Monday reminder',
         );
     }
 
