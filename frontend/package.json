@@ -85,7 +85,7 @@
     "@vue/eslint-config-typescript": "14.9.0",
     "@vue/test-utils": "2.5.1",
     "autoprefixer": "10.6.1",
-    "dotenv": "18.0.1",
+    "dotenv": "18.0.2",
     "eslint": "10.11.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-vue": "10.11.0",
