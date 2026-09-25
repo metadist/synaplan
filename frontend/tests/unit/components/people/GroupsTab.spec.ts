@@ -84,4 +84,70 @@ describe('GroupsTab delete confirmation', () => {
     )
     expect(deleteGroup).not.toHaveBeenCalled()
   })
+
+  it('uses the generic confirmation when the share list fails', async () => {
+    listGroupShares.mockRejectedValue(new Error('shares unavailable'))
+    getGroupConfig.mockResolvedValue({ settings: {}, conflicts: {} })
+
+    const wrapper = mount(GroupsTab, {
+      global: { stubs: { GroupDetailPanel: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="btn-delete-group-4"]').trigger('click')
+    await flushPromises()
+
+    expect(confirmDelete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message:
+          'Delete the group "Sales"? People stay in the instance. Shares to this group end, and the group\'s policies are removed.',
+      })
+    )
+    expect(deleteGroup).not.toHaveBeenCalled()
+  })
+
+  it('uses the generic confirmation when the policy list fails', async () => {
+    listGroupShares.mockResolvedValue([])
+    getGroupConfig.mockRejectedValue(new Error('config unavailable'))
+
+    const wrapper = mount(GroupsTab, {
+      global: { stubs: { GroupDetailPanel: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="btn-delete-group-4"]').trigger('click')
+    await flushPromises()
+
+    expect(confirmDelete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message:
+          'Delete the group "Sales"? People stay in the instance. Shares to this group end, and the group\'s policies are removed.',
+      })
+    )
+    expect(deleteGroup).not.toHaveBeenCalled()
+  })
+
+  it('ignores a second delete click while the first confirmation is open', async () => {
+    listGroupShares.mockResolvedValue([])
+    getGroupConfig.mockResolvedValue({ settings: {}, conflicts: {} })
+    let resolveConfirm: (value: boolean) => void = () => {}
+    confirmDelete.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveConfirm = resolve
+        })
+    )
+
+    const wrapper = mount(GroupsTab, {
+      global: { stubs: { GroupDetailPanel: true } },
+    })
+    await flushPromises()
+    const button = wrapper.get('[data-testid="btn-delete-group-4"]')
+    void button.trigger('click')
+    void button.trigger('click')
+    await flushPromises()
+
+    expect(confirmDelete).toHaveBeenCalledTimes(1)
+    resolveConfirm(false)
+    await flushPromises()
+    expect(deleteGroup).not.toHaveBeenCalled()
+  })
 })

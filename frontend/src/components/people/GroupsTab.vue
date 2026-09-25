@@ -108,6 +108,7 @@ const { success, error: showError } = useNotification()
 
 const groups = ref<IamGroup[]>([])
 const loading = ref(false)
+const deleteInFlight = ref(false)
 const selectedId = ref<number | null>(null)
 const selectedGroup = computed(
   () => groups.value.find((group) => group.id === selectedId.value) ?? null
@@ -184,13 +185,15 @@ async function groupDeleteMessage(group: IamGroup): Promise<string> {
 }
 
 async function deleteGroup(group: IamGroup) {
-  const confirmed = await confirm({
-    title: t('people.groups.delete'),
-    message: await groupDeleteMessage(group),
-    danger: true,
-  })
-  if (!confirmed) return
+  if (deleteInFlight.value) return
+  deleteInFlight.value = true
   try {
+    const confirmed = await confirm({
+      title: t('people.groups.delete'),
+      message: await groupDeleteMessage(group),
+      danger: true,
+    })
+    if (!confirmed) return
     await iamApi.deleteGroup(group.id)
     success(t('people.groups.deleted'))
     if (selectedId.value === group.id) {
@@ -199,6 +202,8 @@ async function deleteGroup(group: IamGroup) {
     await loadGroups()
   } catch (error) {
     showError(error instanceof Error ? error.message : t('people.groups.saveError'))
+  } finally {
+    deleteInFlight.value = false
   }
 }
 
