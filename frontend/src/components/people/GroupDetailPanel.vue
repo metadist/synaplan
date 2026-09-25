@@ -200,6 +200,8 @@ const memberSearchEmpty = ref(false)
 const pickedMember = ref<AdminUserSearchHit | null>(null)
 const memberSearchRoot = ref<HTMLElement | null>(null)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+let membersGeneration = 0
+let sharesGeneration = 0
 
 function kindLabel(kind: string): string {
   const key = `people.groups.resourceKind.${kind}`
@@ -214,25 +216,40 @@ function permissionLabel(permission: string): string {
 }
 
 async function loadMembers() {
+  const groupId = props.group.id
+  const generation = membersGeneration
   membersLoading.value = true
   try {
-    members.value = await iamApi.listMembers(props.group.id)
+    const rows = await iamApi.listMembers(groupId)
+    if (generation !== membersGeneration || props.group.id !== groupId) return
+    members.value = rows
   } catch (error) {
+    if (generation !== membersGeneration || props.group.id !== groupId) return
+    members.value = []
     showError(error instanceof Error ? error.message : t('people.groups.loadError'))
   } finally {
-    membersLoading.value = false
+    if (generation === membersGeneration) {
+      membersLoading.value = false
+    }
   }
 }
 
 async function loadShares() {
+  const groupId = props.group.id
+  const generation = sharesGeneration
   sharesLoading.value = true
   try {
-    shares.value = await iamApi.listGroupShares(props.group.id)
+    const rows = await iamApi.listGroupShares(groupId)
+    if (generation !== sharesGeneration || props.group.id !== groupId) return
+    shares.value = rows
   } catch (error) {
+    if (generation !== sharesGeneration || props.group.id !== groupId) return
     shares.value = []
     showError(error instanceof Error ? error.message : t('people.groups.loadError'))
   } finally {
-    sharesLoading.value = false
+    if (generation === sharesGeneration) {
+      sharesLoading.value = false
+    }
   }
 }
 
@@ -338,6 +355,12 @@ async function removeMember(member: IamGroupMember) {
 watch(
   () => props.group.id,
   () => {
+    membersGeneration += 1
+    sharesGeneration += 1
+    members.value = []
+    shares.value = []
+    membersLoading.value = true
+    sharesLoading.value = true
     void loadMembers()
     void loadShares()
   },
