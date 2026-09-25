@@ -53,20 +53,26 @@ final class VectorSearchServiceSharedStatsTest extends TestCase
     public function testOwnDocumentsStayAndASharedFileIsNotCountedTwice(): void
     {
         $storage = $this->createMock(VectorStorageFacade::class);
-        $storage->method('getStats')->willReturn(new StorageStats(10, 3, 1, ['mine' => 10]));
-        $storage->method('getFilesWithChunksByGroupKey')->willReturn([
+        $storage->expects($this->once())->method('getStats')->with(2)->willReturn(new StorageStats(10, 3, 1, ['mine' => 10]));
+        $storage->expects($this->once())->method('getFilesWithChunksByGroupKey')->with(9, 'handbook')->willReturn([
             4 => ['chunks' => 3, 'groupKey' => 'handbook'],
         ]);
         $storage->expects($this->once())
-            ->method('getFileChunkInfo')
-            ->with(9, 8)
-            ->willReturn(['chunks' => 2, 'groupKey' => 'handbook']);
+            ->method('getFilesWithChunks')
+            ->with(9)
+            ->willReturn([
+                4 => ['chunks' => 3, 'groupKey' => 'handbook'],
+                8 => ['chunks' => 2, 'groupKey' => 'handbook'],
+                7 => ['chunks' => 9, 'groupKey' => 'private'],
+                99 => ['chunks' => 50, 'groupKey' => 'private'],
+            ]);
+        $storage->expects($this->never())->method('getFileChunkInfo');
 
         $scopes = $this->createMock(RagScopeResolver::class);
         $scopes->method('resolve')->willReturn([
             new RagScope(2, null),
             new RagScope(9, 'handbook'),
-            new RagScope(9, 'handbook', [4, 8]),
+            new RagScope(9, 'handbook', [4, 8, 7]),
         ]);
 
         $stats = $this->service($storage, $scopes)->getUserStats(2);

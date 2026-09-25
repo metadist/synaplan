@@ -264,7 +264,15 @@ final readonly class VectorSearchService
     {
         try {
             $stats = $this->vectorStorage->getStats($userId);
-            $shared = $this->countSharedSearchable($userId);
+            try {
+                $shared = $this->countSharedSearchable($userId);
+            } catch (\Exception $e) {
+                $this->logger->error('VectorSearchService: shared stats failed', [
+                    'error' => $e->getMessage(),
+                    'user_id' => $userId,
+                ]);
+                $shared = ['files' => 0, 'chunks' => 0, 'groups' => 0];
+            }
 
             return [
                 'total_documents' => $stats->totalFiles + $shared['files'],
@@ -305,6 +313,8 @@ final readonly class VectorSearchService
         $seenFiles = [];
         /** @var array<string, true> $seenFolders */
         $seenFolders = [];
+        /** @var array<int, array<int, array{chunks: int, groupKey: string|null}>> $filesByOwner */
+        $filesByOwner = [];
 
         foreach ($this->ragScopeResolver->resolve($userId, null) as $scope) {
             if ($scope->ownerId === $userId) {
@@ -312,20 +322,27 @@ final readonly class VectorSearchService
             }
 
             if ([] !== $scope->fileIds) {
+                $catalog = $this->indexedFilesForOwner($filesByOwner, $scope->ownerId);
                 $added = false;
                 foreach ($scope->fileIds as $fileId) {
                     $fileKey = $scope->ownerId.':'.$fileId;
                     if (isset($seenFiles[$fileKey])) {
                         continue;
                     }
-                    $info = $this->vectorStorage->getFileChunkInfo($scope->ownerId, $fileId);
-                    $fileChunks = $info['chunks'];
-                    if ($fileChunks < 1) {
+                    $info = $catalog[$fileId] ?? null;
+                    if (null === $info || $info['chunks'] < 1) {
+                        continue;
+                    }
+                    if (
+                        null !== $scope->groupKey
+                        && '' !== $scope->groupKey
+                        && $info['groupKey'] !== $scope->groupKey
+                    ) {
                         continue;
                     }
                     $seenFiles[$fileKey] = true;
                     ++$files;
-                    $chunks += $fileChunks;
+                    $chunks += $info['chunks'];
                     $added = true;
                 }
                 if ($added && null !== $scope->groupKey && '' !== $scope->groupKey) {
@@ -361,6 +378,22 @@ final readonly class VectorSearchService
         }
 
         return ['files' => $files, 'chunks' => $chunks, 'groups' => $groups];
+    }
+
+    /**
+     * One scan per owner. Shared attachments must not each scroll the collection.
+     *
+     * @param array<int, array<int, array{chunks: int, groupKey: string|null}>> $filesByOwner
+     *
+     * @return array<int, array{chunks: int, groupKey: string|null}>
+     */
+    private function indexedFilesForOwner(array &$filesByOwner, int $ownerId): array
+    {
+        if (!isset($filesByOwner[$ownerId])) {
+            $filesByOwner[$ownerId] = $this->vectorStorage->getFilesWithChunks($ownerId);
+        }
+
+        return $filesByOwner[$ownerId];
     }
 
     /**
