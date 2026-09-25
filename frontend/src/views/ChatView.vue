@@ -569,7 +569,7 @@ import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { canComposeChat, isSharedConversationLocked } from '@/utils/sharedConversationLock'
-import { chatGoneStatus } from '@/utils/chatAccessError'
+import { chatGoneStatus, continueOutcomeAfterRecheck } from '@/utils/chatAccessError'
 import SharedConversationBanner from '@/components/iam/SharedConversationBanner.vue'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
@@ -785,10 +785,17 @@ const continueSharedConversation = async () => {
     await chatsStore.loadChats()
     await chatsStore.loadConversationAccess(copy.id)
   } catch (error) {
-    const gone = chatGoneStatus(error)
-    if (gone) {
-      await chatsStore.releaseUnavailableChat(id, gone)
-      return
+    if (chatGoneStatus(error)) {
+      await chatsStore.loadConversationAccess(id)
+      const outcome = continueOutcomeAfterRecheck(
+        chatsStore.activeChatId === id,
+        chatsStore.conversationAccess
+      )
+      if (outcome === 'released') return
+      if (outcome === 'read-only') {
+        showErrorToast(t('iam.continueNeedsUse'))
+        return
+      }
     }
     showErrorToast(t('iam.continueFailed'))
   }

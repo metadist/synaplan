@@ -936,6 +936,7 @@
     "sharedBy": "Von {name}",
     "continueAsCopy": "Als meine Kopie fortsetzen",
     "continueFailed": "Ihre Kopie konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    "continueNeedsUse": "Ihre Kopie wurde nicht erstellt. Sie können diesen Chat weiterhin lesen.",
     "readOnly": "Sie können diese Unterhaltung ansehen. Um eine Nachricht hinzuzufügen, setzen Sie sie als eigene Kopie fort.",
     "sharedFolder": "Geteilt · {name}",
     "banner": {
