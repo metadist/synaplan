@@ -111,6 +111,7 @@
                     }}
                   </span>
                   <span
+                    v-if="!widget.shared"
                     :class="[
                       'px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap',
                       widget.isActive
