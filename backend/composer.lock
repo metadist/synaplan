@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "498336f7a636b356704054561e4163bf",
+    "content-hash": "2ebcbb6d89b351fa73f724e32b167fff",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -3497,16 +3497,16 @@
         },
         {
             "name": "google/recaptcha",
-            "version": "1.5.2",
+            "version": "2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/google/recaptcha.git",
-                "reference": "ee4352ff2fe5ee23f2a8fbd165375dab3a1bad17"
+                "reference": "81700ff698b4c3e98b9b5ac54741008b46a154ea"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/google/recaptcha/zipball/ee4352ff2fe5ee23f2a8fbd165375dab3a1bad17",
-                "reference": "ee4352ff2fe5ee23f2a8fbd165375dab3a1bad17",
+                "url": "https://api.github.com/repos/google/recaptcha/zipball/81700ff698b4c3e98b9b5ac54741008b46a154ea",
+                "reference": "81700ff698b4c3e98b9b5ac54741008b46a154ea",
                 "shasum": ""
             },
             "require": {
@@ -3521,7 +3521,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-main": "1.5.x-dev"
+                    "dev-main": "2.0.x-dev"
                 }
             },
             "autoload": {
@@ -3546,7 +3546,7 @@
                 "issues": "https://github.com/google/recaptcha/issues",
                 "source": "https://github.com/google/recaptcha"
             },
-            "time": "2026-09-22T09:50:41+00:00"
+            "time": "2026-09-22T09:57:18+00:00"
         },
         {
             "name": "graham-campbell/result-type",

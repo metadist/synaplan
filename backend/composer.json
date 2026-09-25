@@ -21,7 +21,7 @@
         "gemini-api-php/client": "^1.7.2",
         "google/apiclient": "^2.19.4",
         "google/protobuf": "^5.34.1",
-        "google/recaptcha": "^1.5.0",
+        "google/recaptcha": "^2.0.0",
         "grpc/grpc": "^1.80",
         "hoels/app-store-server-library-php": "^2.0",
         "jumbojett/openid-connect-php": "^1.0.2",
