@@ -972,6 +972,7 @@
       "remove": "Remove",
       "removeTitle": "Stop sharing",
       "removeConfirm": "Remove {name}?",
+      "removeConfirmConversation": "Remove {name}? They lose this chat and can no longer make their own copy.",
       "loadFailed": "Couldn't load who this is shared with.",
       "saveFailed": "Couldn't share this. Please try again.",
       "shared": "Shared with {name}.",

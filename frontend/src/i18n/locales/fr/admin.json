@@ -972,6 +972,7 @@
       "remove": "Retirer",
       "removeTitle": "Arrêter le partage",
       "removeConfirm": "Retirer {name} ?",
+      "removeConfirmConversation": "Retirer {name} ? Cette personne perd ce chat et ne peut plus en faire sa propre copie.",
       "loadFailed": "Impossible de charger les partages.",
       "saveFailed": "Le partage a échoué. Veuillez réessayer.",
       "shared": "Partagé avec {name}.",

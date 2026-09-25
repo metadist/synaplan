@@ -968,6 +968,7 @@
       "remove": "Kaldır",
       "removeTitle": "Paylaşımı durdur",
       "removeConfirm": "{name} kaldırılsın mı?",
+      "removeConfirmConversation": "{name} kaldırılsın mı? Bu sohbeti kaybeder ve artık kendi kopyasını oluşturamaz.",
       "loadFailed": "Paylaşımlar yüklenemedi.",
       "saveFailed": "Paylaşılamadı. Lütfen tekrar deneyin.",
       "shared": "{name} ile paylaşıldı.",

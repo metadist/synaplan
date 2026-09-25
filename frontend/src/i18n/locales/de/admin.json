@@ -972,6 +972,7 @@
       "remove": "Entfernen",
       "removeTitle": "Teilen beenden",
       "removeConfirm": "{name} entfernen?",
+      "removeConfirmConversation": "{name} entfernen? Die Person verliert diesen Chat und kann keine eigene Kopie mehr erstellen.",
       "loadFailed": "Die Freigaben konnten nicht geladen werden.",
       "saveFailed": "Teilen ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
       "shared": "Mit {name} geteilt.",

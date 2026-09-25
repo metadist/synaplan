@@ -968,6 +968,7 @@
       "remove": "Quitar",
       "removeTitle": "Dejar de compartir",
       "removeConfirm": "¿Quitar a {name}?",
+      "removeConfirmConversation": "¿Quitar a {name}? Pierde este chat y ya no puede crear su propia copia.",
       "loadFailed": "No se pudo cargar con quién está compartido.",
       "saveFailed": "No se pudo compartir. Inténtelo de nuevo.",
       "shared": "Compartido con {name}.",
