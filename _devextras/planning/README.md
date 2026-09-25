@@ -10,8 +10,9 @@ paths were renamed on 2026-09-17.
 
 | Path | Why it stays here |
 | ---- | ----------------- |
-| [`20260917_roadmap.md`](./20260917_roadmap.md) | Current roadmap (Wave 5 leftovers + Wave 6 integrations) |
+| [`20260925_roadmap.md`](./20260925_roadmap.md) | Current roadmap (UX close-out, openDesk meeting notes minimum, Wave 6 integrations) |
 | [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: catalog, Connect UI, openDesk STT, editor / office clients |
+| [`20260917_roadmap.md`](./20260917_roadmap.md) | Stub → live plan + frozen 2026-09-17 text |
 | [`20260910_roadmap_update.md`](./20260910_roadmap_update.md) | Stub → live plan + frozen 2026-09-10 text |
 | [`20260903_roadmap.md`](./20260903_roadmap.md) | Stub → live plan + frozen 2026-09-03 text |
 | [`20260907_ux_user_flows.md`](./20260907_ux_user_flows.md) | Binding UX contract (U1–U12) |

@@ -2,7 +2,7 @@
 
 **Status:** Plan drafted 2026-09-17. No product code until
 [`00_master_plan.md`](./00_master_plan.md) §0 is ticked.
-**Live overview:** [`../20260917_roadmap.md`](../20260917_roadmap.md) §6–§7.
+**Live overview:** [`../20260925_roadmap.md`](../20260925_roadmap.md) §4–§5 (row 2 openDesk minimum, rows 3–4 catalog and clients).
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md).
 
 Use **your** Synaplan instance the way people use Claude Code today: point
