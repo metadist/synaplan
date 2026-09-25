@@ -298,7 +298,7 @@ jobs:
       # 127.0.0.1:6379. Digest pinned to match docker-compose.yml for parity
       # (Redis 7.4 — see docker-compose.yml for the Centrifugo pub/sub rationale).
       redis:
-        image: redis:7.4-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
+        image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
         ports:
           - 6379:6379
         options: >-
@@ -457,7 +457,7 @@ jobs:
           --health-retries=5
 
       redis:
-        image: redis:7.4-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
+        image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
         ports:
           - 6379:6379
         options: >-
