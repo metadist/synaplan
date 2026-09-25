@@ -253,6 +253,46 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame(['effort' => 'none'], $payload['reasoning']);
     }
 
+    /**
+     * @param array<string, mixed> $extra    thinking / output_config keys of the Messages body
+     * @param ?string              $expected null means no reasoning block
+     */
+    #[DataProvider('clientThinkingProvider')]
+    public function testToResponsesRequestHonoursClientThinking(string $model, array $extra, ?string $expected): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toResponsesRequest([
+            'model' => $model,
+            'max_tokens' => 64,
+            'messages' => [['role' => 'user', 'content' => 'hi']],
+        ] + $extra, stream: false);
+
+        $this->assertSame($expected, $payload['reasoning']['effort'] ?? null);
+        $this->assertArrayNotHasKey('thinking', $payload);
+        $this->assertArrayNotHasKey('output_config', $payload);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: array<string, mixed>, 2: ?string}>
+     */
+    public static function clientThinkingProvider(): array
+    {
+        return [
+            'no thinking keeps the cheapest tier' => ['gpt-6-sol', [], 'none'],
+            'disabled keeps the cheapest tier' => ['gpt-6-sol', ['thinking' => ['type' => 'disabled'], 'output_config' => ['effort' => 'high']], 'none'],
+            'adaptive without effort is medium' => ['gpt-6-sol', ['thinking' => ['type' => 'adaptive']], 'medium'],
+            'explicit effort wins' => ['gpt-6-luna', ['thinking' => ['type' => 'adaptive'], 'output_config' => ['effort' => 'high']], 'high'],
+            'effort without thinking block' => ['gpt-6-sol', ['output_config' => ['effort' => 'low']], 'low'],
+            'small budget' => ['gpt-6-sol', ['thinking' => ['type' => 'enabled', 'budget_tokens' => 2048]], 'low'],
+            'medium budget' => ['gpt-6-sol', ['thinking' => ['type' => 'enabled', 'budget_tokens' => 10000]], 'medium'],
+            'large budget' => ['gpt-6-sol', ['thinking' => ['type' => 'enabled', 'budget_tokens' => 31999]], 'high'],
+            'huge budget' => ['gpt-6-sol', ['thinking' => ['type' => 'enabled', 'budget_tokens' => 64000]], 'xhigh'],
+            'max clamps to the family cap' => ['gpt-5.5', ['output_config' => ['effort' => 'max']], 'xhigh'],
+            'huge budget on o-series caps at high' => ['o3', ['thinking' => ['type' => 'enabled', 'budget_tokens' => 64000]], 'high'],
+            'non-reasoning model gets no block' => ['gpt-4o', ['thinking' => ['type' => 'enabled', 'budget_tokens' => 8000]], null],
+        ];
+    }
+
     public function testToResponsesRequestKeepsNonAutoImageDetail(): void
     {
         $t = new OpenAiMessagesTranslator(new MockHttpClient());

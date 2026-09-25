@@ -42,6 +42,9 @@ final class OpenAiReasoningEffort
     /** o-series (o1/o3/o4) and anything unknown: no skip tier, no xhigh. */
     private const TIERS_FALLBACK = ['low', 'medium', 'high'];
 
+    /** Every tier name OpenAI uses, cheapest first. */
+    private const LADDER = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
     /**
      * Tiers the given model accepts, cheapest first.
      *
@@ -64,5 +67,30 @@ final class OpenAiReasoningEffort
     public static function lowest(string $model): string
     {
         return self::tiers($model)[0];
+    }
+
+    /**
+     * Highest tier the model accepts that does not exceed $requested, so a
+     * cross-provider `max` lands on the family's cap instead of HTTP 400.
+     * Falls back to the cheapest tier when the request is below the family's
+     * floor or is not a tier name at all.
+     */
+    public static function clamp(string $model, string $requested): string
+    {
+        $tiers = self::tiers($model);
+        $ceiling = array_search(strtolower($requested), self::LADDER, true);
+        if (false === $ceiling) {
+            return $tiers[0];
+        }
+
+        $best = $tiers[0];
+        foreach ($tiers as $tier) {
+            $rank = array_search($tier, self::LADDER, true);
+            if (false !== $rank && $rank <= $ceiling) {
+                $best = $tier;
+            }
+        }
+
+        return $best;
     }
 }
