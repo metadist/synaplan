@@ -60,4 +60,27 @@ final class OpenAiReasoningEffortTest extends TestCase
             OpenAiReasoningEffort::tiers('gpt-5.5-pro'),
         );
     }
+
+    #[DataProvider('clampProvider')]
+    public function testClamp(string $model, string $requested, string $expected): void
+    {
+        $this->assertSame($expected, OpenAiReasoningEffort::clamp($model, $requested));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function clampProvider(): array
+    {
+        return [
+            'supported tier is kept' => ['gpt-6-sol', 'high', 'high'],
+            'max on a family capped at xhigh' => ['gpt-5.5', 'max', 'xhigh'],
+            'xhigh on o-series caps at high' => ['o3', 'xhigh', 'high'],
+            'minimal on a none-family rounds down to none' => ['gpt-6-sol', 'minimal', 'none'],
+            'below the family floor takes the floor' => ['gpt-5.5-pro', 'low', 'medium'],
+            'none on astra takes its floor' => ['gpt-6-astra', 'none', 'low'],
+            'unknown name takes the floor' => ['gpt-6-luna', 'turbo', 'none'],
+            'case-insensitive' => ['gpt-6-sol', 'HIGH', 'high'],
+        ];
+    }
 }
