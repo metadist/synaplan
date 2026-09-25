@@ -133,8 +133,8 @@
                 :permission="widget.access && widget.access !== 'owner' ? widget.access : null"
               />
 
-              <!-- Stats -->
-              <div class="mb-4 p-3 surface-chip rounded-lg space-y-3">
+              <!-- Session totals stay with the owner. -->
+              <div v-if="!widget.shared" class="mb-4 p-3 surface-chip rounded-lg space-y-3">
                 <div class="grid grid-cols-2 gap-3">
                   <div>
                     <p class="text-xs txt-secondary mb-1">{{ $t('widgets.activeSessions') }}</p>
@@ -461,6 +461,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { listedWidgets } from '@/utils/widgetList'
 import { iamApi } from '@/services/api/iamApi'
 
 const router = useRouter()
@@ -478,7 +479,9 @@ const iamSharingEnabled = computed(() => isIamSharingEnabled())
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
 const iamShareName = ref('')
-const visibleWidgets = computed(() => (filterShared.value ? sharedWidgets.value : widgets.value))
+const visibleWidgets = computed(() =>
+  listedWidgets(widgets.value, sharedWidgets.value, filterShared.value)
+)
 const showWizard = ref(false)
 const successWidget = ref<widgetsApi.Widget | null>(null)
 const setupWidget = ref<widgetsApi.Widget | null>(null)
