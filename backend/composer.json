@@ -7,8 +7,8 @@
         "php": ">=8.4",
         "ext-ctype": "*",
         "ext-iconv": "*",
-        "api-platform/doctrine-orm": "^4.3.15",
-        "api-platform/symfony": "^4.3.15",
+        "api-platform/doctrine-orm": "^5.0.1",
+        "api-platform/symfony": "^5.0.1",
         "ardagnsrn/ollama-php": "^1.0.5",
         "codewithkyrian/whisper.php": "^1.1",
         "doctrine/dbal": "^4.4.3",
@@ -135,6 +135,7 @@
         }
     },
     "require-dev": {
+        "api-platform/test": "^5.0.1",
         "dama/doctrine-test-bundle": "^8.6",
         "dg/bypass-finals": "^1.9",
         "friendsofphp/php-cs-fixer": "^3.95.11",
