@@ -3,16 +3,23 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import DesktopConfiguration from '@/components/config/DesktopConfiguration.vue'
 
-const { mockListJobs, mockReload, desktopOn, confirmMock, successMock, revokeDevice } = vi.hoisted(
-  () => ({
-    mockListJobs: vi.fn(),
-    mockReload: vi.fn(),
-    desktopOn: { value: true },
-    confirmMock: vi.fn(),
-    successMock: vi.fn(),
-    revokeDevice: vi.fn(),
-  })
-)
+const {
+  mockListJobs,
+  mockReload,
+  desktopOn,
+  confirmMock,
+  successMock,
+  revokeDevice,
+  createPairingCode,
+} = vi.hoisted(() => ({
+  mockListJobs: vi.fn(),
+  mockReload: vi.fn(),
+  desktopOn: { value: true },
+  confirmMock: vi.fn(),
+  successMock: vi.fn(),
+  revokeDevice: vi.fn(),
+  createPairingCode: vi.fn(),
+}))
 
 const devicesRef = ref<
   Array<{
@@ -30,7 +37,7 @@ vi.mock('@/services/api/desktopApi', () => ({
   desktopApi: {
     listJobs: mockListJobs,
     listDevices: vi.fn().mockResolvedValue([]),
-    createPairingCode: vi.fn(),
+    createPairingCode,
     revokeDevice,
   },
 }))
@@ -71,7 +78,8 @@ describe('DesktopConfiguration', () => {
     mockListJobs.mockResolvedValue([])
     mockReload.mockResolvedValue(undefined)
     confirmMock.mockResolvedValue(false)
-    revokeDevice.mockResolvedValue({ cancelledJobs: 0 })
+    revokeDevice.mockResolvedValue({ cancelledJobs: 0, removed: false })
+    createPairingCode.mockResolvedValue({ code: 'ABCD-EFGH', expiresAt: 4_000_000_000 })
   })
 
   it('is absent when desktop is off', async () => {
@@ -142,5 +150,151 @@ describe('DesktopConfiguration', () => {
     expect(successMock).toHaveBeenCalledWith(
       'This computer was disconnected. 2 waiting tasks were cancelled and will not run.'
     )
+    expect(wrapper.get('[data-testid="text-device-presence"]').text()).toContain('Not seen yet')
+    expect(wrapper.get('[data-testid="text-device-presence"]').text()).not.toContain('Connected')
+    expect(wrapper.get('[data-testid="text-check-in-hint"]').text()).toContain('3 minutes')
+  })
+
+  it('labels a recent check-in as connected and an old one as not connected', async () => {
+    const now = Math.floor(Date.now() / 1000)
+    devicesRef.value = [
+      {
+        id: 1,
+        name: 'Online',
+        status: 'active',
+        lastSeen: now,
+        created: 1,
+        keyPrefix: null,
+        capabilities: [],
+      },
+      {
+        id: 2,
+        name: 'Away',
+        status: 'active',
+        lastSeen: now - 181,
+        created: 1,
+        keyPrefix: null,
+        capabilities: [],
+      },
+    ]
+    const wrapper = await mountPage()
+    const labels = wrapper
+      .findAll('[data-testid="text-device-presence"]')
+      .map((node) => node.text())
+    expect(labels[0]).toContain('Connected')
+    expect(labels[1]).toContain('Not connected')
+    expect(wrapper.find('[data-testid="card-get-desktop"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="card-get-desktop-compact"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="link-desktop-github"]').attributes('href')).toBe(REPO)
+  })
+
+  it('offers pair on the empty list and remove on a disconnected computer', async () => {
+    const empty = await mountPage()
+    expect(empty.get('[data-testid="btn-pair-empty"]').text()).toContain('Pair this computer')
+
+    devicesRef.value = [
+      {
+        id: 8,
+        name: 'Old tower',
+        status: 'revoked',
+        lastSeen: 1,
+        created: 1,
+        keyPrefix: null,
+        capabilities: [],
+      },
+    ]
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="btn-disconnect"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="text-device-presence"]').text()).toContain('Disconnected')
+
+    confirmMock.mockResolvedValue(true)
+    revokeDevice.mockResolvedValue({ cancelledJobs: 0, removed: true })
+    await wrapper.get('[data-testid="btn-remove"]').trigger('click')
+    await flushPromises()
+    expect(confirmMock.mock.calls[0][0].message).toContain('Old tower')
+    expect(revokeDevice).toHaveBeenCalledWith(8)
+    expect(successMock).toHaveBeenCalledWith(
+      '"Old tower" was removed from this list. It cannot reach your account. No waiting tasks were cancelled.'
+    )
+  })
+
+  it('closes the pairing dialog when a computer that was not active appears', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mount(DesktopConfiguration, {
+        global: {
+          stubs: {
+            Icon: true,
+            Transition: false,
+            Teleport: { template: '<div><slot /></div>' },
+          },
+        },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="btn-pair"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="modal-pairing"]').exists()).toBe(true)
+
+      devicesRef.value = [
+        {
+          id: 9,
+          name: 'tower',
+          status: 'active',
+          lastSeen: 0,
+          created: 1,
+          keyPrefix: null,
+          capabilities: [],
+        },
+      ]
+      await vi.advanceTimersByTimeAsync(3000)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="modal-pairing"]').exists()).toBe(false)
+      expect(successMock).toHaveBeenCalledWith(
+        '"tower" was added. It shows as connected after the app checks in.'
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not create a pairing code after the dialog is closed during refresh', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mount(DesktopConfiguration, {
+        global: {
+          stubs: {
+            Icon: true,
+            Transition: false,
+            Teleport: { template: '<div><slot /></div>' },
+          },
+        },
+      })
+      await flushPromises()
+
+      let releaseReload: () => void = () => {}
+      mockReload.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseReload = resolve
+          })
+      )
+      const opening = wrapper.get('[data-testid="btn-pair"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="modal-pairing"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="btn-pairing-close"]').trigger('click')
+      releaseReload()
+      await opening
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(9000)
+
+      expect(createPairingCode).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="modal-pairing"]').exists()).toBe(false)
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

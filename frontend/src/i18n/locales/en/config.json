@@ -908,6 +908,11 @@
       "confirmDisconnect": "\"{name}\" will no longer be able to reach your account. No waiting tasks will be cancelled. You can pair it again later with a new code. | \"{name}\" will no longer be able to reach your account. 1 waiting task will be cancelled and will not run. You can pair it again later with a new code. | \"{name}\" will no longer be able to reach your account. {count} waiting tasks will be cancelled and will not run. You can pair it again later with a new code.",
       "disconnected": "This computer was disconnected. No waiting tasks were cancelled. | This computer was disconnected. 1 waiting task was cancelled and will not run. | This computer was disconnected. {count} waiting tasks were cancelled and will not run.",
       "disconnectFailed": "The computer could not be disconnected.",
+      "remove": "Remove",
+      "confirmRemoveTitle": "Remove this computer",
+      "confirmRemove": "\"{name}\" is already disconnected. Removing it deletes it from this list. It still cannot reach your account.",
+      "removed": "\"{name}\" was removed from this list. It cannot reach your account. No waiting tasks were cancelled. | \"{name}\" was removed from this list. It cannot reach your account. 1 waiting task was cancelled and will not run. | \"{name}\" was removed from this list. It cannot reach your account. {count} waiting tasks were cancelled and will not run.",
+      "removeFailed": "The computer could not be removed from the list.",
       "pairing": {
         "title": "Pair this computer",
         "intro": "Open Synaplan Desktop on the computer you want to connect, then enter this address and code.",
@@ -920,7 +925,9 @@
         "copyAddress": "Copy address",
         "copyCode": "Copy code",
         "createFailed": "The pairing code could not be created.",
-        "copyFailed": "Could not copy to clipboard."
+        "copyFailed": "Could not copy to clipboard.",
+        "paired": "\"{name}\" was added. It shows as connected after the app checks in.",
+        "pairedOnline": "\"{name}\" is connected."
       },
       "devices": {
         "empty": "No computers are connected yet.",
@@ -931,11 +938,17 @@
         "actions": "Actions",
         "never": "never",
         "statusActive": "Connected",
-        "statusRevoked": "Disconnected"
+        "statusAway": "Not connected",
+        "statusNever": "Not seen yet",
+        "statusRevoked": "Disconnected",
+        "checkInHint": "This computer checks in about every {minutes} minutes."
       },
       "run": {
         "action": "Run on this computer",
         "multiple": "{count} computers",
+        "online": "{name} is connected",
+        "away": "{name} is not connected. It checks in about every {minutes} minutes.",
+        "never": "{name} has not checked in yet",
         "needPrompt": "Type what the computer should do first.",
         "skillTitle": "Run on this computer",
         "skillMessage": "Which skill should run on \"{name}\"?",
@@ -945,8 +958,8 @@
         "enqueueFailed": "The job could not be sent."
       },
       "jobCard": {
-        "waiting": "Waiting for {name}",
-        "waitingSkill": "Waiting for {name} to start {skill}",
+        "waiting": "Waiting for {name}. It checks in about every {minutes} minutes.",
+        "waitingSkill": "Waiting for {name} to start {skill}. It checks in about every {minutes} minutes.",
         "running": "{name} is running {skill}",
         "done": "{name} finished",
         "failed": "{name} could not finish",
@@ -984,7 +997,8 @@
         "stepsTitle": "Connect in three steps",
         "step1": "Install Synaplan Desktop on the computer you want to use.",
         "step2": "Click “Pair this computer” here and copy the address and the code.",
-        "step3": "Enter both in the app. The computer then appears in the list below."
+        "step3": "Enter both in the app. The computer then appears in the list below.",
+        "compact": "The app is a public beta on GitHub."
       }
     },
     "phoneVerification": {

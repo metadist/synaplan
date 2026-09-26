@@ -55,6 +55,7 @@ describe('DesktopJobCard', () => {
       'Hide this card'
     )
     expect(wrapper.get('[data-testid="btn-cancel-job"]').text()).toBe('Cancel task')
+    expect(wrapper.text()).toContain('every 3 minutes')
 
     await wrapper.get('[data-testid="btn-dismiss-job"]').trigger('click')
     expect(wrapper.emitted('dismiss')).toHaveLength(1)

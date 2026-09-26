@@ -57,12 +57,12 @@ export const desktopApi = {
     return { code: data.code, expiresAt: data.expiresAt }
   },
 
-  async revokeDevice(id: number): Promise<{ cancelledJobs: number }> {
+  async revokeDevice(id: number): Promise<{ cancelledJobs: number; removed: boolean }> {
     const data = await httpClient(`/api/v1/desktop/devices/${id}`, {
       method: 'DELETE',
       schema: RevokeDesktopDeviceResponseSchema,
     })
-    return { cancelledJobs: data.cancelledJobs }
+    return { cancelledJobs: data.cancelledJobs, removed: data.removed }
   },
 
   async cancelJob(id: number): Promise<{ cancelled: boolean; job: DesktopJob }> {

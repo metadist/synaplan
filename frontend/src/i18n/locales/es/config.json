@@ -658,6 +658,11 @@
       "confirmDisconnect": "«{name}» ya no podrá acceder a tu cuenta. No se cancelará ninguna tarea en espera. Podrás volver a vincularlo más tarde con un nuevo código. | «{name}» ya no podrá acceder a tu cuenta. Se cancelará 1 tarea en espera y no se ejecutará. Podrás volver a vincularlo más tarde con un nuevo código. | «{name}» ya no podrá acceder a tu cuenta. Se cancelarán {count} tareas en espera y no se ejecutarán. Podrás volver a vincularlo más tarde con un nuevo código.",
       "disconnected": "Este equipo se desconectó. No se canceló ninguna tarea en espera. | Este equipo se desconectó. Se canceló 1 tarea en espera y no se ejecutará. | Este equipo se desconectó. Se cancelaron {count} tareas en espera y no se ejecutarán.",
       "disconnectFailed": "No se pudo desconectar el equipo.",
+      "remove": "Quitar",
+      "confirmRemoveTitle": "Quitar este equipo",
+      "confirmRemove": "«{name}» ya está desconectado. Quitarlo solo lo borra de esta lista. Sigue sin poder acceder a tu cuenta.",
+      "removed": "«{name}» se quitó de esta lista. No puede acceder a tu cuenta. No se canceló ninguna tarea en espera. | «{name}» se quitó de esta lista. No puede acceder a tu cuenta. Se canceló 1 tarea en espera y no se ejecutará. | «{name}» se quitó de esta lista. No puede acceder a tu cuenta. Se cancelaron {count} tareas en espera y no se ejecutarán.",
+      "removeFailed": "No se pudo quitar el equipo de la lista.",
       "pairing": {
         "title": "Vincular este equipo",
         "intro": "Abre Synaplan Desktop en el equipo que quieres conectar e introduce esta dirección y este código.",
@@ -670,7 +675,9 @@
         "copyAddress": "Copiar dirección",
         "copyCode": "Copiar código",
         "createFailed": "No se pudo crear el código de vinculación.",
-        "copyFailed": "No se pudo copiar al portapapeles."
+        "copyFailed": "No se pudo copiar al portapapeles.",
+        "paired": "Se añadió «{name}». Se mostrará como conectado cuando la app se comunique.",
+        "pairedOnline": "«{name}» está conectado."
       },
       "devices": {
         "empty": "Aún no hay equipos conectados.",
@@ -681,11 +688,17 @@
         "actions": "Acciones",
         "never": "nunca",
         "statusActive": "Conectado",
-        "statusRevoked": "Desconectado"
+        "statusAway": "No conectado",
+        "statusNever": "Aún no visto",
+        "statusRevoked": "Desconectado",
+        "checkInHint": "Este equipo se comunica aproximadamente cada {minutes} minutos."
       },
       "run": {
         "action": "Ejecutar en este equipo",
         "multiple": "{count} equipos",
+        "online": "{name} está conectado",
+        "away": "{name} no está conectado. Se comunica aproximadamente cada {minutes} minutos.",
+        "never": "{name} aún no se ha comunicado",
         "needPrompt": "Escribe primero qué debe hacer el equipo.",
         "skillTitle": "Ejecutar en este equipo",
         "skillMessage": "¿Qué skill debe ejecutarse en «{name}»?",
@@ -695,8 +708,8 @@
         "enqueueFailed": "No se pudo enviar el trabajo."
       },
       "jobCard": {
-        "waiting": "Esperando a {name}",
-        "waitingSkill": "Esperando a que {name} inicie {skill}",
+        "waiting": "Esperando a {name}. Se comunica aproximadamente cada {minutes} minutos.",
+        "waitingSkill": "Esperando a que {name} inicie {skill}. Se comunica aproximadamente cada {minutes} minutos.",
         "running": "{name} está ejecutando {skill}",
         "done": "{name} ha terminado",
         "failed": "{name} no pudo terminar",
@@ -727,14 +740,15 @@
         "title": "Obtener Synaplan Desktop",
         "beta": "Beta",
         "platforms": "Disponible para",
-        "description": "Una pequeña aplicación para macOS, Windows y Linux. Se vincula con tu cuenta de Synaplan y ejecuta en tu propio equipo las habilidades que instales, por ejemplo crear una presentación a partir de tus notas.",
+        "description": "Una pequeña aplicación para macOS, Windows y Linux. Se vincula con tu cuenta de Synaplan y ejecuta en tu propio equipo los skills que instales, por ejemplo crear una presentación a partir de tus notas.",
         "github": "Obtener en GitHub",
         "releases": "Versiones",
         "betaNote": "Las versiones beta aún no están firmadas, así que tu sistema operativo puede pedirte confirmación en el primer inicio. El repositorio también explica cómo compilar la aplicación tú mismo.",
         "stepsTitle": "Conectar en tres pasos",
         "step1": "Instala Synaplan Desktop en el equipo que quieras usar.",
         "step2": "Pulsa aquí «Vincular este equipo» y copia la dirección y el código.",
-        "step3": "Introduce ambos en la aplicación. El equipo aparecerá en la lista de abajo."
+        "step3": "Introduce ambos en la aplicación. El equipo aparecerá en la lista de abajo.",
+        "compact": "La app es una beta pública en GitHub."
       }
     },
     "phoneVerification": {

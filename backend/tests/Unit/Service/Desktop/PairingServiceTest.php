@@ -164,4 +164,44 @@ final class PairingServiceTest extends TestCase
 
         self::assertSame(DesktopDevice::STATUS_REVOKED, $device->getStatus());
     }
+
+    public function testPairReusesRevokedDeviceWithTheSameName(): void
+    {
+        $this->stubUser(7);
+        $revoked = (new DesktopDevice())
+            ->setOwnerId(7)
+            ->setName('tower')
+            ->setApiKeyId(55)
+            ->setStatus(DesktopDevice::STATUS_REVOKED)
+            ->setLastSeen(1_700_000_000)
+            ->setCapabilities(['old']);
+
+        $this->deviceRepository->expects(self::once())
+            ->method('findRevokedByOwnerAndName')
+            ->with(7, 'tower')
+            ->willReturn($revoked);
+
+        $oldKey = (new ApiKey())->setOwnerId(7)->setKey('sk_old')->setName('Desktop — tower');
+        $this->apiKeyRepository->expects(self::once())->method('find')->with(55)->willReturn($oldKey);
+        $this->apiKeyRepository->expects(self::once())->method('remove')->with($oldKey, false);
+        $this->apiKeyRepository->expects(self::once())->method('save');
+        $this->deviceRepository->expects(self::once())->method('save')->with($revoked);
+
+        $this->service->pair(7, "  tower \n", ['skill.run', 'notes']);
+
+        self::assertSame(DesktopDevice::STATUS_ACTIVE, $revoked->getStatus());
+        self::assertSame(0, $revoked->getLastSeen());
+        self::assertSame(['skill.run', 'notes'], $revoked->getCapabilities());
+        self::assertSame('tower', $revoked->getName());
+    }
+
+    public function testForgetDeletesTheRow(): void
+    {
+        $device = (new DesktopDevice())->setOwnerId(1)->setStatus(DesktopDevice::STATUS_REVOKED);
+        $this->apiKeyRepository->expects(self::never())->method('remove');
+        $this->userRepository->expects(self::never())->method('find');
+        $this->deviceRepository->expects(self::once())->method('remove')->with($device);
+
+        $this->service->forget($device);
+    }
 }

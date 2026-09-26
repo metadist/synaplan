@@ -21,7 +21,7 @@
     <!-- Get the app: the client is a public beta on GitHub (build from source or
          a beta build from Releases). Links go to the repository, never to a
          binary we do not host. -->
-    <div class="surface-card p-5 md:p-6" data-testid="card-get-desktop">
+    <div v-if="devices.length === 0" class="surface-card p-5 md:p-6" data-testid="card-get-desktop">
       <div class="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div class="min-w-0 space-y-4">
           <div class="flex items-start gap-4">
@@ -50,7 +50,7 @@
             <li
               v-for="platform in platforms"
               :key="platform.id"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium surface-chip txt-primary"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium surface-chip txt-primary cursor-default select-none"
             >
               <Icon :icon="platform.icon" class="w-4 h-4" aria-hidden="true" />
               {{ platform.label }}
@@ -96,7 +96,7 @@
           <ol class="space-y-3 text-sm">
             <li v-for="step in 3" :key="step" class="flex items-start gap-3">
               <span
-                class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold bg-[var(--brand)] text-white"
+                class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold bg-[var(--brand)] text-[var(--on-brand)]"
               >
                 {{ step }}
               </span>
@@ -107,6 +107,23 @@
           </ol>
         </div>
       </div>
+    </div>
+    <div
+      v-else
+      class="surface-card px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+      data-testid="card-get-desktop-compact"
+    >
+      <p class="text-sm txt-secondary">{{ $t('config.desktop.get.compact') }}</p>
+      <a
+        :href="DESKTOP_REPO_URL"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+        data-testid="link-desktop-github"
+      >
+        <Icon icon="mdi:github" class="w-5 h-5" aria-hidden="true" />
+        {{ $t('config.desktop.get.github') }}
+      </a>
     </div>
 
     <!-- Error Alert -->
@@ -144,96 +161,82 @@
     >
       <ComputerDesktopIcon class="w-16 h-16 mx-auto txt-secondary mb-4" />
       <p class="txt-secondary text-lg">{{ $t('config.desktop.devices.empty') }}</p>
+      <button
+        type="button"
+        class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+        data-testid="btn-pair-empty"
+        @click="openPairing"
+      >
+        <PlusIcon class="w-5 h-5" />
+        {{ $t('config.desktop.pairButton') }}
+      </button>
     </div>
 
-    <!-- Device table -->
-    <div v-else class="surface-card overflow-hidden" data-testid="section-devices-table">
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="border-b border-light-border/30 dark:border-dark-border/20">
-            <tr class="bg-black/5 dark:bg-white/5">
-              <th
-                class="px-6 py-3 text-left text-xs font-semibold txt-primary uppercase tracking-wider"
-              >
-                {{ $t('config.desktop.devices.name') }}
-              </th>
-              <th
-                class="px-6 py-3 text-left text-xs font-semibold txt-primary uppercase tracking-wider"
-              >
-                {{ $t('config.desktop.devices.status') }}
-              </th>
-              <th
-                class="px-6 py-3 text-left text-xs font-semibold txt-primary uppercase tracking-wider"
-              >
-                {{ $t('config.desktop.devices.lastSeen') }}
-              </th>
-              <th
-                class="px-6 py-3 text-left text-xs font-semibold txt-primary uppercase tracking-wider"
-              >
-                {{ $t('config.desktop.devices.waitingJobs') }}
-              </th>
-              <th
-                class="px-6 py-3 text-left text-xs font-semibold txt-primary uppercase tracking-wider"
-              >
-                {{ $t('config.desktop.devices.actions') }}
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-light-border/30 dark:divide-dark-border/20">
-            <tr
-              v-for="device in devices"
-              :key="device.id"
-              class="hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-              data-testid="item-device"
+    <!-- One card per computer so Disconnect stays on screen at 320px. -->
+    <ul v-else class="space-y-3" data-testid="section-devices">
+      <li
+        v-for="device in devices"
+        :key="device.id"
+        class="surface-card p-4 space-y-3"
+        data-testid="item-device"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-center gap-2 min-w-0">
+            <ComputerDesktopIcon class="w-5 h-5 txt-secondary shrink-0" />
+            <span class="text-sm font-medium txt-primary break-words">{{ device.name }}</span>
+          </div>
+          <span
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium shrink-0"
+            :class="presenceClass(presenceOf(device))"
+            data-testid="text-device-presence"
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full"
+              :class="presenceDotClass(presenceOf(device))"
+              aria-hidden="true"
+            ></span>
+            {{ presenceLabel(presenceOf(device)) }}
+          </span>
+        </div>
+        <dl class="grid grid-cols-2 gap-3 text-sm">
+          <div class="min-w-0">
+            <dt class="text-xs txt-secondary">{{ $t('config.desktop.devices.lastSeen') }}</dt>
+            <dd class="txt-primary break-words">{{ formatLastSeen(device.lastSeen) }}</dd>
+          </div>
+          <div class="min-w-0">
+            <dt class="text-xs txt-secondary">{{ $t('config.desktop.devices.waitingJobs') }}</dt>
+            <dd class="txt-primary">{{ waitingCount(device.id) }}</dd>
+            <p
+              v-if="device.status === 'active'"
+              class="text-xs txt-secondary mt-1"
+              data-testid="text-check-in-hint"
             >
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center gap-2">
-                  <ComputerDesktopIcon class="w-5 h-5 txt-secondary shrink-0" />
-                  <span class="text-sm font-medium txt-primary">{{ device.name }}</span>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span
-                  :class="[
-                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
-                    device.status === 'active'
-                      ? 'bg-green-500/10 text-green-500'
-                      : 'bg-gray-500/10 text-gray-500',
-                  ]"
-                >
-                  <span
-                    class="w-1.5 h-1.5 rounded-full"
-                    :class="device.status === 'active' ? 'bg-green-500' : 'bg-gray-500'"
-                  ></span>
-                  {{
-                    device.status === 'active'
-                      ? $t('config.desktop.devices.statusActive')
-                      : $t('config.desktop.devices.statusRevoked')
-                  }}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm txt-secondary">
-                {{ formatLastSeen(device.lastSeen) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm txt-secondary">
-                {{ waitingCount(device.id) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <button
-                  v-if="device.status === 'active'"
-                  class="text-sm text-red-500 hover:text-red-600 font-medium"
-                  data-testid="btn-disconnect"
-                  @click="disconnect(device)"
-                >
-                  {{ $t('config.desktop.disconnect') }}
-                </button>
-                <span v-else class="text-sm txt-muted">—</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+              {{ $t('config.desktop.devices.checkInHint', { minutes: checkInMinutes }) }}
+            </p>
+          </div>
+        </dl>
+        <div>
+          <button
+            v-if="device.status === 'active'"
+            type="button"
+            class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+            data-testid="btn-disconnect"
+            @click="disconnect(device)"
+          >
+            {{ $t('config.desktop.disconnect') }}
+          </button>
+          <button
+            v-else
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            data-testid="btn-remove"
+            @click="removeDevice(device)"
+          >
+            {{ $t('config.desktop.remove') }}
+          </button>
+        </div>
+      </li>
+    </ul>
 
     <!-- Pairing modal -->
     <Teleport to="#app">
@@ -393,6 +396,11 @@ import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { desktopPairingAddress } from '@/utils/desktopPairingAddress'
+import {
+  DESKTOP_CHECK_IN_MINUTES,
+  desktopPresence,
+  type DesktopPresence,
+} from '@/utils/desktopPresence'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
 
 const { t } = useI18n()
@@ -430,6 +438,15 @@ const serverAddress = desktopPairingAddress()
 
 const now = ref(Math.floor(Date.now() / 1000))
 let ticker: number | null = null
+const checkInMinutes = DESKTOP_CHECK_IN_MINUTES
+
+// While the pairing dialog is open, poll the device list. A computer that
+// was not active when the dialog opened (new row, or a disconnected row
+// paired again) closes the dialog. This is a real check, not a delay.
+const PAIR_POLL_MS = 3000
+let pairPoll: number | null = null
+let pairWatch = 0
+const activeIdsAtOpen = ref<Set<number>>(new Set())
 
 const secondsLeft = computed(() =>
   pairingCode.value ? Math.max(0, pairingCode.value.expiresAt - now.value) : 0
@@ -448,6 +465,32 @@ const formatLastSeen = (lastSeen: number): string => {
 }
 
 const waitingCount = (deviceId: number): number => waitingByDevice.value[deviceId] ?? 0
+
+const presenceOf = (device: DesktopDevice): DesktopPresence =>
+  desktopPresence(device.status, device.lastSeen, now.value)
+
+const presenceLabel = (presence: DesktopPresence): string => {
+  if (presence === 'online') return t('config.desktop.devices.statusActive')
+  if (presence === 'away') return t('config.desktop.devices.statusAway')
+  if (presence === 'never') return t('config.desktop.devices.statusNever')
+  return t('config.desktop.devices.statusRevoked')
+}
+
+const presenceClass = (presence: DesktopPresence): string => {
+  if (presence === 'online') {
+    return 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
+  }
+  if (presence === 'away') {
+    return 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]'
+  }
+  return 'bg-[var(--status-neutral-muted)] text-[var(--status-neutral-text)]'
+}
+
+const presenceDotClass = (presence: DesktopPresence): string => {
+  if (presence === 'online') return 'bg-[var(--status-success)]'
+  if (presence === 'away') return 'bg-[var(--status-warning)]'
+  return 'bg-[var(--status-neutral)]'
+}
 
 const loadAll = async () => {
   if (!isDesktopAgentEnabled()) {
@@ -480,10 +523,68 @@ const loadAll = async () => {
   }
 }
 
-const openPairing = () => {
+const stopPairPoll = () => {
+  if (pairPoll) {
+    clearInterval(pairPoll)
+    pairPoll = null
+  }
+}
+
+const notePairSuccess = async (device: DesktopDevice) => {
+  pairWatch += 1
+  stopPairPoll()
+  showPairing.value = false
+  pairingCode.value = null
+  await loadAll()
+  if (desktopPresence(device.status, device.lastSeen, now.value) === 'online') {
+    success(t('config.desktop.pairing.pairedOnline', { name: device.name }))
+    return
+  }
+  success(t('config.desktop.pairing.paired', { name: device.name }))
+}
+
+const pollForPairedDevice = async () => {
+  const watch = pairWatch
+  if (!showPairing.value) return
+  try {
+    await reload()
+  } catch {
+    return
+  }
+  if (watch !== pairWatch || !showPairing.value) return
+
+  for (const id of [...activeIdsAtOpen.value]) {
+    const current = devices.value.find((device) => device.id === id)
+    if (!current || current.status !== 'active') activeIdsAtOpen.value.delete(id)
+  }
+
+  const appeared = devices.value.find(
+    (device) => device.status === 'active' && !activeIdsAtOpen.value.has(device.id)
+  )
+  if (!appeared) return
+  await notePairSuccess(appeared)
+}
+
+const openPairing = async () => {
+  const watch = pairWatch
   showPairing.value = true
   copiedField.value = null
+  try {
+    await reload()
+  } catch {
+    // A failed refresh must not block the code. The next poll tries again.
+  }
+  // Close during the refresh bumps pairWatch and hides the dialog. Do not
+  // mint a code or leave a poll running after that.
+  if (watch !== pairWatch || !showPairing.value) return
+  activeIdsAtOpen.value = new Set(
+    devices.value.filter((device) => device.status === 'active').map((device) => device.id)
+  )
   createCode()
+  stopPairPoll()
+  pairPoll = window.setInterval(() => {
+    void pollForPairedDevice()
+  }, PAIR_POLL_MS)
 }
 
 const createCode = async () => {
@@ -501,6 +602,8 @@ const createCode = async () => {
 }
 
 const closePairing = () => {
+  pairWatch += 1
+  stopPairPoll()
   showPairing.value = false
   pairingCode.value = null
 }
@@ -537,6 +640,24 @@ const disconnect = async (device: DesktopDevice) => {
   }
 }
 
+const removeDevice = async (device: DesktopDevice) => {
+  const confirmed = await dialog.confirm({
+    title: t('config.desktop.confirmRemoveTitle'),
+    message: t('config.desktop.confirmRemove', { name: device.name }),
+    confirmText: t('config.desktop.remove'),
+    cancelText: t('common.cancel'),
+  })
+  if (!confirmed) return
+
+  try {
+    const { cancelledJobs } = await desktopApi.revokeDevice(device.id)
+    success(t('config.desktop.removed', { name: device.name, count: cancelledJobs }, cancelledJobs))
+    await loadAll()
+  } catch (err) {
+    showError(getErrorMessage(err) || t('config.desktop.removeFailed'))
+  }
+}
+
 onMounted(() => {
   loadAll()
   ticker = window.setInterval(() => {
@@ -550,5 +671,6 @@ onActivated(() => {
 
 onUnmounted(() => {
   if (ticker) clearInterval(ticker)
+  stopPairPoll()
 })
 </script>

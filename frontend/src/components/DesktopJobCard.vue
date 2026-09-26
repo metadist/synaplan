@@ -51,6 +51,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { desktopApi, type DesktopJob } from '@/services/api/desktopApi'
 import { jobCardView, type DesktopJobStatus } from '@/utils/desktopJobCard'
+import { DESKTOP_CHECK_IN_MINUTES } from '@/utils/desktopPresence'
 
 const props = defineProps<{
   jobId: number
@@ -99,9 +100,13 @@ const statusLine = computed(() => {
     return t('config.desktop.jobCard.running', { name, skill: skillName })
   }
   if (view.value.phase === 'waiting' && skillName) {
-    return t('config.desktop.jobCard.waitingSkill', { name, skill: skillName })
+    return t('config.desktop.jobCard.waitingSkill', {
+      name,
+      skill: skillName,
+      minutes: DESKTOP_CHECK_IN_MINUTES,
+    })
   }
-  return t('config.desktop.jobCard.waiting', { name })
+  return t('config.desktop.jobCard.waiting', { name, minutes: DESKTOP_CHECK_IN_MINUTES })
 })
 
 const metaLine = computed(() => {

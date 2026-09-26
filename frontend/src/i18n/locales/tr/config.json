@@ -658,6 +658,11 @@
       "confirmDisconnect": "„{name}” artık hesabınıza erişemeyecek. {count} bekleyen görev iptal edilecek ve çalışmayacak. Daha sonra yeni bir kodla tekrar bağlayabilirsiniz.",
       "disconnected": "Bu bilgisayarın bağlantısı kesildi. {count} bekleyen görev iptal edildi ve çalışmayacak.",
       "disconnectFailed": "Bilgisayarın bağlantısı kesilemedi.",
+      "remove": "Kaldır",
+      "confirmRemoveTitle": "Bu bilgisayarı kaldır",
+      "confirmRemove": "„{name}” zaten bağlantısı kesilmiş durumda. Kaldırmak yalnızca bu listeden siler. Hesabınıza yine erişemez.",
+      "removed": "„{name}” bu listeden kaldırıldı. Hesabınıza erişemez. {count} bekleyen görev iptal edildi ve çalışmayacak.",
+      "removeFailed": "Bilgisayar listeden kaldırılamadı.",
       "pairing": {
         "title": "Bu bilgisayarı bağla",
         "intro": "Bağlamak istediğiniz bilgisayarda Synaplan Desktop'ı açın, ardından bu adresi ve kodu girin.",
@@ -670,7 +675,9 @@
         "copyAddress": "Adresi kopyala",
         "copyCode": "Kodu kopyala",
         "createFailed": "Eşleme kodu oluşturulamadı.",
-        "copyFailed": "Panoya kopyalanamadı."
+        "copyFailed": "Panoya kopyalanamadı.",
+        "paired": "„{name}” eklendi. Uygulama haber verdikten sonra bağlı olarak görünür.",
+        "pairedOnline": "„{name}” bağlı."
       },
       "devices": {
         "empty": "Henüz bağlı bilgisayar yok.",
@@ -681,11 +688,17 @@
         "actions": "İşlemler",
         "never": "hiç",
         "statusActive": "Bağlı",
-        "statusRevoked": "Bağlantı kesildi"
+        "statusAway": "Bağlı değil",
+        "statusNever": "Henüz görülmedi",
+        "statusRevoked": "Bağlantı kesildi",
+        "checkInHint": "Bu bilgisayar yaklaşık her {minutes} dakikada bir haber verir."
       },
       "run": {
         "action": "Bu bilgisayarda çalıştır",
         "multiple": "{count} bilgisayar",
+        "online": "{name} bağlı",
+        "away": "{name} bağlı değil. Yaklaşık her {minutes} dakikada bir haber verir.",
+        "never": "{name} henüz haber vermedi",
         "needPrompt": "Önce bilgisayarın ne yapması gerektiğini yazın.",
         "skillTitle": "Bu bilgisayarda çalıştır",
         "skillMessage": "„{name}” üzerinde hangi skill çalıştırılsın?",
@@ -695,8 +708,8 @@
         "enqueueFailed": "İş gönderilemedi."
       },
       "jobCard": {
-        "waiting": "{name} bekleniyor",
-        "waitingSkill": "{name}, {skill} görevini başlatmak için bekleniyor",
+        "waiting": "{name} bekleniyor. Yaklaşık her {minutes} dakikada bir haber verir.",
+        "waitingSkill": "{name}, {skill} görevini başlatmak için bekleniyor. Yaklaşık her {minutes} dakikada bir haber verir.",
         "running": "{name}, {skill} görevini çalıştırıyor",
         "done": "{name} tamamlandı",
         "failed": "{name} tamamlayamadı",
@@ -727,14 +740,15 @@
         "title": "Synaplan Desktop'u edin",
         "beta": "Beta",
         "platforms": "Şu platformlar için",
-        "description": "macOS, Windows ve Linux için küçük bir uygulama. Synaplan hesabınla eşleşir ve yüklediğin becerileri kendi bilgisayarında çalıştırır; örneğin notlarından bir sunum hazırlar.",
+        "description": "macOS, Windows ve Linux için küçük bir uygulama. Synaplan hesabınızla eşleşir ve yüklediğiniz skill'leri kendi bilgisayarınızda çalıştırır; örneğin notlarınızdan bir sunum hazırlar.",
         "github": "GitHub'dan edin",
         "releases": "Sürümler",
-        "betaNote": "Beta sürümleri henüz imzalı değil, bu yüzden işletim sistemin ilk açılışta onay isteyebilir. Uygulamayı kendin nasıl derleyeceğin de depoda anlatılıyor.",
+        "betaNote": "Beta sürümleri henüz imzalı değil, bu yüzden işletim sisteminiz ilk açılışta onay isteyebilir. Uygulamayı kendiniz nasıl derleyeceğiniz de depoda anlatılıyor.",
         "stepsTitle": "Üç adımda bağlan",
-        "step1": "Kullanmak istediğin bilgisayara Synaplan Desktop'u yükle.",
-        "step2": "Burada “Bu bilgisayarı bağla”ya tıkla ve adres ile kodu kopyala.",
-        "step3": "İkisini de uygulamaya gir. Bilgisayar ardından aşağıdaki listede görünür."
+        "step1": "Kullanmak istediğiniz bilgisayara Synaplan Desktop'u yükleyin.",
+        "step2": "Burada “Bu bilgisayarı bağla”ya tıklayın ve adres ile kodu kopyalayın.",
+        "step3": "İkisini de uygulamaya girin. Bilgisayar ardından aşağıdaki listede görünür.",
+        "compact": "Uygulama GitHub'da herkese açık bir betadır."
       }
     },
     "phoneVerification": {
