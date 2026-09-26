@@ -1,16 +1,17 @@
 <template>
   <div
-    class="flex items-center gap-3 px-3 py-2.5 surface-chip rounded-lg"
+    class="flex items-start gap-3 px-3 py-2.5 surface-chip rounded-lg"
     :class="{ 'border-l-2 border-red-500': isFailed }"
     data-testid="comp-desktop-job-card"
   >
-    <ArrowPathIcon v-if="isWaiting" class="w-4 h-4 shrink-0 txt-secondary animate-spin" />
-    <CheckCircleIcon v-else-if="isSucceeded" class="w-4 h-4 shrink-0 text-green-500" />
-    <ExclamationTriangleIcon v-else class="w-4 h-4 shrink-0 text-red-500" />
+    <ArrowPathIcon v-if="isActive" class="w-4 h-4 shrink-0 mt-0.5 txt-secondary animate-spin" />
+    <CheckCircleIcon v-else-if="isSucceeded" class="w-4 h-4 shrink-0 mt-0.5 text-green-500" />
+    <ExclamationTriangleIcon v-else class="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
 
     <div class="flex-1 min-w-0">
-      <p class="text-sm txt-primary truncate">{{ statusLine }}</p>
-      <p v-if="detailLine" class="text-xs txt-secondary truncate">{{ detailLine }}</p>
+      <p class="text-sm txt-primary break-words">{{ statusLine }}</p>
+      <p v-if="metaLine" class="text-xs txt-secondary break-words">{{ metaLine }}</p>
+      <p v-if="detailLine" class="text-xs txt-secondary break-words">{{ detailLine }}</p>
     </div>
 
     <button
@@ -34,6 +35,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import { desktopApi, type DesktopJob } from '@/services/api/desktopApi'
+import { jobCardView, type DesktopJobStatus } from '@/utils/desktopJobCard'
 
 const props = defineProps<{
   jobId: number
@@ -42,47 +44,63 @@ const props = defineProps<{
 
 const emit = defineEmits<{ dismiss: [] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const POLL_MS = 4000
-// Client-side safety net: even if the server-side reaper is not ticking (e.g. a
-// dev install with no cron), the card must reach an honest terminal state
-// instead of spinning forever (DS16 acceptance).
-const CLIENT_TIMEOUT_MS = 5 * 60 * 1000
+// After this long a still-open job explains itself, but polling continues so a
+// late lease or result replaces that explanation. Stopping here used to freeze
+// the card on "did not answer" while the computer was still working.
+const WAIT_HINT_MS = 5 * 60 * 1000
 
-const status = ref<DesktopJob['status']>('queued')
+const status = ref<DesktopJobStatus>('queued')
 const errorCode = ref<string | null>(null)
-const timedOut = ref(false)
+const result = ref<DesktopJob['result']>(null)
+const skill = ref('')
+const created = ref<number | null>(null)
+const waitedLong = ref(false)
 
 let poller: number | null = null
 let deadline = 0
 
-const isWaiting = computed(
-  () => !timedOut.value && (status.value === 'queued' || status.value === 'leased')
+const view = computed(() =>
+  jobCardView(status.value, errorCode.value, result.value, waitedLong.value)
 )
-const isSucceeded = computed(() => status.value === 'succeeded')
-const isFailed = computed(
-  () => timedOut.value || status.value === 'failed' || status.value === 'cancelled'
-)
+const isActive = computed(() => view.value.phase === 'waiting' || view.value.phase === 'running')
+const isSucceeded = computed(() => view.value.phase === 'succeeded')
+const isFailed = computed(() => view.value.phase === 'failed' || view.value.phase === 'cancelled')
 
 const statusLine = computed(() => {
-  if (isSucceeded.value) return t('config.desktop.jobCard.done', { name: props.deviceName })
-  if (isFailed.value) return t('config.desktop.jobCard.failed', { name: props.deviceName })
-  return t('config.desktop.jobCard.waiting', { name: props.deviceName })
+  const name = props.deviceName
+  const skillName = skill.value
+  if (view.value.phase === 'succeeded') return t('config.desktop.jobCard.done', { name })
+  if (view.value.phase === 'failed') return t('config.desktop.jobCard.failed', { name })
+  if (view.value.phase === 'cancelled') return t('config.desktop.jobCard.cancelled', { name })
+  if (view.value.phase === 'running' && skillName) {
+    return t('config.desktop.jobCard.running', { name, skill: skillName })
+  }
+  if (view.value.phase === 'waiting' && skillName) {
+    return t('config.desktop.jobCard.waitingSkill', { name, skill: skillName })
+  }
+  return t('config.desktop.jobCard.waiting', { name })
 })
 
-// A device that never answered (timeout / expiry) gets the plain-language line
-// from §3.1; a device that refused the skill gets the specific reason.
+const metaLine = computed(() => {
+  if (!skill.value || created.value == null) return ''
+  const time = new Intl.DateTimeFormat(locale.value, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(created.value * 1000))
+  return t('config.desktop.jobCard.meta', { skill: skill.value, time })
+})
+
 const detailLine = computed(() => {
-  if (!isFailed.value) return ''
-  if (timedOut.value || errorCode.value === 'timeout') return t('config.desktop.jobCard.noAnswer')
-  if (errorCode.value === 'unknown_skill') return t('config.desktop.jobCard.unknownSkill')
-  if (errorCode.value === 'skill_disabled') return t('config.desktop.jobCard.skillDisabled')
-  if (errorCode.value) return t('config.desktop.jobCard.localError')
-  return t('config.desktop.jobCard.noAnswer')
+  const detail = view.value.detail
+  if (detail.type === 'device') return detail.text
+  if (detail.type === 'key') return t(`config.desktop.jobCard.${detail.key}`)
+  return ''
 })
 
-const isTerminal = (s: DesktopJob['status']): boolean =>
+const isTerminal = (s: DesktopJobStatus): boolean =>
   s === 'succeeded' || s === 'failed' || s === 'cancelled'
 
 const stopPolling = () => {
@@ -93,23 +111,24 @@ const stopPolling = () => {
 }
 
 const poll = async () => {
-  if (Date.now() > deadline) {
-    timedOut.value = true
-    stopPolling()
-    return
-  }
   try {
     const job = await desktopApi.getJob(props.jobId)
     status.value = job.status
     errorCode.value = job.errorCode ?? null
+    result.value = job.result ?? null
+    skill.value = job.skill
+    created.value = job.created
+    if (Date.now() > deadline && (job.status === 'queued' || job.status === 'leased')) {
+      waitedLong.value = true
+    }
     if (isTerminal(job.status)) stopPolling()
   } catch {
-    // A transient poll failure is not terminal; the deadline still bounds it.
+    // A transient poll failure is not terminal; the next poll tries again.
   }
 }
 
 onMounted(() => {
-  deadline = Date.now() + CLIENT_TIMEOUT_MS
+  deadline = Date.now() + WAIT_HINT_MS
   poll()
   poller = window.setInterval(poll, POLL_MS)
 })

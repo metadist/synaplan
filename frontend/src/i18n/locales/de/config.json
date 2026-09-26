@@ -918,12 +918,22 @@
       },
       "jobCard": {
         "waiting": "Warten auf {name}",
+        "waitingSkill": "Warten auf {name}, um {skill} zu starten",
+        "running": "{name} führt {skill} aus",
         "done": "{name} ist fertig",
         "failed": "{name} konnte nicht abschließen",
+        "cancelled": "Diese Aufgabe wurde abgebrochen",
         "noAnswer": "Dieser Computer hat nicht geantwortet.",
+        "queuedTooLong": "Dieser Computer hat die Aufgabe noch nicht gestartet. Sie bleibt in der Warteschlange, bis der Computer sie übernimmt.",
+        "stillRunning": "Dieser Computer hat die Aufgabe begonnen und ist noch nicht fertig.",
         "unknownSkill": "Dieser Computer hat diesen Skill nicht.",
-        "skillDisabled": "Dieser Skill ist auf diesem Computer deaktiviert.",
-        "localError": "Der Skill ist auf diesem Computer fehlgeschlagen."
+        "skillDisabled": "Dieser Computer hat den Skill abgelehnt.",
+        "unknownType": "Dieser Computer konnte diese Aufgabe nicht ausführen.",
+        "timedOut": "Dieser Computer hat die Aufgabe nicht rechtzeitig beendet.",
+        "localError": "Dieser Computer konnte die Aufgabe nicht abschließen.",
+        "cancelledDetail": "Für diese Aufgabe wird nichts weiter ausgeführt.",
+        "thisComputer": "Dein Computer",
+        "meta": "{skill} · {time}"
       },
       "get": {
         "title": "Synaplan Desktop holen",

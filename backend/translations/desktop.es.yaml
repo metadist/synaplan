@@ -1,0 +1,12 @@
+desktop:
+  job:
+    unnamed: 'tarea'
+    finished: 'La tarea «%skill%» terminó en tu equipo.'
+    failed: 'La tarea «%skill%» en tu equipo no terminó. %reason%'
+    files: 'Archivos: %ids%'
+    reason:
+      unknown_skill: 'Este equipo no tiene ese skill.'
+      unknown_type: 'Este equipo no pudo ejecutar esa tarea.'
+      skill_disabled: 'Este equipo se negó a ejecutar el skill.'
+      timeout: 'Este equipo no terminó a tiempo.'
+      local_error: 'Este equipo no pudo terminar la tarea.'

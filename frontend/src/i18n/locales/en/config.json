@@ -946,12 +946,22 @@
       },
       "jobCard": {
         "waiting": "Waiting for {name}",
+        "waitingSkill": "Waiting for {name} to start {skill}",
+        "running": "{name} is running {skill}",
         "done": "{name} finished",
         "failed": "{name} could not finish",
+        "cancelled": "This task was cancelled",
         "noAnswer": "This computer did not answer.",
+        "queuedTooLong": "This computer has not started the task yet. It stays queued until the computer picks it up.",
+        "stillRunning": "This computer started the task and has not finished yet.",
         "unknownSkill": "This computer does not have that skill.",
-        "skillDisabled": "That skill is turned off on this computer.",
-        "localError": "The skill failed on this computer."
+        "skillDisabled": "This computer refused to run the skill.",
+        "unknownType": "This computer could not run that task.",
+        "timedOut": "This computer did not finish the task in time.",
+        "localError": "This computer could not finish the task.",
+        "cancelledDetail": "Nothing else will run for this task.",
+        "thisComputer": "Your computer",
+        "meta": "{skill} · {time}"
       },
       "get": {
         "title": "Get Synaplan Desktop",

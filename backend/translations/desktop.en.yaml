@@ -1,0 +1,12 @@
+desktop:
+  job:
+    unnamed: 'task'
+    finished: 'The "%skill%" task finished on your computer.'
+    failed: 'The "%skill%" task on your computer did not finish. %reason%'
+    files: 'Files: %ids%'
+    reason:
+      unknown_skill: 'This computer does not have that skill.'
+      unknown_type: 'This computer could not run that task.'
+      skill_disabled: 'This computer refused to run the skill.'
+      timeout: 'This computer did not finish in time.'
+      local_error: 'This computer could not finish the task.'

@@ -63,7 +63,9 @@ export const desktopApi = {
     })
   },
 
-  async enqueueJob(payload: EnqueueJobPayload): Promise<{ jobId: number; status: string }> {
+  async enqueueJob(
+    payload: EnqueueJobPayload
+  ): Promise<{ jobId: number; status: string; chatTitle: string | null }> {
     const data = await httpClient('/api/v1/desktop/jobs', {
       method: 'POST',
       body: JSON.stringify({
@@ -78,7 +80,12 @@ export const desktopApi = {
       }),
       schema: EnqueueDesktopJobResponseSchema,
     })
-    return { jobId: data.jobId, status: data.status }
+    return {
+      jobId: data.jobId,
+      status: data.status,
+      chatTitle:
+        typeof data.chatTitle === 'string' && data.chatTitle !== '' ? data.chatTitle : null,
+    }
   },
 
   async getJob(id: number): Promise<DesktopJob> {

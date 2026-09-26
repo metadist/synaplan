@@ -696,12 +696,22 @@
       },
       "jobCard": {
         "waiting": "Esperando a {name}",
+        "waitingSkill": "Esperando a que {name} inicie {skill}",
+        "running": "{name} está ejecutando {skill}",
         "done": "{name} ha terminado",
         "failed": "{name} no pudo terminar",
+        "cancelled": "Esta tarea se canceló",
         "noAnswer": "Este equipo no respondió.",
+        "queuedTooLong": "Este equipo aún no ha iniciado la tarea. Sigue en la cola hasta que el equipo la tome.",
+        "stillRunning": "Este equipo inició la tarea y aún no ha terminado.",
         "unknownSkill": "Este equipo no tiene ese skill.",
-        "skillDisabled": "Ese skill está desactivado en este equipo.",
-        "localError": "El skill falló en este equipo."
+        "skillDisabled": "Este equipo se negó a ejecutar el skill.",
+        "unknownType": "Este equipo no pudo ejecutar esa tarea.",
+        "timedOut": "Este equipo no terminó la tarea a tiempo.",
+        "localError": "Este equipo no pudo terminar la tarea.",
+        "cancelledDetail": "No se ejecutará nada más de esta tarea.",
+        "thisComputer": "Tu equipo",
+        "meta": "{skill} · {time}"
       },
       "get": {
         "title": "Obtener Synaplan Desktop",
