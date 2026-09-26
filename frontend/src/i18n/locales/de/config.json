@@ -880,6 +880,11 @@
       "confirmDisconnect": "„{name}“ kann dein Konto dann nicht mehr erreichen. Es werden keine wartenden Aufgaben abgebrochen. Du kannst den Computer später mit einem neuen Code erneut verbinden. | „{name}“ kann dein Konto dann nicht mehr erreichen. 1 wartende Aufgabe wird abgebrochen und nicht ausgeführt. Du kannst den Computer später mit einem neuen Code erneut verbinden. | „{name}“ kann dein Konto dann nicht mehr erreichen. {count} wartende Aufgaben werden abgebrochen und nicht ausgeführt. Du kannst den Computer später mit einem neuen Code erneut verbinden.",
       "disconnected": "Dieser Computer wurde getrennt. Es wurden keine wartenden Aufgaben abgebrochen. | Dieser Computer wurde getrennt. 1 wartende Aufgabe wurde abgebrochen und wird nicht ausgeführt. | Dieser Computer wurde getrennt. {count} wartende Aufgaben wurden abgebrochen und werden nicht ausgeführt.",
       "disconnectFailed": "Der Computer konnte nicht getrennt werden.",
+      "remove": "Entfernen",
+      "confirmRemoveTitle": "Diesen Computer entfernen",
+      "confirmRemove": "„{name}“ ist schon getrennt. Entfernen löscht ihn nur aus dieser Liste. Er kann dein Konto weiterhin nicht erreichen.",
+      "removed": "„{name}“ wurde aus dieser Liste entfernt. Er kann dein Konto nicht erreichen. Es wurden keine wartenden Aufgaben abgebrochen. | „{name}“ wurde aus dieser Liste entfernt. Er kann dein Konto nicht erreichen. 1 wartende Aufgabe wurde abgebrochen und wird nicht ausgeführt. | „{name}“ wurde aus dieser Liste entfernt. Er kann dein Konto nicht erreichen. {count} wartende Aufgaben wurden abgebrochen und werden nicht ausgeführt.",
+      "removeFailed": "Der Computer konnte nicht aus der Liste entfernt werden.",
       "pairing": {
         "title": "Diesen Computer verbinden",
         "intro": "Öffne Synaplan Desktop auf dem Computer, den du verbinden möchtest, und gib diese Adresse und den Code ein.",
@@ -892,7 +897,9 @@
         "copyAddress": "Adresse kopieren",
         "copyCode": "Code kopieren",
         "createFailed": "Der Verbindungscode konnte nicht erstellt werden.",
-        "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen."
+        "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen.",
+        "paired": "„{name}“ wurde hinzugefügt. Er gilt als verbunden, sobald sich die App meldet.",
+        "pairedOnline": "„{name}“ ist verbunden."
       },
       "devices": {
         "empty": "Es sind noch keine Computer verbunden.",
@@ -903,11 +910,17 @@
         "actions": "Aktionen",
         "never": "nie",
         "statusActive": "Verbunden",
-        "statusRevoked": "Getrennt"
+        "statusAway": "Nicht verbunden",
+        "statusNever": "Noch nicht gesehen",
+        "statusRevoked": "Getrennt",
+        "checkInHint": "Dieser Computer meldet sich etwa alle {minutes} Minuten."
       },
       "run": {
         "action": "Auf diesem Computer ausführen",
         "multiple": "{count} Computer",
+        "online": "{name} ist verbunden",
+        "away": "{name} ist nicht verbunden. Die App meldet sich etwa alle {minutes} Minuten.",
+        "never": "{name} hat sich noch nicht gemeldet",
         "needPrompt": "Gib zuerst ein, was der Computer tun soll.",
         "skillTitle": "Auf diesem Computer ausführen",
         "skillMessage": "Welcher Skill soll auf „{name}“ ausgeführt werden?",
@@ -917,8 +930,8 @@
         "enqueueFailed": "Die Aufgabe konnte nicht gesendet werden."
       },
       "jobCard": {
-        "waiting": "Warten auf {name}",
-        "waitingSkill": "Warten auf {name}, um {skill} zu starten",
+        "waiting": "Warten auf {name}. Die App meldet sich etwa alle {minutes} Minuten.",
+        "waitingSkill": "Warten auf {name}, um {skill} zu starten. Die App meldet sich etwa alle {minutes} Minuten.",
         "running": "{name} führt {skill} aus",
         "done": "{name} ist fertig",
         "failed": "{name} konnte nicht abschließen",
@@ -956,7 +969,8 @@
         "stepsTitle": "In drei Schritten verbinden",
         "step1": "Installiere Synaplan Desktop auf dem Computer, den du nutzen willst.",
         "step2": "Klicke hier auf „Diesen Computer verbinden“ und kopiere Adresse und Code.",
-        "step3": "Gib beides in der App ein. Der Computer erscheint dann in der Liste unten."
+        "step3": "Gib beides in der App ein. Der Computer erscheint dann in der Liste unten.",
+        "compact": "Die App ist eine öffentliche Beta auf GitHub."
       }
     },
     "phoneVerification": {

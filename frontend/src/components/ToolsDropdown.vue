@@ -205,6 +205,7 @@ import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
 import { useDesktopDevices } from '@/composables/useDesktopDevices'
+import { DESKTOP_CHECK_IN_MINUTES, desktopPresence } from '@/utils/desktopPresence'
 import { useConfigStore } from '@/stores/config'
 
 interface Props {
@@ -288,8 +289,12 @@ const showRunOnDevice = computed(() => isDesktopAgentEnabled() && hasActiveDevic
 
 const runOnDeviceSubtext = computed(() => {
   const list = activeDevices.value
-  if (list.length === 1) return list[0].name
-  return t('config.desktop.run.multiple', { count: list.length })
+  if (list.length !== 1) return t('config.desktop.run.multiple', { count: list.length })
+  const device = list[0]
+  const presence = desktopPresence(device.status, device.lastSeen, Math.floor(Date.now() / 1000))
+  if (presence === 'online') return t('config.desktop.run.online', { name: device.name })
+  if (presence === 'never') return t('config.desktop.run.never', { name: device.name })
+  return t('config.desktop.run.away', { name: device.name, minutes: DESKTOP_CHECK_IN_MINUTES })
 })
 
 const handleRunOnDevice = () => {

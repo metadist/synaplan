@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\DesktopDevice;
 use App\Entity\DesktopJob;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\DesktopDeviceRepository;
 use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Desktop\DesktopDevicePresence;
 use App\Service\Desktop\DesktopJobChatTitle;
 use App\Service\Desktop\DesktopJobContract;
 use App\Service\Desktop\DesktopJobResultNotifier;
@@ -209,12 +211,13 @@ final class DesktopController extends AbstractController
                             property: 'devices',
                             type: 'array',
                             items: new OA\Items(
-                                required: ['id', 'name', 'status', 'lastSeen', 'created', 'capabilities'],
+                                required: ['id', 'name', 'status', 'presence', 'lastSeen', 'created', 'capabilities'],
                                 properties: [
                                     new OA\Property(property: 'id', type: 'integer', example: 1),
                                     new OA\Property(property: 'name', type: 'string', example: "Jan's laptop"),
                                     new OA\Property(property: 'keyPrefix', type: 'string', example: 'sk_1234...', nullable: true),
-                                    new OA\Property(property: 'status', type: 'string', enum: ['active', 'revoked'], example: 'active'),
+                                    new OA\Property(property: 'status', type: 'string', enum: ['active', 'revoked'], example: 'active', description: 'Whether the pairing key is still valid. active is not the same as the app currently running.'),
+                                    new OA\Property(property: 'presence', type: 'string', enum: ['online', 'away', 'never', 'revoked'], example: 'never', description: 'online: check-in within the idle poll interval (180s). away: key still valid, app has not checked in that recently. never: key valid, app has not checked in yet. revoked: computer was disconnected.'),
                                     new OA\Property(property: 'lastSeen', type: 'integer', format: 'int64', example: 0, description: 'Unix timestamp of the last check-in (0 = never).'),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64', example: 1756500000),
                                     new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['skill.run']),
@@ -249,6 +252,7 @@ final class DesktopController extends AbstractController
                     'name' => $device->getName(),
                     'keyPrefix' => $keyPrefix,
                     'status' => $device->getStatus(),
+                    'presence' => DesktopDevicePresence::resolve($device->getStatus(), $device->getLastSeen()),
                     'lastSeen' => $device->getLastSeen(),
                     'created' => $device->getCreated(),
                     'capabilities' => $device->getCapabilities(),
@@ -261,7 +265,7 @@ final class DesktopController extends AbstractController
     #[OA\Delete(
         path: '/api/v1/desktop/devices/{id}',
         operationId: 'revokeDesktopDevice',
-        summary: 'Revoke a paired computer and cancel its waiting tasks',
+        summary: 'Disconnect a paired computer, or remove one that is already disconnected',
         tags: ['Desktop'],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
@@ -269,12 +273,13 @@ final class DesktopController extends AbstractController
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Device revoked',
+                description: 'Computer disconnected, or an already-disconnected row removed from the list',
                 content: new OA\JsonContent(
-                    required: ['success', 'cancelledJobs'],
+                    required: ['success', 'cancelledJobs', 'removed'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'cancelledJobs', type: 'integer', example: 2, description: 'Queued and leased tasks targeted at this computer that were cancelled. A task the computer had already started may still finish there; its result is not saved.'),
+                        new OA\Property(property: 'removed', type: 'boolean', example: false, description: 'True when the computer was already disconnected and its row was deleted from the list. False when this call disconnected it.'),
                     ]
                 )
             ),
@@ -296,8 +301,13 @@ final class DesktopController extends AbstractController
             throw new NotFoundHttpException('Device not found');
         }
 
+        $removed = DesktopDevice::STATUS_REVOKED === $device->getStatus();
         $cancelled = $this->jobStore->cancelOpenForDevice((int) $user->getId(), (int) $device->getId());
-        $this->pairingService->revoke($device);
+        if ($removed) {
+            $this->pairingService->forget($device);
+        } else {
+            $this->pairingService->revoke($device);
+        }
         foreach ($cancelled as $job) {
             $this->resultNotifier->notify($job);
         }
@@ -305,6 +315,7 @@ final class DesktopController extends AbstractController
         return $this->json([
             'success' => true,
             'cancelledJobs' => \count($cancelled),
+            'removed' => $removed,
         ]);
     }
 

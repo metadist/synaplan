@@ -52,6 +52,29 @@ class DesktopDeviceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Newest revoked row with this exact name, if the owner has one.
+     *
+     * Re-pairing the same computer reuses that row instead of adding another
+     * one with the same name. An active row is never returned: rotating a
+     * live key from a second pair would disconnect the computer that is
+     * already using it.
+     */
+    public function findRevokedByOwnerAndName(int $ownerId, string $name): ?DesktopDevice
+    {
+        return $this->createQueryBuilder('d')
+            ->where('d.ownerId = :ownerId')
+            ->andWhere('d.name = :name')
+            ->andWhere('d.status = :status')
+            ->setParameter('ownerId', $ownerId)
+            ->setParameter('name', $name)
+            ->setParameter('status', DesktopDevice::STATUS_REVOKED)
+            ->orderBy('d.created', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * @return list<DesktopDevice>
      */
     public function findActiveByOwner(int $ownerId): array
