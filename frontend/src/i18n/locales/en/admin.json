@@ -1029,7 +1029,7 @@
         "knowledge_folder": "It appears in their Sources as shared.",
         "assistant": "They will find it under Assistants → Shared with me.",
         "saved_task": "They can use it as a template under Automations.",
-        "widget": "They can open the widget settings."
+        "widget": "They will find it under Chat Widgets."
       }
     }
   },

@@ -1029,7 +1029,7 @@
         "knowledge_folder": "Il apparaît chez eux sous Sources comme partagé.",
         "assistant": "Ils le trouveront sous Assistants → Partagé avec moi.",
         "saved_task": "Ils peuvent l'utiliser comme modèle sous Automatisations.",
-        "widget": "Ils peuvent ouvrir les réglages du widget."
+        "widget": "Ils le trouveront sous Widgets de chat."
       }
     }
   },
