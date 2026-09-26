@@ -373,6 +373,7 @@ import {
 } from '@/utils/mediaTypes'
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
+import { collapseApiToolTurn } from '@/utils/apiToolTurn'
 import { z } from 'zod'
 import { setLocale, supportedLanguages, type SupportedLanguage } from '@/i18n'
 import { parseAIResponse } from '@/utils/responseParser'
@@ -669,7 +670,7 @@ const parseMessageParts = (message: Message): MessagePart[] => {
 
   // For user messages, just return as text
   if (message.direction === 'IN') {
-    return [{ type: 'text', content: message.text }]
+    return [{ type: 'text', content: collapseApiToolTurn(message.text) }]
   }
 
   // For assistant messages, parse into parts
