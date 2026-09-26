@@ -58,6 +58,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     budget: array<string, mixed>,
  *     session_id: string|null,
  *     session_key: string,
+ *     session_client: string,
  *     body_mutated: bool,
  *     request_body: array<string, mixed>,
  *     translator_context: array<string, mixed>,
@@ -389,6 +390,7 @@ final readonly class MessagesGateway
             'budget' => $budget,
             'session_id' => $sessionId,
             'session_key' => $sessionKey,
+            'session_client' => ApiSessionClient::fromRequest($request),
             'body_mutated' => $bodyMutated,
             'request_body' => $requestBody,
             'translator_context' => $translatorContext,
@@ -826,7 +828,7 @@ final readonly class MessagesGateway
             $this->messageBus->dispatch(new SummarizeApiSessionCommand(
                 userId: (int) $user->getId(),
                 sessionKey: $prepared['session_key'],
-                client: 'claude-code',
+                client: $prepared['session_client'],
                 model: $prepared['resolved']['displayModel'],
                 requestExcerpt: mb_substr($this->lastUserText($prepared['request_body']), 0, $cap),
                 responseExcerpt: mb_substr($responseText, 0, $cap),
@@ -878,16 +880,7 @@ final readonly class MessagesGateway
             return '';
         }
 
-        foreach (array_reverse($messages) as $msg) {
-            if (!\is_array($msg) || 'user' !== ($msg['role'] ?? '')) {
-                continue;
-            }
-            $content = $msg['content'] ?? '';
-
-            return \is_string($content) ? $content : (json_encode($content, \JSON_INVALID_UTF8_SUBSTITUTE) ?: '');
-        }
-
-        return '';
+        return AnthropicContentText::lastHumanRequest($messages);
     }
 
     /**

@@ -699,6 +699,7 @@
     "documentChanges": "Bu dosyadaki değişiklikler",
     "documentChangesTitle": "Neler değişti",
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
+    "toolStepHidden": "Bu bilgisayardaki bir adım tamamlandı.",
     "audioGenerated": "İstediğiniz ses burada. Aşağıdan oynatabilir veya indirebilirsiniz.",
     "mediaJob": {
       "title": {
