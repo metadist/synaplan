@@ -7,6 +7,7 @@ namespace App\Service\Desktop;
 use App\Entity\Chat;
 use App\Repository\ChatRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Names a still-untitled chat from the skill and the instruction, so the
@@ -33,14 +34,33 @@ final readonly class DesktopJobChatTitle
     public function __construct(
         private ChatRepository $chatRepository,
         private EntityManagerInterface $em,
+        private LoggerInterface $logger,
     ) {
     }
 
     /**
      * Set a title when the chat still has a placeholder. Returns the stored
      * title, or null when the chat was left unchanged.
+     *
+     * Never throws. The job is already queued when this runs, so a title
+     * write that fails must not turn a successful enqueue into an error.
      */
     public function nameIfUntitled(int $ownerId, ?int $chatId, string $skill, string $prompt): ?string
+    {
+        try {
+            return $this->apply($ownerId, $chatId, $skill, $prompt);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to name the chat for a desktop job', [
+                'chat_id' => $chatId,
+                'owner_id' => $ownerId,
+                'exception' => $e,
+            ]);
+
+            return null;
+        }
+    }
+
+    private function apply(int $ownerId, ?int $chatId, string $skill, string $prompt): ?string
     {
         if (null === $chatId || $chatId <= 0) {
             return null;
@@ -51,16 +71,36 @@ final readonly class DesktopJobChatTitle
             return null;
         }
 
-        $current = trim((string) $chat->getTitle());
-        if (!\in_array($current, self::PLACEHOLDERS, true)) {
+        if (!self::isPlaceholder($chat->getTitle())) {
             return null;
         }
 
+        $previous = $chat->getTitle();
         $title = self::build($skill, $prompt);
         $chat->setTitle($title);
-        $this->em->flush();
+        try {
+            $this->em->flush();
+        } catch (\Throwable $e) {
+            $chat->setTitle($previous);
+            throw $e;
+        }
 
         return $title;
+    }
+
+    /**
+     * Same rule as the history list: the shipped "new chat" labels, plus the
+     * legacy `Chat 12` form (`isDefaultChatTitle` treats a `Chat ` prefix as
+     * untitled).
+     */
+    public static function isPlaceholder(?string $title): bool
+    {
+        $current = trim((string) $title);
+        if (\in_array($current, self::PLACEHOLDERS, true)) {
+            return true;
+        }
+
+        return str_starts_with($current, 'Chat ');
     }
 
     public static function build(string $skill, string $prompt): string
