@@ -3,6 +3,7 @@ desktop:
     unnamed: 'tâche'
     finished: 'La tâche « %skill% » s''est terminée sur votre ordinateur.'
     failed: 'La tâche « %skill% » sur votre ordinateur ne s''est pas terminée. %reason%'
+    cancelled: 'La tâche « %skill% » a été annulée et ne s''exécutera pas. Si l''ordinateur avait déjà commencé, ce travail peut encore se terminer là-bas, mais le résultat ne sera pas enregistré ici.'
     files: 'Fichiers : %ids%'
     reason:
       unknown_skill: 'Cet ordinateur n''a pas ce skill.'

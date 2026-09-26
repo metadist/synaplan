@@ -7,6 +7,7 @@ import {
   EnqueueDesktopJobResponseSchema,
   GetDesktopJobResponseSchema,
   ListDesktopJobsResponseSchema,
+  CancelDesktopJobResponseSchema,
 } from '@/generated/api-schemas'
 
 /**
@@ -56,11 +57,20 @@ export const desktopApi = {
     return { code: data.code, expiresAt: data.expiresAt }
   },
 
-  async revokeDevice(id: number): Promise<void> {
-    await httpClient(`/api/v1/desktop/devices/${id}`, {
+  async revokeDevice(id: number): Promise<{ cancelledJobs: number }> {
+    const data = await httpClient(`/api/v1/desktop/devices/${id}`, {
       method: 'DELETE',
       schema: RevokeDesktopDeviceResponseSchema,
     })
+    return { cancelledJobs: data.cancelledJobs }
+  },
+
+  async cancelJob(id: number): Promise<{ cancelled: boolean; job: DesktopJob }> {
+    const data = await httpClient(`/api/v1/desktop/jobs/${id}/cancel`, {
+      method: 'POST',
+      schema: CancelDesktopJobResponseSchema,
+    })
+    return { cancelled: data.cancelled, job: data.job }
   },
 
   async enqueueJob(

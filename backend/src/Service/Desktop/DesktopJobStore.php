@@ -135,18 +135,6 @@ final class DesktopJobStore
         ?array $result = null,
         ?string $errorCode = null,
     ): ?DesktopJob {
-        $job = $this->jobRepository->findByLeaseToken($leaseToken);
-
-        if (null === $job
-            || $job->getOwnerId() !== $device->getOwnerId()
-            || DesktopJob::STATUS_LEASED !== $job->getStatus()) {
-            return null;
-        }
-
-        if (!\in_array($status, [DesktopJob::STATUS_SUCCEEDED, DesktopJob::STATUS_FAILED], true)) {
-            return null;
-        }
-
         if (null !== $result) {
             $encoded = json_encode($result, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
             if (false === $encoded || \strlen($encoded) > self::RESULT_MAX_BYTES) {
@@ -154,15 +142,91 @@ final class DesktopJobStore
             }
         }
 
-        $job->setStatus($status)
-            ->setResult($result)
-            ->setErrorCode($errorCode)
-            ->setLeaseToken(null)
-            ->touch();
+        /** @var DesktopJob|null $updated */
+        $updated = $this->em->wrapInTransaction(function () use ($device, $leaseToken, $status, $result, $errorCode): ?DesktopJob {
+            $job = $this->jobRepository->findByLeaseToken($leaseToken);
 
-        $this->jobRepository->save($job);
+            if (null === $job
+                || $job->getOwnerId() !== $device->getOwnerId()
+                || DesktopJob::STATUS_LEASED !== $job->getStatus()) {
+                return null;
+            }
 
-        return $job;
+            if (!\in_array($status, [DesktopJob::STATUS_SUCCEEDED, DesktopJob::STATUS_FAILED], true)) {
+                return null;
+            }
+
+            $job->setStatus($status)
+                ->setResult($result)
+                ->setErrorCode($errorCode)
+                ->setLeaseToken(null)
+                ->touch();
+
+            $this->jobRepository->save($job);
+
+            return $job;
+        });
+
+        return $updated;
+    }
+
+    /**
+     * Stop one queued or leased job owned by this user.
+     *
+     * A queued job is no longer leasable. A leased job loses its lease token,
+     * so a later device report is rejected. A skill the computer has already
+     * started may still finish on that computer; the server will not record it.
+     * A finished job is left unchanged.
+     *
+     * @return array{job: DesktopJob|null, cancelled: bool}
+     */
+    public function cancelOwned(int $id, int $ownerId): array
+    {
+        /** @var array{job: DesktopJob|null, cancelled: bool} $result */
+        $result = $this->em->wrapInTransaction(function () use ($id, $ownerId): array {
+            $job = $this->jobRepository->findOwnedForUpdate($id, $ownerId);
+            if (null === $job || !$this->markCancelled($job)) {
+                return ['job' => $job, 'cancelled' => false];
+            }
+
+            $this->em->flush();
+
+            return ['job' => $job, 'cancelled' => true];
+        });
+
+        return $result;
+    }
+
+    /**
+     * Cancel every queued or leased job targeted at this device.
+     *
+     * Jobs that any of the user's computers may still pick up (no device id)
+     * are left queued. Same lease rule as {@see cancelOwned()}: work the
+     * computer has already started may finish locally, and is not recorded.
+     *
+     * @return list<DesktopJob>
+     */
+    public function cancelOpenForDevice(int $ownerId, int $deviceId): array
+    {
+        /** @var list<DesktopJob> $cancelled */
+        $cancelled = $this->em->wrapInTransaction(function () use ($ownerId, $deviceId): array {
+            $cancelled = [];
+            foreach ($this->jobRepository->findOpenForDevice($ownerId, $deviceId) as $job) {
+                if ($job->getDeviceId() !== $deviceId || !$this->markCancelled($job)) {
+                    continue;
+                }
+                $this->em->persist($job);
+                $cancelled[] = $job;
+            }
+
+            if ([] !== $cancelled) {
+                $this->em->flush();
+            }
+
+            return $cancelled;
+        });
+
+        return $cancelled;
     }
 
     /**
@@ -237,6 +301,24 @@ final class DesktopJobStore
             ->setLeaseToken(null)
             ->setErrorCode(DesktopJobContract::ERROR_TIMEOUT)
             ->touch();
+    }
+
+    /**
+     * Move a queued or leased job to cancelled and drop the lease so the
+     * device cannot report a result afterwards.
+     */
+    private function markCancelled(DesktopJob $job): bool
+    {
+        if (!\in_array($job->getStatus(), [DesktopJob::STATUS_QUEUED, DesktopJob::STATUS_LEASED], true)) {
+            return false;
+        }
+
+        $job->setStatus(DesktopJob::STATUS_CANCELLED)
+            ->setLeaseToken(null)
+            ->setLeaseExpires(0)
+            ->touch();
+
+        return true;
     }
 
     /**

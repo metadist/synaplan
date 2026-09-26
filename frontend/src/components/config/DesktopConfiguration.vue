@@ -518,9 +518,10 @@ const copy = async (value: string, field: 'address' | 'code') => {
 }
 
 const disconnect = async (device: DesktopDevice) => {
+  const waiting = waitingCount(device.id)
   const confirmed = await dialog.confirm({
     title: t('config.desktop.confirmDisconnectTitle'),
-    message: t('config.desktop.confirmDisconnect', { name: device.name }),
+    message: t('config.desktop.confirmDisconnect', { name: device.name, count: waiting }, waiting),
     confirmText: t('config.desktop.disconnect'),
     cancelText: t('common.cancel'),
     danger: true,
@@ -528,9 +529,9 @@ const disconnect = async (device: DesktopDevice) => {
   if (!confirmed) return
 
   try {
-    await desktopApi.revokeDevice(device.id)
-    await reload()
-    success(t('config.desktop.disconnected'))
+    const { cancelledJobs } = await desktopApi.revokeDevice(device.id)
+    success(t('config.desktop.disconnected', { count: cancelledJobs }, cancelledJobs))
+    await loadAll()
   } catch (err) {
     showError(getErrorMessage(err) || t('config.desktop.disconnectFailed'))
   }

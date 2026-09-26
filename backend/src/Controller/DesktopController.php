@@ -11,6 +11,7 @@ use App\Repository\DesktopDeviceRepository;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Desktop\DesktopJobChatTitle;
 use App\Service\Desktop\DesktopJobContract;
+use App\Service\Desktop\DesktopJobResultNotifier;
 use App\Service\Desktop\DesktopJobStore;
 use App\Service\Desktop\Exception\PairingException;
 use App\Service\Desktop\Exception\PairingLimitException;
@@ -53,6 +54,7 @@ final class DesktopController extends AbstractController
         private readonly DesktopDeviceRepository $deviceRepository,
         private readonly ApiKeyRepository $apiKeyRepository,
         private readonly DesktopJobStore $jobStore,
+        private readonly DesktopJobResultNotifier $resultNotifier,
         private readonly DesktopJobChatTitle $chatTitle,
         private readonly RedisService $redis,
         private readonly LoggerInterface $logger,
@@ -259,7 +261,7 @@ final class DesktopController extends AbstractController
     #[OA\Delete(
         path: '/api/v1/desktop/devices/{id}',
         operationId: 'revokeDesktopDevice',
-        summary: 'Revoke a paired computer (kills its API key)',
+        summary: 'Revoke a paired computer and cancel its waiting tasks',
         tags: ['Desktop'],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
@@ -269,9 +271,10 @@ final class DesktopController extends AbstractController
                 response: 200,
                 description: 'Device revoked',
                 content: new OA\JsonContent(
-                    required: ['success'],
+                    required: ['success', 'cancelledJobs'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'cancelledJobs', type: 'integer', example: 2, description: 'Queued and leased tasks targeted at this computer that were cancelled. A task the computer had already started may still finish there; its result is not saved.'),
                     ]
                 )
             ),
@@ -293,9 +296,16 @@ final class DesktopController extends AbstractController
             throw new NotFoundHttpException('Device not found');
         }
 
+        $cancelled = $this->jobStore->cancelOpenForDevice((int) $user->getId(), (int) $device->getId());
         $this->pairingService->revoke($device);
+        foreach ($cancelled as $job) {
+            $this->resultNotifier->notify($job);
+        }
 
-        return $this->json(['success' => true]);
+        return $this->json([
+            'success' => true,
+            'cancelledJobs' => \count($cancelled),
+        ]);
     }
 
     #[Route('/jobs', name: 'job_enqueue', methods: ['POST'])]
@@ -529,6 +539,73 @@ final class DesktopController extends AbstractController
         }
 
         return $this->json(['success' => true, 'job' => $this->jobStatusView($job)]);
+    }
+
+    #[Route('/jobs/{id}/cancel', name: 'job_cancel', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/desktop/jobs/{id}/cancel',
+        operationId: 'cancelDesktopJob',
+        summary: 'Cancel a queued or leased desktop job',
+        description: 'A queued job will not be leased. A leased job loses its lease, so the computer cannot report a result. Work the computer has already started may still finish there; that result is not saved. A finished job is left unchanged.',
+        tags: ['Desktop'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Job is cancelled, or was already finished and left unchanged',
+                content: new OA\JsonContent(
+                    required: ['success', 'cancelled', 'job'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'cancelled', type: 'boolean', example: true, description: 'True only when this call moved the job to cancelled.'),
+                        new OA\Property(
+                            property: 'job',
+                            type: 'object',
+                            required: ['id', 'type', 'skill', 'status', 'created'],
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 1),
+                                new OA\Property(property: 'deviceId', type: 'integer', nullable: true, example: 1),
+                                new OA\Property(property: 'type', type: 'string', example: 'skill.run'),
+                                new OA\Property(property: 'skill', type: 'string', example: 'pptx'),
+                                new OA\Property(property: 'status', type: 'string', enum: ['queued', 'leased', 'succeeded', 'failed', 'cancelled'], example: 'cancelled'),
+                                new OA\Property(property: 'errorCode', type: 'string', nullable: true, example: null),
+                                new OA\Property(property: 'result', type: 'object', nullable: true),
+                                new OA\Property(property: 'chatId', type: 'integer', nullable: true, example: 99),
+                                new OA\Property(property: 'created', type: 'integer', format: 'int64', example: 1756500000),
+                                new OA\Property(property: 'updated', type: 'integer', format: 'int64', example: 1756500050),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Feature disabled or job not found'),
+        ]
+    )]
+    public function cancelJob(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $this->guard($user?->getId());
+
+        if (!$user instanceof User) {
+            return $this->json(['success' => false, 'error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $result = $this->jobStore->cancelOwned($id, (int) $user->getId());
+        if (null === $result['job']) {
+            throw new NotFoundHttpException('Job not found');
+        }
+
+        if ($result['cancelled']) {
+            $this->resultNotifier->notify($result['job']);
+        }
+
+        return $this->json([
+            'success' => true,
+            'cancelled' => $result['cancelled'],
+            'job' => $this->jobStatusView($result['job']),
+        ]);
     }
 
     /**
