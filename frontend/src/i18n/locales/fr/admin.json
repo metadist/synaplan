@@ -862,7 +862,7 @@
       },
       "feature": {
         "SAVEDTASKS_ENABLED": "Tâches enregistrées",
-        "DESKTOP_AGENT_ENABLED": "Agent bureau",
+        "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Outils document",
         "MULTITASK_ROUTING_ENABLED": "Routage en plusieurs étapes",
         "MULTITASK_PARALLEL_ENABLED": "Étapes en parallèle",

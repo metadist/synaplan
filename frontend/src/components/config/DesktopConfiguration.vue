@@ -18,6 +18,23 @@
       </template>
     </PageHeader>
 
+    <div
+      v-if="chatGate === 'gateway' || chatGate === 'key'"
+      class="surface-card p-4 md:p-5 flex flex-col sm:flex-row sm:items-center gap-3"
+      data-testid="alert-chat-gate"
+      role="status"
+    >
+      <p class="text-sm txt-primary flex-1">{{ chatGateMessage }}</p>
+      <RouterLink
+        v-if="chatGateAdmin"
+        to="/channels/agents"
+        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center justify-center shrink-0"
+        data-testid="link-coding-clients"
+      >
+        {{ $t('config.desktop.chatGate.openCodingClients') }}
+      </RouterLink>
+    </div>
+
     <!-- Get the app: the client is a public beta on GitHub (build from source or
          a beta build from Releases). Links go to the repository, never to a
          binary we do not host. -->
@@ -394,6 +411,8 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
+import { getMessagesGatewayStatus } from '@/services/api/messagesGatewayApi'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { desktopPairingAddress } from '@/utils/desktopPairingAddress'
 import {
@@ -421,6 +440,26 @@ const platforms = [
 
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+// Null until the gateway status returns, so a slow request does not flash a warning.
+const chatGate = ref<'ready' | 'gateway' | 'key' | null>(null)
+const chatGateAdmin = ref(false)
+
+const chatGateMessage = computed(() => {
+  if (chatGate.value === 'gateway') {
+    return t(
+      chatGateAdmin.value
+        ? 'config.desktop.chatGate.gatewayAdmin'
+        : 'config.desktop.chatGate.gatewayUser'
+    )
+  }
+  if (chatGate.value === 'key') {
+    return t(
+      chatGateAdmin.value ? 'config.desktop.chatGate.keyAdmin' : 'config.desktop.chatGate.keyUser'
+    )
+  }
+  return ''
+})
 
 // Waiting-job counts per device (queued + leased), shown in the table (§3.1).
 const waitingByDevice = ref<Record<number, number>>({})
@@ -490,6 +529,27 @@ const presenceDotClass = (presence: DesktopPresence): string => {
   if (presence === 'online') return 'bg-[var(--status-success)]'
   if (presence === 'away') return 'bg-[var(--status-warning)]'
   return 'bg-[var(--status-neutral)]'
+}
+
+const loadChatGate = async () => {
+  if (!isDesktopAgentEnabled()) {
+    chatGate.value = null
+    return
+  }
+  try {
+    const status = await getMessagesGatewayStatus()
+    chatGateAdmin.value = status.is_admin
+    if (!status.enabled) {
+      chatGate.value = 'gateway'
+      return
+    }
+    const hasKey = Object.values(status.keys).some(
+      (key) => key.effective_source === 'user' || key.effective_source === 'operator'
+    )
+    chatGate.value = hasKey ? 'ready' : 'key'
+  } catch {
+    chatGate.value = null
+  }
 }
 
 const loadAll = async () => {
@@ -659,6 +719,7 @@ const removeDevice = async (device: DesktopDevice) => {
 }
 
 onMounted(() => {
+  void loadChatGate()
   loadAll()
   ticker = window.setInterval(() => {
     now.value = Math.floor(Date.now() / 1000)
@@ -666,6 +727,7 @@ onMounted(() => {
 })
 
 onActivated(() => {
+  void loadChatGate()
   loadAll()
 })
 

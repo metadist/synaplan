@@ -1427,7 +1427,7 @@ final readonly class SystemConfigService
             'FEATURE_DESKTOP_AGENT_ENABLED' => [
                 'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Synaplan Desktop: show the Desktop page, pairing codes, connected computers and the job queue the desktop client (public beta on GitHub) works from. When off, every desktop route answers 404.',
+                'description' => 'Synaplan Desktop: show the Desktop page and let a paired computer chat and run tasks. When off, the page is hidden and a paired computer cannot chat or run tasks until you turn this on. Download is from the source repository; there is no signed installer yet.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => DesktopAgentConfig::CONFIG_GROUP,

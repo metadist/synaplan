@@ -11,6 +11,7 @@ const {
   successMock,
   revokeDevice,
   createPairingCode,
+  mockGatewayStatus,
 } = vi.hoisted(() => ({
   mockListJobs: vi.fn(),
   mockReload: vi.fn(),
@@ -19,6 +20,7 @@ const {
   successMock: vi.fn(),
   revokeDevice: vi.fn(),
   createPairingCode: vi.fn(),
+  mockGatewayStatus: vi.fn(),
 }))
 
 const devicesRef = ref<
@@ -58,12 +60,31 @@ vi.mock('@/composables/useDesktopAgentFeature', () => ({
   isDesktopAgentEnabled: () => desktopOn.value,
 }))
 
+vi.mock('@/services/api/messagesGatewayApi', () => ({
+  getMessagesGatewayStatus: mockGatewayStatus,
+}))
+
+const readyGateway = {
+  enabled: true,
+  is_admin: false,
+  keys: {
+    anthropic: { effective_source: 'operator' },
+    openai: { effective_source: 'none' },
+    google: { effective_source: 'none' },
+  },
+}
+
+const routerLinkStub = {
+  props: ['to'],
+  template: '<a :href="to"><slot /></a>',
+}
+
 const REPO = 'https://github.com/metadist/synaplan-desktop'
 
 const mountPage = async () => {
   const wrapper = mount(DesktopConfiguration, {
     global: {
-      stubs: { Icon: true, Teleport: true, Transition: false },
+      stubs: { Icon: true, Teleport: true, Transition: false, RouterLink: routerLinkStub },
     },
   })
   await flushPromises()
@@ -80,6 +101,7 @@ describe('DesktopConfiguration', () => {
     confirmMock.mockResolvedValue(false)
     revokeDevice.mockResolvedValue({ cancelledJobs: 0, removed: false })
     createPairingCode.mockResolvedValue({ code: 'ABCD-EFGH', expiresAt: 4_000_000_000 })
+    mockGatewayStatus.mockResolvedValue(readyGateway)
   })
 
   it('is absent when desktop is off', async () => {
@@ -89,6 +111,7 @@ describe('DesktopConfiguration', () => {
     expect(wrapper.find('[data-testid="btn-pair"]').exists()).toBe(false)
     expect(mockReload).not.toHaveBeenCalled()
     expect(mockListJobs).not.toHaveBeenCalled()
+    expect(mockGatewayStatus).not.toHaveBeenCalled()
   })
 
   it('links to the public desktop repository and its releases as a beta', async () => {
@@ -227,6 +250,7 @@ describe('DesktopConfiguration', () => {
             Icon: true,
             Transition: false,
             Teleport: { template: '<div><slot /></div>' },
+            RouterLink: routerLinkStub,
           },
         },
       })
@@ -268,6 +292,7 @@ describe('DesktopConfiguration', () => {
             Icon: true,
             Transition: false,
             Teleport: { template: '<div><slot /></div>' },
+            RouterLink: routerLinkStub,
           },
         },
       })
@@ -296,5 +321,64 @@ describe('DesktopConfiguration', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('tells an admin how to turn on app chat and links to Coding clients', async () => {
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      enabled: false,
+      is_admin: true,
+    })
+    const wrapper = await mountPage()
+    const alert = wrapper.get('[data-testid="alert-chat-gate"]')
+    expect(alert.text()).toContain('turn on the AI gateway under Coding clients')
+    expect(alert.text()).toContain('Pairing still works')
+    const link = wrapper.get('[data-testid="link-coding-clients"]')
+    expect(link.attributes('href')).toBe('/channels/agents')
+    expect(link.text()).toBe('Open Coding clients')
+  })
+
+  it('tells a regular user to ask an admin when the gateway is off', async () => {
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      enabled: false,
+      is_admin: false,
+    })
+    const wrapper = await mountPage()
+    expect(wrapper.get('[data-testid="alert-chat-gate"]').text()).toContain(
+      'until an admin turns on the AI gateway'
+    )
+    expect(wrapper.find('[data-testid="link-coding-clients"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-pair"]').exists()).toBe(true)
+  })
+
+  it('says app chat has no provider key when the gateway is on but nothing will pay', async () => {
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      is_admin: true,
+      keys: {
+        anthropic: { effective_source: 'none' },
+        openai: { effective_source: 'none' },
+        google: { effective_source: 'none' },
+      },
+    })
+    const wrapper = await mountPage()
+    expect(wrapper.get('[data-testid="alert-chat-gate"]').text()).toContain(
+      'no provider key will pay for app chat'
+    )
+    expect(wrapper.get('[data-testid="link-coding-clients"]').attributes('href')).toBe(
+      '/channels/agents'
+    )
+  })
+
+  it('hides the chat notice when the gateway status cannot be loaded', async () => {
+    mockGatewayStatus.mockRejectedValue(new Error('offline'))
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="alert-chat-gate"]').exists()).toBe(false)
+  })
+
+  it('hides the chat notice when a provider key is already available', async () => {
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="alert-chat-gate"]').exists()).toBe(false)
   })
 })

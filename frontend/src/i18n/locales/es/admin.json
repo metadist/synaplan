@@ -858,7 +858,7 @@
       },
       "feature": {
         "SAVEDTASKS_ENABLED": "Tareas guardadas",
-        "DESKTOP_AGENT_ENABLED": "Agente de escritorio",
+        "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Herramientas de documentos",
         "MULTITASK_ROUTING_ENABLED": "Enrutado de varios pasos",
         "MULTITASK_PARALLEL_ENABLED": "Pasos en paralelo",

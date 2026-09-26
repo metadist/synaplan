@@ -899,6 +899,13 @@
     "desktop": {
       "title": "Ordinateur",
       "description": "Synaplan Desktop est une application distincte pour cet ordinateur. Elle utilise votre compte Synaplan et peut exécuter les skills que vous installez.",
+      "chatGate": {
+        "gatewayAdmin": "L’application ne peut pas discuter tant que vous n’activez pas la passerelle IA sous Clients de codage et qu’une clé de fournisseur n’est pas disponible. L’association fonctionne toujours.",
+        "gatewayUser": "L’application ne peut pas discuter tant qu’un administrateur n’active pas la passerelle IA sous Clients de codage. L’association fonctionne toujours.",
+        "keyAdmin": "La passerelle IA est activée, mais aucune clé de fournisseur ne paie le chat de l’application. Autorisez la clé de l’instance sous Clients de codage, ou enregistrez la vôtre.",
+        "keyUser": "Le chat de l’application n’a pas encore de clé de fournisseur. Demandez à un administrateur d’autoriser la clé de l’instance, ou enregistrez la vôtre. L’association fonctionne toujours.",
+        "openCodingClients": "Ouvrir Clients de codage"
+      },
       "pairButton": "Associer cet ordinateur",
       "loadFailed": "Impossible de charger les ordinateurs connectés.",
       "disconnect": "Déconnecter",

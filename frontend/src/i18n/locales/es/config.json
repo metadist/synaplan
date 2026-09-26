@@ -651,6 +651,13 @@
     "desktop": {
       "title": "Escritorio",
       "description": "Synaplan Desktop es una app independiente para este equipo. Usa tu cuenta de Synaplan y puede ejecutar skills que instales.",
+      "chatGate": {
+        "gatewayAdmin": "La app no puede chatear hasta que actives la puerta de enlace de IA en Clientes de programación y haya una clave de proveedor. Vincular sigue funcionando.",
+        "gatewayUser": "La app no puede chatear hasta que un administrador active la puerta de enlace de IA en Clientes de programación. Vincular sigue funcionando.",
+        "keyAdmin": "La puerta de enlace de IA está activa, pero ninguna clave de proveedor paga el chat de la app. Permite la clave de la instancia en Clientes de programación o guarda la tuya.",
+        "keyUser": "El chat de la app aún no tiene clave de proveedor. Pide a un administrador que permita la clave de la instancia, o guarda la tuya. Vincular sigue funcionando.",
+        "openCodingClients": "Abrir Clientes de programación"
+      },
       "pairButton": "Vincular este equipo",
       "loadFailed": "No se pudieron cargar los equipos conectados.",
       "disconnect": "Desconectar",

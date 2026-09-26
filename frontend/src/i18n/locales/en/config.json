@@ -901,6 +901,13 @@
     "desktop": {
       "title": "Desktop",
       "description": "Synaplan Desktop is a separate app for this computer. It uses your Synaplan account and can run skills you install.",
+      "chatGate": {
+        "gatewayAdmin": "The app cannot chat until you turn on the AI gateway under Coding clients and a provider key is available. Pairing still works.",
+        "gatewayUser": "The app cannot chat until an admin turns on the AI gateway under Coding clients. Pairing still works.",
+        "keyAdmin": "The AI gateway is on, but no provider key will pay for app chat. Allow the instance key under Coding clients, or save your own.",
+        "keyUser": "App chat has no provider key yet. Ask an admin to allow the instance key, or save your own. Pairing still works.",
+        "openCodingClients": "Open Coding clients"
+      },
       "pairButton": "Pair this computer",
       "loadFailed": "The connected computers could not be loaded.",
       "disconnect": "Disconnect",
