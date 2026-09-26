@@ -176,6 +176,7 @@ import {
   SHARE_PERMISSIONS,
   shareConsequenceKey,
   shareFindKey,
+  shareRemoveConfirmKey,
   type ShareKind,
 } from '@/utils/shareCopy'
 import PermissionSelect from './PermissionSelect.vue'
@@ -309,7 +310,7 @@ const changePermission = async (row: IamShare, next: string) => {
 const remove = async (row: IamShare) => {
   const ok = await confirm({
     title: t('iam.dialog.removeTitle'),
-    message: t('iam.dialog.removeConfirm', { name: rowLabel(row) }),
+    message: t(shareRemoveConfirmKey(props.kind), { name: rowLabel(row) }),
     danger: true,
   })
   if (!ok) return

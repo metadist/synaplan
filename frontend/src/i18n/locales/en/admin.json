@@ -939,6 +939,7 @@
     "sharedBy": "From {name}",
     "continueAsCopy": "Continue as my copy",
     "continueFailed": "Couldn't create your copy. Please try again.",
+    "continueNeedsUse": "Your copy was not created. You can still read this chat.",
     "readOnly": "You can view this conversation. To add a message, continue it as your own copy.",
     "sharedFolder": "Shared · {name}",
     "banner": {
@@ -975,6 +976,7 @@
       "remove": "Remove",
       "removeTitle": "Stop sharing",
       "removeConfirm": "Remove {name}?",
+      "removeConfirmConversation": "Remove {name}? They lose this chat and can no longer make their own copy.",
       "loadFailed": "Couldn't load who this is shared with.",
       "saveFailed": "Couldn't share this. Please try again.",
       "shared": "Shared with {name}.",

@@ -935,6 +935,7 @@
     "sharedBy": "{name} tarafından",
     "continueAsCopy": "Kendi kopyam olarak devam et",
     "continueFailed": "Kopyanız oluşturulamadı. Lütfen tekrar deneyin.",
+    "continueNeedsUse": "Kopyanız oluşturulmadı. Bu sohbeti hâlâ okuyabilirsiniz.",
     "readOnly": "Bu sohbeti görüntüleyebilirsiniz. Mesaj eklemek için kendi kopyanız olarak devam edin.",
     "sharedFolder": "Paylaşılan · {name}",
     "banner": {
@@ -971,6 +972,7 @@
       "remove": "Kaldır",
       "removeTitle": "Paylaşımı durdur",
       "removeConfirm": "{name} kaldırılsın mı?",
+      "removeConfirmConversation": "{name} kaldırılsın mı? Bu sohbeti kaybeder ve artık kendi kopyasını oluşturamaz.",
       "loadFailed": "Paylaşımlar yüklenemedi.",
       "saveFailed": "Paylaşılamadı. Lütfen tekrar deneyin.",
       "shared": "{name} ile paylaşıldı.",

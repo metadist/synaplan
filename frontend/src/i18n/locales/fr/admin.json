@@ -939,6 +939,7 @@
     "sharedBy": "De {name}",
     "continueAsCopy": "Continuer comme ma copie",
     "continueFailed": "Impossible de créer votre copie. Veuillez réessayer.",
+    "continueNeedsUse": "Votre copie n'a pas été créée. Vous pouvez encore lire ce chat.",
     "readOnly": "Vous pouvez voir cette conversation. Pour ajouter un message, continuez-la comme votre propre copie.",
     "sharedFolder": "Partagé · {name}",
     "banner": {
@@ -975,6 +976,7 @@
       "remove": "Retirer",
       "removeTitle": "Arrêter le partage",
       "removeConfirm": "Retirer {name} ?",
+      "removeConfirmConversation": "Retirer {name} ? Cette personne perd ce chat et ne peut plus en faire sa propre copie.",
       "loadFailed": "Impossible de charger les partages.",
       "saveFailed": "Le partage a échoué. Veuillez réessayer.",
       "shared": "Partagé avec {name}.",
