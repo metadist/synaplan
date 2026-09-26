@@ -105,6 +105,24 @@ describe('ConfigField — locale overlay for backend schema copy', () => {
     expect(wrapper.text()).not.toContain('English schema fallback that must not appear.')
   })
 
+  it('names a feature switch in words and keeps the config key', () => {
+    const wrapper = mountOverlay('FEATURE_DESKTOP_AGENT_ENABLED', {
+      tab: 'features',
+      section: 'platforms',
+      type: 'boolean',
+      sensitive: false,
+      description: 'English schema fallback that must not appear.',
+      default: 'true',
+      source: 'database',
+    })
+
+    expect(wrapper.get('[data-testid="config-field-title"]').text()).toBe('Synaplan Desktop')
+    expect(wrapper.text()).toContain('FEATURE_DESKTOP_AGENT_ENABLED')
+    expect(wrapper.text()).toContain('waiting tasks are not picked up')
+    expect(wrapper.text()).toContain('There is no installer yet')
+    expect(wrapper.text()).not.toContain('English schema fallback that must not appear.')
+  })
+
   it('falls back to the schema description when no locale key exists', () => {
     const wrapper = mountOverlay('REGISTRATION_ENABLED', booleanSchema, {
       value: 'true',

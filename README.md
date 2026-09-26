@@ -168,7 +168,7 @@ The same assistant, the same knowledge base, the same model policy — on every 
 |---------|--------------|--------|
 | **Web app** | Full chat + admin UI, light/dark, five languages | This repo — `make up` |
 | **Mobile apps** | Chat, documents and voice on iPhone and Android — pointed at web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
-| **Desktop Client** | Pair a computer, keep research local, run Agents on this machine | [metadist/synaplan-desktop](https://github.com/metadist/synaplan-desktop) |
+| **Synaplan Desktop** | Pair a computer and run skills on it. In the web app: **Manage → Channels → Synaplan Desktop**. No installer yet — build from the repository. | [metadist/synaplan-desktop](https://github.com/metadist/synaplan-desktop) |
 | **Outlook add-in** | Bring Synaplan into Outlook (Web, new & classic, Mac) — find and process mail without sending it anywhere | [metadist/Synamail](https://github.com/metadist/Synamail) |
 | **Chat widget** | Embed your assistant on any website with one snippet — cross-origin ready, human takeover included | [Widget guide](https://docs.synaplan.com/index.php/widget) |
 | **WhatsApp & Email** | The AI answers on the channel the question came in on | [WhatsApp](docs/WHATSAPP.md) · [Email](docs/EMAIL.md) |
@@ -202,7 +202,7 @@ Everything below is the same platform, packaged for different homes. Pick what f
 | **[synaplan](https://github.com/metadist/synaplan)** | The platform itself (this repo): backend, frontend, widget, plugins, dev stack, and the `deploy/` production contract with Elestio, AWS Marketplace, and Umbrel adapters |
 | **[synaplan-charts](https://github.com/metadist/synaplan-charts)** | Helm charts for Kubernetes — for partners and enterprises running K8s clusters |
 | **[Mobile apps](https://github.com/metadist/synaplan-apps)** | Native iOS and Android — [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
-| **[synaplan-desktop](https://github.com/metadist/synaplan-desktop)** | Desktop Client — pair a computer and run Agents locally |
+| **[synaplan-desktop](https://github.com/metadist/synaplan-desktop)** | Synaplan Desktop — pair a computer and run skills on it. No installer yet; build from source. |
 | **[Synamail](https://github.com/metadist/Synamail)** | Outlook add-in (Web, new & classic, Mac) — Synaplan inside your mailbox |
 | **[synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud)** / **[synaplan-opencloud](https://github.com/metadist/synaplan-opencloud)** | Apps for Nextcloud / OpenCloud — use those files as AI knowledge while the file store stays in charge (ownCloud works via the built-in WebDAV connection) |
 | **[synaplan-tts](https://github.com/metadist/synaplan-tts)** | Optional self-hosted text-to-speech service for voice output |
@@ -279,7 +279,7 @@ make up
 - **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
 - **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/index.php/widget))
 - **Mobile Apps** — Chat, documents and voice on iPhone and Android, pointed at web.synaplan.com or at your own server ([App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme))
-- **Desktop Client** — Pair a computer and run Agents locally ([synaplan-desktop](https://github.com/metadist/synaplan-desktop))
+- **Synaplan Desktop** — Pair a computer and run skills on it. Open **Manage → Channels → Synaplan Desktop**. No installer yet ([synaplan-desktop](https://github.com/metadist/synaplan-desktop))
 - **AI assistants** — Saved recipes (instructions, knowledge folders, tools, triggers) that you publish in versions ([assistants](https://docs.synaplan.com/assistants))
 - **Tools & approvals** — One tool registry; write-class actions pause under **Approvals** ([tools](https://docs.synaplan.com/tools-and-approvals))
 - **People & groups** — Share folders, chats, assistants and tasks; **Operate → People** ([people](https://docs.synaplan.com/people-and-groups))
@@ -513,7 +513,7 @@ In-repo guides (for developers working on this codebase):
 | [synaplan](https://github.com/metadist/synaplan) | Main app (this repo) |
 | [synaplan-docs](https://github.com/metadist/synaplan-docs) | Public docs site (docs.synaplan.com) |
 | [Synamail](https://github.com/metadist/Synamail) | Outlook add-in |
-| [synaplan-desktop](https://github.com/metadist/synaplan-desktop) | Desktop Client (Windows, macOS, Linux) |
+| [synaplan-desktop](https://github.com/metadist/synaplan-desktop) | Synaplan Desktop (Windows, macOS, Linux). No installer yet; build from source. |
 | [synaplan-apps](https://github.com/metadist/synaplan-apps) | iOS and Android apps — [App Store](https://apps.apple.com/app/id6784278288) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app) |
 | [synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud) | Nextcloud integration |
 | [synaplan-opencloud](https://github.com/metadist/synaplan-opencloud) | OpenCloud integration |

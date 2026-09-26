@@ -42,7 +42,7 @@
     "poweredBy": "Desarrollado por"
   },
   "pageTitles": {
-    "desktop": "Escritorio",
+    "desktop": "Synaplan Desktop",
     "login": "Iniciar sesión",
     "register": "Registrarse",
     "forgotPassword": "Olvidé mi contraseña",
@@ -110,7 +110,7 @@
     "upgrade": "Mejorar"
   },
   "nav": {
-    "desktop": "Escritorio",
+    "desktop": "Synaplan Desktop",
     "linkedPlatforms": "Plataformas vinculadas",
     "chat": "Chat",
     "new": "Nuevo",

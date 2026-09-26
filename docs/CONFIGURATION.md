@@ -837,7 +837,7 @@ and [AI plugs](ADMIN.md#ai-plugs-s1-s4).
 
 Every feature from the September 2026 waves — people & sharing, AI assistants,
 tool registry and approvals, saved-task steps, watched pages, linked
-platforms, desktop client, office document tools, optional module gates — is a
+platforms, Synaplan Desktop, office document tools, optional module gates — is a
 `BCONFIG` flag that is **on by default** and editable under **Operate → System
 configuration → Features**. Automated deployments pin a flag with
 `FEATURE_<GROUP>_<SETTING>=false` (or `true`); the toggle then shows as locked.

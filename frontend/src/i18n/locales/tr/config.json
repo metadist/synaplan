@@ -649,7 +649,7 @@
       }
     },
     "desktop": {
-      "title": "Masaüstü",
+      "title": "Synaplan Desktop",
       "description": "Synaplan Desktop, bu bilgisayar için ayrı bir uygulamadır. Synaplan hesabınızı kullanır ve yüklediğiniz skill'leri çalıştırabilir.",
       "chatGate": {
         "gatewayAdmin": "Kodlama istemcileri altında AI ağ geçidini açana ve bir sağlayıcı anahtarı kullanılabilir olana kadar uygulama sohbet edemez. Bağlama çalışmaya devam eder.",
@@ -744,18 +744,16 @@
         "meta": "{skill} · {time}"
       },
       "get": {
-        "title": "Synaplan Desktop'u edin",
-        "beta": "Beta",
-        "platforms": "Şu platformlar için",
+        "title": "Synaplan Desktop",
+        "platforms": "Şu sistemlerde çalışır",
         "description": "macOS, Windows ve Linux için küçük bir uygulama. Synaplan hesabınızla eşleşir ve yüklediğiniz skill'leri kendi bilgisayarınızda çalıştırır; örneğin notlarınızdan bir sunum hazırlar.",
-        "github": "GitHub'dan edin",
-        "releases": "Sürümler",
-        "betaNote": "Beta sürümleri henüz imzalı değil, bu yüzden işletim sisteminiz ilk açılışta onay isteyebilir. Uygulamayı kendiniz nasıl derleyeceğiniz de depoda anlatılıyor.",
+        "github": "Kaynak depoyu aç",
+        "betaNote": "Henüz bir yükleyici yok. Depo, Synaplan Desktop'u kendiniz nasıl derleyeceğinizi anlatır.",
         "stepsTitle": "Üç adımda bağlan",
-        "step1": "Kullanmak istediğiniz bilgisayara Synaplan Desktop'u yükleyin.",
+        "step1": "Kullanmak istediğiniz bilgisayarda Synaplan Desktop'u kaynak depodan derleyin.",
         "step2": "Burada “Bu bilgisayarı bağla”ya tıklayın ve adres ile kodu kopyalayın.",
         "step3": "İkisini de uygulamaya girin. Bilgisayar ardından aşağıdaki listede görünür.",
-        "compact": "Uygulama GitHub'da herkese açık bir betadır."
+        "compact": "Henüz bir yükleyici yok. Synaplan Desktop'u kaynak depodan derleyin."
       }
     },
     "phoneVerification": {

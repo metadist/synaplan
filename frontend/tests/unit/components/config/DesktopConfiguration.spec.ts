@@ -115,16 +115,17 @@ describe('DesktopConfiguration', () => {
     expect(mockGatewayStatus).not.toHaveBeenCalled()
   })
 
-  it('links to the public desktop repository and its releases as a beta', async () => {
+  it('links to the source repository and does not promise an installer', async () => {
     const wrapper = await mountPage()
     const github = wrapper.get('[data-testid="link-desktop-github"]')
     expect(github.attributes('href')).toBe(REPO)
     expect(github.attributes('target')).toBe('_blank')
     expect(github.attributes('rel')).toContain('noopener')
-    expect(wrapper.get('[data-testid="link-desktop-releases"]').attributes('href')).toBe(
-      `${REPO}/releases`
-    )
-    expect(wrapper.get('[data-testid="badge-desktop-beta"]').text()).toBe('Beta')
+    expect(wrapper.find('[data-testid="link-desktop-releases"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="badge-desktop-beta"]').exists()).toBe(false)
+    const card = wrapper.get('[data-testid="card-get-desktop"]').text()
+    expect(card).toContain('There is no installer yet')
+    expect(card).not.toMatch(/beta/i)
   })
 
   it('names the three supported operating systems', async () => {

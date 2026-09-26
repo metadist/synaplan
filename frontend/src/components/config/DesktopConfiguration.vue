@@ -35,9 +35,8 @@
       </RouterLink>
     </div>
 
-    <!-- Get the app: the client is a public beta on GitHub (build from source or
-         a beta build from Releases). Links go to the repository, never to a
-         binary we do not host. -->
+    <!-- There is no installer yet. The only link is the source repository,
+         which explains how to build Synaplan Desktop. -->
     <div v-if="devices.length === 0" class="surface-card p-5 md:p-6" data-testid="card-get-desktop">
       <div class="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div class="min-w-0 space-y-4">
@@ -45,20 +44,12 @@
             <div
               class="flex-shrink-0 w-12 h-12 rounded-xl bg-[var(--brand-alpha-light)] flex items-center justify-center"
             >
-              <ArrowDownTrayIcon class="w-6 h-6 txt-brand" />
+              <ComputerDesktopIcon class="w-6 h-6 txt-brand" />
             </div>
             <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <h2 class="text-lg font-semibold txt-primary">
-                  {{ $t('config.desktop.get.title') }}
-                </h2>
-                <span
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-[var(--brand-alpha-light)] txt-brand"
-                  data-testid="badge-desktop-beta"
-                >
-                  {{ $t('config.desktop.get.beta') }}
-                </span>
-              </div>
+              <h2 class="text-lg font-semibold txt-primary">
+                {{ $t('config.desktop.get.title') }}
+              </h2>
               <p class="mt-1 text-sm txt-secondary">{{ $t('config.desktop.get.description') }}</p>
             </div>
           </div>
@@ -84,16 +75,6 @@
             >
               <Icon icon="mdi:github" class="w-5 h-5" aria-hidden="true" />
               {{ $t('config.desktop.get.github') }}
-            </a>
-            <a
-              :href="`${DESKTOP_REPO_URL}/releases`"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
-              data-testid="link-desktop-releases"
-            >
-              <ArrowTopRightOnSquareIcon class="w-4 h-4" aria-hidden="true" />
-              {{ $t('config.desktop.get.releases') }}
             </a>
           </div>
 
@@ -399,8 +380,6 @@ import {
   ClipboardDocumentIcon,
   ComputerDesktopIcon,
   ArrowPathIcon,
-  ArrowDownTrayIcon,
-  ArrowTopRightOnSquareIcon,
   InformationCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
@@ -428,7 +407,7 @@ const { success, error: showError } = useNotification()
 const { formatRelativeTime } = useDateFormat()
 const { devices, reload } = useDesktopDevices()
 
-/** Public source repository of the desktop client (Apache-2.0, build from source or beta builds). */
+/** Public source repository. There is no signed installer; the page links here so people can build the app. */
 const DESKTOP_REPO_URL = 'https://github.com/metadist/synaplan-desktop'
 
 // Operating-system names are brand names and stay untranslated.

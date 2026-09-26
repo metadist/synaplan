@@ -897,7 +897,7 @@
       }
     },
     "desktop": {
-      "title": "Ordinateur",
+      "title": "Synaplan Desktop",
       "description": "Synaplan Desktop est une application distincte pour cet ordinateur. Elle utilise votre compte Synaplan et peut exécuter les skills que vous installez.",
       "chatGate": {
         "gatewayAdmin": "L’application ne peut pas discuter tant que vous n’activez pas la passerelle IA sous Clients de codage et qu’une clé de fournisseur n’est pas disponible. L’association fonctionne toujours.",
@@ -992,18 +992,16 @@
         "meta": "{skill} · {time}"
       },
       "get": {
-        "title": "Obtenir Synaplan Desktop",
-        "beta": "Bêta",
-        "platforms": "Disponible pour",
+        "title": "Synaplan Desktop",
+        "platforms": "Fonctionne sur",
         "description": "Une petite application pour macOS, Windows et Linux. Elle s’associe à votre compte Synaplan et exécute sur votre propre ordinateur les skills que vous installez, par exemple créer une présentation à partir de vos notes.",
-        "github": "Obtenir sur GitHub",
-        "releases": "Versions",
-        "betaNote": "Les versions bêta ne sont pas encore signées ; votre système peut donc demander une confirmation au premier démarrage. Le dépôt explique aussi comment compiler l’application vous-même.",
+        "github": "Ouvrir le dépôt source",
+        "betaNote": "Il n’y a pas encore d’installateur. Le dépôt explique comment construire Synaplan Desktop vous-même.",
         "stepsTitle": "Se connecter en trois étapes",
-        "step1": "Installez Synaplan Desktop sur l’ordinateur que vous voulez utiliser.",
+        "step1": "Construisez Synaplan Desktop à partir du dépôt source sur l’ordinateur que vous voulez utiliser.",
         "step2": "Cliquez ici sur « Associer cet ordinateur » et copiez l’adresse et le code.",
         "step3": "Saisissez les deux dans l’application. L’ordinateur apparaît ensuite dans la liste ci-dessous.",
-        "compact": "L'application est une bêta publique sur GitHub."
+        "compact": "Il n’y a pas encore d’installateur. Construisez Synaplan Desktop à partir du dépôt source."
       }
     },
     "phoneVerification": {
