@@ -23,6 +23,7 @@ final class DesktopJobStoreTest extends TestCase
     {
         $this->jobRepository = $this->createMock(DesktopJobRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->em->method('wrapInTransaction')->willReturnCallback(static fn (callable $fn) => $fn());
         $this->store = new DesktopJobStore($this->jobRepository, $this->em);
     }
 
@@ -75,8 +76,6 @@ final class DesktopJobStoreTest extends TestCase
         $device = self::device(4, 1);
         $job = (new DesktopJob())->setOwnerId(1)->setStatus(DesktopJob::STATUS_QUEUED);
 
-        // wrapInTransaction just runs the callback in the unit test.
-        $this->em->method('wrapInTransaction')->willReturnCallback(static fn (callable $fn) => $fn());
         $this->jobRepository->expects(self::once())
             ->method('findNextLeasable')
             ->with(1, 4)
@@ -97,7 +96,6 @@ final class DesktopJobStoreTest extends TestCase
     public function testLeaseForDeviceReturnsNullWhenNothingQueued(): void
     {
         $device = self::device(4, 1);
-        $this->em->method('wrapInTransaction')->willReturnCallback(static fn (callable $fn) => $fn());
         $this->jobRepository->method('findNextLeasable')->willReturn(null);
 
         self::assertNull($this->store->leaseForDevice($device));
@@ -174,7 +172,7 @@ final class DesktopJobStoreTest extends TestCase
 
         $result = $this->store->requeueExpiredLeases();
 
-        self::assertSame(['requeued' => 1, 'failed' => 0], $result);
+        self::assertSame(['requeued' => 1, 'failed' => 0, 'failedJobs' => []], $result);
         self::assertSame(DesktopJob::STATUS_QUEUED, $job->getStatus());
         self::assertNull($job->getLeaseToken());
         self::assertSame(0, $job->getLeaseExpires());
@@ -188,7 +186,7 @@ final class DesktopJobStoreTest extends TestCase
 
         $result = $this->store->requeueExpiredLeases();
 
-        self::assertSame(['requeued' => 0, 'failed' => 1], $result);
+        self::assertSame(['requeued' => 0, 'failed' => 1, 'failedJobs' => [$job]], $result);
         self::assertSame(DesktopJob::STATUS_FAILED, $job->getStatus());
         self::assertSame('timeout', $job->getErrorCode());
     }
@@ -198,7 +196,68 @@ final class DesktopJobStoreTest extends TestCase
         $this->jobRepository->method('findExpiredLeases')->willReturn([]);
         $this->em->expects(self::never())->method('flush');
 
-        self::assertSame(['requeued' => 0, 'failed' => 0], $this->store->requeueExpiredLeases());
+        self::assertSame(['requeued' => 0, 'failed' => 0, 'failedJobs' => []], $this->store->requeueExpiredLeases());
+    }
+
+    public function testRequeueExpiredLeasesFailsAQueuedJobThatWaitedTooLong(): void
+    {
+        $old = time() - DesktopJobStore::QUEUED_TTL_SECONDS - 60;
+        $job = (new DesktopJob())->setOwnerId(1)->setStatus(DesktopJob::STATUS_QUEUED)
+            ->setCreated($old)
+            ->setUpdated($old);
+        $this->jobRepository->method('findExpiredLeases')->willReturn([]);
+        $this->jobRepository->expects(self::once())
+            ->method('findStaleQueued')
+            ->with(self::callback(static fn (int $cutoff): bool => $cutoff <= time() - DesktopJobStore::QUEUED_TTL_SECONDS))
+            ->willReturn([$job]);
+
+        $result = $this->store->requeueExpiredLeases();
+
+        self::assertSame(1, $result['failed']);
+        self::assertSame([$job], $result['failedJobs']);
+        self::assertSame(DesktopJob::STATUS_FAILED, $job->getStatus());
+        self::assertSame('timeout', $job->getErrorCode());
+    }
+
+    public function testRequeueExpiredLeasesDoesNotFailAJobLeasedBeforeTheLock(): void
+    {
+        $job = (new DesktopJob())->setOwnerId(1)->setStatus(DesktopJob::STATUS_LEASED)->setLeaseToken('lt_live');
+        $this->jobRepository->method('findExpiredLeases')->willReturn([]);
+        $this->jobRepository->method('findStaleQueued')->willReturn([$job]);
+        $this->em->expects(self::never())->method('flush');
+
+        $result = $this->store->requeueExpiredLeases();
+
+        self::assertSame(['requeued' => 0, 'failed' => 0, 'failedJobs' => []], $result);
+        self::assertSame(DesktopJob::STATUS_LEASED, $job->getStatus());
+        self::assertSame('lt_live', $job->getLeaseToken());
+    }
+
+    public function testRequeueExpiredLeasesLeavesAQueuedJobThatWasRefreshed(): void
+    {
+        $job = (new DesktopJob())->setOwnerId(1)->setStatus(DesktopJob::STATUS_QUEUED);
+        $this->jobRepository->method('findExpiredLeases')->willReturn([]);
+        $this->jobRepository->method('findStaleQueued')->willReturn([$job]);
+        $this->em->expects(self::never())->method('flush');
+
+        $result = $this->store->requeueExpiredLeases();
+
+        self::assertSame(['requeued' => 0, 'failed' => 0, 'failedJobs' => []], $result);
+        self::assertSame(DesktopJob::STATUS_QUEUED, $job->getStatus());
+        self::assertNull($job->getErrorCode());
+    }
+
+    public function testRequeueExpiredLeasesSkipsALeaseThatWasAlreadyFinished(): void
+    {
+        $job = (new DesktopJob())->setOwnerId(1)->setStatus(DesktopJob::STATUS_SUCCEEDED)
+            ->setAttempt(3)->setMaxAttempts(3);
+        $this->jobRepository->method('findExpiredLeases')->willReturn([$job]);
+        $this->em->expects(self::never())->method('flush');
+
+        $result = $this->store->requeueExpiredLeases();
+
+        self::assertSame(['requeued' => 0, 'failed' => 0, 'failedJobs' => []], $result);
+        self::assertSame(DesktopJob::STATUS_SUCCEEDED, $job->getStatus());
     }
 
     private static function device(int $id, int $ownerId): DesktopDevice

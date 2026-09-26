@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Desktop\DesktopJobResultNotifier;
 use App\Service\Desktop\DesktopJobStore;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -37,6 +38,7 @@ final class ReapDesktopJobsCommand extends Command
         private readonly DesktopJobStore $jobStore,
         private readonly DesktopAgentConfig $desktopAgentConfig,
         private readonly LockFactory $lockFactory,
+        private readonly DesktopJobResultNotifier $resultNotifier,
     ) {
         parent::__construct();
     }
@@ -64,6 +66,9 @@ final class ReapDesktopJobsCommand extends Command
             $result = $this->jobStore->requeueExpiredLeases();
             $requeued = $result['requeued'];
             $failed = $result['failed'];
+            foreach ($result['failedJobs'] as $job) {
+                $this->resultNotifier->notify($job);
+            }
 
             if ($requeued > 0 || $failed > 0) {
                 $io->success(sprintf('Requeued %d and failed %d expired desktop job(s).', $requeued, $failed));

@@ -24,6 +24,13 @@ final class DesktopJobStore
     /** How long a leased job is reserved before the reaper may requeue it. */
     public const LEASE_TTL_SECONDS = 300;
 
+    /**
+     * How long a job may sit `queued` (never leased, or returned to the queue)
+     * before the reaper fails it. A closed app can still pick the job up the
+     * same day; it does not wait forever.
+     */
+    public const QUEUED_TTL_SECONDS = 86400;
+
     /** Cap on the stored result JSON — untrusted input re-entering the account. */
     public const RESULT_MAX_BYTES = 65536;
 
@@ -161,37 +168,75 @@ final class DesktopJobStore
     /**
      * Requeue (or fail) jobs whose lease expired. Called by the reaper.
      *
-     * @return array{requeued: int, failed: int}
+     * @return array{requeued: int, failed: int, failedJobs: list<DesktopJob>}
      */
     public function requeueExpiredLeases(int $limit = 100): array
     {
-        $now = time();
-        $requeued = 0;
-        $failed = 0;
+        /** @var array{requeued: int, failed: int, failedJobs: list<DesktopJob>} $result */
+        $result = $this->em->wrapInTransaction(function () use ($limit): array {
+            $now = time();
+            $requeued = 0;
+            $failed = 0;
+            /** @var list<DesktopJob> $failedJobs */
+            $failedJobs = [];
 
-        foreach ($this->jobRepository->findExpiredLeases($now, $limit) as $job) {
-            if ($job->getAttempt() < $job->getMaxAttempts()) {
-                $job->setStatus(DesktopJob::STATUS_QUEUED)
-                    ->setLeaseToken(null)
-                    ->setLeaseExpires(0)
-                    ->touch();
-                ++$requeued;
-            } else {
-                $job->setStatus(DesktopJob::STATUS_FAILED)
-                    ->setLeaseToken(null)
-                    ->setErrorCode(DesktopJobContract::ERROR_TIMEOUT)
-                    ->touch();
-                ++$failed;
+            foreach ($this->jobRepository->findExpiredLeases($now, $limit) as $job) {
+                if (DesktopJob::STATUS_LEASED !== $job->getStatus() || $job->getLeaseExpires() >= $now) {
+                    continue;
+                }
+                if ($job->getAttempt() < $job->getMaxAttempts()) {
+                    $job->setStatus(DesktopJob::STATUS_QUEUED)
+                        ->setLeaseToken(null)
+                        ->setLeaseExpires(0)
+                        ->touch();
+                    ++$requeued;
+                } else {
+                    $this->failTimedOut($job);
+                    $failedJobs[] = $job;
+                    ++$failed;
+                }
+
+                $this->em->persist($job);
             }
 
-            $this->em->persist($job);
+            $cutoff = $now - self::QUEUED_TTL_SECONDS;
+            foreach ($this->jobRepository->findStaleQueued($cutoff, $limit) as $job) {
+                if (!$this->isStillStaleQueued($job, $cutoff)) {
+                    continue;
+                }
+                $this->failTimedOut($job);
+                $failedJobs[] = $job;
+                ++$failed;
+                $this->em->persist($job);
+            }
+
+            if ($requeued > 0 || $failed > 0) {
+                $this->em->flush();
+            }
+
+            return ['requeued' => $requeued, 'failed' => $failed, 'failedJobs' => $failedJobs];
+        });
+
+        return $result;
+    }
+
+    private function isStillStaleQueued(DesktopJob $job, int $cutoff): bool
+    {
+        if (DesktopJob::STATUS_QUEUED !== $job->getStatus()) {
+            return false;
         }
 
-        if ($requeued > 0 || $failed > 0) {
-            $this->em->flush();
-        }
+        $updated = $job->getUpdated();
 
-        return ['requeued' => $requeued, 'failed' => $failed];
+        return $updated > 0 ? $updated < $cutoff : $job->getCreated() < $cutoff;
+    }
+
+    private function failTimedOut(DesktopJob $job): void
+    {
+        $job->setStatus(DesktopJob::STATUS_FAILED)
+            ->setLeaseToken(null)
+            ->setErrorCode(DesktopJobContract::ERROR_TIMEOUT)
+            ->touch();
     }
 
     /**
