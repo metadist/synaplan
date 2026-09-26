@@ -67,6 +67,17 @@ const description = computed(() =>
   te(descriptionKey.value) ? t(descriptionKey.value) : props.schema.description
 )
 
+/**
+ * Feature switches are stored as FEATURE_* env names. People already have a
+ * short name for each one under group policies; use that as the heading and
+ * keep the env name beside it so an admin can still match a pin.
+ */
+const featureTitle = computed(() => {
+  if (!props.fieldKey.startsWith('FEATURE_')) return ''
+  const key = `people.policies.feature.${props.fieldKey.slice('FEATURE_'.length)}`
+  return te(key) ? t(key) : ''
+})
+
 const placeholder = computed(() => {
   if (props.value.isMasked && !isDirty.value && props.value.isSet) {
     return '••••••••'
@@ -164,11 +175,17 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
   <div v-if="!schema.managedBy" class="config-field">
     <div class="flex items-center justify-between mb-1.5">
       <div class="flex items-center gap-1.5 min-w-0">
-        <label :for="fieldKey" class="flex items-center gap-2 text-sm font-medium txt-primary">
-          <code class="text-xs bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">{{
+        <label
+          :for="fieldKey"
+          class="flex items-center gap-2 text-sm font-medium txt-primary min-w-0"
+        >
+          <span v-if="featureTitle" class="truncate" data-testid="config-field-title">{{
+            featureTitle
+          }}</span>
+          <code class="text-xs bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded shrink-0">{{
             fieldKey
           }}</code>
-          <Icon :icon="statusIcon" :class="['w-4 h-4', statusColor]" />
+          <Icon :icon="statusIcon" :class="['w-4 h-4 shrink-0', statusColor]" />
         </label>
         <ProviderHelpHint
           v-if="helpMeta"

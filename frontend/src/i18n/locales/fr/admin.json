@@ -441,7 +441,8 @@
         "COMPUTE_MAX_TIMEOUT_SEC": "Plafond dur en secondes pour une exécution.",
         "COMPUTE_POLICY_INTERACTIVE": "Lorsque la personne propriétaire est présente (chat ou un appel API en direct) : exécuter automatiquement, demander d’abord, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
         "COMPUTE_POLICY_UNATTENDED": "Lorsqu’une tâche enregistrée exécute un travail sur fichiers toute seule : demander d’abord (défaut), exécuter automatiquement, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
-        "COMPUTE_WORKSPACE_TTL_DAYS": "Combien de jours un dossier de travail sur fichiers peut rester inutilisé avant que le nettoyage le supprime. Valeur par défaut : 90."
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Combien de jours un dossier de travail sur fichiers peut rester inutilisé avant que le nettoyage le supprime. Valeur par défaut : 90.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, sous Gérer → Canaux. Un ordinateur associé peut discuter dans l’app et prendre les tâches en attente. Si c’est désactivé, cette page est masquée, l’association s’arrête, l’app ne peut pas discuter et les tâches en attente ne sont pas prises tant que vous ne le réactivez pas. Il n’y a pas encore d’installateur — l’app se construit à partir du dépôt source."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {

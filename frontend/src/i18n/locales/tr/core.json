@@ -42,7 +42,7 @@
     "poweredBy": "Sunan"
   },
   "pageTitles": {
-    "desktop": "Masaüstü",
+    "desktop": "Synaplan Desktop",
     "login": "Giriş",
     "register": "Kayıt Ol",
     "forgotPassword": "Şifremi Unuttum",
@@ -110,7 +110,7 @@
     "upgrade": "Yükselt"
   },
   "nav": {
-    "desktop": "Masaüstü",
+    "desktop": "Synaplan Desktop",
     "linkedPlatforms": "Bağlı platformlar",
     "chat": "Sohbet",
     "new": "Yeni",

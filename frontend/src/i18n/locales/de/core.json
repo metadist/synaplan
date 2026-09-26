@@ -42,7 +42,7 @@
     "poweredBy": "Bereitgestellt von"
   },
   "pageTitles": {
-    "desktop": "Desktop",
+    "desktop": "Synaplan Desktop",
     "login": "Anmelden",
     "register": "Registrieren",
     "forgotPassword": "Passwort vergessen",
@@ -111,7 +111,7 @@
     "upgrade": "Upgrade"
   },
   "nav": {
-    "desktop": "Desktop",
+    "desktop": "Synaplan Desktop",
     "chat": "Chat",
     "new": "Neu",
     "newDescription": "Neuen Chat starten",

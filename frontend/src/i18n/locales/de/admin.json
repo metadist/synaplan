@@ -441,7 +441,8 @@
         "COMPUTE_MAX_TIMEOUT_SEC": "Harte Obergrenze in Sekunden für einen Dateiarbeits-Lauf.",
         "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
-        "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90."
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Verwalten → Kanäle. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {

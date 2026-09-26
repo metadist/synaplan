@@ -42,7 +42,7 @@
     "poweredBy": "Propulsé par"
   },
   "pageTitles": {
-    "desktop": "Ordinateur",
+    "desktop": "Synaplan Desktop",
     "login": "Connexion",
     "register": "Inscription",
     "forgotPassword": "Mot de passe oublié",
@@ -111,7 +111,7 @@
     "upgrade": "Passer à une formule supérieure"
   },
   "nav": {
-    "desktop": "Ordinateur",
+    "desktop": "Synaplan Desktop",
     "chat": "Chat",
     "new": "Nouveau",
     "newDescription": "Démarrer un nouveau chat",

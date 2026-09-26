@@ -2,14 +2,12 @@
 
 > **Status.** The server half (pairing, scoped keys, job queue, check-in
 > contract) ships in this app behind `DESKTOP_AGENT.ENABLED` (on by default
-> since the Features tab landed; see [Feature flags](FEATURE_FLAGS.md)). The
-> desktop client for **macOS, Windows and Linux** is a **public beta** in
-> [synaplan-desktop](https://github.com/metadist/synaplan-desktop): build it
-> from source or take a beta build from that repository's
-> [Releases](https://github.com/metadist/synaplan-desktop/releases) page once
-> one is published. Signed, notarized installers come later. The job contract
-> stays frozen at `protocol: 1`. The web app links to the repository from
-> **Channels → Desktop**.
+> since the Features tab landed; see [Feature flags](FEATURE_FLAGS.md)).
+> Synaplan Desktop for **macOS, Windows and Linux** lives in
+> [synaplan-desktop](https://github.com/metadist/synaplan-desktop). There is
+> no signed installer yet — build it from that repository. The job contract
+> stays frozen at `protocol: 1`. In the web app the page is
+> **Manage → Channels → Synaplan Desktop**.
 
 ## What it is
 
@@ -166,7 +164,7 @@ never logged at info level.
 
 Flow:
 
-1. User opens **Channels → Desktop** in the web app and clicks *Pair this
+1. User opens **Manage → Channels → Synaplan Desktop** in the web app and clicks *Pair this
    computer* → server mints a code. The address shown is the API origin
    (`http://localhost:8000` in local Vite — or the same host on `:8000` when
    the UI is opened via a LAN IP — not `:5173` or Keycloak `:8080`).
@@ -283,7 +281,7 @@ breaking a shipped client (invariant C9).
 With the flag on and a paired unsigned desktop client running:
 
 1. In the web app, open a chat and queue a `skill.run` job for that computer
-   (Channels → Desktop, or `POST /api/v1/desktop/jobs` with
+   (Manage → Channels → Synaplan Desktop, or `POST /api/v1/desktop/jobs` with
    `{ skill, prompt, fileIds }` only).
 2. The computer checks in over MCP (`agent_checkin`), honours top-level
    `next_call_at`, and runs the skill with the same local tool policy as
