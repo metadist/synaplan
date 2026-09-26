@@ -1,0 +1,12 @@
+desktop:
+  job:
+    unnamed: 'tâche'
+    finished: 'La tâche « %skill% » s''est terminée sur votre ordinateur.'
+    failed: 'La tâche « %skill% » sur votre ordinateur ne s''est pas terminée. %reason%'
+    files: 'Fichiers : %ids%'
+    reason:
+      unknown_skill: 'Cet ordinateur n''a pas ce skill.'
+      unknown_type: 'Cet ordinateur n''a pas pu exécuter cette tâche.'
+      skill_disabled: 'Cet ordinateur a refusé d''exécuter le skill.'
+      timeout: 'Cet ordinateur n''a pas terminé à temps.'
+      local_error: 'Cet ordinateur n''a pas pu terminer la tâche.'

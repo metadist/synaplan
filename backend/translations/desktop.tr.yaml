@@ -1,0 +1,12 @@
+desktop:
+  job:
+    unnamed: 'görev'
+    finished: '"%skill%" görevi bilgisayarınızda bitti.'
+    failed: '"%skill%" görevi bilgisayarınızda bitmedi. %reason%'
+    files: 'Dosyalar: %ids%'
+    reason:
+      unknown_skill: 'Bu bilgisayarda bu skill yok.'
+      unknown_type: 'Bu bilgisayar bu görevi çalıştıramadı.'
+      skill_disabled: 'Bu bilgisayar skill''i çalıştırmayı reddetti.'
+      timeout: 'Bu bilgisayar zamanında bitirmedi.'
+      local_error: 'Bu bilgisayar görevi bitiremedi.'

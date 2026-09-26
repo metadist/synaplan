@@ -696,12 +696,22 @@
       },
       "jobCard": {
         "waiting": "{name} bekleniyor",
+        "waitingSkill": "{name}, {skill} görevini başlatmak için bekleniyor",
+        "running": "{name}, {skill} görevini çalıştırıyor",
         "done": "{name} tamamlandı",
         "failed": "{name} tamamlayamadı",
+        "cancelled": "Bu görev iptal edildi",
         "noAnswer": "Bu bilgisayar yanıt vermedi.",
+        "queuedTooLong": "Bu bilgisayar göreve henüz başlamadı. Bilgisayar onu alıncaya kadar kuyrukta kalır.",
+        "stillRunning": "Bu bilgisayar göreve başladı ve henüz bitirmedi.",
         "unknownSkill": "Bu bilgisayarda bu skill yok.",
-        "skillDisabled": "Bu skill bu bilgisayarda kapalı.",
-        "localError": "Skill bu bilgisayarda başarısız oldu."
+        "skillDisabled": "Bu bilgisayar skill'i çalıştırmayı reddetti.",
+        "unknownType": "Bu bilgisayar bu görevi çalıştıramadı.",
+        "timedOut": "Bu bilgisayar görevi zamanında bitirmedi.",
+        "localError": "Bu bilgisayar görevi bitiremedi.",
+        "cancelledDetail": "Bu görev için başka bir şey çalışmayacak.",
+        "thisComputer": "Bilgisayarınız",
+        "meta": "{skill} · {time}"
       },
       "get": {
         "title": "Synaplan Desktop'u edin",

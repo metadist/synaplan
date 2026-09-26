@@ -295,8 +295,8 @@ const runOnDeviceSubtext = computed(() => {
 const handleRunOnDevice = () => {
   const device = activeDevices.value[0]
   if (!device) return
-  emit('runOnDevice', { id: device.id, name: device.name })
   closeDropdown()
+  emit('runOnDevice', { id: device.id, name: device.name })
 }
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])

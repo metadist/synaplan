@@ -1,0 +1,12 @@
+desktop:
+  job:
+    unnamed: 'Aufgabe'
+    finished: 'Die Aufgabe „%skill%“ wurde auf deinem Computer abgeschlossen.'
+    failed: 'Die Aufgabe „%skill%“ auf deinem Computer wurde nicht abgeschlossen. %reason%'
+    files: 'Dateien: %ids%'
+    reason:
+      unknown_skill: 'Dieser Computer hat diesen Skill nicht.'
+      unknown_type: 'Dieser Computer konnte diese Aufgabe nicht ausführen.'
+      skill_disabled: 'Dieser Computer hat den Skill abgelehnt.'
+      timeout: 'Dieser Computer hat nicht rechtzeitig fertiggestellt.'
+      local_error: 'Dieser Computer konnte die Aufgabe nicht abschließen.'

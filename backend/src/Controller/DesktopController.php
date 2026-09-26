@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\DesktopDeviceRepository;
 use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Desktop\DesktopJobChatTitle;
 use App\Service\Desktop\DesktopJobContract;
 use App\Service\Desktop\DesktopJobStore;
 use App\Service\Desktop\Exception\PairingException;
@@ -52,6 +53,7 @@ final class DesktopController extends AbstractController
         private readonly DesktopDeviceRepository $deviceRepository,
         private readonly ApiKeyRepository $apiKeyRepository,
         private readonly DesktopJobStore $jobStore,
+        private readonly DesktopJobChatTitle $chatTitle,
         private readonly RedisService $redis,
         private readonly LoggerInterface $logger,
     ) {
@@ -335,6 +337,7 @@ final class DesktopController extends AbstractController
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'jobId', type: 'integer', example: 1),
                         new OA\Property(property: 'status', type: 'string', example: 'queued'),
+                        new OA\Property(property: 'chatTitle', type: 'string', nullable: true, example: 'pptx: Make 3 slides about Q3', description: 'Set when the chat still had a placeholder title. Null when the chat already had a name, or when no chat was given.'),
                     ]
                 )
             ),
@@ -404,10 +407,13 @@ final class DesktopController extends AbstractController
             $idempotency,
         );
 
+        $chatTitle = $this->chatTitle->nameIfUntitled((int) $user->getId(), $chatId, $skill, $prompt);
+
         return $this->json([
             'success' => true,
             'jobId' => $job->getId(),
             'status' => $job->getStatus(),
+            'chatTitle' => $chatTitle,
         ], Response::HTTP_CREATED);
     }
 

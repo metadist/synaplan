@@ -7,9 +7,12 @@ namespace App\Service\Desktop;
 use App\Entity\Chat;
 use App\Entity\DesktopJob;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\ChatRepository;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Posts the "done" note back into the chat that queued a desktop job, so a
@@ -22,9 +25,13 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class DesktopJobResultNotifier
 {
+    private const DEVICE_TEXT_MAX = 400;
+
     public function __construct(
         private ChatRepository $chatRepository,
+        private UserRepository $userRepository,
         private EntityManagerInterface $em,
+        private TranslatorInterface $translator,
         private LoggerInterface $logger,
     ) {
     }
@@ -46,6 +53,7 @@ final readonly class DesktopJobResultNotifier
                 return;
             }
 
+            $locale = $this->localeFor($job->getOwnerId());
             $message = (new Message())
                 ->setUserId($job->getOwnerId())
                 ->setChat($chat)
@@ -56,8 +64,8 @@ final readonly class DesktopJobResultNotifier
                 ->setMessageType('API')
                 ->setFile(0)
                 ->setTopic('CHAT')
-                ->setLanguage('en')
-                ->setText($this->buildText($job))
+                ->setLanguage($locale)
+                ->setText($this->buildText($job, $locale))
                 ->setDirection('OUT')
                 ->setStatus('complete');
 
@@ -73,22 +81,35 @@ final readonly class DesktopJobResultNotifier
         }
     }
 
-    private function buildText(DesktopJob $job): string
+    private function localeFor(int $ownerId): string
     {
-        $skill = (string) ($job->getInput()['skill'] ?? 'skill');
+        $user = $this->userRepository->find($ownerId);
+
+        return $user instanceof User ? $user->getLocale() : 'en';
+    }
+
+    private function buildText(DesktopJob $job, string $locale): string
+    {
+        $skill = trim((string) ($job->getInput()['skill'] ?? ''));
+        if ('' === $skill) {
+            $skill = $this->translator->trans('desktop.job.unnamed', [], 'desktop', $locale);
+        }
 
         if (DesktopJob::STATUS_SUCCEEDED !== $job->getStatus()) {
-            $code = $job->getErrorCode() ?? DesktopJobContract::ERROR_LOCAL_ERROR;
-
-            return \sprintf('The "%s" task on your computer did not complete (%s).', $skill, $code);
+            return $this->translator->trans('desktop.job.failed', [
+                '%skill%' => $skill,
+                '%reason%' => $this->failureReason($job, $locale),
+            ], 'desktop', $locale);
         }
 
         $result = $job->getResult() ?? [];
-        $lines = [\sprintf('The "%s" task finished on your computer.', $skill)];
+        $lines = [
+            $this->translator->trans('desktop.job.finished', ['%skill%' => $skill], 'desktop', $locale),
+        ];
 
-        $summary = $result['summary'] ?? null;
-        if (\is_string($summary) && '' !== trim($summary)) {
-            $lines[] = trim($summary);
+        $summary = $this->deviceText($result['summary'] ?? null);
+        if (null !== $summary) {
+            $lines[] = $summary;
         }
 
         $fileIds = [];
@@ -100,9 +121,50 @@ final readonly class DesktopJobResultNotifier
             }
         }
         if ([] !== $fileIds) {
-            $lines[] = 'Files: '.implode(', ', array_map(static fn (int $id): string => '#'.$id, $fileIds));
+            $lines[] = $this->translator->trans('desktop.job.files', [
+                '%ids%' => implode(', ', array_map(static fn (int $id): string => '#'.$id, $fileIds)),
+            ], 'desktop', $locale);
         }
 
         return implode("\n", $lines);
+    }
+
+    private function failureReason(DesktopJob $job, string $locale): string
+    {
+        $result = $job->getResult() ?? [];
+        $message = $this->deviceText($result['message'] ?? null);
+        if (null === $message) {
+            $message = $this->deviceText($result['summary'] ?? null);
+        }
+        if (null !== $message) {
+            return $message;
+        }
+
+        $code = $job->getErrorCode() ?? DesktopJobContract::ERROR_LOCAL_ERROR;
+        $key = 'desktop.job.reason.'.$code;
+        $translated = $this->translator->trans($key, [], 'desktop', $locale);
+        if ($translated === $key) {
+            return $this->translator->trans('desktop.job.reason.local_error', [], 'desktop', $locale);
+        }
+
+        return $translated;
+    }
+
+    private function deviceText(mixed $value): ?string
+    {
+        if (!\is_string($value)) {
+            return null;
+        }
+
+        $withoutControls = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', ' ', $value) ?? $value;
+        $cleaned = trim((string) preg_replace('/\s+/u', ' ', strip_tags($withoutControls)));
+        if ('' === $cleaned) {
+            return null;
+        }
+        if (mb_strlen($cleaned) <= self::DEVICE_TEXT_MAX) {
+            return $cleaned;
+        }
+
+        return mb_substr($cleaned, 0, self::DEVICE_TEXT_MAX - 1).'…';
     }
 }
