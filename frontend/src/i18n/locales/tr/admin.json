@@ -858,7 +858,7 @@
       },
       "feature": {
         "SAVEDTASKS_ENABLED": "Kayıtlı görevler",
-        "DESKTOP_AGENT_ENABLED": "Masaüstü aracısı",
+        "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Belge araçları",
         "MULTITASK_ROUTING_ENABLED": "Çok adımlı yönlendirme",
         "MULTITASK_PARALLEL_ENABLED": "Paralel adımlar",

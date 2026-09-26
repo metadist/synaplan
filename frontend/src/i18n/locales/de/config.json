@@ -873,6 +873,13 @@
     "desktop": {
       "title": "Desktop",
       "description": "Synaplan Desktop ist eine separate App für diesen Computer. Sie nutzt dein Synaplan-Konto und kann Skills ausführen, die du installierst.",
+      "chatGate": {
+        "gatewayAdmin": "Die App kann erst chatten, wenn du das KI-Gateway unter Coding-Clients einschaltest und ein Anbieterschlüssel verfügbar ist. Verbinden funktioniert weiterhin.",
+        "gatewayUser": "Die App kann erst chatten, wenn ein Admin das KI-Gateway unter Coding-Clients einschaltet. Verbinden funktioniert weiterhin.",
+        "keyAdmin": "Das KI-Gateway ist an, aber kein Anbieterschlüssel bezahlt den App-Chat. Erlaube den Instanz-Schlüssel unter Coding-Clients oder speichere deinen eigenen.",
+        "keyUser": "Für den App-Chat gibt es noch keinen Anbieterschlüssel. Bitte einen Admin, den Instanz-Schlüssel zu erlauben, oder speichere deinen eigenen. Verbinden funktioniert weiterhin.",
+        "openCodingClients": "Coding-Clients öffnen"
+      },
       "pairButton": "Diesen Computer verbinden",
       "loadFailed": "Die verbundenen Computer konnten nicht geladen werden.",
       "disconnect": "Trennen",

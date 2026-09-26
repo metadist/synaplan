@@ -17,6 +17,7 @@ use App\Message\SummarizeApiSessionCommand;
 use App\Repository\ModelRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\PremiumFeatureGate;
@@ -137,6 +138,7 @@ final readonly class MessagesGateway
         private ?AgentConfig $agentConfig = null,
         private ?AgentRuntimeResolver $agentRuntimeResolver = null,
         private ?DesktopOmittedModel $desktopOmittedModel = null,
+        private ?DesktopAgentConfig $desktopAgentConfig = null,
     ) {
     }
 
@@ -145,6 +147,11 @@ final readonly class MessagesGateway
      */
     public function prepare(Request $request, User $user): array
     {
+        $desktopOff = $this->refuseDesktopWhenTurnedOff($request, $user);
+        if (null !== $desktopOff) {
+            return $desktopOff;
+        }
+
         if (!$this->config->isEnabled($user->getId())) {
             return $this->err(403, 'permission_error', 'Messages gateway is disabled on this Synaplan instance.');
         }
@@ -230,6 +237,17 @@ final readonly class MessagesGateway
         $allowOperator = $this->config->allowOperatorKey($user->getId());
         $credential = $this->resolveCredential($resolved['provider'], $user->getId(), $allowOperator);
         if (null === $credential) {
+            // A paired computer must not see HTTP 401: the desktop app treats
+            // every 401 as "this computer was disconnected" and may drop the
+            // key. The computer is still paired; chat has nothing to pay with.
+            if (ApiSessionClient::DESKTOP === ApiSessionClient::fromRequest($request)) {
+                return $this->err(
+                    403,
+                    'permission_error',
+                    'This computer is still paired, but app chat has no provider key. Ask an admin to allow the instance key under Coding clients, or save your own provider key. Nothing was sent.',
+                );
+            }
+
             return $this->err(
                 401,
                 'authentication_error',
@@ -735,6 +753,33 @@ final readonly class MessagesGateway
         }
 
         return false;
+    }
+
+    /**
+     * Paired-desktop chat is part of Synaplan Desktop. When that feature is
+     * off, refuse before the gateway check so the sentence does not look like
+     * a disabled gateway (the app would replace that with a shorter line that
+     * has no next step).
+     *
+     * @return GatewayError|null
+     */
+    private function refuseDesktopWhenTurnedOff(Request $request, User $user): ?array
+    {
+        if (null === $this->desktopAgentConfig) {
+            return null;
+        }
+        if (ApiSessionClient::DESKTOP !== ApiSessionClient::fromRequest($request)) {
+            return null;
+        }
+        if ($this->desktopAgentConfig->isEnabled($user->getId())) {
+            return null;
+        }
+
+        return $this->err(
+            403,
+            'permission_error',
+            'Synaplan Desktop is turned off on this instance. The app cannot chat, pair, or run tasks until an admin turns it on under Features.',
+        );
     }
 
     /**

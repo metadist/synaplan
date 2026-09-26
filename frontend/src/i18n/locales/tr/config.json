@@ -651,6 +651,13 @@
     "desktop": {
       "title": "Masaüstü",
       "description": "Synaplan Desktop, bu bilgisayar için ayrı bir uygulamadır. Synaplan hesabınızı kullanır ve yüklediğiniz skill'leri çalıştırabilir.",
+      "chatGate": {
+        "gatewayAdmin": "Kodlama istemcileri altında AI ağ geçidini açana ve bir sağlayıcı anahtarı kullanılabilir olana kadar uygulama sohbet edemez. Bağlama çalışmaya devam eder.",
+        "gatewayUser": "Bir yönetici Kodlama istemcileri altında AI ağ geçidini açana kadar uygulama sohbet edemez. Bağlama çalışmaya devam eder.",
+        "keyAdmin": "AI ağ geçidi açık, ancak uygulama sohbetini ödeyecek bir sağlayıcı anahtarı yok. Kodlama istemcileri altında örnek anahtarına izin verin veya kendi anahtarınızı kaydedin.",
+        "keyUser": "Uygulama sohbetinin henüz bir sağlayıcı anahtarı yok. Bir yöneticiden örnek anahtarına izin vermesini isteyin veya kendi anahtarınızı kaydedin. Bağlama çalışmaya devam eder.",
+        "openCodingClients": "Kodlama istemcilerini aç"
+      },
       "pairButton": "Bu bilgisayarı bağla",
       "loadFailed": "Bağlı bilgisayarlar yüklenemedi.",
       "disconnect": "Bağlantıyı kes",

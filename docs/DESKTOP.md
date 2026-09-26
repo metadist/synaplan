@@ -46,7 +46,7 @@ environment pin → per-user → global → code fallback **false**:
 
 | State | Effect |
 | ----- | ------ |
-| Off | Every `/api/v1/desktop/*` route answers **404**, the two MCP tools are **absent** from `tools/list`, the reaper command is a no-op, and no Desktop UI appears. The feature is completely invisible. |
+| Off | Every `/api/v1/desktop/*` route answers **404**, the two MCP tools are **absent** from `tools/list`, the reaper command is a no-op, and no Desktop UI appears. App chat with a paired desktop key is refused: the response says Synaplan Desktop is turned off on this instance. |
 | On (global, default) | The routes and MCP tools appear for every user. |
 | On (per-user, `BOWNERID = <id>`) | Only that user sees the feature; a per-user value beats the global one. |
 
@@ -65,6 +65,32 @@ ON DUPLICATE KEY UPDATE BVALUE = '0';
 
 The runtime-config endpoint exposes the resolved boolean as
 `features.desktopAgentEnabled` so the frontend can hide the UI when it is off.
+
+## App chat
+
+A paired computer chats through the Messages gateway (`POST /v1/messages`)
+using the `desktop:messages` scope. Pairing does not turn that chat on.
+Two switches stay at their existing defaults (both off until an admin changes
+them under **Coding clients**):
+
+1. **Messages gateway enabled.** While this is off and Synaplan Desktop is on,
+   the computer is told the gateway is turned off.
+2. **A provider key for the default chat model.** Either the instance key is
+   allowed as a fallback, or the user has saved their own key for that
+   model's provider. A local model (Ollama, or a custom endpoint) does not
+   need one. Groq, Mistral, and the other catalog providers count when their
+   own key is available. Without a key the model needs, the computer stays
+   paired and the response says nothing was sent (HTTP 403). A missing key
+   is not HTTP 401, so the app does not treat it as a disconnected computer.
+
+When Synaplan Desktop itself is turned off, that sentence wins even if the
+gateway is also off. Claude Code and other full API keys keep the existing
+HTTP 401 when they have no provider key.
+
+The Desktop page states which of these is missing. An admin gets a link to
+Coding clients. Everyone else is told to ask an admin. This app does not
+turn the gateway or the instance key on by itself: the instance key spends
+the install's provider budget.
 
 ## API keys and scopes
 
