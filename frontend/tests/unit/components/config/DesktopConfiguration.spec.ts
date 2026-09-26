@@ -258,4 +258,43 @@ describe('DesktopConfiguration', () => {
       vi.useRealTimers()
     }
   })
+
+  it('does not create a pairing code after the dialog is closed during refresh', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = mount(DesktopConfiguration, {
+        global: {
+          stubs: {
+            Icon: true,
+            Transition: false,
+            Teleport: { template: '<div><slot /></div>' },
+          },
+        },
+      })
+      await flushPromises()
+
+      let releaseReload: () => void = () => {}
+      mockReload.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseReload = resolve
+          })
+      )
+      const opening = wrapper.get('[data-testid="btn-pair"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="modal-pairing"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="btn-pairing-close"]').trigger('click')
+      releaseReload()
+      await opening
+      await flushPromises()
+      await vi.advanceTimersByTimeAsync(9000)
+
+      expect(createPairingCode).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="modal-pairing"]').exists()).toBe(false)
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

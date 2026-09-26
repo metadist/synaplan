@@ -194,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { WrenchScrewdriverIcon, ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -287,11 +287,30 @@ const { activeDevices, hasActiveDevices, ensureLoaded } = useDesktopDevices()
 // feature flag AND at least one active device (revoking the last one hides it).
 const showRunOnDevice = computed(() => isDesktopAgentEnabled() && hasActiveDevices.value)
 
+// Date.now() inside a computed is cached until a dependency changes. A clock
+// the menu owns keeps "connected" from sticking after the check-in window.
+const nowSec = ref(Math.floor(Date.now() / 1000))
+let presenceTicker: number | null = null
+
+const startPresenceClock = () => {
+  nowSec.value = Math.floor(Date.now() / 1000)
+  if (presenceTicker !== null) return
+  presenceTicker = window.setInterval(() => {
+    nowSec.value = Math.floor(Date.now() / 1000)
+  }, 1000)
+}
+
+const stopPresenceClock = () => {
+  if (presenceTicker === null) return
+  window.clearInterval(presenceTicker)
+  presenceTicker = null
+}
+
 const runOnDeviceSubtext = computed(() => {
   const list = activeDevices.value
   if (list.length !== 1) return t('config.desktop.run.multiple', { count: list.length })
   const device = list[0]
-  const presence = desktopPresence(device.status, device.lastSeen, Math.floor(Date.now() / 1000))
+  const presence = desktopPresence(device.status, device.lastSeen, nowSec.value)
   if (presence === 'online') return t('config.desktop.run.online', { name: device.name })
   if (presence === 'never') return t('config.desktop.run.never', { name: device.name })
   return t('config.desktop.run.away', { name: device.name, minutes: DESKTOP_CHECK_IN_MINUTES })
@@ -304,6 +323,10 @@ const handleRunOnDevice = () => {
   emit('runOnDevice', { id: device.id, name: device.name })
 }
 const isOpen = ref(false)
+watch(isOpen, (open) => {
+  if (open) startPresenceClock()
+  else stopPresenceClock()
+})
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
 const featuresStatus = ref<Record<string, Feature>>({})
@@ -440,6 +463,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
   mobileMq.removeEventListener('change', onMobileMqChange)
+  stopPresenceClock()
 })
 </script>
 

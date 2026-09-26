@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import ToolsDropdown from '@/components/ToolsDropdown.vue'
@@ -7,6 +8,10 @@ import ToolsDropdown from '@/components/ToolsDropdown.vue'
 const { features } = vi.hoisted(() => ({
   features: { selfAware: false, help: false, memoryService: false },
 }))
+
+const desktopEnabled = { value: false }
+const activeDevices = ref<Array<{ id: number; name: string; status: string; lastSeen: number }>>([])
+const hasActiveDevices = ref(false)
 
 vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({ features }),
@@ -18,13 +23,13 @@ vi.mock('@/services/api/nativeHaptics', () => ({
 }))
 
 vi.mock('@/composables/useDesktopAgentFeature', () => ({
-  isDesktopAgentEnabled: () => false,
+  isDesktopAgentEnabled: () => desktopEnabled.value,
 }))
 
 vi.mock('@/composables/useDesktopDevices', () => ({
   useDesktopDevices: () => ({
-    activeDevices: { value: [] },
-    hasActiveDevices: { value: false },
+    activeDevices,
+    hasActiveDevices,
     ensureLoaded: vi.fn(),
   }),
 }))
@@ -67,6 +72,9 @@ describe('ToolsDropdown summarize', () => {
   beforeEach(() => {
     stubMatchMedia()
     features.selfAware = false
+    desktopEnabled.value = false
+    activeDevices.value = []
+    hasActiveDevices.value = false
   })
 
   it('lists Summarize a document and emits summarizeDocument', async () => {
@@ -85,6 +93,9 @@ describe('ToolsDropdown /help', () => {
   beforeEach(() => {
     stubMatchMedia()
     features.selfAware = false
+    desktopEnabled.value = false
+    activeDevices.value = []
+    hasActiveDevices.value = false
   })
 
   it('hides /help when features.selfAware is off', async () => {
@@ -104,5 +115,34 @@ describe('ToolsDropdown /help', () => {
     const help = wrapper.get('[data-testid="btn-tool-help"]')
     expect(help.text()).toContain('Help')
     expect(help.text()).toContain('Ask what this AI assistant can do here')
+  })
+})
+
+describe('ToolsDropdown run on this computer', () => {
+  beforeEach(() => {
+    stubMatchMedia()
+    desktopEnabled.value = true
+    hasActiveDevices.value = true
+  })
+
+  it('stops saying the computer is connected after the check-in window', async () => {
+    vi.useFakeTimers()
+    try {
+      const now = Math.floor(Date.now() / 1000)
+      activeDevices.value = [{ id: 1, name: 'tower', status: 'active', lastSeen: now - 100 }]
+      const wrapper = await mountDropdown()
+      await wrapper.get('[data-testid="btn-tools-toggle"]').trigger('click')
+      await flushPromises()
+
+      const row = wrapper.get('[data-testid="btn-tool-run-on-device"]')
+      expect(row.text()).toContain('tower is connected')
+
+      await vi.advanceTimersByTimeAsync(90_000)
+      await flushPromises()
+      expect(row.text()).toContain('tower is not connected')
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

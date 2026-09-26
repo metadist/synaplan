@@ -566,6 +566,7 @@ const pollForPairedDevice = async () => {
 }
 
 const openPairing = async () => {
+  const watch = pairWatch
   showPairing.value = true
   copiedField.value = null
   try {
@@ -573,6 +574,9 @@ const openPairing = async () => {
   } catch {
     // A failed refresh must not block the code. The next poll tries again.
   }
+  // Close during the refresh bumps pairWatch and hides the dialog. Do not
+  // mint a code or leave a poll running after that.
+  if (watch !== pairWatch || !showPairing.value) return
   activeIdsAtOpen.value = new Set(
     devices.value.filter((device) => device.status === 'active').map((device) => device.id)
   )
