@@ -67,13 +67,13 @@ final class PlatformLinkControllerTest extends WebTestCase
             'host' => 'https://example.com',
             'redirect_uris' => ['https://example.com/cb'],
         ]);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('GET', '/api/v1/platform-links/instances/self');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('GET', '/api/v1/platform-links/instances/pi_aabbccddeeff/public');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->postJson('/api/v1/platform-links/codes', [
             'instance_id' => 'pi_aabbccddeeff',
@@ -81,7 +81,7 @@ final class PlatformLinkControllerTest extends WebTestCase
             'redirect_uri' => 'https://example.com/cb',
             'state' => 's',
         ]);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->getCookieJar()->clear();
         $this->postJson('/api/v1/platform-links/exchange', [
@@ -89,17 +89,17 @@ final class PlatformLinkControllerTest extends WebTestCase
             'instance_secret' => 'x',
             'code' => str_repeat('ab', 16),
         ]);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->authenticateClient($this->client, $user);
         $this->client->request('GET', '/api/v1/me/platform-links');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('DELETE', '/api/v1/me/platform-links/1');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('GET', '/api/v1/admin/platform-links/instances');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testAdminRegisterIsActiveAndAnonymousIsPending(): void
@@ -109,30 +109,30 @@ final class PlatformLinkControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $admin);
 
         $this->postJson('/api/v1/platform-links/instances', $this->registerBody('example.com'));
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $adminBody = $this->json();
         self::assertSame('active', $adminBody['status']);
         self::assertStringStartsWith('pi_', $adminBody['instance_id']);
 
         $this->client->request('GET', '/api/v1/platform-links/instances/'.$adminBody['instance_id'].'/public');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertSame('example.com', $this->json()['host']);
 
         $this->client->getCookieJar()->clear();
         $this->postJson('/api/v1/platform-links/instances', $this->registerBody('example.org'));
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $anon = $this->json();
         self::assertSame('pending', $anon['status']);
 
         $this->client->request('GET', '/api/v1/platform-links/instances/'.$anon['instance_id'].'/public');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->authenticateClient($this->client, $admin);
         $this->client->request('POST', '/api/v1/admin/platform-links/instances/'.$anon['instance_id'].'/approve');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         $this->client->request('GET', '/api/v1/platform-links/instances/'.$anon['instance_id'].'/public');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
     }
 
     public function testExchangeHappyPathReplayForeignPendingAndWrongSecret(): void
@@ -164,7 +164,7 @@ final class PlatformLinkControllerTest extends WebTestCase
             'redirect_uri' => 'https://example.com/apps/synaplan_integration/link/callback',
             'state' => 'nonce-1',
         ]);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $redirect = $this->json()['redirect'];
         self::assertStringContainsString('code=', $redirect);
         self::assertStringContainsString('state=nonce-1', $redirect);
@@ -176,7 +176,7 @@ final class PlatformLinkControllerTest extends WebTestCase
             'instance_secret' => $instanceA['instance_secret'],
             'code' => $code,
         ]);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $exchanged = $this->json();
         self::assertStringStartsWith('sk_', $exchanged['api_key']['key']);
         self::assertSame(ApiKeyScope::platformLinkScopes(), $exchanged['api_key']['scopes']);
@@ -194,7 +194,7 @@ final class PlatformLinkControllerTest extends WebTestCase
             'instance_secret' => $instanceA['instance_secret'],
             'code' => $code,
         ]);
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         $replayMessage = $this->json()['error'];
 
         $this->authenticateClient($this->client, $user);
@@ -211,7 +211,7 @@ final class PlatformLinkControllerTest extends WebTestCase
             'instance_secret' => $instanceB['instance_secret'],
             'code' => $foreignCode,
         ]);
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         self::assertSame($replayMessage, $this->json()['error']);
 
         $this->authenticateClient($this->client, $user);
@@ -221,7 +221,7 @@ final class PlatformLinkControllerTest extends WebTestCase
             'redirect_uri' => 'https://example.net/apps/synaplan_integration/link/callback',
             'state' => 'nonce-3',
         ]);
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
 
         $this->client->getCookieJar()->clear();
         $this->postJson('/api/v1/platform-links/exchange', [
@@ -229,24 +229,24 @@ final class PlatformLinkControllerTest extends WebTestCase
             'instance_secret' => $pending['instance_secret'],
             'code' => str_repeat('cd', 16),
         ]);
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
 
         $this->postJson('/api/v1/platform-links/exchange', [
             'instance_id' => $instanceA['instance_id'],
             'instance_secret' => 'wrong-secret',
             'code' => str_repeat('ef', 16),
         ]);
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
 
         $key = $exchanged['api_key']['key'];
         $this->client->request('GET', '/api/v1/auth/me', server: ['HTTP_X_API_KEY' => $key]);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $this->client->request('GET', '/api/v1/admin/users', server: ['HTTP_X_API_KEY' => $key]);
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
 
         $this->authenticateClient($this->client, $user);
         $this->client->request('GET', '/api/v1/me/platform-links');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $links = $this->json()['links'];
         self::assertCount(1, $links);
 
@@ -262,11 +262,11 @@ final class PlatformLinkControllerTest extends WebTestCase
         self::assertSame('nextcloud', $linked['linked_platform']['client']);
 
         $this->client->request('DELETE', '/api/v1/me/platform-links/'.$links[0]['id']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         $this->client->getCookieJar()->clear();
         $this->client->request('GET', '/api/v1/auth/me', server: ['HTTP_X_API_KEY' => $key]);
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
         self::assertNull($this->em->getRepository(ApiKey::class)->find($exchanged['api_key']['id']));
     }
 
@@ -307,11 +307,11 @@ final class PlatformLinkControllerTest extends WebTestCase
         // The previous owner cannot disconnect the link they lost.
         $this->authenticateClient($this->client, $first);
         $this->client->request('DELETE', '/api/v1/me/platform-links/'.$links[0]['id']);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->getCookieJar()->clear();
         $this->client->request('GET', '/api/v1/auth/me', server: ['HTTP_X_API_KEY' => $secondLink['api_key']['key']]);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
     }
 
     /**
@@ -330,7 +330,7 @@ final class PlatformLinkControllerTest extends WebTestCase
             'redirect_uri' => 'https://move.example/apps/synaplan_integration/link/callback',
             'state' => $state,
         ]);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $code = $this->codeFromRedirect($this->json()['redirect']);
 
         $this->client->getCookieJar()->clear();
@@ -339,7 +339,7 @@ final class PlatformLinkControllerTest extends WebTestCase
             'instance_secret' => $instance['instance_secret'],
             'code' => $code,
         ]);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         return $this->json();
     }

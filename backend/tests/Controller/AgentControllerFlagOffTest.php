@@ -35,7 +35,7 @@ final class AgentControllerFlagOffTest extends WebTestCase
         $user = $this->createUser('agent-off-list@synaplan.internal');
         $this->authenticateClient($this->client, $user);
         $this->client->request('GET', '/api/v1/agents');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testCreateIs404WhenFlagOff(): void
@@ -48,7 +48,7 @@ final class AgentControllerFlagOffTest extends WebTestCase
             server: ['CONTENT_TYPE' => 'application/json'],
             content: json_encode(['name' => 'Should not exist']),
         );
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testGetPatchDeleteAre404WhenFlagOff(): void
@@ -57,7 +57,7 @@ final class AgentControllerFlagOffTest extends WebTestCase
         $this->authenticateClient($this->client, $user);
 
         $this->client->request('GET', '/api/v1/agents/1');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request(
             'PATCH',
@@ -65,16 +65,16 @@ final class AgentControllerFlagOffTest extends WebTestCase
             server: ['CONTENT_TYPE' => 'application/json'],
             content: json_encode(['name' => 'Nope']),
         );
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('DELETE', '/api/v1/agents/1');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('GET', '/api/v1/agents/gallery');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('POST', '/api/v1/agents/1/clone');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request(
             'POST',
@@ -82,19 +82,19 @@ final class AgentControllerFlagOffTest extends WebTestCase
             server: ['CONTENT_TYPE' => 'application/json'],
             content: json_encode(['changelog' => 'nope']),
         );
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('GET', '/api/v1/agents/1/versions');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->client->request('GET', '/api/v1/agents/1/usage');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testUnauthenticatedIs401Not404(): void
     {
         $this->client->request('GET', '/api/v1/agents');
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
     private function createUser(string $email): User
