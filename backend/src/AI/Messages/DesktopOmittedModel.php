@@ -36,7 +36,7 @@ final readonly class DesktopOmittedModel
         return $key instanceof ApiKey && ApiKeyScope::isPairedDesktop($key->getScopes());
     }
 
-    public function providerIdFor(User $user): ?string
+    public function selectedModel(User $user): ?Model
     {
         $modelId = $this->modelConfig->getDefaultModel('CHAT', $user->getId());
         if (null === $modelId) {
@@ -48,13 +48,6 @@ final readonly class DesktopOmittedModel
             return null;
         }
 
-        $providerId = $model->getProviderId();
-        if ('' !== $providerId) {
-            return $providerId;
-        }
-
-        $name = $model->getName();
-
-        return '' !== $name ? $name : null;
+        return $model;
     }
 }

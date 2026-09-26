@@ -145,7 +145,12 @@ final class ApiKeyScope
      */
     public static function isPairedDesktop(array $scopes): bool
     {
-        foreach (self::normalize($scopes) as $scope) {
+        $normalized = self::normalize($scopes);
+        if (\in_array(self::WILDCARD, $normalized, true)) {
+            return false;
+        }
+
+        foreach ($normalized as $scope) {
             if (self::DESKTOP_ALL === $scope || str_starts_with($scope, 'desktop:')) {
                 return true;
             }

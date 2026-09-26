@@ -131,6 +131,18 @@ final class MessagesModelResolverTest extends TestCase
         $this->assertSame($key, $resolved['requested']);
     }
 
+    public function testResolveSelectedKeepsTheChosenRow(): void
+    {
+        $model = $this->makeModel(42, 'OpenAI', 'gpt-5.4', 'GPT-5.4 chat');
+        $this->modelRepository->expects($this->never())->method('createQueryBuilder');
+
+        $resolved = $this->resolver->resolveSelected($model);
+
+        $this->assertSame(42, $resolved['model_id']);
+        $this->assertSame('openai', $resolved['provider']);
+        $this->assertSame('gpt-5.4', $resolved['providerModelId']);
+    }
+
     public function testResolveFailsClosedWhenUnknown(): void
     {
         $this->expectLookupSequence([null, null, null, null]);

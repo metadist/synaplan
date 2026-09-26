@@ -175,12 +175,17 @@ final readonly class MessagesGateway
         $budget = $this->rateLimitService->checkCostBudget($user);
 
         $modelString = isset($decoded['model']) && \is_string($decoded['model']) ? $decoded['model'] : null;
-        $filledOmittedModel = false;
+        $selected = null;
         if (null !== $this->desktopOmittedModel && $this->desktopOmittedModel->applies($request, $modelString)) {
-            $modelString = $this->desktopOmittedModel->providerIdFor($user);
-            $filledOmittedModel = null !== $modelString && '' !== $modelString;
+            $selected = $this->desktopOmittedModel->selectedModel($user);
         }
-        $resolved = $this->modelResolver->resolve($modelString);
+        if ($selected instanceof Model) {
+            $resolved = $this->modelResolver->resolveSelected($selected);
+            $filledOmittedModel = true;
+        } else {
+            $resolved = $this->modelResolver->resolve($modelString);
+            $filledOmittedModel = false;
+        }
         if (null === $resolved) {
             $suggestions = $this->modelResolver->listResolvableAnthropicModelIds();
             $hint = [] === $suggestions
