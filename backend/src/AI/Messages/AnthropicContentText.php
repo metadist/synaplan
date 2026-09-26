@@ -14,6 +14,27 @@ namespace App\AI\Messages;
 final class AnthropicContentText
 {
     /**
+     * Newest user turn that still contains text a person typed.
+     * A trailing tool-only turn must not hide the request before it.
+     *
+     * @param array<int|string, mixed> $messages
+     */
+    public static function lastHumanRequest(array $messages): string
+    {
+        foreach (array_reverse($messages) as $message) {
+            if (!\is_array($message) || 'user' !== ($message['role'] ?? '')) {
+                continue;
+            }
+            $text = trim(self::humanText($message['content'] ?? ''));
+            if ('' !== $text) {
+                return $text;
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * Text a person would recognize. Tool blocks are dropped. An empty
      * string means the turn was only tool JSON.
      *

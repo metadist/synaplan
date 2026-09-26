@@ -33,6 +33,16 @@ final class ApiSessionClientTest extends TestCase
         self::assertSame(ApiSessionClient::CLAUDE_CODE, ApiSessionClient::fromRequest($request));
     }
 
+    public function testWildcardKeyWithDesktopUserAgentStaysClaudeCode(): void
+    {
+        $request = Request::create('/v1/messages', 'POST');
+        $key = (new ApiKey())->setScopes(['desktop:messages', '*']);
+        $request->attributes->set('api_key', $key);
+        $request->headers->set('User-Agent', 'synaplan-desktop/0.4.0');
+
+        self::assertSame(ApiSessionClient::CLAUDE_CODE, ApiSessionClient::fromRequest($request));
+    }
+
     public function testDesktopUserAgentIsRecognizedWithoutAPairedKey(): void
     {
         $request = Request::create('/v1/messages', 'POST');

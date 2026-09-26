@@ -880,16 +880,7 @@ final readonly class MessagesGateway
             return '';
         }
 
-        foreach (array_reverse($messages) as $msg) {
-            if (!\is_array($msg) || 'user' !== ($msg['role'] ?? '')) {
-                continue;
-            }
-            $content = $msg['content'] ?? '';
-
-            return AnthropicContentText::humanText($content);
-        }
-
-        return '';
+        return AnthropicContentText::lastHumanRequest($messages);
     }
 
     /**

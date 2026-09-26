@@ -24,8 +24,16 @@ final class ApiSessionClient
     public static function fromRequest(Request $request): string
     {
         $key = $request->attributes->get('api_key');
-        if ($key instanceof ApiKey && ApiKeyScope::isPairedDesktop($key->getScopes())) {
-            return self::DESKTOP;
+        if ($key instanceof ApiKey) {
+            // A full key is Claude Code (or another general client) even when
+            // the process names itself synaplan-desktop. Only a paired desktop
+            // key, or a request with no key, may use that user agent.
+            if (self::includesWildcard($key->getScopes())) {
+                return self::CLAUDE_CODE;
+            }
+            if (ApiKeyScope::isPairedDesktop($key->getScopes())) {
+                return self::DESKTOP;
+            }
         }
 
         $agent = strtolower((string) $request->headers->get('User-Agent', ''));
@@ -34,6 +42,20 @@ final class ApiSessionClient
         }
 
         return self::CLAUDE_CODE;
+    }
+
+    /**
+     * @param array<int|string, mixed> $scopes
+     */
+    private static function includesWildcard(array $scopes): bool
+    {
+        foreach ($scopes as $scope) {
+            if (\is_string($scope) && ApiKeyScope::WILDCARD === trim($scope)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function label(string $client): string

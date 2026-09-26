@@ -31,6 +31,19 @@ final class AnthropicContentTextTest extends TestCase
         self::assertSame('Make 3 slides about Q3', AnthropicContentText::humanText($payload));
     }
 
+    public function testToolOnlyTurnFallsBackToTheEarlierRequest(): void
+    {
+        $messages = [
+            ['role' => 'user', 'content' => 'Make 3 slides about Q3'],
+            ['role' => 'assistant', 'content' => 'Working on it.'],
+            ['role' => 'user', 'content' => [
+                ['type' => 'tool_result', 'tool_use_id' => 'toolu_1', 'content' => '# SKILL.md'],
+            ]],
+        ];
+
+        self::assertSame('Make 3 slides about Q3', AnthropicContentText::lastHumanRequest($messages));
+    }
+
     public function testOrdinaryProseAndUserJsonStayIntact(): void
     {
         self::assertSame('Hello there', AnthropicContentText::humanText('Hello there'));
