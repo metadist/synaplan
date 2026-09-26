@@ -79,13 +79,11 @@ class DesktopJobRepository extends ServiceEntityRepository
     }
 
     /**
-     * Leased jobs whose lease has expired — the reaper requeues or fails these.
-     *
-     * @return list<DesktopJob>
-     */
-    /**
      * Queued jobs that have waited past the queued TTL. `updated` is refreshed
      * when a lease is returned to the queue, so a retry gets a fresh window.
+     *
+     * MUST be called inside a transaction. The row lock stops a check-in from
+     * leasing the same job before the reaper commits.
      *
      * @return list<DesktopJob>
      */
@@ -99,9 +97,17 @@ class DesktopJobRepository extends ServiceEntityRepository
             ->orderBy('j.created', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->getResult();
     }
 
+    /**
+     * Leased jobs whose lease has expired — the reaper requeues or fails these.
+     *
+     * MUST be called inside a transaction so the row lock is held until commit.
+     *
+     * @return list<DesktopJob>
+     */
     public function findExpiredLeases(int $now, int $limit = 100): array
     {
         return $this->createQueryBuilder('j')
@@ -112,6 +118,7 @@ class DesktopJobRepository extends ServiceEntityRepository
             ->orderBy('j.leaseExpires', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->getResult();
     }
 

@@ -172,40 +172,63 @@ final class DesktopJobStore
      */
     public function requeueExpiredLeases(int $limit = 100): array
     {
-        $now = time();
-        $requeued = 0;
-        $failed = 0;
-        /** @var list<DesktopJob> $failedJobs */
-        $failedJobs = [];
+        /** @var array{requeued: int, failed: int, failedJobs: list<DesktopJob>} $result */
+        $result = $this->em->wrapInTransaction(function () use ($limit): array {
+            $now = time();
+            $requeued = 0;
+            $failed = 0;
+            /** @var list<DesktopJob> $failedJobs */
+            $failedJobs = [];
 
-        foreach ($this->jobRepository->findExpiredLeases($now, $limit) as $job) {
-            if ($job->getAttempt() < $job->getMaxAttempts()) {
-                $job->setStatus(DesktopJob::STATUS_QUEUED)
-                    ->setLeaseToken(null)
-                    ->setLeaseExpires(0)
-                    ->touch();
-                ++$requeued;
-            } else {
+            foreach ($this->jobRepository->findExpiredLeases($now, $limit) as $job) {
+                if (DesktopJob::STATUS_LEASED !== $job->getStatus() || $job->getLeaseExpires() >= $now) {
+                    continue;
+                }
+                if ($job->getAttempt() < $job->getMaxAttempts()) {
+                    $job->setStatus(DesktopJob::STATUS_QUEUED)
+                        ->setLeaseToken(null)
+                        ->setLeaseExpires(0)
+                        ->touch();
+                    ++$requeued;
+                } else {
+                    $this->failTimedOut($job);
+                    $failedJobs[] = $job;
+                    ++$failed;
+                }
+
+                $this->em->persist($job);
+            }
+
+            $cutoff = $now - self::QUEUED_TTL_SECONDS;
+            foreach ($this->jobRepository->findStaleQueued($cutoff, $limit) as $job) {
+                if (!$this->isStillStaleQueued($job, $cutoff)) {
+                    continue;
+                }
                 $this->failTimedOut($job);
                 $failedJobs[] = $job;
                 ++$failed;
+                $this->em->persist($job);
             }
 
-            $this->em->persist($job);
+            if ($requeued > 0 || $failed > 0) {
+                $this->em->flush();
+            }
+
+            return ['requeued' => $requeued, 'failed' => $failed, 'failedJobs' => $failedJobs];
+        });
+
+        return $result;
+    }
+
+    private function isStillStaleQueued(DesktopJob $job, int $cutoff): bool
+    {
+        if (DesktopJob::STATUS_QUEUED !== $job->getStatus()) {
+            return false;
         }
 
-        foreach ($this->jobRepository->findStaleQueued($now - self::QUEUED_TTL_SECONDS, $limit) as $job) {
-            $this->failTimedOut($job);
-            $failedJobs[] = $job;
-            ++$failed;
-            $this->em->persist($job);
-        }
+        $updated = $job->getUpdated();
 
-        if ($requeued > 0 || $failed > 0) {
-            $this->em->flush();
-        }
-
-        return ['requeued' => $requeued, 'failed' => $failed, 'failedJobs' => $failedJobs];
+        return $updated > 0 ? $updated < $cutoff : $job->getCreated() < $cutoff;
     }
 
     private function failTimedOut(DesktopJob $job): void
