@@ -372,6 +372,10 @@ run_scheduler_role() {
             runtime_log "Saved Tasks tick failed; it will be retried on the next tick." >&2
         fi
 
+        if ! run_scheduler_command bin/console --env="$env" app:desktop:reap-jobs --no-interaction; then
+            runtime_log "Desktop job reaper failed; it will be retried on the next tick." >&2
+        fi
+
         if [ "$now" -ge "$next_hourly" ]; then
             if ! run_scheduler_command bin/console --env="$env" app:files:reap-ephemeral --no-interaction; then
                 runtime_log "Ephemeral-file reaper failed; it will be retried next hour." >&2

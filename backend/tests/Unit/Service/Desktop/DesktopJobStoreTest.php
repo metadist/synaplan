@@ -174,7 +174,7 @@ final class DesktopJobStoreTest extends TestCase
 
         $result = $this->store->requeueExpiredLeases();
 
-        self::assertSame(['requeued' => 1, 'failed' => 0], $result);
+        self::assertSame(['requeued' => 1, 'failed' => 0, 'failedJobs' => []], $result);
         self::assertSame(DesktopJob::STATUS_QUEUED, $job->getStatus());
         self::assertNull($job->getLeaseToken());
         self::assertSame(0, $job->getLeaseExpires());
@@ -188,7 +188,7 @@ final class DesktopJobStoreTest extends TestCase
 
         $result = $this->store->requeueExpiredLeases();
 
-        self::assertSame(['requeued' => 0, 'failed' => 1], $result);
+        self::assertSame(['requeued' => 0, 'failed' => 1, 'failedJobs' => [$job]], $result);
         self::assertSame(DesktopJob::STATUS_FAILED, $job->getStatus());
         self::assertSame('timeout', $job->getErrorCode());
     }
@@ -198,7 +198,24 @@ final class DesktopJobStoreTest extends TestCase
         $this->jobRepository->method('findExpiredLeases')->willReturn([]);
         $this->em->expects(self::never())->method('flush');
 
-        self::assertSame(['requeued' => 0, 'failed' => 0], $this->store->requeueExpiredLeases());
+        self::assertSame(['requeued' => 0, 'failed' => 0, 'failedJobs' => []], $this->store->requeueExpiredLeases());
+    }
+
+    public function testRequeueExpiredLeasesFailsAQueuedJobThatWaitedTooLong(): void
+    {
+        $job = (new DesktopJob())->setOwnerId(1)->setStatus(DesktopJob::STATUS_QUEUED);
+        $this->jobRepository->method('findExpiredLeases')->willReturn([]);
+        $this->jobRepository->expects(self::once())
+            ->method('findStaleQueued')
+            ->with(self::callback(static fn (int $cutoff): bool => $cutoff <= time() - DesktopJobStore::QUEUED_TTL_SECONDS))
+            ->willReturn([$job]);
+
+        $result = $this->store->requeueExpiredLeases();
+
+        self::assertSame(1, $result['failed']);
+        self::assertSame([$job], $result['failedJobs']);
+        self::assertSame(DesktopJob::STATUS_FAILED, $job->getStatus());
+        self::assertSame('timeout', $job->getErrorCode());
     }
 
     private static function device(int $id, int $ownerId): DesktopDevice

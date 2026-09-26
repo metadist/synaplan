@@ -24,6 +24,13 @@ final class DesktopJobStore
     /** How long a leased job is reserved before the reaper may requeue it. */
     public const LEASE_TTL_SECONDS = 300;
 
+    /**
+     * How long a job may sit `queued` (never leased, or returned to the queue)
+     * before the reaper fails it. A closed app can still pick the job up the
+     * same day; it does not wait forever.
+     */
+    public const QUEUED_TTL_SECONDS = 86400;
+
     /** Cap on the stored result JSON — untrusted input re-entering the account. */
     public const RESULT_MAX_BYTES = 65536;
 
@@ -161,13 +168,15 @@ final class DesktopJobStore
     /**
      * Requeue (or fail) jobs whose lease expired. Called by the reaper.
      *
-     * @return array{requeued: int, failed: int}
+     * @return array{requeued: int, failed: int, failedJobs: list<DesktopJob>}
      */
     public function requeueExpiredLeases(int $limit = 100): array
     {
         $now = time();
         $requeued = 0;
         $failed = 0;
+        /** @var list<DesktopJob> $failedJobs */
+        $failedJobs = [];
 
         foreach ($this->jobRepository->findExpiredLeases($now, $limit) as $job) {
             if ($job->getAttempt() < $job->getMaxAttempts()) {
@@ -177,13 +186,18 @@ final class DesktopJobStore
                     ->touch();
                 ++$requeued;
             } else {
-                $job->setStatus(DesktopJob::STATUS_FAILED)
-                    ->setLeaseToken(null)
-                    ->setErrorCode(DesktopJobContract::ERROR_TIMEOUT)
-                    ->touch();
+                $this->failTimedOut($job);
+                $failedJobs[] = $job;
                 ++$failed;
             }
 
+            $this->em->persist($job);
+        }
+
+        foreach ($this->jobRepository->findStaleQueued($now - self::QUEUED_TTL_SECONDS, $limit) as $job) {
+            $this->failTimedOut($job);
+            $failedJobs[] = $job;
+            ++$failed;
             $this->em->persist($job);
         }
 
@@ -191,7 +205,15 @@ final class DesktopJobStore
             $this->em->flush();
         }
 
-        return ['requeued' => $requeued, 'failed' => $failed];
+        return ['requeued' => $requeued, 'failed' => $failed, 'failedJobs' => $failedJobs];
+    }
+
+    private function failTimedOut(DesktopJob $job): void
+    {
+        $job->setStatus(DesktopJob::STATUS_FAILED)
+            ->setLeaseToken(null)
+            ->setErrorCode(DesktopJobContract::ERROR_TIMEOUT)
+            ->touch();
     }
 
     /**

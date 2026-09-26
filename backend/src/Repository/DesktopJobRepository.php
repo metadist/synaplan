@@ -83,6 +83,25 @@ class DesktopJobRepository extends ServiceEntityRepository
      *
      * @return list<DesktopJob>
      */
+    /**
+     * Queued jobs that have waited past the queued TTL. `updated` is refreshed
+     * when a lease is returned to the queue, so a retry gets a fresh window.
+     *
+     * @return list<DesktopJob>
+     */
+    public function findStaleQueued(int $cutoff, int $limit = 100): array
+    {
+        return $this->createQueryBuilder('j')
+            ->where('j.status = :queued')
+            ->andWhere('(j.updated > 0 AND j.updated < :cutoff) OR (j.updated = 0 AND j.created < :cutoff)')
+            ->setParameter('queued', DesktopJob::STATUS_QUEUED)
+            ->setParameter('cutoff', $cutoff)
+            ->orderBy('j.created', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findExpiredLeases(int $now, int $limit = 100): array
     {
         return $this->createQueryBuilder('j')
