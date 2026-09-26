@@ -40,6 +40,7 @@ final class DesktopJobResultNotifierTest extends TestCase
                     'desktop.job.finished' => sprintf('The "%s" task finished on your computer.', $skill),
                     'desktop.job.files' => 'Files: '.($parameters['%ids%'] ?? ''),
                     'desktop.job.unnamed' => 'task',
+                    'desktop.job.cancelled' => sprintf('The "%s" task was cancelled and will not run. If the computer had already started, that work may still finish there, but the result will not be saved here.', $skill),
                     'desktop.job.reason.skill_disabled' => 'This computer refused to run the skill.',
                     'desktop.job.reason.local_error' => 'This computer could not finish the task.',
                     default => $id,
@@ -83,6 +84,17 @@ final class DesktopJobResultNotifierTest extends TestCase
             $message->getText(),
         );
         self::assertStringNotContainsString('(local_error)', $message->getText());
+    }
+
+    public function testCancelNoteSaysTheTaskWillNotRun(): void
+    {
+        $this->ownerSpeaks('en');
+        $message = $this->capture($this->job(DesktopJob::STATUS_CANCELLED, null, null));
+
+        self::assertSame(
+            'The "hello-files" task was cancelled and will not run. If the computer had already started, that work may still finish there, but the result will not be saved here.',
+            $message->getText(),
+        );
     }
 
     public function testSuccessNoteIncludesTheSummary(): void

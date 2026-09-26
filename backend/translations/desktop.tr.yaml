@@ -3,6 +3,7 @@ desktop:
     unnamed: 'görev'
     finished: '"%skill%" görevi bilgisayarınızda bitti.'
     failed: '"%skill%" görevi bilgisayarınızda bitmedi. %reason%'
+    cancelled: '"%skill%" görevi iptal edildi ve çalışmayacak. Bilgisayar çoktan başladıysa bu iş orada bitebilir, ancak sonuç buraya kaydedilmez.'
     files: 'Dosyalar: %ids%'
     reason:
       unknown_skill: 'Bu bilgisayarda bu skill yok.'

@@ -95,6 +95,12 @@ final readonly class DesktopJobResultNotifier
             $skill = $this->translator->trans('desktop.job.unnamed', [], 'desktop', $locale);
         }
 
+        if (DesktopJob::STATUS_CANCELLED === $job->getStatus()) {
+            return $this->translator->trans('desktop.job.cancelled', [
+                '%skill%' => $skill,
+            ], 'desktop', $locale);
+        }
+
         if (DesktopJob::STATUS_SUCCEEDED !== $job->getStatus()) {
             return $this->translator->trans('desktop.job.failed', [
                 '%skill%' => $skill,

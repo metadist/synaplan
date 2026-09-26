@@ -118,6 +118,17 @@ final class DesktopJobStoreTest extends TestCase
         self::assertNull($this->store->reportResult($device, 'lt_x', DesktopJob::STATUS_SUCCEEDED));
     }
 
+    public function testReportResultRejectsCancelledJob(): void
+    {
+        $device = self::device(4, 1);
+        $job = (new DesktopJob())->setOwnerId(1)->setStatus(DesktopJob::STATUS_CANCELLED)->setLeaseToken('lt_x');
+        $this->jobRepository->method('findByLeaseToken')->willReturn($job);
+
+        self::assertNull($this->store->reportResult($device, 'lt_x', DesktopJob::STATUS_SUCCEEDED, ['summary' => 'done']));
+        self::assertSame(DesktopJob::STATUS_CANCELLED, $job->getStatus());
+        self::assertSame('lt_x', $job->getLeaseToken());
+    }
+
     public function testReportResultRejectsNonLeasedJob(): void
     {
         $device = self::device(4, 1);
@@ -245,6 +256,86 @@ final class DesktopJobStoreTest extends TestCase
         self::assertSame(['requeued' => 0, 'failed' => 0, 'failedJobs' => []], $result);
         self::assertSame(DesktopJob::STATUS_QUEUED, $job->getStatus());
         self::assertNull($job->getErrorCode());
+    }
+
+    public function testCancelOwnedStopsAQueuedJob(): void
+    {
+        $job = (new DesktopJob())->setOwnerId(1)->setDeviceId(4)->setStatus(DesktopJob::STATUS_QUEUED);
+        $this->jobRepository->expects(self::once())
+            ->method('findOwnedForUpdate')
+            ->with(7, 1)
+            ->willReturn($job);
+        $this->em->expects(self::once())->method('flush');
+
+        $result = $this->store->cancelOwned(7, 1);
+
+        self::assertTrue($result['cancelled']);
+        self::assertSame($job, $result['job']);
+        self::assertSame(DesktopJob::STATUS_CANCELLED, $job->getStatus());
+        self::assertNull($job->getLeaseToken());
+        self::assertSame(0, $job->getLeaseExpires());
+    }
+
+    public function testCancelOwnedStopsALeasedJobAndDropsTheToken(): void
+    {
+        $job = (new DesktopJob())->setOwnerId(1)->setDeviceId(4)
+            ->setStatus(DesktopJob::STATUS_LEASED)
+            ->setLeaseToken('lt_live')
+            ->setLeaseExpires(time() + 300);
+        $this->jobRepository->method('findOwnedForUpdate')->willReturn($job);
+
+        $result = $this->store->cancelOwned(7, 1);
+
+        self::assertTrue($result['cancelled']);
+        self::assertSame(DesktopJob::STATUS_CANCELLED, $job->getStatus());
+        self::assertNull($job->getLeaseToken());
+        self::assertSame(0, $job->getLeaseExpires());
+    }
+
+    public function testCancelOwnedLeavesAFinishedJob(): void
+    {
+        $job = (new DesktopJob())->setOwnerId(1)->setStatus(DesktopJob::STATUS_SUCCEEDED)->setLeaseToken(null);
+        $this->jobRepository->method('findOwnedForUpdate')->willReturn($job);
+        $this->em->expects(self::never())->method('flush');
+
+        $result = $this->store->cancelOwned(7, 1);
+
+        self::assertFalse($result['cancelled']);
+        self::assertSame(DesktopJob::STATUS_SUCCEEDED, $job->getStatus());
+    }
+
+    public function testCancelOwnedReturnsNullWhenTheJobIsMissing(): void
+    {
+        $this->jobRepository->method('findOwnedForUpdate')->willReturn(null);
+        $this->em->expects(self::never())->method('flush');
+
+        $result = $this->store->cancelOwned(7, 1);
+
+        self::assertFalse($result['cancelled']);
+        self::assertNull($result['job']);
+    }
+
+    public function testCancelOpenForDeviceCancelsOnlyThatDevicesOpenJobs(): void
+    {
+        $queued = (new DesktopJob())->setOwnerId(1)->setDeviceId(4)->setStatus(DesktopJob::STATUS_QUEUED);
+        $leased = (new DesktopJob())->setOwnerId(1)->setDeviceId(4)
+            ->setStatus(DesktopJob::STATUS_LEASED)
+            ->setLeaseToken('lt_x');
+        $finished = (new DesktopJob())->setOwnerId(1)->setDeviceId(4)->setStatus(DesktopJob::STATUS_SUCCEEDED);
+        $otherDevice = (new DesktopJob())->setOwnerId(1)->setDeviceId(9)->setStatus(DesktopJob::STATUS_QUEUED);
+        $this->jobRepository->expects(self::once())
+            ->method('findOpenForDevice')
+            ->with(1, 4)
+            ->willReturn([$queued, $leased, $finished, $otherDevice]);
+
+        $cancelled = $this->store->cancelOpenForDevice(1, 4);
+
+        self::assertSame([$queued, $leased], $cancelled);
+        self::assertSame(DesktopJob::STATUS_CANCELLED, $queued->getStatus());
+        self::assertSame(DesktopJob::STATUS_CANCELLED, $leased->getStatus());
+        self::assertNull($leased->getLeaseToken());
+        self::assertSame(DesktopJob::STATUS_SUCCEEDED, $finished->getStatus());
+        self::assertSame(DesktopJob::STATUS_QUEUED, $otherDevice->getStatus());
     }
 
     public function testRequeueExpiredLeasesSkipsALeaseThatWasAlreadyFinished(): void

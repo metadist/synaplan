@@ -43,13 +43,64 @@ class DesktopJobRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * The job holding this lease token, locked for update.
+     *
+     * MUST be called inside a transaction. The row lock stops a cancel from
+     * committing between this read and the result write (which would otherwise
+     * record a result for a job the person already stopped).
+     */
     public function findByLeaseToken(string $leaseToken): ?DesktopJob
     {
         if ('' === $leaseToken) {
             return null;
         }
 
-        return $this->findOneBy(['leaseToken' => $leaseToken]);
+        return $this->createQueryBuilder('j')
+            ->where('j.leaseToken = :token')
+            ->setParameter('token', $leaseToken)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * One owner-scoped job, locked so a lease cannot start while it is cancelled.
+     *
+     * MUST be called inside a transaction.
+     */
+    public function findOwnedForUpdate(int $id, int $ownerId): ?DesktopJob
+    {
+        return $this->createQueryBuilder('j')
+            ->where('j.id = :id')
+            ->andWhere('j.ownerId = :ownerId')
+            ->setParameter('id', $id)
+            ->setParameter('ownerId', $ownerId)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Queued and leased jobs targeted at one device, locked for cancellation.
+     *
+     * Unassigned jobs (any of the user's computers may pick them up) are not
+     * included. MUST be called inside a transaction.
+     *
+     * @return list<DesktopJob>
+     */
+    public function findOpenForDevice(int $ownerId, int $deviceId): array
+    {
+        return $this->createQueryBuilder('j')
+            ->where('j.ownerId = :ownerId')
+            ->andWhere('j.deviceId = :deviceId')
+            ->andWhere('j.status IN (:open)')
+            ->setParameter('ownerId', $ownerId)
+            ->setParameter('deviceId', $deviceId)
+            ->setParameter('open', [DesktopJob::STATUS_QUEUED, DesktopJob::STATUS_LEASED])
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getResult();
     }
 
     public function findByOwnerIdempotency(int $ownerId, string $idempotency): ?DesktopJob

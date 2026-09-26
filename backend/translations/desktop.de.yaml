@@ -3,6 +3,7 @@ desktop:
     unnamed: 'Aufgabe'
     finished: 'Die Aufgabe „%skill%“ wurde auf deinem Computer abgeschlossen.'
     failed: 'Die Aufgabe „%skill%“ auf deinem Computer wurde nicht abgeschlossen. %reason%'
+    cancelled: 'Die Aufgabe „%skill%“ wurde abgebrochen und wird nicht ausgeführt. Falls der Computer schon begonnen hatte, kann diese Arbeit dort noch zu Ende gehen, aber das Ergebnis wird hier nicht gespeichert.'
     files: 'Dateien: %ids%'
     reason:
       unknown_skill: 'Dieser Computer hat diesen Skill nicht.'

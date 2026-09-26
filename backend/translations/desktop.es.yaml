@@ -3,6 +3,7 @@ desktop:
     unnamed: 'tarea'
     finished: 'La tarea «%skill%» terminó en tu equipo.'
     failed: 'La tarea «%skill%» en tu equipo no terminó. %reason%'
+    cancelled: 'La tarea «%skill%» se canceló y no se ejecutará. Si el equipo ya había empezado, ese trabajo puede terminar allí, pero el resultado no se guardará aquí.'
     files: 'Archivos: %ids%'
     reason:
       unknown_skill: 'Este equipo no tiene ese skill.'

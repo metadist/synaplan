@@ -3,6 +3,7 @@ desktop:
     unnamed: 'task'
     finished: 'The "%skill%" task finished on your computer.'
     failed: 'The "%skill%" task on your computer did not finish. %reason%'
+    cancelled: 'The "%skill%" task was cancelled and will not run. If the computer had already started, that work may still finish there, but the result will not be saved here.'
     files: 'Files: %ids%'
     reason:
       unknown_skill: 'This computer does not have that skill.'

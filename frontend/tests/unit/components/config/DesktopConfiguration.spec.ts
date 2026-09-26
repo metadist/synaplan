@@ -3,31 +3,48 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import DesktopConfiguration from '@/components/config/DesktopConfiguration.vue'
 
-const { mockListJobs, mockReload, desktopOn } = vi.hoisted(() => ({
-  mockListJobs: vi.fn(),
-  mockReload: vi.fn(),
-  desktopOn: { value: true },
-}))
+const { mockListJobs, mockReload, desktopOn, confirmMock, successMock, revokeDevice } = vi.hoisted(
+  () => ({
+    mockListJobs: vi.fn(),
+    mockReload: vi.fn(),
+    desktopOn: { value: true },
+    confirmMock: vi.fn(),
+    successMock: vi.fn(),
+    revokeDevice: vi.fn(),
+  })
+)
+
+const devicesRef = ref<
+  Array<{
+    id: number
+    name: string
+    status: string
+    lastSeen: number
+    created: number
+    keyPrefix: string | null
+    capabilities: string[]
+  }>
+>([])
 
 vi.mock('@/services/api/desktopApi', () => ({
   desktopApi: {
     listJobs: mockListJobs,
     listDevices: vi.fn().mockResolvedValue([]),
     createPairingCode: vi.fn(),
-    revokeDevice: vi.fn(),
+    revokeDevice,
   },
 }))
 
 vi.mock('@/composables/useDesktopDevices', () => ({
-  useDesktopDevices: () => ({ devices: ref([]), reload: mockReload }),
+  useDesktopDevices: () => ({ devices: devicesRef, reload: mockReload }),
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+  useNotification: () => ({ success: successMock, error: vi.fn() }),
 }))
 
 vi.mock('@/composables/useDialog', () => ({
-  useDialog: () => ({ confirm: vi.fn() }),
+  useDialog: () => ({ confirm: confirmMock }),
 }))
 
 vi.mock('@/composables/useDesktopAgentFeature', () => ({
@@ -50,8 +67,11 @@ describe('DesktopConfiguration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     desktopOn.value = true
+    devicesRef.value = []
     mockListJobs.mockResolvedValue([])
     mockReload.mockResolvedValue(undefined)
+    confirmMock.mockResolvedValue(false)
+    revokeDevice.mockResolvedValue({ cancelledJobs: 0 })
   })
 
   it('is absent when desktop is off', async () => {
@@ -87,5 +107,40 @@ describe('DesktopConfiguration', () => {
     const wrapper = await mountPage()
     expect(wrapper.get('[data-testid="section-desktop-steps"]').findAll('li')).toHaveLength(3)
     expect(wrapper.find('[data-testid="note-not-available"]').exists()).toBe(false)
+  })
+
+  it('tells how many waiting tasks disconnect will cancel', async () => {
+    devicesRef.value = [
+      {
+        id: 4,
+        name: 'Studio Mac',
+        status: 'active',
+        lastSeen: 0,
+        created: 1,
+        keyPrefix: 'sk_abcd...',
+        capabilities: [],
+      },
+    ]
+    mockListJobs.mockResolvedValue([
+      { id: 1, deviceId: 4, status: 'queued', skill: 'pptx', created: 1 },
+      { id: 2, deviceId: 4, status: 'leased', skill: 'pptx', created: 2 },
+      { id: 3, deviceId: 9, status: 'queued', skill: 'notes', created: 3 },
+    ])
+    confirmMock.mockResolvedValue(true)
+    revokeDevice.mockResolvedValue({ cancelledJobs: 2 })
+
+    const wrapper = await mountPage()
+    expect(wrapper.get('[data-testid="item-device"]').text()).toContain('2')
+
+    await wrapper.get('[data-testid="btn-disconnect"]').trigger('click')
+    await flushPromises()
+
+    const message = confirmMock.mock.calls[0][0].message as string
+    expect(message).toContain('Studio Mac')
+    expect(message).toContain('2 waiting tasks will be cancelled')
+    expect(revokeDevice).toHaveBeenCalledWith(4)
+    expect(successMock).toHaveBeenCalledWith(
+      'This computer was disconnected. 2 waiting tasks were cancelled and will not run.'
+    )
   })
 })
