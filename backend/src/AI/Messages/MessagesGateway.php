@@ -135,6 +135,7 @@ final readonly class MessagesGateway
         private iterable $translators = [],
         private ?AgentConfig $agentConfig = null,
         private ?AgentRuntimeResolver $agentRuntimeResolver = null,
+        private ?DesktopOmittedModel $desktopOmittedModel = null,
     ) {
     }
 
@@ -174,6 +175,11 @@ final readonly class MessagesGateway
         $budget = $this->rateLimitService->checkCostBudget($user);
 
         $modelString = isset($decoded['model']) && \is_string($decoded['model']) ? $decoded['model'] : null;
+        $filledOmittedModel = false;
+        if (null !== $this->desktopOmittedModel && $this->desktopOmittedModel->applies($request, $modelString)) {
+            $modelString = $this->desktopOmittedModel->providerIdFor($user);
+            $filledOmittedModel = null !== $modelString && '' !== $modelString;
+        }
         $resolved = $this->modelResolver->resolve($modelString);
         if (null === $resolved) {
             $suggestions = $this->modelResolver->listResolvableAnthropicModelIds();
@@ -194,6 +200,10 @@ final readonly class MessagesGateway
 
         $requestBody = $decoded;
         $bodyMutated = false;
+        if ($filledOmittedModel) {
+            $requestBody['model'] = $resolved['providerModelId'];
+            $bodyMutated = true;
+        }
 
         // Transport policy first (image cap, detail hint), so the routing
         // decision below sees the images that actually reach the upstream.

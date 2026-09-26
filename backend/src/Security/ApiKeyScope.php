@@ -138,6 +138,23 @@ final class ApiKeyScope
     }
 
     /**
+     * A key minted for a paired computer. A general `*` key is not included:
+     * Claude Code and other full keys must still name a model.
+     *
+     * @param list<string>|array<int|string, mixed> $scopes
+     */
+    public static function isPairedDesktop(array $scopes): bool
+    {
+        foreach (self::normalize($scopes) as $scope) {
+            if (self::DESKTOP_ALL === $scope || str_starts_with($scope, 'desktop:')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * The scope set the Outlook add-in connect flow mints
      * (`App\Service\PlatformLink\OutlookConnectService`). Frozen: already-issued
      * Synamail keys carry exactly this list.
