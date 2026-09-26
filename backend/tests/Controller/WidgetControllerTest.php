@@ -370,11 +370,11 @@ class WidgetControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'read',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/widgets/'.$created['widgetId']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $body = json_decode((string) $this->client->getResponse()->getContent(), true);
         self::assertTrue($body['widget']['shared']);
         self::assertSame('read', $body['widget']['access']);
@@ -388,13 +388,13 @@ class WidgetControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode(['name' => 'Hijacked'], JSON_THROW_ON_ERROR)
         );
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
 
         $this->client->request('GET', '/api/v1/widgets/'.$created['widgetId'].'/embed');
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
 
         $this->client->request('GET', '/api/v1/widgets/'.$created['widgetId'].'/sessions');
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testEditShareLetsMemberUpdateWidget(): void
@@ -410,7 +410,7 @@ class WidgetControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'edit',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request(
@@ -421,7 +421,7 @@ class WidgetControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode(['name' => 'Co-edited'], JSON_THROW_ON_ERROR)
         );
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
     }
 
     public function testAdminCannotReadForeignWidgetSessions(): void
@@ -436,7 +436,7 @@ class WidgetControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $admin);
         $this->client->request('GET', '/api/v1/widgets/'.$created['widgetId'].'/sessions');
 
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     private function enableSharing(): void
@@ -481,7 +481,7 @@ class WidgetControllerTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode(['name' => $name], JSON_THROW_ON_ERROR)
         );
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $body = json_decode((string) $this->client->getResponse()->getContent(), true);
         self::assertIsArray($body);
         self::assertIsInt($body['widget']['id']);
