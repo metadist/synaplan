@@ -75,10 +75,13 @@ them under **Coding clients**):
 
 1. **Messages gateway enabled.** While this is off and Synaplan Desktop is on,
    the computer is told the gateway is turned off.
-2. **A provider key.** Either the instance key is allowed as a fallback, or
-   the user has saved their own key. Without one, the computer stays paired
-   and the response says nothing was sent (HTTP 403). A missing key is not
-   HTTP 401, so the app does not treat it as a disconnected computer.
+2. **A provider key for the default chat model.** Either the instance key is
+   allowed as a fallback, or the user has saved their own key for that
+   model's provider. A local model (Ollama, or a custom endpoint) does not
+   need one. Groq, Mistral, and the other catalog providers count when their
+   own key is available. Without a key the model needs, the computer stays
+   paired and the response says nothing was sent (HTTP 403). A missing key
+   is not HTTP 401, so the app does not treat it as a disconnected computer.
 
 When Synaplan Desktop itself is turned off, that sentence wins even if the
 gateway is also off. Claude Code and other full API keys keep the existing

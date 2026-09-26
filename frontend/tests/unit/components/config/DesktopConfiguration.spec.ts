@@ -67,6 +67,7 @@ vi.mock('@/services/api/messagesGatewayApi', () => ({
 const readyGateway = {
   enabled: true,
   is_admin: false,
+  app_chat_credential: 'ready',
   keys: {
     anthropic: { effective_source: 'operator' },
     openai: { effective_source: 'none' },
@@ -356,6 +357,7 @@ describe('DesktopConfiguration', () => {
     mockGatewayStatus.mockResolvedValue({
       ...readyGateway,
       is_admin: true,
+      app_chat_credential: 'missing',
       keys: {
         anthropic: { effective_source: 'none' },
         openai: { effective_source: 'none' },
@@ -378,6 +380,48 @@ describe('DesktopConfiguration', () => {
   })
 
   it('hides the chat notice when a provider key is already available', async () => {
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="alert-chat-gate"]').exists()).toBe(false)
+  })
+
+  it('hides the key notice when the default chat model is local even if the listed keys are empty', async () => {
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      is_admin: true,
+      app_chat_credential: 'ready',
+      keys: {
+        anthropic: { effective_source: 'none' },
+        openai: { effective_source: 'none' },
+        google: { effective_source: 'none' },
+      },
+    })
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="alert-chat-gate"]').exists()).toBe(false)
+  })
+
+  it('warns when the default chat model has no key even if another provider key exists', async () => {
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      is_admin: true,
+      app_chat_credential: 'missing',
+    })
+    const wrapper = await mountPage()
+    expect(wrapper.get('[data-testid="alert-chat-gate"]').text()).toContain(
+      'no provider key will pay for app chat'
+    )
+  })
+
+  it('does not claim a key is missing when no chat model is selected', async () => {
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      is_admin: true,
+      app_chat_credential: 'unset',
+      keys: {
+        anthropic: { effective_source: 'none' },
+        openai: { effective_source: 'none' },
+        google: { effective_source: 'none' },
+      },
+    })
     const wrapper = await mountPage()
     expect(wrapper.find('[data-testid="alert-chat-gate"]').exists()).toBe(false)
   })

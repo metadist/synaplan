@@ -543,6 +543,17 @@ const loadChatGate = async () => {
       chatGate.value = 'gateway'
       return
     }
+    // The status names the account's default chat model, including Ollama,
+    // Groq, and the other providers. The three keys on this payload are only
+    // a fallback for an older status response.
+    if (status.app_chat_credential === 'missing') {
+      chatGate.value = 'key'
+      return
+    }
+    if (status.app_chat_credential === 'ready' || status.app_chat_credential === 'unset') {
+      chatGate.value = 'ready'
+      return
+    }
     const hasKey = Object.values(status.keys).some(
       (key) => key.effective_source === 'user' || key.effective_source === 'operator'
     )
