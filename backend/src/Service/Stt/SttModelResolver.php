@@ -43,17 +43,31 @@ final readonly class SttModelResolver
             throw new SttModelNotFoundException($modelString);
         }
 
-        $default = $this->modelConfigService->resolveSttDefault($userId);
-        if (null !== $default['model_id']) {
-            $model = $this->modelRepository->find($default['model_id']);
+        // The stored SOUND2TEXT row, not the live-model fallback. An unusable
+        // cloud binding must not be replaced by another cloud provider that
+        // happens to have a key — that is the same rule the chat recorder uses.
+        $configuredId = $this->modelConfigService->getConfiguredDefaultModel('SOUND2TEXT', $userId);
+        if (null !== $configuredId && $this->isUsableSttRow($configuredId)) {
+            $model = $this->modelRepository->find($configuredId);
             if ($model instanceof Model && 1 === $model->getActive() && self::TAG === $model->getTag()) {
                 return $this->toResolved($model);
             }
         }
 
-        $fallback = $this->modelRepository->findActiveByTag(self::TAG);
-        if ([] !== $fallback) {
-            return $this->toResolved($fallback[0]);
+        // No usable stored binding. Local whisper.cpp is the default the chat
+        // recorder uses in that case, so the API must hit the same row.
+        $whisper = null;
+        foreach ($this->modelRepository->findActiveByTag(self::TAG) as $model) {
+            if (!$this->isUsableSttRow((int) $model->getId())) {
+                continue;
+            }
+            if ('whisper' === strtolower($model->getService())) {
+                $whisper = $model;
+                break;
+            }
+        }
+        if ($whisper instanceof Model) {
+            return $this->toResolved($whisper);
         }
 
         throw new SttModelNotFoundException($modelString);
@@ -76,6 +90,11 @@ final readonly class SttModelResolver
         }
 
         return $data;
+    }
+
+    private function isUsableSttRow(int $modelId): bool
+    {
+        return $modelId > 0 && $this->modelConfigService->isConfiguredModelUsable($modelId);
     }
 
     /**

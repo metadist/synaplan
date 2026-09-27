@@ -254,6 +254,9 @@
     "noSpeechDetected": "⚠️ No speech detected in recording",
     "transcriptionFailed": "Transcription failed: {error}",
     "dictationSttFailed": "This recording could not be transcribed. Speech-to-text is not set up, or the audio could not be understood. Connect a speech-to-text service under Settings, or try again.",
+    "speechOff": "Local speech is turned off, so this recording was not transcribed. Turn on local speech, or choose a speech model in Settings.",
+    "speechBinaryMissing": "Speech recognition is not installed on this server, so this recording was not transcribed. Install speech recognition, or choose a speech model in Settings.",
+    "speechModelMissing": "The local speech model file is missing, so this recording was not transcribed. Add that model, or choose a speech model in Settings.",
     "mic": {
       "permissionWeb": "Microphone access is blocked. Allow it in your browser settings and try again.",
       "permissionIos": "Microphone access is turned off. Open the iOS Settings app, select this app, and turn on Microphone.",

@@ -245,6 +245,9 @@
     "noSpeechDetected": "⚠️ No se detectó voz en la grabación",
     "transcriptionFailed": "Error de transcripción: {error}",
     "dictationSttFailed": "No se pudo transcribir esta grabación. El reconocimiento de voz no está configurado, o el audio no se entendió. Conecta un servicio de voz a texto en Ajustes, o inténtalo de nuevo.",
+    "speechOff": "El reconocimiento de voz local está desactivado, así que esta grabación no se transcribió. Activa la voz local o elige un modelo de voz en Ajustes.",
+    "speechBinaryMissing": "El reconocimiento de voz no está instalado en este servidor, así que esta grabación no se transcribió. Instala el reconocimiento de voz o elige un modelo de voz en Ajustes.",
+    "speechModelMissing": "Falta el archivo del modelo de voz local, así que esta grabación no se transcribió. Añade ese modelo o elige un modelo de voz en Ajustes.",
     "mic": {
       "permissionWeb": "El acceso al micrófono está bloqueado. Permítelo en la configuración de tu navegador e inténtalo de nuevo.",
       "permissionIos": "El acceso al micrófono está desactivado. Abre los ajustes de iOS, selecciona esta app y activa «Micrófono».",

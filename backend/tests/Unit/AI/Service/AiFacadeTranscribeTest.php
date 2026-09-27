@@ -367,6 +367,36 @@ class AiFacadeTranscribeTest extends TestCase
         ]);
     }
 
+    public function testHasConfiguredSttProviderUsesTheStoredBinding(): void
+    {
+        $this->modelConfig->expects($this->once())
+            ->method('getConfiguredDefaultModel')
+            ->with('SOUND2TEXT', 42)
+            ->willReturn(21);
+        $this->modelConfig->expects($this->never())->method('getDefaultModel');
+        $this->modelConfig->method('isConfiguredModelUsable')->with(21)->willReturn(false);
+
+        $this->assertFalse($this->facade->hasConfiguredSttProvider(42));
+    }
+
+    public function testHasConfiguredSttProviderIsTrueForAUsableCloudBinding(): void
+    {
+        $this->modelConfig->method('getConfiguredDefaultModel')->with('SOUND2TEXT', 42)->willReturn(21);
+        $this->modelConfig->method('isConfiguredModelUsable')->with(21)->willReturn(true);
+        $this->modelConfig->method('getProviderForModel')->with(21)->willReturn('Groq');
+
+        $this->assertTrue($this->facade->hasConfiguredSttProvider(42));
+    }
+
+    public function testHasConfiguredSttProviderIsFalseWhenTheStoredBindingIsWhisper(): void
+    {
+        $this->modelConfig->method('getConfiguredDefaultModel')->with('SOUND2TEXT', 42)->willReturn(330);
+        $this->modelConfig->method('isConfiguredModelUsable')->with(330)->willReturn(true);
+        $this->modelConfig->method('getProviderForModel')->with(330)->willReturn('whisper');
+
+        $this->assertFalse($this->facade->hasConfiguredSttProvider(42));
+    }
+
     private function mockSttProvider(string $name): SpeechToTextProviderInterface&MockObject
     {
         $provider = $this->createMock(SpeechToTextProviderInterface::class);

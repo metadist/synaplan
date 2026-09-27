@@ -20,3 +20,6 @@ admin:
 file_analysis:
   audio_pending: 'The recording is still being prepared. Please wait a moment and send your question again.'
   audio_failed: 'This recording could not be transcribed. Speech-to-text is not set up on this server, or the audio could not be understood. Connect a speech-to-text service under Settings, or try a different file.'
+  audio_speech_off: 'Local speech is turned off, so this recording was not transcribed. Turn on local speech, or choose a speech model in Settings.'
+  audio_binary_missing: 'Speech recognition is not installed on this server, so this recording was not transcribed. Install speech recognition, or choose a speech model in Settings.'
+  audio_model_missing: 'The local speech model file is missing, so this recording was not transcribed. Add that model, or choose a speech model in Settings.'

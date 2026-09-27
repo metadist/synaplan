@@ -9,7 +9,7 @@ Live order: [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d
 | Step | State | Notes |
 | ---- | ----- | ----- |
 | Roadmap order + sprint files | done 2026-09-27 | This folder. No product code. |
-| E1 transcription (J-STT-1…3) | planned | Next coding sprint. whisper.cpp, no new engine. |
+| E1 transcription (J-STT-1…3) | in progress | No cloud key uses local whisper.cpp. Speech off, missing binary, and missing model file each end in one sentence and a next step. |
 | E1 #2204 quieter model placeholder | planned | Own commit. |
 | E1 #2205 host ports | planned | Own commit. |
 | E1 #2206 two-file compose docs | planned | Own commit. Do not shrink the dev compose. |

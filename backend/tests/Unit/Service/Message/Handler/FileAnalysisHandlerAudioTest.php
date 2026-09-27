@@ -8,6 +8,8 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\ModelConfigService;
+use App\Service\SpeechFailure;
+use App\Service\WhisperService;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -315,6 +317,75 @@ class FileAnalysisHandlerAudioTest extends TestCase
         $result = $this->handler->handle($message, [], []);
 
         $this->assertStringContainsString('Sprache-zu-Text', $result['content']);
+        $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
+    }
+
+    public function testSpeechOffNamesTheRecoveryInsteadOfAProviderError(): void
+    {
+        $whisper = $this->createMock(WhisperService::class);
+        $whisper->method('unavailableReason')->willReturn(SpeechFailure::SPEECH_OFF);
+        $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
+
+        $this->handler = new FileAnalysisHandler(
+            $this->aiFacade,
+            $this->modelConfigService,
+            $this->logger,
+            '/var/www/backend/var/uploads',
+            null,
+            null,
+            new ChatFailureClassifier(),
+            null,
+            null,
+            null,
+            $whisper,
+        );
+
+        $message = $this->buildAudioMessage(
+            text: 'what did I say',
+            transcript: '',
+            status: 'error',
+        );
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertStringContainsString('Local speech is turned off', $result['content']);
+        $this->assertStringContainsString('choose a speech model in Settings', $result['content']);
+        $this->assertStringNotContainsString('500', $result['content']);
+        $this->assertStringNotContainsString('HTTP', $result['content']);
+        $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
+    }
+
+    public function testRuntimeUnavailableUsesGenericCopy(): void
+    {
+        $whisper = $this->createMock(WhisperService::class);
+        $whisper->method('unavailableReason')->willReturn(null);
+        $whisper->expects($this->never())->method('isAvailable');
+        $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
+
+        $this->handler = new FileAnalysisHandler(
+            $this->aiFacade,
+            $this->modelConfigService,
+            $this->logger,
+            '/var/www/backend/var/uploads',
+            null,
+            null,
+            new ChatFailureClassifier(),
+            null,
+            null,
+            null,
+            $whisper,
+        );
+
+        $message = $this->buildAudioMessage(
+            text: 'what did I say',
+            transcript: '',
+            status: 'error',
+        );
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertStringContainsString('could not be transcribed', $result['content']);
+        $this->assertStringNotContainsString('not installed', $result['content']);
         $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
     }
 

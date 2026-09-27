@@ -16,6 +16,8 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
+use App\Service\SpeechFailure;
+use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -53,6 +55,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
     private const AUDIO_FAILED_FALLBACK = 'This recording could not be transcribed. Speech-to-text is not set up on this server, or the audio could not be understood. Connect a speech-to-text service under Settings, or try a different file.';
 
+    private const AUDIO_SPEECH_OFF_FALLBACK = 'Local speech is turned off, so this recording was not transcribed. Turn on local speech, or choose a speech model in Settings.';
+
+    private const AUDIO_BINARY_MISSING_FALLBACK = 'Speech recognition is not installed on this server, so this recording was not transcribed. Install speech recognition, or choose a speech model in Settings.';
+
+    private const AUDIO_MODEL_MISSING_FALLBACK = 'The local speech model file is missing, so this recording was not transcribed. Add that model, or choose a speech model in Settings.';
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
@@ -64,6 +72,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         private ?ChatErrorPresenter $chatErrorPresenter = null,
         private ?TranslatorInterface $translator = null,
         private ?ConversationFileCatalog $conversationFileCatalog = null,
+        private ?WhisperService $whisperService = null,
     ) {
     }
 
@@ -1819,9 +1828,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ]);
 
         $locale = $this->normalizeLocale($message->getLanguage());
-        $content = $isStillProcessing
-            ? $this->trans('file_analysis.audio_pending', self::AUDIO_PENDING_FALLBACK, $locale)
-            : $this->trans('file_analysis.audio_failed', self::AUDIO_FAILED_FALLBACK, $locale);
+        if ($isStillProcessing) {
+            $content = $this->trans('file_analysis.audio_pending', self::AUDIO_PENDING_FALLBACK, $locale);
+        } else {
+            [$key, $fallback] = $this->audioFailedCopy($message);
+            $content = $this->trans($key, $fallback, $locale);
+        }
 
         return [
             'content' => $content,
@@ -1831,6 +1843,27 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     : 'audio_transcription_failed',
             ],
         ];
+    }
+
+    /**
+     * @return array{0: string, 1: string} translation key and English fallback
+     */
+    private function audioFailedCopy(Message $message): array
+    {
+        $reason = null;
+        if (null !== $this->whisperService && !$this->aiFacade->hasConfiguredSttProvider($message->getUserId())) {
+            // Null means the files are present and something else failed
+            // (FFmpeg, a binary that cannot start). That stays the generic
+            // transcription failure, not "speech recognition is not installed".
+            $reason = $this->whisperService->unavailableReason();
+        }
+
+        return match ($reason) {
+            SpeechFailure::SPEECH_OFF => ['file_analysis.audio_speech_off', self::AUDIO_SPEECH_OFF_FALLBACK],
+            SpeechFailure::BINARY_MISSING => ['file_analysis.audio_binary_missing', self::AUDIO_BINARY_MISSING_FALLBACK],
+            SpeechFailure::MODEL_MISSING => ['file_analysis.audio_model_missing', self::AUDIO_MODEL_MISSING_FALLBACK],
+            default => ['file_analysis.audio_failed', self::AUDIO_FAILED_FALLBACK],
+        };
     }
 
     private function normalizeLocale(string $lang): string

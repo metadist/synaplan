@@ -791,6 +791,17 @@ final readonly class ModelConfigService
      * different model than the one configured. Treating it as unusable turns
      * that into a deliberate, logged fallback.
      */
+    /**
+     * Whether this catalog row can serve a request right now.
+     *
+     * Public so speech routing can tell an unusable cloud binding (no API key)
+     * apart from local whisper.cpp, which has no key.
+     */
+    public function isConfiguredModelUsable(int $modelId): bool
+    {
+        return $this->isModelProviderUsable($modelId);
+    }
+
     private function isModelProviderUsable(int $modelId): bool
     {
         $model = $this->modelRepository->find($modelId);
