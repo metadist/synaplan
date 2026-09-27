@@ -23,6 +23,7 @@ Flagship: [`04_opendesk_audio_transcriber.md`](./04_opendesk_audio_transcriber.m
 | Date | Decision |
 | ---- | -------- |
 | 2026-09-17 | Track created. openDesk chat = Element; meetings = Jitsi. v1 STT = Jitsi meetings. Nextcloud Talk is not the openDesk path. |
+| 2026-09-27 | In-app sound transcription is E1 and is not gated on BI1. OD-A starts after J-STT-1 is walked. See [`../20260927_roadmap.md`](../20260927_roadmap.md). |
 
 ## Review log
 
