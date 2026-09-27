@@ -6,8 +6,8 @@
 #
 # Two modes:
 #   try    (default) - local try-out: clones the repo and starts the Docker dev
-#                      stack. Open http://localhost:5173 and a live status page
-#                      walks you through the first start.
+#                      stack. The status page is http://localhost:5173 unless
+#                      the project .env sets SYNAPLAN_FRONTEND_PORT.
 #   server           - production self-hosting on a Linux box using the
 #                      deploy/ contract (published images, generated secrets,
 #                      backup/restore lifecycle). A reverse proxy for HTTPS in
@@ -46,6 +46,41 @@ say()  { printf '%s\n' "$*"; }
 step() { printf '\n==> %s\n' "$*"; }
 warn() { printf 'WARNING: %s\n' "$*" >&2; }
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+# Copy SYNAPLAN_*_PORT from a Compose env file. An exported shell variable
+# wins, matching Docker Compose. Only a decimal port is accepted.
+load_synaplan_ports() {
+    local file="$1"
+    [ -f "$file" ] || return 0
+    local line key value
+    while IFS= read -r line || [ -n "$line" ]; do
+        line=${line%$'\r'}
+        line="${line#"${line%%[![:space:]]*}"}"
+        case "$line" in
+            ''|\#*) continue ;;
+            SYNAPLAN_*_PORT=*) ;;
+            *) continue ;;
+        esac
+        key=${line%%=*}
+        value=${line#*=}
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        case "$value" in
+            \"*\") value=${value#\"}; value=${value%\"} ;;
+            \'*\') value=${value#\'}; value=${value%\'} ;;
+            *)
+                value=${value%%#*}
+                value="${value%"${value##*[![:space:]]}"}"
+                ;;
+        esac
+        case "$value" in
+            ''|*[!0-9]*) continue ;;
+        esac
+        if [ -z "${!key:-}" ]; then
+            export "$key=$value"
+        fi
+    done < "$file"
+}
 
 # When piped through `curl | bash`, stdin is the script itself. Prompts must
 # read from the terminal, if there is one; otherwise defaults apply silently.
@@ -118,7 +153,10 @@ fi
 say "Docker, Compose v2 and ${FETCH_TOOL} are available."
 
 if [ "$MODE" = "try" ]; then
-    for port in 5173 8000; do
+    # The project .env is what Compose will publish. Load it before the
+    # fixed-port preflight and before the URL printed at the end.
+    load_synaplan_ports "${INSTALL_DIR}/.env"
+    for port in "${SYNAPLAN_FRONTEND_PORT:-5173}" "${SYNAPLAN_BACKEND_PORT:-8000}"; do
         if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ":${port} "; then
             warn "Port ${port} is already in use - the dev stack needs it. Stop the other service or expect a failure."
         fi
