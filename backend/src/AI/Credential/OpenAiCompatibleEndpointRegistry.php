@@ -13,10 +13,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Install-wide registry of "OpenAI Compatible" upstream endpoints (LocalAI,
  * vLLM, LiteLLM, Ollama's /v1, any gateway that speaks the OpenAI Chat
- * Completions + Embeddings API).
+ * Completions, Embeddings, or Images API).
  *
  * An endpoint is a named tuple {base_url, api_key, headers, label,
- * capabilities}. It is stored globally (ownerId = 0) in BCONFIG under the
+ * capabilities}. `text2pic` means the endpoint speaks
+ * `POST /images/generations` (LocalAI and other OpenAI-compatible image
+ * servers). It is stored globally (ownerId = 0) in BCONFIG under the
  * group {@see self::CONFIG_GROUP}, one row per endpoint (setting =
  * "endpoint.<name>"), with the whole JSON payload encrypted at rest via
  * {@see EncryptionService} (which derives its key from APP_SECRET) — the same
@@ -42,7 +44,7 @@ final class OpenAiCompatibleEndpointRegistry
     private const NAME_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,62}$/';
 
     /** Capabilities an endpoint may advertise (maps to BMODELS.BTAG values). */
-    public const CAPABILITIES = ['chat', 'vectorize', 'pic2text', 'rerank'];
+    public const CAPABILITIES = ['chat', 'vectorize', 'pic2text', 'text2pic', 'rerank'];
 
     public function __construct(
         private readonly ConfigRepository $configRepository,

@@ -1,13 +1,16 @@
 # Backend integrations — master plan
 
-**Status:** Draft 2026-09-17. Do not start product code until every row
-in §0 is agreed. If a row is rejected, update this file in the same
-change as the alternative.
+**Status:** Draft 2026-09-17. Do not start the Integrations page until
+every row in §0 is agreed. In-app transcription (E1) is not this page
+and is not gated here. If a row is rejected, update this file in the
+same change as the alternative.
 **Owner surface:** Developer & devices → **Integrations** (new page).
 No new rail item.
 **Class:** the page is `ota-candidate`. Adapters live in sibling or new
 repos (`backend-only` from this repo’s point of view).
-**Related:** live roadmap §6–§7; catalog [`01_catalog.md`](./01_catalog.md);
+**Related:** live order [`../20260927_roadmap.md`](../20260927_roadmap.md)
+(transcription is E1 and is not this page); catalog reference
+[`../20260917_roadmap.md`](../20260917_roadmap.md) §6–§7; catalog [`01_catalog.md`](./01_catalog.md);
 editors [`02_developer_clients.md`](./02_developer_clients.md); office
 [`03_office_and_mail.md`](./03_office_and_mail.md); openDesk STT
 [`04_opendesk_audio_transcriber.md`](./04_opendesk_audio_transcriber.md).

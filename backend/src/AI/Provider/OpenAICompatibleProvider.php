@@ -9,6 +9,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
+use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
@@ -17,14 +18,16 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use OpenAI\Contracts\ClientContract;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Generic "OpenAI Compatible" provider.
  *
- * Speaks the standard OpenAI Chat Completions + Embeddings HTTP API against
- * ANY admin-registered endpoint (LocalAI, vLLM, LiteLLM, Ollama's /v1, …).
- * Deliberately does NOT use OpenAI's proprietary Responses API — self-hosted
- * gateways implement Chat Completions, not Responses.
+ * Speaks the standard OpenAI Chat Completions, Embeddings, and Images
+ * (`POST /images/generations`) HTTP APIs against ANY admin-registered
+ * endpoint (LocalAI, vLLM, LiteLLM, Ollama's /v1, …). Deliberately does
+ * NOT use OpenAI's proprietary Responses API — self-hosted gateways
+ * implement Chat Completions and the Images API, not Responses.
  *
  * Unlike the fixed providers (OpenAI/Groq/…), this one has no single set of
  * env credentials. A single instance serves every BMODELS row of service
@@ -33,9 +36,15 @@ use Psr\Log\LoggerInterface;
  * via {@see OpenAiCompatibleEndpointRegistry}. This mirrors how the Higgsfield
  * provider resolves per-user credentials at call time.
  */
-final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface
+final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface
 {
     use ChatCompletionsToolSupport;
+
+    /**
+     * Local diffusion (FLUX on CPU) blocks until the PNG is done. 180s matches
+     * a patient local box without holding a chat worker for an unbounded render.
+     */
+    private const IMAGE_TIMEOUT_SECONDS = 180;
 
     /** @var array<string, ClientContract> keyed by endpoint name */
     private array $clients = [];
@@ -43,6 +52,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
     public function __construct(
         private readonly OpenAiCompatibleEndpointRegistry $endpoints,
         private readonly LoggerInterface $logger,
+        private readonly HttpClientInterface $httpClient,
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
         private readonly StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
@@ -65,7 +75,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
 
     public function getCapabilities(): array
     {
-        return ['chat', 'embedding', 'vision'];
+        return ['chat', 'embedding', 'vision', 'image_generation'];
     }
 
     public function getDefaultModels(): array
@@ -311,6 +321,75 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
         throw new ProviderException('Image comparison is not supported by the OpenAI-compatible provider', $this->getName());
     }
 
+    // ==================== IMAGE GENERATION ====================
+
+    /**
+     * Text-to-image via the OpenAI Images API (`POST {base}/images/generations`).
+     *
+     * The body stays minimal on purpose: DALL-E fields such as `quality` and
+     * `style` are rejected by LocalAI and most self-hosted gateways. `response_format`
+     * is requested so we can persist bytes ourselves; a gateway that does not
+     * know the field is retried once without it.
+     *
+     * Attached reference images are refused. Editing would need `/images/edits`,
+     * which this provider does not speak, and silently dropping the attachment
+     * would tell the user a picture was edited when a new one was drawn.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return list<array{url: string, b64_json: ?string, revised_prompt: ?string}>
+     */
+    public function generateImage(string $prompt, array $options = []): array
+    {
+        $model = $this->requireModel($options);
+        $references = $options['images'] ?? [];
+        if (is_array($references) && [] !== $references) {
+            throw new ProviderException('This OpenAI-compatible endpoint generates a new image from text. It does not edit an attached picture. Remove the attachment, or pick an image model that can edit.', $this->getName());
+        }
+
+        $endpoint = $this->endpointForCall($options);
+        $body = [
+            'model' => $model,
+            'prompt' => $prompt,
+            'n' => $this->imageCount($options),
+            'response_format' => 'b64_json',
+        ];
+        $size = $options['size'] ?? null;
+        if (is_string($size) && 1 === preg_match('/^\d+x\d+$/', $size)) {
+            $body['size'] = $size;
+        }
+
+        $this->logger->info('OpenAI-compatible: generateImage', [
+            'endpoint' => $endpoint['name'],
+            'model' => $model,
+            'prompt_length' => strlen($prompt),
+            'n' => $body['n'],
+            'size' => $body['size'] ?? null,
+        ]);
+
+        $result = $this->postImages($endpoint, $body);
+        if ($result['status'] >= 400 && $this->errorMentions($result['payload'], 'response_format')) {
+            unset($body['response_format']);
+            $result = $this->postImages($endpoint, $body);
+        }
+
+        if ($result['status'] >= 400) {
+            $this->throwImageFailure($result['status'], $result['payload']);
+        }
+
+        return $this->normalizeGeneratedImages($result['payload'], $endpoint['base_url']);
+    }
+
+    public function createVariations(string $imageUrl, int $count = 1): array
+    {
+        throw new ProviderException('Image variations are not supported by the OpenAI-compatible provider. Generate a new image from a prompt instead.', $this->getName());
+    }
+
+    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
+    {
+        throw new ProviderException('Masked image editing is not supported by the OpenAI-compatible provider. Generate a new image from a prompt instead.', $this->getName());
+    }
+
     // ==================== INTERNALS ====================
 
     /**
@@ -358,12 +437,11 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
     }
 
     /**
-     * Build (and cache) an OpenAI client bound to the endpoint that serves the
-     * requested model.
-     *
      * @param array<string, mixed> $options
+     *
+     * @return array{name: string, label: string, base_url: string, api_key: string, headers: array<string, string>, capabilities: string[]}
      */
-    private function clientForCall(array $options): ClientContract
+    private function endpointForCall(array $options): array
     {
         $endpoint = $this->endpoints->resolveForModel(
             is_string($options['model'] ?? null) ? $options['model'] : null,
@@ -373,6 +451,13 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
         if (null === $endpoint) {
             throw new ProviderException('No OpenAI-compatible endpoint resolved for this model. Configure an endpoint in Admin and set "endpoint" in the model JSON.', $this->getName());
         }
+
+        return $endpoint;
+    }
+
+    private function clientForCall(array $options): ClientContract
+    {
+        $endpoint = $this->endpointForCall($options);
 
         $cacheKey = $endpoint['name'];
         if (isset($this->clients[$cacheKey])) {
@@ -397,6 +482,176 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
         ]);
 
         return $this->clients[$cacheKey] = $factory->make();
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function imageCount(array $options): int
+    {
+        $count = $options['n'] ?? 1;
+        if (!is_int($count) && !(is_string($count) && is_numeric($count))) {
+            return 1;
+        }
+
+        return max(1, min(4, (int) $count));
+    }
+
+    /**
+     * @param array{name: string, base_url: string, api_key: string, headers: array<string, string>} $endpoint
+     * @param array<string, mixed>                                                                   $body
+     *
+     * @return array{status: int, payload: array<string, mixed>}
+     */
+    private function postImages(array $endpoint, array $body): array
+    {
+        $headers = ['Accept' => 'application/json'];
+        if ('' !== $endpoint['api_key']) {
+            $headers['Authorization'] = 'Bearer '.$endpoint['api_key'];
+        }
+        foreach ($endpoint['headers'] as $name => $value) {
+            $headers[$name] = $value;
+        }
+
+        try {
+            $response = $this->httpClient->request('POST', rtrim($endpoint['base_url'], '/').'/images/generations', [
+                'headers' => $headers,
+                'json' => $body,
+                'timeout' => self::IMAGE_TIMEOUT_SECONDS,
+            ]);
+            $status = $response->getStatusCode();
+            try {
+                $decoded = $response->toArray(false);
+            } catch (\Throwable) {
+                $decoded = ['error' => ['message' => substr($response->getContent(false), 0, 500)]];
+            }
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new ProviderException('OpenAI-compatible image generation could not reach the endpoint: '.$e->getMessage(), $this->getName(), null, 0, $e);
+        }
+
+        return [
+            'status' => $status,
+            'payload' => $decoded,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function errorMentions(array $payload, string $needle): bool
+    {
+        return str_contains(strtolower($this->upstreamErrorText($payload)), strtolower($needle));
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function upstreamErrorText(array $payload): string
+    {
+        $error = $payload['error'] ?? null;
+        if (is_array($error)) {
+            $message = $error['message'] ?? '';
+            if (is_string($message) && '' !== $message) {
+                return $message;
+            }
+        }
+        if (is_string($error) && '' !== $error) {
+            return $error;
+        }
+
+        $encoded = json_encode($payload);
+
+        return is_string($encoded) ? $encoded : '';
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function throwImageFailure(int $status, array $payload): never
+    {
+        $text = $this->upstreamErrorText($payload);
+        if ('' === trim($text)) {
+            $text = 'HTTP '.$status;
+        }
+
+        if (false !== stripos($text, 'content_policy') || false !== stripos($text, 'safety')) {
+            throw ProviderException::contentBlocked($this->getName(), 'SAFETY', substr($text, 0, 300));
+        }
+
+        throw new ProviderException('OpenAI-compatible image generation failed: '.substr($text, 0, 300), $this->getName(), ['status_code' => $status], $status >= 400 && $status <= 599 ? $status : 0);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return list<array{url: string, b64_json: ?string, revised_prompt: ?string}>
+     */
+    private function normalizeGeneratedImages(array $payload, string $baseUrl): array
+    {
+        $data = $payload['data'] ?? null;
+        if (!is_array($data)) {
+            throw new ProviderException('OpenAI-compatible image generation returned no images.', $this->getName());
+        }
+
+        $images = [];
+        foreach ($data as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $b64 = isset($item['b64_json']) && is_string($item['b64_json']) && '' !== $item['b64_json']
+                ? $item['b64_json']
+                : null;
+            $url = isset($item['url']) && is_string($item['url']) && '' !== $item['url']
+                ? $item['url']
+                : null;
+
+            if (null !== $b64) {
+                $url = 'data:image/png;base64,'.$b64;
+            } elseif (null !== $url) {
+                $url = $this->absoluteImageUrl($url, $baseUrl);
+            } else {
+                continue;
+            }
+
+            $revised = $item['revised_prompt'] ?? null;
+            $images[] = [
+                'url' => $url,
+                'b64_json' => $b64,
+                'revised_prompt' => is_string($revised) ? $revised : null,
+            ];
+        }
+
+        if ([] === $images) {
+            throw new ProviderException('OpenAI-compatible image generation returned no images.', $this->getName());
+        }
+
+        return $images;
+    }
+
+    /**
+     * LocalAI sometimes returns a path on the gateway host (`/generated/x.png`)
+     * rather than an absolute URL. Join it to the endpoint origin, not to the
+     * `/v1` prefix, because generated files are served beside the API.
+     */
+    private function absoluteImageUrl(string $url, string $baseUrl): string
+    {
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://') || str_starts_with($url, 'data:')) {
+            return $url;
+        }
+
+        $parts = parse_url($baseUrl);
+        if (!is_array($parts) || !isset($parts['host'])) {
+            return $url;
+        }
+
+        $origin = ($parts['scheme'] ?? 'http').'://'.$parts['host'];
+        if (isset($parts['port'])) {
+            $origin .= ':'.$parts['port'];
+        }
+
+        return $origin.'/'.ltrim($url, '/');
     }
 
     /**

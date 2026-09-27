@@ -4,7 +4,8 @@ This file moved on 2026-09-17.
 
 | What | Where |
 | ---- | ----- |
-| **Live plan** (Wave 5 leftovers + Wave 6 backend integrations) | [`20260917_roadmap.md`](./20260917_roadmap.md) |
+| **Live order** (transcription first, then early intake) | [`20260927_roadmap.md`](./20260927_roadmap.md) |
+| Wave 5 leftovers + Wave 6 catalog | [`20260917_roadmap.md`](./20260917_roadmap.md) |
 | Frozen 2026-09-10 original | [`2026-archive/20260910_roadmap/20260910_roadmap_update.md`](./2026-archive/20260910_roadmap/20260910_roadmap_update.md) |
 | Frozen 2026-09-03 original | [`2026-archive/20260903_roadmap/20260903_roadmap.md`](./2026-archive/20260903_roadmap/20260903_roadmap.md) |
 

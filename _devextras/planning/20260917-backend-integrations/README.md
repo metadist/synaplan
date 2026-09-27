@@ -1,8 +1,11 @@
 # Wave 6 — Backend integrations
 
-**Status:** Plan drafted 2026-09-17. No product code until
+**Status:** Plan drafted 2026-09-17. No Integrations-page code until
 [`00_master_plan.md`](./00_master_plan.md) §0 is ticked.
-**Live overview:** [`../20260917_roadmap.md`](../20260917_roadmap.md) §6–§7.
+**Live order:** [`../20260927_roadmap.md`](../20260927_roadmap.md).
+Speech-to-text in the app is sprint E1 and does not wait for this folder.
+openDesk meeting notes start after that walk.
+**Catalog reference:** [`../20260917_roadmap.md`](../20260917_roadmap.md) §6–§7.
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md).
 
 Use **your** Synaplan instance the way people use Claude Code today: point
