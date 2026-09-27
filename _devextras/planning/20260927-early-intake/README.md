@@ -1,7 +1,7 @@
 # Early intake — 2026-09-27
 
 **Status:** Planned. No product code in the planning change.
-**Live order:** [`../20260927_roadmap.md`](../20260927_roadmap.md).
+**Live order:** [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d.
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md).
 
 | File | Content |

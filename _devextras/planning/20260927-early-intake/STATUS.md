@@ -1,7 +1,8 @@
 # Status — Early intake (2026-09-27)
 
 Plan of record: [`00_master_plan.md`](./00_master_plan.md).
-Live order: [`../20260927_roadmap.md`](../20260927_roadmap.md).
+Live order: [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d
+(combined with [#2211](https://github.com/metadist/synaplan/pull/2211)).
 
 ## Steps
 
@@ -19,7 +20,7 @@ Live order: [`../20260927_roadmap.md`](../20260927_roadmap.md).
 
 | Date | Decision |
 | ---- | -------- |
-| 2026-09-27 | Sound transcription is the next sprint. Telegram is the early channel. #2204, #2205, #2206 ride along because they are small. openDesk media waits until J-STT-1 is walked. |
+| 2026-09-27 | Sound transcription is the next feature sprint (row 1b) beside the UX close-out from [#2211](https://github.com/metadist/synaplan/pull/2211). Telegram is row 1d. #2204, #2205, #2206 are row 1c. openDesk meeting notes (row 2) wait until J-STT-1 is walked. |
 
 ## Review log
 

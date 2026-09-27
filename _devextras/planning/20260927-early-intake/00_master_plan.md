@@ -2,7 +2,7 @@
 
 **Status:** Draft 2026-09-27. Tick §0 before the first product PR of
 each sprint.
-**Order:** [`../20260927_roadmap.md`](../20260927_roadmap.md) §1.
+**Order:** [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d.
 **Class:** E1 transcription and #2204 are `ota-candidate` where the UI
 changes; #2205 and #2206 are compose and docs (`no-app-impact` /
 backend deploy, not a store binary). E2 is `ota-candidate` for the

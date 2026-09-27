@@ -2,9 +2,9 @@
 
 **Status:** Binding from 2026-09-07. Copy and journeys are reviewed **before**
 the Vue is built, not after. This is the UX contract for every remaining
-sprint in the live order
-[`20260927_roadmap.md`](./20260927_roadmap.md)
-(Wave 5 / Wave 6 reference:
+sprint in the live plan
+[`20260925_roadmap.md`](./20260925_roadmap.md)
+(2026-09-17 reference, now a stub:
 [`20260917_roadmap.md`](./20260917_roadmap.md);
 archived overviews:
 [`2026-archive/20260910_roadmap/20260910_roadmap_update.md`](./2026-archive/20260910_roadmap/20260910_roadmap_update.md),

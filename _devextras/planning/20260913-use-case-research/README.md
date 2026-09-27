@@ -12,9 +12,8 @@ this change.
 turn that answer into work. Every case is written so a non-technical reader
 can recognise their own situation.
 **Companion:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
-(U1–U12, binding), [`../20260927_roadmap.md`](../20260927_roadmap.md)
-(live order), and [`../20260917_roadmap.md`](../20260917_roadmap.md)
-(Wave 5 / Wave 6 reference). This file does not replace them; it feeds them.
+(U1–U12, binding) and [`../20260925_roadmap.md`](../20260925_roadmap.md)
+(live plan). This file does not replace either; it feeds them.
 
 ---
 

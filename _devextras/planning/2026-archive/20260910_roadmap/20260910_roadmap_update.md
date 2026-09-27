@@ -1,9 +1,7 @@
 # Archived — Roadmap update 2026-09-10
 
-Frozen Wave 4 / Intermezzo / Wave 5 overview. **Live order:**
-[`../../20260927_roadmap.md`](../../20260927_roadmap.md).
-Wave 5 / Wave 6 reference:
-[`../../20260917_roadmap.md`](../../20260917_roadmap.md).
+Frozen Wave 4 / Intermezzo / Wave 5 overview. **Live plan:**
+[`../../20260925_roadmap.md`](../../20260925_roadmap.md).
 
 Relative links below were rewritten for this archive folder.
 

@@ -99,9 +99,9 @@ guesser already classifies `flux` as `text2pic`.
 # Feature prompts (vibe-code later)
 
 Placement on the live order
-([`20260927_roadmap.md`](./20260927_roadmap.md)): #2204, #2205, and
-#2206 are the easy half of sprint E1. #2202 is sprint E2 (early, own
-PR). Generate from
+([`20260925_roadmap.md`](./20260925_roadmap.md) §1): #2204, #2205, and
+#2206 are row 1c. #2202 is row 1d (early, own PR). In-app transcription
+is row 1b. Generate from
 [`20260927-early-intake/`](./20260927-early-intake/README.md).
 
 These are the latest feature issues. The same brief is the starting

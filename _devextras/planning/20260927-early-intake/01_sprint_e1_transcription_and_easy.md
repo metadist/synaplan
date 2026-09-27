@@ -1,7 +1,10 @@
 # E1 — Sound transcription, then three easy fixes
 
 **Sprint:** E1 of [`00_master_plan.md`](./00_master_plan.md).
-**Goal:** Next coding sprint. Transcription is the first commit series.
+Row 1b–1c of [`../20260925_roadmap.md`](../20260925_roadmap.md).
+Runs beside the UX close-out. It does not wait for that walk list to
+finish.
+**Goal:** Next feature sprint. Transcription is the first commit series.
 #2204, #2205, and #2206 follow in the same window as separate commits.
 
 ## User-flow
