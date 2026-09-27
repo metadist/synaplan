@@ -16,6 +16,8 @@ export function speechFailureMessageKey(
     case 'model_missing':
       return 'chatInput.speechModelMissing'
     default:
-      return source === 'file' ? 'chatInput.audioTranscriptionFailed' : 'chatInput.dictationSttFailed'
+      return source === 'file'
+        ? 'chatInput.audioTranscriptionFailed'
+        : 'chatInput.dictationSttFailed'
   }
 }

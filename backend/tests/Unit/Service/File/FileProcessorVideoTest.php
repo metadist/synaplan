@@ -60,9 +60,11 @@ class FileProcessorVideoTest extends TestCase
             tikaMinEntropy: 2.0,
         );
 
-        // No external STT and no local whisper -> external API transcription path.
+        // Cloud speech is configured; local whisper is not. The video path
+        // transcribes through that cloud model and does not call a provider
+        // that was never set up.
         $this->whisperService->method('isAvailable')->willReturn(false);
-        $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
+        $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(true);
     }
 
     protected function tearDown(): void
