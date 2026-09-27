@@ -1,3 +1,15 @@
+# Published image. Copy this file and deploy/selfhost.env.example (as .env)
+# into an empty directory. Set SYNAPLAN_VERSION to a release tag, never latest.
+# Then: docker compose up -d
+# Open http://127.0.0.1:8000 unless you changed SYNAPLAN_HTTP_BIND or
+# SYNAPLAN_HTTP_PORT. This file does not build from source and does not need
+# the git checkout.
+# Two requirements before the first start (exact steps: root README, "Your
+# first answer in three steps"): replace every replace-with-* secret
+# placeholder with a generated value — starting with them means shared, public
+# credentials — and fetch _docker/centrifugo/config.json to
+# ../_docker/centrifugo/config.json relative to this file. The realtime
+# service mounts that path and fails its config check without it.
 name: "${COMPOSE_PROJECT_NAME:-synaplan}"
 
 x-app-image: &app-image "${SYNAPLAN_IMAGE:-ghcr.io/metadist/synaplan}:${SYNAPLAN_VERSION:?Set SYNAPLAN_VERSION to a published compatible immutable SemVer release}"
