@@ -7,9 +7,9 @@ Synaplan exposes an Anthropic Messages API-compatible gateway so Claude Code and
 
 ## Quick start (Claude Code)
 
-1. Create an API key in Synaplan (**Channels → API Keys**).
-2. Enable the gateway under **Channels → AI Agents** (admin: turn on “Enable Messages gateway”).
-3. Save a BYO Anthropic key on that page (or allow the operator key carefully).
+1. Create an API key in Synaplan (**Manage → Developer & devices → API Keys**).
+2. Enable the gateway under **Manage → Developer & devices → Coding clients** (admin: turn on “Enable Messages gateway”).
+3. Save your own Anthropic key under **Manage → Your AI accounts** (or ask an admin to allow the server key).
 4. Configure Claude Code:
 
 ```bash
@@ -68,7 +68,7 @@ search or vision:
 | `VISION_MAX_IMAGES` | `0` | Max image blocks forwarded per request, newest kept; `0` means unlimited |
 | `CONTEXT_INJECTION_ENABLED` | `0` | Append session-stable RAG/memory system block |
 
-Every one of these is editable in the UI under **Channels → AI Agents** (admins
+Every one of these is editable in the UI under **Manage → Developer & devices → Coding clients** (admins
 only), grouped by what it controls: access, tool calling, images, context and
 session, connection. Because several of them read `auto`, the tool calling
 section also lists what the gateway actually runs server-side right now
@@ -192,7 +192,7 @@ This routing works technically; Anthropic does not officially support Claude Cod
 - Tool/web search/vision integration plan: [CLAUDE_CODE_COMPATIBILITY_PLAN.md](./CLAUDE_CODE_COMPATIBILITY_PLAN.md)
 - User docs: [docs.synaplan.com — Claude Code](https://docs.synaplan.com/) (page `claude-code`)
 - OpenAI-compatible sibling: [OPENAI_COMPATIBLE_API.md](./OPENAI_COMPATIBLE_API.md)
-- UI: **Channels → AI Agents**
+- UI: **Manage → Developer & devices → Coding clients**
 - Smoke scripts: `_devextras/testing/messages-gateway/`
 - Synaplan Desktop (agent client, server side): [DESKTOP.md](./DESKTOP.md)
 - File work (`code_execution` / `compute:run`): [COMPUTE.md](./COMPUTE.md)

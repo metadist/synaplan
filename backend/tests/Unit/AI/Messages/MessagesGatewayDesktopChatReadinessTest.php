@@ -94,23 +94,32 @@ class MessagesGatewayDesktopChatReadinessTest extends TestCase
         self::assertStringNotContainsString('gateway', strtolower($result['message']));
     }
 
-    public function testMissingProviderKeyForClaudeCodeStaysUnauthorized(): void
+    public function testMissingProviderKeyForClaudeCodeIsNotRetried(): void
     {
         $result = $this->gateway()->prepare($this->claudeRequest(), $this->user());
 
-        self::assertSame(401, $result['status']);
-        self::assertSame('authentication_error', $result['error_type']);
-        self::assertStringContainsString('No API key available', $result['message']);
+        self::assertFalse($result['ok']);
+        self::assertSame(403, $result['status']);
+        self::assertSame('permission_error', $result['error_type']);
+        self::assertStringContainsString('Your AI accounts', $result['message']);
+        self::assertStringContainsString('Coding clients', $result['message']);
+        self::assertStringContainsString('Nothing was sent', $result['message']);
+        self::assertStringNotContainsString('Channels', $result['message']);
+        self::assertStringNotContainsString('AI Agents', $result['message']);
+        self::assertStringNotContainsString('operator-key', $result['message']);
     }
 
-    public function testFullKeyThatNamesItselfDesktopStaysUnauthorized(): void
+    public function testFullKeyThatNamesItselfDesktopUsesTheCodingClientMessage(): void
     {
         $this->desktopEnabled = false;
 
         $result = $this->gateway()->prepare($this->claudeRequest(userAgent: 'synaplan-desktop/0.1'), $this->user());
 
-        self::assertSame(401, $result['status']);
-        self::assertStringContainsString('No API key available', $result['message']);
+        self::assertSame(403, $result['status']);
+        self::assertSame('permission_error', $result['error_type']);
+        self::assertStringContainsString('Your AI accounts', $result['message']);
+        self::assertStringNotContainsString('still paired', $result['message']);
+        self::assertStringNotContainsString('turned off', $result['message']);
     }
 
     public function testWithoutDesktopConfigAPairedComputerKeepsTheGatewaySentence(): void

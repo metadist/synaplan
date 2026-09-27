@@ -141,6 +141,19 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
      */
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
+        // Claude Code parses the Anthropic error envelope. The Synaplan
+        // {success, error, message} shape is an unhelpful parse failure, and
+        // a 401 of that shape is also retried for minutes.
+        if (str_starts_with($request->getPathInfo(), '/v1/messages')) {
+            return new JsonResponse([
+                'type' => 'error',
+                'error' => [
+                    'type' => 'authentication_error',
+                    'message' => $exception->getMessage(),
+                ],
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
         return new JsonResponse([
             'success' => false,
             'error' => 'Authentication failed',

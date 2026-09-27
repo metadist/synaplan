@@ -248,13 +248,14 @@ final readonly class MessagesGateway
                 );
             }
 
+            // 403 permission_error, same as a disabled gateway: Claude Code retries
+            // 401 for minutes. The Synaplan key is valid; the provider key is missing.
             return $this->err(
-                401,
-                'authentication_error',
+                403,
+                'permission_error',
                 sprintf(
-                    'No API key available for provider `%s`. Save a BYO key in Channels → AI Agents%s.',
+                    'No API key available for provider `%s`. Save your own key under Manage → Your AI accounts, or ask an admin to allow the server key under Manage → Developer & devices → Coding clients. Nothing was sent.',
                     $resolved['provider'],
-                    $allowOperator ? '' : ' (operator-key fallback is disabled)',
                 ),
             );
         }
