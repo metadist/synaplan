@@ -583,13 +583,63 @@ const maskAPIKey = (key: string): string => {
   return `${key.substring(0, 12)}...${key.substring(key.length - 8)}`
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+let previouslyFocused: HTMLElement | null = null
+let restoreFocusTimer: ReturnType<typeof setTimeout> | null = null
+
+const focusableInPanel = (): HTMLElement[] => {
+  if (!keyModalPanel.value) return []
+  return Array.from(keyModalPanel.value.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1
+  )
+}
+
+const clearRestoreFocus = () => {
+  if (restoreFocusTimer !== null) {
+    clearTimeout(restoreFocusTimer)
+    restoreFocusTimer = null
+  }
+}
+
 const closeKeyModal = () => {
   showKeyModal.value = false
   newlyCreatedKey.value = ''
+  const restore = previouslyFocused
+  previouslyFocused = null
+  clearRestoreFocus()
+  // Restoring focus inside the key event re-activates the control that opened
+  // the dialog. Move focus after that event has finished.
+  restoreFocusTimer = setTimeout(() => {
+    restoreFocusTimer = null
+    restore?.focus()
+  }, 0)
 }
 
 const onKeyModalKeydown = (event: KeyboardEvent) => {
-  if (!showKeyModal.value || event.key !== 'Escape') return
+  if (!showKeyModal.value) return
+
+  if (event.key === 'Tab') {
+    const nodes = focusableInPanel()
+    if (nodes.length === 0) {
+      event.preventDefault()
+      return
+    }
+    const first = nodes[0]
+    const last = nodes[nodes.length - 1]
+    const active = document.activeElement
+    if (event.shiftKey && (active === first || !keyModalPanel.value?.contains(active))) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault()
+      first.focus()
+    }
+    return
+  }
+
+  if (event.key !== 'Escape') return
   event.preventDefault()
   closeKeyModal()
 }
@@ -677,8 +727,11 @@ const formatDate = (timestamp: number): string => {
 
 watch(showKeyModal, async (open) => {
   if (!open) return
+  clearRestoreFocus()
+  previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
   await nextTick()
-  keyModalPanel.value?.focus()
+  const nodes = focusableInPanel()
+  ;(nodes[0] ?? keyModalPanel.value)?.focus()
 })
 
 onMounted(() => {
@@ -687,6 +740,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearRestoreFocus()
   document.removeEventListener('keydown', onKeyModalKeydown)
 })
 

@@ -95,6 +95,7 @@ describe('APIKeysConfiguration — one-time key dialog', () => {
 
     expect(dialog()?.getAttribute('role')).toBe('dialog')
     expect(dialog()?.getAttribute('aria-modal')).toBe('true')
+    expect(document.activeElement).toBe(document.querySelector('[data-testid="btn-copy"]'))
     expect(dialog()?.textContent).toContain(SECRET)
     expect(document.body.textContent).not.toContain('close automatically')
 
@@ -131,5 +132,15 @@ describe('APIKeysConfiguration — one-time key dialog', () => {
     await click('modal-api-key-created')
     expect(dialog()).toBeNull()
     expect(document.body.textContent).not.toContain(SECRET)
+  })
+
+  it('keeps Tab inside the dialog', async () => {
+    await openDialog()
+    const close = document.querySelector<HTMLElement>('[data-testid="btn-close"]')
+    close?.focus()
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }))
+
+    expect(document.activeElement).toBe(document.querySelector('[data-testid="btn-copy"]'))
   })
 })
