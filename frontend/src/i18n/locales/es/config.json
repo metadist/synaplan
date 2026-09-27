@@ -640,7 +640,6 @@
       "errorActivating": "Error al activar clave API",
       "errorDeleting": "Error al eliminar clave API",
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
-      "usageCount": "solicitudes",
       "scopes": {
         "hint": "Déjelo sin marcar para acceso completo. Marcar Personas limita esta clave. El trabajo con archivos añade ámbitos de chat y archivos para ejecutar scripts — no otorga acceso de administrador.",
         "iamRead": "Personas — ver grupos",

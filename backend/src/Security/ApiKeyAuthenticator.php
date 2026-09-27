@@ -107,9 +107,9 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
             throw new AuthenticationException('API key is inactive');
         }
 
-        // Update last used timestamp (async to not slow down request)
-        $apiKeyEntity->updateLastUsed();
-        $this->apiKeyRepository->save($apiKeyEntity, false); // Don't flush immediately
+        // Persist immediately. save($entity, false) never flushed on /v1
+        // requests, so Last used stayed empty for keys in active use.
+        $this->apiKeyRepository->touchLastUsed($apiKeyEntity);
 
         $this->logger->info('API Key authentication successful', [
             'key_id' => $apiKeyEntity->getId(),

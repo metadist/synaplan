@@ -107,8 +107,8 @@ class ApiKeyAuthenticatorTest extends TestCase
 
         $this->apiKeyRepository
             ->expects($this->once())
-            ->method('save')
-            ->with($apiKey, false);
+            ->method('touchLastUsed')
+            ->with($apiKey);
 
         $passport = $this->authenticator->authenticate($request);
 
@@ -180,7 +180,7 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->apiKeyRepository->expects(self::any())->method('findActiveByKey')
             ->with('sk_valid_api_key_here')
             ->willReturn($apiKey);
-        $this->apiKeyRepository->method('save');
+        $this->apiKeyRepository->method('touchLastUsed');
 
         $passport = $this->authenticator->authenticate($request);
 
@@ -203,7 +203,10 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->apiKeyRepository->expects(self::any())->method('findActiveByKey')
             ->with('sk-valid-key')
             ->willReturn($apiKey);
-        $this->apiKeyRepository->method('save');
+        $this->apiKeyRepository
+            ->expects($this->once())
+            ->method('touchLastUsed')
+            ->with($apiKey);
 
         $passport = $this->authenticator->authenticate($request);
 
@@ -224,7 +227,7 @@ class ApiKeyAuthenticatorTest extends TestCase
         $request->headers->set('X-API-Key', 'valid-key');
 
         $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
-        $this->apiKeyRepository->method('save');
+        $this->apiKeyRepository->method('touchLastUsed');
 
         $this->logger
             ->expects($this->exactly(2))

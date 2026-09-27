@@ -888,7 +888,6 @@
       "errorActivating": "Échec de l’activation de la clé API",
       "errorDeleting": "Échec de la suppression de la clé API",
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
-      "usageCount": "requêtes",
       "scopes": {
         "hint": "Laissez décoché pour un accès complet. Cocher Personnes limite cette clé. Le travail sur fichiers ajoute les portées chat et fichiers pour exécuter des scripts — pas d’accès administrateur.",
         "iamRead": "Personnes — voir les groupes",

@@ -890,7 +890,6 @@
       "errorActivating": "Failed to activate API key",
       "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
-      "usageCount": "requests",
       "scopes": {
         "hint": "Leave unchecked for full access. Checking People limits this key to People. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
         "iamRead": "People — view groups",
