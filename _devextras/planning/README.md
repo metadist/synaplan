@@ -10,7 +10,8 @@ paths were renamed on 2026-09-17.
 
 | Path | Why it stays here |
 | ---- | ----------------- |
-| [`20260925_roadmap.md`](./20260925_roadmap.md) | Current roadmap (UX close-out, openDesk meeting notes minimum, Wave 6 integrations) |
+| [`20260925_roadmap.md`](./20260925_roadmap.md) | Current roadmap (UX close-out, in-app transcription, Telegram, openDesk meeting notes, Wave 6) |
+| [`20260927-early-intake/`](./20260927-early-intake/README.md) | Sprint files for transcription, the easy issues, and Telegram |
 | [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: catalog, Connect UI, openDesk STT, editor / office clients |
 | [`20260917_roadmap.md`](./20260917_roadmap.md) | Stub → live plan + frozen 2026-09-17 text |
 | [`20260910_roadmap_update.md`](./20260910_roadmap_update.md) | Stub → live plan + frozen 2026-09-10 text |
