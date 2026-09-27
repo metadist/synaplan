@@ -15,6 +15,9 @@
 #
 # Usage:
 #   ./scripts/compose-up.sh -f docker-compose-minimal.yml
+# Host ports are optional. Copy .env.example to .env and set SYNAPLAN_*_PORT.
+# Unset, every published port stays at today's number. Container DNS and
+# healthchecks stay on the container port (the right-hand side).
 #
 # To switch to standard install (with Ollama + Whisper):
 #   docker compose -f docker-compose-minimal.yml down
@@ -49,7 +52,7 @@ services:
         ============================================================
          Synaplan (minimal install) is starting
         ============================================================
-         OPEN  http://localhost:5173  RIGHT NOW -- a live status
+         OPEN  http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}  RIGHT NOW -- a live status
          screen shows every boot step and switches to the app
          automatically.
 
@@ -60,11 +63,11 @@ services:
            - running database migrations + seeding
 
          When everything is ready, open:
-           App      http://localhost:5173
+           App      http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
            Login    admin@synaplan.com / admin123
-           API      http://localhost:8000  (docs: /api/doc)
-           Mail UI  http://localhost:8025  (MailHog)
-           DB UI    http://localhost:8082  (phpMyAdmin)
+           API      http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}  (docs: /api/doc)
+           Mail UI  http://localhost:${SYNAPLAN_MAILHOG_UI_PORT:-8025}  (MailHog)
+           DB UI    http://localhost:${SYNAPLAN_PHPMYADMIN_PORT:-8082}  (phpMyAdmin)
 
          This minimal install uses cloud AI only: the app greets
          you with a first-run setup screen where you paste one
@@ -126,7 +129,7 @@ services:
         ============================================================
          Synaplan is READY (took $$(elapsed)s)
 
-           Open   http://localhost:5173
+           Open   http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
            Login  admin@synaplan.com / admin123
         ============================================================
 
@@ -149,8 +152,11 @@ services:
       # Optional building blocks the boot page lists with a live on/off state.
       # No Qdrant here on purpose (see header) -- the page says so explicitly.
       BOOT_STATUS_COMPANIONS: centrifugo=centrifugo:8000,tika=tika:9998,collabora=collabora:9980,tts=tts:10200
+      SYNAPLAN_BACKEND_PORT: ${SYNAPLAN_BACKEND_PORT:-8000}
+      SYNAPLAN_MAILHOG_UI_PORT: ${SYNAPLAN_MAILHOG_UI_PORT:-8025}
+      SYNAPLAN_PHPMYADMIN_PORT: ${SYNAPLAN_PHPMYADMIN_PORT:-8082}
     ports:
-      - "5173:5173"
+      - "${SYNAPLAN_FRONTEND_PORT:-5173}:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
@@ -218,7 +224,7 @@ services:
       - path: backend/.env
         required: false
     ports:
-      - "8000:80"
+      - "${SYNAPLAN_BACKEND_PORT:-8000}:80"
     volumes:
       - ./backend:/var/www/backend
       - /var/www/backend/var/cache
@@ -232,9 +238,9 @@ services:
     environment:
       APP_ENV: dev
       # APP_SECRET loaded from backend/.env (env_file above)
-      APP_URL: http://localhost:8000
+      APP_URL: http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}
       PLUGINS_DIR: /plugins
-      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URL: http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       # No Ollama - use external AI providers
@@ -460,7 +466,7 @@ services:
       MYSQL_PASSWORD: synaplan_password
       MYSQL_ROOT_PASSWORD: root_password
     ports:
-      - "3307:3306"
+      - "${SYNAPLAN_DB_PORT:-3307}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./_devextras/db-init:/docker-entrypoint-initdb.d:ro
@@ -480,7 +486,7 @@ services:
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:
-      - "9999:9998"
+      - "${SYNAPLAN_TIKA_PORT:-9999}:9998"
     healthcheck:
       test: ["CMD", "sh", "-c", "wget -qO- http://localhost:9998/version >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -501,7 +507,7 @@ services:
       PMA_USER: synaplan_user
       PMA_PASSWORD: synaplan_password
     ports:
-      - "8082:80"
+      - "${SYNAPLAN_PHPMYADMIN_PORT:-8082}:80"
     depends_on:
       - db
     restart: unless-stopped
@@ -513,8 +519,8 @@ services:
     image: mailhog/mailhog:latest@sha256:8d76a3d4ffa32a3661311944007a415332c4bb855657f4f6c57996405c009bea
     container_name: synaplan-mailhog
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+      - "${SYNAPLAN_MAILHOG_SMTP_PORT:-1025}:1025"  # SMTP
+      - "${SYNAPLAN_MAILHOG_UI_PORT:-8025}:8025"  # Web UI
     restart: unless-stopped
     networks:
       - synaplan-network

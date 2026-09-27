@@ -8,9 +8,13 @@
 # Usage:
 #   make up
 #   # or: ./scripts/compose-up.sh
-# Starts the boot-status page on :5173 first, then pulls/starts the rest.
+# Host ports are optional. Copy .env.example to .env and set SYNAPLAN_*_PORT.
+# Unset, every published port stays at today's number. Container DNS and
+# healthchecks stay on the container port (the right-hand side).
+# Starts the boot-status page on SYNAPLAN_FRONTEND_PORT first (5173 when
+# unset), then pulls/starts the rest.
 # A plain `docker compose up -d` still works but waits for every image pull
-# before :5173 answers.
+# before that port answers.
 #
 # To add local AI (Ollama + the bge-m3 embedding model, ~1 GB extra):
 #   COMPOSE_PROFILES=local-ai docker compose up -d
@@ -33,7 +37,8 @@
 #                    searxng  (self-hosted web search)
 #                    oidc     (Keycloak, SSO test realm)
 #                    -> COMPOSE_PROFILES=local-ai,office docker compose up -d
-# The boot page at http://localhost:5173 shows which blocks are running.
+# The boot page is http://localhost:<SYNAPLAN_FRONTEND_PORT> (5173 when unset).
+# It shows which blocks are running.
 #
 services:
   # ----------------------------------------------------------------------------
@@ -64,7 +69,7 @@ services:
         ============================================================
          Synaplan is starting
         ============================================================
-         OPEN  http://localhost:5173  RIGHT NOW -- a live status
+         OPEN  http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}  RIGHT NOW -- a live status
          screen shows every boot step (database, backend, AI model
          download) and switches to the app automatically.
 
@@ -75,11 +80,11 @@ services:
            - running database migrations + seeding
 
          When everything is ready:
-           App      http://localhost:5173
+           App      http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
            Login    admin@synaplan.com / admin123
-           API      http://localhost:8000  (docs: /api/doc)
-           Mail UI  http://localhost:8025  (MailHog)
-           DB UI    http://localhost:8082  (phpMyAdmin)
+           API      http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}  (docs: /api/doc)
+           Mail UI  http://localhost:${SYNAPLAN_MAILHOG_UI_PORT:-8025}  (MailHog)
+           DB UI    http://localhost:${SYNAPLAN_PHPMYADMIN_PORT:-8082}  (phpMyAdmin)
 
          Chat needs one AI provider key -- the app greets you with
          a first-run setup screen and guides you (free key: Groq).
@@ -145,7 +150,7 @@ services:
         ============================================================
          Synaplan is READY (took $$(elapsed)s)
 
-           Open   http://localhost:5173
+           Open   http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
            Login  admin@synaplan.com / admin123
         ============================================================
 
@@ -179,8 +184,12 @@ services:
       # (TCP probe per entry). A profile that is not enabled leaves the host
       # name unresolvable, so the block shows as "off" with its enable command.
       BOOT_STATUS_COMPANIONS: qdrant=qdrant:6333,centrifugo=centrifugo:8000,tika=tika:9998,collabora=collabora:9980,tts=tts:10200
+      # Host ports the boot page links to. Probes above stay on container ports.
+      SYNAPLAN_BACKEND_PORT: ${SYNAPLAN_BACKEND_PORT:-8000}
+      SYNAPLAN_MAILHOG_UI_PORT: ${SYNAPLAN_MAILHOG_UI_PORT:-8025}
+      SYNAPLAN_PHPMYADMIN_PORT: ${SYNAPLAN_PHPMYADMIN_PORT:-8082}
     ports:
-      - "5173:5173"
+      - "${SYNAPLAN_FRONTEND_PORT:-5173}:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
@@ -277,7 +286,7 @@ services:
       - path: backend/.env
         required: false
     ports:
-      - "8000:80"
+      - "${SYNAPLAN_BACKEND_PORT:-8000}:80"
     volumes:
       - ./backend:/var/www/backend
       # Writable Symfony cache inside the container. Bind-mounted ./backend/var/cache often
@@ -301,9 +310,9 @@ services:
       # Local Docker Nextcloud (http://nextcloud) — ignored unless APP_ENV=dev.
       DAV_ALLOW_INSECURE_LOCAL: "1"
       # APP_SECRET loaded from backend/.env (env_file above)
-      APP_URL: http://localhost:8000
+      APP_URL: http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}
       PLUGINS_DIR: /plugins
-      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URL: http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       # Empty until the `local-ai` profile sets it in the command below. An
@@ -702,8 +711,8 @@ services:
       DAV_ALLOW_INSECURE_LOCAL: "1"
       # Public URLs, same as the backend: approval digest/instant mail
       # builds browser links from FRONTEND_URL ?? APP_URL.
-      APP_URL: http://localhost:8000
-      FRONTEND_URL: http://localhost:5173
+      APP_URL: http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}
+      FRONTEND_URL: http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
@@ -763,7 +772,7 @@ services:
       MYSQL_PASSWORD: synaplan_password
       MYSQL_ROOT_PASSWORD: root_password
     ports:
-      - "3307:3306"
+      - "${SYNAPLAN_DB_PORT:-3307}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./_devextras/db-init:/docker-entrypoint-initdb.d:ro
@@ -869,7 +878,7 @@ services:
     image: ollama/ollama:latest@sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551
     container_name: synaplan-ollama
     ports:
-      - "11435:11434"
+      - "${SYNAPLAN_OLLAMA_PORT:-11435}:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
@@ -913,7 +922,7 @@ services:
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:
-      - "9999:9998"
+      - "${SYNAPLAN_TIKA_PORT:-9999}:9998"
     # Healthcheck uses bash /dev/tcp + HTTP probe (the apache/tika image has no
     # curl/wget). Measures the round-trip on /version and treats anything
     # slower than 3000 ms as not-yet-ready -- Tika's JVM warm-up can keep the
@@ -1012,7 +1021,7 @@ services:
       PMA_USER: synaplan_user
       PMA_PASSWORD: synaplan_password
     ports:
-      - "8082:80"
+      - "${SYNAPLAN_PHPMYADMIN_PORT:-8082}:80"
     depends_on:
       - db
     restart: unless-stopped
@@ -1024,8 +1033,8 @@ services:
     image: mailhog/mailhog:latest@sha256:8d76a3d4ffa32a3661311944007a415332c4bb855657f4f6c57996405c009bea
     container_name: synaplan-mailhog
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+      - "${SYNAPLAN_MAILHOG_SMTP_PORT:-1025}:1025"  # SMTP
+      - "${SYNAPLAN_MAILHOG_UI_PORT:-8025}:8025"  # Web UI
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -1055,14 +1064,14 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
       KC_FEATURES: token-exchange:v1,admin-fine-grained-authz:v1
-      KC_HOSTNAME: ${KC_HOSTNAME:-https://host.docker.internal:8443}
+      KC_HOSTNAME: ${KC_HOSTNAME:-https://host.docker.internal:${SYNAPLAN_KEYCLOAK_HTTPS_PORT:-8443}}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HOSTNAME_STRICT: "false"
       KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/cert.pem
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/key.pem
     ports:
-      - "8080:8080"
-      - "8443:8443"
+      - "${SYNAPLAN_KEYCLOAK_HTTP_PORT:-8080}:8080"
+      - "${SYNAPLAN_KEYCLOAK_HTTPS_PORT:-8443}:8443"
     volumes:
       - keycloak_certs:/opt/keycloak/certs:ro
     healthcheck:
@@ -1085,8 +1094,8 @@ services:
     entrypoint: ["/bin/bash", "/setup/setup.sh"]
     environment:
       KC_SERVER: http://keycloak:8080
-      KC_CALLBACK: http://localhost:8000/api/v1/auth/keycloak/callback
-      KC_ORIGIN: http://localhost:8000
+      KC_CALLBACK: http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}/api/v1/auth/keycloak/callback
+      KC_ORIGIN: http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}
       KC_CLIENT_ID: ${OIDC_CLIENT_ID:-synaplan-app}
       KC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-test-oidc-secret}
     volumes:
@@ -1209,7 +1218,7 @@ services:
     image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
     container_name: synaplan-qdrant
     ports:
-      - "6333:6333"
+      - "${SYNAPLAN_QDRANT_PORT:-6333}:6333"
     volumes:
       - qdrant_storage:/qdrant/storage
     restart: unless-stopped
