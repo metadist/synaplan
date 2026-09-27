@@ -67,7 +67,7 @@ final class AdminOpenAiEndpointsController extends AbstractController
                 new OA\Property(property: 'base_url', type: 'string', example: 'https://localai.example.com/v1'),
                 new OA\Property(property: 'api_key', type: 'string', nullable: true, description: 'Omit or send null to keep the existing key; empty string clears it'),
                 new OA\Property(property: 'headers', type: 'object', nullable: true),
-                new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'vectorize', 'pic2text']),
+                new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'vectorize', 'pic2text', 'text2pic']),
             ]
         )
     )]

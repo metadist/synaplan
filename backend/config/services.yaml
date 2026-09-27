@@ -567,6 +567,7 @@ services:
             - { name: 'app.ai.chat', key: 'openaicompatible' }
             - { name: 'app.ai.embedding', key: 'openaicompatible' }
             - { name: 'app.ai.vision', key: 'openaicompatible' }
+            - { name: 'app.ai.image_generation', key: 'openaicompatible' }
 
     # AI Facade
     App\AI\Service\AiFacade:

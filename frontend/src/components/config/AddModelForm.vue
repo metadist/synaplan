@@ -152,8 +152,9 @@ const { success, error: showError } = useNotification()
 const OPENAI_COMPATIBLE_SERVICE = 'OpenAICompatible'
 
 // Full set of BTAG capabilities used across the model catalog. When an
-// endpoint is selected we restrict to what that endpoint advertises, since
-// the OpenAI-compatible provider only implements chat/vectorize/pic2text.
+// endpoint is selected we restrict to what that endpoint advertises.
+// text2pic is included: the OpenAI-compatible provider calls
+// POST /images/generations on that endpoint.
 const ALL_TAGS = [
   'sort',
   'chat',

@@ -126,7 +126,7 @@ final class ChatCompletionsToolSupportTest extends TestCase
     public function testUnknownOpenAiCompatibleModelStaysProviderCapable(): void
     {
         $registry = $this->createStub(\App\AI\Credential\OpenAiCompatibleEndpointRegistry::class);
-        $provider = new OpenAICompatibleProvider($registry, new NullLogger(), '/tmp');
+        $provider = new OpenAICompatibleProvider($registry, new NullLogger(), new \Symfony\Component\HttpClient\MockHttpClient(), '/tmp');
         self::assertInstanceOf(ToolCallingChatProviderInterface::class, $provider);
         self::assertTrue($provider->supportsToolCalling('local-llama'));
     }
