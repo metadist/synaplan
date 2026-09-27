@@ -13,6 +13,7 @@ import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, isMediaPartType } from '@/utils/mediaParts'
 import { isChannelSource } from '@/utils/channelSource'
+import { collapseApiToolTurn } from '@/utils/apiToolTurn'
 import { extractPastedBlocks } from '@/utils/pastedContent'
 import {
   buildUploadUrl,
@@ -155,6 +156,10 @@ export function parseContentWithThinking(
   content: string,
   role: 'user' | 'assistant' = 'assistant'
 ): Part[] {
+  if (role === 'user') {
+    content = collapseApiToolTurn(content)
+  }
+
   // Handle special file generation markers from backend
   if (content.startsWith('__FILE_GENERATED__:')) {
     const filename = content.replace('__FILE_GENERATED__:', '').trim()

@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
+use App\AI\Messages\AppChatCredential;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
@@ -45,6 +46,7 @@ final class MessagesGatewayController extends AbstractController
         private readonly GatewayToolCatalog $toolCatalog,
         private readonly McpServerConfigRepository $mcpServers,
         private readonly LoggerInterface $logger,
+        private readonly AppChatCredential $appChatCredential,
     ) {
     }
 
@@ -59,7 +61,7 @@ final class MessagesGatewayController extends AbstractController
         response: 200,
         description: 'Gateway status',
         content: new OA\JsonContent(
-            required: ['enabled', 'upstream_url', 'keys', 'budget', 'is_admin', 'setup', 'model_aliases'],
+            required: ['enabled', 'upstream_url', 'keys', 'budget', 'is_admin', 'setup', 'model_aliases', 'app_chat_credential'],
             properties: [
                 new OA\Property(property: 'enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean', example: false),
@@ -141,6 +143,13 @@ final class MessagesGatewayController extends AbstractController
                 ),
                 new OA\Property(property: 'is_admin', type: 'boolean', example: false),
                 new OA\Property(
+                    property: 'app_chat_credential',
+                    description: 'Whether the signed-in user\'s default chat model can pay for app chat. ready: a local model (Ollama or a custom endpoint) or a resolved provider key. missing: that model needs a key and none is available. unset: no default chat model is selected.',
+                    type: 'string',
+                    enum: ['ready', 'missing', 'unset'],
+                    example: 'missing',
+                ),
+                new OA\Property(
                     property: 'setup',
                     properties: [
                         new OA\Property(property: 'base_url_hint', type: 'string'),
@@ -209,6 +218,7 @@ final class MessagesGatewayController extends AbstractController
                 'allowed' => $budget['allowed'],
             ],
             'is_admin' => $isAdmin,
+            'app_chat_credential' => $this->appChatCredential->forUser($user),
             'setup' => [
                 'base_url_hint' => '(your Synaplan origin, e.g. https://web.synaplan.com)',
                 'env_api_key' => 'ANTHROPIC_API_KEY',

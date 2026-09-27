@@ -47,6 +47,7 @@ import { useMessageDigestsStore } from '@/stores/messageDigests'
 import type { MessageDigestReference } from '@/services/api/messageDigestsApi'
 import { useConfigStore } from '@/stores/config'
 import { useNotification } from '@/composables/useNotification'
+import { TOOL_RESULT_MARKER } from '@/utils/apiToolTurn'
 import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
 import { completeInlineMarkdown } from '@/utils/partialMarkdown'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
@@ -763,6 +764,9 @@ function normalizeContentForRender(input: string): string {
   }
   if (input === '__FILE_GENERATION_FAILED__') {
     return t('message.fileGenerationFailed')
+  }
+  if (input === TOOL_RESULT_MARKER) {
+    return t('message.toolStepHidden')
   }
   if (input === '__AUDIO_GENERATED__') {
     return t('message.audioGenerated')

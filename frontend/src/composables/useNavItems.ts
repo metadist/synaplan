@@ -277,6 +277,16 @@ export function useNavItems() {
           label: t('nav.liveSupport'),
           ...grouped('channels', channels),
         },
+        ...(isDesktopAgentEnabled()
+          ? [
+              {
+                key: 'desktop',
+                path: '/channels/desktop',
+                label: t('nav.desktop'),
+                ...grouped('channels', channels),
+              },
+            ]
+          : []),
         {
           key: 'connections',
           path: '/channels/connections',
@@ -317,16 +327,6 @@ export function useNavItems() {
           label: t('nav.aiAgents'),
           ...grouped('developer', developer),
         },
-        ...(isDesktopAgentEnabled()
-          ? [
-              {
-                key: 'desktop',
-                path: '/channels/desktop',
-                label: t('nav.desktop'),
-                ...grouped('developer', developer),
-              },
-            ]
-          : []),
       ]
 
       items.push({

@@ -47,7 +47,7 @@ final class ShareControllerTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
 
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testOwnerSharesConversationAndMemberCanRead(): void
@@ -69,11 +69,11 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $group->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $body = $this->json();
         self::assertSame('use', $body['chat']['access']);
         self::assertSame((int) $owner->getId(), $body['chat']['owner']['id']);
@@ -85,7 +85,7 @@ final class ShareControllerTest extends WebTestCase
         self::assertNull($body['chat']['shareToken'], 'A group share must not leak the public link token');
 
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertNotEmpty($this->json()['items']);
     }
 
@@ -104,7 +104,7 @@ final class ShareControllerTest extends WebTestCase
             'permission' => 'edit',
         ]);
 
-        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
     public function testAdminCannotReadForeignChatWithoutShare(): void
@@ -117,7 +117,7 @@ final class ShareControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $admin);
         $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
 
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testAdminCannotDownloadForeignFileWithoutShare(): void
@@ -140,7 +140,7 @@ final class ShareControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $admin);
         $this->client->request('GET', '/api/v1/files/'.$file->getId().'/download');
 
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testContinueCreatesOwnerCopy(): void
@@ -157,11 +157,11 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('POST', '/api/v1/chats/'.$chat->getId().'/continue');
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $copy = $this->json()['chat'];
         self::assertSame('owner', $copy['access']);
         self::assertNotSame($chat->getId(), $copy['id']);
@@ -180,7 +180,7 @@ final class ShareControllerTest extends WebTestCase
             server: ['HTTP_X_API_KEY' => $key],
         );
 
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
     }
 
     public function testIamReadKeyCannotGrantShare(): void
@@ -205,7 +205,7 @@ final class ShareControllerTest extends WebTestCase
             ], JSON_THROW_ON_ERROR),
         );
 
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testSharingWithYourselfIs400(): void
@@ -223,7 +223,7 @@ final class ShareControllerTest extends WebTestCase
             'permission' => 'read',
         ]);
 
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
     }
 
     public function testSharedItemTellsHowItArrivedAndIsNewUntilSeen(): void
@@ -237,7 +237,7 @@ final class ShareControllerTest extends WebTestCase
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertSame(0, $this->json()['count']);
 
         $this->authenticateClient($this->client, $owner);
@@ -248,7 +248,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $group->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
@@ -265,7 +265,7 @@ final class ShareControllerTest extends WebTestCase
         self::assertGreaterThanOrEqual(1, $this->json()['count']);
 
         $this->postJson('/api/v1/me/shared/seen', ['kind' => 'conversation']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertTrue($this->json()['success']);
 
         $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
@@ -298,7 +298,7 @@ final class ShareControllerTest extends WebTestCase
                 'subjectId' => (int) $group->getId(),
                 'permission' => 'use',
             ]);
-            self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+            self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         }
 
         $this->authenticateClient($this->client, $member);
@@ -310,7 +310,7 @@ final class ShareControllerTest extends WebTestCase
             'kind' => 'conversation',
             'resourceId' => (string) $first->getId(),
         ]);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
         self::assertSame($before - 1, $this->json()['count']);
@@ -339,7 +339,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $group->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
         self::assertGreaterThanOrEqual(1, $this->json()['count']);
@@ -362,7 +362,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $group->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $this->postJson('/api/v1/shares', [
             'kind' => 'conversation',
             'resource' => (string) $chat->getId(),
@@ -370,7 +370,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => 0,
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
@@ -383,7 +383,7 @@ final class ShareControllerTest extends WebTestCase
         self::assertSame('use', $items[0]['permission']);
 
         $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertSame(['type' => 'group', 'name' => 'Design'], $this->json()['chat']['sharedVia']);
     }
 
@@ -403,7 +403,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'read',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $this->postJson('/api/v1/shares', [
             'kind' => 'conversation',
             'resource' => (string) $everyone->getId(),
@@ -411,7 +411,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => 0,
             'permission' => 'read',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
@@ -432,10 +432,10 @@ final class ShareControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $member);
 
         $this->client->request('GET', '/api/v1/me/shared/unseen');
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
 
         $this->postJson('/api/v1/me/shared/seen', ['kind' => 'no-such-kind']);
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
     }
 
     public function testEveryoneIsNotOfferedWhenPolicyIsAdminsOnly(): void
@@ -449,7 +449,7 @@ final class ShareControllerTest extends WebTestCase
             $member = $this->createUser('share-no-everyone@synaplan.internal');
             $this->authenticateClient($this->client, $member);
             $this->client->request('GET', '/api/v1/iam/subjects');
-            self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+            self::assertResponseStatusCodeSame(Response::HTTP_OK);
             $types = array_column($this->json()['subjects'], 'type');
             self::assertNotContains('everyone', $types);
 
@@ -480,7 +480,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => 0,
             'permission' => 'read',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_DISABLED);
         $this->em->flush();
@@ -494,7 +494,7 @@ final class ShareControllerTest extends WebTestCase
                 'subjectId' => 0,
                 'permission' => 'read',
             ]);
-            self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
             $error = (string) $this->json()['error'];
             self::assertSame('Sharing with everyone is turned off.', $error);
             self::assertStringNotContainsString('IAM', $error);
@@ -514,7 +514,7 @@ final class ShareControllerTest extends WebTestCase
             $ids = array_column($this->json()['items'], 'id');
             self::assertNotContains((string) $chat->getId(), $ids);
             $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
-            self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
 
             $stillThere = $this->em->getRepository(Share::class)->findOneBy([
                 'resourceKind' => 'conversation',
@@ -525,7 +525,7 @@ final class ShareControllerTest extends WebTestCase
 
             $this->authenticateClient($this->client, $owner);
             $this->client->request('GET', '/api/v1/shares?kind=conversation&resource='.$chat->getId());
-            self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+            self::assertResponseStatusCodeSame(Response::HTTP_OK);
             $rows = $this->json()['shares'];
             self::assertCount(1, $rows);
             self::assertSame('everyone', $rows[0]['subjectType']);
@@ -618,7 +618,7 @@ final class ShareControllerTest extends WebTestCase
                 'subjectId' => 0,
                 'permission' => 'read',
             ]);
-            self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+            self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
             self::assertSame(0, $this->json()['share']['grantedBy']);
             self::assertTrue($this->json()['share']['effective']);
             $this->em->clear();
@@ -632,7 +632,7 @@ final class ShareControllerTest extends WebTestCase
                 'subjectId' => 0,
                 'permission' => 'read',
             ]);
-            self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         } finally {
             $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
             $this->em->flush();

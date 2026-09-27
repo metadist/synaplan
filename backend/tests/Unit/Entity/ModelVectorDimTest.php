@@ -55,13 +55,19 @@ final class ModelVectorDimTest extends TestCase
         self::assertSame(1024, $model->getVectorDim());
     }
 
-    public function testFallsBackOnZeroOrNegativeDimension(): void
+    public function testFallsBackOnZeroDimension(): void
     {
         $model = new Model();
         $model->setJson(['meta' => ['dimensions' => 0]]);
-        self::assertSame(1024, $model->getVectorDim());
 
+        self::assertSame(1024, $model->getVectorDim());
+    }
+
+    public function testFallsBackOnNegativeDimension(): void
+    {
+        $model = new Model();
         $model->setJson(['meta' => ['dimensions' => -512]]);
+
         self::assertSame(1024, $model->getVectorDim());
     }
 }

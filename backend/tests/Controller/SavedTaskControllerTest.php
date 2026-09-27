@@ -41,7 +41,7 @@ final class SavedTaskControllerTest extends WebTestCase
 
         $this->client->request('DELETE', '/api/v1/saved-tasks/'.$taskId);
 
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertTrue($this->json()['success'] ?? false);
         $this->em->clear();
         self::assertNull($this->em->find(SavedTask::class, $taskId));
@@ -58,7 +58,7 @@ final class SavedTaskControllerTest extends WebTestCase
 
         $this->client->request('DELETE', '/api/v1/saved-tasks/'.$task->getId());
 
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
         $this->em->clear();
         self::assertInstanceOf(SavedTask::class, $this->em->find(SavedTask::class, $task->getId()));
     }
@@ -74,7 +74,7 @@ final class SavedTaskControllerTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/saved-tasks/'.$task->getId().'/runs');
 
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testAdminCannotSeeForeignRuns(): void
@@ -88,7 +88,7 @@ final class SavedTaskControllerTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/saved-tasks/'.$task->getId().'/runs');
 
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testCopyCreatesPausedOwnedTask(): void
@@ -110,7 +110,7 @@ final class SavedTaskControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $this->postJson('/api/v1/shares', [
             'kind' => 'assistant',
             'resource' => (string) $prompt->getId(),
@@ -118,11 +118,11 @@ final class SavedTaskControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('POST', '/api/v1/saved-tasks/'.$task->getId().'/copy');
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $body = $this->json();
         $copy = $body['task'];
         self::assertNotSame($task->getId(), $copy['id']);
@@ -151,12 +151,12 @@ final class SavedTaskControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('POST', '/api/v1/saved-tasks/'.$task->getId().'/copy');
 
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $body = $this->json();
         self::assertFalse($body['task']['enabled']);
         self::assertContains('needsAssistant', array_column($body['checklist'], 'code'));

@@ -19,7 +19,9 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * Anthropic Messages ↔ OpenAI Chat Completions / Responses translator.
  *
  * Strips Anthropic-only fields (`thinking`, beta body keys) that Claude Code
- * sends to gateway aliases. Tool schemas map `input_schema` → `parameters`;
+ * sends to gateway aliases; on the Responses route the client's `thinking` /
+ * `output_config.effort` request is first mapped onto `reasoning.effort`.
+ * Tool schemas map `input_schema` → `parameters`;
  * image blocks map to `image_url` / `input_image` parts so vision survives
  * the alias route.
  *
@@ -32,6 +34,16 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 {
     private const DEFAULT_UPSTREAM = 'https://api.openai.com';
     private const DEFAULT_TIMEOUT = 600;
+
+    /**
+     * Exclusive upper `thinking.budget_tokens` bound per effort tier; larger
+     * budgets map to `xhigh`.
+     */
+    private const THINKING_BUDGET_TIERS = [
+        4096 => 'low',
+        16384 => 'medium',
+        32768 => 'high',
+    ];
 
     /** Anthropic-only top-level keys that OpenAI rejects. */
     private const STRIP_KEYS = [
@@ -318,6 +330,8 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
      */
     public function toResponsesRequest(array $requestBody, bool $stream, ?string $imageDetail = null): array
     {
+        $effort = self::responsesEffort((string) ($requestBody['model'] ?? ''), $requestBody);
+
         foreach (self::STRIP_KEYS as $key) {
             unset($requestBody[$key]);
         }
@@ -354,7 +368,6 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             $payload['max_output_tokens'] = (int) $requestBody['max_tokens'];
         }
 
-        $effort = self::lowestResponsesEffort($model);
         if (null !== $effort) {
             $payload['reasoning'] = ['effort' => $effort];
         }
@@ -387,21 +400,91 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
     }
 
     /**
+     * Responses `reasoning.effort` for an Anthropic Messages body: the
+     * client's thinking request clamped to the family's tiers, or the
+     * cheapest tier when the client asked for no thinking. Non-reasoning
+     * models return null (no `reasoning` block).
+     *
+     * @param array<string, mixed> $requestBody Messages body before STRIP_KEYS
+     */
+    public static function responsesEffort(string $model, array $requestBody): ?string
+    {
+        $lowest = self::lowestResponsesEffort($model);
+        if (null === $lowest) {
+            return null;
+        }
+
+        $requested = self::requestedThinkingEffort($requestBody);
+
+        return null === $requested ? $lowest : OpenAiReasoningEffort::clamp(self::bareModelId($model), $requested);
+    }
+
+    /**
      * Cheapest Responses `reasoning.effort` the family accepts.
      * Non-reasoning models return null (no `reasoning` block).
      */
     public static function lowestResponsesEffort(string $model): ?string
+    {
+        $model = self::bareModelId($model);
+        if (!self::usesCompletionTokens($model)) {
+            return null;
+        }
+
+        return OpenAiReasoningEffort::lowest($model);
+    }
+
+    /**
+     * Effort tier the client asked for, or null for "no thinking".
+     *
+     * `thinking.type: disabled` always wins. An explicit `output_config.effort`
+     * comes next, then the `thinking.budget_tokens` size; thinking without
+     * either maps to OpenAI's default `medium`.
+     *
+     * @param array<string, mixed> $requestBody
+     */
+    private static function requestedThinkingEffort(array $requestBody): ?string
+    {
+        $thinking = \is_array($requestBody['thinking'] ?? null) ? $requestBody['thinking'] : [];
+        $type = $thinking['type'] ?? null;
+        if ('disabled' === $type) {
+            return null;
+        }
+
+        $outputConfig = \is_array($requestBody['output_config'] ?? null) ? $requestBody['output_config'] : [];
+        $effort = $outputConfig['effort'] ?? null;
+        if (\is_string($effort) && '' !== $effort) {
+            return strtolower($effort);
+        }
+
+        if ('enabled' !== $type && 'adaptive' !== $type) {
+            return null;
+        }
+
+        $budget = $thinking['budget_tokens'] ?? null;
+        if (!\is_int($budget) || $budget <= 0) {
+            return 'medium';
+        }
+        foreach (self::THINKING_BUDGET_TIERS as $limit => $tier) {
+            if ($budget < $limit) {
+                return $tier;
+            }
+        }
+
+        return 'xhigh';
+    }
+
+    /**
+     * Lowercased bare model id; accepts a catalog key (`openai:gpt-6-sol:chat`).
+     */
+    private static function bareModelId(string $model): string
     {
         $model = strtolower($model);
         if (str_contains($model, ':')) {
             $parts = explode(':', $model);
             $model = $parts[1] ?? $model;
         }
-        if (!self::usesCompletionTokens($model)) {
-            return null;
-        }
 
-        return OpenAiReasoningEffort::lowest($model);
+        return $model;
     }
 
     /**

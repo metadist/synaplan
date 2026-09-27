@@ -960,6 +960,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
+import { TOOL_RESULT_MARKER } from '@/utils/apiToolTurn'
 import { useI18n } from 'vue-i18n'
 import {
   UserIcon,
@@ -1241,7 +1242,9 @@ const copied = ref(false)
 const copyableText = computed(() =>
   props.parts
     .filter((p) => p.type !== 'thinking')
-    .map((p) => p.content ?? '')
+    .map((p) =>
+      p.content === TOOL_RESULT_MARKER ? t('message.toolStepHidden') : (p.content ?? '')
+    )
     .join('\n')
     .trim()
 )

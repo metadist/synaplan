@@ -101,6 +101,24 @@ final class OpenAiCompatibleEndpointRegistryTest extends TestCase
         $this->assertStringNotContainsString('sk-secret-123', json_encode($list) ?: '');
     }
 
+    public function testDefaultCapabilitiesIncludeImageGeneration(): void
+    {
+        $this->registry->saveEndpoint('localai', 'https://localai.example.com/v1', null);
+
+        $endpoint = $this->registry->getEndpoint('localai');
+        $this->assertNotNull($endpoint);
+        $this->assertContains('text2pic', $endpoint['capabilities']);
+    }
+
+    public function testUnknownCapabilityIsDroppedAndText2PicIsKept(): void
+    {
+        $this->registry->saveEndpoint('localai', 'https://localai.example.com/v1', null, [], null, ['chat', 'text2pic', 'text2vid']);
+
+        $endpoint = $this->registry->getEndpoint('localai');
+        $this->assertNotNull($endpoint);
+        $this->assertSame(['chat', 'text2pic'], $endpoint['capabilities']);
+    }
+
     public function testGetEndpointReturnsDecryptedKey(): void
     {
         $this->registry->saveEndpoint('localai', 'https://localai.example.com/v1', 'sk-secret-123');

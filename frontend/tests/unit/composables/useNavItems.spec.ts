@@ -64,7 +64,7 @@ const navMessages = {
     channels: 'Channels',
     connections: 'Connections',
     groupDeveloper: 'Developer & devices',
-    desktop: 'Desktop',
+    desktop: 'Synaplan Desktop',
     groupApi: 'API',
     myGroups: 'My groups',
     configInbound: 'Inbound',
@@ -255,7 +255,7 @@ describe('useNavItems rail', () => {
     ).toEqual(new Set(['assistants', 'channels', 'connections', 'developer']))
   })
 
-  it('shows Desktop under Developer & devices only when the flag is on', () => {
+  it('shows Synaplan Desktop under Channels only when the flag is on', () => {
     const off = mountNav({ email: 'user@test.com', level: 'PRO' })
     const offManage = off.vm.navItems.find((item: { key: string }) => item.key === 'manage')
     expect((offManage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
@@ -268,8 +268,14 @@ describe('useNavItems rail', () => {
     const desktop = (onManage?.children ?? []).find(
       (child: { key: string }) => child.key === 'desktop'
     )
-    expect(desktop?.groupKey).toBe('developer')
+    expect(desktop?.label).toBe('Synaplan Desktop')
+    expect(desktop?.groupKey).toBe('channels')
     expect(desktop?.path).toBe('/channels/desktop')
+    expect(
+      (onManage?.children ?? [])
+        .filter((child: { groupKey?: string }) => child.groupKey === 'developer')
+        .map((child: { key: string }) => child.key)
+    ).not.toContain('desktop')
   })
 
   it('shows Approvals under Automations when the flag is on', () => {

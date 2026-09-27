@@ -1191,7 +1191,9 @@
 }
 
 .design-v2.dark [data-testid='comp-chat-input-shell'] .btn-primary {
-  color: #ffffff;
+  /* Keep this rule so a composer recolor cannot paint the label. The ink is
+     the on-brand token: white fails AA on the dark-mode brand fill. */
+  color: var(--on-brand);
 }
 
 /* ----------------------------------------------------------

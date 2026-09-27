@@ -28,6 +28,11 @@ export function shareFindKey(kind: ShareKind): string {
   return `iam.dialog.find.${copyKind(kind)}`
 }
 
+export function shareRemoveConfirmKey(kind: ShareKind): string {
+  if (kind === 'conversation') return 'iam.dialog.removeConfirmConversation'
+  return 'iam.dialog.removeConfirm'
+}
+
 export function shareBannerSourceKey(kind: ShareKind, viaType: string): string {
   const key = copyKind(kind)
   if (viaType === 'group') return `iam.banner.${key}.sourceGroup`

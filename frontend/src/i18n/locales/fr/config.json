@@ -897,15 +897,27 @@
       }
     },
     "desktop": {
-      "title": "Ordinateur",
+      "title": "Synaplan Desktop",
       "description": "Synaplan Desktop est une application distincte pour cet ordinateur. Elle utilise votre compte Synaplan et peut exécuter les skills que vous installez.",
+      "chatGate": {
+        "gatewayAdmin": "L’application ne peut pas discuter tant que vous n’activez pas la passerelle IA sous Clients de codage et qu’une clé de fournisseur n’est pas disponible. L’association fonctionne toujours.",
+        "gatewayUser": "L’application ne peut pas discuter tant qu’un administrateur n’active pas la passerelle IA sous Clients de codage. L’association fonctionne toujours.",
+        "keyAdmin": "La passerelle IA est activée, mais aucune clé de fournisseur ne paie le chat de l’application. Autorisez la clé de l’instance sous Clients de codage, ou enregistrez la vôtre.",
+        "keyUser": "Le chat de l’application n’a pas encore de clé de fournisseur. Demandez à un administrateur d’autoriser la clé de l’instance, ou enregistrez la vôtre. L’association fonctionne toujours.",
+        "openCodingClients": "Ouvrir Clients de codage"
+      },
       "pairButton": "Associer cet ordinateur",
       "loadFailed": "Impossible de charger les ordinateurs connectés.",
       "disconnect": "Déconnecter",
       "confirmDisconnectTitle": "Déconnecter cet ordinateur",
-      "confirmDisconnect": "« {name} » ne pourra plus accéder à votre compte. Vous pourrez l'associer à nouveau plus tard avec un nouveau code.",
-      "disconnected": "Ordinateur déconnecté.",
+      "confirmDisconnect": "« {name} » ne pourra plus accéder à votre compte. Aucune tâche en attente ne sera annulée. Vous pourrez l'associer à nouveau plus tard avec un nouveau code. | « {name} » ne pourra plus accéder à votre compte. 1 tâche en attente sera annulée et ne s'exécutera pas. Vous pourrez l'associer à nouveau plus tard avec un nouveau code. | « {name} » ne pourra plus accéder à votre compte. {count} tâches en attente seront annulées et ne s'exécuteront pas. Vous pourrez l'associer à nouveau plus tard avec un nouveau code.",
+      "disconnected": "Cet ordinateur a été déconnecté. Aucune tâche en attente n'a été annulée. | Cet ordinateur a été déconnecté. 1 tâche en attente a été annulée et ne s'exécutera pas. | Cet ordinateur a été déconnecté. {count} tâches en attente ont été annulées et ne s'exécuteront pas.",
       "disconnectFailed": "Impossible de déconnecter l'ordinateur.",
+      "remove": "Retirer",
+      "confirmRemoveTitle": "Retirer cet ordinateur",
+      "confirmRemove": "« {name} » est déjà déconnecté. Le retirer le supprime seulement de cette liste. Il ne peut toujours pas accéder à votre compte.",
+      "removed": "« {name} » a été retiré de cette liste. Il ne peut pas accéder à votre compte. Aucune tâche en attente n'a été annulée. | « {name} » a été retiré de cette liste. Il ne peut pas accéder à votre compte. 1 tâche en attente a été annulée et ne s'exécutera pas. | « {name} » a été retiré de cette liste. Il ne peut pas accéder à votre compte. {count} tâches en attente ont été annulées et ne s'exécuteront pas.",
+      "removeFailed": "Impossible de retirer l'ordinateur de la liste.",
       "pairing": {
         "title": "Associer cet ordinateur",
         "intro": "Ouvrez Synaplan Desktop sur l'ordinateur à connecter, puis saisissez cette adresse et ce code.",
@@ -918,7 +930,9 @@
         "copyAddress": "Copier l'adresse",
         "copyCode": "Copier le code",
         "createFailed": "Impossible de créer le code d'association.",
-        "copyFailed": "Impossible de copier dans le presse-papiers."
+        "copyFailed": "Impossible de copier dans le presse-papiers.",
+        "paired": "« {name} » a été ajouté. Il s'affiche comme connecté une fois que l'application s'est signalée.",
+        "pairedOnline": "« {name} » est connecté."
       },
       "devices": {
         "empty": "Aucun ordinateur n'est encore connecté.",
@@ -929,11 +943,17 @@
         "actions": "Actions",
         "never": "jamais",
         "statusActive": "Connecté",
-        "statusRevoked": "Déconnecté"
+        "statusAway": "Non connecté",
+        "statusNever": "Pas encore vu",
+        "statusRevoked": "Déconnecté",
+        "checkInHint": "Cet ordinateur se signale environ toutes les {minutes} minutes."
       },
       "run": {
         "action": "Exécuter sur cet ordinateur",
         "multiple": "{count} ordinateurs",
+        "online": "{name} est connecté",
+        "away": "{name} n'est pas connecté. Il se signale environ toutes les {minutes} minutes.",
+        "never": "{name} ne s'est pas encore signalé",
         "needPrompt": "Saisissez d'abord ce que l'ordinateur doit faire.",
         "skillTitle": "Exécuter sur cet ordinateur",
         "skillMessage": "Quel skill exécuter sur « {name} » ?",
@@ -943,26 +963,45 @@
         "enqueueFailed": "Impossible d'envoyer la tâche."
       },
       "jobCard": {
-        "waiting": "En attente de {name}",
+        "waiting": "En attente de {name}. Il se signale environ toutes les {minutes} minutes.",
+        "waitingSkill": "En attente que {name} démarre {skill}. Il se signale environ toutes les {minutes} minutes.",
+        "running": "{name} exécute {skill}",
         "done": "{name} a terminé",
         "failed": "{name} n'a pas pu terminer",
+        "cancelled": "Cette tâche a été annulée",
         "noAnswer": "Cet ordinateur n'a pas répondu.",
+        "queuedTooLong": "Cet ordinateur n'a pas encore démarré la tâche. Elle reste en file jusqu'à ce que l'ordinateur la prenne.",
+        "stillRunning": "Cet ordinateur a démarré la tâche et n'a pas encore terminé.",
         "unknownSkill": "Cet ordinateur n'a pas ce skill.",
-        "skillDisabled": "Ce skill est désactivé sur cet ordinateur.",
-        "localError": "Le skill a échoué sur cet ordinateur."
+        "skillDisabled": "Cet ordinateur a refusé d'exécuter le skill.",
+        "unknownType": "Cet ordinateur n'a pas pu exécuter cette tâche.",
+        "timedOut": "Cet ordinateur n'a pas terminé la tâche à temps.",
+        "localError": "Cet ordinateur n'a pas pu terminer la tâche.",
+        "cancelledDetail": "Rien d'autre ne sera exécuté pour cette tâche. Si l'ordinateur avait déjà commencé, ce travail peut encore se terminer là-bas, mais le résultat ne sera pas enregistré ici.",
+        "thisComputer": "Votre ordinateur",
+        "thisTask": "cette tâche",
+        "cancel": "Annuler la tâche",
+        "hide": "Masquer cette carte. La tâche continue d'attendre ou de s'exécuter.",
+        "confirmCancelTitle": "Annuler cette tâche",
+        "confirmCancelQueued": "{name} n'a pas encore démarré {skill}. L'annuler signifie qu'elle ne s'exécutera pas.",
+        "confirmCancelRunning": "{name} a peut-être déjà démarré {skill}. L'annuler signifie que le résultat ne sera pas enregistré ici. Le travail déjà commencé sur cet ordinateur peut encore s'y terminer.",
+        "cancelledDone": "Cette tâche a été annulée et ne s'exécutera pas. Si l'ordinateur avait déjà commencé, ce travail peut encore se terminer là-bas, mais le résultat ne sera pas enregistré ici.",
+        "alreadyFinished": "Cette tâche était déjà terminée, elle n'a donc pas été annulée.",
+        "cancelFailed": "Impossible d'annuler cette tâche.",
+        "keepWaiting": "Continuer d'attendre",
+        "meta": "{skill} · {time}"
       },
       "get": {
-        "title": "Obtenir Synaplan Desktop",
-        "beta": "Bêta",
-        "platforms": "Disponible pour",
-        "description": "Une petite application pour macOS, Windows et Linux. Elle s’associe à votre compte Synaplan et exécute sur votre propre ordinateur les compétences que vous installez, par exemple créer une présentation à partir de vos notes.",
-        "github": "Obtenir sur GitHub",
-        "releases": "Versions",
-        "betaNote": "Les versions bêta ne sont pas encore signées ; votre système peut donc demander une confirmation au premier démarrage. Le dépôt explique aussi comment compiler l’application vous-même.",
+        "title": "Synaplan Desktop",
+        "platforms": "Fonctionne sur",
+        "description": "Une petite application pour macOS, Windows et Linux. Elle s’associe à votre compte Synaplan et exécute sur votre propre ordinateur les skills que vous installez, par exemple créer une présentation à partir de vos notes.",
+        "github": "Ouvrir le dépôt source",
+        "betaNote": "Il n’y a pas encore d’installateur. Le dépôt explique comment construire Synaplan Desktop vous-même.",
         "stepsTitle": "Se connecter en trois étapes",
-        "step1": "Installez Synaplan Desktop sur l’ordinateur que vous voulez utiliser.",
+        "step1": "Construisez Synaplan Desktop à partir du dépôt source sur l’ordinateur que vous voulez utiliser.",
         "step2": "Cliquez ici sur « Associer cet ordinateur » et copiez l’adresse et le code.",
-        "step3": "Saisissez les deux dans l’application. L’ordinateur apparaît ensuite dans la liste ci-dessous."
+        "step3": "Saisissez les deux dans l’application. L’ordinateur apparaît ensuite dans la liste ci-dessous.",
+        "compact": "Il n’y a pas encore d’installateur. Construisez Synaplan Desktop à partir du dépôt source."
       }
     },
     "phoneVerification": {

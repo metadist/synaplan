@@ -699,6 +699,7 @@
     "documentChanges": "Cambios en este archivo",
     "documentChangesTitle": "Qué cambió",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
+    "toolStepHidden": "Un paso en este ordenador ha terminado.",
     "audioGenerated": "Aquí está el audio que solicitaste. Puedes reproducirlo o descargarlo abajo.",
     "mediaJob": {
       "title": {

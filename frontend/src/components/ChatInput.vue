@@ -501,6 +501,14 @@ import { useAuthStore } from '@/stores/auth'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useDialog } from '@/composables/useDialog'
 import { desktopApi } from '@/services/api/desktopApi'
+import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
+import { useDesktopDevices } from '@/composables/useDesktopDevices'
+import {
+  readDismissedJobIds,
+  rememberDismissedJobId,
+  RESTORED_JOB_LIMIT,
+  shouldRestoreDesktopJob,
+} from '@/utils/desktopJobCard'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
 import {
@@ -650,7 +658,10 @@ const { warning, error: showError, success } = useNotification()
 
 // DS16: jobs dispatched to a paired computer via "Run on this computer".
 // Rendered as waiting/failed cards above the composer until dismissed.
-const desktopJobs = ref<Array<{ id: number; deviceName: string }>>([])
+// Restored from the job list so a reload mid-wait does not hide them.
+const desktopJobs = ref<Array<{ id: number; deviceName: string; chatId: number | null }>>([])
+const { devices, ensureLoaded: ensureDesktopDevices } = useDesktopDevices()
+let desktopRestoreSeq = 0
 
 /**
  * Send the typed instruction to a paired computer as a `skill.run` job. There is
@@ -681,13 +692,15 @@ const handleRunOnDevice = async (device: { id: number; name: string }) => {
   }
 
   try {
-    const { jobId } = await desktopApi.enqueueJob({
+    const chatId = chatsStore.activeChatId
+    const { jobId, chatTitle } = await desktopApi.enqueueJob({
       deviceId: device.id,
       skill,
       prompt,
-      chatId: chatsStore.activeChatId,
+      chatId,
     })
-    desktopJobs.value.push({ id: jobId, deviceName: device.name })
+    if (chatId && chatTitle) chatsStore.applyChatTitle(chatId, chatTitle)
+    desktopJobs.value.push({ id: jobId, deviceName: device.name, chatId })
     message.value = ''
     success(t('config.desktop.run.sent', { name: device.name }))
   } catch (err) {
@@ -695,9 +708,68 @@ const handleRunOnDevice = async (device: { id: number; name: string }) => {
   }
 }
 
-const dismissDesktopJob = (jobId: number) => {
-  desktopJobs.value = desktopJobs.value.filter((j) => j.id !== jobId)
+const desktopDeviceName = (deviceId: number | null | undefined): string => {
+  if (deviceId == null) return t('config.desktop.jobCard.thisComputer')
+  return (
+    devices.value.find((device) => device.id === deviceId)?.name ||
+    t('config.desktop.jobCard.thisComputer')
+  )
 }
+
+const restoreDesktopJobs = async () => {
+  const chatId = chatsStore.activeChatId
+  const seq = ++desktopRestoreSeq
+  if (!chatId || !isDesktopAgentEnabled()) {
+    if (seq === desktopRestoreSeq) desktopJobs.value = []
+    return
+  }
+  try {
+    await ensureDesktopDevices()
+    const jobs = (await desktopApi.listJobs()) ?? []
+    if (seq !== desktopRestoreSeq || chatsStore.activeChatId !== chatId) return
+    const dismissed = readDismissedJobIds(localStorage)
+    const now = Date.now()
+    const restored: Array<{ id: number; deviceName: string; chatId: number | null }> = []
+    for (const job of jobs) {
+      if (!shouldRestoreDesktopJob(job, chatId, dismissed, now)) continue
+      restored.push({
+        id: job.id,
+        chatId,
+        deviceName: desktopDeviceName(job.deviceId),
+      })
+      if (restored.length >= RESTORED_JOB_LIMIT) break
+    }
+    const seen = new Set(restored.map((job) => job.id))
+    for (const extra of desktopJobs.value) {
+      if (extra.chatId === chatId && !seen.has(extra.id) && !dismissed.has(extra.id)) {
+        restored.unshift(extra)
+      }
+    }
+    desktopJobs.value = restored
+  } catch {
+    // A failed reload must not wipe a card the person just started.
+  }
+}
+
+const dismissDesktopJob = (jobId: number) => {
+  try {
+    rememberDismissedJobId(localStorage, jobId)
+  } catch {
+    // Dismiss still hides the card for this visit when storage is blocked.
+  }
+  desktopJobs.value = desktopJobs.value.filter((job) => job.id !== jobId)
+}
+
+watch(
+  () => chatsStore.activeChatId,
+  () => {
+    void restoreDesktopJobs()
+  }
+)
+
+onMounted(() => {
+  void restoreDesktopJobs()
+})
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()

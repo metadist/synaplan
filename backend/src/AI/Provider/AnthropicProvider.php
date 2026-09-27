@@ -81,6 +81,17 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-fable-5-1',
     ];
 
+    /**
+     * Models that reject `thinking.type: disabled` and still think when the
+     * field is omitted. Reasoning off sends `output_config.effort: low`.
+     *
+     * Measured on Claude Opus 5.5. Opus 5 and Fable 5.1 are omitted until the
+     * same rejection is confirmed.
+     */
+    private const ALWAYS_ON_THINKING_MODELS = [
+        'claude-opus-5-5',
+    ];
+
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
     private const ADAPTIVE_THINKING_MODELS = [
         'claude-opus-4-6',
@@ -300,6 +311,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
             $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
+            $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
 
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
@@ -477,6 +489,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
             $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
+            $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
 
             // Only accumulate when the request really declares tools. A forced
             // schema tool also streams its `input` as `input_json_delta`, but
@@ -801,6 +814,47 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         }
 
         return ['type' => 'enabled', 'budget_tokens' => 5000];
+    }
+
+    /**
+     * Keep thinking at the minimum the model allows when the user turned reasoning off.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function applyMinimumThinkingEffort(array $requestBody, string $model, bool $thinkingEnabled): array
+    {
+        if ($thinkingEnabled || !$this->thinkingCannotBeDisabled($model)) {
+            return $requestBody;
+        }
+
+        $outputConfig = $requestBody['output_config'] ?? [];
+        if (!\is_array($outputConfig)) {
+            $outputConfig = [];
+        }
+        if (!isset($outputConfig['effort'])) {
+            $outputConfig['effort'] = 'low';
+        }
+        $requestBody['output_config'] = $outputConfig;
+
+        $this->logger->info('Anthropic: reasoning off uses minimum effort', [
+            'model' => $model,
+            'effort' => $outputConfig['effort'],
+        ]);
+
+        return $requestBody;
+    }
+
+    private function thinkingCannotBeDisabled(string $model): bool
+    {
+        foreach (self::ALWAYS_ON_THINKING_MODELS as $alwaysOn) {
+            if (str_starts_with($model, $alwaysOn)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

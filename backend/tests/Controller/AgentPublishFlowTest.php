@@ -56,15 +56,15 @@ final class AgentPublishFlowTest extends WebTestCase
 
         $this->authenticateClient($this->client, $owner);
         $this->postJson('/api/v1/agents', ['name' => 'Contract review']);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $id = (int) $this->json()['agent']['id'];
 
         $this->postJson('/api/v1/agents/'.$id.'/publish', ['changelog' => 'First published cut']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertSame(1, $this->json()['version']['version']);
 
         $this->postJson('/api/v1/agents/'.$id.'/publish', ['changelog' => 'unchanged']);
-        self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
         self::assertSame('nothing_changed', $this->json()['error']);
 
         $this->client->request(
@@ -73,7 +73,7 @@ final class AgentPublishFlowTest extends WebTestCase
             server: ['CONTENT_TYPE' => 'application/json'],
             content: json_encode(['description' => 'Now stricter'], JSON_THROW_ON_ERROR),
         );
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         $this->postJson('/api/v1/shares', [
             'kind' => 'agent',
@@ -82,11 +82,11 @@ final class AgentPublishFlowTest extends WebTestCase
             'subjectId' => (int) $group->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/agents/gallery');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $shared = array_values(array_filter($this->json()['cards'], static fn (array $c): bool => 'Contract review' === ($c['name'] ?? null)));
         self::assertCount(1, $shared);
         self::assertSame('shared', $shared[0]['origin']);
@@ -96,11 +96,11 @@ final class AgentPublishFlowTest extends WebTestCase
         self::assertTrue($shared[0]['canStartChat']);
 
         $this->client->request('GET', '/api/v1/agents/'.$id);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertArrayNotHasKey('draft', $this->json()['agent']);
 
         $this->client->request('POST', '/api/v1/agents/'.$id.'/clone');
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $clone = $this->json()['agent'];
         self::assertSame('draft', $clone['status']);
         self::assertSame($id, $clone['parentId']);
@@ -108,13 +108,13 @@ final class AgentPublishFlowTest extends WebTestCase
 
         $this->authenticateClient($this->client, $outsider);
         $this->client->request('GET', '/api/v1/agents/'.$id);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
         $this->client->request('POST', '/api/v1/agents/'.$id.'/clone');
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->authenticateClient($this->client, $admin);
         $this->client->request('GET', '/api/v1/agents/'.$id);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->authenticateClient($this->client, $owner);
         $this->client->request(
@@ -123,7 +123,7 @@ final class AgentPublishFlowTest extends WebTestCase
             server: ['CONTENT_TYPE' => 'application/json'],
             content: json_encode(['status' => 'archived'], JSON_THROW_ON_ERROR),
         );
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertSame('archived', $this->json()['agent']['status']);
 
         $this->authenticateClient($this->client, $member);
@@ -134,10 +134,10 @@ final class AgentPublishFlowTest extends WebTestCase
 
         $this->authenticateClient($this->client, $owner);
         $this->client->request('DELETE', '/api/v1/agents/'.$id);
-        self::assertSame(Response::HTTP_NO_CONTENT, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
 
         $this->client->request('GET', '/api/v1/agents/'.$id);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
 
         $this->em->clear();
         self::assertSame(
@@ -164,7 +164,7 @@ final class AgentPublishFlowTest extends WebTestCase
             'subjectId' => (int) $other->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
     /**

@@ -11,6 +11,8 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class OpenAICompatibleProviderTest extends TestCase
 {
@@ -20,7 +22,7 @@ final class OpenAICompatibleProviderTest extends TestCase
     protected function setUp(): void
     {
         $this->registry = $this->createStub(OpenAiCompatibleEndpointRegistry::class);
-        $this->provider = new OpenAICompatibleProvider($this->registry, new NullLogger(), '/tmp');
+        $this->provider = new OpenAICompatibleProvider($this->registry, new NullLogger(), new MockHttpClient(), '/tmp');
     }
 
     public function testName(): void
@@ -31,7 +33,7 @@ final class OpenAICompatibleProviderTest extends TestCase
 
     public function testCapabilities(): void
     {
-        $this->assertSame(['chat', 'embedding', 'vision'], $this->provider->getCapabilities());
+        $this->assertSame(['chat', 'embedding', 'vision', 'image_generation'], $this->provider->getCapabilities());
     }
 
     public function testAvailabilityDelegatesToRegistry(): void
@@ -93,6 +95,127 @@ final class OpenAICompatibleProviderTest extends TestCase
         $this->assertArrayNotHasKey('response_format', $request);
     }
 
+    public function testGenerateImageRequiresModel(): void
+    {
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('Model must be specified');
+        $this->provider->generateImage('a cup of coffee', []);
+    }
+
+    public function testGenerateImageFailsWhenNoEndpointResolved(): void
+    {
+        $this->registry->method('resolveForModel')->willReturn(null);
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('No OpenAI-compatible endpoint resolved');
+        $this->provider->generateImage('a cup of coffee', ['model' => 'flux.1-schnell']);
+    }
+
+    public function testGenerateImageRefusesAttachedReference(): void
+    {
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('does not edit an attached picture');
+        $this->provider->generateImage('make it blue', [
+            'model' => 'flux.1-schnell',
+            'images' => ['/tmp/ref.png'],
+        ]);
+    }
+
+    public function testGenerateImagePostsImagesGenerationsAndReturnsDataUrl(): void
+    {
+        $seen = null;
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen = ['method' => $method, 'url' => $url, 'options' => $options];
+
+            return new MockResponse((string) json_encode([
+                'data' => [[
+                    'b64_json' => 'aGVsbG8=',
+                    'revised_prompt' => 'a hand pouring coffee',
+                ]],
+            ]));
+        });
+
+        $images = $this->imageProvider($client)->generateImage('a hand pouring coffee', [
+            'model' => 'flux.1-schnell',
+            'size' => '1024x1024',
+            'quality' => 'standard',
+            'style' => 'vivid',
+        ]);
+
+        $this->assertIsArray($seen);
+        $this->assertSame('POST', $seen['method']);
+        $this->assertSame('http://localai.example:8080/v1/images/generations', $seen['url']);
+        $this->assertIsArray($seen['options']);
+        $body = json_decode((string) $seen['options']['body'], true);
+        $this->assertIsArray($body);
+        $this->assertSame('flux.1-schnell', $body['model']);
+        $this->assertSame('a hand pouring coffee', $body['prompt']);
+        $this->assertSame('1024x1024', $body['size']);
+        $this->assertSame('b64_json', $body['response_format']);
+        $this->assertArrayNotHasKey('quality', $body);
+        $this->assertArrayNotHasKey('style', $body);
+        $headers = implode("\n", $seen['options']['headers']);
+        $this->assertStringContainsString('Authorization: Bearer sk-test', $headers);
+        $this->assertStringContainsString('X-Lab: 1', $headers);
+        $this->assertSame('data:image/png;base64,aGVsbG8=', $images[0]['url']);
+        $this->assertSame('aGVsbG8=', $images[0]['b64_json']);
+        $this->assertSame('a hand pouring coffee', $images[0]['revised_prompt']);
+    }
+
+    public function testGenerateImageResolvesRelativeUrlAgainstEndpointOrigin(): void
+    {
+        $client = new MockHttpClient(new MockResponse((string) json_encode([
+            'data' => [['url' => '/generated/cup.png']],
+        ])));
+
+        $images = $this->imageProvider($client)->generateImage('a cup', ['model' => 'flux.1-schnell']);
+
+        $this->assertSame('http://localai.example:8080/generated/cup.png', $images[0]['url']);
+        $this->assertNull($images[0]['b64_json']);
+    }
+
+    public function testGenerateImageRetriesWithoutResponseFormatWhenRejected(): void
+    {
+        $bodies = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$bodies): MockResponse {
+            $body = json_decode((string) $options['body'], true);
+            $bodies[] = $body;
+            if (isset($body['response_format'])) {
+                return new MockResponse((string) json_encode([
+                    'error' => ['message' => "Unknown parameter: 'response_format'"],
+                ]), ['http_code' => 400]);
+            }
+
+            return new MockResponse((string) json_encode([
+                'data' => [['url' => 'https://cdn.example/cup.png']],
+            ]));
+        });
+
+        $images = $this->imageProvider($client)->generateImage('a cup', ['model' => 'flux.1-schnell']);
+
+        $this->assertCount(2, $bodies);
+        $this->assertArrayNotHasKey('response_format', $bodies[1]);
+        $this->assertSame('https://cdn.example/cup.png', $images[0]['url']);
+    }
+
+    public function testGenerateImageThrowsProviderExceptionOnHttpError(): void
+    {
+        $client = new MockHttpClient(new MockResponse((string) json_encode([
+            'error' => ['message' => 'model not loaded'],
+        ]), ['http_code' => 404]));
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('model not loaded');
+        $this->imageProvider($client)->generateImage('a cup', ['model' => 'missing']);
+    }
+
+    public function testCreateVariationsIsUnsupported(): void
+    {
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('Image variations are not supported');
+        $this->provider->createVariations('https://example/a.png');
+    }
+
     /**
      * @param list<array<string, mixed>> $messages
      * @param array<string, mixed>       $options
@@ -102,5 +225,20 @@ final class OpenAICompatibleProviderTest extends TestCase
     private function buildChatRequest(array $messages, array $options, string $model, bool $stream): array
     {
         return (new \ReflectionClass($this->provider))->getMethod('buildChatRequest')->invoke($this->provider, $messages, $options, $model, $stream);
+    }
+
+    private function imageProvider(MockHttpClient $client): OpenAICompatibleProvider
+    {
+        $registry = $this->createStub(OpenAiCompatibleEndpointRegistry::class);
+        $registry->method('resolveForModel')->willReturn([
+            'name' => 'localai',
+            'label' => 'Local AI',
+            'base_url' => 'http://localai.example:8080/v1',
+            'api_key' => 'sk-test',
+            'headers' => ['X-Lab' => '1'],
+            'capabilities' => ['text2pic'],
+        ]);
+
+        return new OpenAICompatibleProvider($registry, new NullLogger(), $client, '/tmp');
     }
 }

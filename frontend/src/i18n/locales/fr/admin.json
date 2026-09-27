@@ -441,7 +441,8 @@
         "COMPUTE_MAX_TIMEOUT_SEC": "Plafond dur en secondes pour une exécution.",
         "COMPUTE_POLICY_INTERACTIVE": "Lorsque la personne propriétaire est présente (chat ou un appel API en direct) : exécuter automatiquement, demander d’abord, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
         "COMPUTE_POLICY_UNATTENDED": "Lorsqu’une tâche enregistrée exécute un travail sur fichiers toute seule : demander d’abord (défaut), exécuter automatiquement, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
-        "COMPUTE_WORKSPACE_TTL_DAYS": "Combien de jours un dossier de travail sur fichiers peut rester inutilisé avant que le nettoyage le supprime. Valeur par défaut : 90."
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Combien de jours un dossier de travail sur fichiers peut rester inutilisé avant que le nettoyage le supprime. Valeur par défaut : 90.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, sous Gérer → Canaux. Un ordinateur associé peut discuter dans l’app et prendre les tâches en attente. Si c’est désactivé, cette page est masquée, l’association s’arrête, l’app ne peut pas discuter et les tâches en attente ne sont pas prises tant que vous ne le réactivez pas. Il n’y a pas encore d’installateur — l’app se construit à partir du dépôt source."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -720,7 +721,10 @@
       "rename": "Renommer",
       "renameTitle": "Renommer le groupe",
       "delete": "Supprimer",
-      "deleteConfirm": "Supprimer le groupe « {name} » ? Les personnes restent ; seul le groupe est retiré.",
+      "deleteConfirm": "Supprimer le groupe « {name} » ? Les personnes restent dans l’instance. {shares}, et {policies}.",
+      "deleteConfirmShares": "1 partage vers ce groupe prend fin | {count} partages vers ce groupe prennent fin",
+      "deleteConfirmPolicies": "1 règle est retirée | {count} règles sont retirées",
+      "deleteConfirmUnknown": "Supprimer le groupe « {name} » ? Les personnes restent dans l’instance. Les partages vers ce groupe prennent fin, et les règles du groupe sont retirées.",
       "empty": "Aucun groupe pour le moment. Créez-en un pour partager plus tard.",
       "loadError": "Impossible de charger les groupes.",
       "saveError": "Impossible d’enregistrer le groupe.",
@@ -859,7 +863,7 @@
       },
       "feature": {
         "SAVEDTASKS_ENABLED": "Tâches enregistrées",
-        "DESKTOP_AGENT_ENABLED": "Agent bureau",
+        "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Outils document",
         "MULTITASK_ROUTING_ENABLED": "Routage en plusieurs étapes",
         "MULTITASK_PARALLEL_ENABLED": "Étapes en parallèle",
@@ -936,6 +940,7 @@
     "sharedBy": "De {name}",
     "continueAsCopy": "Continuer comme ma copie",
     "continueFailed": "Impossible de créer votre copie. Veuillez réessayer.",
+    "continueNeedsUse": "Votre copie n'a pas été créée. Vous pouvez encore lire ce chat.",
     "readOnly": "Vous pouvez voir cette conversation. Pour ajouter un message, continuez-la comme votre propre copie.",
     "sharedFolder": "Partagé · {name}",
     "banner": {
@@ -972,6 +977,7 @@
       "remove": "Retirer",
       "removeTitle": "Arrêter le partage",
       "removeConfirm": "Retirer {name} ?",
+      "removeConfirmConversation": "Retirer {name} ? Cette personne perd ce chat et ne peut plus en faire sa propre copie.",
       "loadFailed": "Impossible de charger les partages.",
       "saveFailed": "Le partage a échoué. Veuillez réessayer.",
       "shared": "Partagé avec {name}.",
@@ -1024,7 +1030,7 @@
         "knowledge_folder": "Il apparaît chez eux sous Sources comme partagé.",
         "assistant": "Ils le trouveront sous Assistants → Partagé avec moi.",
         "saved_task": "Ils peuvent l'utiliser comme modèle sous Automatisations.",
-        "widget": "Ils peuvent ouvrir les réglages du widget."
+        "widget": "Ils le trouveront sous Widgets de chat."
       }
     }
   },

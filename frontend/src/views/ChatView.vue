@@ -569,6 +569,7 @@ import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { canComposeChat, isSharedConversationLocked } from '@/utils/sharedConversationLock'
+import { chatGoneStatus, continueOutcomeAfterRecheck } from '@/utils/chatAccessError'
 import SharedConversationBanner from '@/components/iam/SharedConversationBanner.vue'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
@@ -783,7 +784,19 @@ const continueSharedConversation = async () => {
     chatsStore.setActiveChat(copy.id)
     await chatsStore.loadChats()
     await chatsStore.loadConversationAccess(copy.id)
-  } catch {
+  } catch (error) {
+    if (chatGoneStatus(error)) {
+      await chatsStore.loadConversationAccess(id)
+      const outcome = continueOutcomeAfterRecheck(
+        chatsStore.activeChatId === id,
+        chatsStore.conversationAccess
+      )
+      if (outcome === 'released') return
+      if (outcome === 'read-only') {
+        showErrorToast(t('iam.continueNeedsUse'))
+        return
+      }
+    }
     showErrorToast(t('iam.continueFailed'))
   }
 }
@@ -1571,8 +1584,12 @@ onMounted(async () => {
 })
 
 const handleVisibilityChangeForToken = () => {
-  if (document.visibilityState === 'visible') {
-    prefetchSseToken()
+  if (document.visibilityState !== 'visible') return
+  prefetchSseToken()
+  const chatId = chatsStore.activeChatId
+  const access = chatsStore.conversationAccess
+  if (chatId && (access === 'read' || access === 'use')) {
+    void chatsStore.loadConversationAccess(chatId)
   }
 }
 

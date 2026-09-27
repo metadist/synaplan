@@ -784,6 +784,14 @@ switched off; it recovers by itself when the endpoint lists it again.
 An **unreachable** endpoint marks nothing, so a brief outage never
 retires a model. Native Ollama is not capability-probed this way.
 
+Image generation on the same endpoint uses the OpenAI Images API
+(`POST {base}/images/generations`), not the Responses API. Tick
+**text2pic** on the endpoint, import or add a model whose id the
+gateway already serves (for a local box, LocalAI's `flux.1-schnell`),
+and set that model as the image default under Settings. `/pic` then
+draws with that model. The endpoint does not edit an attached picture;
+remove the attachment or pick another image model for edits.
+
 The Operate page is **AI infrastructure** (`/admin/setup`). The
 **Extraction** tab shows adapter health, lets an admin reorder a family
 chain, and offers **Test with a file**. Tika and Docling have the same

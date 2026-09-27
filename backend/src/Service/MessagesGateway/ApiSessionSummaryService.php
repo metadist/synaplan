@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\MessagesGateway;
 
+use App\AI\Messages\AnthropicContentText;
+use App\AI\Messages\ApiSessionClient;
 use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\Message;
@@ -110,6 +112,7 @@ final readonly class ApiSessionSummaryService
         try {
             $state = $this->readState($stateKey);
 
+            $requestExcerpt = AnthropicContentText::humanText($requestExcerpt);
             $entry = trim(sprintf(
                 "Request: %s\nResponse: %s",
                 $this->clip(trim($requestExcerpt), self::EXCERPT_MAX_CHARS),
@@ -139,7 +142,7 @@ final readonly class ApiSessionSummaryService
                 return;
             }
 
-            $chatId = $this->upsertSessionChat($userId, $state, $client, $summary, $model, $language, $state['pending']);
+            $chatId = $this->upsertSessionChat($userId, $user, $state, $client, $summary, $model, $language, $state['pending']);
 
             $state['summary'] = $summary;
             $state['pending'] = [];
@@ -159,6 +162,13 @@ final readonly class ApiSessionSummaryService
     {
         $userId = (int) $user->getId();
         $modelConfig = $this->modelConfigService->getSummaryModelConfig($userId);
+        $provider = strtolower(trim((string) ($modelConfig['provider'] ?? '')));
+        $modelName = $modelConfig['model'] ?? null;
+        // The dev stub answers with a canned "demo mode" paragraph and a
+        // placeholder image. That must not become the session log.
+        if ('test' === $provider || !\is_string($modelName) || '' === trim($modelName)) {
+            return $this->plainExcerptSummary($pending);
+        }
 
         $sections = [];
         if ('' !== $previousSummary) {
@@ -172,7 +182,7 @@ final readonly class ApiSessionSummaryService
                 ['role' => 'user', 'content' => implode("\n\n", $sections)],
             ], $userId, [
                 'provider' => $modelConfig['provider'] ?? null,
-                'model' => $modelConfig['model'] ?? null,
+                'model' => $modelName,
                 'temperature' => 0.2,
                 'max_tokens' => self::SUMMARY_MAX_TOKENS,
             ]);
@@ -228,7 +238,7 @@ final readonly class ApiSessionSummaryService
     {
         $requests = [];
         foreach ($pending as $entry) {
-            if (1 !== preg_match('/^Request:\s*(.*)$/s', $entry, $match)) {
+            if (1 !== preg_match('/^Request:[ \t]*(.*)$/s', $entry, $match)) {
                 continue;
             }
             $parts = preg_split('/^Response:\s*/m', (string) $match[1], 2);
@@ -318,7 +328,7 @@ final readonly class ApiSessionSummaryService
      * @param array{chatId: int|null} $state
      * @param list<string>            $turns pending "Request: …\nResponse: …" entries being folded
      */
-    private function upsertSessionChat(int $userId, array $state, string $client, string $summary, string $model, string $language, array $turns): int
+    private function upsertSessionChat(int $userId, User $user, array $state, string $client, string $summary, string $model, string $language, array $turns): int
     {
         $chat = null;
         if (null !== $state['chatId']) {
@@ -332,9 +342,14 @@ final readonly class ApiSessionSummaryService
             $chat = new Chat();
             $chat->setUserId($userId);
             $chat->setSource(self::CHAT_SOURCE);
-            $chat->setTitle(sprintf('%s · %s', $this->clientLabel($client), date('Y-m-d H:i')));
+            $chat->setTitle(sprintf('%s · %s', $this->clientLabel($client), ApiSessionClient::localStamp($user)));
             $this->em->persist($chat);
             $this->em->flush();
+        } elseif (ApiSessionClient::DESKTOP === $client) {
+            $retitled = ApiSessionClient::retitleDesktop((string) $chat->getTitle());
+            if (null !== $retitled) {
+                $chat->setTitle($retitled);
+            }
         }
 
         // One second per message keeps the turn order stable for readers that
@@ -343,6 +358,7 @@ final readonly class ApiSessionSummaryService
         $tick = time();
         foreach ($turns as $entry) {
             [$request, $response] = $this->splitTurn($entry);
+            $request = AnthropicContentText::humanText($request);
             if ('' !== $request) {
                 $this->appendTurnMessage($userId, $chat, 'IN', $request, $language, $tick);
                 ++$tick;
@@ -351,6 +367,13 @@ final readonly class ApiSessionSummaryService
                 $this->appendTurnMessage($userId, $chat, 'OUT', $response, $language, $tick);
                 ++$tick;
             }
+        }
+
+        if ('' === trim($summary)) {
+            $chat->updateTimestamp();
+            $this->em->flush();
+
+            return (int) $chat->getId();
         }
 
         $message = $this->em->getRepository(Message::class)->findOneBy([
@@ -407,7 +430,7 @@ final readonly class ApiSessionSummaryService
      */
     private function splitTurn(string $entry): array
     {
-        if (1 !== preg_match('/^Request:\s*(.*?)(?:\nResponse:\s*(.*))?$/s', $entry, $match)) {
+        if (1 !== preg_match('/^Request:[ \t]*(.*?)(?:\nResponse:[ \t]*(.*))?$/s', $entry, $match)) {
             return ['', ''];
         }
 
@@ -533,11 +556,31 @@ final readonly class ApiSessionSummaryService
 
     private function clientLabel(string $client): string
     {
-        return match ($client) {
-            'claude-code' => 'Claude Code',
-            'openai-api' => 'API client (OpenAI-compatible)',
-            default => 'API client',
-        };
+        return ApiSessionClient::label($client);
+    }
+
+    /**
+     * Factual stand-in when no real summarizer model is configured.
+     * Uses the person's own request text, never the dev stub's canned reply.
+     *
+     * @param list<string> $pending
+     */
+    private function plainExcerptSummary(array $pending): string
+    {
+        $bits = [];
+        foreach ($pending as $entry) {
+            [$request] = $this->splitTurn($entry);
+            $text = trim(AnthropicContentText::humanText($request));
+            if ('' !== $text) {
+                $bits[] = $text;
+            }
+        }
+
+        if ([] === $bits) {
+            return '';
+        }
+
+        return $this->clip(implode(' ', $bits), self::SUMMARY_MAX_CHARS);
     }
 
     private function clip(string $value, int $maxChars): string

@@ -608,7 +608,9 @@
   /* Primärbutton */
   .btn-primary {
     background: var(--brand);
-    color: #fff;
+    /* Dark brand is a light blue; white ink on it is ~2.9:1. --on-brand is
+       white in light mode and near-black in dark mode. */
+    color: var(--on-brand);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
   }
   .btn-primary:hover {

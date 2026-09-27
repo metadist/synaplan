@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Messages\AnthropicContentText;
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
@@ -170,9 +171,12 @@ class ChatController extends AbstractController
                     // Tool commands (/pic, /vid, …) are kept in the stored message
                     // text for backend routing, but the raw prefix must never leak
                     // into the chat list preview — only the user's actual query.
-                    $content = PastedContentText::strip(
+                    $content = AnthropicContentText::humanText(PastedContentText::strip(
                         $this->stripToolCommandPrefix($message->getText() ?? ''),
-                    );
+                    ));
+                    if ('' === trim($content)) {
+                        continue;
+                    }
                     $firstMessagePreview = mb_strlen($content) > 30
                         ? mb_substr($content, 0, 30).'…'
                         : $content;

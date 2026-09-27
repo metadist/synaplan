@@ -51,6 +51,7 @@ final readonly class PairingService
         }
 
         $name = self::sanitizeDeviceName($deviceName);
+        $cleanCapabilities = self::sanitizeCapabilities($capabilities);
 
         // sk_ (3) + 58 hex chars = 61 chars (fits VARCHAR(64)) — same shape as
         // the manually-created keys in ApiKeyController.
@@ -65,14 +66,19 @@ final readonly class PairingService
 
         $this->apiKeyRepository->save($apiKey);
 
-        $device = (new DesktopDevice())
-            ->setOwnerId($userId)
-            ->setName($name)
-            ->setApiKeyId((int) $apiKey->getId())
-            ->setStatus(DesktopDevice::STATUS_ACTIVE)
-            ->setCapabilities(self::sanitizeCapabilities($capabilities));
+        $device = $this->deviceRepository->findRevokedByOwnerAndName($userId, $name);
+        if ($device instanceof DesktopDevice) {
+            $this->revive($device, $apiKey, $cleanCapabilities);
+        } else {
+            $device = (new DesktopDevice())
+                ->setOwnerId($userId)
+                ->setName($name)
+                ->setApiKeyId((int) $apiKey->getId())
+                ->setStatus(DesktopDevice::STATUS_ACTIVE)
+                ->setCapabilities($cleanCapabilities);
 
-        $this->deviceRepository->save($device);
+            $this->deviceRepository->save($device);
+        }
 
         return [
             'deviceId' => (int) $device->getId(),
@@ -87,13 +93,47 @@ final readonly class PairingService
      */
     public function revoke(DesktopDevice $device): void
     {
+        $this->deleteKey($device);
+
+        $device->setStatus(DesktopDevice::STATUS_REVOKED);
+        $this->deviceRepository->save($device);
+    }
+
+    /**
+     * Drop a device row that is already revoked. The key was deleted when the
+     * computer was disconnected; this only removes the list entry.
+     */
+    public function forget(DesktopDevice $device): void
+    {
+        $this->deviceRepository->remove($device);
+    }
+
+    /**
+     * Pairing the same computer again reuses its revoked row so the list does
+     * not grow a second copy of the name. Last check-in is cleared: the old
+     * session must not make the row look connected before the app checks in.
+     *
+     * @param list<string> $capabilities
+     */
+    private function revive(DesktopDevice $device, ApiKey $apiKey, array $capabilities): void
+    {
+        $this->deleteKey($device);
+
+        $device
+            ->setApiKeyId((int) $apiKey->getId())
+            ->setStatus(DesktopDevice::STATUS_ACTIVE)
+            ->setCapabilities($capabilities)
+            ->setLastSeen(0);
+
+        $this->deviceRepository->save($device);
+    }
+
+    private function deleteKey(DesktopDevice $device): void
+    {
         $apiKey = $this->apiKeyRepository->find($device->getApiKeyId());
         if ($apiKey instanceof ApiKey) {
             $this->apiKeyRepository->remove($apiKey, false);
         }
-
-        $device->setStatus(DesktopDevice::STATUS_REVOKED);
-        $this->deviceRepository->save($device);
     }
 
     private static function sanitizeDeviceName(string $name): string

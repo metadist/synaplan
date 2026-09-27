@@ -2,14 +2,12 @@
 
 > **Status.** The server half (pairing, scoped keys, job queue, check-in
 > contract) ships in this app behind `DESKTOP_AGENT.ENABLED` (on by default
-> since the Features tab landed; see [Feature flags](FEATURE_FLAGS.md)). The
-> desktop client for **macOS, Windows and Linux** is a **public beta** in
-> [synaplan-desktop](https://github.com/metadist/synaplan-desktop): build it
-> from source or take a beta build from that repository's
-> [Releases](https://github.com/metadist/synaplan-desktop/releases) page once
-> one is published. Signed, notarized installers come later. The job contract
-> stays frozen at `protocol: 1`. The web app links to the repository from
-> **Channels → Desktop**.
+> since the Features tab landed; see [Feature flags](FEATURE_FLAGS.md)).
+> Synaplan Desktop for **macOS, Windows and Linux** lives in
+> [synaplan-desktop](https://github.com/metadist/synaplan-desktop). There is
+> no signed installer yet — build it from that repository. The job contract
+> stays frozen at `protocol: 1`. In the web app the page is
+> **Manage → Channels → Synaplan Desktop**.
 
 ## What it is
 
@@ -46,7 +44,7 @@ environment pin → per-user → global → code fallback **false**:
 
 | State | Effect |
 | ----- | ------ |
-| Off | Every `/api/v1/desktop/*` route answers **404**, the two MCP tools are **absent** from `tools/list`, the reaper command is a no-op, and no Desktop UI appears. The feature is completely invisible. |
+| Off | Every `/api/v1/desktop/*` route answers **404**, the two MCP tools are **absent** from `tools/list`, the reaper command is a no-op, and no Desktop UI appears. App chat with a paired desktop key is refused: the response says Synaplan Desktop is turned off on this instance. |
 | On (global, default) | The routes and MCP tools appear for every user. |
 | On (per-user, `BOWNERID = <id>`) | Only that user sees the feature; a per-user value beats the global one. |
 
@@ -65,6 +63,32 @@ ON DUPLICATE KEY UPDATE BVALUE = '0';
 
 The runtime-config endpoint exposes the resolved boolean as
 `features.desktopAgentEnabled` so the frontend can hide the UI when it is off.
+
+## App chat
+
+A paired computer chats through the Messages gateway (`POST /v1/messages`)
+using the `desktop:messages` scope. Pairing does not turn that chat on.
+Two switches stay at their existing defaults (both off until an admin changes
+them under **Coding clients**):
+
+1. **Messages gateway enabled.** While this is off and Synaplan Desktop is on,
+   the computer is told the gateway is turned off.
+2. **A provider key for the default chat model.** Either the instance key is
+   allowed as a fallback, or the user has saved their own key for that
+   model's provider. A local model (Ollama, or a custom endpoint) does not
+   need one. Groq, Mistral, and the other catalog providers count when their
+   own key is available. Without a key the model needs, the computer stays
+   paired and the response says nothing was sent (HTTP 403). A missing key
+   is not HTTP 401, so the app does not treat it as a disconnected computer.
+
+When Synaplan Desktop itself is turned off, that sentence wins even if the
+gateway is also off. Claude Code and other full API keys keep the existing
+HTTP 401 when they have no provider key.
+
+The Desktop page states which of these is missing. An admin gets a link to
+Coding clients. Everyone else is told to ask an admin. This app does not
+turn the gateway or the instance key on by itself: the instance key spends
+the install's provider budget.
 
 ## API keys and scopes
 
@@ -140,7 +164,7 @@ never logged at info level.
 
 Flow:
 
-1. User opens **Channels → Desktop** in the web app and clicks *Pair this
+1. User opens **Manage → Channels → Synaplan Desktop** in the web app and clicks *Pair this
    computer* → server mints a code. The address shown is the API origin
    (`http://localhost:8000` in local Vite — or the same host on `:8000` when
    the UI is opened via a LAN IP — not `:5173` or Keycloak `:8080`).
@@ -257,7 +281,7 @@ breaking a shipped client (invariant C9).
 With the flag on and a paired unsigned desktop client running:
 
 1. In the web app, open a chat and queue a `skill.run` job for that computer
-   (Channels → Desktop, or `POST /api/v1/desktop/jobs` with
+   (Manage → Channels → Synaplan Desktop, or `POST /api/v1/desktop/jobs` with
    `{ skill, prompt, fileIds }` only).
 2. The computer checks in over MCP (`agent_checkin`), honours top-level
    `next_call_at`, and runs the skill with the same local tool policy as

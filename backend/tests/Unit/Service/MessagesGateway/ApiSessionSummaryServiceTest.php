@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\MessagesGateway;
 
+use App\AI\Messages\ApiSessionClient;
 use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\Message;
@@ -44,6 +45,7 @@ final class ApiSessionSummaryServiceTest extends TestCase
     private EntityManagerInterface&MockObject $em;
     private EntityRepository&MockObject $messageRepository;
     private User $user;
+    private Chat $existingChat;
 
     protected function setUp(): void
     {
@@ -63,10 +65,10 @@ final class ApiSessionSummaryServiceTest extends TestCase
         $userRepository = $this->createMock(EntityRepository::class);
         $userRepository->method('find')->willReturn($this->user);
 
-        $chat = new Chat();
-        $chat->setUserId(self::USER_ID);
+        $this->existingChat = new Chat();
+        $this->existingChat->setUserId(self::USER_ID);
         $chatRepository = $this->createMock(EntityRepository::class);
-        $chatRepository->method('find')->willReturn($chat);
+        $chatRepository->method('find')->willReturn($this->existingChat);
 
         $this->messageRepository = $this->createMock(EntityRepository::class);
 
@@ -341,12 +343,143 @@ final class ApiSessionSummaryServiceTest extends TestCase
         $ref->setValue($entity, $id);
     }
 
-    private function record(string $requestExcerpt, string $responseExcerpt): void
+    public function testDesktopSessionIsTitledInTheAccountTimezone(): void
+    {
+        $this->user->setUserDetails(['timezone' => 'Europe/Berlin']);
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->aiFacade->method('chat')->willReturn(['content' => 'Slides drafted.', 'usage' => []]);
+
+        $created = null;
+        $this->em->expects($this->atLeastOnce())
+            ->method('persist')
+            ->willReturnCallback(function (object $entity) use (&$created): void {
+                self::assignId($entity);
+                if ($entity instanceof Chat && null === $created) {
+                    $created = $entity;
+                }
+            });
+
+        $this->record('Make 3 slides', 'Done', ApiSessionClient::DESKTOP);
+
+        self::assertInstanceOf(Chat::class, $created);
+        $stamp = ApiSessionClient::localStamp($this->user);
+        self::assertSame(ApiSessionClient::label(ApiSessionClient::DESKTOP).' · '.$stamp, $created->getTitle());
+    }
+
+    public function testContinuingDesktopSessionReplacesAClaudeCodeTitle(): void
+    {
+        $this->existingChat->setTitle('Claude Code · 2026-09-25 15:11');
+        $this->seedState([
+            'summary' => 'Existing summary.',
+            'pending' => ['Request: a\nResponse: b'],
+            'countSinceRefresh' => 4,
+            'lastRefreshAt' => time(),
+            'chatId' => 7,
+        ]);
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->aiFacade->method('chat')->willReturn(['content' => 'Updated.', 'usage' => []]);
+        $this->em->method('persist')->willReturnCallback(static fn (object $entity) => self::assignId($entity));
+
+        $this->record('Next step', 'Ok', ApiSessionClient::DESKTOP);
+
+        self::assertSame('Synaplan Desktop · 2026-09-25 15:11', $this->existingChat->getTitle());
+    }
+
+    public function testDemoSummarizerStoresTheRequestInsteadOfTheCannedReply(): void
+    {
+        $this->useSummaryProvider('test', 'test-model');
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $messages = [];
+        $this->em->expects($this->atLeastOnce())
+            ->method('persist')
+            ->willReturnCallback(function (object $entity) use (&$messages): void {
+                self::assignId($entity);
+                if ($entity instanceof Message) {
+                    $messages[] = $entity;
+                }
+            });
+
+        $this->record('Make three slides about Q3', 'Done.');
+
+        $state = $this->readState();
+        self::assertSame('Make three slides about Q3', $state['summary']);
+        $summary = null;
+        foreach ($messages as $message) {
+            $text = (string) $message->getText();
+            self::assertStringNotContainsString('picsum', $text);
+            self::assertStringNotContainsString('demo mode', strtolower($text));
+            self::assertStringNotContainsString('provider setup', strtolower($text));
+            if ('api_session' === $message->getTopic()) {
+                $summary = $message;
+            }
+        }
+        self::assertInstanceOf(Message::class, $summary);
+        self::assertSame('[Session log] Make three slides about Q3', $summary->getText());
+    }
+
+    public function testToolResultJsonIsNotStoredAsTheUserTurn(): void
+    {
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->aiFacade->method('chat')->willReturn(['content' => 'Slides are ready.', 'usage' => []]);
+
+        $stored = [];
+        $this->em->method('persist')->willReturnCallback(function (object $entity) use (&$stored): void {
+            self::assignId($entity);
+            if ($entity instanceof Message) {
+                $stored[] = $entity;
+            }
+        });
+
+        $this->record(
+            '{"type":"tool_result","tool_use_id":"toolu_1","content":"# SKILL.md"}',
+            'Created the slides.',
+        );
+
+        self::assertNotEmpty($stored);
+        $assistant = null;
+        foreach ($stored as $message) {
+            $text = (string) $message->getText();
+            self::assertStringNotContainsString('tool_result', $text);
+            self::assertStringNotContainsString('SKILL.md', $text);
+            if ('IN' === $message->getDirection()) {
+                self::fail('A tool result must not become a user message.');
+            }
+            if ('OUT' === $message->getDirection() && 'CHAT' === $message->getTopic()) {
+                $assistant = $message;
+            }
+        }
+        self::assertInstanceOf(Message::class, $assistant);
+        self::assertSame('Created the slides.', $assistant->getText());
+    }
+
+    private function useSummaryProvider(string $provider, ?string $model): void
+    {
+        $modelConfigService = $this->createMock(ModelConfigService::class);
+        $modelConfigService->method('getSummaryModelConfig')->willReturn([
+            'provider' => $provider,
+            'model' => $model,
+            'model_id' => 42,
+        ]);
+
+        $this->service = new ApiSessionSummaryService(
+            $this->aiFacade,
+            $modelConfigService,
+            $this->rateLimitService,
+            $this->em,
+            $this->cache,
+            new LockFactory(new InMemoryStore()),
+            new NullLogger(),
+        );
+    }
+
+    private function record(string $requestExcerpt, string $responseExcerpt, string $client = 'claude-code'): void
     {
         $this->service->record(
             self::USER_ID,
             self::SESSION_KEY,
-            'claude-code',
+            $client,
             'claude-sonnet-4-20250514',
             $requestExcerpt,
             $responseExcerpt,

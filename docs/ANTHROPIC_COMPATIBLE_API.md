@@ -176,7 +176,16 @@ Cost depends on whose key serves the request:
 
 Desktop sends the project's catalog chat key (`service:providerId:tag`) on `/v1/messages`. That path uses the same translators, so any chat-capable catalog model on those protocols works — a Groq, A2Agent, or Ollama pick does **not** need a `MODEL_ALIASES` entry.
 
-Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped before a non-Anthropic upstream call. This routing works technically; Anthropic does not officially support Claude Code against non-Claude models through a gateway.
+Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped before a non-Anthropic upstream call. OpenAI reasoning models (o-series, GPT-5, GPT-6) on `/v1/responses` first get the client's request mapped onto `reasoning.effort` and clamped to the model family's tiers:
+
+| Client request | `reasoning.effort` |
+| -------------- | ------------------ |
+| no `thinking`, or `thinking.type: "disabled"` | the family's cheapest tier (`none` on GPT-6 Sol / Luna, `low` on GPT-6 Astra) |
+| `output_config.effort` | that tier |
+| `thinking.budget_tokens` below 4096 / 16384 / 32768 / above | `low` / `medium` / `high` / `xhigh` |
+| `thinking` without effort or budget | `medium` |
+
+This routing works technically; Anthropic does not officially support Claude Code against non-Claude models through a gateway.
 
 ## Related
 

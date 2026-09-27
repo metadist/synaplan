@@ -7,10 +7,11 @@ import {
   EnqueueDesktopJobResponseSchema,
   GetDesktopJobResponseSchema,
   ListDesktopJobsResponseSchema,
+  CancelDesktopJobResponseSchema,
 } from '@/generated/api-schemas'
 
 /**
- * Channels → Desktop: pair and manage the user's computers, and enqueue
+ * Manage → Channels → Synaplan Desktop: pair and manage the user's computers, and enqueue
  * `skill.run` jobs for them.
  *
  * Every route 404s when the DESKTOP_AGENT feature flag is off, so callers must
@@ -56,14 +57,25 @@ export const desktopApi = {
     return { code: data.code, expiresAt: data.expiresAt }
   },
 
-  async revokeDevice(id: number): Promise<void> {
-    await httpClient(`/api/v1/desktop/devices/${id}`, {
+  async revokeDevice(id: number): Promise<{ cancelledJobs: number; removed: boolean }> {
+    const data = await httpClient(`/api/v1/desktop/devices/${id}`, {
       method: 'DELETE',
       schema: RevokeDesktopDeviceResponseSchema,
     })
+    return { cancelledJobs: data.cancelledJobs, removed: data.removed }
   },
 
-  async enqueueJob(payload: EnqueueJobPayload): Promise<{ jobId: number; status: string }> {
+  async cancelJob(id: number): Promise<{ cancelled: boolean; job: DesktopJob }> {
+    const data = await httpClient(`/api/v1/desktop/jobs/${id}/cancel`, {
+      method: 'POST',
+      schema: CancelDesktopJobResponseSchema,
+    })
+    return { cancelled: data.cancelled, job: data.job }
+  },
+
+  async enqueueJob(
+    payload: EnqueueJobPayload
+  ): Promise<{ jobId: number; status: string; chatTitle: string | null }> {
     const data = await httpClient('/api/v1/desktop/jobs', {
       method: 'POST',
       body: JSON.stringify({
@@ -78,7 +90,12 @@ export const desktopApi = {
       }),
       schema: EnqueueDesktopJobResponseSchema,
     })
-    return { jobId: data.jobId, status: data.status }
+    return {
+      jobId: data.jobId,
+      status: data.status,
+      chatTitle:
+        typeof data.chatTitle === 'string' && data.chatTitle !== '' ? data.chatTitle : null,
+    }
   },
 
   async getJob(id: number): Promise<DesktopJob> {

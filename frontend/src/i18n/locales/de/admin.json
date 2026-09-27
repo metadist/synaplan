@@ -441,7 +441,8 @@
         "COMPUTE_MAX_TIMEOUT_SEC": "Harte Obergrenze in Sekunden für einen Dateiarbeits-Lauf.",
         "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
-        "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90."
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Verwalten → Kanäle. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -720,7 +721,10 @@
       "rename": "Umbenennen",
       "renameTitle": "Gruppe umbenennen",
       "delete": "Löschen",
-      "deleteConfirm": "Die Gruppe \"{name}\" löschen? Die Personen bleiben; nur die Gruppe wird entfernt.",
+      "deleteConfirm": "Die Gruppe \"{name}\" löschen? Die Personen bleiben in der Instanz. {shares}, und {policies}.",
+      "deleteConfirmShares": "1 Freigabe an diese Gruppe endet | {count} Freigaben an diese Gruppe enden",
+      "deleteConfirmPolicies": "1 Richtlinie wird entfernt | {count} Richtlinien werden entfernt",
+      "deleteConfirmUnknown": "Die Gruppe \"{name}\" löschen? Die Personen bleiben in der Instanz. Freigaben an diese Gruppe enden, und die Richtlinien der Gruppe werden entfernt.",
       "empty": "Noch keine Gruppen. Erstellen Sie eine, um später zu teilen.",
       "loadError": "Gruppen konnten nicht geladen werden.",
       "saveError": "Die Gruppe konnte nicht gespeichert werden.",
@@ -859,7 +863,7 @@
       },
       "feature": {
         "SAVEDTASKS_ENABLED": "Gespeicherte Aufgaben",
-        "DESKTOP_AGENT_ENABLED": "Desktop-Agent",
+        "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Dokumentwerkzeuge",
         "MULTITASK_ROUTING_ENABLED": "Mehrschritt-Routing",
         "MULTITASK_PARALLEL_ENABLED": "Parallele Schritte",
@@ -936,6 +940,7 @@
     "sharedBy": "Von {name}",
     "continueAsCopy": "Als meine Kopie fortsetzen",
     "continueFailed": "Ihre Kopie konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    "continueNeedsUse": "Ihre Kopie wurde nicht erstellt. Sie können diesen Chat weiterhin lesen.",
     "readOnly": "Sie können diese Unterhaltung ansehen. Um eine Nachricht hinzuzufügen, setzen Sie sie als eigene Kopie fort.",
     "sharedFolder": "Geteilt · {name}",
     "banner": {
@@ -972,6 +977,7 @@
       "remove": "Entfernen",
       "removeTitle": "Teilen beenden",
       "removeConfirm": "{name} entfernen?",
+      "removeConfirmConversation": "{name} entfernen? Die Person verliert diesen Chat und kann keine eigene Kopie mehr erstellen.",
       "loadFailed": "Die Freigaben konnten nicht geladen werden.",
       "saveFailed": "Teilen ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
       "shared": "Mit {name} geteilt.",
@@ -1024,7 +1030,7 @@
         "knowledge_folder": "Er erscheint bei ihnen unter Quellen als geteilt.",
         "assistant": "Sie finden ihn unter Assistenten → Mit mir geteilt.",
         "saved_task": "Sie können sie unter Automatisierungen als Vorlage nutzen.",
-        "widget": "Sie können die Widget-Einstellungen öffnen."
+        "widget": "Sie finden es unter Chat-Widgets."
       }
     }
   },

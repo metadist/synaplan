@@ -3,6 +3,7 @@ import {
   defaultSharePermission,
   shareConsequenceKey,
   shareFindKey,
+  shareRemoveConfirmKey,
   SHARE_PERMISSIONS,
 } from '@/utils/shareCopy'
 
@@ -19,6 +20,8 @@ describe('shareCopy', () => {
     )
     expect(shareFindKey('assistant')).toBe('iam.dialog.find.assistant')
     expect(shareFindKey('agent')).toBe('iam.dialog.find.assistant')
+    expect(shareRemoveConfirmKey('conversation')).toBe('iam.dialog.removeConfirmConversation')
+    expect(shareRemoveConfirmKey('widget')).toBe('iam.dialog.removeConfirm')
     expect(shareConsequenceKey('agent', 'use')).toBe('iam.dialog.consequence.assistant.use')
     expect(defaultSharePermission('agent')).toBe('use')
   })

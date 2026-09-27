@@ -264,11 +264,20 @@ final readonly class VectorSearchService
     {
         try {
             $stats = $this->vectorStorage->getStats($userId);
+            try {
+                $shared = $this->countSharedSearchable($userId);
+            } catch (\Exception $e) {
+                $this->logger->error('VectorSearchService: shared stats failed', [
+                    'error' => $e->getMessage(),
+                    'user_id' => $userId,
+                ]);
+                $shared = ['files' => 0, 'chunks' => 0, 'groups' => 0];
+            }
 
             return [
-                'total_documents' => $stats->totalFiles,
-                'total_chunks' => $stats->totalChunks,
-                'total_groups' => $stats->totalGroups,
+                'total_documents' => $stats->totalFiles + $shared['files'],
+                'total_chunks' => $stats->totalChunks + $shared['chunks'],
+                'total_groups' => $stats->totalGroups + $shared['groups'],
                 'avg_chunk_size' => 0, // Not supported by facade yet
                 'chunks_by_group' => $stats->chunksByGroup,
             ];
@@ -285,6 +294,119 @@ final readonly class VectorSearchService
                 'avg_chunk_size' => 0,
             ];
         }
+    }
+
+    /**
+     * Indexed files the person can search that live under someone else's id.
+     *
+     * Own files are already in {@see VectorStorageFacade::getStats()}. A shared
+     * folder is counted only for that folder, never the owner's other files.
+     *
+     * @return array{files: int, chunks: int, groups: int}
+     */
+    private function countSharedSearchable(int $userId): array
+    {
+        $files = 0;
+        $chunks = 0;
+        $groups = 0;
+        /** @var array<string, true> $seenFiles */
+        $seenFiles = [];
+        /** @var array<string, true> $seenFolders */
+        $seenFolders = [];
+        /** @var array<int, array<int, array{chunks: int, groupKey: string|null}>> $filesByOwner */
+        $filesByOwner = [];
+
+        foreach ($this->ragScopeResolver->resolve($userId, null) as $scope) {
+            if ($scope->ownerId === $userId) {
+                continue;
+            }
+
+            if ([] !== $scope->fileIds) {
+                $catalog = $this->indexedFilesForOwner($filesByOwner, $scope->ownerId);
+                $added = false;
+                foreach ($scope->fileIds as $fileId) {
+                    $fileKey = $scope->ownerId.':'.$fileId;
+                    if (isset($seenFiles[$fileKey])) {
+                        continue;
+                    }
+                    $info = $catalog[$fileId] ?? null;
+                    if (null === $info || $info['chunks'] < 1) {
+                        continue;
+                    }
+                    if (
+                        null !== $scope->groupKey
+                        && '' !== $scope->groupKey
+                        && $info['groupKey'] !== $scope->groupKey
+                    ) {
+                        continue;
+                    }
+                    $seenFiles[$fileKey] = true;
+                    ++$files;
+                    $chunks += $info['chunks'];
+                    $added = true;
+                }
+                if ($added && null !== $scope->groupKey && '' !== $scope->groupKey) {
+                    $this->countSharedFolder($seenFolders, $groups, $scope->ownerId, $scope->groupKey);
+                }
+
+                continue;
+            }
+
+            if (null === $scope->groupKey || '' === $scope->groupKey) {
+                continue;
+            }
+
+            $rows = $this->vectorStorage->getFilesWithChunksByGroupKey($scope->ownerId, $scope->groupKey);
+            $added = false;
+            foreach ($rows as $fileId => $row) {
+                $fileChunks = $row['chunks'];
+                if ($fileChunks < 1) {
+                    continue;
+                }
+                $added = true;
+                $fileKey = $scope->ownerId.':'.$fileId;
+                if (isset($seenFiles[$fileKey])) {
+                    continue;
+                }
+                $seenFiles[$fileKey] = true;
+                ++$files;
+                $chunks += $fileChunks;
+            }
+            if ($added) {
+                $this->countSharedFolder($seenFolders, $groups, $scope->ownerId, $scope->groupKey);
+            }
+        }
+
+        return ['files' => $files, 'chunks' => $chunks, 'groups' => $groups];
+    }
+
+    /**
+     * One scan per owner. Shared attachments must not each scroll the collection.
+     *
+     * @param array<int, array<int, array{chunks: int, groupKey: string|null}>> $filesByOwner
+     *
+     * @return array<int, array{chunks: int, groupKey: string|null}>
+     */
+    private function indexedFilesForOwner(array &$filesByOwner, int $ownerId): array
+    {
+        if (!isset($filesByOwner[$ownerId])) {
+            $filesByOwner[$ownerId] = $this->vectorStorage->getFilesWithChunks($ownerId);
+        }
+
+        return $filesByOwner[$ownerId];
+    }
+
+    /**
+     * @param array<string, true> $seenFolders
+     */
+    private function countSharedFolder(array &$seenFolders, int &$groups, int $ownerId, string $groupKey): void
+    {
+        $folderKey = $ownerId.':'.$groupKey;
+        if (isset($seenFolders[$folderKey])) {
+            return;
+        }
+        $seenFolders[$folderKey] = true;
+        ++$groups;
     }
 
     /**
