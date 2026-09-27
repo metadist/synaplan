@@ -19,6 +19,13 @@ database and vector snapshots are consistent.
 
 ## First installation
 
+The shortest start is two files and no git checkout: copy `compose.yaml` and
+`selfhost.env.example` (as `.env`) into an empty directory, keep
+`SYNAPLAN_VERSION` on a release tag, and run `docker compose up -d`. Open
+`http://127.0.0.1:8000` unless `SYNAPLAN_HTTP_BIND` or `SYNAPLAN_HTTP_PORT`
+changed. The steps below are the same contract from a clone of this
+repository, plus prepare, validate, and smoke-test.
+
 ```bash
 cp deploy/selfhost.env.example deploy/.env
 # Replace every required placeholder, including SYNAPLAN_VERSION.

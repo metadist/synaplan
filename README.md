@@ -30,15 +30,36 @@
 
 ## Your first answer in three steps
 
-One line — the installer checks Docker, fetches Synaplan, and starts the stack:
+Copy two files into an empty directory and start the published image. No git checkout and no `make`.
+
+1. **Save the two files.** [`deploy/compose.yaml`](deploy/compose.yaml) becomes `compose.yaml`. [`deploy/selfhost.env.example`](deploy/selfhost.env.example) becomes `.env`.
+
+```bash
+mkdir synaplan && cd synaplan
+curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/compose.yaml
+curl -fsSL -o .env https://raw.githubusercontent.com/metadist/synaplan/main/deploy/selfhost.env.example
+```
+
+2. **Pin a release tag.** In `.env`, `SYNAPLAN_VERSION` is already a release tag (today `5.0.5`). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. Set `APP_URL` and `FRONTEND_URL` to the address you will open. Leave both admin lines empty to create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
+3. **Start, then open the app.**
+
+```bash
+docker compose up -d
+```
+
+Open **<http://127.0.0.1:8000>**. That address is `SYNAPLAN_HTTP_BIND` plus `SYNAPLAN_HTTP_PORT`. A Docker GUI uses the same two files: paste `compose.yaml`, select `.env`, and start. To roll back, change `SYNAPLAN_VERSION` to the previous release tag and run `docker compose up -d` again.
+
+Then connect one AI provider. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting.
+
+### Develop from this repository
+
+The steps above run the published image. To work on the source, the installer checks Docker, fetches Synaplan, and starts the development stack:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | bash
 ```
 
-Or do exactly the same by hand (`make up` starts the status page on `:5173`
-first, then pulls and starts the rest — a plain `docker compose up -d` also
-works but `:5173` stays silent until every image is pulled):
+Or do the same by hand (`make up` starts the status page on `:5173` first, then pulls and starts the rest — a plain `docker compose up -d` also works but `:5173` stays silent until every image is pulled):
 
 ```bash
 git clone https://github.com/metadist/synaplan.git
@@ -50,7 +71,7 @@ make up
 2. **Log in** as `admin@synaplan.com` / `admin123` — the status screen shows these too.
 3. **Connect an AI provider — the app takes you there.** Until a key is in place, chat answers in demo mode and points you to the setup. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting. **You never touch a config file.**
 
-That is the whole local-hosting onboarding. After chat works, open **Manage → Connections** to hook up Outlook, Nextcloud, Dropbox, a calendar, or Jira / Confluence — then you can say *"summarize the latest mail from X"* or *"create a picture and put it in nextcloud"*.
+That is the source-checkout onboarding. After chat works, open **Manage → Connections** to hook up Outlook, Nextcloud, Dropbox, a calendar, or Jira / Confluence — then you can say *"summarize the latest mail from X"* or *"create a picture and put it in nextcloud"*.
 
 ### Key management, the short version
 
