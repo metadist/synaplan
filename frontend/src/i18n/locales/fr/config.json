@@ -876,8 +876,7 @@
         "subtitle": "Votre nouvelle clé API a été créée. Copiez-la maintenant et conservez-la en lieu sûr.",
         "yourKey": "Votre clé API",
         "warningTitle": "Important : enregistrez cette clé maintenant !",
-        "warningText": "Pour des raisons de sécurité, cette clé ne s’affichera qu’une seule fois. Assurez-vous de la copier et de la stocker dans un endroit sûr avant de fermer cette fenêtre.",
-        "autoClose": "Cette fenêtre se fermera automatiquement dans {seconds} secondes"
+        "warningText": "Pour des raisons de sécurité, cette clé ne s’affichera qu’une seule fois. Assurez-vous de la copier et de la stocker dans un endroit sûr avant de fermer cette fenêtre."
       },
       "revokedSuccess": "Clé API révoquée avec succès",
       "activatedSuccess": "Clé API activée avec succès",
