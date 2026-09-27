@@ -19,12 +19,17 @@ database and vector snapshots are consistent.
 
 ## First installation
 
-The shortest start is two files and no git checkout: copy `compose.yaml` and
-`selfhost.env.example` (as `.env`) into an empty directory, keep
-`SYNAPLAN_VERSION` on a release tag, and run `docker compose up -d`. Open
+The shortest start needs no git checkout: copy `compose.yaml` and
+`selfhost.env.example` (as `.env`) into an empty directory, fetch the static
+realtime config to `../_docker/centrifugo/config.json` (relative to the compose
+file — the `centrifugo` service mounts that path and fails its config check
+without it), keep `SYNAPLAN_VERSION` on a release tag, replace every
+`replace-with-*` secret placeholder with a generated value (starting with them
+means shared, public credentials), and run `docker compose up -d`. Open
 `http://127.0.0.1:8000` unless `SYNAPLAN_HTTP_BIND` or `SYNAPLAN_HTTP_PORT`
-changed. The steps below are the same contract from a clone of this
-repository, plus prepare, validate, and smoke-test.
+changed. Exact commands: root README "Your first answer in three steps". The
+steps below are the same contract from a clone of this repository, plus
+prepare, validate, and smoke-test.
 
 ```bash
 cp deploy/selfhost.env.example deploy/.env

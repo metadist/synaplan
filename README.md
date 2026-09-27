@@ -30,24 +30,43 @@
 
 ## Your first answer in three steps
 
-Copy two files into an empty directory and start the published image. No git checkout and no `make`.
+Start the published image without a git checkout and without `make`. Two files you edit (`compose.yaml`, `.env`) plus one static asset the realtime service needs (`config.json`, downloaded once, never edited).
 
-1. **Save the two files.** [`deploy/compose.yaml`](deploy/compose.yaml) becomes `compose.yaml`. [`deploy/selfhost.env.example`](deploy/selfhost.env.example) becomes `.env`.
+1. **Save the files.**
 
 ```bash
 mkdir synaplan && cd synaplan
 curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/compose.yaml
 curl -fsSL -o .env https://raw.githubusercontent.com/metadist/synaplan/main/deploy/selfhost.env.example
+mkdir -p ../_docker/centrifugo
+curl -fsSL -o ../_docker/centrifugo/config.json https://raw.githubusercontent.com/metadist/synaplan/main/_docker/centrifugo/config.json
 ```
 
-2. **Pin a release tag.** In `.env`, `SYNAPLAN_VERSION` is already a release tag (today `5.0.5`). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. Set `APP_URL` and `FRONTEND_URL` to the address you will open. Leave both admin lines empty to create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
+The third file is the realtime (Centrifugo) configuration. The compose file mounts it from `../_docker/centrifugo/config.json`, relative to `compose.yaml` — without it at exactly that path, the realtime service fails its config check and live chat features stay down. A Docker GUI needs the same three files in the same relative layout: paste `compose.yaml`, select `.env`, and provide `config.json` at `../_docker/centrifugo/config.json`.
+
+2. **Configure.** In `.env`, `SYNAPLAN_VERSION` is already a release tag (today `5.0.5`). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. Set `APP_URL` and `FRONTEND_URL` to the same address you will open. Leave both admin lines empty to create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
+
+Then generate unique secrets. The template ships `replace-with-*` placeholders for eight credentials — starting with those values means every install shares the same publicly known secrets, so never do that. Give each one an independent value (run once, before the first start; after data exists these values must never change):
+
+```bash
+for key in APP_SECRET TOKEN_SECRET MARIADB_PASSWORD MARIADB_ROOT_PASSWORD \
+    REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET; do
+  secret=$(openssl rand -hex 32)
+  sed -i.bak "s|^${key}=.*|${key}=${secret}|" .env
+done
+rm -f .env.bak
+chmod 600 .env
+```
+
 3. **Start, then open the app.**
 
 ```bash
 docker compose up -d
 ```
 
-Open **<http://127.0.0.1:8000>**. That address is `SYNAPLAN_HTTP_BIND` plus `SYNAPLAN_HTTP_PORT`. A Docker GUI uses the same two files: paste `compose.yaml`, select `.env`, and start. To roll back, change `SYNAPLAN_VERSION` to the previous release tag and run `docker compose up -d` again.
+Open **<http://127.0.0.1:8000>**. That address is `SYNAPLAN_HTTP_BIND` plus `SYNAPLAN_HTTP_PORT`.
+
+To move to another release later, back up `./data` first, change `SYNAPLAN_VERSION`, and run `docker compose up -d` again. If the newer version already migrated the database, switching the tag back is not enough — restore the backup as described in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#roll-back).
 
 Then connect one AI provider. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting.
 
