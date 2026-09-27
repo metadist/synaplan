@@ -50,7 +50,7 @@ final class ReapDesktopJobsCommand extends Command
         // Flag off means idle, not broken (C8): shipping this to main before any
         // device exists must be a no-op on every production install.
         if (!$this->desktopAgentConfig->isEnabled(null)) {
-            $io->writeln('Desktop agent feature is disabled. Nothing to reap.');
+            $io->writeln('Synaplan Desktop is turned off. Nothing to reap.');
 
             return Command::SUCCESS;
         }

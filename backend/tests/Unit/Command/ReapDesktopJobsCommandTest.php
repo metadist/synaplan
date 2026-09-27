@@ -40,7 +40,7 @@ final class ReapDesktopJobsCommandTest extends TestCase
         $tester = $this->runCommand();
 
         self::assertSame(0, $tester->getStatusCode());
-        self::assertStringContainsString('disabled', $tester->getDisplay());
+        self::assertStringContainsString('turned off', $tester->getDisplay());
     }
 
     public function testReaperRequeuesWhenEnabled(): void

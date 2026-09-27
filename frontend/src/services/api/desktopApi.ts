@@ -11,7 +11,7 @@ import {
 } from '@/generated/api-schemas'
 
 /**
- * Channels → Desktop: pair and manage the user's computers, and enqueue
+ * Manage → Channels → Synaplan Desktop: pair and manage the user's computers, and enqueue
  * `skill.run` jobs for them.
  *
  * Every route 404s when the DESKTOP_AGENT feature flag is off, so callers must

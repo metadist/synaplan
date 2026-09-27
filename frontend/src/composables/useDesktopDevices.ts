@@ -6,7 +6,7 @@ import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
  * Shared list of the current user's paired computers.
  *
  * Module-level state (a tiny store) so the two surfaces that care about it stay
- * in sync without re-fetching: the Channels → Desktop page owns the list and
+ * in sync without re-fetching: the Manage → Channels → Synaplan Desktop page owns the list and
  * mutates it (pair/revoke), while the chat composer only reads
  * {@link hasActiveDevices} to decide whether to offer "Run on this computer"
  * (DS16). Revoking the last computer on the page therefore hides the composer

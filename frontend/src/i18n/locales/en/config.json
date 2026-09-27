@@ -899,7 +899,7 @@
       }
     },
     "desktop": {
-      "title": "Desktop",
+      "title": "Synaplan Desktop",
       "description": "Synaplan Desktop is a separate app for this computer. It uses your Synaplan account and can run skills you install.",
       "chatGate": {
         "gatewayAdmin": "The app cannot chat until you turn on the AI gateway under Coding clients and a provider key is available. Pairing still works.",
@@ -994,18 +994,16 @@
         "meta": "{skill} · {time}"
       },
       "get": {
-        "title": "Get Synaplan Desktop",
-        "beta": "Beta",
-        "platforms": "Available for",
+        "title": "Synaplan Desktop",
+        "platforms": "Runs on",
         "description": "A small app for macOS, Windows and Linux. It pairs with your Synaplan account and runs the skills you install on your own computer — for example building a presentation from your notes.",
-        "github": "Get it on GitHub",
-        "releases": "Releases",
-        "betaNote": "Beta builds are not signed yet, so your operating system may ask you to confirm the first start. The repository also explains how to build the app yourself.",
+        "github": "Open the source repository",
+        "betaNote": "There is no installer yet. The repository explains how to build Synaplan Desktop yourself.",
         "stepsTitle": "Connect in three steps",
-        "step1": "Install Synaplan Desktop on the computer you want to use.",
+        "step1": "Build Synaplan Desktop from the source repository on the computer you want to use.",
         "step2": "Click “Pair this computer” here and copy the address and the code.",
         "step3": "Enter both in the app. The computer then appears in the list below.",
-        "compact": "The app is a public beta on GitHub."
+        "compact": "There is no installer yet. Build Synaplan Desktop from the source repository."
       }
     },
     "phoneVerification": {

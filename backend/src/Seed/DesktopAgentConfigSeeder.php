@@ -11,9 +11,9 @@ use Doctrine\DBAL\Connection;
  * Idempotent seeder for the global Synaplan Desktop flag (BCONFIG, ownerId=0).
  *
  * Insert-if-missing only — operator overrides are never touched. The flag
- * seeds ON (`1`) since 4.8: the Synaplan Desktop client is available as a
- * public beta from GitHub, so the pairing surface is shown by default. System
- * configuration → Features or `FEATURE_DESKTOP_AGENT_ENABLED=false` turns it off.
+ * seeds ON (`1`) since 4.8, so the pairing surface is shown by default.
+ * There is no signed installer; the app is built from the source repository.
+ * System configuration → Features or `FEATURE_DESKTOP_AGENT_ENABLED=false` turns it off.
  */
 final readonly class DesktopAgentConfigSeeder
 {
