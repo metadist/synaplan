@@ -133,6 +133,9 @@
        (#000, ~19:1) and quieter than design-v2 secondary ink (#3a3f48, ~10:1),
        still 4.7:1 on the light dropdown panel (#f0f0f0 / #f5f5f8). */
     --txt-model-placeholder: #6b6b6b;
+    /* Hover wash is rgba(0, 63, 199, 0.06). #6b6b6b falls to ~4.2:1 on
+       #f0f0f0 under that wash; #5e5e5e stays 5.2:1. Rest state stays quiet. */
+    --txt-model-placeholder-hover: #5e5e5e;
 
     --border-light: rgba(0, 0, 0, 0.06);
     --brand-alpha-light: rgba(0, 63, 199, 0.08);
@@ -193,6 +196,9 @@
     /* 5.1:1 on the dark dropdown panel (#1a2438) and 6.0:1 on the glass panel
        (#0e1628). Quieter than near-white model names and than #bdc2cc. */
     --txt-model-placeholder: #8b95a7;
+    /* Hover wash is rgba(107, 143, 214, 0.12). #8b95a7 falls to ~4.3:1 on
+       #1a2438; #959fb1 stays 4.9:1. */
+    --txt-model-placeholder-hover: #959fb1;
 
     --border-light: rgba(109, 154, 224, 0.15);
     --brand-alpha-light: rgba(109, 154, 224, 0.18);
@@ -592,6 +598,10 @@
     color: var(--txt-model-placeholder);
     font-style: italic;
     font-weight: 400;
+  }
+  .dropdown-item:hover .txt-model-placeholder,
+  .dropdown-item:focus-visible .txt-model-placeholder {
+    color: var(--txt-model-placeholder-hover);
   }
   .txt-tertiary {
     color: var(--txt-secondary);
