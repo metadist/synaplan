@@ -57,7 +57,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
     private const AUDIO_SPEECH_OFF_FALLBACK = 'Local speech is turned off, so this recording was not transcribed. Turn on local speech, or choose a speech model in Settings.';
 
-    private const AUDIO_BINARY_MISSING_FALLBACK = 'Speech recognition is not installed on this server, so this recording was not transcribed. Turn on local speech, or choose a speech model in Settings.';
+    private const AUDIO_BINARY_MISSING_FALLBACK = 'Speech recognition is not installed on this server, so this recording was not transcribed. Install speech recognition, or choose a speech model in Settings.';
 
     private const AUDIO_MODEL_MISSING_FALLBACK = 'The local speech model file is missing, so this recording was not transcribed. Add that model, or choose a speech model in Settings.';
 
@@ -1852,10 +1852,10 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     {
         $reason = null;
         if (null !== $this->whisperService && !$this->aiFacade->hasConfiguredSttProvider($message->getUserId())) {
+            // Null means the files are present and something else failed
+            // (FFmpeg, a binary that cannot start). That stays the generic
+            // transcription failure, not "speech recognition is not installed".
             $reason = $this->whisperService->unavailableReason();
-            if (null === $reason && !$this->whisperService->isAvailable()) {
-                $reason = SpeechFailure::BINARY_MISSING;
-            }
         }
 
         return match ($reason) {

@@ -21,5 +21,5 @@ file_analysis:
   audio_pending: 'Kayıt hâlâ hazırlanıyor. Lütfen biraz bekle ve sorununu yeniden gönder.'
   audio_failed: 'Bu kayıt yazıya dökülemedi. Bu sunucuda konuşmayı metne çevirme yok veya ses anlaşılamadı. Ayarlar’dan bir konuşmayı metne çevirme hizmeti bağla veya başka bir dosya dene.'
   audio_speech_off: 'Yerel konuşma tanıma kapalı, bu yüzden bu kayıt yazıya dökülmedi. Yerel konuşmayı aç veya Ayarlar’dan bir konuşma modeli seç.'
-  audio_binary_missing: 'Konuşma tanıma bu sunucuda yüklü değil, bu yüzden bu kayıt yazıya dökülmedi. Yerel konuşmayı aç veya Ayarlar’dan bir konuşma modeli seç.'
+  audio_binary_missing: 'Konuşma tanıma bu sunucuda yüklü değil, bu yüzden bu kayıt yazıya dökülmedi. Konuşma tanımayı yükle veya Ayarlar’dan bir konuşma modeli seç.'
   audio_model_missing: 'Yerel konuşma modeli dosyası eksik, bu yüzden bu kayıt yazıya dökülmedi. Modeli ekle veya Ayarlar’dan bir konuşma modeli seç.'

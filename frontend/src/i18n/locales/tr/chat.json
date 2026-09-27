@@ -246,7 +246,7 @@
     "transcriptionFailed": "Yazıya dökme başarısız: {error}",
     "dictationSttFailed": "Bu kayıt yazıya dökülemedi. Konuşmayı metne çevirme kurulmamış olabilir veya ses anlaşılamadı. Ayarlar’dan bir konuşmayı metne çevirme hizmeti bağlayın veya tekrar deneyin.",
     "speechOff": "Yerel konuşma tanıma kapalı, bu yüzden bu kayıt yazıya dökülmedi. Yerel konuşmayı aç veya Ayarlar’dan bir konuşma modeli seç.",
-    "speechBinaryMissing": "Konuşma tanıma bu sunucuda yüklü değil, bu yüzden bu kayıt yazıya dökülmedi. Yerel konuşmayı aç veya Ayarlar’dan bir konuşma modeli seç.",
+    "speechBinaryMissing": "Konuşma tanıma bu sunucuda yüklü değil, bu yüzden bu kayıt yazıya dökülmedi. Konuşma tanımayı yükle veya Ayarlar’dan bir konuşma modeli seç.",
     "speechModelMissing": "Yerel konuşma modeli dosyası eksik, bu yüzden bu kayıt yazıya dökülmedi. Modeli ekle veya Ayarlar’dan bir konuşma modeli seç.",
     "mic": {
       "permissionWeb": "Mikrofon erişimi engellendi. Tarayıcı ayarlarından izin ver ve tekrar dene.",

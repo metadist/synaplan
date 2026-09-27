@@ -255,7 +255,7 @@
     "transcriptionFailed": "Transkription fehlgeschlagen: {error}",
     "dictationSttFailed": "Diese Aufnahme konnte nicht transkribiert werden. Sprache-zu-Text ist nicht eingerichtet, oder das Audio wurde nicht erkannt. Verbinden Sie unter Einstellungen einen Sprache-zu-Text-Dienst, oder versuchen Sie es erneut.",
     "speechOff": "Lokale Spracherkennung ist ausgeschaltet, deshalb wurde diese Aufnahme nicht transkribiert. Schalte lokale Sprache ein oder wähle unter Einstellungen ein Sprachmodell.",
-    "speechBinaryMissing": "Spracherkennung ist auf diesem Server nicht installiert, deshalb wurde diese Aufnahme nicht transkribiert. Schalte lokale Sprache ein oder wähle unter Einstellungen ein Sprachmodell.",
+    "speechBinaryMissing": "Spracherkennung ist auf diesem Server nicht installiert, deshalb wurde diese Aufnahme nicht transkribiert. Installiere die Spracherkennung oder wähle unter Einstellungen ein Sprachmodell.",
     "speechModelMissing": "Die lokale Sprachmodell-Datei fehlt, deshalb wurde diese Aufnahme nicht transkribiert. Füge das Modell hinzu oder wähle unter Einstellungen ein Sprachmodell.",
     "mic": {
       "permissionWeb": "Der Zugriff auf das Mikrofon ist blockiert. Erlaube ihn in den Browser-Einstellungen und versuche es erneut.",

@@ -355,6 +355,40 @@ class FileAnalysisHandlerAudioTest extends TestCase
         $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
     }
 
+    public function testRuntimeUnavailableUsesGenericCopy(): void
+    {
+        $whisper = $this->createMock(WhisperService::class);
+        $whisper->method('unavailableReason')->willReturn(null);
+        $whisper->expects($this->never())->method('isAvailable');
+        $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
+
+        $this->handler = new FileAnalysisHandler(
+            $this->aiFacade,
+            $this->modelConfigService,
+            $this->logger,
+            '/var/www/backend/var/uploads',
+            null,
+            null,
+            new ChatFailureClassifier(),
+            null,
+            null,
+            null,
+            $whisper,
+        );
+
+        $message = $this->buildAudioMessage(
+            text: 'what did I say',
+            transcript: '',
+            status: 'error',
+        );
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertStringContainsString('could not be transcribed', $result['content']);
+        $this->assertStringNotContainsString('not installed', $result['content']);
+        $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
+    }
+
     /**
      * Build a Message mock that exposes a single transcribed audio File entity.
      */

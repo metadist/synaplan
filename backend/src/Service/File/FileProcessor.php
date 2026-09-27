@@ -1557,12 +1557,11 @@ final readonly class FileProcessor
             return SpeechFailure::TRANSCRIPTION_FAILED;
         }
 
-        $reason = $this->whisperService->unavailableReason();
-        if (null === $reason && !$this->whisperService->isAvailable()) {
-            return SpeechFailure::BINARY_MISSING;
-        }
-
-        return $reason ?? SpeechFailure::TRANSCRIPTION_FAILED;
+        // Only the explicit setup reason. isAvailable() is also false when the
+        // binary cannot start or FFmpeg is missing, and those are runtime
+        // failures — labeling them binary_missing tells the person to install
+        // speech recognition that is already on disk.
+        return $this->whisperService->unavailableReason() ?? SpeechFailure::TRANSCRIPTION_FAILED;
     }
 
     /**

@@ -147,6 +147,20 @@ final class FileProcessorAudioFallbackTest extends TestCase
         $this->assertArrayNotHasKey('error', $meta);
     }
 
+    public function testRuntimeUnavailableIsNotLabeledBinaryMissing(): void
+    {
+        $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
+        $this->aiFacade->expects($this->never())->method('transcribe');
+
+        $this->whisperService->method('isAvailable')->willReturn(false);
+        $this->whisperService->method('unavailableReason')->willReturn(null);
+
+        [$text, $meta] = $this->processor->extractText('audio.mp3', 'mp3', null);
+
+        $this->assertSame('', $text);
+        $this->assertSame('transcription_failed', $meta['speech_failure']);
+    }
+
     public function testBothPathsFailReturnsEmptyString(): void
     {
         $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(true);

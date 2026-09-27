@@ -44,14 +44,11 @@ final class SttModelResolverTest extends TestCase
     public function testResolveFallsBackToSound2TextDefault(): void
     {
         $this->models->method('findActiveByTagAndIdentity')->willReturn(null);
-        $this->config->expects($this->any())
-            ->method('resolveSttDefault')
-            ->with(7)
-            ->willReturn([
-                'provider' => 'groq',
-                'model' => 'whisper-large-v3',
-                'model_id' => 21,
-            ]);
+        $this->config->expects($this->once())
+            ->method('getConfiguredDefaultModel')
+            ->with('SOUND2TEXT', 7)
+            ->willReturn(21);
+        $this->config->expects($this->never())->method('resolveSttDefault');
         $this->config->method('isConfiguredModelUsable')->willReturn(true);
         $this->models->expects($this->any())
             ->method('find')
@@ -66,16 +63,31 @@ final class SttModelResolverTest extends TestCase
 
     public function testUnusableCloudDefaultBindsLocalWhisper(): void
     {
-        $this->config->method('resolveSttDefault')->willReturn([
-            'provider' => 'groq',
-            'model' => 'whisper-large-v3',
-            'model_id' => 21,
-        ]);
+        $this->config->method('getConfiguredDefaultModel')->with('SOUND2TEXT', 7)->willReturn(21);
+        $this->config->expects($this->never())->method('resolveSttDefault');
         $this->config->method('isConfiguredModelUsable')->willReturnCallback(
             static fn (int $id): bool => 330 === $id,
         );
         $this->models->method('findActiveByTag')->willReturn([
             $this->sttModel(21, 'whisper-large-v3', 'Groq'),
+            $this->sttModel(330, 'whisper', 'Whisper'),
+        ]);
+
+        $resolved = $this->resolver->resolve(null, 7);
+
+        $this->assertSame('whisper', $resolved['provider']);
+        $this->assertSame(330, $resolved['model_id']);
+    }
+
+    public function testUnusableStoredCloudDoesNotBindAnotherCloudProvider(): void
+    {
+        $this->config->method('getConfiguredDefaultModel')->with('SOUND2TEXT', 7)->willReturn(21);
+        $this->config->method('isConfiguredModelUsable')->willReturnCallback(
+            static fn (int $id): bool => 22 === $id || 330 === $id,
+        );
+        $this->models->method('findActiveByTag')->willReturn([
+            $this->sttModel(21, 'whisper-large-v3', 'Groq'),
+            $this->sttModel(22, 'whisper-1', 'OpenAI'),
             $this->sttModel(330, 'whisper', 'Whisper'),
         ]);
 

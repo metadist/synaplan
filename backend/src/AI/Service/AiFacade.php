@@ -1468,10 +1468,11 @@ class AiFacade
     /**
      * Check if the user has a usable cloud speech-to-text model.
      *
-     * True only when SOUND2TEXT resolves to a provider other than local
-     * whisper.cpp and that provider can actually serve a request (it has a
-     * key). An install with no cloud key falls through to whisper.cpp even
-     * when the stored default still names a cloud row. A positive model id
+     * True only when the stored SOUND2TEXT binding names a provider other
+     * than local whisper.cpp and that provider can actually serve a request
+     * (it has a key). The stored row is used as written: an unusable cloud
+     * binding is not replaced by another cloud provider that happens to have
+     * a key. That install falls through to whisper.cpp. A positive model id
      * whose provider has no key is not "configured" — treating it as such
      * sent the recording to that provider and surfaced the HTTP failure.
      */
@@ -1481,7 +1482,7 @@ class AiFacade
             return false;
         }
 
-        $modelId = $this->modelConfig->getDefaultModel('SOUND2TEXT', $userId);
+        $modelId = $this->modelConfig->getConfiguredDefaultModel('SOUND2TEXT', $userId);
         if (null === $modelId || $modelId <= 0 || !$this->modelConfig->isConfiguredModelUsable($modelId)) {
             return false;
         }
