@@ -23,6 +23,12 @@
      and placeholders read clearly on the light blue-grey surfaces
      (was #4b515c). */
   --txt-secondary: #3a3f48;
+  /* Same placeholder ink as the base theme: #6b6b6b is 4.9:1 on the glass
+     dropdown (#f5f5f8). Do not point this at --txt-secondary (#3a3f48, ~10:1);
+     that is why the empty row shouted as loud as a real model. */
+  --txt-model-placeholder: #6b6b6b;
+  /* Same hover ink as the base theme: 5.1:1 on the glass hover wash. */
+  --txt-model-placeholder-hover: #5e5e5e;
   --border-light: rgba(0, 45, 140, 0.22);
   --brand-alpha-light: rgba(0, 63, 199, 0.09);
 
@@ -52,6 +58,10 @@
   --bg-card: rgba(16, 24, 42, 0.9);
   --bg-chip: rgba(255, 255, 255, 0.04);
   --txt-secondary: #bdc2cc;
+  /* #8b95a7 is 6.0:1 on the dark glass dropdown (#0e1628), quieter than #bdc2cc. */
+  --txt-model-placeholder: #8b95a7;
+  /* Hover wash here is rgba(107, 143, 214, 0.08). #959fb1 stays above 6:1. */
+  --txt-model-placeholder-hover: #959fb1;
   --border-light: rgba(107, 143, 214, 0.16);
   --brand-alpha-light: rgba(107, 143, 214, 0.1);
 

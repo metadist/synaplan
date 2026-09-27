@@ -172,7 +172,7 @@
                 data-testid="btn-model-option"
                 @click="selectModel(capability as Capability, null)"
               >
-                <span class="txt-secondary italic">{{ $t('config.aiModels.selectModel') }}</span>
+                <span class="txt-model-placeholder">{{ $t('config.aiModels.selectModel') }}</span>
               </button>
               <button
                 v-for="model in getModelsByPurpose(capability as Capability)"
