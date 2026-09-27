@@ -98,8 +98,14 @@ guesser already classifies `flux` as `text2pic`.
 
 # Feature prompts (vibe-code later)
 
-These are the latest feature issues. Comment the same brief on the
-issue so a later generation can start from the thread.
+Placement on the live order
+([`20260927_roadmap.md`](./20260927_roadmap.md)): #2204, #2205, and
+#2206 are the easy half of sprint E1. #2202 is sprint E2 (early, own
+PR). Generate from
+[`20260927-early-intake/`](./20260927-early-intake/README.md).
+
+These are the latest feature issues. The same brief is the starting
+note for that generation.
 
 ## #2206 — Published image, two files, `docker compose up`
 
