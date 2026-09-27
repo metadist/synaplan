@@ -254,6 +254,9 @@
     "noSpeechDetected": "⚠️ Aucune parole détectée dans l’enregistrement",
     "transcriptionFailed": "La transcription a échoué : {error}",
     "dictationSttFailed": "Cet enregistrement n’a pas pu être transcrit. La reconnaissance vocale n’est pas configurée, ou l’audio n’a pas été compris. Connectez un service de transcription dans Réglages, ou réessayez.",
+    "speechOff": "La reconnaissance vocale locale est désactivée, donc cet enregistrement n’a pas été transcrit. Active la voix locale, ou choisis un modèle de voix dans les Paramètres.",
+    "speechBinaryMissing": "La reconnaissance vocale n’est pas installée sur ce serveur, donc cet enregistrement n’a pas été transcrit. Active la voix locale, ou choisis un modèle de voix dans les Paramètres.",
+    "speechModelMissing": "Le fichier du modèle vocal local est manquant, donc cet enregistrement n’a pas été transcrit. Ajoute ce modèle, ou choisis un modèle de voix dans les Paramètres.",
     "mic": {
       "permissionWeb": "L’accès au microphone est bloqué. Autorisez-le dans les réglages de votre navigateur, puis réessayez.",
       "permissionIos": "L’accès au microphone est désactivé. Ouvrez Réglages iOS, sélectionnez cette application et activez le microphone.",

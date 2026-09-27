@@ -10,7 +10,7 @@ final class SttModelNotFoundException extends \RuntimeException
     {
         $message = null !== $model && '' !== $model
             ? sprintf('The speech-to-text model `%s` does not exist or is not available.', $model)
-            : 'No speech-to-text model specified and no default SOUND2TEXT model is configured.';
+            : 'No speech model is ready. Turn on local speech, or choose a speech model in Settings.';
 
         parent::__construct($message, 404, $previous);
     }

@@ -487,6 +487,7 @@ import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { FileItem } from '@/services/filesService'
 import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
+import { speechFailureMessageKey } from '@/utils/speechFailure'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
@@ -1572,11 +1573,16 @@ const uploadFiles = async (files: File[]) => {
           void deleteFile(result.file_id).catch(() => {})
         }
 
-        const errorKey =
-          result.extraction_error === 'audio_transcription_failed'
-            ? 'chatInput.audioTranscriptionFailed'
-            : 'chatInput.documentExtractionFailed'
-        showError(t(errorKey, { filename: result.filename }))
+        if (result.extraction_error === 'audio_transcription_failed') {
+          const failureKey = speechFailureMessageKey(result.speech_failure, 'file')
+          showError(
+            failureKey === 'chatInput.audioTranscriptionFailed'
+              ? t(failureKey, { filename: result.filename })
+              : t(failureKey)
+          )
+        } else {
+          showError(t('chatInput.documentExtractionFailed', { filename: result.filename }))
+        }
         continue
       }
 
@@ -1594,7 +1600,7 @@ const uploadFiles = async (files: File[]) => {
       if (result.text) {
         const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
         const languageInfo = result.language ? ` (${result.language})` : ''
-        success(`🎙️ Audio transcribed${languageInfo}: "${preview}"`)
+        success(t('chatInput.transcribed', { language: languageInfo, preview }))
       }
 
       console.log('✅ File uploaded and processed:', result)
@@ -1604,8 +1610,7 @@ const uploadFiles = async (files: File[]) => {
         break
       }
       console.error('❌ File upload failed:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      showError(`File upload failed: ${errorMessage}`)
+      showError(t('chatInput.uploadError'))
 
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name)
       if (index !== -1) {
@@ -1901,8 +1906,9 @@ const transcribeAudio = async (audioBlob: Blob) => {
 
     if (result.extraction_error === 'audio_transcription_failed') {
       // Same upload-file endpoint as attachments: empty text here means STT
-      // is missing or failed, not "no speech" (issue #1908).
-      showError(t('chatInput.dictationSttFailed'))
+      // is missing or failed, not "no speech" (issue #1908). The code names
+      // the recovery; the provider's text is not shown.
+      showError(t(speechFailureMessageKey(result.speech_failure, 'dictation')))
     } else if (result.text) {
       message.value += (message.value ? ' ' : '') + result.text
       nextTick(() => textareaRef.value?.focus())
@@ -1911,8 +1917,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
     }
   } catch (err: unknown) {
     console.error('❌ Transcription failed:', err)
-    const error = err as { message?: string }
-    showError(t('chatInput.transcriptionFailed', { error: error.message || 'Unknown error' }))
+    showError(t('chatInput.dictationSttFailed'))
   } finally {
     isRecording.value = false
     transcribing.value = false

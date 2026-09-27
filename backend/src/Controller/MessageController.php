@@ -20,6 +20,7 @@ use App\Service\ModelConfigService;
 use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\SpeechFailure;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -675,6 +676,9 @@ class MessageController extends AbstractController
      * Form-Data: file (single file)
      *
      * Response: { "success": true, "file_id": 123, "filename": "...", "size": 1024, "mime": "...", "file_type": "pdf" }
+     * Audio that could not be transcribed also includes "extraction_error": "audio_transcription_failed"
+     * and "speech_failure": one of speech_off, binary_missing, model_missing, transcription_failed.
+     * speech_failure is a stable code. The provider's error text is not returned.
      */
     #[Route('/upload-file', name: 'upload_file', methods: ['POST'])]
     public function uploadFileForChat(
@@ -861,6 +865,11 @@ class MessageController extends AbstractController
                     ? 'audio_transcription_failed'
                     : 'document_extraction_failed';
                 $response['extraction_strategy'] = $extractMeta['strategy'] ?? 'unknown';
+                if ($isAudio) {
+                    $response['speech_failure'] = SpeechFailure::normalize(
+                        isset($extractMeta['speech_failure']) ? (string) $extractMeta['speech_failure'] : null,
+                    );
+                }
             }
 
             // Include transcribed text for audio files (for microphone input)

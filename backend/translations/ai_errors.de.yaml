@@ -20,3 +20,6 @@ admin:
 file_analysis:
   audio_pending: 'Die Aufnahme wird noch vorbereitet. Bitte warte einen Moment und sende deine Frage erneut.'
   audio_failed: 'Diese Aufnahme konnte nicht transkribiert werden. Auf diesem Server ist keine Sprache-zu-Text-Funktion eingerichtet, oder das Audio war nicht verständlich. Richte unter Einstellungen einen Sprache-zu-Text-Dienst ein oder versuche eine andere Datei.'
+  audio_speech_off: 'Lokale Spracherkennung ist ausgeschaltet, deshalb wurde diese Aufnahme nicht transkribiert. Schalte lokale Sprache ein oder wähle unter Einstellungen ein Sprachmodell.'
+  audio_binary_missing: 'Spracherkennung ist auf diesem Server nicht installiert, deshalb wurde diese Aufnahme nicht transkribiert. Schalte lokale Sprache ein oder wähle unter Einstellungen ein Sprachmodell.'
+  audio_model_missing: 'Die lokale Sprachmodell-Datei fehlt, deshalb wurde diese Aufnahme nicht transkribiert. Füge das Modell hinzu oder wähle unter Einstellungen ein Sprachmodell.'

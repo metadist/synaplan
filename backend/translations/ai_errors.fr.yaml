@@ -20,3 +20,6 @@ admin:
 file_analysis:
   audio_pending: 'L’enregistrement est encore en cours de préparation. Attends un instant et renvoie ta question.'
   audio_failed: 'Cet enregistrement n’a pas pu être transcrit. La reconnaissance vocale n’est pas configurée sur ce serveur, ou l’audio n’était pas compréhensible. Connecte un service de transcription dans les Paramètres, ou essaie un autre fichier.'
+  audio_speech_off: 'La reconnaissance vocale locale est désactivée, donc cet enregistrement n’a pas été transcrit. Active la voix locale, ou choisis un modèle de voix dans les Paramètres.'
+  audio_binary_missing: 'La reconnaissance vocale n’est pas installée sur ce serveur, donc cet enregistrement n’a pas été transcrit. Active la voix locale, ou choisis un modèle de voix dans les Paramètres.'
+  audio_model_missing: 'Le fichier du modèle vocal local est manquant, donc cet enregistrement n’a pas été transcrit. Ajoute ce modèle, ou choisis un modèle de voix dans les Paramètres.'

@@ -146,6 +146,31 @@ readonly class WhisperService
     }
 
     /**
+     * Why local whisper.cpp cannot transcribe, or null when the binary and
+     * the default model file are both on disk.
+     *
+     * Does not spawn a process. A binary that exists but cannot run (missing
+     * shared libraries) still returns null here; {@see isAvailable()} is the
+     * check that forks `whisper --help`.
+     */
+    public function unavailableReason(): ?string
+    {
+        if (!$this->whisperEnabled) {
+            return SpeechFailure::SPEECH_OFF;
+        }
+
+        if (!is_file($this->whisperBinary) || !is_executable($this->whisperBinary)) {
+            return SpeechFailure::BINARY_MISSING;
+        }
+
+        if (!is_file($this->getModelPath($this->defaultModel))) {
+            return SpeechFailure::MODEL_MISSING;
+        }
+
+        return null;
+    }
+
+    /**
      * Binary is executable and the default model file is on disk.
      * Does not spawn a process.
      *
@@ -156,13 +181,7 @@ readonly class WhisperService
      */
     public function isInstalled(): bool
     {
-        if (!$this->whisperEnabled) {
-            return false;
-        }
-
-        return is_file($this->whisperBinary)
-            && is_executable($this->whisperBinary)
-            && is_file($this->getModelPath($this->defaultModel));
+        return null === $this->unavailableReason();
     }
 
     /**

@@ -1466,11 +1466,14 @@ class AiFacade
     }
 
     /**
-     * Check if the user has configured an external STT provider.
+     * Check if the user has a usable cloud speech-to-text model.
      *
-     * Returns true when the user's SOUND2TEXT default model points to an external
-     * provider (OpenAI, Groq, etc.) — in that case, local Whisper.cpp should
-     * be skipped and the external API used directly.
+     * True only when SOUND2TEXT resolves to a provider other than local
+     * whisper.cpp and that provider can actually serve a request (it has a
+     * key). An install with no cloud key falls through to whisper.cpp even
+     * when the stored default still names a cloud row. A positive model id
+     * whose provider has no key is not "configured" — treating it as such
+     * sent the recording to that provider and surfaced the HTTP failure.
      */
     public function hasConfiguredSttProvider(?int $userId): bool
     {
@@ -1479,8 +1482,13 @@ class AiFacade
         }
 
         $modelId = $this->modelConfig->getDefaultModel('SOUND2TEXT', $userId);
+        if (null === $modelId || $modelId <= 0 || !$this->modelConfig->isConfiguredModelUsable($modelId)) {
+            return false;
+        }
 
-        return null !== $modelId && $modelId > 0;
+        $provider = strtolower((string) $this->modelConfig->getProviderForModel($modelId));
+
+        return '' !== $provider && 'whisper' !== $provider;
     }
 
     /**

@@ -13,6 +13,7 @@ use App\Plug\Extraction\ExtractorRejectedException;
 use App\Plug\PlugConfigService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Office\StructuredTextExtractor;
+use App\Service\SpeechFailure;
 use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Process\Process;
@@ -299,7 +300,12 @@ final readonly class FileProcessor
                 'keys' => $keys,
             ]);
 
-            return ['', ['strategy' => 'chain_exhausted', 'attempts' => $attempts] + $workingMeta];
+            $exhausted = ['strategy' => 'chain_exhausted', 'attempts' => $attempts] + $workingMeta;
+            if ('audio' === $family) {
+                $exhausted['speech_failure'] = $this->audioSpeechFailure($userId, $hasCloudStt);
+            }
+
+            return ['', $exhausted];
         } finally {
             if (null !== $convertedTmp && is_file($convertedTmp)) {
                 @unlink($convertedTmp);
@@ -584,6 +590,13 @@ final readonly class FileProcessor
     {
         if ($this->isVideo($request->ext) || !$this->isTranscribableMedia($request->ext)) {
             return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        // The no-cloud chain still lists stt_cloud as a later step. Do not
+        // call it: that would send the recording to a provider the user never
+        // gave a key.
+        if (!$this->aiFacade->hasConfiguredSttProvider($request->userId)) {
+            return ['verdict' => 'unavailable', 'passed' => false];
         }
 
         return $this->gatePair(
@@ -1487,7 +1500,7 @@ final readonly class FileProcessor
      *
      * Strategy when no external provider is configured:
      *   1. Local Whisper.cpp (free, no network dependency)
-     *   2. External provider as last resort
+     *   2. Stop with a speech_failure code. Do not call a cloud provider.
      *
      * @param string   $absolutePath Full path to the audio/video file
      * @param array    $baseMeta     Base metadata for logging
@@ -1513,16 +1526,43 @@ final readonly class FileProcessor
                 return $localResult;
             }
 
+            unset($externalResult[1]['error']);
+            $externalResult[1]['speech_failure'] = SpeechFailure::TRANSCRIPTION_FAILED;
+
             return $externalResult;
         }
 
-        // No external provider configured — prefer local Whisper, fall back to external.
+        // No usable cloud speech model — local whisper.cpp only. Falling
+        // through to a cloud provider here is what put an HTTP error in front
+        // of a person who never set a key.
         $localResult = $this->transcribeLocally($absolutePath, $baseMeta);
         if (null !== $localResult) {
             return $localResult;
         }
 
-        return $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
+        return ['', [
+            'strategy' => 'audio_unavailable',
+            'speech_failure' => $this->audioSpeechFailure($userId, false),
+        ] + $baseMeta];
+    }
+
+    /**
+     * One stable code for a failed audio extraction. Cloud setups get the
+     * generic code (the recording itself failed). Everyone else gets the
+     * local-speech reason, which names the next step.
+     */
+    private function audioSpeechFailure(?int $userId, bool $hasCloudStt): string
+    {
+        if ($hasCloudStt || $this->aiFacade->hasConfiguredSttProvider($userId)) {
+            return SpeechFailure::TRANSCRIPTION_FAILED;
+        }
+
+        $reason = $this->whisperService->unavailableReason();
+        if (null === $reason && !$this->whisperService->isAvailable()) {
+            return SpeechFailure::BINARY_MISSING;
+        }
+
+        return $reason ?? SpeechFailure::TRANSCRIPTION_FAILED;
     }
 
     /**

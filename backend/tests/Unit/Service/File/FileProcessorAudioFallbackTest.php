@@ -130,21 +130,21 @@ final class FileProcessorAudioFallbackTest extends TestCase
         $this->assertSame('whisper_local', $meta['strategy']);
     }
 
-    public function testExternalUsedAsFallbackWhenLocalUnavailableAndNoProviderConfigured(): void
+    public function testMissingLocalSpeechDoesNotCallACloudProvider(): void
     {
         $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
-        $this->aiFacade->method('transcribe')->willReturn([
-            'text' => 'External as last resort',
-            'provider' => 'openai',
-        ]);
+        $this->aiFacade->expects($this->never())->method('transcribe');
 
         $this->whisperService->method('isAvailable')->willReturn(false);
+        $this->whisperService->method('unavailableReason')->willReturn('model_missing');
         $this->whisperService->expects($this->never())->method('transcribe');
 
         [$text, $meta] = $this->processor->extractText('audio.mp3', 'mp3', null);
 
-        $this->assertSame('External as last resort', $text);
-        $this->assertSame('whisper_api', $meta['strategy']);
+        $this->assertSame('', $text);
+        $this->assertSame('audio_unavailable', $meta['strategy']);
+        $this->assertSame('model_missing', $meta['speech_failure']);
+        $this->assertArrayNotHasKey('error', $meta);
     }
 
     public function testBothPathsFailReturnsEmptyString(): void

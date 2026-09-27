@@ -52,6 +52,7 @@ final class SttModelResolverTest extends TestCase
                 'model' => 'whisper-large-v3',
                 'model_id' => 21,
             ]);
+        $this->config->method('isConfiguredModelUsable')->willReturn(true);
         $this->models->expects($this->any())
             ->method('find')
             ->with(21)
@@ -61,6 +62,27 @@ final class SttModelResolverTest extends TestCase
 
         $this->assertSame('groq', $resolved['provider']);
         $this->assertSame('whisper-large-v3', $resolved['displayModel']);
+    }
+
+    public function testUnusableCloudDefaultBindsLocalWhisper(): void
+    {
+        $this->config->method('resolveSttDefault')->willReturn([
+            'provider' => 'groq',
+            'model' => 'whisper-large-v3',
+            'model_id' => 21,
+        ]);
+        $this->config->method('isConfiguredModelUsable')->willReturnCallback(
+            static fn (int $id): bool => 330 === $id,
+        );
+        $this->models->method('findActiveByTag')->willReturn([
+            $this->sttModel(21, 'whisper-large-v3', 'Groq'),
+            $this->sttModel(330, 'whisper', 'Whisper'),
+        ]);
+
+        $resolved = $this->resolver->resolve(null, 7);
+
+        $this->assertSame('whisper', $resolved['provider']);
+        $this->assertSame(330, $resolved['model_id']);
     }
 
     public function testUnknownModelThrows(): void
