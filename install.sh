@@ -162,7 +162,7 @@ if [ "$MODE" = "try" ]; then
     say "============================================================"
     say " Synaplan is starting."
     say ""
-    say " OPEN  http://localhost:5173  NOW - a live status screen"
+    say " OPEN  http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}  NOW - a live status screen"
     say " shows every boot step and switches to the app when ready."
     say " The first start takes 5-15 minutes; later starts seconds."
     say ""
