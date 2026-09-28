@@ -683,6 +683,7 @@
     kind="conversation"
     :resource-id="iamShareResourceId"
     :resource-name="shareModalChatTitle"
+    :owner-name="shareOwnerName"
     @close="iamShareOpen = false"
     @public-link="openPublicLinkFromIam"
   />
@@ -790,6 +791,9 @@ const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref('')
 const iamShareOpen = ref(false)
+const shareOwnerName = computed(
+  () => authStore.user?.firstName?.trim() || authStore.user?.email || ''
+)
 const iamShareResourceId = ref('')
 const isCreatingChat = ref(false)
 const chatSearchQuery = ref('')

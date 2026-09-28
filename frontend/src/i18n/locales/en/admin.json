@@ -702,7 +702,14 @@
       "left": "You left the group. Items you shared with it stay shared with the other members.",
       "leftAndStopped": "You left the group and stopped sharing your items with it.",
       "leaveFailed": "Could not leave the group.",
-      "leaveDirectory": "This membership comes from your login and cannot be left here."
+      "leaveDirectory": "This membership comes from your login and cannot be left here.",
+      "ledBy": "Led by {name}",
+      "noLeader": "No one leads this group yet.",
+      "alsoIn": "Also in this group: {names}",
+      "onlyYou": "You are the only person in this group.",
+      "sharedLine": "Shared with this group: {items}",
+      "youCanLeave": "You can leave. You then lose access to what this group can see.",
+      "youLead": "You lead this group. You can leave, and you then lose access to what this group can see."
     },
     "users": {
       "groups": "Groups",
@@ -712,7 +719,7 @@
       "name": "Name",
       "kind": "Kind",
       "members": "Members",
-      "memberCount": "{count} members",
+      "memberCount": "{count} member | {count} members",
       "fromLogin": "From your login",
       "manual": "Manual",
       "create": "Create group",
@@ -771,6 +778,7 @@
         "share_revoke": "Share removed",
         "group_create": "Group created",
         "group_update": "Group updated",
+        "group_rename": "Group renamed",
         "group_delete": "Group deleted",
         "group_member_set": "Member added",
         "group_member_remove": "Member removed",
@@ -790,6 +798,16 @@
         "platform_instance_approved": "Platform approved",
         "platform_instance_revoked": "Platform revoked",
         "admin_user_level_change": "User level changed"
+      },
+      "what": "What happened",
+      "emptyNote": "This log records who did what. It does not open chat or file contents.",
+      "someone": "Someone",
+      "anItem": "an item",
+      "sentence": {
+        "shareGrant": "{who} shared “{resource}” with {subject}.",
+        "shareRevoke": "{who} stopped sharing “{resource}” with {subject}.",
+        "withSubject": "{who}: {action} — {resource}, with {subject}.",
+        "generic": "{who}: {action} — {resource}."
       }
     },
     "linkedPlatforms": {

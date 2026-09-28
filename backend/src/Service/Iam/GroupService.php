@@ -292,6 +292,67 @@ final readonly class GroupService
     }
 
     /**
+     * Who leads each group, and who else is in it, for the signed-in member.
+     *
+     * @param list<int> $groupIds
+     *
+     * @return array<int, array{leaderName: ?string, memberNames: list<string>}>
+     */
+    public function membershipContext(int $userId, array $groupIds): array
+    {
+        $members = [];
+        foreach ($groupIds as $groupId) {
+            foreach ($this->groupMemberRepository->findByGroupId($groupId) as $member) {
+                $members[] = $member;
+            }
+        }
+        if ([] === $members) {
+            return [];
+        }
+
+        $userIds = array_values(array_unique(array_map(
+            static fn (GroupMember $member): int => $member->getUserId(),
+            $members,
+        )));
+        $names = [];
+        foreach ($this->userRepository->findBy(['id' => $userIds]) as $user) {
+            if ($user instanceof User && null !== $user->getId()) {
+                $names[(int) $user->getId()] = $user->getDisplayName();
+            }
+        }
+
+        $byGroup = [];
+        foreach ($members as $member) {
+            $byGroup[$member->getGroupId()][] = $member;
+        }
+
+        $out = [];
+        foreach ($groupIds as $groupId) {
+            $rows = $byGroup[$groupId] ?? [];
+            $leaders = [];
+            $others = [];
+            foreach ($rows as $member) {
+                $name = $names[$member->getUserId()] ?? null;
+                if (null === $name || '' === $name) {
+                    continue;
+                }
+                if (GroupMember::ROLE_MANAGER === $member->getRole()) {
+                    $leaders[] = $name;
+                }
+                if ($member->getUserId() !== $userId) {
+                    $others[] = $name;
+                }
+            }
+            $out[$groupId] = [
+                'leaderName' => [] === $leaders ? null : implode(', ', $leaders),
+                'memberNames' => $others,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * @return list<GroupMember>
      */
     public function membersOf(Group $group): array

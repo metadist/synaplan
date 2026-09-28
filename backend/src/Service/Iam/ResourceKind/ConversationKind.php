@@ -46,11 +46,9 @@ final readonly class ConversationKind implements ShareableResourceKindInterface
             return new ResourceCard($resourceId, $resourceId, 'chat');
         }
 
-        $title = $chat->getTitle();
-
         return new ResourceCard(
             (string) $chat->getId(),
-            (null !== $title && '' !== $title) ? $title : ('#'.(string) $chat->getId()),
+            ChatDisplayTitle::of($chat),
             'chat',
             ['ownerId' => $chat->getUserId()],
         );
@@ -63,10 +61,9 @@ final readonly class ConversationKind implements ShareableResourceKindInterface
                 continue;
             }
             $id = (string) $chat->getId();
-            $title = $chat->getTitle();
             yield new ResourceCard(
                 $id,
-                (null !== $title && '' !== $title) ? $title : ('#'.$id),
+                ChatDisplayTitle::of($chat),
                 'chat',
                 ['ownerId' => $chat->getUserId()],
             );

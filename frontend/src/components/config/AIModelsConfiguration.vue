@@ -111,7 +111,7 @@
               class="basis-full text-xs font-normal txt-secondary"
               data-testid="hint-group-model-limit"
             >
-              {{ $t('config.aiModels.groupLimitsModels') }}
+              {{ groupLimitText }}
             </span>
           </label>
           <div class="relative">
@@ -731,6 +731,18 @@ const saving = ref(false)
 const resetting = ref(false)
 const availableModels = ref<ModelsData>({})
 const restrictedCapabilities = ref<string[]>([])
+const groupLimitNames = ref<string[]>([])
+const groupLimitsCombined = ref(false)
+const groupLimitText = computed(() => {
+  const names = groupLimitNames.value.filter((name) => name.trim() !== '')
+  if (names.length > 1 || groupLimitsCombined.value) {
+    return t('config.aiModels.groupLimitsCombined', { names: names.join(', ') })
+  }
+  if (names.length === 1) {
+    return t('config.aiModels.groupLimitsNamed', { name: names[0] })
+  }
+  return t('config.aiModels.groupLimitsModels')
+})
 const providers = ref<ProviderAvailability[]>([])
 
 // "Select suggested models" applies the seeded recommendation, which spans
@@ -945,6 +957,8 @@ const loadData = async () => {
       availableModels.value = modelsRes.models
       providers.value = modelsRes.providers ?? []
       restrictedCapabilities.value = modelsRes.restricted ?? []
+      groupLimitNames.value = modelsRes.groupLimits?.names ?? []
+      groupLimitsCombined.value = modelsRes.groupLimits?.combined === true
     }
 
     if (defaultsRes.success) {

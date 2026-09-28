@@ -35,20 +35,61 @@
           class="surface-card rounded-lg p-5 flex flex-wrap items-center gap-3"
           :data-testid="`card-my-group-${group.id}`"
         >
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1 basis-full sm:basis-auto">
             <p class="txt-primary font-medium truncate">{{ group.name }}</p>
             <p v-if="group.description" class="txt-secondary text-sm mt-0.5">
               {{ group.description }}
             </p>
+            <p class="txt-secondary text-sm mt-1" :data-testid="`text-my-group-leader-${group.id}`">
+              {{
+                group.leaderName
+                  ? $t('people.myGroups.ledBy', { name: group.leaderName })
+                  : $t('people.myGroups.noLeader')
+              }}
+            </p>
+            <p
+              class="txt-secondary text-sm mt-0.5"
+              :data-testid="`text-my-group-members-${group.id}`"
+            >
+              {{
+                (group.memberNames?.length ?? 0) > 0
+                  ? $t('people.myGroups.alsoIn', { names: group.memberNames?.join(', ') })
+                  : $t('people.myGroups.onlyYou')
+              }}
+            </p>
+            <p
+              class="txt-secondary text-sm mt-0.5"
+              :data-testid="`text-my-group-shares-${group.id}`"
+            >
+              {{
+                (group.shares?.length ?? 0) > 0
+                  ? $t('people.myGroups.sharedLine', {
+                      items: group.shares?.map((item) => item.name).join(', '),
+                    })
+                  : $t('people.groups.sharedEmpty')
+              }}
+            </p>
+            <p v-if="canLeave(group)" class="txt-secondary text-sm mt-0.5">
+              {{
+                group.role === 'manager'
+                  ? $t('people.myGroups.youLead')
+                  : $t('people.myGroups.youCanLeave')
+              }}
+            </p>
           </div>
-          <span class="pill text-xs">
+          <span
+            class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium txt-secondary border border-light-border/30 dark:border-dark-border/20"
+          >
             {{
               group.kind === 'directory'
                 ? $t('people.groups.fromLogin')
                 : $t('people.groups.manual')
             }}
           </span>
-          <span v-if="group.role" class="pill text-xs">
+          <span
+            v-if="group.role"
+            class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium txt-secondary border border-light-border/30 dark:border-dark-border/20"
+          >
             {{
               group.role === 'manager'
                 ? $t('people.groups.roleManager')

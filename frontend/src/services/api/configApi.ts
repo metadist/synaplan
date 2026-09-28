@@ -9,6 +9,8 @@ export interface ModelsResponse {
   providers: ProviderAvailability[]
   /** Capabilities a group allow-list limits for this member. */
   restricted?: string[]
+  /** Groups whose model lists were combined for this member. */
+  groupLimits?: { names: string[]; combined: boolean }
 }
 
 export interface DefaultsResponse {

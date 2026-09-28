@@ -59,6 +59,26 @@ final class GroupController extends AbstractController
                                     new OA\Property(property: 'role', type: 'string', enum: ['member', 'manager'], nullable: true),
                                     new OA\Property(property: 'membershipSource', type: 'string', enum: ['manual', 'directory'], nullable: true),
                                     new OA\Property(property: 'canLeave', type: 'boolean', example: true),
+                                    new OA\Property(property: 'leaderName', type: 'string', nullable: true, example: 'Ada Lovelace', description: 'Who leads the group. Null when nobody has the manager role.'),
+                                    new OA\Property(
+                                        property: 'memberNames',
+                                        type: 'array',
+                                        description: 'Other people in the group, not including the signed-in member.',
+                                        items: new OA\Items(type: 'string', example: 'Grace Hopper'),
+                                    ),
+                                    new OA\Property(
+                                        property: 'shares',
+                                        type: 'array',
+                                        description: 'Items shared with the group. Names only — never the content.',
+                                        items: new OA\Items(
+                                            required: ['name', 'kind'],
+                                            properties: [
+                                                new OA\Property(property: 'name', type: 'string', example: 'Q3 plan'),
+                                                new OA\Property(property: 'kind', type: 'string', example: 'conversation'),
+                                            ],
+                                            type: 'object',
+                                        ),
+                                    ),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),
                                     new OA\Property(property: 'updated', type: 'integer', format: 'int64'),
                                 ]
@@ -80,16 +100,39 @@ final class GroupController extends AbstractController
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $rows = $this->groupService->groupsOf((int) $user->getId());
+        $userId = (int) $user->getId();
+        $rows = $this->groupService->groupsOf($userId);
+        $groupIds = array_map(static fn (array $row): int => (int) $row['group']->getId(), $rows);
+        $context = $this->groupService->membershipContext($userId, $groupIds);
 
         return $this->json([
             'groups' => array_map(
-                fn (array $row) => $this->groupService->serializeGroup(
-                    $row['group'],
-                    null,
-                    $row['role'],
-                    $row['source'],
-                ),
+                function (array $row) use ($context): array {
+                    $group = $row['group'];
+                    $id = (int) $group->getId();
+                    $card = $this->groupService->serializeGroup(
+                        $group,
+                        null,
+                        $row['role'],
+                        $row['source'],
+                    );
+                    $card['leaderName'] = $context[$id]['leaderName'] ?? null;
+                    $card['memberNames'] = $context[$id]['memberNames'] ?? [];
+                    $card['shares'] = [];
+                    foreach ($this->shareService->describeGrantsToGroup($id) as $share) {
+                        $name = trim((string) ($share['name'] ?? ''));
+                        $resourceId = (string) ($share['id'] ?? '');
+                        if ('' === $name || $name === $resourceId || str_starts_with($name, '#')) {
+                            continue;
+                        }
+                        $card['shares'][] = [
+                            'name' => $name,
+                            'kind' => (string) ($share['kind'] ?? ''),
+                        ];
+                    }
+
+                    return $card;
+                },
                 $rows,
             ),
         ]);

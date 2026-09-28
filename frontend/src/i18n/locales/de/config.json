@@ -14,6 +14,8 @@
       "system": "System",
       "selectModel": "-- Modell auswählen --",
       "groupLimitsModels": "Ihre Gruppe begrenzt, welche Modelle Sie hier verwenden können.",
+      "groupLimitsNamed": "{name} begrenzt, welche Modelle Sie hier verwenden können.",
+      "groupLimitsCombined": "{names} begrenzen zusammen, welche Modelle Sie hier verwenden können.",
       "systemModelsInfo": "Systemmodelle sind automatisch gesperrt und können nicht geändert werden. Dies sind Kern-Modelle, die für spezifische Funktionen erforderlich sind.",
       "modelsPurposesTitle": "Modelle & Verwendungszwecke",
       "allModels": "Alle Modelle",
