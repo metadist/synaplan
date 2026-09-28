@@ -40,6 +40,29 @@ class GroupMemberRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param list<int> $groupIds
+     *
+     * @return list<GroupMember>
+     */
+    public function findByGroupIds(array $groupIds): array
+    {
+        if ([] === $groupIds) {
+            return [];
+        }
+
+        /** @var list<GroupMember> $members */
+        $members = $this->createQueryBuilder('m')
+            ->where('m.groupId IN (:ids)')
+            ->setParameter('ids', $groupIds)
+            ->orderBy('m.groupId', 'ASC')
+            ->addOrderBy('m.created', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $members;
+    }
+
+    /**
      * @return list<GroupMember>
      */
     public function findByGroupId(int $groupId): array

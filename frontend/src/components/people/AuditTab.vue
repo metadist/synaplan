@@ -20,13 +20,14 @@
       <div v-if="loading && entries.length === 0" class="text-center py-12">
         <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
       </div>
-      <p
+      <div
         v-else-if="entries.length === 0"
         class="text-center py-12 txt-secondary"
         data-testid="audit-empty"
       >
-        {{ $t('people.audit.empty') }}
-      </p>
+        <p>{{ $t('people.audit.empty') }}</p>
+        <p class="mt-2">{{ $t('people.audit.emptyNote') }}</p>
+      </div>
       <table v-else class="w-full" data-testid="table-audit">
         <thead>
           <tr class="border-b border-light-border/30 dark:border-dark-border/20">
@@ -34,19 +35,7 @@
               {{ $t('people.audit.when') }}
             </th>
             <th class="text-left py-2 px-3 text-sm font-medium txt-secondary">
-              {{ $t('people.audit.who') }}
-            </th>
-            <th class="text-left py-2 px-3 text-sm font-medium txt-secondary">
-              {{ $t('people.audit.actionLabel') }}
-            </th>
-            <th class="text-left py-2 px-3 text-sm font-medium txt-secondary">
-              {{ $t('people.audit.kind') }}
-            </th>
-            <th class="text-left py-2 px-3 text-sm font-medium txt-secondary">
-              {{ $t('people.audit.resource') }}
-            </th>
-            <th class="text-left py-2 px-3 text-sm font-medium txt-secondary">
-              {{ $t('people.audit.subject') }}
+              {{ $t('people.audit.what') }}
             </th>
           </tr>
         </thead>
@@ -56,12 +45,10 @@
             :key="entry.id"
             class="border-b border-light-border/30 dark:border-dark-border/20"
           >
-            <td class="py-3 px-3 txt-secondary text-sm">{{ formatWhen(entry.created) }}</td>
-            <td class="py-3 px-3 txt-primary text-sm">#{{ entry.actorId }}</td>
-            <td class="py-3 px-3 txt-primary text-sm">{{ actionLabel(entry.action) }}</td>
-            <td class="py-3 px-3 txt-secondary text-sm">{{ entry.kind }}</td>
-            <td class="py-3 px-3 txt-secondary text-sm">{{ entry.resourceId }}</td>
-            <td class="py-3 px-3 txt-secondary text-sm">{{ subjectText(entry.subject) }}</td>
+            <td class="py-3 px-3 txt-secondary text-sm whitespace-nowrap align-top">
+              {{ formatWhen(entry.created) }}
+            </td>
+            <td class="py-3 px-3 txt-primary text-sm">{{ rowSentence(entry) }}</td>
           </tr>
         </tbody>
       </table>
@@ -97,6 +84,7 @@ const ACTION_KEYS: Record<string, string> = {
   'share.revoke': 'people.audit.action.share_revoke',
   'group.create': 'people.audit.action.group_create',
   'group.update': 'people.audit.action.group_update',
+  'group.rename': 'people.audit.action.group_rename',
   'group.delete': 'people.audit.action.group_delete',
   'group.member_set': 'people.audit.action.group_member_set',
   'group.member_remove': 'people.audit.action.group_member_remove',
@@ -125,11 +113,7 @@ const loading = ref(false)
 
 const filterChips = computed(() => [
   { action: undefined, label: t('people.audit.filterAll') },
-  { action: 'share.grant', label: t('people.audit.action.share_grant') },
-  { action: 'share.revoke', label: t('people.audit.action.share_revoke') },
-  { action: 'directory.sync', label: t('people.audit.action.directory_sync') },
-  { action: 'impersonation.start', label: t('people.audit.action.impersonation_start') },
-  { action: 'admin.metadata_view', label: t('people.audit.action.admin_metadata_view') },
+  ...Object.entries(ACTION_KEYS).map(([action, key]) => ({ action, label: t(key) })),
 ])
 
 function actionLabel(action: string): string {
@@ -141,12 +125,53 @@ function formatWhen(created: number): string {
   return formatDateTime(new Date(created * 1000))
 }
 
-function subjectText(subject: IamAuditEntry['subject']): string {
-  if (!subject || typeof subject !== 'object') return '—'
-  const parts = Object.entries(subject as Record<string, unknown>)
-    .filter(([, value]) => value !== null && value !== undefined && value !== '')
-    .map(([key, value]) => `${key}: ${String(value)}`)
-  return parts.length > 0 ? parts.join(', ') : '—'
+function rowSentence(entry: IamAuditEntry): string {
+  const who = entry.actorName?.trim() || t('people.audit.someone')
+  const resource = entry.resourceName?.trim() || t('people.audit.anItem')
+  const subject = subjectLabel(entry)
+  if (entry.action === 'share.grant' || entry.action === 'share.revoke') {
+    const key =
+      entry.action === 'share.grant'
+        ? 'people.audit.sentence.shareGrant'
+        : 'people.audit.sentence.shareRevoke'
+    const permission = permissionLabel(entry)
+    const sentence = t(key, { who, resource, subject: subject || t('people.audit.someone') })
+    return permission ? `${sentence} (${permission})` : sentence
+  }
+  if (subject) {
+    return t('people.audit.sentence.withSubject', {
+      who,
+      action: actionLabel(entry.action),
+      resource,
+      subject,
+    })
+  }
+  return t('people.audit.sentence.generic', {
+    who,
+    action: actionLabel(entry.action),
+    resource,
+  })
+}
+
+function subjectLabel(entry: IamAuditEntry): string {
+  const named = entry.subjectName?.trim()
+  if (named) return named
+  const subject = entry.subject
+  if (subject && typeof subject === 'object' && 'subjectType' in subject) {
+    const type = String((subject as { subjectType?: unknown }).subjectType ?? '')
+    if (type === 'everyone') return t('iam.everyone')
+  }
+  return ''
+}
+
+function permissionLabel(entry: IamAuditEntry): string {
+  const subject = entry.subject
+  if (!subject || typeof subject !== 'object' || !('permission' in subject)) return ''
+  const permission = String((subject as { permission?: unknown }).permission ?? '')
+  if (!permission) return ''
+  const key = `iam.permission.${permission}`
+  const label = t(key)
+  return label === key ? permission : label
 }
 
 async function load(reset: boolean): Promise<void> {

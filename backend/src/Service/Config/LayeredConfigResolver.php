@@ -177,6 +177,29 @@ final class LayeredConfigResolver implements ResetInterface
     }
 
     /**
+     * Groups whose allow-list actually drops models for this person.
+     * An empty list means "every model" and is not a restriction.
+     *
+     * @return list<int>
+     */
+    public function modelAllowListGroupIds(?int $userId): array
+    {
+        if (null === $userId || $userId <= 0 || !$this->usesGroupLayer($userId, 'MODELS', 'ALLOWED')) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($this->orderedGroupRows($userId, 'MODELS', 'ALLOWED') as $row) {
+            if ([] === PolicyAllowList::decodeList($row->getValue())) {
+                continue;
+            }
+            $ids[] = $row->getGroupId();
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
      * @return list<string>
      */
     public function allowedCatalogKeys(?int $userId): array

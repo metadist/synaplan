@@ -702,7 +702,14 @@
       "left": "Sie haben die Gruppe verlassen. Was Sie mit ihr geteilt haben, bleibt für die anderen Mitglieder geteilt.",
       "leftAndStopped": "Sie haben die Gruppe verlassen und Ihre Freigaben für sie beendet.",
       "leaveFailed": "Die Gruppe konnte nicht verlassen werden.",
-      "leaveDirectory": "Diese Mitgliedschaft kommt aus Ihrer Anmeldung und kann hier nicht verlassen werden."
+      "leaveDirectory": "Diese Mitgliedschaft kommt aus Ihrer Anmeldung und kann hier nicht verlassen werden.",
+      "ledBy": "Geleitet von {name}",
+      "noLeader": "Diese Gruppe hat noch niemanden, der sie leitet.",
+      "alsoIn": "Außerdem in dieser Gruppe: {names}",
+      "onlyYou": "Sie sind die einzige Person in dieser Gruppe.",
+      "sharedLine": "Mit dieser Gruppe geteilt: {items}",
+      "youCanLeave": "Sie können die Gruppe verlassen. Danach sehen Sie nicht mehr, was diese Gruppe sehen kann.",
+      "youLead": "Sie leiten diese Gruppe. Sie können sie verlassen; danach sehen Sie nicht mehr, was diese Gruppe sehen kann."
     },
     "users": {
       "groups": "Gruppen",
@@ -712,7 +719,7 @@
       "name": "Name",
       "kind": "Art",
       "members": "Mitglieder",
-      "memberCount": "{count} Mitglieder",
+      "memberCount": "{count} Mitglied | {count} Mitglieder",
       "fromLogin": "Aus Ihrer Anmeldung",
       "manual": "Manuell",
       "create": "Gruppe erstellen",
@@ -771,6 +778,7 @@
         "share_revoke": "Freigabe entfernt",
         "group_create": "Gruppe erstellt",
         "group_update": "Gruppe geändert",
+        "group_rename": "Gruppe umbenannt",
         "group_delete": "Gruppe gelöscht",
         "group_member_set": "Mitglied hinzugefügt",
         "group_member_remove": "Mitglied entfernt",
@@ -790,6 +798,16 @@
         "platform_instance_approved": "Plattform freigegeben",
         "platform_instance_revoked": "Plattform widerrufen",
         "admin_user_level_change": "Benutzer-Level geändert"
+      },
+      "what": "Was passiert ist",
+      "emptyNote": "Dieses Protokoll hält fest, wer was getan hat. Es öffnet keine Chat- oder Dateiinhalte.",
+      "someone": "Jemand",
+      "anItem": "ein Element",
+      "sentence": {
+        "shareGrant": "{who} hat „{resource}“ mit {subject} geteilt.",
+        "shareRevoke": "{who} hat die Freigabe von „{resource}“ für {subject} beendet.",
+        "withSubject": "{who}: {action} — {resource}, mit {subject}.",
+        "generic": "{who}: {action} — {resource}."
       }
     },
     "linkedPlatforms": {
@@ -889,18 +907,18 @@
     "sharedWithMe": "Mit mir geteilt",
     "incoming": {
       "title": "Eingehende Chats",
-      "subtitle": "Chats, die Personen oder Gruppen mit dir geteilt haben",
+      "subtitle": "Chats, die Personen oder Gruppen mit Ihnen geteilt haben",
       "menu": "Eingehende Chats",
       "menuNew": "Neue eingehende Chats",
       "new": "Neu",
       "newCount": "{count} neu im Eingang",
-      "hint": "Öffne einen Chat, um ihn anzusehen. Um eigene Nachrichten hinzuzufügen, führe ihn als deine Kopie fort.",
+      "hint": "Öffnen Sie einen Chat, um ihn anzusehen. Um eigene Nachrichten hinzuzufügen, führen Sie ihn als Ihre Kopie fort.",
       "owner": "von {name}",
       "sourceGroup": "Dieser Chat gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
       "sourceEveryone": "Dieser Chat gehört {owner}. Er wurde mit allen geteilt, die ein Konto haben.",
       "sourceDirect": "Dieser Chat gehört {owner}. Er wurde persönlich mit Ihnen geteilt.",
       "emptyTitle": "Noch nichts im Eingang",
-      "emptyText": "Wenn jemand einen Chat mit dir oder einer deiner Gruppen teilt, erscheint er hier.",
+      "emptyText": "Wenn jemand einen Chat mit Ihnen oder einer Ihrer Gruppen teilt, erscheint er hier.",
       "filter": {
         "label": "Chats filtern",
         "all": "Alle",
@@ -910,7 +928,7 @@
       },
       "pill": {
         "private": "Eigene",
-        "privateTitle": "Das ist dein Chat. Teilen ändert das nicht.",
+        "privateTitle": "Das ist Ihr Chat. Teilen ändert das nicht.",
         "sharedWithPeople": "1 Person | {count} Personen",
         "sharedWithPeopleTitle": "Mit 1 Person geteilt | Mit {count} Personen geteilt",
         "group": "Gruppe",
@@ -918,11 +936,11 @@
         "groupTitleGeneric": "Mit einer Gruppe geteilt",
         "everyone": "Alle",
         "everyoneTitle": "Mit allen geteilt, die ein Konto haben",
-        "direct": "Mit dir geteilt",
-        "directTitle": "Persönlich mit dir geteilt",
+        "direct": "Mit Ihnen geteilt",
+        "directTitle": "Persönlich mit Ihnen geteilt",
         "from": "Von {name}",
         "widget": "Widget",
-        "widgetTitle": "Ein Besucher-Gespräch aus einem deiner Chat-Widgets"
+        "widgetTitle": "Ein Besucher-Gespräch aus einem Ihrer Chat-Widgets"
       }
     },
     "everyone": "Alle mit einem Konto",

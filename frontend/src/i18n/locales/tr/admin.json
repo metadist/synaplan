@@ -698,7 +698,14 @@
       "left": "Gruptan ayrıldınız. Paylaştığınız öğeler diğer üyelerle paylaşılmış kalır.",
       "leftAndStopped": "Gruptan ayrıldınız ve bu grupla paylaşımlarınızı kaldırdınız.",
       "leaveFailed": "Gruptan ayrılamadı.",
-      "leaveDirectory": "Bu üyelik girişinizden gelir; burada ayrılamazsınız."
+      "leaveDirectory": "Bu üyelik girişinizden gelir; burada ayrılamazsınız.",
+      "ledBy": "Yöneten: {name}",
+      "noLeader": "Bu grubu henüz kimse yönetmiyor.",
+      "alsoIn": "Bu grupta ayrıca: {names}",
+      "onlyYou": "Bu gruptaki tek kişi sizsiniz.",
+      "sharedLine": "Bu grupla paylaşılanlar: {items}",
+      "youCanLeave": "Ayrılabilirsiniz. O zaman bu grubun görebildiklerine erişiminizi kaybedersiniz.",
+      "youLead": "Bu grubu siz yönetiyorsunuz. Ayrılabilirsiniz; o zaman bu grubun görebildiklerine erişiminizi kaybedersiniz."
     },
     "users": {
       "groups": "Gruplar",
@@ -767,6 +774,7 @@
         "share_revoke": "Paylaşım kaldırıldı",
         "group_create": "Grup oluşturuldu",
         "group_update": "Grup güncellendi",
+        "group_rename": "Grup yeniden adlandırıldı",
         "group_delete": "Grup silindi",
         "group_member_set": "Üye eklendi",
         "group_member_remove": "Üye kaldırıldı",
@@ -786,6 +794,16 @@
         "platform_instance_approved": "Platform onaylandı",
         "platform_instance_revoked": "Platform iptal edildi",
         "admin_user_level_change": "Kullanıcı seviyesi değiştirildi"
+      },
+      "what": "Ne oldu",
+      "emptyNote": "Bu kayıt kimin ne yaptığını tutar. Sohbet veya dosya içeriğini açmaz.",
+      "someone": "Birisi",
+      "anItem": "bir öğe",
+      "sentence": {
+        "shareGrant": "{who}, “{resource}” öğesini {subject} ile paylaştı.",
+        "shareRevoke": "{who}, “{resource}” paylaşımını {subject} ile durdurdu.",
+        "withSubject": "{who}: {action} — {resource}, {subject} ile.",
+        "generic": "{who}: {action} — {resource}."
       }
     },
     "linkedPlatforms": {

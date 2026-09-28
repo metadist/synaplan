@@ -108,6 +108,7 @@ import { useI18n } from 'vue-i18n'
 import ChatKindPill from '@/components/iam/ChatKindPill.vue'
 import { useIncomingStore } from '@/stores/incoming'
 import { useChatsStore } from '@/stores/chats'
+import { incomingChatTitle } from '@/utils/incomingChatTitle'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { kindOfSharedItem, type ChatKind } from '@/utils/chatKind'
@@ -132,6 +133,10 @@ const chatsStore = useChatsStore()
 const { formatRelativeTime, formatDate } = useDateFormat()
 
 const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
+
+function incomingTitle(name: string): string {
+  return incomingChatTitle(name, t('chat.newChat'))
+}
 const filter = ref<IncomingFilter>('all')
 
 const rows = computed<IncomingRow[]>(() =>
@@ -140,7 +145,7 @@ const rows = computed<IncomingRow[]>(() =>
       const { kind, label } = kindOfSharedItem(item)
       return {
         id: Number(item.id),
-        title: item.name,
+        title: incomingTitle(item.name),
         kind,
         kindLabel: label,
         isNew: item.isNew === true,
