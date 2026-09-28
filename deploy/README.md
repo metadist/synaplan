@@ -20,16 +20,16 @@ database and vector snapshots are consistent.
 ## First installation
 
 The shortest start needs no git checkout: copy `compose.yaml` and
-`selfhost.env.example` (as `.env`) into an empty directory, fetch the static
-realtime config to `../_docker/centrifugo/config.json` (relative to the compose
-file — the `centrifugo` service mounts that path and fails its config check
-without it), keep `SYNAPLAN_VERSION` on a release tag, replace every
-`replace-with-*` secret placeholder with a generated value (starting with them
-means shared, public credentials), and run `docker compose up -d`. Open
+`selfhost.env.example` (as `.env`) into an empty directory, keep
+`SYNAPLAN_VERSION` on a release tag, and run `docker compose up -d`. Leave the
+eight secrets commented out. The first start generates them into
+`data/secrets.env` and refuses a `replace-with-*` example value without
+creating anything. Back `data/secrets.env` up with the database. Open
 `http://127.0.0.1:8000` unless `SYNAPLAN_HTTP_BIND` or `SYNAPLAN_HTTP_PORT`
 changed. Exact commands: root README "Your first answer in three steps". The
 steps below are the same contract from a clone of this repository, plus
-prepare, validate, and smoke-test.
+prepare, validate, and smoke-test. `prepare.sh` writes `data/secrets.env`
+first; the one-shot in `compose.yaml` then only copies that file.
 
 ```bash
 cp deploy/selfhost.env.example deploy/.env
@@ -68,6 +68,18 @@ calls `ensure_deployment_secrets`, which resolves each of them once:
   `MARIADB_PASSWORD` would lock the application out of its own data permanently.
   Restore the variable in your configuration, or write the known value into
   `deploy/data/secrets.env`.
+
+A plain `docker compose up` runs the same rules in the `secrets-init` one-shot,
+without `prepare.sh`. An existing `data/secrets.env` is never rewritten. Every
+secret must already be in that file; a value set only in `.env` is not used
+once the file exists. A missing value is generated only while the file does
+not exist yet and `data/mariadb` is still empty. A `replace-with-*` example
+value stops the start before anything is created. The application, the
+database, and the realtime service each receive only the secrets they use.
+The web container does not receive the database root password or the realtime
+admin password. The application reads `DB_PASSWORD`, so its start command
+copies `MARIADB_PASSWORD` onto `DB_PASSWORD` before the entrypoint builds the
+database URL.
 
 Because the file is authoritative and is exported before Compose runs, editing
 one of these eight variables in `deploy/.env` no longer changes the running
