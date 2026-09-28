@@ -1,0 +1,546 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "Synaplan - AI knowledge management, all-in-one on a single Azure VM. Creates the virtual network, the VM with its data disk, a Key Vault for the generated administrator password, and an optional daily backup."
+  },
+  "parameters": {
+    "vmName": {
+      "type": "string",
+      "defaultValue": "synaplan",
+      "minLength": 1,
+      "maxLength": 60,
+      "metadata": {
+        "description": "Name of the virtual machine. Every other resource is named after it."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D4s_v5",
+      "allowedValues": [
+        "Standard_D4s_v5",
+        "Standard_D8s_v5",
+        "Standard_E4s_v5",
+        "Standard_E8s_v5",
+        "Standard_D4ps_v5",
+        "Standard_D8ps_v5"
+      ],
+      "metadata": {
+        "description": "Synaplan needs at least 4 vCPU and 8 GB of memory. The Dps sizes are Arm64 and need the Arm64 image."
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "synaplan",
+      "metadata": {
+        "description": "Login name for the SSH account on the VM. This is the operating-system account, not the Synaplan administrator."
+      }
+    },
+    "sshPublicKey": {
+      "type": "string",
+      "metadata": {
+        "description": "Your public SSH key, in the OpenSSH format that starts with ssh-rsa or ssh-ed25519. Password login is disabled in the image, so this is the only key-based way in; Azure Run Command and the serial console work without it."
+      }
+    },
+    "dataDiskSizeGb": {
+      "type": "int",
+      "defaultValue": 100,
+      "minValue": 20,
+      "maxValue": 32767,
+      "metadata": {
+        "description": "Managed disk holding the database, uploads and vectors. It outlives the VM, so size it for your documents, not for today."
+      }
+    },
+    "allowedWebSourceAddress": {
+      "type": "string",
+      "defaultValue": "Internet",
+      "metadata": {
+        "description": "Which source addresses may reach the web interface. Internet is everyone - narrow it to a CIDR range such as 203.0.113.0/24 for an internal installation."
+      }
+    },
+    "allowedSshSourceAddress": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Leave empty. Azure Run Command and the serial console give you a shell without an open port 22. Set a CIDR range only if you specifically want SSH."
+      }
+    },
+    "domainName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "A domain whose A record points at this VM. With one, Synaplan gets a real Let's Encrypt certificate; without one it serves a self-signed certificate and the browser warns on every visit."
+      }
+    },
+    "adminEmail": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Login for the first Synaplan administrator. The password is generated per VM, stored in the Key Vault this template creates, and has to be replaced at the first sign-in before anything else works."
+      }
+    },
+    "aiProvider": {
+      "type": "string",
+      "defaultValue": "groq",
+      "allowedValues": ["groq", "openai", "anthropic", "google", "mistral", "xai"],
+      "metadata": {
+        "description": "Which provider Synaplan uses by default. Synaplan cannot answer anything without a key for it."
+      }
+    },
+    "aiProviderApiKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional. The API key for the provider above. It travels as VM user data, which anyone with read access to the VM can retrieve - leave it empty and add the key under Admin then AI Providers after signing in, where it is stored encrypted."
+      }
+    },
+    "enableDailyBackup": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Daily application-consistent backups of the VM through Azure Backup. The image ships the pre- and post-scripts that quiesce Synaplan for them."
+      }
+    },
+    "backupRetentionDays": {
+      "type": "int",
+      "defaultValue": 7,
+      "minValue": 7,
+      "maxValue": 9999,
+      "metadata": {
+        "description": "How many daily backups to keep. Azure Backup enforces a minimum of seven."
+      }
+    },
+    "virtualNetworkNewOrExisting": {
+      "type": "string",
+      "defaultValue": "new",
+      "allowedValues": ["new", "existing"],
+      "metadata": {
+        "description": "Create a virtual network for this deployment, or deploy into one you already run."
+      }
+    },
+    "virtualNetworkName": {
+      "type": "string",
+      "defaultValue": "synaplan-vnet",
+      "metadata": {
+        "description": "Name of the virtual network, new or existing."
+      }
+    },
+    "virtualNetworkResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "Resource group of an existing virtual network. Ignored when a new one is created."
+      }
+    },
+    "virtualNetworkAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.20.0.0/16",
+      "metadata": {
+        "description": "Address space of the virtual network this template creates."
+      }
+    },
+    "subnetName": {
+      "type": "string",
+      "defaultValue": "synaplan",
+      "metadata": {
+        "description": "Name of the subnet, new or existing."
+      }
+    },
+    "subnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.20.1.0/24",
+      "metadata": {
+        "description": "Address range of the subnet this template creates."
+      }
+    },
+    "imageResourceId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Resource id of an Azure Compute Gallery image version. Used for testing an image built from deploy/azure/packer; leave it empty to deploy the published Marketplace image."
+      }
+    },
+    "marketplacePublisher": {
+      "type": "string",
+      "defaultValue": "metadist",
+      "metadata": {
+        "description": "Publisher of the Marketplace image. Only used when imageResourceId is empty."
+      }
+    },
+    "marketplaceOffer": {
+      "type": "string",
+      "defaultValue": "synaplan",
+      "metadata": {
+        "description": "Offer id of the Marketplace image. Only used when imageResourceId is empty."
+      }
+    },
+    "marketplaceSku": {
+      "type": "string",
+      "defaultValue": "synaplan-x64",
+      "metadata": {
+        "description": "Plan id of the Marketplace image. Use synaplan-arm64 together with a Dps VM size."
+      }
+    },
+    "marketplaceVersion": {
+      "type": "string",
+      "defaultValue": "latest",
+      "metadata": {
+        "description": "Version of the Marketplace image, or latest."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Region to deploy into."
+      }
+    }
+  },
+  "variables": {
+    "useGalleryImage": "[not(empty(parameters('imageResourceId')))]",
+    "hasDomainName": "[not(empty(parameters('domainName')))]",
+    "hasSshRule": "[not(empty(parameters('allowedSshSourceAddress')))]",
+    "createVirtualNetwork": "[equals(parameters('virtualNetworkNewOrExisting'), 'new')]",
+
+    "publicIpName": "[concat(parameters('vmName'), '-ip')]",
+    "networkInterfaceName": "[concat(parameters('vmName'), '-nic')]",
+    "networkSecurityGroupName": "[concat(parameters('vmName'), '-nsg')]",
+    "dataDiskName": "[concat(parameters('vmName'), '-data')]",
+    "recoveryVaultName": "[concat(parameters('vmName'), '-backup')]",
+    "backupPolicyName": "synaplan-daily",
+    "backupFabric": "Azure",
+    "adminPasswordSecretName": "synaplan-admin-password",
+
+    "subnetId": "[if(variables('createVirtualNetwork'), resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('subnetName')), resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('subnetName')))]",
+
+    "keyVaultName": "[take(concat('sy', uniqueString(resourceGroup().id, parameters('vmName'))), 24)]",
+    "keyVaultSecretsOfficerRoleId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')]",
+
+    "adminEmailResolved": "[if(not(empty(parameters('adminEmail'))), parameters('adminEmail'), if(variables('hasDomainName'), concat('admin@', parameters('domainName')), 'admin@example.com'))]",
+
+    "providerKeyName": {
+      "groq": "groq-api-key",
+      "openai": "openai-api-key",
+      "anthropic": "anthropic-api-key",
+      "google": "google-gemini-api-key",
+      "mistral": "mistral-api-key",
+      "xai": "xai-api-key"
+    },
+
+    "userDataDocument": "[if(empty(parameters('aiProviderApiKey')), '# No Synaplan user data was supplied by this deployment.\n', concat(variables('providerKeyName')[parameters('aiProvider')], '=', parameters('aiProviderApiKey'), '\n'))]",
+
+    "vmTags": "[union(createObject('synaplan:ai-provider', parameters('aiProvider'), 'synaplan:data-disk', 'attached', 'synaplan:key-vault', variables('keyVaultName'), 'synaplan:admin-email', variables('adminEmailResolved')), if(variables('hasDomainName'), createObject('synaplan:domain', parameters('domainName')), createObject()), if(parameters('enableDailyBackup'), createObject('synaplan:recovery-vault', variables('recoveryVaultName'), 'synaplan:recovery-vault-resource-group', resourceGroup().name), createObject()))]"
+  },
+  "resources": [
+    {
+      "condition": "[variables('createVirtualNetwork')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-11-01",
+      "name": "[parameters('virtualNetworkName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": ["[parameters('virtualNetworkAddressPrefix')]"]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('subnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('subnetAddressPrefix')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('networkSecurityGroupName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": "[concat(createArray(createObject('name', 'https', 'properties', createObject('description', 'HTTPS', 'protocol', 'Tcp', 'sourcePortRange', '*', 'destinationPortRange', '443', 'sourceAddressPrefix', parameters('allowedWebSourceAddress'), 'destinationAddressPrefix', '*', 'access', 'Allow', 'priority', 100, 'direction', 'Inbound')), createObject('name', 'http', 'properties', createObject('description', 'HTTP redirect and Let''s Encrypt challenge', 'protocol', 'Tcp', 'sourcePortRange', '*', 'destinationPortRange', '80', 'sourceAddressPrefix', parameters('allowedWebSourceAddress'), 'destinationAddressPrefix', '*', 'access', 'Allow', 'priority', 110, 'direction', 'Inbound'))), if(variables('hasSshRule'), createArray(createObject('name', 'ssh', 'properties', createObject('description', 'SSH', 'protocol', 'Tcp', 'sourcePortRange', '*', 'destinationPortRange', '22', 'sourceAddressPrefix', parameters('allowedSshSourceAddress'), 'destinationAddressPrefix', '*', 'access', 'Allow', 'priority', 120, 'direction', 'Inbound'))), createArray()))]"
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('publicIpName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "publicIPAddressVersion": "IPv4"
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('networkInterfaceName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('subnetId')]"
+              },
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName'))]"
+              }
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+        }
+      },
+      "dependsOn": "[concat(createArray(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName')), resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))), if(variables('createVirtualNetwork'), createArray(resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))), createArray()))]"
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[variables('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "tenantId": "[subscription().tenantId]",
+        "enableRbacAuthorization": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 7,
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2024-07-01",
+      "name": "[parameters('vmName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('vmTags')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "plan": "[if(variables('useGalleryImage'), json('null'), createObject('name', parameters('marketplaceSku'), 'publisher', parameters('marketplacePublisher'), 'product', parameters('marketplaceOffer')))]",
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "storageProfile": {
+          "imageReference": "[if(variables('useGalleryImage'), createObject('id', parameters('imageResourceId')), createObject('publisher', parameters('marketplacePublisher'), 'offer', parameters('marketplaceOffer'), 'sku', parameters('marketplaceSku'), 'version', parameters('marketplaceVersion')))]",
+          "osDisk": {
+            "createOption": "FromImage",
+            "caching": "ReadWrite",
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+            }
+          },
+          "dataDisks": [
+            {
+              "name": "[variables('dataDiskName')]",
+              "lun": 0,
+              "createOption": "Empty",
+              "diskSizeGB": "[parameters('dataDiskSizeGb')]",
+              "caching": "None",
+              "deleteOption": "Detach",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
+            }
+          ]
+        },
+        "osProfile": {
+          "computerName": "[parameters('vmName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "linuxConfiguration": {
+            "disablePasswordAuthentication": true,
+            "ssh": {
+              "publicKeys": [
+                {
+                  "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
+                  "keyData": "[parameters('sshPublicKey')]"
+                }
+              ]
+            },
+            "patchSettings": {
+              "patchMode": "ImageDefault"
+            }
+          }
+        },
+        "userData": "[base64(variables('userDataDocument'))]",
+        "securityProfile": {
+          "securityType": "TrustedLaunch",
+          "uefiSettings": {
+            "secureBootEnabled": true,
+            "vTpmEnabled": true
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName')), parameters('vmName'), 'secrets-officer')]",
+      "scope": "[concat('Microsoft.KeyVault/vaults/', variables('keyVaultName'))]",
+      "properties": {
+        "roleDefinitionId": "[variables('keyVaultSecretsOfficerRoleId')]",
+        "principalId": "[reference(resourceId('Microsoft.Compute/virtualMachines', parameters('vmName')), '2024-07-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ]
+    },
+    {
+      "condition": "[parameters('enableDailyBackup')]",
+      "type": "Microsoft.RecoveryServices/vaults",
+      "apiVersion": "2023-04-01",
+      "name": "[variables('recoveryVaultName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "RS0",
+        "tier": "Standard"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "publicNetworkAccess": "Enabled"
+      }
+    },
+    {
+      "condition": "[parameters('enableDailyBackup')]",
+      "type": "Microsoft.RecoveryServices/vaults/backupPolicies",
+      "apiVersion": "2023-04-01",
+      "name": "[concat(variables('recoveryVaultName'), '/', variables('backupPolicyName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "backupManagementType": "AzureIaasVM",
+        "policyType": "V2",
+        "instantRpRetentionRangeInDays": 2,
+        "timeZone": "UTC",
+        "schedulePolicy": {
+          "schedulePolicyType": "SimpleSchedulePolicyV2",
+          "scheduleRunFrequency": "Daily",
+          "dailySchedule": {
+            "scheduleRunTimes": ["2026-01-01T02:00:00Z"]
+          }
+        },
+        "retentionPolicy": {
+          "retentionPolicyType": "LongTermRetentionPolicy",
+          "dailySchedule": {
+            "retentionTimes": ["2026-01-01T02:00:00Z"],
+            "retentionDuration": {
+              "count": "[parameters('backupRetentionDays')]",
+              "durationType": "Days"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.RecoveryServices/vaults', variables('recoveryVaultName'))]"
+      ]
+    },
+    {
+      "condition": "[parameters('enableDailyBackup')]",
+      "type": "Microsoft.RecoveryServices/vaults/backupFabrics/protectionContainers/protectedItems",
+      "apiVersion": "2023-04-01",
+      "name": "[concat(variables('recoveryVaultName'), '/', variables('backupFabric'), '/iaasvmcontainer;iaasvmcontainerv2;', resourceGroup().name, ';', parameters('vmName'), '/vm;iaasvmcontainerv2;', resourceGroup().name, ';', parameters('vmName'))]",
+      "properties": {
+        "protectedItemType": "Microsoft.Compute/virtualMachines",
+        "policyId": "[resourceId('Microsoft.RecoveryServices/vaults/backupPolicies', variables('recoveryVaultName'), variables('backupPolicyName'))]",
+        "sourceResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.RecoveryServices/vaults/backupPolicies', variables('recoveryVaultName'), variables('backupPolicyName'))]",
+        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2021-04-01",
+      "name": "pid-bed9262c-702d-4475-b82e-13f054662a0d-partnercenter",
+      "properties": {
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "resources": []
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "webUrl": {
+      "type": "string",
+      "value": "[if(variables('hasDomainName'), concat('https://', parameters('domainName')), concat('https://', reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName')), '2023-11-01').ipAddress))]",
+      "metadata": {
+        "description": "Open this to reach Synaplan."
+      }
+    },
+    "dnsRecordToCreate": {
+      "type": "string",
+      "value": "[if(variables('hasDomainName'), concat(parameters('domainName'), ' A ', reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName')), '2023-11-01').ipAddress), 'No domain configured, so Synaplan serves a self-signed certificate.')]",
+      "metadata": {
+        "description": "Create this record. Until it resolves, Synaplan serves a self-signed certificate, because Let's Encrypt cannot issue for a name it cannot reach."
+      }
+    },
+    "administratorEmail": {
+      "type": "string",
+      "value": "[variables('adminEmailResolved')]",
+      "metadata": {
+        "description": "Sign in with this address."
+      }
+    },
+    "revealAdministratorCredentials": {
+      "type": "string",
+      "value": "[concat('az keyvault secret show --vault-name ', variables('keyVaultName'), ' --name ', variables('adminPasswordSecretName'), ' --query value --output tsv')]",
+      "metadata": {
+        "description": "Reveals the generated administrator password. It is single-use - the first sign-in has to replace it before the application does anything else."
+      }
+    },
+    "shellCommand": {
+      "type": "string",
+      "value": "[concat('az vm run-command invoke --resource-group ', resourceGroup().name, ' --name ', parameters('vmName'), ' --command-id RunShellScript --scripts \"synaplan-admin-password\"')]",
+      "metadata": {
+        "description": "The same password without Key Vault permissions, straight off the VM. Run Command needs no open port and no SSH key."
+      }
+    },
+    "sshCommand": {
+      "type": "string",
+      "value": "[concat('ssh ', parameters('adminUsername'), '@', reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIpName')), '2023-11-01').ipAddress)]",
+      "metadata": {
+        "description": "Only reachable when allowedSshSourceAddress opened port 22."
+      }
+    },
+    "dataDiskName": {
+      "type": "string",
+      "value": "[variables('dataDiskName')]",
+      "metadata": {
+        "description": "The disk holding all your data. It is detached rather than deleted when the VM goes away."
+      }
+    }
+  }
+}

@@ -299,53 +299,105 @@ for wrapper in "$SCRIPT_DIR/../elestio"/*.sh; do
     assert_no_direct_docker_compose "$wrapper"
 done
 
-# The AWS adapter is the same kind of wrapper, one layer further out: an EC2
-# instance runs these from systemd and from `synaplan-update` / `synaplan-snapshot`,
-# with no platform in between to resolve anything for them.
+# The marketplace image adapters are the same kind of wrapper, one layer further
+# out: a virtual machine runs these from systemd and from `synaplan-update` /
+# `synaplan-snapshot`, with no platform in between to resolve anything for them.
+# AWS keeps first-boot and lifecycle helpers in deploy/aws/scripts/. Azure first
+# boot lives in deploy/azure/scripts/; the shared host TLS, update, stop and
+# snapshot-hook path lives in deploy/host/.
+HOST_DIR="$SCRIPT_DIR/../host"
 AWS_DIR="$SCRIPT_DIR/../aws"
-for wrapper in "$AWS_DIR/scripts"/*.sh; do
+AZURE_DIR="$SCRIPT_DIR/../azure"
+CLOUD_ADAPTERS=(aws azure)
+
+for wrapper in "$HOST_DIR"/*.sh; do
     assert_no_direct_docker_compose "$wrapper"
 done
 
-# The systemd units are the AWS equivalent of elestio.yml: the platform — here,
-# the instance itself — runs them outside every lifecycle hook, so a unit that
-# spelled out `docker compose` would be the one step of the deployment that
-# skipped the whole library.
-for unit in "$AWS_DIR/systemd"/*.service; do
-    assert_no_direct_docker_compose "$unit"
+for adapter in "${CLOUD_ADAPTERS[@]}"; do
+    for wrapper in "$SCRIPT_DIR/../$adapter/scripts"/*.sh; do
+        assert_no_direct_docker_compose "$wrapper"
+    done
+
+    # The systemd units are the cloud equivalent of elestio.yml: the platform —
+    # here, the instance itself — runs them outside every lifecycle hook, so a
+    # unit that spelled out `docker compose` would be the one step of the
+    # deployment that skipped the whole library.
+    for unit in "$SCRIPT_DIR/../$adapter/systemd"/*.service; do
+        assert_no_direct_docker_compose "$unit"
+    done
 done
 
 assert_systemd_runs() {
-    local unit="$AWS_DIR/systemd/$1"
-    local field="$2"
-    local script="$3"
+    local unit="$SCRIPT_DIR/../$1/systemd/$2"
+    local field="$3"
+    local script="$4"
     grep -Eq "^$field=/opt/synaplan/$script( |\$)" "$unit" || {
-        printf '%s %s does not run /opt/synaplan/%s\n' "$1" "$field" "$script" >&2
+        printf '%s/%s %s does not run /opt/synaplan/%s\n' "$1" "$2" "$field" "$script" >&2
         exit 1
     }
 }
 
-# Starting the stack is the portable script's job on AWS too, so an instance
-# comes up exactly the way a self-hosted install does.
-assert_systemd_runs synaplan.service ExecStart deploy/scripts/run.sh
-assert_systemd_runs synaplan-firstboot.service ExecStart deploy/aws/scripts/firstboot.sh
+# Starting the stack is the portable script's job on every cloud too, so an
+# instance comes up exactly the way a self-hosted install does. AWS and Azure
+# keep their own stop wrappers: AWS under deploy/aws/scripts/, Azure under
+# deploy/host/.
+assert_systemd_runs aws synaplan.service ExecStart deploy/scripts/run.sh
+assert_systemd_runs aws synaplan.service ExecStop deploy/aws/scripts/stop.sh
+assert_systemd_runs aws synaplan-firstboot.service ExecStart deploy/aws/scripts/firstboot.sh
+assert_systemd_runs azure synaplan.service ExecStart deploy/scripts/run.sh
+assert_systemd_runs azure synaplan.service ExecStop deploy/host/stop.sh
+assert_systemd_runs azure synaplan-firstboot.service ExecStart deploy/azure/scripts/firstboot.sh
 
 # The update path owns no logic of its own: it is the portable backup gate, a
 # version bump, and the portable start. Dropping either half would turn
-# `synaplan-update` into an unguarded restart on a new image.
+# `synaplan-update` into an unguarded restart on a new image. AWS keeps its
+# sequencer in deploy/aws/scripts/; Azure uses the shared copy in deploy/host/.
 for portable in pre-update.sh post-update.sh; do
     grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$AWS_DIR/scripts/update.sh" || {
         printf 'deploy/aws/scripts/update.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
         exit 1
     }
+    grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$HOST_DIR/update.sh" || {
+        printf 'deploy/host/update.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
+        exit 1
+    }
 done
 
-# systemd, the wrappers in /usr/local/bin and the SSM document all invoke these
-# by path. A file that lost its executable bit fails at boot, not at build.
-for script in "$AWS_DIR/scripts"/*.sh; do
-    [[ -x "$script" ]] || {
-        printf 'deploy/aws/scripts/%s is not executable, so the instance cannot invoke it\n' \
-            "$(basename "$script")" >&2
+# The backup gate an external snapshot mechanism reaches the installation
+# through: the SSM document on AWS, the Azure Backup script framework on Azure.
+for portable in pre-backup.sh post-backup.sh; do
+    grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$HOST_DIR/snapshot-hook.sh" || {
+        printf 'deploy/host/snapshot-hook.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
+        exit 1
+    }
+    grep -Fq "\$DEPLOY_DIR/scripts/$portable" "$AWS_DIR/scripts/snapshot-hook.sh" || {
+        printf 'deploy/aws/scripts/snapshot-hook.sh no longer calls deploy/scripts/%s\n' "$portable" >&2
+        exit 1
+    }
+done
+
+# systemd, the wrappers in /usr/local/bin, the SSM document and the Azure Backup
+# configuration all invoke these by path. A file that lost its executable bit
+# fails at boot, not at build.
+for directory in "$HOST_DIR" "$AWS_DIR" "$AZURE_DIR"; do
+    for script in "$directory"/*.sh "$directory"/scripts/*.sh; do
+        [[ -f "$script" ]] || continue
+        [[ -x "$script" ]] || {
+            printf '%s is not executable, so the instance cannot invoke it\n' "$script" >&2
+            exit 1
+        }
+    done
+done
+
+# Azure Backup only runs the hooks when the configuration file names an
+# executable script that exists; a path typo there is a silent downgrade to
+# crash-consistent backups, discovered at restore time.
+AZURE_BACKUP_CONFIG="$SCRIPT_DIR/../azure/backup/VMSnapshotScriptPluginConfig.json"
+for field in preScriptLocation postScriptLocation; do
+    grep -Fq "\"$field\": \"/opt/synaplan/deploy/host/snapshot-hook.sh\"" "$AZURE_BACKUP_CONFIG" || {
+        printf '%s does not point %s at deploy/host/snapshot-hook.sh\n' \
+            "$(basename "$AZURE_BACKUP_CONFIG")" "$field" >&2
         exit 1
     }
 done
@@ -1607,8 +1659,11 @@ for script in "$SCRIPT_DIR"/*.sh; do
     assert_resolves_secrets_before_compose "$script"
 done
 
-for script in "$AWS_DIR/scripts"/*.sh; do
-    assert_resolves_secrets_before_compose "$script" only-when-it-does
+for directory in "$HOST_DIR" "$AWS_DIR" "$AZURE_DIR"; do
+    for script in "$directory"/*.sh "$directory"/scripts/*.sh; do
+        [[ -f "$script" ]] || continue
+        assert_resolves_secrets_before_compose "$script" only-when-it-does
+    done
 done
 
 # The platform manifest must no longer declare the managed secrets. Elestio would
