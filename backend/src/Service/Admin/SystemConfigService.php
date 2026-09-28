@@ -238,7 +238,7 @@ final readonly class SystemConfigService
                     'google' => ['label' => 'Google OAuth 2.0', 'fields' => ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CLOUD_PROJECT_ID']],
                     'github' => ['label' => 'GitHub OAuth 2.0', 'fields' => ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']],
                     'apple' => ['label' => 'Sign in with Apple', 'fields' => ['APPLE_CLIENT_ID', 'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY', 'APPLE_APP_BUNDLE_ID']],
-                    'oidc' => ['label' => 'OIDC (Enterprise SSO)', 'fields' => ['OIDC_DISCOVERY_URL', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET']],
+                    'oidc' => ['label' => 'OIDC (Enterprise SSO)', 'fields' => ['OIDC_DISCOVERY_URL', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'OIDC_SCOPES', 'OIDC_PROVIDER_LABEL']],
                 ],
             ],
             'channels' => [
@@ -2488,6 +2488,18 @@ final readonly class SystemConfigService
             'OIDC_CLIENT_SECRET' => [
                 'tab' => 'auth', 'section' => 'oidc', 'type' => 'password',
                 'sensitive' => true, 'description' => 'OIDC client secret',
+                'default' => '',
+            ],
+            'OIDC_SCOPES' => [
+                'tab' => 'auth', 'section' => 'oidc', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Space-separated permissions requested at sign-in. offline_access is rewritten to offline when the provider advertises offline and not offline_access (Kinde). A refused permission stops sign-in and names the permission. Restart required.',
+                'default' => 'openid email profile offline_access',
+            ],
+            'OIDC_PROVIDER_LABEL' => [
+                'tab' => 'auth', 'section' => 'oidc', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Text on the sign-in button. Leave empty to show Enterprise SSO. Restart required.',
                 'default' => '',
             ],
 
