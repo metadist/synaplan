@@ -34,6 +34,7 @@
       "emailPasswordRejected": "Profiliniz kaydedilmedi. Giriş e-postası değiştirilmedi, çünkü geçerli parola yanlış.",
       "emailInvalid": "Geçerli bir e-posta adresi girin. Hiçbir şey kaydedilmedi.",
       "emailTaken": "Bu e-posta adresi başka bir hesap tarafından kullanılıyor. Hiçbir şey kaydedilmedi.",
+      "emailReserved": "Bu e-posta adresi kullanılamaz. Hiçbir şey kaydedilmedi.",
       "emailManaged": "Bu giriş e-postası oturum açma sağlayıcınız tarafından yönetiliyor ve burada değiştirilemez. Hiçbir şey kaydedilmedi.",
       "emailSaved": "Giriş e-postanız artık {email}. Bir sonraki girişinizde bunu kullanın.",
       "phone": "Telefon",

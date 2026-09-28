@@ -82,7 +82,7 @@
                     v-model="emailPassword"
                     type="password"
                     autocomplete="current-password"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                     :placeholder="$t('profile.personalInfo.emailPasswordPlaceholder')"
                     data-testid="input-email-password"
                   />
@@ -243,7 +243,7 @@
                   v-model="timezoneQuery"
                   type="search"
                   autocomplete="off"
-                  class="mb-2 w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                  class="mb-2 w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   :placeholder="$t('profile.accountSettings.timezoneSearch')"
                   :aria-label="$t('profile.accountSettings.timezoneSearch')"
                   data-testid="input-timezone-search"
@@ -254,7 +254,7 @@
                 <select
                   id="profile-timezone"
                   v-model="formData.timezone"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="select-timezone"
                 >
                   <option v-if="formData.timezone === ''" value="">
@@ -824,11 +824,8 @@ const emailFieldHint = computed(() => {
   return t('profile.personalInfo.emailLockedHint')
 })
 
-const emailInputClass = computed(() =>
-  canChangeEmail.value
-    ? 'w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none'
-    : 'w-full px-4 py-2.5 rounded-lg bg-chat/50 border border-light-border/30 dark:border-dark-border/20 txt-secondary cursor-not-allowed'
-)
+const emailInputClass =
+  'w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed'
 
 const timezoneOptions = computed(() => listTimezones(new Date(), formData.value.timezone))
 const timezoneSelect = computed(() =>
@@ -927,6 +924,8 @@ function profileSaveError(err: unknown): string {
         return t('profile.personalInfo.emailInvalid')
       case 'email_taken':
         return t('profile.personalInfo.emailTaken')
+      case 'email_reserved':
+        return t('profile.personalInfo.emailReserved')
       case 'email_managed':
         return t('profile.personalInfo.emailManaged')
       case 'timezone_invalid':

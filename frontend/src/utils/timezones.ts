@@ -1,3 +1,5 @@
+import { IANA_TIME_ZONE_IDS } from '@/utils/ianaTimeZones'
+
 export interface TimezoneOption {
   value: string
   label: string
@@ -35,14 +37,24 @@ const SEARCH_ALIASES: Record<string, readonly string[]> = {
   'Atlantic/Faroe': ['Faeroe', 'Atlantic/Faeroe'],
 }
 
-function ianaTimeZoneIds(): string[] {
+/**
+ * Prefer the runtime IANA list so offsets follow that ICU build. Fall back to
+ * the bundled identifier list, including backward-compatible links, when the
+ * runtime cannot enumerate zones. A one-entry result is not a real list.
+ */
+export function resolveIanaTimeZoneIds(supported?: readonly string[] | null): readonly string[] {
+  if (supported && supported.length > 1) return [...supported]
+  return IANA_TIME_ZONE_IDS
+}
+
+function ianaTimeZoneIds(): readonly string[] {
   const intl = Intl as typeof Intl & {
     supportedValuesOf?: (key: 'timeZone') => string[]
   }
-  if (typeof intl.supportedValuesOf === 'function') {
-    return intl.supportedValuesOf('timeZone')
+  if (typeof intl.supportedValuesOf !== 'function') {
+    return resolveIanaTimeZoneIds(null)
   }
-  return ['UTC']
+  return resolveIanaTimeZoneIds(intl.supportedValuesOf('timeZone'))
 }
 
 /**

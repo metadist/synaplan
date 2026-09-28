@@ -451,6 +451,69 @@ class ProfileControllerTest extends WebTestCase
         $this->assertSame('John', $this->user->getUserDetails()['firstName']);
     }
 
+    public function testStoredEmailIsCanonicalizedWithoutAPassword(): void
+    {
+        $this->user->setMail('ProfileTest@Example.com');
+        $this->em->flush();
+
+        $this->putProfile([
+            'email' => ' profiletest@example.com ',
+            'firstName' => 'Jane',
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->em->refresh($this->user);
+        $this->assertSame('profiletest@example.com', $this->user->getMail());
+        $this->assertSame('Jane', $this->user->getUserDetails()['firstName']);
+    }
+
+    public function testReservedProcessorEmailIsRejected(): void
+    {
+        $this->putProfile([
+            'email' => 'Guest-Processor@synaplan.internal',
+            'currentPassword' => 'OldPass123!',
+            'firstName' => 'ShouldNotStick',
+        ]);
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame('email_reserved', $payload['error']);
+        $this->em->refresh($this->user);
+        $this->assertSame('profiletest@example.com', $this->user->getMail());
+        $this->assertSame('John', $this->user->getUserDetails()['firstName']);
+    }
+
+    public function testOffsetAndAbbreviationTimezonesAreRejected(): void
+    {
+        foreach (['+05:45', 'CST'] as $timezone) {
+            $this->putProfile([
+                'timezone' => $timezone,
+                'firstName' => 'ShouldNotStick',
+            ]);
+
+            $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+            $payload = json_decode($this->client->getResponse()->getContent(), true);
+            $this->assertSame('timezone_invalid', $payload['error']);
+        }
+
+        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
+        $user = $this->em->find(User::class, $this->user->getId());
+        $this->assertInstanceOf(User::class, $user);
+        $this->assertSame('John', $user->getUserDetails()['firstName']);
+        $this->assertArrayNotHasKey('timezone', $user->getUserDetails());
+    }
+
+    public function testBackwardCompatibleTimezoneAliasIsStored(): void
+    {
+        $this->putProfile([
+            'timezone' => 'Asia/Calcutta',
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->em->refresh($this->user);
+        $this->assertSame('Asia/Calcutta', $this->user->getUserDetails()['timezone']);
+    }
+
     public function testFractionalHourTimezoneIsStored(): void
     {
         $this->putProfile([

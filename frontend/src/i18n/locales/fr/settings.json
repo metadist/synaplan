@@ -228,6 +228,7 @@
       "emailPasswordRejected": "Votre profil n’a pas été enregistré. L’e-mail de connexion n’a pas été modifié, car le mot de passe actuel est incorrect.",
       "emailInvalid": "Saisissez une adresse e-mail valide. Rien n’a été enregistré.",
       "emailTaken": "Cette adresse e-mail est déjà utilisée par un autre compte. Rien n’a été enregistré.",
+      "emailReserved": "Cette adresse e-mail ne peut pas être utilisée. Rien n’a été enregistré.",
       "emailManaged": "Cet e-mail de connexion est géré par votre fournisseur de connexion et ne peut pas être modifié ici. Rien n’a été enregistré.",
       "emailSaved": "Votre e-mail de connexion est maintenant {email}. Utilisez-le lors de votre prochaine connexion.",
       "phone": "Téléphone",

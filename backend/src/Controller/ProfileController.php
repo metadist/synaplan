@@ -5,7 +5,9 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\EmailChatService;
+use App\Service\GuestSessionService;
 use App\Service\UserDeletionService;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -249,7 +251,17 @@ class ProfileController extends AbstractController
         }
 
         $user->setUserDetails($details);
-        $this->em->flush();
+        try {
+            $this->em->flush();
+        } catch (UniqueConstraintViolationException) {
+            // The pre-check above is not atomic. UNIQ_BUSER_BMAIL rejects the
+            // second writer when two accounts take the same address together.
+            return $this->profileError(
+                'email_taken',
+                'That email address is already used by another account. Nothing was saved.',
+                Response::HTTP_CONFLICT,
+            );
+        }
 
         $this->logger->info('Profile updated', [
             'user_id' => $user->getId(),
@@ -285,7 +297,14 @@ class ProfileController extends AbstractController
         $submitted = $this->normalizeSignInEmail($data['email']);
         $current = $this->normalizeSignInEmail($user->getMail());
         if ($submitted === $current) {
-            return null;
+            // Same inbox. A local account stores the canonical lowercase form
+            // when the saved value still has spaces or different casing.
+            // Accounts without a password keep the address their provider sent.
+            if ($user->getMail() === $submitted || !$user->canChangePassword()) {
+                return null;
+            }
+
+            return $submitted;
         }
 
         if (!$user->canChangePassword()) {
@@ -300,6 +319,14 @@ class ProfileController extends AbstractController
             return $this->profileError(
                 'email_invalid',
                 'Enter a valid email address. Nothing was saved.',
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        if (GuestSessionService::isReservedProcessorEmail($submitted)) {
+            return $this->profileError(
+                'email_reserved',
+                'That email address cannot be used. Nothing was saved.',
                 Response::HTTP_BAD_REQUEST,
             );
         }
@@ -355,9 +382,7 @@ class ProfileController extends AbstractController
             return null;
         }
 
-        try {
-            new \DateTimeZone($timezone);
-        } catch (\Exception) {
+        if (!$this->isListedIanaTimezone($timezone)) {
             return $this->profileError(
                 'timezone_invalid',
                 'Choose a timezone from the list. Nothing was saved.',
@@ -366,6 +391,22 @@ class ProfileController extends AbstractController
         }
 
         return null;
+    }
+
+    /**
+     * IANA identifiers plus backward-compatible links. Fixed offsets such as
+     * "+05:45" and abbreviations such as "CST" are valid DateTimeZone values
+     * but are not choices in the profile list.
+     */
+    private function isListedIanaTimezone(string $timezone): bool
+    {
+        static $listed = null;
+        if (null === $listed) {
+            $listed = array_fill_keys(\DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC), true);
+            $listed['UTC'] = true;
+        }
+
+        return isset($listed[$timezone]);
     }
 
     private function normalizeSignInEmail(string $email): string

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { IANA_TIME_ZONE_IDS } from '@/utils/ianaTimeZones'
 import {
   filterTimezones,
   formatUtcOffset,
   groupTimezones,
   listTimezones,
+  resolveIanaTimeZoneIds,
   timezoneGroupsForSelect,
 } from '@/utils/timezones'
 
@@ -12,6 +14,15 @@ const summer = new Date('2026-07-15T12:00:00Z')
 
 describe('listTimezones', () => {
   const zones = listTimezones(winter)
+
+  it('keeps the full bundled list when the runtime cannot enumerate zones', () => {
+    expect(IANA_TIME_ZONE_IDS.length).toBeGreaterThan(400)
+    expect(resolveIanaTimeZoneIds(null)).toBe(IANA_TIME_ZONE_IDS)
+    expect(resolveIanaTimeZoneIds(['UTC'])).toBe(IANA_TIME_ZONE_IDS)
+    expect(IANA_TIME_ZONE_IDS).toContain('Europe/Berlin')
+    expect(IANA_TIME_ZONE_IDS).not.toContain('+05:45')
+    expect(IANA_TIME_ZONE_IDS).not.toContain('CST')
+  })
 
   it('imports the IANA list instead of a short hardcoded sample', () => {
     expect(zones.length).toBeGreaterThan(100)

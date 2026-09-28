@@ -53,6 +53,7 @@
       "emailPasswordRejected": "Dein Profil wurde nicht gespeichert. Die Anmelde-E-Mail wurde nicht geändert, weil das aktuelle Passwort falsch ist.",
       "emailInvalid": "Gib eine gültige E-Mail-Adresse ein. Es wurde nichts gespeichert.",
       "emailTaken": "Diese E-Mail-Adresse wird bereits von einem anderen Konto verwendet. Es wurde nichts gespeichert.",
+      "emailReserved": "Diese E-Mail-Adresse kann nicht verwendet werden. Es wurde nichts gespeichert.",
       "emailManaged": "Diese Anmelde-E-Mail wird von deinem Anmelde-Anbieter verwaltet und kann hier nicht geändert werden. Es wurde nichts gespeichert.",
       "emailSaved": "Deine Anmelde-E-Mail ist jetzt {email}. Verwende sie beim nächsten Anmelden.",
       "phone": "Telefon",

@@ -34,6 +34,7 @@
       "emailPasswordRejected": "Tu perfil no se ha guardado. El correo de inicio de sesión no ha cambiado, porque la contraseña actual es incorrecta.",
       "emailInvalid": "Introduce un correo válido. No se ha guardado nada.",
       "emailTaken": "Ese correo ya lo usa otra cuenta. No se ha guardado nada.",
+      "emailReserved": "Ese correo no se puede usar. No se ha guardado nada.",
       "emailManaged": "Este correo de inicio de sesión lo gestiona tu proveedor de acceso y no se puede cambiar aquí. No se ha guardado nada.",
       "emailSaved": "Tu correo de inicio de sesión ahora es {email}. Úsalo la próxima vez que inicies sesión.",
       "phone": "Teléfono",

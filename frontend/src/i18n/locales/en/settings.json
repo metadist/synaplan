@@ -228,6 +228,7 @@
       "emailPasswordRejected": "Your profile was not saved. The sign-in email was not changed, because the current password is wrong.",
       "emailInvalid": "Enter a valid email address. Nothing was saved.",
       "emailTaken": "That email address is already used by another account. Nothing was saved.",
+      "emailReserved": "That email address cannot be used. Nothing was saved.",
       "emailManaged": "This sign-in email is managed by your login provider and cannot be changed here. Nothing was saved.",
       "emailSaved": "Your sign-in email is now {email}. Use it the next time you sign in.",
       "phone": "Phone",
