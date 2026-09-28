@@ -111,12 +111,17 @@ final class ReasoningLevelCatalog
      * is a real level. No request leaves the boolean untouched and drops a
      * stale effort so providers keep today's default.
      *
+     * When thinking is on and the caller did not send a level, an authored
+     * catalog default (not the cheapest fallback) is used. Thinking off is
+     * left alone so an older client can still disable reasoning.
+     *
      * @param array<string, mixed> $options
      * @param list<string>         $features
+     * @param array<string, mixed> $modelJson
      *
      * @return array<string, mixed>
      */
-    public static function apply(array $options, string $service, string $providerId, array $features): array
+    public static function apply(array $options, string $service, string $providerId, array $features, array $modelJson = []): array
     {
         $levels = self::levels($service, $providerId, $features);
         if (null === $levels) {
@@ -127,7 +132,13 @@ final class ReasoningLevelCatalog
 
         $requested = $options['reasoning_effort'] ?? null;
         if (!is_string($requested) || '' === trim($requested)) {
-            unset($options['reasoning_effort']);
+            $default = self::authoredDefault($levels, $modelJson);
+            if (null !== $default && self::reasoningIsOn($options['reasoning'] ?? false)) {
+                $options['reasoning_effort'] = $default;
+                $options['reasoning'] = !in_array($default, ['none', 'minimal'], true);
+            } else {
+                unset($options['reasoning_effort']);
+            }
 
             return $options;
         }
@@ -137,6 +148,31 @@ final class ReasoningLevelCatalog
         $options['reasoning'] = !in_array($clamped, ['none', 'minimal'], true);
 
         return $options;
+    }
+
+    /**
+     * Catalog default only when the row actually names a level this model accepts.
+     *
+     * @param list<string>         $levels
+     * @param array<string, mixed> $json
+     */
+    public static function authoredDefault(array $levels, array $json): ?string
+    {
+        $candidate = self::catalogDefault($json);
+        if (null !== $candidate && in_array($candidate, $levels, true)) {
+            return $candidate;
+        }
+
+        return null;
+    }
+
+    private static function reasoningIsOn(mixed $reasoning): bool
+    {
+        if (is_array($reasoning)) {
+            return [] !== $reasoning;
+        }
+
+        return (bool) $reasoning;
     }
 
     /**

@@ -36,6 +36,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
 {
     private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+    /**
+     * Smallest non-zero thinking budget for a chosen "low" level.
+     * Zero disables thinking on Flash, so low has to stay above it and
+     * below the medium budget (1024).
+     */
+    private const LOW_THINKING_BUDGET = 512;
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
 
     /**
@@ -640,17 +647,16 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             return ['thinkingBudget' => $budget];
         }
 
-        // Cross-provider semantic levels. We default to 'low' for chat to
-        // make TTFT acceptable on Gemini 3.x Pro models. Callers that
-        // explicitly want deeper reasoning (e.g. an "extended thinking"
-        // toggle in the UI) can set 'high'.
+        // Cross-provider semantic levels. Thinking off stays a zero budget
+        // on Flash (and is omitted on Pro, which rejects 0). A chosen `low`
+        // is a real, smaller budget — not off.
         $effort = $options['reasoning_effort'] ?? null;
 
-        // The legacy `reasoning => true/false` flag (already used by some
-        // providers) maps to 'high'/'low' here so we don't break callers
-        // that flip reasoning on without choosing a level.
+        // The legacy `reasoning => true/false` flag maps to high / off so
+        // callers that flip reasoning without choosing a level keep the
+        // previous on/off behaviour.
         if (null === $effort && array_key_exists('reasoning', $options)) {
-            $effort = ((bool) $options['reasoning']) ? 'high' : 'low';
+            $effort = ((bool) $options['reasoning']) ? 'high' : 'off';
         }
 
         if (null === $effort) {
@@ -665,7 +671,8 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         $isPro = '' !== $model && $this->isProGeminiModel($model);
 
         return match ($effort) {
-            'off', 'none', 'disabled', 'low' => $isPro ? null : ['thinkingBudget' => 0],
+            'off', 'none', 'disabled' => $isPro ? null : ['thinkingBudget' => 0],
+            'low' => ['thinkingBudget' => self::LOW_THINKING_BUDGET],
             'medium' => ['thinkingBudget' => 1024],
             'high' => ['thinkingBudget' => 8192],
             'dynamic' => ['thinkingBudget' => -1],

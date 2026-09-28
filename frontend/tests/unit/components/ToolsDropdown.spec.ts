@@ -50,7 +50,7 @@ function stubMatchMedia() {
   )
 }
 
-async function mountDropdown() {
+async function mountDropdown(props: Record<string, unknown> = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const router = createRouter({
@@ -61,12 +61,37 @@ async function mountDropdown() {
   await router.isReady()
 
   return mount(ToolsDropdown, {
+    props,
     global: {
       plugins: [pinia, router],
       stubs: { Icon: true },
     },
   })
 }
+
+describe('ToolsDropdown active toggles', () => {
+  beforeEach(() => {
+    stubMatchMedia()
+    desktopEnabled.value = false
+    activeDevices.value = []
+    hasActiveDevices.value = false
+  })
+
+  it('keeps the tools dot off when a reasoning level replaces Thinking', async () => {
+    const wrapper = await mountDropdown({
+      thinkingEnabled: true,
+      hasReasoningLevels: true,
+    })
+
+    expect(wrapper.find('[data-testid="badge-tools-active"]').exists()).toBe(false)
+  })
+
+  it('shows the tools dot when Thinking is on and the model has no levels', async () => {
+    const wrapper = await mountDropdown({ thinkingEnabled: true })
+
+    expect(wrapper.find('[data-testid="badge-tools-active"]').exists()).toBe(true)
+  })
+})
 
 describe('ToolsDropdown summarize', () => {
   beforeEach(() => {

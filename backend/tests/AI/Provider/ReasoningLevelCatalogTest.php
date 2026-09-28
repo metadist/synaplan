@@ -108,6 +108,26 @@ final class ReasoningLevelCatalogTest extends TestCase
         self::assertTrue($untouched['reasoning']);
         self::assertArrayNotHasKey('reasoning_effort', $untouched);
 
+        $fromCatalog = ReasoningLevelCatalog::apply(
+            ['reasoning' => true],
+            'xAI',
+            'grok-4.7',
+            ['reasoning'],
+            ['reasoning_effort_default' => 'high'],
+        );
+        self::assertSame('high', $fromCatalog['reasoning_effort']);
+        self::assertTrue($fromCatalog['reasoning']);
+
+        $leftOff = ReasoningLevelCatalog::apply(
+            ['reasoning' => false],
+            'xAI',
+            'grok-4.7',
+            ['reasoning'],
+            ['reasoning_effort_default' => 'high'],
+        );
+        self::assertFalse($leftOff['reasoning']);
+        self::assertArrayNotHasKey('reasoning_effort', $leftOff);
+
         $fixedDepth = ReasoningLevelCatalog::apply(
             ['reasoning' => true, 'reasoning_effort' => 'high'],
             'xAI',

@@ -212,8 +212,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *
      * The streaming path already merged the request options, including the
      * Thinking boolean. The non-streaming path only gains a level when the
-     * caller sent one, and that level then sets the boolean. No chosen level
-     * leaves both paths as they were.
+     * caller sent one. When thinking is on and no level was sent, the model's
+     * catalog default is applied. The model JSON is also forwarded as
+     * modelConfig so providers that read reasoning_effort_default see it.
      *
      * @param array<string, mixed> $aiOptions
      * @param array<string, mixed> $requestOptions
@@ -232,11 +233,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             return $aiOptions;
         }
 
+        $modelJson = $model->getJson();
+        if (!isset($aiOptions['modelConfig']) || !is_array($aiOptions['modelConfig'])) {
+            $aiOptions['modelConfig'] = $modelJson;
+        }
+
         return ReasoningLevelCatalog::apply(
             $aiOptions,
             $model->getService(),
             $model->getProviderId(),
             $model->getFeatures(),
+            $modelJson,
         );
     }
 

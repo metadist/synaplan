@@ -341,7 +341,9 @@ const isMobileViewport = ref(mobileMq.matches)
 const onMobileMqChange = (e: MediaQueryListEvent) => (isMobileViewport.value = e.matches)
 
 const activeToggleCount = computed(
-  () => Number(props.thinkingEnabled ?? false) + Number(props.voiceReply ?? false)
+  () =>
+    Number((props.thinkingEnabled ?? false) && !props.hasReasoningLevels) +
+    Number(props.voiceReply ?? false)
 )
 
 const isToolActive = (commandName: string): boolean => {
