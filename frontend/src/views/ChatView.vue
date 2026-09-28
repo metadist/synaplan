@@ -624,6 +624,7 @@ import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
 import { AudioStreamer } from '@/utils/AudioStreamer'
+import { createSmoothStream } from '@/utils/smoothStream'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import {
   chatErrorSuggestsOtherModel,
@@ -2493,8 +2494,9 @@ const handleContinueResponse = async (message: Message) => {
   }
 
   const trackId = Date.now()
-  let streamingRafId: number | null = null
-  let streamingDirty = false
+  const continueSmoother = createSmoothStream({
+    onRender: (text) => renderStreamingContent(text, message.id),
+  })
 
   const stopStreaming = chatApi.streamMessage({
     userId,
@@ -2507,16 +2509,7 @@ const handleContinueResponse = async (message: Message) => {
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
         fullContent += data.chunk
-
-        streamingDirty = true
-        if (streamingRafId === null) {
-          streamingRafId = requestAnimationFrame(() => {
-            streamingRafId = null
-            if (!streamingDirty) return
-            streamingDirty = false
-            renderStreamingContent(fullContent, message.id)
-          })
-        }
+        continueSmoother.push(fullContent)
       } else if (data.status === 'reasoning' && data.chunk) {
         const msg = historyStore.messages.find((m) => m.id === message.id)
         if (msg) {
@@ -2534,11 +2527,7 @@ const handleContinueResponse = async (message: Message) => {
           reasoningPart.content += data.chunk
         }
       } else if (data.status === 'complete') {
-        if (streamingRafId !== null) {
-          cancelAnimationFrame(streamingRafId)
-          streamingRafId = null
-        }
-
+        continueSmoother.flush()
         renderStreamingContent(fullContent, message.id)
 
         if (data.truncated) {
@@ -2567,6 +2556,7 @@ const handleContinueResponse = async (message: Message) => {
           void historyStore.reconcileMessage(message.id, message.backendMessageId)
         }
       } else if (data.status === 'error') {
+        continueSmoother.cancel()
         message.truncated = true
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
@@ -2575,7 +2565,10 @@ const handleContinueResponse = async (message: Message) => {
     },
   })
 
-  stopStreamingFn = stopStreaming
+  stopStreamingFn = () => {
+    continueSmoother.cancel()
+    stopStreaming()
+  }
 }
 
 interface PluginChatRoute {
@@ -2998,8 +2991,13 @@ const streamAIResponse = async (
     renderStreamingContent(text.length >= paintedPrefix.length ? text : paintedPrefix, messageId)
   }
 
-  let streamingRafId: number | null = null
-  let streamingDirty = false
+  const textSmoother = createSmoothStream({
+    onRender: renderStreamingText,
+    initialShown: paintedPrefix,
+  })
+  streamingAbortController.signal.addEventListener('abort', () => {
+    textSmoother.cancel()
+  })
 
   try {
     if (useMockData) {
@@ -3058,6 +3056,7 @@ const streamAIResponse = async (
           }
 
           if (data.status === 'guest_limit_reached') {
+            textSmoother.cancel()
             // #1128: drop the empty assistant placeholder — same as the
             // authenticated rate-limit path (removeMessage), otherwise the
             // guest sees a blank bubble above the signup modal.
@@ -3292,16 +3291,7 @@ const streamAIResponse = async (
               historyStore.finishLiveThinking(messageId)
             }
             fullContent += data.chunk
-
-            streamingDirty = true
-            if (streamingRafId === null) {
-              streamingRafId = requestAnimationFrame(() => {
-                streamingRafId = null
-                if (!streamingDirty) return
-                streamingDirty = false
-                renderStreamingText(fullContent)
-              })
-            }
+            textSmoother.push(fullContent)
           } else if (data.status === 'reasoning' && data.chunk) {
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
@@ -3373,15 +3363,11 @@ const streamAIResponse = async (
               applyDocsToMessage(streamingMessage, data.metadata?.docs)
             }
           } else if (data.status === 'complete') {
-            if (streamingRafId !== null) {
-              cancelAnimationFrame(streamingRafId)
-              streamingRafId = null
-            }
-            streamingDirty = false
-
             if (data.truncated) {
               fullContent += '\n\n---\n\n⚠️ *' + t('message.truncated') + '*'
             }
+
+            textSmoother.flush()
 
             if (fullContent) {
               renderStreamingText(fullContent)
@@ -3502,10 +3488,7 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
             scrollToBottom()
           } else if (data.status === 'error') {
-            if (streamingRafId !== null) {
-              cancelAnimationFrame(streamingRafId)
-              streamingRafId = null
-            }
+            textSmoother.cancel()
             processingStatus.value = ''
             processingMetadata.value = {}
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -3952,19 +3935,9 @@ const streamAIResponse = async (
               }
             }
 
-            // Mark dirty and schedule a throttled render via rAF.
-            // This avoids re-parsing the full markdown on every single SSE chunk,
-            // which causes O(n²) rendering for long responses.
-            streamingDirty = true
-
-            if (streamingRafId === null) {
-              streamingRafId = requestAnimationFrame(() => {
-                streamingRafId = null
-                if (!streamingDirty) return
-                streamingDirty = false
-                renderStreamingText(fullContent)
-              })
-            }
+            // Reveal the chunk across frames. Parsing still happens at most
+            // once per frame; a large provider chunk no longer lands as a block.
+            textSmoother.push(fullContent)
           } else if (data.status === 'reasoning' && data.chunk) {
             // Reasoning chunks from OpenAI o-series / GPT-5 models
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -4206,11 +4179,7 @@ const streamAIResponse = async (
             // mutations (parts updated, processingStatus cleared, isStreaming
             // toggled) into one paint, preserving the smooth single-frame
             // transition this phase was originally targeting.
-            if (streamingRafId !== null) {
-              cancelAnimationFrame(streamingRafId)
-              streamingRafId = null
-            }
-            streamingDirty = false
+            textSmoother.flush()
 
             if (fullContent) {
               renderStreamingText(fullContent)
@@ -4474,12 +4443,7 @@ const streamAIResponse = async (
             currentTrackId = undefined
             currentStreamingChatId = undefined
           } else if (data.status === 'error') {
-            // Cancel any pending throttled render
-            if (streamingRafId !== null) {
-              cancelAnimationFrame(streamingRafId)
-              streamingRafId = null
-            }
-            streamingDirty = false
+            textSmoother.cancel()
 
             const rawError = typeof data.error === 'string' ? data.error : ''
             const classified =
@@ -4729,12 +4693,7 @@ const streamAIResponse = async (
   } catch (error) {
     console.error('❌ Streaming error:', error)
 
-    // Cancel any pending throttled render
-    if (streamingRafId !== null) {
-      cancelAnimationFrame(streamingRafId)
-      streamingRafId = null
-    }
-    streamingDirty = false
+    textSmoother.cancel()
 
     historyStore.updateStreamingMessage(messageId, t('chatError.reason.unknown'))
     historyStore.finishStreamingMessage(messageId)

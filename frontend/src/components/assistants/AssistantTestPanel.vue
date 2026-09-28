@@ -16,6 +16,13 @@
       >
         {{ line }}
       </p>
+      <p
+        v-if="liveReply"
+        class="text-sm txt-primary whitespace-pre-wrap"
+        data-testid="text-test-live"
+      >
+        {{ liveReply }}
+      </p>
     </div>
     <form class="flex gap-2" @submit.prevent="send">
       <input
@@ -51,6 +58,12 @@ const draftInputRef = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const lines = ref<string[]>([])
 
+const liveReply = ref('')
+let replySmoother: SmoothStream | null = null
+
+onUnmounted(() => {
+  replySmoother?.cancel()
+})
 const usingDefaultChat = computed(() => {
   const chat = store.current?.draft?.models.chat
   return chat == null || chat === ''
@@ -70,6 +83,15 @@ function send(): void {
   lines.value.push(message)
   sending.value = true
   let reply = ''
+  liveReply.value = ''
+  replySmoother?.cancel()
+  let reply = ''
+  const smoother = createSmoothStream({
+    onRender: (text) => {
+      liveReply.value = text
+    },
+  })
+  replySmoother = smoother
   chatApi.streamMessage({
     userId,
     message,
@@ -80,13 +102,17 @@ function send(): void {
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
         reply += data.chunk
+        smoother.push(reply)
       }
       if (data.status === 'complete' || data.status === 'error') {
+        smoother.flush()
         if (reply) {
           lines.value.push(reply)
         }
+        liveReply.value = ''
         sending.value = false
-      }
+        smoother.cancel()
+        if (replySmoother === smoother) replySmoother = null
     },
   })
 }
