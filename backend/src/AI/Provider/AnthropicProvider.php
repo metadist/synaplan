@@ -92,6 +92,29 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5-5',
     ];
 
+    /**
+     * Models whose thinking `display` defaults to `omitted`, so the text
+     * between tool calls arrives as an empty thinking block.
+     *
+     * Longer prefixes must be listed before shorter ones (`claude-opus-5-5`
+     * before `claude-opus-5`) because matching is prefix-based.
+     */
+    private const OMITTED_THINKING_DISPLAY_MODELS = [
+        'claude-opus-4-8',
+        'claude-opus-4-7',
+        'claude-opus-5-5',
+        'claude-opus-5',
+        'claude-sonnet-5',
+        'claude-fable-5-1',
+        'claude-fable-5',
+    ];
+
+    /**
+     * Beta that lets `thinking.display: updates` return the short progress
+     * line these models write between tool calls, without the full summary.
+     */
+    private const THINKING_DISPLAY_UPDATES_BETA = 'thinking-display-updates-2026-08-18';
+
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
     private const ADAPTIVE_THINKING_MODELS = [
         'claude-opus-4-6',
@@ -312,6 +335,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
             $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
 
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
@@ -321,7 +345,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             ]);
 
             $response = $this->httpClient->request('POST', self::BASE_URL.'/messages', [
-                'headers' => $this->getHeaders(),
+                'headers' => $this->requestHeaders($requestBody, false),
                 'json' => $requestBody,
                 'timeout' => $this->timeout,
             ]);
@@ -490,6 +514,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
             $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
 
             // Only accumulate when the request really declares tools. A forced
             // schema tool also streams its `input` as `input_json_delta`, but
@@ -507,9 +532,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             ]);
 
             $response = $this->httpClient->request('POST', self::BASE_URL.'/messages', [
-                'headers' => array_merge($this->getHeaders(), [
-                    'Accept' => 'text/event-stream',
-                ]),
+                'headers' => $this->requestHeaders($requestBody, true),
                 'json' => $requestBody,
                 'timeout' => $this->timeout,
                 'buffer' => false, // Don't buffer the response
@@ -745,6 +768,26 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         ];
     }
 
+    /**
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, string>
+     */
+    private function requestHeaders(array $requestBody, bool $stream): array
+    {
+        $headers = $this->getHeaders();
+        if ($stream) {
+            $headers['Accept'] = 'text/event-stream';
+        }
+
+        $thinking = $requestBody['thinking'] ?? null;
+        if (\is_array($thinking) && 'updates' === ($thinking['display'] ?? null)) {
+            $headers['anthropic-beta'] = self::THINKING_DISPLAY_UPDATES_BETA;
+        }
+
+        return $headers;
+    }
+
     private function supportsThinking(string $model): bool
     {
         foreach (self::THINKING_MODELS as $thinkingModel) {
@@ -809,11 +852,62 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     {
         foreach (self::ADAPTIVE_THINKING_MODELS as $adaptiveModel) {
             if (str_starts_with($model, $adaptiveModel)) {
-                return ['type' => 'adaptive'];
+                $config = ['type' => 'adaptive'];
+                if ($this->thinkingDisplayDefaultsToOmitted($model)) {
+                    // Without this the model still thinks, but the summary —
+                    // including the line it writes between tool calls — is empty.
+                    $config['display'] = 'summarized';
+                }
+
+                return $config;
             }
         }
 
         return ['type' => 'enabled', 'budget_tokens' => 5000];
+    }
+
+    /**
+     * Keep the short progress line visible when thinking cannot be turned off.
+     *
+     * These models write that line into a thinking block. The default display
+     * omits the text, so the chat shows nothing between tool calls. `updates`
+     * returns only that line, not the full reasoning summary the person turned off.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function applyProgressThinkingDisplay(array $requestBody, string $model, bool $thinkingEnabled): array
+    {
+        if ($thinkingEnabled || !$this->thinkingCannotBeDisabled($model)) {
+            return $requestBody;
+        }
+
+        if (!$this->thinkingDisplayDefaultsToOmitted($model)) {
+            return $requestBody;
+        }
+
+        $requestBody['thinking'] = [
+            'type' => 'adaptive',
+            'display' => 'updates',
+        ];
+
+        $this->logger->info('Anthropic: progress text requested while reasoning is off', [
+            'model' => $model,
+        ]);
+
+        return $requestBody;
+    }
+
+    private function thinkingDisplayDefaultsToOmitted(string $model): bool
+    {
+        foreach (self::OMITTED_THINKING_DISPLAY_MODELS as $omittedModel) {
+            if (str_starts_with($model, $omittedModel)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
