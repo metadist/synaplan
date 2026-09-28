@@ -106,7 +106,7 @@
             @click="handleSocialLogin('keycloak')"
           >
             <Icon icon="mdi:key-variant" class="w-4 h-4 mr-2" />
-            {{ $t('auth.loginWithSso') }}
+            {{ enterpriseSsoLabel }}
           </button>
         </div>
 
@@ -132,7 +132,7 @@
             @click="handleSocialLogin('keycloak')"
           >
             <Icon icon="mdi:key-variant" class="w-4 h-4 mr-2" />
-            {{ $t('auth.loginWithSso') }}
+            {{ enterpriseSsoLabel }}
           </button>
         </div>
 
@@ -229,7 +229,7 @@
                   class="w-4.5 h-4.5"
                 />
                 <span class="group-hover:translate-x-0.5 transition-transform duration-200">{{
-                  provider.name
+                  socialProviderLabel(provider, t)
                 }}</span>
               </button>
             </div>
@@ -410,6 +410,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { socialProviderLabel } from '@/utils/socialProviderLabel'
 import { cycleLocale } from '@/i18n'
 import {
   SunIcon,
@@ -449,7 +450,7 @@ import {
 
 const router = useRouter()
 const route = useRoute()
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
 const config = useConfigStore()
@@ -508,9 +509,15 @@ interface SocialProvider {
   enabled: boolean
   icon: string
   auto_redirect?: boolean
+  custom_label?: boolean
 }
 
 const socialProviders = ref<SocialProvider[]>([])
+const enterpriseSsoLabel = computed(() => {
+  const provider = socialProviders.value.find((item) => item.id === 'keycloak')
+  if (!provider) return t('auth.enterpriseSso')
+  return socialProviderLabel(provider, t)
+})
 const oidcAutoRedirect = ref(false)
 const sessionExpired = ref(false)
 const justRegistered = ref(false)

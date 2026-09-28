@@ -24,6 +24,8 @@ export interface SocialProvider {
   enabled: boolean
   icon: string
   auto_redirect?: boolean
+  /** True when an administrator set the enterprise login button text. */
+  custom_label?: boolean
 }
 
 export function useSocialAuth() {

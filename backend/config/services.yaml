@@ -30,6 +30,7 @@ parameters:
 
     # OIDC scopes requested during login (space-separated)
     env(OIDC_SCOPES): 'openid email profile offline_access'
+    env(OIDC_PROVIDER_LABEL): ''
 
     # Native mobile deep-link scheme used for the OAuth handoff (Epic 3).
     # Must match the custom URL scheme registered by the Capacitor app
@@ -1030,6 +1031,7 @@ services:
             $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
             $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
             $appleClientId: '%env(string:default::APPLE_CLIENT_ID)%'
+            $oidcProviderLabel: '%env(string:OIDC_PROVIDER_LABEL)%'
 
     # OAuth State Service (signed tokens for CSRF protection)
     App\Service\OAuthStateService:

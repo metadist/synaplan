@@ -122,6 +122,8 @@ different provider:
 |----------|---------|-------|
 | `OIDC_ADMIN_ROLES` | `admin,realm-admin,synaplan-admin,administrator` | Claim values that grant admin |
 | `OIDC_ROLE_CLAIMS` | `realm_access.roles,resource_access.{client_id}.roles,groups` | Dot-notation paths; `{client_id}` expands to `OIDC_CLIENT_ID`. Azure AD: `roles`. Auth0: `https://myapp\.com/roles` |
+| `OIDC_SCOPES` | `openid email profile offline_access` | Permissions requested at sign-in. `offline_access` is rewritten to `offline` when discovery lists `offline` and not `offline_access` (Kinde). A refused permission stops sign-in and names that permission. |
+| `OIDC_PROVIDER_LABEL` | empty | Button text. Empty shows "Enterprise SSO" in the visitor's language. |
 
 Two properties of that mapping are worth knowing before you rely on it:
 
