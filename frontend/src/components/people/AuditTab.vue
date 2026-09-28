@@ -104,6 +104,9 @@ const ACTION_KEYS: Record<string, string> = {
   'platform_instance.approved': 'people.audit.action.platform_instance_approved',
   'platform_instance.revoked': 'people.audit.action.platform_instance_revoked',
   'admin.user_level_change': 'people.audit.action.admin_user_level_change',
+  'messages_gateway.flags': 'people.audit.action.messages_gateway_flags',
+  'messages_gateway.upstream': 'people.audit.action.messages_gateway_upstream',
+  'messages_gateway.aliases': 'people.audit.action.messages_gateway_aliases',
 }
 
 const selectedAction = ref<string | undefined>(undefined)

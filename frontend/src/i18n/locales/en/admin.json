@@ -797,7 +797,10 @@
         "platform_instance_registered": "Platform registered",
         "platform_instance_approved": "Platform approved",
         "platform_instance_revoked": "Platform revoked",
-        "admin_user_level_change": "User level changed"
+        "admin_user_level_change": "User level changed",
+        "messages_gateway_flags": "Gateway settings changed",
+        "messages_gateway_upstream": "Gateway address changed",
+        "messages_gateway_aliases": "Model aliases changed"
       },
       "what": "What happened",
       "emptyNote": "This log records who did what. It does not open chat or file contents.",

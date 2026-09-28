@@ -797,7 +797,10 @@
         "platform_instance_registered": "Plattform registriert",
         "platform_instance_approved": "Plattform freigegeben",
         "platform_instance_revoked": "Plattform widerrufen",
-        "admin_user_level_change": "Benutzer-Level geändert"
+        "admin_user_level_change": "Benutzer-Level geändert",
+        "messages_gateway_flags": "Gateway-Einstellungen geändert",
+        "messages_gateway_upstream": "Gateway-Adresse geändert",
+        "messages_gateway_aliases": "Modell-Aliase geändert"
       },
       "what": "Was passiert ist",
       "emptyNote": "Dieses Protokoll hält fest, wer was getan hat. Es öffnet keine Chat- oder Dateiinhalte.",

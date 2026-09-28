@@ -793,7 +793,10 @@
         "platform_instance_registered": "Plataforma registrada",
         "platform_instance_approved": "Plataforma aprobada",
         "platform_instance_revoked": "Plataforma revocada",
-        "admin_user_level_change": "Nivel de usuario cambiado"
+        "admin_user_level_change": "Nivel de usuario cambiado",
+        "messages_gateway_flags": "Ajustes de la puerta de enlace cambiados",
+        "messages_gateway_upstream": "Dirección de la puerta de enlace cambiada",
+        "messages_gateway_aliases": "Alias de modelos cambiados"
       },
       "what": "Qué ocurrió",
       "emptyNote": "Este registro indica quién hizo qué. No abre el contenido de chats ni de archivos.",

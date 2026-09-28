@@ -11,11 +11,14 @@ use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Controller\MessagesGatewayController;
+use App\Entity\AuditLogEntry;
 use App\Entity\Config;
 use App\Entity\User;
+use App\Repository\AuditLogEntryRepository;
 use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Service\BillingService;
+use App\Service\Iam\AuditLogWriter;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
@@ -41,11 +44,18 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
     private AnalyzeImageTool&MockObject $analyzeImageTool;
     private MessagesGatewayController $controller;
 
+    /** @var list<AuditLogEntry> */
+    private array $auditEntries = [];
+
     protected function setUp(): void
     {
         $this->configRepository = $this->createMock(ConfigRepository::class);
         $this->webSearchTool = $this->createMock(WebSearchTool::class);
         $this->analyzeImageTool = $this->createMock(AnalyzeImageTool::class);
+        $auditRepository = $this->createMock(AuditLogEntryRepository::class);
+        $auditRepository->method('save')->willReturnCallback(function (AuditLogEntry $entry): void {
+            $this->auditEntries[] = $entry;
+        });
 
         $this->controller = new MessagesGatewayController(
             $this->createStub(MessagesGatewayConfig::class),
@@ -60,6 +70,7 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
             $this->createStub(McpServerConfigRepository::class),
             new NullLogger(),
             $this->createStub(AppChatCredential::class),
+            new AuditLogWriter($auditRepository),
         );
 
         $this->grantAdmin(true);
@@ -72,6 +83,7 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
         $response = $this->controller->putFlags($this->request(['enabled' => true]), $this->makeUser());
 
         $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+        $this->assertSame([], $this->auditEntries);
     }
 
     public function testWritesEveryValueKind(): void
@@ -202,6 +214,26 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
         );
 
         $this->assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+        $this->assertSame([], $this->auditEntries);
+    }
+
+    public function testFlagUpdateWritesAnAuditRowWithOldAndNewValues(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('0');
+
+        $response = $this->controller->putFlags($this->request(['enabled' => true]), $this->makeUser());
+
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertCount(1, $this->auditEntries);
+        $entry = $this->auditEntries[0];
+        $this->assertSame('messages_gateway.flags', $entry->getAction());
+        $this->assertSame('messages_gateway', $entry->getResourceKind());
+        $subject = $entry->getSubject();
+        $this->assertIsArray($subject);
+        $this->assertSame(['old' => '0', 'new' => '1'], $subject['changes']['ENABLED']);
+        $encoded = json_encode($subject);
+        $this->assertIsString($encoded);
+        $this->assertStringNotContainsString('sk-', $encoded);
     }
 
     private function grantAdmin(bool $granted): void

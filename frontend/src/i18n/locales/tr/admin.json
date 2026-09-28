@@ -793,7 +793,10 @@
         "platform_instance_registered": "Platform kaydedildi",
         "platform_instance_approved": "Platform onaylandı",
         "platform_instance_revoked": "Platform iptal edildi",
-        "admin_user_level_change": "Kullanıcı seviyesi değiştirildi"
+        "admin_user_level_change": "Kullanıcı seviyesi değiştirildi",
+        "messages_gateway_flags": "Ağ geçidi ayarları değiştirildi",
+        "messages_gateway_upstream": "Ağ geçidi adresi değiştirildi",
+        "messages_gateway_aliases": "Model takma adları değiştirildi"
       },
       "what": "Ne oldu",
       "emptyNote": "Bu kayıt kimin ne yaptığını tutar. Sohbet veya dosya içeriğini açmaz.",

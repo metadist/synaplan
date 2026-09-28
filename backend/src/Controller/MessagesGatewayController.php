@@ -13,6 +13,7 @@ use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Iam\AuditLogWriter;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
@@ -48,6 +49,7 @@ final class MessagesGatewayController extends AbstractController
         private readonly McpServerConfigRepository $mcpServers,
         private readonly LoggerInterface $logger,
         private readonly AppChatCredential $appChatCredential,
+        private readonly AuditLogWriter $auditLogWriter,
     ) {
     }
 
@@ -388,11 +390,18 @@ final class MessagesGatewayController extends AbstractController
 
         $url = trim((string) ($decoded['upstream_url'] ?? ''));
 
+        $previous = $this->config->upstreamUrl();
+
         try {
             $this->config->setUpstreamUrl($url, (int) $user->getId());
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
+
+        $current = $this->config->upstreamUrl();
+        $this->auditGatewayChange($user, $request, 'messages_gateway.upstream', 'upstream', [
+            'UPSTREAM_URL' => ['old' => $previous, 'new' => $current],
+        ]);
 
         return $this->json([
             'success' => true,
@@ -455,6 +464,7 @@ final class MessagesGatewayController extends AbstractController
             return $this->json(['error' => 'model_aliases must be an object'], Response::HTTP_BAD_REQUEST);
         }
 
+        $previous = $this->config->modelAliases();
         $clean = [];
         foreach ($aliases as $from => $to) {
             if (\is_string($from) && '' !== $from && \is_string($to) && '' !== $to) {
@@ -469,6 +479,10 @@ final class MessagesGatewayController extends AbstractController
             // Force object encoding so {} stays {} (never []) in BCONFIG.
             json_encode((object) $clean, \JSON_THROW_ON_ERROR),
         );
+
+        $this->auditGatewayChange($user, $request, 'messages_gateway.aliases', 'aliases', [
+            'MODEL_ALIASES' => ['old' => $previous, 'new' => $clean],
+        ]);
 
         return new JsonResponse(['success' => true, 'model_aliases' => (object) $clean]);
     }
@@ -585,19 +599,27 @@ final class MessagesGatewayController extends AbstractController
         }
 
         $response = [];
+        $changes = [];
         foreach ($updated as $key => $value) {
+            $new = \is_bool($value) ? ($value ? '1' : '0') : (string) $value;
+            $old = $this->configRepository->getValue(0, MessagesGatewayConfig::CONFIG_GROUP, $key);
             $this->configRepository->setValue(
                 0,
                 MessagesGatewayConfig::CONFIG_GROUP,
                 $key,
-                \is_bool($value) ? ($value ? '1' : '0') : (string) $value,
+                $new,
             );
             $response[strtolower($key)] = $value;
+            $changes[$key] = ['old' => $old, 'new' => $new];
         }
 
-        $this->logger->warning('MessagesGateway: settings updated (audit)', [
+        if ([] !== $changes) {
+            $this->auditGatewayChange($user, $request, 'messages_gateway.flags', 'flags', $changes);
+        }
+
+        $this->logger->info('MessagesGateway: settings updated', [
             'acting_user_id' => $user->getId(),
-            'updated' => $response,
+            'updated' => array_keys($response),
         ]);
 
         return new JsonResponse(['success' => true, 'updated' => (object) $response]);
@@ -708,6 +730,24 @@ final class MessagesGatewayController extends AbstractController
         ) {
             throw new \InvalidArgumentException('vision_mode=synaplan requires a configured Synaplan vision (PIC2TEXT) model');
         }
+    }
+
+    /**
+     * One People → Audit row for a gateway settings write. Values are setting
+     * names and model ids, never provider keys.
+     *
+     * @param array<string, mixed> $changes
+     */
+    private function auditGatewayChange(User $user, Request $request, string $action, string $resourceId, array $changes): void
+    {
+        $this->auditLogWriter->record(
+            (int) $user->getId(),
+            $action,
+            'messages_gateway',
+            $resourceId,
+            ['changes' => $changes],
+            (string) $request->getClientIp(),
+        );
     }
 
     /**

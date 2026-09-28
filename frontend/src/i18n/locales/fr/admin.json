@@ -797,7 +797,10 @@
         "platform_instance_registered": "Plateforme enregistrée",
         "platform_instance_approved": "Plateforme approuvée",
         "platform_instance_revoked": "Plateforme révoquée",
-        "admin_user_level_change": "Niveau utilisateur modifié"
+        "admin_user_level_change": "Niveau utilisateur modifié",
+        "messages_gateway_flags": "Réglages de la passerelle modifiés",
+        "messages_gateway_upstream": "Adresse de la passerelle modifiée",
+        "messages_gateway_aliases": "Alias de modèles modifiés"
       },
       "what": "Ce qui s’est passé",
       "emptyNote": "Ce journal indique qui a fait quoi. Il n’ouvre pas le contenu des chats ni des fichiers.",
