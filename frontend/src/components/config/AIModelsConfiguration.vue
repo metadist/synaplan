@@ -140,7 +140,13 @@
               @click="toggleDropdown(capability as Capability)"
             >
               <span class="flex items-center gap-2 truncate">
-                <span class="truncate">{{ getSelectedModelLabel(capability as Capability) }}</span>
+                <span
+                  class="truncate"
+                  :class="{
+                    'txt-model-placeholder': !getSelectedModelObj(capability as Capability),
+                  }"
+                  >{{ getSelectedModelLabel(capability as Capability) }}</span
+                >
                 <ModelCostBadge
                   v-if="getSelectedModelObj(capability as Capability)"
                   :model="getSelectedModelObj(capability as Capability)!"
