@@ -64,20 +64,27 @@ final readonly class OAuthLoginResponder
 
     /**
      * Error response routed to the right place for the client type.
+     *
+     * `$extra` adds optional query fields such as `error_code` and `scope`.
+     * It cannot overwrite `error` or `provider`.
+     *
+     * @param array<string, string> $extra
      */
-    public function error(string $provider, string $error, bool $native): Response
+    public function error(string $provider, string $error, bool $native, array $extra = []): Response
     {
-        if ($native) {
-            return new RedirectResponse($this->deepLink([
-                'error' => $error,
-                'provider' => $provider,
-            ]));
+        $query = ['error' => $error, 'provider' => $provider];
+        foreach ($extra as $key => $value) {
+            if (isset($query[$key]) || '' === $value) {
+                continue;
+            }
+            $query[$key] = $value;
         }
 
-        return new RedirectResponse($this->frontendUrl.'/auth/callback?'.http_build_query([
-            'error' => $error,
-            'provider' => $provider,
-        ]));
+        if ($native) {
+            return new RedirectResponse($this->deepLink($query));
+        }
+
+        return new RedirectResponse($this->frontendUrl.'/auth/callback?'.http_build_query($query));
     }
 
     /**

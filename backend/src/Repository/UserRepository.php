@@ -44,6 +44,27 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
+     * Another account that already uses this sign-in email, ignoring case.
+     * The signed-in user's own row is excluded so an unchanged address is free.
+     */
+    public function findOtherByNormalizedEmail(string $email, int $userId): ?User
+    {
+        $normalized = mb_strtolower(trim($email));
+        if ('' === $normalized) {
+            return null;
+        }
+
+        return $this->createQueryBuilder('u')
+            ->where('LOWER(u.mail) = :email')
+            ->andWhere('u.id != :userId')
+            ->setParameter('email', $normalized)
+            ->setParameter('userId', $userId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * Shortest query the people picker answers. Anything shorter matches too
      * many accounts to be a lookup and turns the endpoint into an enumerator.
      */

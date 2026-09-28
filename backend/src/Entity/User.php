@@ -9,7 +9,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'BUSER')]
-#[ORM\Index(columns: ['BMAIL'], name: 'BMAIL')]
+#[ORM\UniqueConstraint(name: 'UNIQ_BUSER_BMAIL', columns: ['BMAIL'])]
 #[ORM\Index(columns: ['BINTYPE'], name: 'BINTYPE')]
 #[ORM\Index(columns: ['BPROVIDERID'], name: 'BPROVIDERID')]
 #[ORM\Index(columns: ['BUSERLEVEL'], name: 'BUSERLEVEL')]

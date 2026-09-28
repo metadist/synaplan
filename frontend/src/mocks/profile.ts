@@ -28,11 +28,6 @@ export interface Language {
   name: string
 }
 
-export interface Timezone {
-  value: string
-  label: string
-}
-
 export const mockProfile: UserProfile = {
   firstName: 'Yusuf',
   lastName: 'Senel',
@@ -69,15 +64,4 @@ export const languages: Language[] = [
   { code: 'it', name: 'Italiano' },
   { code: 'pt', name: 'Português' },
   { code: 'nl', name: 'Nederlands' },
-]
-
-export const timezones: Timezone[] = [
-  { value: 'Europe/Berlin', label: 'Europe/Berlin (GMT+1)' },
-  { value: 'Europe/London', label: 'Europe/London (GMT+0)' },
-  { value: 'Europe/Paris', label: 'Europe/Paris (GMT+1)' },
-  { value: 'Europe/Amsterdam', label: 'Europe/Amsterdam (GMT+1)' },
-  { value: 'America/New_York', label: 'America/New_York (GMT-5)' },
-  { value: 'America/Los_Angeles', label: 'America/Los_Angeles (GMT-8)' },
-  { value: 'Asia/Tokyo', label: 'Asia/Tokyo (GMT+9)' },
-  { value: 'Australia/Sydney', label: 'Australia/Sydney (GMT+11)' },
 ]
