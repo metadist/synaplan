@@ -290,6 +290,8 @@
       },
       "defaultConfigTitle": "Varsayılan Model Yapılandırması",
       "loadingModels": "Modeller yükleniyor...",
+      "loadFailed": "Model listesi yüklenemedi.",
+      "retry": "Yeniden dene",
       "system": "Sistem",
       "selectModel": "-- Model Seç --",
       "groupLimitsModels": "Grubunuz burada kullanabileceğiniz modelleri sınırlar.",
