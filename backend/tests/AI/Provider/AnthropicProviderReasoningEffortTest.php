@@ -127,7 +127,7 @@ final class AnthropicProviderReasoningEffortTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $headers
+     * @param array<int|string, mixed> $headers
      *
      * @return array<string, string>
      */
@@ -135,11 +135,11 @@ final class AnthropicProviderReasoningEffortTest extends TestCase
     {
         $flat = [];
         foreach ($headers as $name => $value) {
-            if (\is_int($name) && \is_string($value) && str_contains($value, ':')) {
+            if (\is_int($name)) {
+                if (!\is_string($value) || !str_contains($value, ':')) {
+                    continue;
+                }
                 [$name, $value] = explode(':', $value, 2);
-            }
-            if (!\is_string($name)) {
-                continue;
             }
             $flat[strtolower(trim($name))] = trim(\is_array($value) ? implode(', ', $value) : (string) $value);
         }
