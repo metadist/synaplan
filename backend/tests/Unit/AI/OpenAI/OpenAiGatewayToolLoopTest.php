@@ -280,6 +280,51 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         }
     }
 
+    public function testStreamForwardsStructuredContentAndDropsReasoning(): void
+    {
+        $facade = $this->createMock(AiFacade::class);
+        $facade->method('chatStream')->willReturnCallback(
+            static function (array $messages, callable $callback, ?int $userId, array $options): array {
+                unset($messages, $userId);
+                $callback(['type' => 'reasoning', 'content' => 'hidden-thought']);
+                $callback(['type' => 'content', 'content' => 'HTTP caching ']);
+                $callback(['type' => 'content', 'content' => 'stores responses.']);
+                $callback(['type' => 'finish', 'finish_reason' => 'stop']);
+                $callback(['type' => 'tool_call_delta', 'index' => 0]);
+
+                return [
+                    'content' => 'HTTP caching stores responses.',
+                    'provider' => 'test',
+                    'model' => is_string($options['model'] ?? null) ? $options['model'] : 'test-model',
+                    'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 2, 'total_tokens' => 3],
+                ];
+            }
+        );
+
+        $loop = $this->loop($this->unavailableSearch(), mcpEnabled: false, facade: $facade);
+        $chunks = [];
+        $loop->stream(
+            $this->user(),
+            [['role' => 'user', 'content' => 'Explain HTTP caching.']],
+            static function (mixed $chunk) use (&$chunks): void {
+                $chunks[] = $chunk;
+            },
+            ['model' => 'test-model', 'provider' => 'test'],
+        );
+
+        $textChunks = array_values(array_filter($chunks, 'is_string'));
+        self::assertGreaterThanOrEqual(2, count($textChunks));
+        self::assertSame('HTTP caching stores responses.', implode('', $textChunks));
+        $encoded = json_encode($chunks);
+        self::assertIsString($encoded);
+        self::assertStringNotContainsString('hidden-thought', $encoded);
+        foreach ($chunks as $chunk) {
+            if (is_array($chunk) && 'tool_call_delta' === ($chunk['type'] ?? '')) {
+                self::fail('provider tool_call_delta chunks must not be forwarded');
+            }
+        }
+    }
+
     private function loop(
         WebSearchTool $search,
         bool $mcpEnabled,

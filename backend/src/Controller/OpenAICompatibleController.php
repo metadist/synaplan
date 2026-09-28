@@ -510,10 +510,10 @@ class OpenAICompatibleController extends AbstractController
                     }
 
                     if (is_array($chunk) && 'tool_call_delta' === ($chunk['type'] ?? '')) {
-                        $accumulator->addDelta($chunk);
                         if ($clientGone) {
                             return;
                         }
+                        $accumulator->addDelta($chunk);
                         if ($firstChunk) {
                             $this->writeSSE(OpenAiChatCompletionResponder::roleChunk($completionId, $created, $displayModel), $flushToClient);
                             $firstChunk = false;
@@ -538,14 +538,11 @@ class OpenAICompatibleController extends AbstractController
                         ? StreamChunk::visibleText($chunk)
                         : '';
 
-                    if ('' === $content) {
+                    if ('' === $content || $clientGone) {
                         return;
                     }
 
                     $accumulatedContent .= $content;
-                    if ($clientGone) {
-                        return;
-                    }
 
                     if ($firstChunk) {
                         $this->writeSSE(OpenAiChatCompletionResponder::roleChunk($completionId, $created, $displayModel), $flushToClient);

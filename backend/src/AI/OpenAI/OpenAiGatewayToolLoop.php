@@ -9,6 +9,7 @@ use App\AI\Messages\Tools\CodeExecutionTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\Entity\ComputeRun;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
@@ -153,8 +154,12 @@ final readonly class OpenAiGatewayToolLoop
     public function stream(User $user, array $messages, callable $callback, array $options): array
     {
         $forwardText = static function (mixed $chunk) use ($callback): void {
-            if (\is_string($chunk) && '' !== $chunk) {
-                $callback($chunk);
+            if (!\is_string($chunk) && !\is_array($chunk)) {
+                return;
+            }
+            $text = StreamChunk::visibleText($chunk);
+            if ('' !== $text) {
+                $callback($text);
             }
         };
 

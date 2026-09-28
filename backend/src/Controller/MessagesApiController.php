@@ -330,7 +330,7 @@ final class MessagesApiController extends AbstractController
                     // Synthesized event path (Phase 2+); Phase 1 passthrough uses strings.
                     $event = $chunk['event'] ?? 'message';
                     $data = $chunk['data'] ?? [];
-                    if (\is_array($data)) {
+                    if (\is_array($data) && !$clientGone) {
                         $collectText($data);
                     }
                     if ($clientGone) {
@@ -362,7 +362,7 @@ final class MessagesApiController extends AbstractController
                     if (str_starts_with($line, 'data:')) {
                         $payload = trim(substr($line, 5));
                         $decoded = json_decode($payload, true);
-                        if (\is_array($decoded)) {
+                        if (\is_array($decoded) && !$clientGone) {
                             $collectText($decoded);
                             $type = $decoded['type'] ?? '';
                             if ('content_block_start' === $type && isset($decoded['index'])) {

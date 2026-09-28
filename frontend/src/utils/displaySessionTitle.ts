@@ -29,3 +29,16 @@ export function displaySessionTitle(title: string, timeZone?: string): string {
 
   return `${match[1]}${pick('year')}-${pick('month')}-${pick('day')} ${pick('hour')}:${pick('minute')}`
 }
+
+/** History search matches the stored title and the clock the viewer sees. */
+export function sessionTitleMatchesQuery(title: string, query: string, timeZone?: string): boolean {
+  const needle = query.trim().toLowerCase()
+  if (needle === '') {
+    return true
+  }
+
+  return (
+    title.toLowerCase().includes(needle) ||
+    displaySessionTitle(title, timeZone).toLowerCase().includes(needle)
+  )
+}
