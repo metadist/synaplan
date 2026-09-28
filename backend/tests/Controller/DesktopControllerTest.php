@@ -90,6 +90,7 @@ final class DesktopControllerTest extends WebTestCase
         $body = $this->json();
         self::assertStringStartsWith('sk_', $body['key']);
         self::assertGreaterThan(0, $body['deviceId']);
+        self::assertSame('desktop-rest-pair@synaplan.internal', $body['account']);
 
         $device = $this->em->getRepository(DesktopDevice::class)->find($body['deviceId']);
         self::assertInstanceOf(DesktopDevice::class, $device);
