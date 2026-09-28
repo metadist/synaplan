@@ -296,9 +296,12 @@ final class MessagesApiController extends AbstractController
             }
             ob_implicit_flush(true);
             set_time_limit(0);
-            ignore_user_abort(false);
+            // Keep the translator running after the client leaves so the turn
+            // is still metered and stored as interrupted (#2226).
+            ignore_user_abort(true);
 
             $buffer = '';
+            $clientGone = false;
             $highestBlockIndex = -1;
             $noticeEmitted = false;
             // Tee of streamed text deltas for the async session summary —
@@ -317,8 +320,11 @@ final class MessagesApiController extends AbstractController
                 }
             };
 
-            $emit = function (string|array $chunk) use (&$buffer, &$highestBlockIndex, &$noticeEmitted, $collectText, $prepared, $user): void {
+            $emit = function (string|array $chunk) use (&$buffer, &$highestBlockIndex, &$noticeEmitted, &$clientGone, $collectText, $prepared, $user): void {
                 set_time_limit(0);
+                if (connection_aborted()) {
+                    $clientGone = true;
+                }
 
                 if (\is_array($chunk)) {
                     // Synthesized event path (Phase 2+); Phase 1 passthrough uses strings.
@@ -327,12 +333,18 @@ final class MessagesApiController extends AbstractController
                     if (\is_array($data)) {
                         $collectText($data);
                     }
+                    if ($clientGone) {
+                        return;
+                    }
                     echo 'event: '.$event."\n";
                     echo 'data: '.json_encode($data, \JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
                     if (ob_get_level()) {
                         ob_flush();
                     }
                     flush();
+                    if (connection_aborted()) {
+                        $clientGone = true;
+                    }
 
                     return;
                 }
@@ -390,35 +402,45 @@ final class MessagesApiController extends AbstractController
                     $out .= $rawLine."\n";
                 }
 
-                if ('' !== $out) {
-                    echo $out;
-                    if (ob_get_level()) {
-                        ob_flush();
-                    }
-                    flush();
+                if ($clientGone || '' === $out) {
+                    return;
+                }
+                echo $out;
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+                if (connection_aborted()) {
+                    $clientGone = true;
                 }
             };
 
             try {
                 $usage = $this->gateway->executeStream($prepared, $user, $emit);
+                if (connection_aborted()) {
+                    $clientGone = true;
+                }
                 // Flush any remaining buffer (incomplete trailing line).
-                if ('' !== $buffer) {
+                if (!$clientGone && '' !== $buffer) {
                     echo $buffer;
                     if (ob_get_level()) {
                         ob_flush();
                     }
                     flush();
                 }
-                // Queue the debounced session summary — only for streams that
-                // actually produced billable output (mirrors recordUsage).
-                if ($usage->outputTokens > 0 || $usage->inputTokens > 0) {
-                    $this->gateway->dispatchSessionSummary($prepared, $user, $responseTextTee);
+                // Queue the debounced session summary — billable output, or
+                // an interrupted turn that already produced text.
+                if ($usage->outputTokens > 0 || $usage->inputTokens > 0 || ($clientGone && '' !== trim($responseTextTee))) {
+                    $this->gateway->dispatchSessionSummary($prepared, $user, $responseTextTee, $clientGone);
                 }
             } catch (\Throwable $e) {
                 $this->logger->error('MessagesGateway: stream failed', [
                     'error' => $e->getMessage(),
                     'user_id' => $user->getId(),
                 ]);
+                if (connection_aborted()) {
+                    return;
+                }
                 echo $this->sseEvent('error', [
                     'type' => 'error',
                     'error' => [

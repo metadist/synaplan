@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Messages\ClaudeCodeTurnText;
 use App\AI\OpenAI\OpenAiGatewayToolLoop;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
@@ -482,18 +483,21 @@ class OpenAICompatibleController extends AbstractController
                 ob_implicit_flush(true);
             }
             set_time_limit(0);
-            ignore_user_abort(false);
+            // Keep generating after the client leaves so usage and the
+            // interrupted turn are still recorded (#2226).
+            ignore_user_abort(true);
 
             $firstChunk = true;
             $accumulatedContent = '';
             $finishReason = 'stop';
+            $clientGone = false;
             $accumulator = new ToolCallAccumulator();
             $announcedIndexes = [];
 
             try {
-                $onChunk = function ($chunk) use ($completionId, $created, $displayModel, &$firstChunk, &$accumulatedContent, &$finishReason, $accumulator, &$announcedIndexes, $flushToClient) {
+                $onChunk = function ($chunk) use ($completionId, $created, $displayModel, &$firstChunk, &$accumulatedContent, &$finishReason, &$clientGone, $accumulator, &$announcedIndexes, $flushToClient) {
                     if (connection_aborted()) {
-                        return;
+                        $clientGone = true;
                     }
 
                     if (is_array($chunk) && 'finish' === ($chunk['type'] ?? '')) {
@@ -507,6 +511,9 @@ class OpenAICompatibleController extends AbstractController
 
                     if (is_array($chunk) && 'tool_call_delta' === ($chunk['type'] ?? '')) {
                         $accumulator->addDelta($chunk);
+                        if ($clientGone) {
+                            return;
+                        }
                         if ($firstChunk) {
                             $this->writeSSE(OpenAiChatCompletionResponder::roleChunk($completionId, $created, $displayModel), $flushToClient);
                             $firstChunk = false;
@@ -518,6 +525,9 @@ class OpenAICompatibleController extends AbstractController
                             $chunk,
                             $announcedIndexes,
                         ), $flushToClient);
+                        if (connection_aborted()) {
+                            $clientGone = true;
+                        }
 
                         return;
                     }
@@ -533,6 +543,9 @@ class OpenAICompatibleController extends AbstractController
                     }
 
                     $accumulatedContent .= $content;
+                    if ($clientGone) {
+                        return;
+                    }
 
                     if ($firstChunk) {
                         $this->writeSSE(OpenAiChatCompletionResponder::roleChunk($completionId, $created, $displayModel), $flushToClient);
@@ -540,6 +553,9 @@ class OpenAICompatibleController extends AbstractController
                     }
 
                     $this->writeSSE(OpenAiChatCompletionResponder::contentChunk($completionId, $created, $displayModel, $content), $flushToClient);
+                    if (connection_aborted()) {
+                        $clientGone = true;
+                    }
                 };
                 $streamMetadata = !empty($options['server_tool_loop'])
                     ? $this->toolLoop->stream($user, $messages, $onChunk, $options)
@@ -549,15 +565,21 @@ class OpenAICompatibleController extends AbstractController
                     $finishReason = 'tool_calls';
                 }
 
-                $this->writeSSE(OpenAiChatCompletionResponder::finishChunk($completionId, $created, $displayModel, $finishReason), $flushToClient);
-
-                if (!empty($options['include_usage'])) {
-                    $usage = is_array($streamMetadata['usage'] ?? null) ? $streamMetadata['usage'] : [];
-                    $this->writeSSE(OpenAiChatCompletionResponder::usageChunk($completionId, $created, $displayModel, $usage), $flushToClient);
+                if (connection_aborted()) {
+                    $clientGone = true;
                 }
 
-                echo "data: [DONE]\n\n";
-                $this->flushSse($flushToClient);
+                if (!$clientGone) {
+                    $this->writeSSE(OpenAiChatCompletionResponder::finishChunk($completionId, $created, $displayModel, $finishReason), $flushToClient);
+
+                    if (!empty($options['include_usage'])) {
+                        $usage = is_array($streamMetadata['usage'] ?? null) ? $streamMetadata['usage'] : [];
+                        $this->writeSSE(OpenAiChatCompletionResponder::usageChunk($completionId, $created, $displayModel, $usage), $flushToClient);
+                    }
+
+                    echo "data: [DONE]\n\n";
+                    $this->flushSse($flushToClient);
+                }
 
                 $toolCalls = $accumulator->isEmpty() ? [] : $accumulator->complete();
                 $responseText = OpenAiChatCompletionResponder::responseTextForMetering($accumulatedContent, $toolCalls);
@@ -576,19 +598,21 @@ class OpenAICompatibleController extends AbstractController
                     'response_text' => $responseText,
                 ]);
 
-                $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText);
+                $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText, $clientGone);
             } catch (\Throwable $e) {
                 ['status' => $status, 'type' => $type, 'code' => $code] = $this->describeFailure($e);
-                $errorPayload = [
-                    'error' => [
-                        'message' => $e->getMessage(),
-                        'type' => $type,
-                        'code' => $code,
-                    ],
-                ];
-                echo 'data: '.json_encode($errorPayload, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
-                echo "data: [DONE]\n\n";
-                $this->flushSse($flushToClient);
+                if (!connection_aborted()) {
+                    $errorPayload = [
+                        'error' => [
+                            'message' => $e->getMessage(),
+                            'type' => $type,
+                            'code' => $code,
+                        ],
+                    ];
+                    echo 'data: '.json_encode($errorPayload, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
+                    echo "data: [DONE]\n\n";
+                    $this->flushSse($flushToClient);
+                }
 
                 $this->logger->error('OpenAI-compatible stream failed', [
                     'error' => $e->getMessage(),
@@ -612,7 +636,7 @@ class OpenAICompatibleController extends AbstractController
      *
      * @param list<array<string, mixed>> $messages
      */
-    private function dispatchSessionSummary(User $user, array $messages, string $displayModel, string $responseText): void
+    private function dispatchSessionSummary(User $user, array $messages, string $displayModel, string $responseText, bool $interrupted = false): void
     {
         if (!$this->messagesGatewayConfig->isSessionSummaryEnabled($user->getId())) {
             return;
@@ -637,6 +661,11 @@ class OpenAICompatibleController extends AbstractController
             return;
         }
 
+        $visibleRequest = ClaudeCodeTurnText::visibleRequest($lastUserMessage);
+        if ('' === $visibleRequest) {
+            return;
+        }
+
         $cap = ApiSessionSummaryService::EXCERPT_MAX_CHARS;
 
         try {
@@ -645,8 +674,9 @@ class OpenAICompatibleController extends AbstractController
                 sessionKey: hash('sha256', $user->getId().'|'.$firstUserMessage),
                 client: 'openai-api',
                 model: $displayModel,
-                requestExcerpt: mb_substr($lastUserMessage, 0, $cap),
+                requestExcerpt: mb_substr($visibleRequest, 0, $cap),
                 responseExcerpt: mb_substr($responseText, 0, $cap),
+                interrupted: $interrupted,
             ));
         } catch (\Throwable $e) {
             $this->logger->warning('OpenAI-compatible: session summary dispatch failed', [

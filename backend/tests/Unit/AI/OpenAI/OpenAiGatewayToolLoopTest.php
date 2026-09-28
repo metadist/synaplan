@@ -250,6 +250,36 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         self::assertSame(['[web_search:q]'], $meta['loop_notes']);
     }
 
+    public function testStreamFinalAnswerArrivesInMultipleChunks(): void
+    {
+        $search = $this->createMock(WebSearchTool::class);
+        $search->method('isAvailable')->willReturn(true);
+        $search->method('declaration')->willReturn((new WebSearchTool(
+            $this->createStub(\App\Plug\WebSearch\WebSearchGateway::class),
+            new NullLogger(),
+        ))->declaration());
+
+        $loop = $this->loop($search, mcpEnabled: false);
+        $chunks = [];
+        $loop->stream(
+            $this->user(),
+            [['role' => 'user', 'content' => 'Explain HTTP caching.']],
+            static function ($chunk) use (&$chunks): void {
+                $chunks[] = $chunk;
+            },
+            ['model' => 'test-model', 'provider' => 'test'],
+        );
+
+        $textChunks = array_values(array_filter($chunks, 'is_string'));
+        self::assertGreaterThanOrEqual(2, count($textChunks));
+        self::assertStringContainsString('explain http caching.', implode('', $textChunks));
+        foreach ($chunks as $chunk) {
+            if (is_array($chunk) && 'tool_call_delta' === ($chunk['type'] ?? '')) {
+                self::fail('a plain answer must not be streamed as tool_call_delta');
+            }
+        }
+    }
+
     private function loop(
         WebSearchTool $search,
         bool $mcpEnabled,
@@ -286,23 +316,46 @@ final class OpenAiGatewayToolLoopTest extends TestCase
     {
         $provider = new TestProvider();
         $facade = $this->createMock(AiFacade::class);
+        $shape = static function (array $messages, array $options) use ($provider): array {
+            $result = $provider->chat($messages, $options);
+            $out = [
+                'content' => $result['content'],
+                'provider' => 'test',
+                'model' => $options['model'] ?? 'test-model',
+                'usage' => $result['usage'],
+            ];
+            if (isset($result['tool_calls'])) {
+                $out['tool_calls'] = $result['tool_calls'];
+            }
+            if (isset($result['finish_reason'])) {
+                $out['finish_reason'] = $result['finish_reason'];
+            }
+
+            return $out;
+        };
         $facade->method('chat')->willReturnCallback(
-            static function (array $messages, ?int $userId, array $options) use ($provider): array {
-                $result = $provider->chat($messages, $options);
-                $out = [
-                    'content' => $result['content'],
-                    'provider' => 'test',
-                    'model' => $options['model'] ?? 'test-model',
-                    'usage' => $result['usage'],
-                ];
-                if (isset($result['tool_calls'])) {
-                    $out['tool_calls'] = $result['tool_calls'];
-                }
-                if (isset($result['finish_reason'])) {
-                    $out['finish_reason'] = $result['finish_reason'];
+            static function (array $messages, ?int $userId, array $options) use ($shape): array {
+                return $shape($messages, $options);
+            }
+        );
+        $facade->method('chatStream')->willReturnCallback(
+            static function (array $messages, callable $callback, ?int $userId, array $options) use ($shape): array {
+                $result = $shape($messages, $options);
+                $toolCalls = is_array($result['tool_calls'] ?? null) ? $result['tool_calls'] : [];
+                if ([] !== $toolCalls) {
+                    return $result;
                 }
 
-                return $out;
+                $content = $result['content'];
+                if (strlen($content) > 1) {
+                    $mid = intdiv(strlen($content), 2);
+                    $callback(substr($content, 0, $mid));
+                    $callback(substr($content, $mid));
+                } elseif ('' !== $content) {
+                    $callback($content);
+                }
+
+                return $result;
             }
         );
 

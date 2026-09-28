@@ -454,6 +454,46 @@ final class ApiSessionSummaryServiceTest extends TestCase
         self::assertSame('Created the slides.', $assistant->getText());
     }
 
+    public function testSideRequestIsNotStored(): void
+    {
+        $this->em->expects($this->never())->method('persist');
+
+        $this->record(
+            'Please write a 5 word title in the predominant language of this conversation.',
+            'Q3 slide deck',
+        );
+    }
+
+    public function testAttributionReminderIsStrippedFromTheStoredTurn(): void
+    {
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->aiFacade->method('chat')->willReturn(['content' => 'Done.', 'usage' => []]);
+
+        $stored = [];
+        $this->em->method('persist')->willReturnCallback(function (object $entity) use (&$stored): void {
+            self::assignId($entity);
+            if ($entity instanceof Message) {
+                $stored[] = $entity;
+            }
+        });
+
+        $this->record(
+            "Attribution for git commits and pull requests you create from here on:\nCo-Authored-By: Claude <noreply@anthropic.com>\n\nAdd a dark mode toggle.",
+            'Added the toggle.',
+        );
+
+        $request = null;
+        foreach ($stored as $message) {
+            if ('IN' === $message->getDirection() && 'CHAT' === $message->getTopic()) {
+                $request = $message;
+            }
+            self::assertStringNotContainsString('Co-Authored-By', (string) $message->getText());
+            self::assertStringNotContainsString('Attribution for git', (string) $message->getText());
+        }
+        self::assertInstanceOf(Message::class, $request);
+        self::assertSame('Add a dark mode toggle.', $request->getText());
+    }
+
     private function useSummaryProvider(string $provider, ?string $model): void
     {
         $modelConfigService = $this->createMock(ModelConfigService::class);

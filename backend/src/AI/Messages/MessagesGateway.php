@@ -862,9 +862,14 @@ final readonly class MessagesGateway
      *
      * @param GatewaySuccess $prepared
      */
-    public function dispatchSessionSummary(array $prepared, User $user, string $responseText): void
+    public function dispatchSessionSummary(array $prepared, User $user, string $responseText, bool $interrupted = false): void
     {
         if (!$this->config->isSessionSummaryEnabled($user->getId())) {
+            return;
+        }
+
+        $requestText = ClaudeCodeTurnText::visibleRequest($this->lastUserText($prepared['request_body']));
+        if ('' === $requestText) {
             return;
         }
 
@@ -876,8 +881,9 @@ final readonly class MessagesGateway
                 sessionKey: $prepared['session_key'],
                 client: $prepared['session_client'],
                 model: $prepared['resolved']['displayModel'],
-                requestExcerpt: mb_substr($this->lastUserText($prepared['request_body']), 0, $cap),
+                requestExcerpt: mb_substr($requestText, 0, $cap),
                 responseExcerpt: mb_substr($responseText, 0, $cap),
+                interrupted: $interrupted,
             ));
         } catch (\Throwable $e) {
             $this->logger->warning('MessagesGateway: session summary dispatch failed', [

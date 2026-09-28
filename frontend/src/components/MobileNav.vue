@@ -612,6 +612,7 @@ import {
 } from '../composables/useNavItems'
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { useI18n } from 'vue-i18n'
 import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
 import { useIncomingStore } from '@/stores/incoming'
@@ -787,9 +788,10 @@ const handleChangeServer = () => {
 }
 
 const getDisplayTitle = (chat: StoreChat): string => {
-  if (!isDefaultChatTitle(chat.title, t('chat.newChat'))) return chat.title
-  if (chat.firstMessagePreview) return chat.firstMessagePreview
-  return t('chat.newChat')
+  const raw = !isDefaultChatTitle(chat.title, t('chat.newChat'))
+    ? chat.title
+    : chat.firstMessagePreview || t('chat.newChat')
+  return displaySessionTitle(raw)
 }
 
 const formatTimestamp = (dateStr: string): string => formatRelativeTime(new Date(dateStr))
