@@ -109,6 +109,7 @@ import ChatKindPill from '@/components/iam/ChatKindPill.vue'
 import { useIncomingStore } from '@/stores/incoming'
 import { useChatsStore } from '@/stores/chats'
 import { incomingChatTitle } from '@/utils/incomingChatTitle'
+import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { kindOfSharedItem, type ChatKind } from '@/utils/chatKind'
@@ -145,7 +146,7 @@ const rows = computed<IncomingRow[]>(() =>
       const { kind, label } = kindOfSharedItem(item)
       return {
         id: Number(item.id),
-        title: incomingTitle(item.name),
+        title: displaySessionTitle(incomingTitle(item.name)),
         kind,
         kindLabel: label,
         isNew: item.isNew === true,

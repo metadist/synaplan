@@ -36,6 +36,7 @@ final readonly class SummarizeApiSessionCommandHandler
                 $command->getModel(),
                 $command->getRequestExcerpt(),
                 $command->getResponseExcerpt(),
+                $command->isInterrupted(),
             );
         } catch (\Throwable $e) {
             $this->logger->warning('SummarizeApiSessionCommand: failed', [

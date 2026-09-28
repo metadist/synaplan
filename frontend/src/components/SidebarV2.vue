@@ -731,6 +731,7 @@ import { useBrandLogo } from '../composables/useBrandLogo'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useUpdatesStore } from '../stores/updates'
 import { formatRunningVersion } from '@/utils/formatRunningVersion'
+import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -1072,9 +1073,10 @@ const filteredChatList = computed(() => {
 })
 
 const getDisplayTitle = (chat: StoreChat): string => {
-  if (!isDefaultChatTitle(chat.title, t('chat.newChat'))) return chat.title
-  if (chat.firstMessagePreview) return chat.firstMessagePreview
-  return t('chat.newChat')
+  const raw = !isDefaultChatTitle(chat.title, t('chat.newChat'))
+    ? chat.title
+    : chat.firstMessagePreview || t('chat.newChat')
+  return displaySessionTitle(raw)
 }
 
 const formatTimestamp = (dateStr: string): string => {

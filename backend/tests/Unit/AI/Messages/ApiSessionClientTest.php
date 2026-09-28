@@ -66,6 +66,15 @@ final class ApiSessionClientTest extends TestCase
         $user->setUserDetails(['timezone' => 'Not/AZone']);
         $now = new \DateTimeImmutable('2026-09-25 15:11:00', new \DateTimeZone('UTC'));
 
+        self::assertSame('2026-09-25 15:11Z', ApiSessionClient::localStamp($user, $now));
+    }
+
+    public function testExplicitUtcStampStaysInThatZone(): void
+    {
+        $user = new User();
+        $user->setUserDetails(['timezone' => 'UTC']);
+        $now = new \DateTimeImmutable('2026-09-25 15:11:00', new \DateTimeZone('UTC'));
+
         self::assertSame('2026-09-25 15:11', ApiSessionClient::localStamp($user, $now));
     }
 

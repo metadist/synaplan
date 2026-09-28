@@ -76,16 +76,24 @@ final class ApiSessionClient
     {
         $now ??= new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $name = $user->getUserDetails()['timezone'] ?? '';
+        $explicit = false;
         $tz = new \DateTimeZone('UTC');
         if (\is_string($name) && '' !== trim($name)) {
             try {
                 $tz = new \DateTimeZone(trim($name));
+                $explicit = true;
             } catch (\Throwable) {
                 $tz = new \DateTimeZone('UTC');
             }
         }
 
-        return $now->setTimezone($tz)->format('Y-m-d H:i');
+        $stamp = $now->setTimezone($tz)->format('Y-m-d H:i');
+        // No account timezone: mark UTC so the chat list can show the viewer's clock.
+        if (!$explicit) {
+            return $stamp.'Z';
+        }
+
+        return $stamp;
     }
 
     /**
@@ -94,7 +102,7 @@ final class ApiSessionClient
      */
     public static function retitleDesktop(string $title): ?string
     {
-        if (1 !== preg_match('/^Claude Code · (\d{4}-\d{2}-\d{2} \d{2}:\d{2})$/', trim($title), $match)) {
+        if (1 !== preg_match('/^Claude Code · (\d{4}-\d{2}-\d{2} \d{2}:\d{2}Z?)$/', trim($title), $match)) {
             return null;
         }
 

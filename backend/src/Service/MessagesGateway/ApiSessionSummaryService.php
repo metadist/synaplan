@@ -6,6 +6,7 @@ namespace App\Service\MessagesGateway;
 
 use App\AI\Messages\AnthropicContentText;
 use App\AI\Messages\ApiSessionClient;
+use App\AI\Messages\ClaudeCodeTurnText;
 use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\Message;
@@ -101,7 +102,19 @@ final readonly class ApiSessionSummaryService
         string $model,
         string $requestExcerpt,
         string $responseExcerpt,
+        bool $interrupted = false,
     ): void {
+        $humanRequest = AnthropicContentText::humanText($requestExcerpt);
+        $requestExcerpt = ClaudeCodeTurnText::visibleRequest($humanRequest);
+        // A tool-only turn has no person text, but the assistant reply is
+        // still part of the session. A side request or a reminder is not.
+        if ('' !== trim($humanRequest) && '' === $requestExcerpt) {
+            return;
+        }
+        if ($interrupted) {
+            $responseExcerpt = trim($responseExcerpt."\n\n".$this->interruptedSentence($userId));
+        }
+
         $stateKey = self::CACHE_PREFIX.hash('sha256', $userId.'|'.$sessionKey);
 
         // Serialize concurrent worker messages for the same session so the
@@ -404,6 +417,20 @@ final readonly class ApiSessionSummaryService
         $this->em->flush();
 
         return (int) $chat->getId();
+    }
+
+    private function interruptedSentence(int $userId): string
+    {
+        $user = $this->em->getRepository(User::class)->find($userId);
+        $locale = $user instanceof User ? strtolower(substr($user->getLocale(), 0, 2)) : 'en';
+
+        return match ($locale) {
+            'de' => 'Diese Antwort wurde unterbrochen. Der Text darüber ist angekommen, bevor die Verbindung geschlossen wurde.',
+            'es' => 'Esta respuesta se interrumpió. El texto de arriba es lo que llegó antes de que se cerrara la conexión.',
+            'fr' => 'Cette réponse a été interrompue. Le texte ci-dessus est arrivé avant la fermeture de la connexion.',
+            'tr' => 'Bu yanıt yarıda kesildi. Yukarıdaki metin, bağlantı kapanmadan önce gelen kısımdır.',
+            default => 'This answer was interrupted. The text above is what arrived before the connection closed.',
+        };
     }
 
     private function appendTurnMessage(int $userId, Chat $chat, string $direction, string $text, string $language, int $timestamp): void

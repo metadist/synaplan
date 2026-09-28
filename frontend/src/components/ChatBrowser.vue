@@ -334,7 +334,7 @@
             <h3
               class="text-sm md:text-base font-semibold txt-primary mb-2 truncate group-hover:txt-brand transition-colors"
             >
-              {{ chat.title }}
+              {{ displaySessionTitle(chat.title) }}
             </h3>
 
             <!-- Meta Information -->
@@ -547,6 +547,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { displaySessionTitle, sessionTitleMatchesQuery } from '@/utils/displaySessionTitle'
 
 const { hideHeader = false } = defineProps<{ hideHeader?: boolean }>()
 
@@ -628,7 +629,7 @@ const openPublicLinkFromIam = () => {
 
 const openShareModal = (chat: ChatItem) => {
   shareModalChatId.value = chat.id
-  shareModalChatTitle.value = chat.title
+  shareModalChatTitle.value = displaySessionTitle(chat.title)
   if (isIamSharingEnabled()) {
     iamShareResourceId.value = String(chat.id)
     iamShareOpen.value = true
@@ -828,7 +829,7 @@ const filteredChats = computed((): ChatItem[] => {
   // Filter by search query
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    result = result.filter((c) => c.title.toLowerCase().includes(query))
+    result = result.filter((c) => sessionTitleMatchesQuery(c.title, query))
   }
 
   // Filter by date range
