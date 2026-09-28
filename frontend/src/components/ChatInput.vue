@@ -61,6 +61,36 @@
         </div>
       </div>
 
+      <div
+        v-if="pendingDesktopRun"
+        class="mb-3 surface-card rounded-lg p-3"
+        data-testid="desktop-skill-picker"
+      >
+        <p class="text-sm txt-primary">
+          {{ $t('config.desktop.run.pickSkill', { name: pendingDesktopRun.deviceName }) }}
+        </p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button
+            v-for="skill in pendingDesktopRun.skills"
+            :key="skill"
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            :data-testid="`btn-desktop-skill-${skill}`"
+            @click="chooseDesktopSkill(skill)"
+          >
+            {{ skill }}
+          </button>
+          <button
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            data-testid="btn-desktop-skill-cancel"
+            @click="pendingDesktopRun = null"
+          >
+            {{ $t('common.cancel') }}
+          </button>
+        </div>
+      </div>
+
       <!-- DS16: waiting/failed cards for jobs dispatched to a paired computer. -->
       <div v-if="desktopJobs.length > 0" class="mb-3 flex flex-col gap-2">
         <DesktopJobCard
@@ -320,6 +350,7 @@
                   <ToolsDropdown
                     :active-command="activeTool"
                     :thinking-enabled="thinkingEnabled"
+                    :has-reasoning-levels="reasoningLevels.length > 0"
                     :voice-reply="voiceReply"
                     :supports-reasoning="supportsReasoning"
                     :enhance-enabled="enhanceEnabled"
@@ -436,6 +467,28 @@
       >
         {{ $t('chatInput.modelCaption', { name: selectedModelName }) }}
       </div>
+
+      <!-- Always on the open composer, including the default model. Models
+           without discrete levels keep the Thinking toggle in the + menu. -->
+      <div
+        v-if="reasoningLevels.length > 0"
+        class="mt-2 flex flex-wrap items-center justify-center gap-2 px-3"
+        data-testid="reasoning-level-row"
+      >
+        <label for="select-reasoning-effort" class="text-sm txt-secondary">
+          {{ $t('chatInput.reasoningLevel.label') }}
+        </label>
+        <select
+          id="select-reasoning-effort"
+          v-model="reasoningEffort"
+          data-testid="select-reasoning-effort"
+          class="max-w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        >
+          <option v-for="level in reasoningLevels" :key="level" :value="level">
+            {{ $t(`chatInput.reasoningLevel.${level}`) }}
+          </option>
+        </select>
+      </div>
     </div>
 
     <!-- File Selection Modal -->
@@ -476,6 +529,11 @@ import FileSelectionModal from './FileSelectionModal.vue'
 import PastedTextCard from './chat/PastedTextCard.vue'
 import PastedTextModal from './chat/PastedTextModal.vue'
 import { parseCommand } from '../commands/parse'
+import {
+  initialReasoningLevel,
+  modelReasoningLevels,
+  reasoningSendFlags,
+} from '@/utils/reasoningLevel'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
@@ -502,6 +560,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useDialog } from '@/composables/useDialog'
 import { desktopApi } from '@/services/api/desktopApi'
+import { ApiError } from '@/services/api/httpClient'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
 import { useDesktopDevices } from '@/composables/useDesktopDevices'
 import {
@@ -609,6 +668,7 @@ const uploadAbortController = ref<AbortController | null>(null)
 const enhanceEnabled = ref(false)
 const enhanceLoading = ref(false)
 const thinkingEnabled = ref(false)
+const reasoningEffort = ref('')
 const paletteVisible = ref(false)
 const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
 const mentionPaletteVisible = ref(false)
@@ -661,7 +721,18 @@ const { warning, error: showError, success } = useNotification()
 // Rendered as waiting/failed cards above the composer until dismissed.
 // Restored from the job list so a reload mid-wait does not hide them.
 const desktopJobs = ref<Array<{ id: number; deviceName: string; chatId: number | null }>>([])
-const { devices, ensureLoaded: ensureDesktopDevices } = useDesktopDevices()
+const pendingDesktopRun = ref<{
+  deviceId: number
+  deviceName: string
+  skills: string[]
+  prompt: string
+  chatId: number | null
+} | null>(null)
+const {
+  devices,
+  ensureLoaded: ensureDesktopDevices,
+  reload: reloadDesktopDevices,
+} = useDesktopDevices()
 let desktopRestoreSeq = 0
 
 /**
@@ -670,42 +741,93 @@ let desktopRestoreSeq = 0
  * skill explicitly. The server never verifies the skill exists — an uninstalled
  * skill fails honestly on the device, surfaced by the waiting/failed card.
  */
-const handleRunOnDevice = async (device: { id: number; name: string }) => {
-  const prompt = message.value.trim()
-  if (!prompt) {
+const handleRunOnDevice = async (device: {
+  id: number
+  name: string
+  enabledSkills?: string[]
+}) => {
+  const promptText = message.value.trim()
+  if (!promptText) {
     warning(t('config.desktop.run.needPrompt'))
+    return
+  }
+  const chatId = chatsStore.activeChatId
+
+  await reloadDesktopDevices()
+  if (chatsStore.activeChatId !== chatId) return
+
+  const fresh = devices.value.find((row) => row.id === device.id && row.status === 'active')
+  if (!fresh) {
+    showError(t('config.desktop.run.inactive', { name: device.name }))
+    return
+  }
+
+  const skills = reportedSkills(fresh.enabledSkills ?? device.enabledSkills)
+  if (skills.length > 0) {
+    pendingDesktopRun.value = {
+      deviceId: fresh.id,
+      deviceName: fresh.name,
+      skills,
+      prompt: promptText,
+      chatId,
+    }
     return
   }
 
   const skill = (
     await dialog.prompt({
       title: t('config.desktop.run.skillTitle'),
-      message: t('config.desktop.run.skillMessage', { name: device.name }),
+      message: t('config.desktop.run.noSkills', { name: fresh.name }),
       placeholder: t('config.desktop.run.skillPlaceholder'),
       confirmText: t('config.desktop.run.action'),
+      cancelText: t('common.cancel'),
     })
   )?.trim()
-  if (!skill) return
+  if (!skill || chatsStore.activeChatId !== chatId) return
 
   if (!/^[a-z0-9-]{1,64}$/.test(skill)) {
     showError(t('config.desktop.run.invalidSkill'))
     return
   }
 
+  await sendDesktopRun(fresh.id, fresh.name, skill, promptText, chatId)
+}
+
+const reportedSkills = (skills: string[] | undefined): string[] =>
+  (skills ?? []).filter((skill) => /^[a-z0-9-]{1,64}$/.test(skill))
+
+const chooseDesktopSkill = (skill: string) => {
+  const pending = pendingDesktopRun.value
+  if (!pending) return
+  pendingDesktopRun.value = null
+  void sendDesktopRun(pending.deviceId, pending.deviceName, skill, pending.prompt, pending.chatId)
+}
+
+const sendDesktopRun = async (
+  deviceId: number,
+  deviceName: string,
+  skill: string,
+  prompt: string,
+  chatId: number | null
+) => {
   try {
-    const chatId = chatsStore.activeChatId
     const { jobId, chatTitle } = await desktopApi.enqueueJob({
-      deviceId: device.id,
+      deviceId,
       skill,
       prompt,
       chatId,
     })
     if (chatId && chatTitle) chatsStore.applyChatTitle(chatId, chatTitle)
-    desktopJobs.value.push({ id: jobId, deviceName: device.name, chatId })
-    message.value = ''
-    success(t('config.desktop.run.sent', { name: device.name }))
+    desktopJobs.value.push({ id: jobId, deviceName, chatId })
+    if (message.value.trim() === prompt) message.value = ''
+    pendingDesktopRun.value = null
+    success(t('config.desktop.run.sent', { name: deviceName }))
   } catch (err) {
-    showError(err instanceof Error ? err.message : t('config.desktop.run.enqueueFailed'))
+    if (err instanceof ApiError && err.code === 'device_inactive') {
+      showError(t('config.desktop.run.inactive', { name: deviceName }))
+      return
+    }
+    showError(t('config.desktop.run.enqueueFailed', { name: deviceName }))
   }
 }
 
@@ -764,6 +886,7 @@ const dismissDesktopJob = (jobId: number) => {
 watch(
   () => chatsStore.activeChatId,
   () => {
+    pendingDesktopRun.value = null
     void restoreDesktopJobs()
   }
 )
@@ -985,6 +1108,7 @@ const emit = defineEmits<{
     message: string,
     options?: {
       includeReasoning?: boolean
+      reasoningEffort?: string
       webSearch?: boolean
       fileIds?: number[]
       voiceReply?: boolean
@@ -1058,6 +1182,23 @@ const supportsReasoning = computed(() => {
 
   return currentChatModel.value.features?.includes('reasoning') ?? false
 })
+
+const reasoningLevels = computed(() => modelReasoningLevels(currentChatModel.value))
+
+watch(
+  () => {
+    const model = currentChatModel.value
+    const levels = modelReasoningLevels(model)
+    return `${model?.id ?? ''}:${levels.join(',')}:${model?.reasoningEffortDefault ?? ''}`
+  },
+  () => {
+    reasoningEffort.value = initialReasoningLevel(
+      reasoningLevels.value,
+      currentChatModel.value?.reasoningEffortDefault
+    )
+  },
+  { immediate: true }
+)
 
 // Auto-enable thinking when switching to a reasoning-capable model
 watch(
@@ -1192,8 +1333,14 @@ const sendMessage = () => {
     messageToSend = `/search ${query}`.trim()
   }
 
+  const reasoning = reasoningSendFlags(
+    reasoningLevels.value,
+    reasoningEffort.value,
+    thinkingEnabled.value
+  )
   const options = {
-    includeReasoning: thinkingEnabled.value,
+    includeReasoning: reasoning.includeReasoning,
+    ...(reasoning.reasoningEffort ? { reasoningEffort: reasoning.reasoningEffort } : {}),
     webSearch: hasWebSearch,
     fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
     voiceReply: voiceReply.value,

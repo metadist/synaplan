@@ -37,7 +37,7 @@ final readonly class PairingService
      *
      * @param array<int|string, mixed> $capabilities capabilities the device declares (v1: `skill.run`); untrusted JSON, sanitized here
      *
-     * @return array{deviceId: int, key: string, apiBaseUrl: string}
+     * @return array{deviceId: int, key: string, apiBaseUrl: string, account: string}
      *
      * @throws PairingException when the owning user no longer exists
      */
@@ -84,6 +84,7 @@ final readonly class PairingService
             'deviceId' => (int) $device->getId(),
             'key' => $keyValue,
             'apiBaseUrl' => rtrim($this->appUrl, '/'),
+            'account' => $owner->getMail(),
         ];
     }
 

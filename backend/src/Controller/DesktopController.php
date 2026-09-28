@@ -138,6 +138,7 @@ final class DesktopController extends AbstractController
                         new OA\Property(property: 'deviceId', type: 'integer', example: 1),
                         new OA\Property(property: 'key', type: 'string', example: 'sk_...', description: 'The scoped API key — shown once.'),
                         new OA\Property(property: 'apiBaseUrl', type: 'string', example: 'https://web.synaplan.com'),
+                        new OA\Property(property: 'account', type: 'string', example: 'owner@example.com', description: 'Email of the account that created the pairing code. Older clients ignore this field.'),
                     ]
                 )
             ),
@@ -190,6 +191,7 @@ final class DesktopController extends AbstractController
             'deviceId' => $result['deviceId'],
             'key' => $result['key'],
             'apiBaseUrl' => $result['apiBaseUrl'],
+            'account' => $result['account'],
         ], Response::HTTP_CREATED);
     }
 
@@ -211,7 +213,7 @@ final class DesktopController extends AbstractController
                             property: 'devices',
                             type: 'array',
                             items: new OA\Items(
-                                required: ['id', 'name', 'status', 'presence', 'lastSeen', 'created', 'capabilities'],
+                                required: ['id', 'name', 'status', 'presence', 'lastSeen', 'created', 'capabilities', 'enabledSkills'],
                                 properties: [
                                     new OA\Property(property: 'id', type: 'integer', example: 1),
                                     new OA\Property(property: 'name', type: 'string', example: "Jan's laptop"),
@@ -221,6 +223,7 @@ final class DesktopController extends AbstractController
                                     new OA\Property(property: 'lastSeen', type: 'integer', format: 'int64', example: 0, description: 'Unix timestamp of the last check-in (0 = never).'),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64', example: 1756500000),
                                     new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['skill.run']),
+                                    new OA\Property(property: 'enabledSkills', type: 'array', items: new OA\Items(type: 'string', example: 'pptx'), description: 'Skills this computer last reported. Empty until it checks in.'),
                                 ]
                             )
                         ),
@@ -256,6 +259,7 @@ final class DesktopController extends AbstractController
                     'lastSeen' => $device->getLastSeen(),
                     'created' => $device->getCreated(),
                     'capabilities' => $device->getCapabilities(),
+                    'enabledSkills' => $device->getEnabledSkills(),
                 ];
             }, $devices),
         ]);
@@ -408,7 +412,12 @@ final class DesktopController extends AbstractController
                 throw new NotFoundHttpException('Device not found');
             }
             if (!$device->isActive()) {
-                return $this->json(['success' => false, 'error' => 'Device is not active.'], Response::HTTP_BAD_REQUEST);
+                return $this->json([
+                    'success' => false,
+                    'error' => 'device_inactive',
+                    'code' => 'device_inactive',
+                    'message' => 'This computer is disconnected.',
+                ], Response::HTTP_BAD_REQUEST);
             }
             $deviceId = (int) $device->getId();
         }

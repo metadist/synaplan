@@ -6,6 +6,7 @@ use App\AI\Credential\ChatReadinessService;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Bundle\BundleConfig;
@@ -16,6 +17,7 @@ use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
+use App\Repository\GroupRepository;
 use App\Repository\ModelRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Auth\DemoLoginHint;
@@ -114,6 +116,7 @@ class ConfigController extends AbstractController
         private readonly ?WorkflowsConfig $workflowsConfig = null,
         private readonly ?DocumentToolsConfig $documentToolsConfig = null,
         private readonly ?ComputeConfig $computeConfig = null,
+        private readonly ?GroupRepository $groupRepository = null,
     ) {
     }
 
@@ -913,6 +916,8 @@ class ConfigController extends AbstractController
                                     new OA\Property(property: 'name', type: 'string', example: 'Qwen 3.6 27B'),
                                     new OA\Property(property: 'quality', type: 'integer', example: 9),
                                     new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
+                                    new OA\Property(property: 'reasoningLevels', type: 'array', items: new OA\Items(type: 'string', example: 'medium'), description: 'Discrete reasoning levels this model accepts, cheapest first. Absent when the model has no level knob and the chat keeps the on/off Thinking control.'),
+                                    new OA\Property(property: 'reasoningEffortDefault', type: 'string', example: 'medium', description: 'Level selected when the person has not chosen one. Present only together with reasoningLevels.'),
                                     new OA\Property(property: 'available', type: 'boolean', example: true, description: 'False only in the admin includeUnavailable view: the provider has no key/URL, or the Ollama model is not pulled.'),
                                     new OA\Property(property: 'unavailableReason', type: 'string', nullable: true, enum: ['provider_unavailable', 'not_pulled'], example: null),
                                 ]
@@ -925,6 +930,16 @@ class ConfigController extends AbstractController
                     type: 'array',
                     description: 'Capabilities a group allow-list limits for this member. A capability that is not listed stays unrestricted.',
                     items: new OA\Items(type: 'string', example: 'CHAT')
+                ),
+                new OA\Property(
+                    property: 'groupLimits',
+                    description: 'Groups whose model lists were combined for this member. Empty when nothing is restricted.',
+                    required: ['names', 'combined'],
+                    properties: [
+                        new OA\Property(property: 'names', type: 'array', items: new OA\Items(type: 'string', example: 'Sales')),
+                        new OA\Property(property: 'combined', type: 'boolean', example: false),
+                    ],
+                    type: 'object',
                 ),
                 new OA\Property(
                     property: 'providers',
@@ -986,7 +1001,7 @@ class ConfigController extends AbstractController
                 continue;
             }
 
-            $modelList[] = [
+            $row = [
                 'id' => $model->getId(),
                 'service' => $model->getService(),
                 'name' => $model->getName(),
@@ -1002,6 +1017,12 @@ class ConfigController extends AbstractController
                 'available' => $available,
                 'unavailableReason' => $unavailableReason,
             ];
+            $reasoningLevels = ReasoningLevelCatalog::levels($model->getService(), $model->getProviderId(), $model->getFeatures());
+            if (null !== $reasoningLevels) {
+                $row['reasoningLevels'] = $reasoningLevels;
+                $row['reasoningEffortDefault'] = ReasoningLevelCatalog::defaultLevel($reasoningLevels, $model->getJson());
+            }
+            $modelList[] = $row;
         }
 
         // Group models by their appropriate capability based on tag
@@ -1123,7 +1144,40 @@ class ConfigController extends AbstractController
             'models' => $grouped,
             'providers' => $providers,
             'restricted' => $restricted,
+            'groupLimits' => $this->groupLimitSummary((int) $user->getId(), $restricted),
         ]);
+    }
+
+    /**
+     * @param list<string> $restricted
+     *
+     * @return array{names: list<string>, combined: bool}
+     */
+    private function groupLimitSummary(int $userId, array $restricted): array
+    {
+        if ([] === $restricted || null === $this->layeredConfigResolver) {
+            return ['names' => [], 'combined' => false];
+        }
+
+        $ids = $this->layeredConfigResolver->modelAllowListGroupIds($userId);
+        if ([] === $ids) {
+            return ['names' => [], 'combined' => false];
+        }
+
+        $byId = [];
+        foreach ($this->groupRepository?->findByIds($ids) ?? [] as $group) {
+            if (null !== $group->getId()) {
+                $byId[(int) $group->getId()] = $group->getName();
+            }
+        }
+        $names = [];
+        foreach ($ids as $id) {
+            if (isset($byId[$id]) && '' !== $byId[$id]) {
+                $names[] = $byId[$id];
+            }
+        }
+
+        return ['names' => $names, 'combined' => count($names) > 1];
     }
 
     /**

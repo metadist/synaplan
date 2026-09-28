@@ -17,6 +17,16 @@ interface ShareableResourceKindInterface
     public function describe(string $resourceId): ResourceCard;
 
     /**
+     * Same cards as {@see describe()}, one entry per requested id.
+     * Kinds that can load a page of rows in one query should do that here.
+     *
+     * @param list<string> $resourceIds
+     *
+     * @return array<string, ResourceCard>
+     */
+    public function describeMany(array $resourceIds): array;
+
+    /**
      * @return iterable<ResourceCard>
      */
     public function listOwnedBy(int $userId): iterable;

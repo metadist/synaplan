@@ -3,6 +3,7 @@
 namespace App\Service\Message\Handler;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\FileGenerationSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
@@ -204,6 +205,46 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         return $aiOptions;
+    }
+
+    /**
+     * Forward a chosen reasoning level when this model publishes one.
+     *
+     * The streaming path already merged the request options, including the
+     * Thinking boolean. The non-streaming path only gains a level when the
+     * caller sent one. When thinking is on and no level was sent, the model's
+     * catalog default is applied. The model JSON is also forwarded as
+     * modelConfig so providers that read reasoning_effort_default see it.
+     *
+     * @param array<string, mixed> $aiOptions
+     * @param array<string, mixed> $requestOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function applyReasoningLevel(array $aiOptions, ?Model $model, array $requestOptions): array
+    {
+        if (!isset($aiOptions['reasoning_effort']) && isset($requestOptions['reasoning_effort']) && is_string($requestOptions['reasoning_effort'])) {
+            $aiOptions['reasoning_effort'] = $requestOptions['reasoning_effort'];
+        }
+
+        if (null === $model) {
+            unset($aiOptions['reasoning_effort']);
+
+            return $aiOptions;
+        }
+
+        $modelJson = $model->getJson();
+        if (!isset($aiOptions['modelConfig']) || !is_array($aiOptions['modelConfig'])) {
+            $aiOptions['modelConfig'] = $modelJson;
+        }
+
+        return ReasoningLevelCatalog::apply(
+            $aiOptions,
+            $model->getService(),
+            $model->getProviderId(),
+            $model->getFeatures(),
+            $modelJson,
+        );
     }
 
     /**
@@ -779,9 +820,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $modelMaxTokens = null;
         $systemPromptFallback = null;
+        $loadedModel = null;
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
             if ($model) {
+                $loadedModel = $model;
                 $modelMaxTokens = $model->getMaxTokens();
                 $json = $model->getJson();
                 if (!$this->modelSupportsSystemMessages($json)) {
@@ -873,6 +916,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         $aiOptions = $this->applyProfileGenerationOptions($aiOptions, $profile, $message->getUserId());
+        $aiOptions = $this->applyReasoningLevel($aiOptions, $loadedModel, $options);
 
         $documentEdit = $this->tryDocumentToolsEdit(
             $topic,
@@ -1553,6 +1597,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Resolve model ID to provider + model name + features (before building messages)
         $modelFeatures = [];
         $modelMaxTokens = null;
+        $loadedModel = null;
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
@@ -1560,6 +1605,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             // Get model features and config from DB
             $model = $this->modelRepository->find($modelId);
             if ($model) {
+                $loadedModel = $model;
                 $modelFeatures = $model->getFeatures();
                 $modelMaxTokens = $model->getMaxTokens();
             }
@@ -1635,6 +1681,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         $aiOptions = $this->applyProfileGenerationOptions($aiOptions, $profile, $message->getUserId());
+        $aiOptions = $this->applyReasoningLevel($aiOptions, $loadedModel, $options);
 
         $this->logger->info('ChatHandler: Calling AiFacade chatStream', [
             'provider' => $provider,

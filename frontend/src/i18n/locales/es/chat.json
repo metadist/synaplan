@@ -229,6 +229,16 @@
     "enhance": "Mejorar",
     "enhanceRejected": "No se pudo mejorar este texto. Prueba con una frase o pregunta más clara.",
     "thinking": "Pensamiento",
+    "reasoningLevel": {
+      "label": "Razonamiento",
+      "none": "Desactivado",
+      "minimal": "Mínimo",
+      "low": "Bajo",
+      "medium": "Medio",
+      "high": "Alto",
+      "xhigh": "Muy alto",
+      "max": "Máximo"
+    },
     "reasoningNotSupported": "Tu modelo de chat actual no soporta razonamiento. Por favor selecciona un modelo con capacidad de razonamiento (GPT-5, o3, DeepSeek-R1) en Configuración de IA → Modelos.",
     "voice": "Iniciar voz",
     "voiceRealtime": "Reconocimiento de voz en tiempo real (Web Speech API)",

@@ -289,7 +289,7 @@ class StreamController extends AbstractController
     #[OA\Post(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response (POST body)',
-        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, agentId, draft, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
+        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, reasoningEffort, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, agentId, draft, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
         security: [['Bearer' => []]],
         tags: ['Messages'],
         requestBody: new OA\RequestBody(
@@ -301,6 +301,7 @@ class StreamController extends AbstractController
                     new OA\Property(property: 'chatId', type: 'string', example: '123', description: 'Required unless incognito is set.'),
                     new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
                     new OA\Property(property: 'reasoning', type: 'string', enum: ['0', '1'], example: '0'),
+                    new OA\Property(property: 'reasoningEffort', type: 'string', enum: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], example: 'medium', description: 'Chosen reasoning level when the model publishes one. Omitted means the model default. none and minimal turn reasoning off; low is a real level.'),
                     new OA\Property(property: 'webSearch', type: 'string', enum: ['0', '1'], example: '0'),
                     new OA\Property(property: 'language', type: 'string', enum: ['de', 'en', 'es', 'fr', 'tr'], example: 'de', description: 'Active UI locale from the client. Seeds BLANG on the inbound message so the sorter / Brave search / reply language prefer the interface language when the message language cannot be detected.'),
                     new OA\Property(property: 'modelId', type: 'string', example: '53'),
@@ -351,6 +352,13 @@ class StreamController extends AbstractController
         required: false,
         description: 'Enable reasoning/thinking mode (1 or 0)',
         schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '1')
+    )]
+    #[OA\Parameter(
+        name: 'reasoningEffort',
+        in: 'query',
+        required: false,
+        description: 'Chosen reasoning level when the model publishes one (none, minimal, low, medium, high, xhigh, max). Omitted means the model default.',
+        schema: new OA\Schema(type: 'string', enum: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], example: 'medium')
     )]
     #[OA\Parameter(
         name: 'webSearch',
@@ -593,6 +601,10 @@ class StreamController extends AbstractController
         $trackId = $params->get('trackId', time());
         $chatId = $params->get('chatId', null);
         $includeReasoning = '1' === $params->get('reasoning', '0');
+        $reasoningEffort = strtolower(trim((string) $params->get('reasoningEffort', '')));
+        if (!in_array($reasoningEffort, ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], true)) {
+            $reasoningEffort = '';
+        }
         $webSearch = '1' === $params->get('webSearch', '0');
         // UI locale from the SPA (vue-i18n). Seeds inbound BLANG so the
         // classifier fast-path, sorter "leave BLANG as is" fallback, Brave
@@ -764,7 +776,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId, $draftRequested, $pinnedAgentVersionId) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $reasoningEffort, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId, $draftRequested, $pinnedAgentVersionId) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -1079,6 +1091,7 @@ class StreamController extends AbstractController
 
                 $processingOptions = [
                     'reasoning' => $includeReasoning,
+                    ...('' !== $reasoningEffort ? ['reasoning_effort' => $reasoningEffort] : []),
                     'web_search' => $webSearch,
                     'voice_reply' => $voiceReply,
                     'is_continuation' => (bool) $continueMessageId,

@@ -295,6 +295,8 @@
       "system": "Sistem",
       "selectModel": "-- Model Seç --",
       "groupLimitsModels": "Grubunuz burada kullanabileceğiniz modelleri sınırlar.",
+      "groupLimitsNamed": "{name}, burada kullanabileceğiniz modelleri sınırlar.",
+      "groupLimitsCombined": "{names} birlikte, burada kullanabileceğiniz modelleri sınırlar.",
       "systemModelsInfo": "Sistem modelleri otomatik olarak kilitlenir ve değiştirilemez. Bunlar belirli işlevler için gerekli çekirdek modellerdir.",
       "modelsPurposesTitle": "Modeller ve Amaçlar",
       "allModels": "Tüm Modeller",
@@ -702,6 +704,7 @@
       },
       "run": {
         "action": "Bu bilgisayarda çalıştır",
+        "runOn": "{name} üzerinde çalıştır",
         "multiple": "{count} bilgisayar",
         "online": "{name} bağlı",
         "away": "{name} bağlı değil. Yaklaşık her {minutes} dakikada bir haber verir.",
@@ -709,10 +712,13 @@
         "needPrompt": "Önce bilgisayarın ne yapması gerektiğini yazın.",
         "skillTitle": "Bu bilgisayarda çalıştır",
         "skillMessage": "„{name}” üzerinde hangi skill çalıştırılsın?",
+        "pickSkill": "{name} için bir skill seçin.",
+        "noSkills": "{name} henüz skill bildirmedi. Skill adını yazın.",
         "skillPlaceholder": "örn. pptx",
         "invalidSkill": "Yalnızca küçük harf, rakam ve kısa çizgi kullanın.",
         "sent": "„{name}” gönderildi.",
-        "enqueueFailed": "İş gönderilemedi."
+        "inactive": "{name} bağlantısı kesildi. Yeniden bağlayıp bir kez daha deneyin.",
+        "enqueueFailed": "İş {name} bilgisayarına gönderilemedi."
       },
       "jobCard": {
         "waiting": "{name} bekleniyor. Yaklaşık her {minutes} dakikada bir haber verir.",
