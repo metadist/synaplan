@@ -331,7 +331,16 @@
             enter-from-class="opacity-0 scale-95 translate-y-4"
             leave-to-class="opacity-0 scale-95 translate-y-4"
           >
-            <div v-if="showKeyModal" class="surface-elevated max-w-2xl w-full p-6 md:p-8">
+            <div
+              v-if="showKeyModal"
+              ref="keyModalPanel"
+              class="surface-elevated max-w-2xl w-full p-6 md:p-8"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="api-key-created-title"
+              data-testid="modal-api-key-created-dialog"
+              tabindex="-1"
+            >
               <!-- Header -->
               <div class="flex items-start gap-4 mb-6">
                 <div
@@ -340,7 +349,7 @@
                   <KeyIcon class="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-semibold txt-primary mb-1">
+                  <h3 id="api-key-created-title" class="text-xl font-semibold txt-primary mb-1">
                     {{ $t('config.apiKeys.keyCreated') }}
                   </h3>
                   <p class="text-sm txt-secondary">
@@ -389,6 +398,7 @@
               <!-- Actions -->
               <div class="flex flex-col sm:flex-row gap-3">
                 <button
+                  type="button"
                   class="flex-1 btn-primary px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
                   data-testid="btn-copy"
                   @click="copyKeyFromModal"
@@ -402,19 +412,13 @@
                   }}
                 </button>
                 <button
+                  type="button"
                   class="flex-1 surface-chip px-4 py-3 rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   data-testid="btn-close"
                   @click="closeKeyModal"
                 >
                   {{ $t('common.close') }}
                 </button>
-              </div>
-
-              <!-- Countdown -->
-              <div class="mt-4 text-center">
-                <p class="text-xs txt-secondary">
-                  {{ $t('config.apiKeys.modal.autoClose', { seconds: modalCountdown }) }}
-                </p>
               </div>
             </div>
           </Transition>
@@ -426,7 +430,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted, onActivated, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, watch, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   PlusIcon,
@@ -481,8 +485,7 @@ const error = ref<string | null>(null)
 const showKeyModal = ref(false)
 const newlyCreatedKey = ref<string>('')
 const copiedFromModal = ref(false)
-const modalCountdown = ref(30)
-let countdownInterval: number | null = null
+const keyModalPanel = ref<HTMLElement | null>(null)
 
 const loadAPIKeys = async () => {
   try {
@@ -559,19 +562,10 @@ const createAPIKey = async () => {
     includeIamManage.value = false
     includeComputeRun.value = false
 
-    // Show modal with the full key
+    // Shown once. Stays open until Close, Escape, or the backdrop.
     newlyCreatedKey.value = response.api_key.key
     showKeyModal.value = true
-    modalCountdown.value = 30
     copiedFromModal.value = false
-
-    // Start countdown
-    countdownInterval = window.setInterval(() => {
-      modalCountdown.value--
-      if (modalCountdown.value <= 0) {
-        closeKeyModal()
-      }
-    }, 1000)
 
     // Show success notification
     success(t('config.apiKeys.keyCreatedSuccess'))
@@ -589,13 +583,65 @@ const maskAPIKey = (key: string): string => {
   return `${key.substring(0, 12)}...${key.substring(key.length - 8)}`
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+let previouslyFocused: HTMLElement | null = null
+let restoreFocusTimer: ReturnType<typeof setTimeout> | null = null
+
+const focusableInPanel = (): HTMLElement[] => {
+  if (!keyModalPanel.value) return []
+  return Array.from(keyModalPanel.value.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1
+  )
+}
+
+const clearRestoreFocus = () => {
+  if (restoreFocusTimer !== null) {
+    clearTimeout(restoreFocusTimer)
+    restoreFocusTimer = null
+  }
+}
+
 const closeKeyModal = () => {
   showKeyModal.value = false
   newlyCreatedKey.value = ''
-  if (countdownInterval) {
-    clearInterval(countdownInterval)
-    countdownInterval = null
+  const restore = previouslyFocused
+  previouslyFocused = null
+  clearRestoreFocus()
+  // Restoring focus inside the key event re-activates the control that opened
+  // the dialog. Move focus after that event has finished.
+  restoreFocusTimer = setTimeout(() => {
+    restoreFocusTimer = null
+    restore?.focus()
+  }, 0)
+}
+
+const onKeyModalKeydown = (event: KeyboardEvent) => {
+  if (!showKeyModal.value) return
+
+  if (event.key === 'Tab') {
+    const nodes = focusableInPanel()
+    if (nodes.length === 0) {
+      event.preventDefault()
+      return
+    }
+    const first = nodes[0]
+    const last = nodes[nodes.length - 1]
+    const active = document.activeElement
+    if (event.shiftKey && (active === first || !keyModalPanel.value?.contains(active))) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault()
+      first.focus()
+    }
+    return
   }
+
+  if (event.key !== 'Escape') return
+  event.preventDefault()
+  closeKeyModal()
 }
 
 const copyKeyFromModal = async () => {
@@ -679,8 +725,23 @@ const formatDate = (timestamp: number): string => {
   return formatDateTime(new Date(timestamp * 1000))
 }
 
+watch(showKeyModal, async (open) => {
+  if (!open) return
+  clearRestoreFocus()
+  previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  await nextTick()
+  const nodes = focusableInPanel()
+  ;(nodes[0] ?? keyModalPanel.value)?.focus()
+})
+
 onMounted(() => {
   loadAPIKeys()
+  document.addEventListener('keydown', onKeyModalKeydown)
+})
+
+onUnmounted(() => {
+  clearRestoreFocus()
+  document.removeEventListener('keydown', onKeyModalKeydown)
 })
 
 // Re-load when navigating back to this tab from api-documentation or other sub-pages.

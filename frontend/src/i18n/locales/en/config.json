@@ -878,8 +878,7 @@
         "subtitle": "Your new API key has been created. Copy it now and store it securely.",
         "yourKey": "Your API Key",
         "warningTitle": "Important: Save this key now!",
-        "warningText": "For security reasons, this key will only be shown once. Make sure to copy and store it in a secure location before closing this window.",
-        "autoClose": "This window will close automatically in {seconds} seconds"
+        "warningText": "For security reasons, this key will only be shown once. Make sure to copy and store it in a secure location before closing this window."
       },
       "revokedSuccess": "API key revoked successfully",
       "activatedSuccess": "API key activated successfully",

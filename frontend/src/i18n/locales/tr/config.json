@@ -628,8 +628,7 @@
         "subtitle": "Yeni API anahtarınız oluşturuldu. Şimdi kopyalayın ve güvenli bir yerde saklayın.",
         "yourKey": "API Anahtarınız",
         "warningTitle": "Önemli: Bu anahtarı şimdi kaydedin!",
-        "warningText": "Güvenlik nedeniyle bu anahtar yalnızca bir kez gösterilecek. Bu pencereyi kapatmadan önce kopyalayıp güvenli bir yerde sakladığınızdan emin olun.",
-        "autoClose": "Bu pencere {seconds} saniye içinde otomatik kapanacak"
+        "warningText": "Güvenlik nedeniyle bu anahtar yalnızca bir kez gösterilecek. Bu pencereyi kapatmadan önce kopyalayıp güvenli bir yerde sakladığınızdan emin olun."
       },
       "revokedSuccess": "API anahtarı başarıyla iptal edildi",
       "activatedSuccess": "API anahtarı başarıyla etkinleştirildi",

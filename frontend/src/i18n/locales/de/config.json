@@ -850,8 +850,7 @@
         "subtitle": "Ihr neuer API-Schlüssel wurde erstellt. Kopieren Sie ihn jetzt und speichern Sie ihn sicher.",
         "yourKey": "Ihr API-Schlüssel",
         "warningTitle": "Wichtig: Speichern Sie diesen Schlüssel jetzt!",
-        "warningText": "Aus Sicherheitsgründen wird dieser Schlüssel nur einmal angezeigt. Stellen Sie sicher, dass Sie ihn kopieren und an einem sicheren Ort speichern, bevor Sie dieses Fenster schließen.",
-        "autoClose": "Dieses Fenster schließt sich automatisch in {seconds} Sekunden"
+        "warningText": "Aus Sicherheitsgründen wird dieser Schlüssel nur einmal angezeigt. Stellen Sie sicher, dass Sie ihn kopieren und an einem sicheren Ort speichern, bevor Sie dieses Fenster schließen."
       },
       "revokedSuccess": "API-Schlüssel erfolgreich widerrufen",
       "activatedSuccess": "API-Schlüssel erfolgreich aktiviert",

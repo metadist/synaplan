@@ -628,8 +628,7 @@
         "subtitle": "Tu nueva clave API ha sido creada. Cópiala ahora y guárdala de forma segura.",
         "yourKey": "Tu Clave API",
         "warningTitle": "Importante: ¡Guarda esta clave ahora!",
-        "warningText": "Por razones de seguridad, esta clave solo se mostrará una vez. Asegúrate de copiarla y guardarla en un lugar seguro antes de cerrar esta ventana.",
-        "autoClose": "Esta ventana se cerrará automáticamente en {seconds} segundos"
+        "warningText": "Por razones de seguridad, esta clave solo se mostrará una vez. Asegúrate de copiarla y guardarla en un lugar seguro antes de cerrar esta ventana."
       },
       "revokedSuccess": "Clave API revocada exitosamente",
       "activatedSuccess": "Clave API activada exitosamente",
