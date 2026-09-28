@@ -2556,6 +2556,7 @@ const handleContinueResponse = async (message: Message) => {
           void historyStore.reconcileMessage(message.id, message.backendMessageId)
         }
       } else if (data.status === 'error') {
+        continueSmoother.flush()
         continueSmoother.cancel()
         message.truncated = true
         message.isStreaming = false
@@ -2566,6 +2567,7 @@ const handleContinueResponse = async (message: Message) => {
   })
 
   stopStreamingFn = () => {
+    continueSmoother.flush()
     continueSmoother.cancel()
     stopStreaming()
   }
@@ -2995,7 +2997,9 @@ const streamAIResponse = async (
     onRender: renderStreamingText,
     initialShown: paintedPrefix,
   })
+  // Stop keeps every character that already arrived; only later chunks are dropped.
   streamingAbortController.signal.addEventListener('abort', () => {
+    textSmoother.flush()
     textSmoother.cancel()
   })
 
@@ -3488,6 +3492,7 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
             scrollToBottom()
           } else if (data.status === 'error') {
+            textSmoother.flush()
             textSmoother.cancel()
             processingStatus.value = ''
             processingMetadata.value = {}
@@ -4443,6 +4448,7 @@ const streamAIResponse = async (
             currentTrackId = undefined
             currentStreamingChatId = undefined
           } else if (data.status === 'error') {
+            textSmoother.flush()
             textSmoother.cancel()
 
             const rawError = typeof data.error === 'string' ? data.error : ''

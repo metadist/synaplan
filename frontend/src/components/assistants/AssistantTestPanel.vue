@@ -46,10 +46,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api/chatApi'
 import { useAgentsStore } from '@/stores/agents'
+import { createSmoothStream, type SmoothStream } from '@/utils/smoothStream'
 
 const store = useAgentsStore()
 const authStore = useAuthStore()
@@ -57,13 +58,13 @@ const draft = ref('')
 const draftInputRef = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const lines = ref<string[]>([])
-
 const liveReply = ref('')
 let replySmoother: SmoothStream | null = null
 
 onUnmounted(() => {
   replySmoother?.cancel()
 })
+
 const usingDefaultChat = computed(() => {
   const chat = store.current?.draft?.models.chat
   return chat == null || chat === ''
@@ -82,7 +83,6 @@ function send(): void {
   draftInputRef.value?.focus()
   lines.value.push(message)
   sending.value = true
-  let reply = ''
   liveReply.value = ''
   replySmoother?.cancel()
   let reply = ''
@@ -113,6 +113,7 @@ function send(): void {
         sending.value = false
         smoother.cancel()
         if (replySmoother === smoother) replySmoother = null
+      }
     },
   })
 }
