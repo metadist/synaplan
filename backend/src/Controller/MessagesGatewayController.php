@@ -17,6 +17,7 @@ use App\Service\Iam\AuditLogWriter;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
+use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -50,6 +51,7 @@ final class MessagesGatewayController extends AbstractController
         private readonly LoggerInterface $logger,
         private readonly AppChatCredential $appChatCredential,
         private readonly AuditLogWriter $auditLogWriter,
+        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -390,18 +392,21 @@ final class MessagesGatewayController extends AbstractController
 
         $url = trim((string) ($decoded['upstream_url'] ?? ''));
 
-        $previous = $this->config->upstreamUrl();
+        $previous = $this->auditSafeUrl($this->config->upstreamUrl());
 
         try {
-            $this->config->setUpstreamUrl($url, (int) $user->getId());
+            $this->entityManager->wrapInTransaction(function () use ($user, $request, $url, $previous): void {
+                $this->config->setUpstreamUrl($url, (int) $user->getId());
+                $this->auditGatewayChange($user, $request, 'messages_gateway.upstream', 'upstream', [
+                    'UPSTREAM_URL' => [
+                        'old' => $previous,
+                        'new' => $this->auditSafeUrl($this->config->upstreamUrl()),
+                    ],
+                ]);
+            });
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        $current = $this->config->upstreamUrl();
-        $this->auditGatewayChange($user, $request, 'messages_gateway.upstream', 'upstream', [
-            'UPSTREAM_URL' => ['old' => $previous, 'new' => $current],
-        ]);
 
         return $this->json([
             'success' => true,
@@ -472,17 +477,19 @@ final class MessagesGatewayController extends AbstractController
             }
         }
 
-        $this->configRepository->setValue(
-            0,
-            MessagesGatewayConfig::CONFIG_GROUP,
-            MessagesGatewayConfig::KEY_MODEL_ALIASES,
-            // Force object encoding so {} stays {} (never []) in BCONFIG.
-            json_encode((object) $clean, \JSON_THROW_ON_ERROR),
-        );
+        $this->entityManager->wrapInTransaction(function () use ($user, $request, $previous, $clean): void {
+            $this->configRepository->setValue(
+                0,
+                MessagesGatewayConfig::CONFIG_GROUP,
+                MessagesGatewayConfig::KEY_MODEL_ALIASES,
+                // Force object encoding so {} stays {} (never []) in BCONFIG.
+                json_encode((object) $clean, \JSON_THROW_ON_ERROR),
+            );
 
-        $this->auditGatewayChange($user, $request, 'messages_gateway.aliases', 'aliases', [
-            'MODEL_ALIASES' => ['old' => $previous, 'new' => $clean],
-        ]);
+            $this->auditGatewayChange($user, $request, 'messages_gateway.aliases', 'aliases', [
+                'MODEL_ALIASES' => ['old' => $previous, 'new' => $clean],
+            ]);
+        });
 
         return new JsonResponse(['success' => true, 'model_aliases' => (object) $clean]);
     }
@@ -600,22 +607,24 @@ final class MessagesGatewayController extends AbstractController
 
         $response = [];
         $changes = [];
-        foreach ($updated as $key => $value) {
-            $new = \is_bool($value) ? ($value ? '1' : '0') : (string) $value;
-            $old = $this->configRepository->getValue(0, MessagesGatewayConfig::CONFIG_GROUP, $key);
-            $this->configRepository->setValue(
-                0,
-                MessagesGatewayConfig::CONFIG_GROUP,
-                $key,
-                $new,
-            );
-            $response[strtolower($key)] = $value;
-            $changes[$key] = ['old' => $old, 'new' => $new];
-        }
+        $this->entityManager->wrapInTransaction(function () use ($updated, $user, $request, &$response, &$changes): void {
+            foreach ($updated as $key => $value) {
+                $new = \is_bool($value) ? ($value ? '1' : '0') : (string) $value;
+                $old = $this->configRepository->getValue(0, MessagesGatewayConfig::CONFIG_GROUP, $key);
+                $this->configRepository->setValue(
+                    0,
+                    MessagesGatewayConfig::CONFIG_GROUP,
+                    $key,
+                    $new,
+                );
+                $response[strtolower($key)] = $value;
+                $changes[$key] = ['old' => $old, 'new' => $new];
+            }
 
-        if ([] !== $changes) {
-            $this->auditGatewayChange($user, $request, 'messages_gateway.flags', 'flags', $changes);
-        }
+            if ([] !== $changes) {
+                $this->auditGatewayChange($user, $request, 'messages_gateway.flags', 'flags', $changes);
+            }
+        });
 
         $this->logger->info('MessagesGateway: settings updated', [
             'acting_user_id' => $user->getId(),
@@ -748,6 +757,34 @@ final class MessagesGatewayController extends AbstractController
             ['changes' => $changes],
             (string) $request->getClientIp(),
         );
+    }
+
+    /**
+     * Query strings and fragments can carry a provider token. The audit row
+     * keeps the host and path only.
+     */
+    private function auditSafeUrl(string $url): string
+    {
+        $parts = parse_url($url);
+        if (!\is_array($parts)) {
+            return $url;
+        }
+
+        $scheme = \is_string($parts['scheme'] ?? null) ? $parts['scheme'] : '';
+        $host = \is_string($parts['host'] ?? null) ? $parts['host'] : '';
+        if ('' === $scheme || '' === $host) {
+            return $url;
+        }
+
+        $safe = $scheme.'://'.$host;
+        if (isset($parts['port'])) {
+            $safe .= ':'.$parts['port'];
+        }
+        if (\is_string($parts['path'] ?? null) && '' !== $parts['path']) {
+            $safe .= $parts['path'];
+        }
+
+        return rtrim($safe, '/');
     }
 
     /**

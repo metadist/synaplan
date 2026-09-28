@@ -811,6 +811,27 @@
         "shareRevoke": "{who} a cessé de partager « {resource} » avec {subject}.",
         "withSubject": "{who} : {action} — {resource}, avec {subject}.",
         "generic": "{who} : {action} — {resource}."
+      },
+      "on": "Activé",
+      "off": "Désactivé",
+      "none": "aucun",
+      "changeLine": "{label} : {old} → {new}",
+      "gatewaySetting": {
+        "ENABLED": "Passerelle",
+        "ALLOW_OPERATOR_KEY": "Clé du serveur",
+        "MCP_TOOLS_ENABLED": "Serveurs d’outils",
+        "MCP_TOOLS_WITH_CLIENT_TOOLS": "Serveurs d’outils avec les outils du client",
+        "MCP_MAX_ITERATIONS": "Tours d’outils",
+        "WEB_SEARCH_MODE": "Recherche web",
+        "WEB_FETCH_MODE": "Lecture web",
+        "VISION_MODE": "Compréhension des images",
+        "VISION_IMAGE_DETAIL": "Détail de l’image",
+        "VISION_MAX_IMAGES": "Images par demande",
+        "CONTEXT_INJECTION_ENABLED": "Contexte supplémentaire",
+        "BUDGET_NOTICE_ENABLED": "Avis de budget",
+        "SESSION_SUMMARY_ENABLED": "Résumé de session",
+        "MODEL_ALIASES": "Alias de modèles",
+        "UPSTREAM_URL": "Adresse de la passerelle"
       }
     },
     "linkedPlatforms": {

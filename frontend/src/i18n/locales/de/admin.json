@@ -811,6 +811,27 @@
         "shareRevoke": "{who} hat die Freigabe von „{resource}“ für {subject} beendet.",
         "withSubject": "{who}: {action} — {resource}, mit {subject}.",
         "generic": "{who}: {action} — {resource}."
+      },
+      "on": "Ein",
+      "off": "Aus",
+      "none": "keine",
+      "changeLine": "{label}: {old} → {new}",
+      "gatewaySetting": {
+        "ENABLED": "Gateway",
+        "ALLOW_OPERATOR_KEY": "Serverschlüssel",
+        "MCP_TOOLS_ENABLED": "Tool-Server",
+        "MCP_TOOLS_WITH_CLIENT_TOOLS": "Tool-Server mit Client-Tools",
+        "MCP_MAX_ITERATIONS": "Tool-Runden",
+        "WEB_SEARCH_MODE": "Websuche",
+        "WEB_FETCH_MODE": "Webabruf",
+        "VISION_MODE": "Bildverständnis",
+        "VISION_IMAGE_DETAIL": "Bilddetail",
+        "VISION_MAX_IMAGES": "Bilder pro Anfrage",
+        "CONTEXT_INJECTION_ENABLED": "Zusätzlicher Kontext",
+        "BUDGET_NOTICE_ENABLED": "Budget-Hinweis",
+        "SESSION_SUMMARY_ENABLED": "Sitzungszusammenfassung",
+        "MODEL_ALIASES": "Modell-Aliase",
+        "UPSTREAM_URL": "Gateway-Adresse"
       }
     },
     "linkedPlatforms": {
