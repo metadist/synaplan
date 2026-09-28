@@ -320,8 +320,15 @@
           </div>
         </div>
 
+        <div v-if="loading" class="text-center py-8" data-testid="section-models-list-loading">
+          <div
+            class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"
+          ></div>
+          <p class="mt-2 txt-secondary">{{ $t('config.aiModels.loadingModels') }}</p>
+        </div>
+
         <div
-          v-if="modelsLoadFailed"
+          v-else-if="modelsLoadFailed"
           class="py-12 text-center"
           data-testid="section-models-load-error-list"
         >
@@ -339,14 +346,14 @@
         </div>
 
         <div
-          v-else-if="!loading && filteredModels.length === 0"
+          v-else-if="filteredModels.length === 0"
           class="text-center py-12 txt-secondary"
           data-testid="section-models-empty"
         >
           {{ $t('config.aiModels.noModelsAvailable') }}
         </div>
 
-        <div v-else-if="!loading" class="overflow-x-auto scroll-thin">
+        <div v-else class="overflow-x-auto scroll-thin">
           <table class="w-full min-w-[640px]">
             <thead>
               <tr class="border-b-2 border-light-border/30 dark:border-dark-border/20">
