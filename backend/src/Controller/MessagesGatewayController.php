@@ -26,7 +26,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Settings API for the Anthropic-compatible Messages gateway (Channels → AI Agents).
+ * Settings API for the Anthropic-compatible Messages gateway
+ * (Manage → Developer & devices → Coding clients).
  */
 #[Route('/api/v1/messages-gateway', name: 'api_messages_gateway_')]
 #[OA\Tag(name: 'Messages Gateway', description: 'Anthropic-compatible Messages API gateway settings')]

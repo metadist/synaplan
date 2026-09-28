@@ -164,9 +164,9 @@ now follows the same satisfy-or-passthrough contract as web search:
 - `GatewayToolLoop` (was `McpToolLoop`) — dispatches on `kind` (`mcp` /
   `native`), so both kinds run in the same loop on both the complete and the
   streaming path.
-- `MESSAGES_GATEWAY.WEB_SEARCH_MODE` — admin-visible under **Channels → AI
-  Agents** (the UI explains when no search provider is configured), four values,
-  and the default needs no attention:
+- `MESSAGES_GATEWAY.WEB_SEARCH_MODE` — admin-visible under **Manage →
+  Developer & devices → Coding clients** (the UI explains when no search
+  provider is configured), four values, and the default needs no attention:
 
   | Mode | Behaviour |
   | ---- | --------- |
@@ -210,7 +210,7 @@ Six settings that changed real gateway behaviour existed only as `BCONFIG` rows:
 MCP tools, MCP tools alongside client tools, the tool-round cap, context
 injection, budget notices and session summaries. An operator had to edit the
 database to reach any of them, so in practice the tool loop shipped off. All of
-them are now on the **Channels → AI Agents** page, grouped by what they control
+them are now on the **Manage → Developer & devices → Coding clients** page, grouped by what they control
 and each with an explanation of the consequence — plus the state that makes a
 setting inert (no tool server connected, no search provider, a parent switch
 off) shown next to the control rather than discovered afterwards.
@@ -300,7 +300,7 @@ Anthropic-backed Claude Code sessions: default `auto` either runs Synaplan’s
 search or forwards the declaration upstream. To use Synaplan’s own search
 results (and to serve search on aliased OpenAI/Gemini routes), configure a
 search provider (`BRAVE_SEARCH_API_KEY` in `backend/.env`). Admins can force
-`synaplan`, `passthrough` or `off` under **Channels → AI Agents**.
+`synaplan`, `passthrough` or `off` under **Manage → Developer & devices → Coding clients**.
 
 The image cost settings default to today’s behaviour — no cap, provider picks
 the detail — so an existing install sees no change until an admin decides

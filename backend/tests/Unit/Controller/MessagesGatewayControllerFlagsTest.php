@@ -29,7 +29,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 /**
- * The settings endpoint behind Channels → AI Agents. It writes one BCONFIG row
+ * The settings endpoint behind Manage → Developer & devices → Coding clients.
+ * It writes one BCONFIG row
  * per submitted setting, so an unnoticed type slip would silently persist
  * garbage that only surfaces on the next gateway request.
  */

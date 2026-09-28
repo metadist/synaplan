@@ -269,6 +269,21 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->assertSame('Invalid API key', $content['message']);
     }
 
+    public function testOnAuthenticationFailureOnMessagesUsesAnthropicEnvelope(): void
+    {
+        $request = Request::create('/v1/messages', 'POST');
+        $exception = new AuthenticationException('Invalid or inactive API key');
+
+        $response = $this->authenticator->onAuthenticationFailure($request, $exception);
+
+        $this->assertSame(401, $response->getStatusCode());
+        $content = json_decode((string) $response->getContent(), true);
+        $this->assertSame('error', $content['type']);
+        $this->assertSame('authentication_error', $content['error']['type']);
+        $this->assertSame('Invalid or inactive API key', $content['error']['message']);
+        $this->assertArrayNotHasKey('success', $content);
+    }
+
     // ========== onAuthenticationSuccess() ==========
 
     public function testOnAuthenticationSuccessReturnsNull(): void
