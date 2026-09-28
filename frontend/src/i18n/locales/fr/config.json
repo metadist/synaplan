@@ -11,6 +11,8 @@
       },
       "defaultConfigTitle": "Configuration des modèles par défaut",
       "loadingModels": "Chargement des modèles…",
+      "loadFailed": "La liste des modèles n'a pas pu être chargée.",
+      "retry": "Réessayer",
       "system": "Système",
       "selectModel": "-- Sélectionner un modèle --",
       "groupLimitsModels": "Votre groupe limite les modèles que vous pouvez utiliser ici.",

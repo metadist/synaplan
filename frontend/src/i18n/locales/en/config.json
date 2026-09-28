@@ -13,6 +13,8 @@
       },
       "defaultConfigTitle": "Default Model Configuration",
       "loadingModels": "Loading models...",
+      "loadFailed": "The model list could not be loaded.",
+      "retry": "Try again",
       "system": "System",
       "selectModel": "-- Select Model --",
       "groupLimitsModels": "Your group limits which models you can use here.",

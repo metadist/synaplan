@@ -53,6 +53,22 @@
         <p class="mt-2 txt-secondary">{{ $t('config.aiModels.loadingModels') }}</p>
       </div>
 
+      <div
+        v-else-if="modelsLoadFailed"
+        class="py-6 text-center"
+        data-testid="section-models-load-error"
+      >
+        <p class="text-sm text-red-600 dark:text-red-400">{{ $t('config.aiModels.loadFailed') }}</p>
+        <button
+          type="button"
+          class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+          data-testid="btn-retry-models"
+          @click="loadData"
+        >
+          {{ $t('config.aiModels.retry') }}
+        </button>
+      </div>
+
       <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
         <div
           v-for="capability in Object.keys(purposeLabels)"
@@ -305,14 +321,32 @@
         </div>
 
         <div
-          v-if="filteredModels.length === 0"
+          v-if="modelsLoadFailed"
+          class="py-12 text-center"
+          data-testid="section-models-load-error-list"
+        >
+          <p class="text-sm text-red-600 dark:text-red-400">
+            {{ $t('config.aiModels.loadFailed') }}
+          </p>
+          <button
+            type="button"
+            class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+            data-testid="btn-retry-models-list"
+            @click="loadData"
+          >
+            {{ $t('config.aiModels.retry') }}
+          </button>
+        </div>
+
+        <div
+          v-else-if="!loading && filteredModels.length === 0"
           class="text-center py-12 txt-secondary"
           data-testid="section-models-empty"
         >
           {{ $t('config.aiModels.noModelsAvailable') }}
         </div>
 
-        <div v-else class="overflow-x-auto scroll-thin">
+        <div v-else-if="!loading" class="overflow-x-auto scroll-thin">
           <table class="w-full min-w-[640px]">
             <thead>
               <tr class="border-b-2 border-light-border/30 dark:border-dark-border/20">
@@ -732,7 +766,8 @@ const purposeLabels = computed<Record<Capability, string>>(() => ({
   TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
 }))
 
-const loading = ref(false)
+const loading = ref(true)
+const modelsLoadFailed = ref(false)
 const saving = ref(false)
 const resetting = ref(false)
 const availableModels = ref<ModelsData>({})
@@ -845,8 +880,10 @@ const canSwitchEmbedding = computed(() => {
   return authStore.isPro || authStore.isAdmin
 })
 
+let catalogLoad: Promise<void> = Promise.resolve()
+
 onMounted(async () => {
-  await Promise.all([loadData(), loadEmbeddingGuard()])
+  await Promise.all([catalogLoad, loadEmbeddingGuard()])
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 
@@ -944,31 +981,43 @@ const scrollToCapability = (capability: Capability) => {
 
 const loadData = async () => {
   loading.value = true
+  modelsLoadFailed.value = false
   try {
-    const [modelsRes, defaultsRes] = await Promise.all([getModels(), getDefaultModels()])
+    const [modelsResult, defaultsResult] = await Promise.allSettled([
+      getModels(),
+      getDefaultModels(),
+    ])
 
-    if (modelsRes.success) {
-      availableModels.value = modelsRes.models
-      providers.value = modelsRes.providers ?? []
-      restrictedCapabilities.value = modelsRes.restricted ?? []
+    if (modelsResult.status === 'fulfilled' && modelsResult.value.success) {
+      availableModels.value = modelsResult.value.models
+      providers.value = modelsResult.value.providers ?? []
+      restrictedCapabilities.value = modelsResult.value.restricted ?? []
+    } else {
+      modelsLoadFailed.value = true
+      console.error(
+        'Failed to load models:',
+        modelsResult.status === 'rejected' ? modelsResult.reason : modelsResult.value
+      )
     }
 
-    if (defaultsRes.success) {
+    if (defaultsResult.status === 'fulfilled' && defaultsResult.value.success) {
       const mergedDefaults: Record<Capability, number | null> = {
         ...defaultConfig.value,
-        ...(defaultsRes.defaults as Partial<Record<Capability, number | null>>),
+        ...(defaultsResult.value.defaults as Partial<Record<Capability, number | null>>),
       }
       defaultConfig.value = mergedDefaults
       originalConfig.value = { ...mergedDefaults }
-      defaultLocked.value = defaultsRes.locked ?? {}
-      defaultSources.value = defaultsRes.sources ?? {}
+      defaultLocked.value = defaultsResult.value.locked ?? {}
+      defaultSources.value = defaultsResult.value.sources ?? {}
+    } else if (defaultsResult.status === 'rejected') {
+      console.error('Failed to load default models:', defaultsResult.reason)
     }
-  } catch (error) {
-    console.error('Failed to load models:', error)
   } finally {
     loading.value = false
   }
 }
+
+catalogLoad = loadData()
 
 const modelsByPurpose = computed<Record<string, AIModel[]>>(() => {
   const result: Record<string, AIModel[]> = {}

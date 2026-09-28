@@ -139,4 +139,37 @@ describe('AIModelsConfiguration empty model row', () => {
     expect(chatTriggerLabel().classes()).not.toContain('txt-model-placeholder')
     expect(chatTriggerLabel().text()).toBe('Llama')
   })
+
+  it('shows a retry instead of an empty menu when the model list fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    getModels.mockRejectedValueOnce(new Error('network'))
+
+    await mountPage()
+
+    expect(wrapper!.find('[data-testid="section-capabilities"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="btn-model-dropdown"]').exists()).toBe(false)
+    expect(wrapper!.get('[data-testid="section-models-load-error"]').text()).toContain(
+      'The model list could not be loaded.'
+    )
+
+    getModels.mockResolvedValue({ success: true, models: { CHAT: [chatModel] }, providers: [] })
+    await wrapper!.get('[data-testid="btn-retry-models"]').trigger('click')
+    await flushPromises()
+
+    expect(getModels).toHaveBeenCalledTimes(2)
+    expect(wrapper!.find('[data-testid="section-models-load-error"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="btn-model-dropdown"]').exists()).toBe(true)
+    errorSpy.mockRestore()
+  })
+
+  it('keeps the model menu when only the saved choices fail to load', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    getDefaultModels.mockRejectedValueOnce(new Error('defaults'))
+
+    await mountPage()
+
+    expect(wrapper!.find('[data-testid="section-models-load-error"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="btn-model-dropdown"]').exists()).toBe(true)
+    errorSpy.mockRestore()
+  })
 })

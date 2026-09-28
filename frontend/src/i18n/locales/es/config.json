@@ -290,6 +290,8 @@
       },
       "defaultConfigTitle": "Configuración de Modelo Predeterminado",
       "loadingModels": "Cargando modelos...",
+      "loadFailed": "No se ha podido cargar la lista de modelos.",
+      "retry": "Reintentar",
       "system": "Sistema",
       "selectModel": "-- Seleccionar Modelo --",
       "groupLimitsModels": "Su grupo limita los modelos que puede usar aquí.",
