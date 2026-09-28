@@ -256,7 +256,7 @@ Everything below is the same platform, packaged for different homes. Pick what f
 - **Git** (the one-line installer also works with `curl` + `tar` when git is missing)
 - **8 GB RAM** minimum (16 GB recommended once you add the `local-ai` profile)
 - **~4 GB free disk** for the standard install (includes file work + spoken answers; +~1 GB for `local-ai`, +~14 GB if you also enable the local chat model)
-- Free TCP ports `5173`, `8000`, `8082`, `8025` (+ `1025` SMTP), `3307`, `6333`, `9999`, `11435` (`local-ai` profile only), `10200` (TTS, localhost-only), `8080`/`8443` (`oidc` profile only)
+- Free TCP ports `5173`, `8000`, `8082`, `8025` (+ `1025` SMTP), `3307`, `6333`, `9999`, `11435` (`local-ai` profile only), `10200` (TTS, localhost-only, `SYNAPLAN_TTS_PORT`), `8080`/`8443` (`oidc` profile only). If one is taken, change that `SYNAPLAN_*_PORT` in `.env` (see `.env.example`) instead of the YAML.
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The three-step start above already does this: `make up` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. (The published `ghcr.io/metadist/synaplan` image is multi-arch too, so pulling it also runs natively.) The first local build takes a few minutes; every later start is a cache hit. Two optional dev tools (phpMyAdmin, MailHog) are still amd64-only upstream images — if you keep them, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so those two emulate quickly.
 
@@ -299,7 +299,7 @@ make up
 | Qdrant | http://localhost:6333 |
 | Tika | http://localhost:9999 |
 | Ollama | http://localhost:11435 (`local-ai` profile only) |
-| TTS | http://127.0.0.1:10200 (localhost-only, no UI — `GET /health`) |
+| TTS | http://127.0.0.1:10200 (localhost-only, no UI — `GET /health`; host port is `SYNAPLAN_TTS_PORT`) |
 
 **Default Login Credentials:**
 
