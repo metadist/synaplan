@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\EmailChatService;
 use App\Service\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,6 +27,7 @@ class ProfileController extends AbstractController
         private EmailChatService $emailChatService,
         private UserDeletionService $userDeletionService,
         private LoggerInterface $logger,
+        private UserRepository $userRepository,
     ) {
     }
 
@@ -137,6 +139,8 @@ class ProfileController extends AbstractController
         required: true,
         content: new OA\JsonContent(
             properties: [
+                new OA\Property(property: 'email', type: 'string', example: 'user@example.com', description: 'Sign-in email. Unchanged values are ignored. A different address requires currentPassword and is rejected for accounts that sign in through an external provider.'),
+                new OA\Property(property: 'currentPassword', type: 'string', format: 'password', example: 'OldPass123!', description: 'Required only when email changes. Confirms the signed-in person owns the account.'),
                 new OA\Property(property: 'firstName', type: 'string', example: 'John'),
                 new OA\Property(property: 'lastName', type: 'string', example: 'Doe'),
                 new OA\Property(property: 'phone', type: 'string', example: '+49123456789'),
@@ -160,11 +164,14 @@ class ProfileController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'message', type: 'string', example: 'Profile updated successfully'),
+                new OA\Property(property: 'email', type: 'string', example: 'user@example.com', description: 'Sign-in email after the update'),
             ]
         )
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    #[OA\Response(response: 400, description: 'Invalid JSON')]
+    #[OA\Response(response: 400, description: 'Invalid JSON, email, or timezone. Nothing was saved.')]
+    #[OA\Response(response: 403, description: 'Current password is wrong, or the sign-in email is managed by the login provider. Nothing was saved.')]
+    #[OA\Response(response: 409, description: 'That email address is already used by another account. Nothing was saved.')]
     public function updateProfile(
         Request $request,
         #[CurrentUser] ?User $user,
@@ -175,8 +182,20 @@ class ProfileController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        if (!$data) {
+        if (!$data || !is_array($data)) {
             return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Reject the whole save before any write. A wrong password or an
+        // unknown timezone must not leave the other fields half-applied.
+        $emailChange = $this->resolveSignInEmail($user, $data);
+        if ($emailChange instanceof JsonResponse) {
+            return $emailChange;
+        }
+
+        $timezoneError = $this->validateTimezone($data);
+        if ($timezoneError instanceof JsonResponse) {
+            return $timezoneError;
         }
 
         // We collect all mutations on a single local $details array and
@@ -195,7 +214,11 @@ class ProfileController extends AbstractController
 
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {
-                $details[$field] = $data[$field];
+                $value = $data[$field];
+                if ('timezone' === $field && is_string($value)) {
+                    $value = trim($value);
+                }
+                $details[$field] = $value;
             }
         }
 
@@ -218,15 +241,144 @@ class ProfileController extends AbstractController
             }
         }
 
+        if (is_string($emailChange)) {
+            $user->setMail($emailChange);
+            // Leave emailVerified as it is. Login refuses unverified addresses,
+            // so clearing the flag here would lock the person out of the
+            // account they just proved they own with their password.
+        }
+
         $user->setUserDetails($details);
         $this->em->flush();
 
-        $this->logger->info('Profile updated', ['user_id' => $user->getId()]);
+        $this->logger->info('Profile updated', [
+            'user_id' => $user->getId(),
+            'email_changed' => is_string($emailChange),
+        ]);
 
         return $this->json([
             'success' => true,
             'message' => 'Profile updated successfully',
+            'email' => $user->getMail(),
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @return JsonResponse|string|null the new address, an error response, or null when it did not change
+     */
+    private function resolveSignInEmail(User $user, array $data): JsonResponse|string|null
+    {
+        if (!array_key_exists('email', $data)) {
+            return null;
+        }
+
+        if (!is_string($data['email'])) {
+            return $this->profileError(
+                'email_invalid',
+                'Enter a valid email address. Nothing was saved.',
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        $submitted = $this->normalizeSignInEmail($data['email']);
+        $current = $this->normalizeSignInEmail($user->getMail());
+        if ($submitted === $current) {
+            return null;
+        }
+
+        if (!$user->canChangePassword()) {
+            return $this->profileError(
+                'email_managed',
+                'This sign-in email is managed by your login provider and cannot be changed here. Nothing was saved.',
+                Response::HTTP_FORBIDDEN,
+            );
+        }
+
+        if (mb_strlen($submitted) > 128 || false === filter_var($submitted, FILTER_VALIDATE_EMAIL)) {
+            return $this->profileError(
+                'email_invalid',
+                'Enter a valid email address. Nothing was saved.',
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        $password = $data['currentPassword'] ?? '';
+        if (!is_string($password) || '' === $password) {
+            return $this->profileError(
+                'email_password_required',
+                'Enter your current password to change your sign-in email. Nothing was saved.',
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        if (!$this->passwordHasher->isPasswordValid($user, $password)) {
+            return $this->profileError(
+                'email_password_incorrect',
+                'Your profile was not saved. The sign-in email was not changed, because the current password is wrong.',
+                Response::HTTP_FORBIDDEN,
+            );
+        }
+
+        $other = $this->userRepository->findOtherByNormalizedEmail($submitted, (int) $user->getId());
+        if (null !== $other) {
+            return $this->profileError(
+                'email_taken',
+                'That email address is already used by another account. Nothing was saved.',
+                Response::HTTP_CONFLICT,
+            );
+        }
+
+        return $submitted;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function validateTimezone(array $data): ?JsonResponse
+    {
+        if (!array_key_exists('timezone', $data) || null === $data['timezone']) {
+            return null;
+        }
+
+        if (!is_string($data['timezone'])) {
+            return $this->profileError(
+                'timezone_invalid',
+                'Choose a timezone from the list. Nothing was saved.',
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        $timezone = trim($data['timezone']);
+        if ('' === $timezone) {
+            return null;
+        }
+
+        try {
+            new \DateTimeZone($timezone);
+        } catch (\Exception) {
+            return $this->profileError(
+                'timezone_invalid',
+                'Choose a timezone from the list. Nothing was saved.',
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        return null;
+    }
+
+    private function normalizeSignInEmail(string $email): string
+    {
+        return mb_strtolower(trim($email));
+    }
+
+    private function profileError(string $code, string $message, int $status): JsonResponse
+    {
+        return $this->json([
+            'error' => $code,
+            'message' => $message,
+        ], $status);
     }
 
     #[Route('/password', name: 'change_password', methods: ['PUT'])]
