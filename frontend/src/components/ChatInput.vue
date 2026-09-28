@@ -697,6 +697,7 @@ const pendingDesktopRun = ref<{
   deviceName: string
   skills: string[]
   prompt: string
+  chatId: number | null
 } | null>(null)
 const {
   devices,
@@ -716,13 +717,16 @@ const handleRunOnDevice = async (device: {
   name: string
   enabledSkills?: string[]
 }) => {
-  const prompt = message.value.trim()
-  if (!prompt) {
+  const promptText = message.value.trim()
+  if (!promptText) {
     warning(t('config.desktop.run.needPrompt'))
     return
   }
+  const chatId = chatsStore.activeChatId
 
   await reloadDesktopDevices()
+  if (chatsStore.activeChatId !== chatId) return
+
   const fresh = devices.value.find((row) => row.id === device.id && row.status === 'active')
   if (!fresh) {
     showError(t('config.desktop.run.inactive', { name: device.name }))
@@ -735,7 +739,8 @@ const handleRunOnDevice = async (device: {
       deviceId: fresh.id,
       deviceName: fresh.name,
       skills,
-      prompt,
+      prompt: promptText,
+      chatId,
     }
     return
   }
@@ -749,14 +754,14 @@ const handleRunOnDevice = async (device: {
       cancelText: t('common.cancel'),
     })
   )?.trim()
-  if (!skill) return
+  if (!skill || chatsStore.activeChatId !== chatId) return
 
   if (!/^[a-z0-9-]{1,64}$/.test(skill)) {
     showError(t('config.desktop.run.invalidSkill'))
     return
   }
 
-  await sendDesktopRun(fresh.id, fresh.name, skill, prompt)
+  await sendDesktopRun(fresh.id, fresh.name, skill, promptText, chatId)
 }
 
 const reportedSkills = (skills: string[] | undefined): string[] =>
@@ -766,17 +771,17 @@ const chooseDesktopSkill = (skill: string) => {
   const pending = pendingDesktopRun.value
   if (!pending) return
   pendingDesktopRun.value = null
-  void sendDesktopRun(pending.deviceId, pending.deviceName, skill, pending.prompt)
+  void sendDesktopRun(pending.deviceId, pending.deviceName, skill, pending.prompt, pending.chatId)
 }
 
 const sendDesktopRun = async (
   deviceId: number,
   deviceName: string,
   skill: string,
-  prompt: string
+  prompt: string,
+  chatId: number | null
 ) => {
   try {
-    const chatId = chatsStore.activeChatId
     const { jobId, chatTitle } = await desktopApi.enqueueJob({
       deviceId,
       skill,
@@ -852,6 +857,7 @@ const dismissDesktopJob = (jobId: number) => {
 watch(
   () => chatsStore.activeChatId,
   () => {
+    pendingDesktopRun.value = null
     void restoreDesktopJobs()
   }
 )
