@@ -17,6 +17,7 @@ class AuthProvidersController extends AbstractController
         private ?string $oidcDiscoveryUrl,
         private ?string $oidcAutoRedirect,
         private ?string $appleClientId = null,
+        private ?string $oidcProviderLabel = null,
     ) {
     }
 
@@ -39,6 +40,7 @@ class AuthProvidersController extends AbstractController
                             new OA\Property(property: 'id', type: 'string', example: 'google'),
                             new OA\Property(property: 'name', type: 'string', example: 'Google'),
                             new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                            new OA\Property(property: 'custom_label', type: 'boolean', example: false, description: 'True when an administrator set OIDC_PROVIDER_LABEL. Absent or false means the client should show its translated "Enterprise SSO" label.'),
                         ]
                     )
                 ),
@@ -47,6 +49,8 @@ class AuthProvidersController extends AbstractController
     )]
     public function getProviders(): JsonResponse
     {
+        $label = $this->enterpriseSsoLabel();
+
         $providers = [
             [
                 'id' => 'google',
@@ -71,7 +75,8 @@ class AuthProvidersController extends AbstractController
             ],
             [
                 'id' => 'keycloak',
-                'name' => 'Keycloak',
+                'name' => $label['name'],
+                'custom_label' => $label['custom'],
                 'enabled' => !empty($this->oidcClientId)
                             && !empty($this->oidcDiscoveryUrl)
                             && !in_array($this->oidcClientId, ['your-oidc-client-id', 'change-me', ''], true),
@@ -83,5 +88,19 @@ class AuthProvidersController extends AbstractController
         return $this->json([
             'providers' => array_values(array_filter($providers, fn ($p) => $p['enabled'])),
         ]);
+    }
+
+    /**
+     * @return array{name: string, custom: bool}
+     */
+    private function enterpriseSsoLabel(): array
+    {
+        $custom = trim($this->oidcProviderLabel ?? '');
+        $custom = preg_replace('/[\r\n\t]+/', ' ', $custom) ?? '';
+        if ('' === $custom || mb_strlen($custom) > 80) {
+            return ['name' => 'Enterprise SSO', 'custom' => false];
+        }
+
+        return ['name' => $custom, 'custom' => true];
     }
 }

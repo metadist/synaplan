@@ -30,7 +30,7 @@
 
 ## Your first answer in three steps
 
-Start the published image without a git checkout and without `make`. Two files you edit (`compose.yaml`, `.env`) plus one static asset the realtime service needs (`config.json`, downloaded once, never edited).
+Start the published image without a git checkout and without `make`. Two files: `compose.yaml` and `.env`.
 
 1. **Save the files.**
 
@@ -38,25 +38,13 @@ Start the published image without a git checkout and without `make`. Two files y
 mkdir synaplan && cd synaplan
 curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/compose.yaml
 curl -fsSL -o .env https://raw.githubusercontent.com/metadist/synaplan/main/deploy/selfhost.env.example
-mkdir -p ../_docker/centrifugo
-curl -fsSL -o ../_docker/centrifugo/config.json https://raw.githubusercontent.com/metadist/synaplan/main/_docker/centrifugo/config.json
 ```
 
-The third file is the realtime (Centrifugo) configuration. The compose file mounts it from `../_docker/centrifugo/config.json`, relative to `compose.yaml` — without it at exactly that path, the realtime service fails its config check and live chat features stay down. A Docker GUI needs the same three files in the same relative layout: paste `compose.yaml`, select `.env`, and provide `config.json` at `../_docker/centrifugo/config.json`.
+A Docker GUI uses the same two files: paste `compose.yaml` and select `.env`.
 
-2. **Configure.** In `.env`, `SYNAPLAN_VERSION` is already a release tag (today `5.0.5`). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. Set `APP_URL` and `FRONTEND_URL` to the same address you will open. Leave both admin lines empty to create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
+2. **Configure.** In `.env`, `SYNAPLAN_VERSION` is already a release tag (today `5.0.5`). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` are `http://127.0.0.1:8000`. If you change the bind, the port, or the public address, set all three to the same address you open in the browser. Live chat stays disconnected when they do not match. Leave both admin lines empty to create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
 
-Then generate unique secrets. The template ships `replace-with-*` placeholders for eight credentials — starting with those values means every install shares the same publicly known secrets, so never do that. Give each one an independent value (run once, before the first start; after data exists these values must never change):
-
-```bash
-for key in APP_SECRET TOKEN_SECRET MARIADB_PASSWORD MARIADB_ROOT_PASSWORD \
-    REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET; do
-  secret=$(openssl rand -hex 32)
-  sed -i.bak "s|^${key}=.*|${key}=${secret}|" .env
-done
-rm -f .env.bak
-chmod 600 .env
-```
+Leave the eight secret lines commented out. The first start generates them into `data/secrets.env`. Back that file up with the database: a restored database cannot be opened without it. To choose the values yourself, set each line to the output of `openssl rand -hex 32` before the first start. Do not use a `replace-with-*` example value — the start is refused and nothing is created.
 
 3. **Start, then open the app.**
 
@@ -256,7 +244,7 @@ Everything below is the same platform, packaged for different homes. Pick what f
 - **Git** (the one-line installer also works with `curl` + `tar` when git is missing)
 - **8 GB RAM** minimum (16 GB recommended once you add the `local-ai` profile)
 - **~4 GB free disk** for the standard install (includes file work + spoken answers; +~1 GB for `local-ai`, +~14 GB if you also enable the local chat model)
-- Free TCP ports `5173`, `8000`, `8082`, `8025` (+ `1025` SMTP), `3307`, `6333`, `9999`, `11435` (`local-ai` profile only), `10200` (TTS, localhost-only), `8080`/`8443` (`oidc` profile only)
+- Free TCP ports `5173`, `8000`, `8082`, `8025` (+ `1025` SMTP), `3307`, `6333`, `9999`, `11435` (`local-ai` profile only), `10200` (TTS, localhost-only, `SYNAPLAN_TTS_PORT`), `8080`/`8443` (`oidc` profile only). If one is taken, change that `SYNAPLAN_*_PORT` in `.env` (see `.env.example`) instead of the YAML.
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The three-step start above already does this: `make up` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. (The published `ghcr.io/metadist/synaplan` image is multi-arch too, so pulling it also runs natively.) The first local build takes a few minutes; every later start is a cache hit. Two optional dev tools (phpMyAdmin, MailHog) are still amd64-only upstream images — if you keep them, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so those two emulate quickly.
 
@@ -299,7 +287,7 @@ make up
 | Qdrant | http://localhost:6333 |
 | Tika | http://localhost:9999 |
 | Ollama | http://localhost:11435 (`local-ai` profile only) |
-| TTS | http://127.0.0.1:10200 (localhost-only, no UI — `GET /health`) |
+| TTS | http://127.0.0.1:10200 (localhost-only, no UI — `GET /health`; host port is `SYNAPLAN_TTS_PORT`) |
 
 **Default Login Credentials:**
 

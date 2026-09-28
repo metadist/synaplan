@@ -130,6 +130,7 @@ final class ModuleOwnershipTest extends TestCase
             'OIDC_ADMIN_ROLES',
             'OIDC_ROLE_CLAIMS',
             'OIDC_SCOPES',
+            'OIDC_PROVIDER_LABEL',
             'OIDC_AUTO_REDIRECT',
             'RECAPTCHA_ENABLED',
             'RECAPTCHA_SECRET_KEY',

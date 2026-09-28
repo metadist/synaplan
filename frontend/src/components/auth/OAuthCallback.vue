@@ -92,12 +92,26 @@ const error = ref<string | null>(null)
 const providerName = computed(() => {
   if (provider.value === 'google') return 'Google'
   if (provider.value === 'github') return 'GitHub'
-  if (provider.value === 'keycloak') return 'Keycloak'
+  if (provider.value === 'keycloak') return t('auth.enterpriseSso')
   return provider.value
 })
 
 const goToLogin = () => {
   router.push('/login')
+}
+
+const oauthErrorMessage = (
+  errorCode: string | null,
+  scope: string | null,
+  errorParam: string | null
+): string => {
+  if (errorCode === 'oidc_invalid_scope') {
+    return scope ? t('auth.oidcInvalidScope', { scope }) : t('auth.oidcInvalidScopeUnknown')
+  }
+  if (errorCode === 'oidc_access_denied') return t('auth.oidcAccessDenied')
+  if (errorCode === 'oidc_auth_failed') return t('auth.oidcAuthFailed')
+  if (errorParam) return decodeURIComponent(errorParam)
+  return t('auth.socialLoginError')
 }
 
 onMounted(async () => {
@@ -107,6 +121,8 @@ onMounted(async () => {
     const successParam = urlParams.get('success')
     const providerParam = urlParams.get('provider')
     const errorParam = urlParams.get('error')
+    const errorCode = urlParams.get('error_code')
+    const scopeParam = urlParams.get('scope')
 
     provider.value = providerParam
 
@@ -117,11 +133,11 @@ onMounted(async () => {
     })
 
     // Check for error in URL params
-    if (errorParam) {
+    if (errorCode || errorParam) {
       // Cancelled / failed OAuth must not leave a pending deep-link in
       // sessionStorage, or the next plain login could be hijacked.
       clearPendingRedirect()
-      error.value = decodeURIComponent(errorParam)
+      error.value = oauthErrorMessage(errorCode, scopeParam, errorParam)
       return
     }
 

@@ -61,14 +61,35 @@
                 <input
                   v-model="formData.email"
                   type="email"
-                  disabled
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat/50 border border-light-border/30 dark:border-dark-border/20 txt-secondary cursor-not-allowed"
-                  :title="$t('profile.personalInfo.emailHint')"
+                  autocomplete="email"
+                  :disabled="!canChangeEmail"
+                  :class="emailInputClass"
                   data-testid="input-email"
                 />
-                <p v-if="isExternalAuth" class="text-xs txt-secondary mt-1">
-                  {{ $t('profile.personalInfo.managedBy', { provider: authProvider }) }}
+                <p class="text-sm txt-secondary mt-1">
+                  {{ emailFieldHint }}
                 </p>
+                <div
+                  v-if="canChangeEmail && emailChanged"
+                  class="mt-4"
+                  data-testid="field-email-password"
+                >
+                  <label class="block txt-primary font-medium mb-2" for="profile-email-password">
+                    {{ $t('profile.personalInfo.emailPasswordLabel') }}
+                  </label>
+                  <input
+                    id="profile-email-password"
+                    v-model="emailPassword"
+                    type="password"
+                    autocomplete="current-password"
+                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    :placeholder="$t('profile.personalInfo.emailPasswordPlaceholder')"
+                    data-testid="input-email-password"
+                  />
+                  <p class="text-sm txt-secondary mt-1">
+                    {{ $t('profile.personalInfo.emailPasswordHint') }}
+                  </p>
+                </div>
               </div>
 
               <div data-testid="field-phone">
@@ -214,18 +235,48 @@
               </div>
 
               <div data-testid="field-timezone">
-                <label class="block txt-primary font-medium mb-2">
+                <label class="block txt-primary font-medium mb-2" for="profile-timezone">
                   {{ $t('profile.accountSettings.timezone') }}
                 </label>
+                <input
+                  id="profile-timezone-search"
+                  v-model="timezoneQuery"
+                  type="search"
+                  autocomplete="off"
+                  class="mb-2 w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  :placeholder="$t('profile.accountSettings.timezoneSearch')"
+                  :aria-label="$t('profile.accountSettings.timezoneSearch')"
+                  data-testid="input-timezone-search"
+                />
+                <p class="txt-secondary text-sm mb-2">
+                  {{ $t('profile.accountSettings.timezoneHint') }}
+                </p>
                 <select
+                  id="profile-timezone"
                   v-model="formData.timezone"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="select-timezone"
                 >
-                  <option v-for="tz in timezones" :key="tz.value" :value="tz.value">
-                    {{ tz.label }}
+                  <option v-if="formData.timezone === ''" value="">
+                    {{ $t('profile.accountSettings.timezonePlaceholder') }}
                   </option>
+                  <optgroup
+                    v-for="group in timezoneGroups"
+                    :key="group.offset"
+                    :label="group.offset"
+                  >
+                    <option v-for="tz in group.zones" :key="tz.value" :value="tz.value">
+                      {{ tz.label }}
+                    </option>
+                  </optgroup>
                 </select>
+                <p
+                  v-if="timezoneSearchMiss"
+                  class="text-sm txt-secondary mt-1"
+                  data-testid="timezone-no-match"
+                >
+                  {{ $t('profile.accountSettings.timezoneNoMatch') }}
+                </p>
               </div>
 
               <div class="md:col-span-2" data-testid="field-invoice-email">
@@ -635,7 +686,8 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
-import { countries, languages, timezones, type UserProfile } from '@/mocks/profile'
+import { countries, languages, type UserProfile } from '@/mocks/profile'
+import { listTimezones, timezoneGroupsForSelect } from '@/utils/timezones'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { profileApi } from '@/services/api'
@@ -723,8 +775,12 @@ const passwordData = ref({
 })
 const loading = ref(false)
 const canChangePassword = ref(true)
+const profileLoaded = ref(false)
 const authProvider = ref<string>('Email/Password')
 const isExternalAuth = ref(false)
+const emailPassword = ref('')
+const timezoneQuery = ref('')
+const saveSuccessMessage = ref('')
 const externalAuthLastLogin = ref<string | null>(null)
 const showDeleteModal = ref(false)
 const deleteConfirmPassword = ref('')
@@ -748,10 +804,45 @@ const hasPasswordChanges = computed(
     !!(passwordData.value.current || passwordData.value.new || passwordData.value.confirm)
 )
 
+const canChangeEmail = computed(
+  () => profileLoaded.value && canChangePassword.value && !isExternalAuth.value
+)
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+const emailChanged = computed(
+  () => normalizeEmail(formData.value.email) !== normalizeEmail(originalData.value.email)
+)
+
+const emailFieldHint = computed(() => {
+  if (!profileLoaded.value || canChangeEmail.value) return t('profile.personalInfo.emailHint')
+  if (isExternalAuth.value) {
+    return t('profile.personalInfo.managedBy', { provider: authProvider.value })
+  }
+  return t('profile.personalInfo.emailLockedHint')
+})
+
+const emailInputClass =
+  'w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed'
+
+const timezoneOptions = computed(() => listTimezones(new Date(), formData.value.timezone))
+const timezoneSelect = computed(() =>
+  timezoneGroupsForSelect(timezoneOptions.value, timezoneQuery.value, formData.value.timezone)
+)
+const timezoneGroups = computed(() => timezoneSelect.value.groups)
+const timezoneSearchMiss = computed(
+  () => timezoneQuery.value.trim().length > 0 && timezoneSelect.value.matchedCount === 0
+)
+
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
   formData,
   originalData,
-  { extraDirtyCheck: hasPasswordChanges }
+  {
+    extraDirtyCheck: hasPasswordChanges,
+    successMessage: () => saveSuccessMessage.value || t('unsavedChanges.saved'),
+  }
 )
 
 function markPasswordTouched() {
@@ -775,6 +866,7 @@ onMounted(async () => {
       canChangePassword.value = response.profile.canChangePassword ?? true
       authProvider.value = response.profile.authProvider ?? 'Email/Password'
       isExternalAuth.value = response.profile.isExternalAuth ?? false
+      profileLoaded.value = true
       externalAuthLastLogin.value = response.profile.externalAuthInfo?.lastLogin ?? null
 
       // Sync isAdmin to auth store if needed
@@ -821,7 +913,44 @@ function isWrongCurrentPassword(err: unknown): boolean {
   )
 }
 
+function profileSaveError(err: unknown): string {
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case 'email_password_incorrect':
+        return t('profile.personalInfo.emailPasswordRejected')
+      case 'email_password_required':
+        return t('profile.personalInfo.emailPasswordRequired')
+      case 'email_invalid':
+        return t('profile.personalInfo.emailInvalid')
+      case 'email_taken':
+        return t('profile.personalInfo.emailTaken')
+      case 'email_reserved':
+        return t('profile.personalInfo.emailReserved')
+      case 'email_managed':
+        return t('profile.personalInfo.emailManaged')
+      case 'timezone_invalid':
+        return t('profile.accountSettings.timezoneInvalid')
+    }
+  }
+  return getErrorMessage(err) || t('profile.saveFailed')
+}
+
 const handleSave = saveChanges(async () => {
+  const changingEmail = emailChanged.value
+  saveSuccessMessage.value = t('unsavedChanges.saved')
+
+  if (changingEmail) {
+    formData.value.email = normalizeEmail(formData.value.email)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.value.email)) {
+      error(t('profile.personalInfo.emailInvalid'))
+      throw new Error('Validation failed')
+    }
+    if (!emailPassword.value) {
+      error(t('profile.personalInfo.emailPasswordRequired'))
+      throw new Error('Validation failed')
+    }
+  }
+
   // Validate password if provided (only for local auth users)
   if (canChangePassword.value && passwordData.value.new) {
     if (passwordData.value.new !== passwordData.value.confirm) {
@@ -840,8 +969,21 @@ const handleSave = saveChanges(async () => {
   try {
     loading.value = true
 
-    // Update profile
-    await profileApi.updateProfile(formData.value)
+    // Update profile. The sign-in email is included, and the password is sent
+    // only when that address actually changed.
+    const updated = await profileApi.updateProfile(
+      formData.value,
+      changingEmail ? emailPassword.value : undefined
+    )
+    if (typeof updated?.email === 'string' && updated.email !== '') {
+      formData.value.email = updated.email
+    }
+    if (changingEmail) {
+      emailPassword.value = ''
+      saveSuccessMessage.value = t('profile.personalInfo.emailSaved', {
+        email: formData.value.email,
+      })
+    }
     profileSaved = true
 
     // Refresh /auth/me to propagate updated flags (e.g. memoriesEnabled)
@@ -878,7 +1020,7 @@ const handleSave = saveChanges(async () => {
       if (profileSaved) {
         originalData.value = { ...formData.value }
       }
-      error(getErrorMessage(err) || t('profile.saveFailed'))
+      error(profileSaveError(err))
     }
     throw err
   } finally {
@@ -890,6 +1032,7 @@ const handleDiscard = () => {
   discardChanges()
   passwordData.value = { current: '', new: '', confirm: '' }
   passwordTouchedByUser.value = false
+  emailPassword.value = ''
 }
 
 const handleDeleteAccount = async () => {
