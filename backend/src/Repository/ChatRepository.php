@@ -85,6 +85,32 @@ class ChatRepository extends ServiceEntityRepository
         );
     }
 
+    /**
+     * Chats for a page of share or audit rows, with messages already loaded
+     * so display titles do not query once per chat.
+     *
+     * @param list<int> $ids
+     *
+     * @return list<Chat>
+     */
+    public function findByIdsWithMessages(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<Chat> $chats */
+        $chats = $this->createQueryBuilder('c')
+            ->leftJoin('c.messages', 'm')
+            ->addSelect('m')
+            ->where('c.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
+
+        return $chats;
+    }
+
     public function findByShareToken(string $token): ?Chat
     {
         return $this->findOneBy(['shareToken' => $token]);

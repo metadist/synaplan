@@ -14,6 +14,8 @@
       "system": "Système",
       "selectModel": "-- Sélectionner un modèle --",
       "groupLimitsModels": "Votre groupe limite les modèles que vous pouvez utiliser ici.",
+      "groupLimitsNamed": "{name} limite les modèles que vous pouvez utiliser ici.",
+      "groupLimitsCombined": "{names} limitent ensemble les modèles que vous pouvez utiliser ici.",
       "systemModelsInfo": "Les modèles système sont automatiquement verrouillés et ne peuvent pas être modifiés. Ce sont des modèles essentiels requis pour des fonctions précises.",
       "modelsPurposesTitle": "Modèles et usages",
       "allModels": "Tous les modèles",
@@ -948,6 +950,7 @@
       },
       "run": {
         "action": "Exécuter sur cet ordinateur",
+        "runOn": "Exécuter sur {name}",
         "multiple": "{count} ordinateurs",
         "online": "{name} est connecté",
         "away": "{name} n'est pas connecté. Il se signale environ toutes les {minutes} minutes.",
@@ -955,10 +958,13 @@
         "needPrompt": "Saisissez d'abord ce que l'ordinateur doit faire.",
         "skillTitle": "Exécuter sur cet ordinateur",
         "skillMessage": "Quel skill exécuter sur « {name} » ?",
+        "pickSkill": "Choisissez un skill pour {name}.",
+        "noSkills": "{name} n'a pas encore indiqué ses skills. Saisissez le nom du skill.",
         "skillPlaceholder": "p. ex. pptx",
         "invalidSkill": "Utilisez uniquement des minuscules, des chiffres et des traits d'union.",
         "sent": "Envoyé à « {name} ».",
-        "enqueueFailed": "Impossible d'envoyer la tâche."
+        "inactive": "{name} est déconnecté. Reconnectez-le, puis réessayez.",
+        "enqueueFailed": "Impossible d'envoyer la tâche à {name}."
       },
       "jobCard": {
         "waiting": "En attente de {name}. Il se signale environ toutes les {minutes} minutes.",

@@ -17,6 +17,7 @@ use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
+use App\Repository\GroupRepository;
 use App\Repository\ModelRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Auth\DemoLoginHint;
@@ -115,6 +116,7 @@ class ConfigController extends AbstractController
         private readonly ?WorkflowsConfig $workflowsConfig = null,
         private readonly ?DocumentToolsConfig $documentToolsConfig = null,
         private readonly ?ComputeConfig $computeConfig = null,
+        private readonly ?GroupRepository $groupRepository = null,
     ) {
     }
 
@@ -930,6 +932,16 @@ class ConfigController extends AbstractController
                     items: new OA\Items(type: 'string', example: 'CHAT')
                 ),
                 new OA\Property(
+                    property: 'groupLimits',
+                    description: 'Groups whose model lists were combined for this member. Empty when nothing is restricted.',
+                    required: ['names', 'combined'],
+                    properties: [
+                        new OA\Property(property: 'names', type: 'array', items: new OA\Items(type: 'string', example: 'Sales')),
+                        new OA\Property(property: 'combined', type: 'boolean', example: false),
+                    ],
+                    type: 'object',
+                ),
+                new OA\Property(
                     property: 'providers',
                     type: 'array',
                     description: 'Availability of every registered AI provider on this installation (internal test provider excluded).',
@@ -1132,7 +1144,40 @@ class ConfigController extends AbstractController
             'models' => $grouped,
             'providers' => $providers,
             'restricted' => $restricted,
+            'groupLimits' => $this->groupLimitSummary((int) $user->getId(), $restricted),
         ]);
+    }
+
+    /**
+     * @param list<string> $restricted
+     *
+     * @return array{names: list<string>, combined: bool}
+     */
+    private function groupLimitSummary(int $userId, array $restricted): array
+    {
+        if ([] === $restricted || null === $this->layeredConfigResolver) {
+            return ['names' => [], 'combined' => false];
+        }
+
+        $ids = $this->layeredConfigResolver->modelAllowListGroupIds($userId);
+        if ([] === $ids) {
+            return ['names' => [], 'combined' => false];
+        }
+
+        $byId = [];
+        foreach ($this->groupRepository?->findByIds($ids) ?? [] as $group) {
+            if (null !== $group->getId()) {
+                $byId[(int) $group->getId()] = $group->getName();
+            }
+        }
+        $names = [];
+        foreach ($ids as $id) {
+            if (isset($byId[$id]) && '' !== $byId[$id]) {
+                $names[] = $byId[$id];
+            }
+        }
+
+        return ['names' => $names, 'combined' => count($names) > 1];
     }
 
     /**

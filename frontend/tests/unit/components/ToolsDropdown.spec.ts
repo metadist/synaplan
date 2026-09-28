@@ -10,7 +10,15 @@ const { features } = vi.hoisted(() => ({
 }))
 
 const desktopEnabled = { value: false }
-const activeDevices = ref<Array<{ id: number; name: string; status: string; lastSeen: number }>>([])
+const activeDevices = ref<
+  Array<{
+    id: number
+    name: string
+    status: string
+    lastSeen: number
+    enabledSkills?: string[]
+  }>
+>([])
 const hasActiveDevices = ref(false)
 
 vi.mock('@/stores/config', () => ({
@@ -31,6 +39,7 @@ vi.mock('@/composables/useDesktopDevices', () => ({
     activeDevices,
     hasActiveDevices,
     ensureLoaded: vi.fn(),
+    reload: vi.fn(),
   }),
 }))
 
@@ -148,6 +157,24 @@ describe('ToolsDropdown run on this computer', () => {
     stubMatchMedia()
     desktopEnabled.value = true
     hasActiveDevices.value = true
+  })
+
+  it('lists each computer and sends the one that was chosen', async () => {
+    const now = Math.floor(Date.now() / 1000)
+    activeDevices.value = [
+      { id: 1, name: 'tower', status: 'active', lastSeen: now, enabledSkills: ['pptx'] },
+      { id: 2, name: 'laptop', status: 'active', lastSeen: now, enabledSkills: ['docx'] },
+    ]
+    const wrapper = await mountDropdown()
+    await wrapper.get('[data-testid="btn-tools-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="btn-tool-run-on-device-2"]').text()).toContain('laptop')
+    await wrapper.get('[data-testid="btn-tool-run-on-device-2"]').trigger('click')
+
+    expect(wrapper.emitted('runOnDevice')?.[0]).toEqual([
+      { id: 2, name: 'laptop', enabledSkills: ['docx'] },
+    ])
   })
 
   it('stops saying the computer is connected after the check-in window', async () => {

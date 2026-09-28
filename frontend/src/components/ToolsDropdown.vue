@@ -171,25 +171,29 @@
         </div>
       </button>
 
-      <!-- DS16: dispatch the typed instruction to a paired computer. Only shown
-           when the flag is on AND the user has ≥1 active device — otherwise the
-           row is meaningless (nothing could answer). -->
-      <button
-        v-if="showRunOnDevice"
-        ref="itemRefs"
-        class="dropdown-item"
-        type="button"
-        data-testid="btn-tool-run-on-device"
-        @click="handleRunOnDevice"
-        @keydown.down.prevent="focusNext"
-        @keydown.up.prevent="focusPrevious"
-      >
-        <Icon icon="mdi:monitor-arrow-down" class="w-5 h-5 flex-shrink-0" />
-        <div class="flex-1 min-w-0">
-          <span class="text-sm font-medium">{{ $t('config.desktop.run.action') }}</span>
-          <div class="text-xs txt-secondary truncate">{{ runOnDeviceSubtext }}</div>
-        </div>
-      </button>
+      <template v-if="showRunOnDevice">
+        <button
+          v-for="device in activeDevices"
+          :key="device.id"
+          ref="itemRefs"
+          class="dropdown-item"
+          type="button"
+          :data-testid="
+            activeDevices.length === 1
+              ? 'btn-tool-run-on-device'
+              : `btn-tool-run-on-device-${device.id}`
+          "
+          @click="chooseRunOnDevice(device)"
+          @keydown.down.prevent="focusNext"
+          @keydown.up.prevent="focusPrevious"
+        >
+          <Icon icon="mdi:monitor-arrow-down" class="w-5 h-5 flex-shrink-0" />
+          <div class="flex-1 min-w-0">
+            <span class="text-sm font-medium">{{ runOnDeviceLabel(device) }}</span>
+            <div class="text-xs txt-secondary truncate">{{ devicePresenceText(device) }}</div>
+          </div>
+        </button>
+      </template>
     </div>
   </div>
 </template>
@@ -230,7 +234,7 @@ const emit = defineEmits<{
   toggleVoiceReply: []
   toggleEnhance: []
   summarizeDocument: []
-  runOnDevice: [device: { id: number; name: string }]
+  runOnDevice: [device: { id: number; name: string; enabledSkills: string[] }]
 }>()
 
 const configStore = useConfigStore()
@@ -284,7 +288,7 @@ const router = useRouter()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const commandsStore = useCommandsStore()
-const { activeDevices, hasActiveDevices, ensureLoaded } = useDesktopDevices()
+const { activeDevices, hasActiveDevices, ensureLoaded, reload } = useDesktopDevices()
 
 // DS16: the composer action is only meaningful with a live target. Gated on the
 // feature flag AND at least one active device (revoking the last one hides it).
@@ -309,26 +313,32 @@ const stopPresenceClock = () => {
   presenceTicker = null
 }
 
-const runOnDeviceSubtext = computed(() => {
-  const list = activeDevices.value
-  if (list.length !== 1) return t('config.desktop.run.multiple', { count: list.length })
-  const device = list[0]
+const devicePresenceText = (device: { name: string; status: string; lastSeen: number }) => {
   const presence = desktopPresence(device.status, device.lastSeen, nowSec.value)
   if (presence === 'online') return t('config.desktop.run.online', { name: device.name })
   if (presence === 'never') return t('config.desktop.run.never', { name: device.name })
   return t('config.desktop.run.away', { name: device.name, minutes: DESKTOP_CHECK_IN_MINUTES })
-})
+}
 
-const handleRunOnDevice = () => {
-  const device = activeDevices.value[0]
-  if (!device) return
+const runOnDeviceLabel = (device: { name: string }) => {
+  if (activeDevices.value.length === 1) return t('config.desktop.run.action')
+  return t('config.desktop.run.runOn', { name: device.name })
+}
+
+const chooseRunOnDevice = (device: { id: number; name: string; enabledSkills?: string[] }) => {
   closeDropdown()
-  emit('runOnDevice', { id: device.id, name: device.name })
+  emit('runOnDevice', {
+    id: device.id,
+    name: device.name,
+    enabledSkills: (device.enabledSkills ?? []).filter((skill) => /^[a-z0-9-]{1,64}$/.test(skill)),
+  })
 }
 const isOpen = ref(false)
 watch(isOpen, (open) => {
-  if (open) startPresenceClock()
-  else stopPresenceClock()
+  if (open) {
+    startPresenceClock()
+    void reload()
+  } else stopPresenceClock()
 })
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)

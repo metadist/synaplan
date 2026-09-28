@@ -702,7 +702,14 @@
       "left": "Vous avez quitté le groupe. Ce que vous avez partagé avec lui reste partagé avec les autres membres.",
       "leftAndStopped": "Vous avez quitté le groupe et avez arrêté de partager vos éléments avec lui.",
       "leaveFailed": "Impossible de quitter le groupe.",
-      "leaveDirectory": "Cette appartenance vient de votre connexion et ne peut pas être quittée ici."
+      "leaveDirectory": "Cette appartenance vient de votre connexion et ne peut pas être quittée ici.",
+      "ledBy": "Dirigé par {name}",
+      "noLeader": "Personne ne dirige encore ce groupe.",
+      "alsoIn": "Aussi dans ce groupe : {names}",
+      "onlyYou": "Vous êtes la seule personne dans ce groupe.",
+      "sharedLine": "Partagé avec ce groupe : {items}",
+      "youCanLeave": "Vous pouvez quitter. Vous perdez alors l’accès à ce que ce groupe peut voir.",
+      "youLead": "Vous dirigez ce groupe. Vous pouvez le quitter, et vous perdez alors l’accès à ce que ce groupe peut voir."
     },
     "users": {
       "groups": "Groupes",
@@ -712,7 +719,7 @@
       "name": "Nom",
       "kind": "Type",
       "members": "Membres",
-      "memberCount": "{count} membres",
+      "memberCount": "{count} membre | {count} membres",
       "fromLogin": "Depuis votre connexion",
       "manual": "Manuel",
       "create": "Créer un groupe",
@@ -771,6 +778,7 @@
         "share_revoke": "Partage retiré",
         "group_create": "Groupe créé",
         "group_update": "Groupe modifié",
+        "group_rename": "Groupe renommé",
         "group_delete": "Groupe supprimé",
         "group_member_set": "Membre ajouté",
         "group_member_remove": "Membre retiré",
@@ -790,6 +798,16 @@
         "platform_instance_approved": "Plateforme approuvée",
         "platform_instance_revoked": "Plateforme révoquée",
         "admin_user_level_change": "Niveau utilisateur modifié"
+      },
+      "what": "Ce qui s’est passé",
+      "emptyNote": "Ce journal indique qui a fait quoi. Il n’ouvre pas le contenu des chats ni des fichiers.",
+      "someone": "Quelqu’un",
+      "anItem": "un élément",
+      "sentence": {
+        "shareGrant": "{who} a partagé « {resource} » avec {subject}.",
+        "shareRevoke": "{who} a cessé de partager « {resource} » avec {subject}.",
+        "withSubject": "{who} : {action} — {resource}, avec {subject}.",
+        "generic": "{who} : {action} — {resource}."
       }
     },
     "linkedPlatforms": {

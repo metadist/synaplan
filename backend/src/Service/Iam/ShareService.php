@@ -296,6 +296,59 @@ final readonly class ShareService
     }
 
     /**
+     * Readable names of items shared with these groups, keyed by group id.
+     * One share query and one card lookup per kind, not one of each per group.
+     * Empty names and raw ids are left out.
+     *
+     * @param list<int> $groupIds
+     *
+     * @return array<int, list<array{name: string, kind: string}>>
+     */
+    public function sharedNamesForGroups(array $groupIds): array
+    {
+        $out = [];
+        foreach ($groupIds as $groupId) {
+            $out[$groupId] = [];
+        }
+        if ([] === $groupIds) {
+            return $out;
+        }
+
+        $shares = $this->shareRepository->findBySubjectIds(Share::SUBJECT_GROUP, $groupIds);
+        $idsByKind = [];
+        foreach ($shares as $share) {
+            $idsByKind[$share->getResourceKind()][] = $share->getResourceId();
+        }
+
+        $cards = [];
+        foreach ($idsByKind as $kind => $ids) {
+            try {
+                $cards[$kind] = $this->registry->get($kind)->describeMany(array_values(array_unique($ids)));
+            } catch (\Throwable) {
+                $cards[$kind] = [];
+            }
+        }
+
+        foreach ($shares as $share) {
+            $groupId = $share->getSubjectId();
+            if (!isset($out[$groupId])) {
+                continue;
+            }
+            $card = $cards[$share->getResourceKind()][$share->getResourceId()] ?? null;
+            $name = null !== $card ? trim($card->name) : '';
+            if ('' === $name || $name === $share->getResourceId() || str_starts_with($name, '#')) {
+                continue;
+            }
+            $out[$groupId][] = [
+                'name' => $name,
+                'kind' => $share->getResourceKind(),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Who an owned conversation is shared with, for the history row.
      * Public links are a separate flag on the chat and are not included.
      *

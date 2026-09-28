@@ -264,9 +264,9 @@ else
     fi
 
     # Build deploy/.env from the example:
-    #  - blank the eight secret placeholders so the lifecycle scripts generate
-    #    real, independent values into deploy/data/secrets.env (their design),
-    #  - set URL, version pin, and the first administrator.
+    #  - clear the eight secrets if an operator uncommented them, so the first
+    #    start generates independent values into deploy/data/secrets.env,
+    #  - set URL, realtime origin, version pin, and the first administrator.
     sed -e 's|^APP_SECRET=.*|APP_SECRET=|' \
         -e 's|^TOKEN_SECRET=.*|TOKEN_SECRET=|' \
         -e 's|^MARIADB_PASSWORD=.*|MARIADB_PASSWORD=|' \
@@ -277,6 +277,7 @@ else
         -e 's|^REALTIME_ADMIN_SECRET=.*|REALTIME_ADMIN_SECRET=|' \
         -e "s|^APP_URL=.*|APP_URL=${DOMAIN}|" \
         -e "s|^FRONTEND_URL=.*|FRONTEND_URL=${DOMAIN}|" \
+        -e "s|^REALTIME_ALLOWED_ORIGINS=.*|REALTIME_ALLOWED_ORIGINS=${DOMAIN}|" \
         -e "s|^BOOTSTRAP_ADMIN_EMAIL=.*|BOOTSTRAP_ADMIN_EMAIL=${ADMIN_EMAIL}|" \
         -e "s|^BOOTSTRAP_ADMIN_PASSWORD=.*|BOOTSTRAP_ADMIN_PASSWORD=${ADMIN_PASSWORD}|" \
         deploy/selfhost.env.example > "$ENV_FILE"

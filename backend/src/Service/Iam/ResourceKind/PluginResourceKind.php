@@ -13,6 +13,8 @@ use App\Service\Iam\Permission;
  */
 final readonly class PluginResourceKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     /**
      * @param list<Permission> $permissions
      */

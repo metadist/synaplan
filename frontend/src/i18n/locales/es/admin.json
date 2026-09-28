@@ -698,7 +698,14 @@
       "left": "Ha salido del grupo. Lo que compartió con él sigue compartido con los demás miembros.",
       "leftAndStopped": "Ha salido del grupo y dejó de compartir sus elementos con él.",
       "leaveFailed": "No se pudo salir del grupo.",
-      "leaveDirectory": "Esta pertenencia viene de su inicio de sesión y no se puede abandonar aquí."
+      "leaveDirectory": "Esta pertenencia viene de su inicio de sesión y no se puede abandonar aquí.",
+      "ledBy": "Dirigido por {name}",
+      "noLeader": "Nadie dirige este grupo todavía.",
+      "alsoIn": "También en este grupo: {names}",
+      "onlyYou": "Usted es la única persona en este grupo.",
+      "sharedLine": "Compartido con este grupo: {items}",
+      "youCanLeave": "Puede salir. Entonces pierde el acceso a lo que este grupo puede ver.",
+      "youLead": "Usted dirige este grupo. Puede salir, y entonces pierde el acceso a lo que este grupo puede ver."
     },
     "users": {
       "groups": "Grupos",
@@ -708,7 +715,7 @@
       "name": "Nombre",
       "kind": "Tipo",
       "members": "Miembros",
-      "memberCount": "{count} miembros",
+      "memberCount": "{count} miembro | {count} miembros",
       "fromLogin": "De su inicio de sesión",
       "manual": "Manual",
       "create": "Crear grupo",
@@ -767,6 +774,7 @@
         "share_revoke": "Uso compartido eliminado",
         "group_create": "Grupo creado",
         "group_update": "Grupo actualizado",
+        "group_rename": "Grupo renombrado",
         "group_delete": "Grupo eliminado",
         "group_member_set": "Miembro añadido",
         "group_member_remove": "Miembro eliminado",
@@ -786,6 +794,16 @@
         "platform_instance_approved": "Plataforma aprobada",
         "platform_instance_revoked": "Plataforma revocada",
         "admin_user_level_change": "Nivel de usuario cambiado"
+      },
+      "what": "Qué ocurrió",
+      "emptyNote": "Este registro indica quién hizo qué. No abre el contenido de chats ni de archivos.",
+      "someone": "Alguien",
+      "anItem": "un elemento",
+      "sentence": {
+        "shareGrant": "{who} compartió «{resource}» con {subject}.",
+        "shareRevoke": "{who} dejó de compartir «{resource}» con {subject}.",
+        "withSubject": "{who}: {action} — {resource}, con {subject}.",
+        "generic": "{who}: {action} — {resource}."
       }
     },
     "linkedPlatforms": {

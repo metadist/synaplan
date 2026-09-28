@@ -12,6 +12,8 @@ use App\Service\Tool\ToolsConfig;
 
 final readonly class ToolResourceKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'tool';
 
     public function __construct(

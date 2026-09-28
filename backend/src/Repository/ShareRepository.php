@@ -47,11 +47,29 @@ class ShareRepository extends ServiceEntityRepository
      */
     public function findBySubject(string $subjectType, int $subjectId): array
     {
+        return $this->findBySubjectIds($subjectType, [$subjectId]);
+    }
+
+    /**
+     * @param list<int> $subjectIds
+     *
+     * @return list<Share>
+     */
+    public function findBySubjectIds(string $subjectType, array $subjectIds): array
+    {
+        if ([] === $subjectIds) {
+            return [];
+        }
+
         /** @var list<Share> $rows */
-        $rows = $this->findBy(
-            ['subjectType' => $subjectType, 'subjectId' => $subjectId],
-            ['created' => 'DESC'],
-        );
+        $rows = $this->createQueryBuilder('s')
+            ->where('s.subjectType = :subjectType')
+            ->andWhere('s.subjectId IN (:subjectIds)')
+            ->setParameter('subjectType', $subjectType)
+            ->setParameter('subjectIds', $subjectIds)
+            ->orderBy('s.created', 'DESC')
+            ->getQuery()
+            ->getResult();
 
         return $rows;
     }
