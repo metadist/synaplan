@@ -797,7 +797,10 @@
         "platform_instance_registered": "Plateforme enregistrée",
         "platform_instance_approved": "Plateforme approuvée",
         "platform_instance_revoked": "Plateforme révoquée",
-        "admin_user_level_change": "Niveau utilisateur modifié"
+        "admin_user_level_change": "Niveau utilisateur modifié",
+        "messages_gateway_flags": "Réglages de la passerelle modifiés",
+        "messages_gateway_upstream": "Adresse de la passerelle modifiée",
+        "messages_gateway_aliases": "Alias de modèles modifiés"
       },
       "what": "Ce qui s’est passé",
       "emptyNote": "Ce journal indique qui a fait quoi. Il n’ouvre pas le contenu des chats ni des fichiers.",
@@ -808,6 +811,27 @@
         "shareRevoke": "{who} a cessé de partager « {resource} » avec {subject}.",
         "withSubject": "{who} : {action} — {resource}, avec {subject}.",
         "generic": "{who} : {action} — {resource}."
+      },
+      "on": "Activé",
+      "off": "Désactivé",
+      "none": "aucun",
+      "changeLine": "{label} : {old} → {new}",
+      "gatewaySetting": {
+        "ENABLED": "Passerelle",
+        "ALLOW_OPERATOR_KEY": "Clé du serveur",
+        "MCP_TOOLS_ENABLED": "Serveurs d’outils",
+        "MCP_TOOLS_WITH_CLIENT_TOOLS": "Serveurs d’outils avec les outils du client",
+        "MCP_MAX_ITERATIONS": "Tours d’outils",
+        "WEB_SEARCH_MODE": "Recherche web",
+        "WEB_FETCH_MODE": "Lecture web",
+        "VISION_MODE": "Compréhension des images",
+        "VISION_IMAGE_DETAIL": "Détail de l’image",
+        "VISION_MAX_IMAGES": "Images par demande",
+        "CONTEXT_INJECTION_ENABLED": "Contexte supplémentaire",
+        "BUDGET_NOTICE_ENABLED": "Avis de budget",
+        "SESSION_SUMMARY_ENABLED": "Résumé de session",
+        "MODEL_ALIASES": "Alias de modèles",
+        "UPSTREAM_URL": "Adresse de la passerelle"
       }
     },
     "linkedPlatforms": {

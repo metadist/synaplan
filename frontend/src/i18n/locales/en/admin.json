@@ -797,7 +797,10 @@
         "platform_instance_registered": "Platform registered",
         "platform_instance_approved": "Platform approved",
         "platform_instance_revoked": "Platform revoked",
-        "admin_user_level_change": "User level changed"
+        "admin_user_level_change": "User level changed",
+        "messages_gateway_flags": "Gateway settings changed",
+        "messages_gateway_upstream": "Gateway address changed",
+        "messages_gateway_aliases": "Model aliases changed"
       },
       "what": "What happened",
       "emptyNote": "This log records who did what. It does not open chat or file contents.",
@@ -808,6 +811,27 @@
         "shareRevoke": "{who} stopped sharing “{resource}” with {subject}.",
         "withSubject": "{who}: {action} — {resource}, with {subject}.",
         "generic": "{who}: {action} — {resource}."
+      },
+      "on": "On",
+      "off": "Off",
+      "none": "none",
+      "changeLine": "{label}: {old} → {new}",
+      "gatewaySetting": {
+        "ENABLED": "Gateway",
+        "ALLOW_OPERATOR_KEY": "Server key",
+        "MCP_TOOLS_ENABLED": "Tool servers",
+        "MCP_TOOLS_WITH_CLIENT_TOOLS": "Tool servers with client tools",
+        "MCP_MAX_ITERATIONS": "Tool rounds",
+        "WEB_SEARCH_MODE": "Web search",
+        "WEB_FETCH_MODE": "Web fetch",
+        "VISION_MODE": "Image understanding",
+        "VISION_IMAGE_DETAIL": "Image detail",
+        "VISION_MAX_IMAGES": "Images per request",
+        "CONTEXT_INJECTION_ENABLED": "Extra context",
+        "BUDGET_NOTICE_ENABLED": "Budget notice",
+        "SESSION_SUMMARY_ENABLED": "Session summary",
+        "MODEL_ALIASES": "Model aliases",
+        "UPSTREAM_URL": "Gateway address"
       }
     },
     "linkedPlatforms": {

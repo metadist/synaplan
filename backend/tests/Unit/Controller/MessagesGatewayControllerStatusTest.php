@@ -12,12 +12,15 @@ use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Controller\MessagesGatewayController;
 use App\Entity\User;
+use App\Repository\AuditLogEntryRepository;
 use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Service\BillingService;
+use App\Service\Iam\AuditLogWriter;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -58,6 +61,8 @@ final class MessagesGatewayControllerStatusTest extends TestCase
             $this->createStub(McpServerConfigRepository::class),
             new NullLogger(),
             $this->createStub(AppChatCredential::class),
+            new AuditLogWriter($this->createStub(AuditLogEntryRepository::class)),
+            $this->createStub(EntityManagerInterface::class),
             $appUrl,
         );
 

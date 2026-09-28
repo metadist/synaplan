@@ -11,14 +11,18 @@ use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Controller\MessagesGatewayController;
+use App\Entity\AuditLogEntry;
 use App\Entity\Config;
 use App\Entity\User;
+use App\Repository\AuditLogEntryRepository;
 use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Service\BillingService;
+use App\Service\Iam\AuditLogWriter;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -37,18 +41,33 @@ use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 final class MessagesGatewayControllerFlagsTest extends TestCase
 {
     private ConfigRepository&MockObject $configRepository;
+    private MessagesGatewayConfig&MockObject $config;
     private WebSearchTool&MockObject $webSearchTool;
     private AnalyzeImageTool&MockObject $analyzeImageTool;
     private MessagesGatewayController $controller;
 
+    /** @var list<AuditLogEntry> */
+    private array $auditEntries = [];
+
     protected function setUp(): void
     {
         $this->configRepository = $this->createMock(ConfigRepository::class);
+        $this->config = $this->createMock(MessagesGatewayConfig::class);
         $this->webSearchTool = $this->createMock(WebSearchTool::class);
         $this->analyzeImageTool = $this->createMock(AnalyzeImageTool::class);
+        $auditRepository = $this->createMock(AuditLogEntryRepository::class);
+        $auditRepository->method('save')->willReturnCallback(function (AuditLogEntry $entry): void {
+            $this->auditEntries[] = $entry;
+        });
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('wrapInTransaction')->willReturnCallback(
+            static function (callable $callback): mixed {
+                return $callback();
+            }
+        );
 
         $this->controller = new MessagesGatewayController(
-            $this->createStub(MessagesGatewayConfig::class),
+            $this->config,
             $this->createStub(UserProviderKeyResolver::class),
             $this->createStub(ProviderKeyStore::class),
             $this->configRepository,
@@ -60,6 +79,8 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
             $this->createStub(McpServerConfigRepository::class),
             new NullLogger(),
             $this->createStub(AppChatCredential::class),
+            new AuditLogWriter($auditRepository),
+            $entityManager,
         );
 
         $this->grantAdmin(true);
@@ -72,6 +93,7 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
         $response = $this->controller->putFlags($this->request(['enabled' => true]), $this->makeUser());
 
         $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+        $this->assertSame([], $this->auditEntries);
     }
 
     public function testWritesEveryValueKind(): void
@@ -202,6 +224,95 @@ final class MessagesGatewayControllerFlagsTest extends TestCase
         );
 
         $this->assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+        $this->assertSame([], $this->auditEntries);
+    }
+
+    public function testFlagUpdateWritesAnAuditRowWithOldAndNewValues(): void
+    {
+        $this->configRepository->method('getValue')->willReturn('0');
+
+        $response = $this->controller->putFlags($this->request(['enabled' => true]), $this->makeUser());
+
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertCount(1, $this->auditEntries);
+        $entry = $this->auditEntries[0];
+        $this->assertSame('messages_gateway.flags', $entry->getAction());
+        $this->assertSame('messages_gateway', $entry->getResourceKind());
+        $subject = $entry->getSubject();
+        $this->assertIsArray($subject);
+        $this->assertSame(['old' => '0', 'new' => '1'], $subject['changes']['ENABLED']);
+        $encoded = json_encode($subject);
+        $this->assertIsString($encoded);
+        $this->assertStringNotContainsString('sk-', $encoded);
+    }
+
+    public function testUpstreamUpdateWritesOneRedactedAuditRow(): void
+    {
+        $this->config->method('upstreamUrl')->willReturnOnConsecutiveCalls(
+            'https://old.example/v1?api_key=sk-old',
+            'https://api.example:8443/v1?token=sk-new',
+            'https://api.example:8443/v1?token=sk-new',
+        );
+        $this->config->expects($this->once())->method('setUpstreamUrl')->with('https://api.example:8443/v1?token=sk-new', 7);
+
+        $response = $this->controller->putUpstream(
+            $this->request(['upstream_url' => 'https://api.example:8443/v1?token=sk-new']),
+            $this->makeUser(),
+        );
+
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertCount(1, $this->auditEntries);
+        $entry = $this->auditEntries[0];
+        $this->assertSame('messages_gateway.upstream', $entry->getAction());
+        $subject = $entry->getSubject();
+        $this->assertIsArray($subject);
+        $this->assertSame(
+            ['old' => 'https://old.example/v1', 'new' => 'https://api.example:8443/v1'],
+            $subject['changes']['UPSTREAM_URL'],
+        );
+        $encoded = json_encode($subject);
+        $this->assertIsString($encoded);
+        $this->assertStringNotContainsString('sk-', $encoded);
+    }
+
+    public function testRejectedUpstreamWritesNoAuditRow(): void
+    {
+        $this->config->method('upstreamUrl')->willReturn('https://api.anthropic.com');
+        $this->config->method('setUpstreamUrl')->willThrowException(new \InvalidArgumentException('Upstream URL is not a valid absolute URL.'));
+
+        $response = $this->controller->putUpstream($this->request(['upstream_url' => 'not a url']), $this->makeUser());
+
+        $this->assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+        $this->assertSame([], $this->auditEntries);
+    }
+
+    public function testAliasUpdateWritesOneAuditRowWithOldAndNewMaps(): void
+    {
+        $this->config->method('modelAliases')->willReturn(['claude-3' => 'old-model']);
+
+        $response = $this->controller->putAliases(
+            $this->request(['model_aliases' => ['claude-3' => 'new-model', '' => 'drop-me']]),
+            $this->makeUser(),
+        );
+
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertCount(1, $this->auditEntries);
+        $entry = $this->auditEntries[0];
+        $this->assertSame('messages_gateway.aliases', $entry->getAction());
+        $subject = $entry->getSubject();
+        $this->assertIsArray($subject);
+        $this->assertSame(
+            ['old' => ['claude-3' => 'old-model'], 'new' => ['claude-3' => 'new-model']],
+            $subject['changes']['MODEL_ALIASES'],
+        );
+    }
+
+    public function testRejectedAliasWriteCreatesNoAuditRow(): void
+    {
+        $response = $this->controller->putAliases($this->request(['model_aliases' => 'nope']), $this->makeUser());
+
+        $this->assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+        $this->assertSame([], $this->auditEntries);
     }
 
     private function grantAdmin(bool $granted): void

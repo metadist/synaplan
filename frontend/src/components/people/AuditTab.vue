@@ -72,6 +72,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { iamApi, type IamAuditEntry } from '@/services/api/iamApi'
+import { gatewayAuditDetail } from '@/utils/auditGatewayChanges'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
 
@@ -104,6 +105,9 @@ const ACTION_KEYS: Record<string, string> = {
   'platform_instance.approved': 'people.audit.action.platform_instance_approved',
   'platform_instance.revoked': 'people.audit.action.platform_instance_revoked',
   'admin.user_level_change': 'people.audit.action.admin_user_level_change',
+  'messages_gateway.flags': 'people.audit.action.messages_gateway_flags',
+  'messages_gateway.upstream': 'people.audit.action.messages_gateway_upstream',
+  'messages_gateway.aliases': 'people.audit.action.messages_gateway_aliases',
 }
 
 const selectedAction = ref<string | undefined>(undefined)
@@ -129,28 +133,33 @@ function rowSentence(entry: IamAuditEntry): string {
   const who = entry.actorName?.trim() || t('people.audit.someone')
   const resource = entry.resourceName?.trim() || t('people.audit.anItem')
   const subject = subjectLabel(entry)
+  let sentence: string
   if (entry.action === 'share.grant' || entry.action === 'share.revoke') {
     const key =
       entry.action === 'share.grant'
         ? 'people.audit.sentence.shareGrant'
         : 'people.audit.sentence.shareRevoke'
     const permission = permissionLabel(entry)
-    const sentence = t(key, { who, resource, subject: subject || t('people.audit.someone') })
-    return permission ? `${sentence} (${permission})` : sentence
-  }
-  if (subject) {
-    return t('people.audit.sentence.withSubject', {
+    const shared = t(key, { who, resource, subject: subject || t('people.audit.someone') })
+    sentence = permission ? `${shared} (${permission})` : shared
+  } else if (subject) {
+    sentence = t('people.audit.sentence.withSubject', {
       who,
       action: actionLabel(entry.action),
       resource,
       subject,
     })
+  } else {
+    sentence = t('people.audit.sentence.generic', {
+      who,
+      action: actionLabel(entry.action),
+      resource,
+    })
   }
-  return t('people.audit.sentence.generic', {
-    who,
-    action: actionLabel(entry.action),
-    resource,
-  })
+  const detail = gatewayAuditDetail(entry.action, entry.subject, (key, values) =>
+    values ? t(key, values) : t(key)
+  )
+  return detail ? `${sentence} ${detail}` : sentence
 }
 
 function subjectLabel(entry: IamAuditEntry): string {

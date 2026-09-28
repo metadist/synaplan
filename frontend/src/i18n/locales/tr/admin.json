@@ -793,7 +793,10 @@
         "platform_instance_registered": "Platform kaydedildi",
         "platform_instance_approved": "Platform onaylandı",
         "platform_instance_revoked": "Platform iptal edildi",
-        "admin_user_level_change": "Kullanıcı seviyesi değiştirildi"
+        "admin_user_level_change": "Kullanıcı seviyesi değiştirildi",
+        "messages_gateway_flags": "Ağ geçidi ayarları değiştirildi",
+        "messages_gateway_upstream": "Ağ geçidi adresi değiştirildi",
+        "messages_gateway_aliases": "Model takma adları değiştirildi"
       },
       "what": "Ne oldu",
       "emptyNote": "Bu kayıt kimin ne yaptığını tutar. Sohbet veya dosya içeriğini açmaz.",
@@ -804,6 +807,27 @@
         "shareRevoke": "{who}, “{resource}” paylaşımını {subject} ile durdurdu.",
         "withSubject": "{who}: {action} — {resource}, {subject} ile.",
         "generic": "{who}: {action} — {resource}."
+      },
+      "on": "Açık",
+      "off": "Kapalı",
+      "none": "yok",
+      "changeLine": "{label}: {old} → {new}",
+      "gatewaySetting": {
+        "ENABLED": "Ağ geçidi",
+        "ALLOW_OPERATOR_KEY": "Sunucu anahtarı",
+        "MCP_TOOLS_ENABLED": "Araç sunucuları",
+        "MCP_TOOLS_WITH_CLIENT_TOOLS": "İstemci araçlarıyla araç sunucuları",
+        "MCP_MAX_ITERATIONS": "Araç turları",
+        "WEB_SEARCH_MODE": "Web araması",
+        "WEB_FETCH_MODE": "Web okuma",
+        "VISION_MODE": "Görüntü anlama",
+        "VISION_IMAGE_DETAIL": "Görüntü ayrıntısı",
+        "VISION_MAX_IMAGES": "İstek başına görüntü",
+        "CONTEXT_INJECTION_ENABLED": "Ek bağlam",
+        "BUDGET_NOTICE_ENABLED": "Bütçe uyarısı",
+        "SESSION_SUMMARY_ENABLED": "Oturum özeti",
+        "MODEL_ALIASES": "Model takma adları",
+        "UPSTREAM_URL": "Ağ geçidi adresi"
       }
     },
     "linkedPlatforms": {
