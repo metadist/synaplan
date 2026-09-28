@@ -139,6 +139,20 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/config/values'));
     }
 
+    public function testAudioTranscribeReachesSpeechToTextAndMeetingNotesOnly(): void
+    {
+        $scopes = [ApiKeyScope::AUDIO_TRANSCRIBE];
+
+        self::assertTrue(ApiKeyScope::isRestricted($scopes));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/audio/transcriptions'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/audio/transcriptions/sessions/stt_sess_1/audio'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/opendesk/meeting-notes'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/opendesk/meeting-notes/connect'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/messages'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/audio/speech'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/files'));
+    }
+
     public function testJobsScopeDoesNotReachMessagesOrMcp(): void
     {
         $scopes = ['desktop:jobs'];

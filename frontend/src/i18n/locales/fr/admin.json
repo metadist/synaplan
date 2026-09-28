@@ -1113,6 +1113,9 @@
     "whatsapp": {
       "label": "Canal WhatsApp"
     },
+    "opendesk_stt": {
+      "label": "Notes de réunion"
+    },
     "compute": {
       "label": "Calcul sécurisé (travail sur fichiers)",
       "running": "Le travail sur fichiers est en cours.",

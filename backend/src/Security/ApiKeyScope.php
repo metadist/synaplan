@@ -98,6 +98,11 @@ final class ApiKeyScope
     public const COMPUTE_RUN = 'compute:run';
 
     /**
+     * `/v1/audio/transcriptions*` and Meeting notes. A meeting key cannot chat.
+     */
+    public const AUDIO_TRANSCRIBE = 'audio:transcribe';
+
+    /**
      * Paths any authenticated key may reach regardless of scopes: identity
      * introspection of the key's own account ("who am I") and the public
      * health probe. Both are read-only; `/api/health` carries no owner data
@@ -309,6 +314,10 @@ final class ApiKeyScope
      */
     public static function requiredScopesForPath(string $path): array
     {
+        if (self::matchesPrefix($path, '/v1/audio/transcriptions')) {
+            return [self::AUDIO_TRANSCRIBE, self::DESKTOP_MESSAGES];
+        }
+
         if ('/v1' === $path || str_starts_with($path, '/v1/')) {
             return [self::DESKTOP_MESSAGES];
         }
@@ -363,6 +372,10 @@ final class ApiKeyScope
 
         if (self::matchesPrefix($path, '/api/v1/agents')) {
             return [self::AGENTS_ALL];
+        }
+
+        if (self::matchesPrefix($path, '/api/v1/opendesk/meeting-notes')) {
+            return [self::AUDIO_TRANSCRIBE];
         }
 
         return [];

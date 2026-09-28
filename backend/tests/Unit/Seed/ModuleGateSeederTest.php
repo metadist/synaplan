@@ -24,7 +24,7 @@ final class ModuleGateSeederTest extends TestCase
 
         $rows = ModuleGateSeeder::defaultRows($ids);
 
-        $this->assertCount(13, $rows);
+        $this->assertCount(14, $rows);
         $bySetting = [];
         foreach ($rows as $row) {
             $this->assertSame(0, $row['ownerId']);
@@ -40,6 +40,7 @@ final class ModuleGateSeederTest extends TestCase
             'GATE_LOCAL_AI',
             'GATE_MOBILE_IAP',
             'GATE_OFFICE_CONVERT',
+            'GATE_OPENDESK_STT',
             'GATE_PIPER_TTS',
             'GATE_SEARXNG',
             'GATE_STRIPE_BILLING',
@@ -48,7 +49,7 @@ final class ModuleGateSeederTest extends TestCase
             'GATE_WHATSAPP',
         ], array_keys($bySetting));
 
-        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT', 'GATE_SEARXNG', 'GATE_PIPER_TTS', 'GATE_LOCAL_AI', 'GATE_HIGGSFIELD', 'GATE_GOOGLE_AI', 'GATE_THEHIVE', 'GATE_STRIPE_BILLING', 'GATE_MOBILE_IAP', 'GATE_WHATSAPP', 'GATE_COMPUTE'];
+        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT', 'GATE_SEARXNG', 'GATE_PIPER_TTS', 'GATE_LOCAL_AI', 'GATE_HIGGSFIELD', 'GATE_GOOGLE_AI', 'GATE_THEHIVE', 'GATE_STRIPE_BILLING', 'GATE_MOBILE_IAP', 'GATE_WHATSAPP', 'GATE_COMPUTE', 'GATE_OPENDESK_STT'];
         foreach ($bySetting as $setting => $value) {
             $this->assertSame(in_array($setting, $on, true) ? '1' : '0', $value, $setting);
         }

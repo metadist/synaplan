@@ -36,6 +36,7 @@
 #                    docling  (layout-aware extraction in front of Tika)
 #                    searxng  (self-hosted web search)
 #                    oidc     (Keycloak, SSO test realm)
+#                    transcriber (Meeting notes for Jitsi and Element)
 #                    -> COMPOSE_PROFILES=local-ai,office docker compose up -d
 # The boot page is http://localhost:<SYNAPLAN_FRONTEND_PORT> (5173 when unset).
 # It shows which blocks are running.
@@ -1210,6 +1211,40 @@ services:
       # here and chowns scratch for the sandbox uid.
       - ./.compute-data/scratch:/scratch
       - ./.compute-data/workspaces:/workspaces
+    networks:
+      - synaplan-network
+
+  # Meeting notes for openDesk. Off unless you start the profile AND set
+  # OPENDESK_STT_URL=http://transcriber:8095 in backend/.env (empty keeps the
+  # Synaplan module absent). Jitsi reaches the published port; Element needs
+  # the Matrix variables. See docs/OPENDESK_MEETING_NOTES.md.
+  transcriber:
+    profiles: [transcriber]
+    pull_policy: build
+    build:
+      context: ./sidecars/synaplan-transcriber
+    container_name: synaplan-transcriber
+    restart: unless-stopped
+    ports:
+      - "${SYNAPLAN_TRANSCRIBER_PORT:-8095}:8095"
+    environment:
+      TRANSCRIBER_MODE: ${TRANSCRIBER_MODE:-opendesk}
+      TRANSCRIBER_LANGUAGE: ${TRANSCRIBER_LANGUAGE:-auto}
+      TRANSCRIBER_AUTH_TOKEN: ${TRANSCRIBER_AUTH_TOKEN:-}
+      SYNAPLAN_URL: http://backend:8000
+      SYNAPLAN_API_KEY: ${SYNAPLAN_API_KEY:-}
+      SYNAPLAN_STT_MODEL: ${SYNAPLAN_STT_MODEL:-}
+      COMMIT_AFTER_MS: ${COMMIT_AFTER_MS:-8000}
+      MATRIX_HOMESERVER: ${MATRIX_HOMESERVER:-}
+      MATRIX_ACCESS_TOKEN: ${MATRIX_ACCESS_TOKEN:-}
+      MATRIX_USER_ID: ${MATRIX_USER_ID:-}
+      NOTES_MATRIX_ROOM: ${NOTES_MATRIX_ROOM:-}
+      NEXTCLOUD_URL: ${NEXTCLOUD_URL:-}
+      NEXTCLOUD_USER: ${NEXTCLOUD_USER:-}
+      NEXTCLOUD_APP_PASSWORD: ${NEXTCLOUD_APP_PASSWORD:-}
+      NOTES_NEXTCLOUD_FOLDER: ${NOTES_NEXTCLOUD_FOLDER:-/Meetings}
+    depends_on:
+      - backend
     networks:
       - synaplan-network
 

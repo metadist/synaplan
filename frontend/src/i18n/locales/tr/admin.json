@@ -1109,6 +1109,9 @@
     "whatsapp": {
       "label": "WhatsApp kanalı"
     },
+    "opendesk_stt": {
+      "label": "Toplantı notları"
+    },
     "compute": {
       "label": "Güvenli dosya çalışması",
       "running": "Dosya çalışması çalışıyor.",

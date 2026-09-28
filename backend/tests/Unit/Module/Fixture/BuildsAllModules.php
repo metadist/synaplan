@@ -17,6 +17,7 @@ use App\Module\Sidecar\ComputeModule;
 use App\Module\Sidecar\DoclingModule;
 use App\Module\Sidecar\LocalAiModule;
 use App\Module\Sidecar\OfficeConvertModule;
+use App\Module\Sidecar\OpendeskSttModule;
 use App\Module\Sidecar\PiperTtsModule;
 use App\Module\Sidecar\SearxngModule;
 use App\Module\Sidecar\TikaModule;
@@ -67,6 +68,7 @@ trait BuildsAllModules
             ),
             new WhatsappModule(false, '', ''),
             new ComputeModule($probe, $this->createStub(ComputeConfig::class), '', ''),
+            new OpendeskSttModule($probe, '', '', '', ''),
         ];
 
         $byId = [];

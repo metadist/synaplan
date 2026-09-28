@@ -39,6 +39,7 @@ final class MinimalModuleEnvTest extends TestCase
         'mobile_iap' => ['IAP_PRODUCT_PRO', 'IAP_PRODUCT_TEAM', 'IAP_PRODUCT_BUSINESS'],
         'whatsapp' => ['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN'],
         'compute' => ['COMPUTE_URL', 'COMPUTE_TOKEN'],
+        'opendesk_stt' => ['OPENDESK_STT_URL'],
     ];
 
     public function testEveryDeclaredModuleHasADecisiveEnvList(): void

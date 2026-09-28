@@ -33,6 +33,7 @@ final class ModuleDescriptorContractTest extends TestCase
         'mobile_iap',
         'whatsapp',
         'compute',
+        'opendesk_stt',
     ];
 
     public function testTheDescriptorSetIsExactlyThePlan(): void
