@@ -1143,7 +1143,7 @@ services:
     container_name: synaplan-tts
     restart: unless-stopped
     ports:
-      - "127.0.0.1:10200:10200"
+      - "127.0.0.1:${SYNAPLAN_TTS_PORT:-10200}:10200"
     volumes:
       - tts_extra_voices:/voices-extra
     environment:
