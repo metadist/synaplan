@@ -139,4 +139,105 @@ describe('AIModelsConfiguration empty model row', () => {
     expect(chatTriggerLabel().classes()).not.toContain('txt-model-placeholder')
     expect(chatTriggerLabel().text()).toBe('Llama')
   })
+
+  it('shows a retry instead of an empty menu when the model list fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    getModels.mockRejectedValueOnce(new Error('network'))
+
+    await mountPage()
+
+    expect(wrapper!.find('[data-testid="section-capabilities"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="btn-model-dropdown"]').exists()).toBe(false)
+    expect(wrapper!.get('[data-testid="section-models-load-error"]').text()).toContain(
+      'The model list could not be loaded.'
+    )
+
+    getModels.mockResolvedValue({ success: true, models: { CHAT: [chatModel] }, providers: [] })
+    await wrapper!.get('[data-testid="btn-retry-models"]').trigger('click')
+    await flushPromises()
+
+    expect(getModels).toHaveBeenCalledTimes(2)
+    expect(wrapper!.find('[data-testid="section-models-load-error"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="btn-model-dropdown"]').exists()).toBe(true)
+    errorSpy.mockRestore()
+  })
+
+  it('shows a retry on the full list when the model list fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    getModels.mockRejectedValueOnce(new Error('network'))
+
+    await mountPage()
+    ;(wrapper!.vm as unknown as { activeTab: string }).activeTab = 'list'
+    await wrapper!.vm.$nextTick()
+
+    const listError = wrapper!.get('[data-testid="section-models-load-error-list"]')
+    expect(listError.isVisible()).toBe(true)
+    expect(listError.text()).toContain('The model list could not be loaded.')
+    expect(wrapper!.find('[data-testid="section-models-empty"]').exists()).toBe(false)
+    expect(wrapper!.find('table').exists()).toBe(false)
+
+    getModels.mockResolvedValue({ success: true, models: { CHAT: [chatModel] }, providers: [] })
+    await wrapper!.get('[data-testid="btn-retry-models-list"]').trigger('click')
+    await flushPromises()
+
+    expect(getModels).toHaveBeenCalledTimes(2)
+    expect(wrapper!.find('[data-testid="section-models-load-error-list"]').exists()).toBe(false)
+    expect(wrapper!.get('table').text()).toContain('Llama')
+    errorSpy.mockRestore()
+  })
+
+  it('says the full list is still loading instead of saying there are no models', async () => {
+    let resolveModels: (value: unknown) => void = () => {}
+    getModels.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveModels = resolve
+        })
+    )
+
+    wrapper = mount(AIModelsConfiguration, {
+      global: {
+        plugins: [createPinia()],
+        stubs: {
+          PageHeader: { template: '<div><slot /><slot name="actions" /></div>' },
+          TabNav: { template: '<div />' },
+          ServiceIcon: { template: '<span />' },
+          ModelCostBadge: { template: '<span />' },
+          EmbeddingSwitchModal: { template: '<div />' },
+          EmbeddingRunsPanel: { template: '<div />' },
+          AIModelsAdminPanel: { template: '<div />' },
+          AddModelForm: { template: '<div />' },
+          OpenAiCompatibleEndpointsPanel: { template: '<div />' },
+          AccordionStack: { template: '<div><slot /></div>' },
+          AccordionSection: { template: '<div><slot /></div>' },
+          SectionJumpNav: { template: '<div />' },
+        },
+      },
+    })
+    ;(wrapper.vm as unknown as { activeTab: string }).activeTab = 'list'
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('[data-testid="section-models-list-loading"]').isVisible()).toBe(true)
+    expect(wrapper.get('[data-testid="section-models-list-loading"]').text()).toContain(
+      'Loading models...'
+    )
+    expect(wrapper.find('[data-testid="section-models-empty"]').exists()).toBe(false)
+    expect(wrapper.find('table').exists()).toBe(false)
+
+    resolveModels({ success: true, models: { CHAT: [chatModel] }, providers: [] })
+    await flushPromises()
+
+    expect(wrapper.get('table').text()).toContain('Llama')
+  })
+
+  it('keeps the model menu when only the saved choices fail to load', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    getDefaultModels.mockRejectedValueOnce(new Error('defaults'))
+
+    await mountPage()
+
+    expect(wrapper!.find('[data-testid="section-models-load-error"]').exists()).toBe(false)
+    expect(wrapper!.find('[data-testid="btn-model-dropdown"]').exists()).toBe(true)
+    errorSpy.mockRestore()
+  })
 })

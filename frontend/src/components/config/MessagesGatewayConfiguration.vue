@@ -24,26 +24,43 @@
           <span
             class="inline-flex items-center gap-2 px-3 py-1 rounded-full"
             :class="
-              status.enabled
+              gatewayReady
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
             "
             data-testid="badge-gateway-enabled"
           >
             <Icon
-              :icon="status.enabled ? 'heroicons:check-circle' : 'heroicons:pause-circle'"
+              :icon="gatewayReady ? 'heroicons:check-circle' : 'heroicons:pause-circle'"
               class="w-4 h-4"
             />
-            {{
-              status.enabled
-                ? $t('messagesGateway.statusEnabled')
-                : $t('messagesGateway.statusDisabled')
-            }}
+            {{ statusBadgeLabel }}
           </span>
           <span class="txt-secondary font-mono text-xs" data-testid="text-upstream-url">
             {{ status.upstream_url }}
           </span>
         </div>
+        <p v-if="missingKey" class="txt-secondary text-sm mt-3" data-testid="text-missing-key">
+          <i18n-t keypath="messagesGateway.missingKey" tag="span">
+            <template #accounts>
+              <RouterLink
+                to="/ai/providers?section=anthropic"
+                class="text-[var(--brand)] hover:underline font-medium"
+                data-testid="link-missing-key-accounts"
+              >
+                {{ $t('messagesGateway.yourAiAccounts') }}
+              </RouterLink>
+            </template>
+          </i18n-t>
+          <span v-if="!status.is_admin"> {{ $t('messagesGateway.missingKeyAdmin') }}</span>
+        </p>
+        <p
+          v-else-if="!status.enabled && !status.is_admin"
+          class="txt-secondary text-sm mt-3"
+          data-testid="text-gateway-off"
+        >
+          {{ $t('messagesGateway.gatewayOff') }}
+        </p>
         <p class="txt-secondary text-sm mt-3">
           {{
             budgetUnlimited
@@ -59,19 +76,35 @@
         </p>
       </div>
 
-      <!-- Setup snippet -->
-      <div class="surface-card p-6" data-testid="section-agents-setup">
+      <!-- Setup snippet. Hidden from non-admins while the gateway is off. -->
+      <div v-if="showSetup" class="surface-card p-6" data-testid="section-agents-setup">
         <h3 class="text-lg font-semibold txt-primary mb-2">
           {{ $t('messagesGateway.setupTitle') }}
         </h3>
-        <p class="txt-secondary text-sm mb-4">{{ $t('messagesGateway.setupHint') }}</p>
+        <p class="txt-secondary text-sm mb-3">{{ $t('messagesGateway.setupHint') }}</p>
+        <p class="txt-secondary text-sm mb-3" data-testid="text-api-key-step">
+          <i18n-t keypath="messagesGateway.apiKeyStep" tag="span">
+            <template #keys>
+              <RouterLink
+                to="/channels/api"
+                class="text-[var(--brand)] hover:underline font-medium"
+                data-testid="link-api-keys"
+              >
+                {{ $t('messagesGateway.apiKeysLink') }}
+              </RouterLink>
+            </template>
+          </i18n-t>
+        </p>
+        <p class="txt-secondary text-sm mb-4" data-testid="text-first-start">
+          {{ $t('messagesGateway.firstStartHint') }}
+        </p>
         <pre
           class="p-4 rounded-lg surface-chip txt-primary text-xs font-mono overflow-x-auto whitespace-pre-wrap"
           data-testid="text-setup-snippet"
           >{{ setupSnippet }}</pre>
         <button
           type="button"
-          class="btn-primary mt-3 px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-primary mt-3 px-4 py-2.5 rounded-lg text-sm font-medium"
           data-testid="btn-copy-setup"
           @click="copySetup"
         >
@@ -100,15 +133,22 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { RouterLink } from 'vue-router'
 import { useNotification } from '@/composables/useNotification'
+import { useConfigStore } from '@/stores/config'
 import PageHeader from '@/components/PageHeader.vue'
 import {
   getMessagesGatewayStatus,
   type MessagesGatewayStatus,
 } from '@/services/api/messagesGatewayApi'
+import {
+  codingClientBaseUrl,
+  codingClientSetupSnippet,
+  providerKeyReady,
+} from '@/utils/codingClientSetup'
 import MessagesGatewayAdminSettings from './messagesGateway/MessagesGatewayAdminSettings.vue'
 
 const { t } = useI18n()
 const { success, error } = useNotification()
+const configStore = useConfigStore()
 
 const loading = ref(true)
 const status = ref<MessagesGatewayStatus | null>(null)
@@ -116,15 +156,32 @@ const status = ref<MessagesGatewayStatus | null>(null)
 // A budget of 0 means "no monthly budget configured" (unlimited), not "exhausted".
 const budgetUnlimited = computed(() => Number(status.value?.budget?.budget ?? 0) <= 0)
 
+const keyReady = computed(() => providerKeyReady(status.value?.keys?.anthropic?.effective_source))
+
+const gatewayReady = computed(() => Boolean(status.value?.enabled) && keyReady.value)
+
+const missingKey = computed(() => Boolean(status.value?.enabled) && !keyReady.value)
+
+const showSetup = computed(() => Boolean(status.value?.enabled) || Boolean(status.value?.is_admin))
+
+const statusBadgeLabel = computed(() => {
+  if (!status.value?.enabled) {
+    return t('messagesGateway.statusDisabled')
+  }
+  if (!keyReady.value) {
+    return t('messagesGateway.statusNotReady')
+  }
+  return t('messagesGateway.statusEnabled')
+})
+
 const setupSnippet = computed(() => {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://web.synaplan.com'
-  return [
-    `export ANTHROPIC_BASE_URL="${origin}"`,
-    'export ANTHROPIC_API_KEY="sk_your_synaplan_api_key"',
-    '# or: export ANTHROPIC_AUTH_TOKEN="sk_your_synaplan_api_key"',
-    '# Set exactly one credential variable.',
-    'claude',
-  ].join('\n')
+  const base = codingClientBaseUrl(
+    configStore.apiBaseUrl,
+    status.value?.setup?.base_url_hint ?? '',
+    origin
+  )
+  return codingClientSetupSnippet(base)
 })
 
 /**

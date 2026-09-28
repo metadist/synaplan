@@ -11,6 +11,8 @@
       },
       "defaultConfigTitle": "Standard-Modellkonfiguration",
       "loadingModels": "Lade Modelle...",
+      "loadFailed": "Die Modellliste konnte nicht geladen werden.",
+      "retry": "Erneut laden",
       "system": "System",
       "selectModel": "-- Modell auswählen --",
       "groupLimitsModels": "Ihre Gruppe begrenzt, welche Modelle Sie hier verwenden können.",

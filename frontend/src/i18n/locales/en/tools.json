@@ -445,7 +445,15 @@
     "description": "Connect Claude Code and other Anthropic-compatible agent tools to your Synaplan workspace. Requests go to POST /v1/messages and are metered against your Synaplan budget.",
     "statusTitle": "Gateway status",
     "statusEnabled": "Enabled",
+    "statusNotReady": "Not ready",
     "statusDisabled": "Disabled",
+    "missingKey": "No provider key will pay for these requests. Save one under {accounts}. Nothing is sent until a key is saved.",
+    "missingKeyAdmin": "An admin can also allow the server key.",
+    "yourAiAccounts": "Your AI accounts",
+    "gatewayOff": "Coding clients are turned off, so nothing is sent. An admin can turn the gateway on.",
+    "apiKeyStep": "Create a Synaplan API key under {keys}, then paste it in place of sk_your_synaplan_api_key.",
+    "apiKeysLink": "Manage → Developer & devices → API Keys",
+    "firstStartHint": "The first time Claude Code starts, it asks whether to use this API key and whether to trust the folder. The suggested answer is no. Choose yes for both, or the key is rejected and nothing is sent.",
     "budgetLine": "Budget used: {percent}% ({used} of {budget})",
     "budgetLineUnlimited": "Budget used: {used} (no monthly budget limit)",
     "setupTitle": "Claude Code setup",
@@ -544,7 +552,7 @@
       "mcpTools": {
         "label": "Let AI assistants use your tools",
         "description": "Synaplan runs the tools of your connected tool servers itself and passes the result back to the assistant.",
-        "noneConfigured": "No tool server is connected yet. You can add one under Channels → MCP servers."
+        "noneConfigured": "No tool server is connected yet. You can add one under Manage → Connections → MCP Servers."
       },
       "mcpWithClientTools": {
         "label": "Offer your tools even when the agent tool brings its own",

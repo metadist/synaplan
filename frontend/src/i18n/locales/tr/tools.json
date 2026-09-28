@@ -371,6 +371,14 @@
     "description": "Claude Code ve diğer Anthropic uyumlu ajan araçlarını Synaplan çalışma alanınıza bağlayın. İstekler POST /v1/messages üzerinden gider ve Synaplan bütçenize yazılır.",
     "statusTitle": "Ağ geçidi durumu",
     "statusEnabled": "Etkin",
+    "statusNotReady": "Hazır değil",
+    "missingKey": "Bu istekleri ödeyecek bir sağlayıcı anahtarı yok. Bir anahtarı {accounts} altına kaydedin. Bir anahtar kaydedilene kadar hiçbir şey gönderilmez.",
+    "missingKeyAdmin": "Bir yönetici sunucu anahtarına da izin verebilir.",
+    "yourAiAccounts": "Yapay zeka hesaplarınız",
+    "gatewayOff": "Kodlama istemcileri kapalı, bu yüzden hiçbir şey gönderilmez. Bir yönetici ağ geçidini açabilir.",
+    "apiKeyStep": "{keys} altında bir Synaplan API anahtarı oluşturun ve sk_your_synaplan_api_key yerine yapıştırın.",
+    "apiKeysLink": "Yönet → Geliştirici ve cihazlar → API Anahtarları",
+    "firstStartHint": "Claude Code ilk açıldığında bu API anahtarını kullanmak isteyip istemediğinizi ve klasöre güvenip güvenmediğinizi sorar. Önerilen yanıt hayırdır. İkisi için de evet seçin; aksi halde anahtar reddedilir ve hiçbir şey gönderilmez.",
     "statusDisabled": "Devre dışı",
     "budgetLine": "Kullanılan bütçe: %{percent} ({used} / {budget})",
     "budgetLineUnlimited": "Kullanılan bütçe: {used} (aylık bütçe limiti yok)",
@@ -470,7 +478,7 @@
       "mcpTools": {
         "label": "AI asistanlarının araçlarınızı kullanmasına izin ver",
         "description": "Synaplan, bağlı araç sunucularınızın araçlarını kendisi çalıştırır ve sonucu asistana geri verir.",
-        "noneConfigured": "Henüz bağlı bir araç sunucusu yok. Kanallar → MCP sunucuları bölümünden ekleyebilirsiniz."
+        "noneConfigured": "Henüz bağlı bir araç sunucusu yok. Yönet → Bağlantılar → MCP Sunucuları bölümünden ekleyebilirsiniz."
       },
       "mcpWithClientTools": {
         "label": "Aracı aracının kendi araçları olsa da sizinkileri sun",

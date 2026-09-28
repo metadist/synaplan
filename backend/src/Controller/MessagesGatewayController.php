@@ -21,6 +21,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -52,6 +53,8 @@ final class MessagesGatewayController extends AbstractController
         private readonly AppChatCredential $appChatCredential,
         private readonly AuditLogWriter $auditLogWriter,
         private readonly EntityManagerInterface $entityManager,
+        #[Autowire('%env(APP_URL)%')]
+        private readonly string $appUrl = '',
     ) {
     }
 
@@ -157,7 +160,7 @@ final class MessagesGatewayController extends AbstractController
                 new OA\Property(
                     property: 'setup',
                     properties: [
-                        new OA\Property(property: 'base_url_hint', type: 'string'),
+                        new OA\Property(property: 'base_url_hint', type: 'string', example: 'http://localhost:8000', description: 'Origin that serves /v1/messages. Copied into ANTHROPIC_BASE_URL.'),
                         new OA\Property(property: 'env_api_key', type: 'string', example: 'ANTHROPIC_API_KEY'),
                         new OA\Property(property: 'env_auth_token', type: 'string', example: 'ANTHROPIC_AUTH_TOKEN'),
                         new OA\Property(property: 'note', type: 'string'),
@@ -225,7 +228,7 @@ final class MessagesGatewayController extends AbstractController
             'is_admin' => $isAdmin,
             'app_chat_credential' => $this->appChatCredential->forUser($user),
             'setup' => [
-                'base_url_hint' => '(your Synaplan origin, e.g. https://web.synaplan.com)',
+                'base_url_hint' => $this->publicApiOrigin(),
                 'env_api_key' => 'ANTHROPIC_API_KEY',
                 'env_auth_token' => 'ANTHROPIC_AUTH_TOKEN',
                 'note' => 'Set exactly one of ANTHROPIC_API_KEY (x-api-key) or ANTHROPIC_AUTH_TOKEN (Bearer).',
@@ -793,5 +796,31 @@ final class MessagesGatewayController extends AbstractController
     private function submittedValue(array $decoded, string $key): mixed
     {
         return $decoded[strtolower($key)] ?? $decoded[$key] ?? null;
+    }
+
+    /**
+     * Origin of APP_URL, without a path. Coding clients call /v1/messages
+     * on this host, which is not always the web page origin.
+     */
+    private function publicApiOrigin(): string
+    {
+        $raw = trim($this->appUrl);
+        if ('' === $raw) {
+            return '';
+        }
+
+        $parts = parse_url($raw);
+        $scheme = \is_array($parts) && \is_string($parts['scheme'] ?? null) ? $parts['scheme'] : '';
+        $host = \is_array($parts) && \is_string($parts['host'] ?? null) ? $parts['host'] : '';
+        if ('' === $scheme || '' === $host) {
+            return rtrim($raw, '/');
+        }
+
+        $origin = $scheme.'://'.$host;
+        if (isset($parts['port'])) {
+            $origin .= ':'.$parts['port'];
+        }
+
+        return $origin;
     }
 }
