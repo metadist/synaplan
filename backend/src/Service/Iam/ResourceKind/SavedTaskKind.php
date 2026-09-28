@@ -14,6 +14,8 @@ use App\Service\Iam\Permission;
  */
 final readonly class SavedTaskKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'saved_task';
 
     public function __construct(

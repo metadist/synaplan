@@ -30,6 +30,17 @@ final class ChatDisplayTitleTest extends TestCase
         self::assertSame('Quarterly plan', ChatDisplayTitle::of($chat));
     }
 
+    public function testLocalizedPlaceholdersUseTheFirstMessage(): void
+    {
+        foreach (['Neuer Chat', 'Nuevo Chat', 'Nouveau chat', 'Yeni Sohbet'] as $placeholder) {
+            $chat = new Chat();
+            $chat->setTitle($placeholder);
+            $chat->getMessages()->add($this->message('IN', '#2146 is still open'));
+
+            self::assertSame('#2146 is still open', ChatDisplayTitle::of($chat), $placeholder);
+        }
+    }
+
     public function testRealTitleWins(): void
     {
         $chat = new Chat();

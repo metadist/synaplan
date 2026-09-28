@@ -53,13 +53,14 @@ final readonly class AuditRowLabels
 
         $users = $this->usersById($userIds);
         $groups = $this->groupsById($groupIds);
+        $cards = $this->cardsFor($rows);
 
         $out = [];
         foreach ($rows as $row) {
             $subject = $row->getSubject() ?? [];
             $out[] = [
                 'actorName' => $users[$row->getActorId()] ?? null,
-                'resourceName' => $this->resourceName($row, $subject, $groups),
+                'resourceName' => $this->resourceName($row, $subject, $groups, $cards),
                 'subjectName' => $this->subjectName($subject, $users, $groups),
             ];
         }
@@ -68,10 +69,42 @@ final readonly class AuditRowLabels
     }
 
     /**
-     * @param array<string, mixed> $subject
-     * @param array<int, string>   $groups
+     * @param list<AuditLogEntry> $rows
+     *
+     * @return array<string, array<string, ResourceKind\ResourceCard>>
      */
-    private function resourceName(AuditLogEntry $row, array $subject, array $groups): ?string
+    private function cardsFor(array $rows): array
+    {
+        $idsByKind = [];
+        foreach ($rows as $row) {
+            $kind = $row->getResourceKind();
+            $id = $row->getResourceId();
+            if ('group' === $kind || '' === $kind || '' === $id) {
+                continue;
+            }
+            $idsByKind[$kind][] = $id;
+        }
+
+        $cards = [];
+        foreach ($idsByKind as $kind => $ids) {
+            try {
+                $cards[$kind] = $this->kinds->get($kind)->describeMany(array_values(array_unique($ids)));
+            } catch (UnknownResourceKindException) {
+                $cards[$kind] = [];
+            } catch (\Throwable) {
+                $cards[$kind] = [];
+            }
+        }
+
+        return $cards;
+    }
+
+    /**
+     * @param array<string, mixed>                                    $subject
+     * @param array<int, string>                                      $groups
+     * @param array<string, array<string, ResourceKind\ResourceCard>> $cards
+     */
+    private function resourceName(AuditLogEntry $row, array $subject, array $groups, array $cards): ?string
     {
         $kind = $row->getResourceKind();
         $id = $row->getResourceId();
@@ -81,15 +114,9 @@ final readonly class AuditRowLabels
         if ('group' === $kind && isset($subject['name']) && is_string($subject['name']) && '' !== trim($subject['name'])) {
             return trim($subject['name']);
         }
-        if ('' === $kind || '' === $id) {
-            return null;
-        }
 
-        try {
-            $card = $this->kinds->get($kind)->describe($id);
-        } catch (UnknownResourceKindException) {
-            return null;
-        } catch (\Throwable) {
+        $card = $cards[$kind][$id] ?? null;
+        if (null === $card) {
             return null;
         }
 
@@ -128,8 +155,10 @@ final readonly class AuditRowLabels
         if (($subject['subjectType'] ?? null) === 'user' && is_numeric($subject['subjectId'] ?? null)) {
             return (int) $subject['subjectId'];
         }
-        if (is_numeric($subject['userId'] ?? null)) {
-            return (int) $subject['userId'];
+        foreach (['userId', 'targetUserId'] as $key) {
+            if (is_numeric($subject[$key] ?? null)) {
+                return (int) $subject[$key];
+            }
         }
 
         return null;

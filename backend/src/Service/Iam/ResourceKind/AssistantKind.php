@@ -22,6 +22,7 @@ use App\Service\Iam\Permission;
  */
 final readonly class AssistantKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
     public const KEY = 'assistant';
 
     public function __construct(

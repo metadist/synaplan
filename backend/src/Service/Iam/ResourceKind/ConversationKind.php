@@ -41,17 +41,38 @@ final readonly class ConversationKind implements ShareableResourceKindInterface
 
     public function describe(string $resourceId): ResourceCard
     {
-        $chat = $this->findChat($resourceId);
-        if (null === $chat) {
-            return new ResourceCard($resourceId, $resourceId, 'chat');
+        return $this->describeMany([$resourceId])[$resourceId];
+    }
+
+    public function describeMany(array $resourceIds): array
+    {
+        $numeric = [];
+        foreach ($resourceIds as $id) {
+            if ('' !== $id && ctype_digit($id)) {
+                $numeric[(int) $id] = $id;
+            }
+        }
+        $byId = [];
+        foreach ($this->chatRepository->findByIdsWithMessages(array_keys($numeric)) as $chat) {
+            if (null !== $chat->getId()) {
+                $byId[(int) $chat->getId()] = $chat;
+            }
         }
 
-        return new ResourceCard(
-            (string) $chat->getId(),
-            ChatDisplayTitle::of($chat),
-            'chat',
-            ['ownerId' => $chat->getUserId()],
-        );
+        $out = [];
+        foreach ($resourceIds as $id) {
+            $chat = ctype_digit($id) ? ($byId[(int) $id] ?? null) : null;
+            $out[$id] = null === $chat
+                ? new ResourceCard($id, $id, 'chat')
+                : new ResourceCard(
+                    (string) $chat->getId(),
+                    ChatDisplayTitle::of($chat),
+                    'chat',
+                    ['ownerId' => $chat->getUserId()],
+                );
+        }
+
+        return $out;
     }
 
     public function listOwnedBy(int $userId): iterable

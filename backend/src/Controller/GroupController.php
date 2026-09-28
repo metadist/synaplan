@@ -104,10 +104,11 @@ final class GroupController extends AbstractController
         $rows = $this->groupService->groupsOf($userId);
         $groupIds = array_map(static fn (array $row): int => (int) $row['group']->getId(), $rows);
         $context = $this->groupService->membershipContext($userId, $groupIds);
+        $shared = $this->shareService->sharedNamesForGroups($groupIds);
 
         return $this->json([
             'groups' => array_map(
-                function (array $row) use ($context): array {
+                function (array $row) use ($context, $shared): array {
                     $group = $row['group'];
                     $id = (int) $group->getId();
                     $card = $this->groupService->serializeGroup(
@@ -118,18 +119,7 @@ final class GroupController extends AbstractController
                     );
                     $card['leaderName'] = $context[$id]['leaderName'] ?? null;
                     $card['memberNames'] = $context[$id]['memberNames'] ?? [];
-                    $card['shares'] = [];
-                    foreach ($this->shareService->describeGrantsToGroup($id) as $share) {
-                        $name = trim((string) ($share['name'] ?? ''));
-                        $resourceId = (string) ($share['id'] ?? '');
-                        if ('' === $name || $name === $resourceId || str_starts_with($name, '#')) {
-                            continue;
-                        }
-                        $card['shares'][] = [
-                            'name' => $name,
-                            'kind' => (string) ($share['kind'] ?? ''),
-                        ];
-                    }
+                    $card['shares'] = $shared[$id] ?? [];
 
                     return $card;
                 },

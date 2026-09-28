@@ -15,6 +15,8 @@ use Psr\Cache\CacheItemPoolInterface;
  */
 final readonly class WidgetKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'widget';
     public const LIST_CACHE_PREFIX = 'iam.widget_list.';
 

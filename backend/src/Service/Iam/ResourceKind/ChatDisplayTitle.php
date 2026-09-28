@@ -34,9 +34,13 @@ final class ChatDisplayTitle
 
     private static function isPlaceholder(string $title): bool
     {
-        return 'New Chat' === $title
-            || 'Neuer Chat' === $title
-            || str_starts_with($title, 'Chat ');
+        return \in_array($title, [
+            'New Chat',
+            'Neuer Chat',
+            'Nuevo Chat',
+            'Nouveau chat',
+            'Yeni Sohbet',
+        ], true) || str_starts_with($title, 'Chat ');
     }
 
     private static function firstUserPreview(Chat $chat): ?string

@@ -107,7 +107,8 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import ChatKindPill from '@/components/iam/ChatKindPill.vue'
 import { useIncomingStore } from '@/stores/incoming'
-import { isDefaultChatTitle, useChatsStore } from '@/stores/chats'
+import { useChatsStore } from '@/stores/chats'
+import { incomingChatTitle } from '@/utils/incomingChatTitle'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { kindOfSharedItem, type ChatKind } from '@/utils/chatKind'
@@ -134,11 +135,7 @@ const { formatRelativeTime, formatDate } = useDateFormat()
 const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
 
 function incomingTitle(name: string): string {
-  const title = name.trim()
-  if (title === '' || title.startsWith('#') || isDefaultChatTitle(title, t('chat.newChat'))) {
-    return t('chat.newChat')
-  }
-  return title
+  return incomingChatTitle(name, t('chat.newChat'))
 }
 const filter = ref<IncomingFilter>('all')
 

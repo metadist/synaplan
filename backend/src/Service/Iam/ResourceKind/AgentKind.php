@@ -18,6 +18,8 @@ use App\Service\Iam\Permission;
  */
 final readonly class AgentKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'agent';
 
     public function __construct(

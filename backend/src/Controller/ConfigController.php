@@ -10,13 +10,13 @@ use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Bundle\BundleConfig;
 use App\Entity\Config;
-use App\Entity\Group;
 use App\Entity\User;
 use App\Model\ModelCatalog;
 use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
+use App\Repository\GroupRepository;
 use App\Repository\ModelRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Auth\DemoLoginHint;
@@ -115,6 +115,7 @@ class ConfigController extends AbstractController
         private readonly ?WorkflowsConfig $workflowsConfig = null,
         private readonly ?DocumentToolsConfig $documentToolsConfig = null,
         private readonly ?ComputeConfig $computeConfig = null,
+        private readonly ?GroupRepository $groupRepository = null,
     ) {
     }
 
@@ -1155,7 +1156,7 @@ class ConfigController extends AbstractController
         }
 
         $byId = [];
-        foreach ($this->em->getRepository(Group::class)->findBy(['id' => $ids]) as $group) {
+        foreach ($this->groupRepository?->findByIds($ids) ?? [] as $group) {
             if (null !== $group->getId()) {
                 $byId[(int) $group->getId()] = $group->getName();
             }

@@ -300,12 +300,7 @@ final readonly class GroupService
      */
     public function membershipContext(int $userId, array $groupIds): array
     {
-        $members = [];
-        foreach ($groupIds as $groupId) {
-            foreach ($this->groupMemberRepository->findByGroupId($groupId) as $member) {
-                $members[] = $member;
-            }
-        }
+        $members = $this->groupMemberRepository->findByGroupIds($groupIds);
         if ([] === $members) {
             return [];
         }
