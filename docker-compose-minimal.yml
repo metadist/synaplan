@@ -290,7 +290,7 @@ services:
       FFMPEG_BINARY: /usr/bin/ffmpeg
       # Piper TTS (optional). Same host-bound default as the standard compose.
       # Enable with: docker compose -f docker-compose-minimal.yml --profile tts up -d
-      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
+      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:${SYNAPLAN_TTS_PORT:-10200}}
       # See docker-compose.yml for context -- raises PHP's silent 20-file cap.
       PHP_MAX_FILE_UPLOADS: "100"
     depends_on:
@@ -556,7 +556,7 @@ services:
     profiles: [tts]
     restart: unless-stopped
     ports:
-      - "127.0.0.1:10200:10200"
+      - "127.0.0.1:${SYNAPLAN_TTS_PORT:-10200}:10200"
     volumes:
       - tts_extra_voices:/voices-extra
     environment:

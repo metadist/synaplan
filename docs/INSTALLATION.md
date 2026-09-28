@@ -485,11 +485,11 @@ docker compose exec backend uname -m   # expect: aarch64
   later start is a cache hit.
 
 ### Port conflicts
-Default host ports: 5173 (frontend), 8000 (backend), 3307 (database), 8082 (phpMyAdmin), 8025/1025 (MailHog), 6333 (Qdrant), 11435 (Ollama, `local-ai` profile only), 9999 (Tika), 10200 (TTS, localhost-only), 8080/8443 (Keycloak, `oidc` profile only)
+Default host ports: 5173 (frontend), 8000 (backend), 3307 (database), 8082 (phpMyAdmin), 8025/1025 (MailHog), 6333 (Qdrant), 11435 (Ollama, `local-ai` profile only), 9999 (Tika), 10200 (TTS, localhost-only), 8080/8443 (Keycloak, `oidc` profile only). Each one is a `SYNAPLAN_*_PORT` value in `.env` (see `.env.example`). Spoken answers use `SYNAPLAN_TTS_PORT` and stay bound to 127.0.0.1.
 
 Redis, Centrifugo, the worker, and the scheduler are internal-only services — they expose no host ports and cannot conflict.
 
-Edit `docker-compose.yml` to change ports if needed.
+Change a host port in `.env`. Do not edit the port mappings in `docker-compose.yml`.
 
 ### Worker / queue issues
 Async jobs (AI processing, document indexing) run in the `worker` container:
