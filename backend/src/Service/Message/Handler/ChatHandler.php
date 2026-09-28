@@ -684,7 +684,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         $docsList = [];
-        $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback);
+        $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback, $modelId);
         $systemPrompt = $this->appendOfficePdfExportHint($decorated['prompt'], $topic);
         $systemPrompt = $this->appendOfficeToolsHint($systemPrompt, $topic, $modelId, $message);
         $docsList = $decorated['docs'];
@@ -1380,7 +1380,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         $docsList = [];
-        $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback);
+        $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback, $modelId);
         $systemPrompt = $this->appendOfficePdfExportHint($decorated['prompt'], $topic);
         $systemPrompt = $this->appendOfficeToolsHint($systemPrompt, $topic, $modelId, $message);
         $docsList = $decorated['docs'];
@@ -1828,6 +1828,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         array $classification,
         array $options,
         ?callable $progressCallback,
+        ?int $modelId = null,
     ): array {
         $docsList = [];
         if (null === $this->selfAwarePromptDecorator) {
@@ -1871,6 +1872,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $message->getUserId(),
                 $isWidget,
                 $docsHits,
+                $modelId,
             ),
             'docs' => $docsList,
         ];
