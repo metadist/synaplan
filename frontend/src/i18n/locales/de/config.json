@@ -922,6 +922,7 @@
       },
       "run": {
         "action": "Auf diesem Computer ausführen",
+        "runOn": "Auf {name} ausführen",
         "multiple": "{count} Computer",
         "online": "{name} ist verbunden",
         "away": "{name} ist nicht verbunden. Die App meldet sich etwa alle {minutes} Minuten.",
@@ -929,10 +930,13 @@
         "needPrompt": "Gib zuerst ein, was der Computer tun soll.",
         "skillTitle": "Auf diesem Computer ausführen",
         "skillMessage": "Welcher Skill soll auf „{name}“ ausgeführt werden?",
+        "pickSkill": "Welchen Skill soll {name} ausführen?",
+        "noSkills": "{name} hat noch keine Skills gemeldet. Gib den Skill-Namen ein.",
         "skillPlaceholder": "z. B. pptx",
         "invalidSkill": "Nur Kleinbuchstaben, Zahlen und Bindestriche verwenden.",
         "sent": "An „{name}“ gesendet.",
-        "enqueueFailed": "Die Aufgabe konnte nicht gesendet werden."
+        "inactive": "{name} ist getrennt. Verbinde den Computer erneut und versuche es noch einmal.",
+        "enqueueFailed": "Die Aufgabe konnte nicht an {name} gesendet werden."
       },
       "jobCard": {
         "waiting": "Warten auf {name}. Die App meldet sich etwa alle {minutes} Minuten.",

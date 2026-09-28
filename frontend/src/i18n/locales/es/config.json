@@ -700,6 +700,7 @@
       },
       "run": {
         "action": "Ejecutar en este equipo",
+        "runOn": "Ejecutar en {name}",
         "multiple": "{count} equipos",
         "online": "{name} está conectado",
         "away": "{name} no está conectado. Se comunica aproximadamente cada {minutes} minutos.",
@@ -707,10 +708,13 @@
         "needPrompt": "Escribe primero qué debe hacer el equipo.",
         "skillTitle": "Ejecutar en este equipo",
         "skillMessage": "¿Qué skill debe ejecutarse en «{name}»?",
+        "pickSkill": "Elige un skill para {name}.",
+        "noSkills": "{name} aún no ha informado sus skills. Escribe el nombre del skill.",
         "skillPlaceholder": "p. ej. pptx",
         "invalidSkill": "Usa solo minúsculas, números y guiones.",
         "sent": "Enviado a «{name}».",
-        "enqueueFailed": "No se pudo enviar el trabajo."
+        "inactive": "{name} está desconectado. Vuelve a conectarlo e inténtalo de nuevo.",
+        "enqueueFailed": "No se pudo enviar el trabajo a {name}."
       },
       "jobCard": {
         "waiting": "Esperando a {name}. Se comunica aproximadamente cada {minutes} minutos.",

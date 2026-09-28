@@ -31,6 +31,7 @@ vi.mock('@/composables/useDesktopDevices', () => ({
     activeDevices,
     hasActiveDevices,
     ensureLoaded: vi.fn(),
+    reload: vi.fn(),
   }),
 }))
 
