@@ -1555,12 +1555,14 @@ secrets_resolved="$(run_ensure_secrets)"
 }
 
 # Every lifecycle script has to resolve the secrets before it touches the stack.
-# compose.yaml declares them as `${VAR:?}`, so a script that reaches Compose
-# without them aborts on the first interpolation — and one that reaches it with
-# only SOME of them configured would start a container against the wrong
-# credentials. build.sh and pre-update.sh are the subtle ones: they call sibling
-# scripts as CHILD processes, whose exports never come back to them, and then run
-# a `compose pull` of their own.
+# A plain `docker compose up` resolves them in the secrets-init container, but
+# these scripts export the values first: Compose prefers a host environment
+# variable, and a script that reaches the stack with only some of them set would
+# start a container against the wrong credentials. build.sh and pre-update.sh are
+# the subtle ones: they call sibling scripts as CHILD processes, whose exports
+# never come back to them, and then run a `compose pull` of their own.
+# secrets-init.sh is the body inlined into compose.yaml. It is not a lifecycle
+# entrypoint and does not call Compose.
 #
 # Pass "only-when-it-does" for a tree where reaching the stack is the exception
 # rather than the rule: the AWS adapter also contains image-build and first-boot
@@ -1603,7 +1605,7 @@ assert_resolves_secrets_before_compose() {
 }
 
 for script in "$SCRIPT_DIR"/*.sh; do
-    [[ "$script" == */lib.sh ]] && continue
+    [[ "$script" == */lib.sh || "$script" == */secrets-init.sh ]] && continue
     assert_resolves_secrets_before_compose "$script"
 done
 

@@ -113,17 +113,6 @@ rsync -a --delete \
     "$STAGE_DIR/deploy/" "$APP_DIR/deploy/"
 chmod 0755 "$APP_DIR/deploy/scripts"/*.sh "$APP_DIR/deploy/aws/scripts"/*.sh
 
-# compose.yaml bind-mounts ../_docker/centrifugo/config.json from deploy/, so
-# the file has to live at $APP_DIR/_docker on the instance. Packer stages it
-# next to deploy/; a missing copy is a first boot that waits 30 minutes for a
-# healthcheck that can never pass.
-install -d -m 0755 "$APP_DIR/_docker"
-rsync -a "$STAGE_DIR/_docker/" "$APP_DIR/_docker/"
-[[ -f "$APP_DIR/_docker/centrifugo/config.json" ]] || {
-    printf 'The Centrifugo config did not land in the image; refusing to bake an AMI whose stack cannot start\n' >&2
-    exit 1
-}
-
 # Persistent state lives on a separate EBS volume so an instance can be replaced
 # without losing anything. The application tree keeps the paths lib.sh expects
 # and reaches the volume through symlinks.

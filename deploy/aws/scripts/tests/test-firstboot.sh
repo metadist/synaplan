@@ -251,9 +251,8 @@ fi
 # deploy/compose.yaml is the stack the instance runs. A bind mount whose source
 # is not ./data (created at first boot) is a file the AMI must contain, or
 # Docker creates a directory at the mount point and the service never becomes
-# healthy. Centrifugo's config is ../_docker/centrifugo/config.json relative to
-# deploy/ — without it, compose up waits until synaplan.service's 30-minute
-# TimeoutStartSec.
+# healthy. Centrifugo is configured from environment variables, so the image
+# does not ship a Centrifugo config file.
 repo_root="$(cd "$DEPLOY_ROOT/.." && pwd)"
 packer_file="$DEPLOY_ROOT/aws/packer/synaplan.pkr.hcl"
 # Bind specs look like `- ./data/uploads:...` or `- ../_docker/centrifugo/config.json:...`.
