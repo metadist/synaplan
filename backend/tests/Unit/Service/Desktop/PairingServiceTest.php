@@ -33,6 +33,7 @@ final class PairingServiceTest extends TestCase
     private function stubUser(int $id): User
     {
         $user = self::userWithId($id);
+        $user->setMail('user'.$id.'@example.test');
         $this->userRepository->expects(self::once())->method('find')->with($id)->willReturn($user);
 
         return $user;
@@ -81,6 +82,7 @@ final class PairingServiceTest extends TestCase
 
         // apiBaseUrl has no trailing slash.
         self::assertSame('https://web.synaplan.com', $result['apiBaseUrl']);
+        self::assertSame('user7@example.test', $result['account']);
     }
 
     public function testPairMintsRestrictedKeyByConstruction(): void

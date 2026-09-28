@@ -138,6 +138,7 @@ final class DesktopController extends AbstractController
                         new OA\Property(property: 'deviceId', type: 'integer', example: 1),
                         new OA\Property(property: 'key', type: 'string', example: 'sk_...', description: 'The scoped API key — shown once.'),
                         new OA\Property(property: 'apiBaseUrl', type: 'string', example: 'https://web.synaplan.com'),
+                        new OA\Property(property: 'account', type: 'string', example: 'owner@example.com', description: 'Email of the account that created the pairing code. Older clients ignore this field.'),
                     ]
                 )
             ),
@@ -190,6 +191,7 @@ final class DesktopController extends AbstractController
             'deviceId' => $result['deviceId'],
             'key' => $result['key'],
             'apiBaseUrl' => $result['apiBaseUrl'],
+            'account' => $result['account'],
         ], Response::HTTP_CREATED);
     }
 
