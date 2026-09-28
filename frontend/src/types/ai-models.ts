@@ -39,6 +39,10 @@ export interface AIModel {
   description: string | null
   isSystemModel: boolean
   features: string[]
+  /** Discrete reasoning levels, cheapest first. Absent when the model keeps the on/off Thinking control. */
+  reasoningLevels?: string[]
+  /** Level used until the person picks another one. Present only with reasoningLevels. */
+  reasoningEffortDefault?: string | null
   /** Only false in admin views requested with includeUnavailable; regular responses contain available models only. */
   available?: boolean
   unavailableReason?: ModelUnavailableReason | null

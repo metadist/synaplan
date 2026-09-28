@@ -2645,6 +2645,7 @@ const handleSendMessage = async (
   content: string,
   options?: {
     includeReasoning?: boolean
+    reasoningEffort?: string
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
@@ -2937,6 +2938,7 @@ const streamAIResponse = async (
   userMessage: string,
   options?: {
     includeReasoning?: boolean
+    reasoningEffort?: string
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
@@ -3583,6 +3585,7 @@ const streamAIResponse = async (
         incognito,
         history: incognitoHistory,
         includeReasoning,
+        reasoningEffort: options?.reasoningEffort,
         webSearch,
         language: options?.language ?? locale.value,
         modelId: finalModelId,

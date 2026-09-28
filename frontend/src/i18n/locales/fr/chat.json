@@ -238,6 +238,16 @@
     "enhance": "Améliorer",
     "enhanceRejected": "Ce texte n’a pas pu être amélioré. Essayez une phrase ou une question plus claire.",
     "thinking": "Réflexion",
+    "reasoningLevel": {
+      "label": "Raisonnement",
+      "none": "Désactivé",
+      "minimal": "Minimal",
+      "low": "Faible",
+      "medium": "Moyen",
+      "high": "Élevé",
+      "xhigh": "Très élevé",
+      "max": "Maximum"
+    },
     "reasoningNotSupported": "Votre modèle de chat actuel ne prend pas en charge le raisonnement. Veuillez sélectionner un modèle capable de raisonner (GPT-5, o3, DeepSeek-R1) dans Config IA → Modèles.",
     "voice": "Démarrer la voix",
     "voiceRealtime": "Reconnaissance vocale en temps réel (Web Speech API)",

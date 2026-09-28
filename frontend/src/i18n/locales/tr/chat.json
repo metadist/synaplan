@@ -229,6 +229,16 @@
     "enhance": "Geliştir",
     "enhanceRejected": "Bu metin geliştirilemedi. Daha net bir cümle veya soru deneyin.",
     "thinking": "Düşünme",
+    "reasoningLevel": {
+      "label": "Akıl yürütme",
+      "none": "Kapalı",
+      "minimal": "En düşük",
+      "low": "Düşük",
+      "medium": "Orta",
+      "high": "Yüksek",
+      "xhigh": "Çok yüksek",
+      "max": "En yüksek"
+    },
     "reasoningNotSupported": "Mevcut sohbet modeliniz akıl yürütmeyi desteklemiyor. Lütfen AI Yapılandırması → Modeller'den akıl yürütme özellikli bir model seçin (GPT-5, o3, DeepSeek-R1).",
     "voice": "Sesi başlat",
     "voiceRealtime": "Gerçek zamanlı konuşma tanıma (Web Speech API)",

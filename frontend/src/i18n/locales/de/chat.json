@@ -238,6 +238,16 @@
     "enhance": "Verbessern",
     "enhanceRejected": "Dieser Text konnte nicht verbessert werden. Bitte formuliere einen klareren Satz oder eine konkretere Frage.",
     "thinking": "Denken",
+    "reasoningLevel": {
+      "label": "Denkaufwand",
+      "none": "Aus",
+      "minimal": "Minimal",
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch",
+      "xhigh": "Sehr hoch",
+      "max": "Maximum"
+    },
     "reasoningNotSupported": "Dein aktuelles Chat-Modell unterstützt kein Reasoning. Bitte wähle ein Reasoning-fähiges Modell (GPT-5, o3, DeepSeek-R1) in der KI-Konfiguration → Modelle.",
     "voice": "Spracheingabe starten",
     "voiceRealtime": "Echtzeit-Spracherkennung (Web Speech API)",

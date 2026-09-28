@@ -74,6 +74,7 @@
       <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
 
       <button
+        v-if="!hasReasoningLevels"
         ref="itemRefs"
         :class="[
           'dropdown-item',
@@ -211,6 +212,8 @@ import { useConfigStore } from '@/stores/config'
 interface Props {
   activeCommand?: string | null
   thinkingEnabled?: boolean
+  /** The composer shows a level menu, so the on/off Thinking row stays hidden. */
+  hasReasoningLevels?: boolean
   voiceReply?: boolean
   supportsReasoning?: boolean
   enhanceEnabled?: boolean

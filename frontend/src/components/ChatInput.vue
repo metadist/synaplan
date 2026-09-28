@@ -320,6 +320,7 @@
                   <ToolsDropdown
                     :active-command="activeTool"
                     :thinking-enabled="thinkingEnabled"
+                    :has-reasoning-levels="reasoningLevels.length > 0"
                     :voice-reply="voiceReply"
                     :supports-reasoning="supportsReasoning"
                     :enhance-enabled="enhanceEnabled"
@@ -436,6 +437,28 @@
       >
         {{ $t('chatInput.modelCaption', { name: selectedModelName }) }}
       </div>
+
+      <!-- Always on the open composer, including the default model. Models
+           without discrete levels keep the Thinking toggle in the + menu. -->
+      <div
+        v-if="reasoningLevels.length > 0"
+        class="mt-2 flex flex-wrap items-center justify-center gap-2 px-3"
+        data-testid="reasoning-level-row"
+      >
+        <label for="select-reasoning-effort" class="text-sm txt-secondary">
+          {{ $t('chatInput.reasoningLevel.label') }}
+        </label>
+        <select
+          id="select-reasoning-effort"
+          v-model="reasoningEffort"
+          data-testid="select-reasoning-effort"
+          class="max-w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        >
+          <option v-for="level in reasoningLevels" :key="level" :value="level">
+            {{ $t(`chatInput.reasoningLevel.${level}`) }}
+          </option>
+        </select>
+      </div>
     </div>
 
     <!-- File Selection Modal -->
@@ -476,6 +499,11 @@ import FileSelectionModal from './FileSelectionModal.vue'
 import PastedTextCard from './chat/PastedTextCard.vue'
 import PastedTextModal from './chat/PastedTextModal.vue'
 import { parseCommand } from '../commands/parse'
+import {
+  initialReasoningLevel,
+  modelReasoningLevels,
+  reasoningSendFlags,
+} from '@/utils/reasoningLevel'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
@@ -609,6 +637,7 @@ const uploadAbortController = ref<AbortController | null>(null)
 const enhanceEnabled = ref(false)
 const enhanceLoading = ref(false)
 const thinkingEnabled = ref(false)
+const reasoningEffort = ref('')
 const paletteVisible = ref(false)
 const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
 const mentionPaletteVisible = ref(false)
@@ -985,6 +1014,7 @@ const emit = defineEmits<{
     message: string,
     options?: {
       includeReasoning?: boolean
+      reasoningEffort?: string
       webSearch?: boolean
       fileIds?: number[]
       voiceReply?: boolean
@@ -1058,6 +1088,23 @@ const supportsReasoning = computed(() => {
 
   return currentChatModel.value.features?.includes('reasoning') ?? false
 })
+
+const reasoningLevels = computed(() => modelReasoningLevels(currentChatModel.value))
+
+watch(
+  () => {
+    const model = currentChatModel.value
+    const levels = modelReasoningLevels(model)
+    return `${model?.id ?? ''}:${levels.join(',')}:${model?.reasoningEffortDefault ?? ''}`
+  },
+  () => {
+    reasoningEffort.value = initialReasoningLevel(
+      reasoningLevels.value,
+      currentChatModel.value?.reasoningEffortDefault
+    )
+  },
+  { immediate: true }
+)
 
 // Auto-enable thinking when switching to a reasoning-capable model
 watch(
@@ -1192,8 +1239,14 @@ const sendMessage = () => {
     messageToSend = `/search ${query}`.trim()
   }
 
+  const reasoning = reasoningSendFlags(
+    reasoningLevels.value,
+    reasoningEffort.value,
+    thinkingEnabled.value
+  )
   const options = {
-    includeReasoning: thinkingEnabled.value,
+    includeReasoning: reasoning.includeReasoning,
+    ...(reasoning.reasoningEffort ? { reasoningEffort: reasoning.reasoningEffort } : {}),
     webSearch: hasWebSearch,
     fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
     voiceReply: voiceReply.value,
