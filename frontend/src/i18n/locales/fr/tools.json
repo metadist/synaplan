@@ -445,6 +445,14 @@
     "description": "Connectez Claude Code et d’autres outils d’agent compatibles Anthropic à votre espace Synaplan. Les requêtes vont vers POST /v1/messages et sont comptabilisées sur votre budget Synaplan.",
     "statusTitle": "État de la passerelle",
     "statusEnabled": "Activée",
+    "statusNotReady": "Pas prête",
+    "missingKey": "Aucune clé de fournisseur ne paiera ces demandes. Enregistrez-en une sous {accounts}. Rien n’est envoyé tant qu’une clé n’est pas enregistrée.",
+    "missingKeyAdmin": "Un administrateur peut aussi autoriser la clé du serveur.",
+    "yourAiAccounts": "Vos comptes IA",
+    "gatewayOff": "Les clients de codage sont arrêtés, donc rien n’est envoyé. Un administrateur peut activer la passerelle.",
+    "apiKeyStep": "Créez une clé API Synaplan sous {keys}, puis collez-la à la place de sk_your_synaplan_api_key.",
+    "apiKeysLink": "Gérer → Développeurs et appareils → Clés API",
+    "firstStartHint": "Au premier démarrage, Claude Code demande s’il faut utiliser cette clé API et s’il faut faire confiance au dossier. La réponse proposée est non. Choisissez oui pour les deux, sinon la clé est refusée et rien n’est envoyé.",
     "statusDisabled": "Désactivée",
     "budgetLine": "Budget utilisé : {percent} % ({used} sur {budget})",
     "budgetLineUnlimited": "Budget utilisé : {used} (aucune limite de budget mensuel)",
@@ -544,7 +552,7 @@
       "mcpTools": {
         "label": "Laisser les assistants IA utiliser vos outils",
         "description": "Synaplan exécute lui-même les outils de vos serveurs d’outils connectés et renvoie le résultat à l’assistant.",
-        "noneConfigured": "Aucun serveur d’outils n’est encore connecté. Vous pouvez en ajouter un sous Canaux → Serveurs MCP."
+        "noneConfigured": "Aucun serveur d’outils n’est encore connecté. Vous pouvez en ajouter un sous Gérer → Connexions → Serveurs MCP."
       },
       "mcpWithClientTools": {
         "label": "Proposer vos outils même lorsque l’outil d’agent apporte les siens",

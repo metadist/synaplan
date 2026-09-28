@@ -371,6 +371,14 @@
     "description": "Conecte Claude Code y otras herramientas de agente compatibles con Anthropic a su espacio Synaplan. Las solicitudes van a POST /v1/messages y se contabilizan en su presupuesto de Synaplan.",
     "statusTitle": "Estado de la puerta de enlace",
     "statusEnabled": "Activada",
+    "statusNotReady": "No lista",
+    "missingKey": "Ninguna clave de proveedor pagará estas solicitudes. Guarde una en {accounts}. No se envía nada hasta que haya una clave guardada.",
+    "missingKeyAdmin": "Un administrador también puede permitir la clave del servidor.",
+    "yourAiAccounts": "Tus cuentas de IA",
+    "gatewayOff": "Los clientes de programación están apagados, así que no se envía nada. Un administrador puede activar la puerta de enlace.",
+    "apiKeyStep": "Cree una clave API de Synaplan en {keys} y péguela en lugar de sk_your_synaplan_api_key.",
+    "apiKeysLink": "Gestionar → Desarrolladores y dispositivos → Claves API",
+    "firstStartHint": "La primera vez que Claude Code se inicia, pregunta si quiere usar esta clave API y si confía en la carpeta. La respuesta sugerida es no. Elija sí en ambas, o la clave se rechaza y no se envía nada.",
     "statusDisabled": "Desactivada",
     "budgetLine": "Presupuesto usado: {percent}% ({used} de {budget})",
     "budgetLineUnlimited": "Presupuesto usado: {used} (sin límite de presupuesto mensual)",
@@ -470,7 +478,7 @@
       "mcpTools": {
         "label": "Permitir que los asistentes de IA usen sus herramientas",
         "description": "Synaplan ejecuta las herramientas de sus servidores conectados y devuelve el resultado al asistente.",
-        "noneConfigured": "Aún no hay ningún servidor de herramientas conectado. Puede añadir uno en Canales → Servidores MCP."
+        "noneConfigured": "Aún no hay ningún servidor de herramientas conectado. Puede añadir uno en Gestionar → Conexiones → Servidores MCP."
       },
       "mcpWithClientTools": {
         "label": "Ofrecer sus herramientas aunque la herramienta de agente traiga las suyas",

@@ -368,6 +368,14 @@
     "description": "Verbinden Sie Claude Code und andere Anthropic-kompatible Agenten-Tools mit Ihrem Synaplan-Arbeitsbereich. Anfragen gehen an POST /v1/messages und werden gegen Ihr Synaplan-Budget erfasst.",
     "statusTitle": "Gateway-Status",
     "statusEnabled": "Aktiviert",
+    "statusNotReady": "Nicht bereit",
+    "missingKey": "Kein Anbieter-Schlüssel bezahlt diese Anfragen. Speichern Sie einen unter {accounts}. Es wird nichts gesendet, bis ein Schlüssel gespeichert ist.",
+    "missingKeyAdmin": "Eine Person mit Administratorrechten kann auch den Server-Schlüssel erlauben.",
+    "yourAiAccounts": "Deine KI-Konten",
+    "gatewayOff": "Coding-Clients sind ausgeschaltet, deshalb wird nichts gesendet. Eine Person mit Administratorrechten kann das Gateway einschalten.",
+    "apiKeyStep": "Erstellen Sie einen Synaplan-API-Schlüssel unter {keys} und setzen Sie ihn an die Stelle von sk_your_synaplan_api_key.",
+    "apiKeysLink": "Verwalten → Entwickler & Geräte → API-Schlüssel",
+    "firstStartHint": "Beim ersten Start fragt Claude Code, ob dieser API-Schlüssel verwendet und ob dem Ordner vertraut werden soll. Der Vorschlag ist Nein. Wählen Sie beides mit Ja, sonst wird der Schlüssel abgelehnt und nichts gesendet.",
     "statusDisabled": "Deaktiviert",
     "budgetLine": "Budget verbraucht: {percent}% ({used} von {budget})",
     "budgetLineUnlimited": "Budget verbraucht: {used} (kein monatliches Budgetlimit)",
@@ -467,7 +475,7 @@
       "mcpTools": {
         "label": "KI-Assistenten Ihre Werkzeuge nutzen lassen",
         "description": "Synaplan führt die Werkzeuge Ihrer verbundenen Werkzeug-Server selbst aus und gibt das Ergebnis an den Assistenten zurück.",
-        "noneConfigured": "Es ist noch kein Werkzeug-Server verbunden. Sie können einen unter Kanäle → MCP-Server hinzufügen."
+        "noneConfigured": "Es ist noch kein Werkzeug-Server verbunden. Sie können einen unter Verwalten → Verbindungen → MCP-Server hinzufügen."
       },
       "mcpWithClientTools": {
         "label": "Eigene Werkzeuge auch anbieten, wenn das Agenten-Tool eigene mitbringt",
