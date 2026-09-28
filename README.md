@@ -42,7 +42,7 @@ curl -fsSL -o .env https://raw.githubusercontent.com/metadist/synaplan/main/depl
 
 A Docker GUI uses the same two files: paste `compose.yaml` and select `.env`.
 
-2. **Configure.** In `.env`, `SYNAPLAN_VERSION` is already a release tag (today `5.0.5`). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` are `http://127.0.0.1:8000`. Change all three together when this install has a public address. Leave both admin lines empty to create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
+2. **Configure.** In `.env`, `SYNAPLAN_VERSION` is already a release tag (today `5.0.5`). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` are `http://127.0.0.1:8000`. If you change the bind, the port, or the public address, set all three to the same address you open in the browser. Live chat stays disconnected when they do not match. Leave both admin lines empty to create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
 
 Leave the eight secret lines commented out. The first start generates them into `data/secrets.env`. Back that file up with the database: a restored database cannot be opened without it. To choose the values yourself, set each line to the output of `openssl rand -hex 32` before the first start. Do not use a `replace-with-*` example value — the start is refused and nothing is created.
 

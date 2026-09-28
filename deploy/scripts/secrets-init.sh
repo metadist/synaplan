@@ -1,7 +1,13 @@
 #!/bin/sh
-# Resolve the eight deployment secrets once, then publish them for the other
-# containers. data/secrets.env is authoritative and is never rewritten.
+# Resolve the eight deployment secrets once, then publish a separate file for
+# each consumer. data/secrets.env is the backup copy and is never rewritten.
 # A replace-with-* example value is refused. Nothing is written in that case.
+# A file that already exists but is missing a key is refused too: a value that
+# lives only in .env would not be in the backup.
+#
+# The published files are sourced by the other containers, so each value is
+# written as a single-quoted shell literal. The backup file stays raw
+# KEY=value lines, which is what a restore reads back.
 #
 # The same script is inlined in deploy/compose.yaml (every "$" doubled) so a
 # two-file install does not need this path. deploy/scripts/tests/test-secrets-init.sh
@@ -9,8 +15,15 @@
 set -eu
 DATA="${SECRETS_INIT_DATA:-/data}"
 SECRETS="$DATA/secrets.env"
-OUT="${SECRETS_INIT_OUT:-/run/synaplan-secrets/secrets.env}"
+# Each consumer mounts only its own directory. The web container never sees
+# the database root password or the realtime admin credentials.
+APP_OUT="${SECRETS_INIT_APP_OUT:-/out/app/secrets.env}"
+DB_OUT="${SECRETS_INIT_DB_OUT:-/out/db/secrets.env}"
+REALTIME_OUT="${SECRETS_INIT_REALTIME_OUT:-/out/realtime/secrets.env}"
 KEYS="APP_SECRET TOKEN_SECRET MARIADB_PASSWORD MARIADB_ROOT_PASSWORD REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET"
+APP_KEYS="APP_SECRET TOKEN_SECRET MARIADB_PASSWORD REALTIME_API_KEY REALTIME_TOKEN_SECRET"
+DB_KEYS="MARIADB_PASSWORD MARIADB_ROOT_PASSWORD"
+REALTIME_KEYS="REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET"
 
 read_key() {
     file=$1
@@ -25,6 +38,25 @@ read_key() {
         esac
     done < "$file"
     printf '%s' "$val"
+}
+
+# One character at a time, so a secret containing *, ? or [ is not treated as a
+# pattern. A single quote becomes the four-character sequence '\'' .
+shell_quote() {
+    input=$1
+    quoted="'"
+    while [ -n "$input" ]; do
+        case "$input" in
+            \'*)
+                quoted="${quoted}'\\''"
+                ;;
+            *)
+                quoted="${quoted}${input%"${input#?}"}"
+                ;;
+        esac
+        input=${input#?}
+    done
+    printf '%s' "${quoted}'"
 }
 
 stack_initialised() {
@@ -69,6 +101,24 @@ list_keys() {
     printf '%s' "$1" | sed 's/^ //; s/ /, /g'
 }
 
+publish_quoted() {
+    dest=$1
+    key_list=$2
+    dest_dir=$(dirname "$dest")
+    mkdir -p "$dest_dir"
+    chmod 755 "$dest_dir"
+    umask 022
+    tmp="$dest_dir/.secrets.env.$$"
+    {
+        printf '%s\n' '# Copy for this start. Do not edit.'
+        for key in $key_list; do
+            printf '%s=%s\n' "$key" "$(shell_quote "$(read_key "$SECRETS" "$key")")"
+        done
+    } > "$tmp"
+    mv "$tmp" "$dest"
+    chmod 644 "$dest"
+}
+
 file_existed=false
 if [ -f "$SECRETS" ]; then
     file_existed=true
@@ -88,12 +138,15 @@ for key in $KEYS; do
     val=""
     if [ "$file_existed" = true ]; then
         val=$(read_key "$SECRETS" "$key")
-    fi
-    if [ -n "$val" ] && is_placeholder "$val"; then
-        file_placeholders="$file_placeholders $key"
-        continue
-    fi
-    if [ -z "$val" ]; then
+        if [ -z "$val" ]; then
+            unresolved="$unresolved $key"
+            continue
+        fi
+        if is_placeholder "$val"; then
+            file_placeholders="$file_placeholders $key"
+            continue
+        fi
+    else
         envval=$(printenv "$key" || true)
         if [ -n "$envval" ]; then
             if is_placeholder "$envval"; then
@@ -106,13 +159,13 @@ for key in $KEYS; do
             fi
             val=$envval
         fi
-    fi
-    if [ -z "$val" ]; then
-        if [ "$file_existed" = true ] || [ "$initialised" = true ]; then
-            unresolved="$unresolved $key"
-            continue
+        if [ -z "$val" ]; then
+            if [ "$initialised" = true ]; then
+                unresolved="$unresolved $key"
+                continue
+            fi
+            val=$(generate_secret)
         fi
-        val=$(generate_secret)
     fi
     assignments="${assignments}${key}=${val}
 "
@@ -132,7 +185,7 @@ fi
 
 if [ -n "$unresolved" ]; then
     if [ "$file_existed" = true ]; then
-        refuse "$(list_keys "$unresolved") has no value in data/secrets.env. That file is authoritative and was not rewritten. Put the original value back, or restore the file from a backup."
+        refuse "$(list_keys "$unresolved") has no value in data/secrets.env. That file was not changed. Add the original value there, or restore the file from a backup. A value that exists only in .env is not used once this file exists."
     fi
     refuse "$(list_keys "$unresolved") has no value, and this install already has a database. Put the original value back. A new password would not open the existing database."
 fi
@@ -158,18 +211,6 @@ if [ "$file_existed" = false ]; then
 fi
 
 umask 077
-out_dir=$(dirname "$OUT")
-mkdir -p "$out_dir"
-# The host copy stays mode 0600. This copy is read by containers that do not
-# run as root (Centrifugo, the application). It never leaves the Docker volume.
-chmod 755 "$out_dir"
-umask 022
-tmpout="$out_dir/.secrets.env.$$"
-{
-    printf '%s\n' '# Copy for this start. Do not edit.'
-    for key in $KEYS; do
-        printf '%s=%s\n' "$key" "$(read_key "$SECRETS" "$key")"
-    done
-} > "$tmpout"
-mv "$tmpout" "$OUT"
-chmod 644 "$OUT"
+publish_quoted "$APP_OUT" "$APP_KEYS"
+publish_quoted "$DB_OUT" "$DB_KEYS"
+publish_quoted "$REALTIME_OUT" "$REALTIME_KEYS"

@@ -70,13 +70,16 @@ calls `ensure_deployment_secrets`, which resolves each of them once:
   `deploy/data/secrets.env`.
 
 A plain `docker compose up` runs the same rules in the `secrets-init` one-shot,
-without `prepare.sh`. An existing `data/secrets.env` is copied and never
-rewritten, a value in `.env` is adopted, and a missing value is generated only
-while `data/mariadb` is still empty. A `replace-with-*` example value stops the
-start before anything is created. The other containers then read that file. They
-do not require the eight variables to be exported in the shell. The application
-reads `DB_PASSWORD`, so its start command copies `MARIADB_PASSWORD` from that
-file onto `DB_PASSWORD` before the entrypoint builds the database URL.
+without `prepare.sh`. An existing `data/secrets.env` is never rewritten. Every
+secret must already be in that file; a value set only in `.env` is not used
+once the file exists. A missing value is generated only while the file does
+not exist yet and `data/mariadb` is still empty. A `replace-with-*` example
+value stops the start before anything is created. The application, the
+database, and the realtime service each receive only the secrets they use.
+The web container does not receive the database root password or the realtime
+admin password. The application reads `DB_PASSWORD`, so its start command
+copies `MARIADB_PASSWORD` onto `DB_PASSWORD` before the entrypoint builds the
+database URL.
 
 Because the file is authoritative and is exported before Compose runs, editing
 one of these eight variables in `deploy/.env` no longer changes the running
