@@ -952,6 +952,7 @@
       },
       "run": {
         "action": "Run on this computer",
+        "runOn": "Run on {name}",
         "multiple": "{count} computers",
         "online": "{name} is connected",
         "away": "{name} is not connected. It checks in about every {minutes} minutes.",
@@ -959,10 +960,13 @@
         "needPrompt": "Type what the computer should do first.",
         "skillTitle": "Run on this computer",
         "skillMessage": "Which skill should run on \"{name}\"?",
+        "pickSkill": "Choose a skill for {name}.",
+        "noSkills": "{name} has not reported its skills yet. Type the skill name.",
         "skillPlaceholder": "e.g. pptx",
         "invalidSkill": "Use only lowercase letters, numbers and hyphens.",
         "sent": "Sent to \"{name}\".",
-        "enqueueFailed": "The job could not be sent."
+        "inactive": "{name} is disconnected. Connect it again, then try once more.",
+        "enqueueFailed": "The job could not be sent to {name}."
       },
       "jobCard": {
         "waiting": "Waiting for {name}. It checks in about every {minutes} minutes.",

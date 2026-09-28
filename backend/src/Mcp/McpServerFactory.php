@@ -313,6 +313,10 @@ final class McpServerFactory
                     static fn ($c): bool => \is_string($c),
                 )));
             }
+            $skills = self::normalizeSkillNames($enabledSkills);
+            if ([] !== $skills) {
+                $device->setEnabledSkills($skills);
+            }
             $this->desktopDeviceRepository->save($device);
 
             // Never guess for a client speaking a protocol we don't know — hand
@@ -381,6 +385,32 @@ final class McpServerFactory
                 'status' => $job->getStatus(),
             ];
         };
+    }
+
+    /**
+     * Skill names the computer may be offered. An omitted or empty list leaves
+     * the last report in place, matching capabilities: a check-in that does
+     * not mention skills must not wipe them.
+     *
+     * @param list<mixed> $enabledSkills
+     *
+     * @return list<string>
+     */
+    private static function normalizeSkillNames(array $enabledSkills): array
+    {
+        $skills = [];
+        foreach ($enabledSkills as $skill) {
+            if (!\is_string($skill)) {
+                continue;
+            }
+            $skill = trim($skill);
+            if (1 !== preg_match('/^[a-z0-9-]{1,64}$/', $skill)) {
+                continue;
+            }
+            $skills[$skill] = $skill;
+        }
+
+        return array_values($skills);
     }
 
     /**
