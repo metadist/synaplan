@@ -861,7 +861,6 @@
       "errorActivating": "Fehler beim Aktivieren des API-Schlüssels",
       "errorDeleting": "Fehler beim Löschen des API-Schlüssels",
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
-      "usageCount": "Anfragen",
       "scopes": {
         "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Personen begrenzt diesen Schlüssel. Dateiarbeit fügt Chat- und Dateiberechtigungen hinzu, damit Skripte laufen können — kein Admin-Zugriff.",
         "iamRead": "Personen — Gruppen ansehen",

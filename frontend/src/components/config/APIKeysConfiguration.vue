@@ -242,9 +242,6 @@
                   >
                     {{ $t('config.apiKeys.linkedPlatform') }}
                   </span>
-                  <span class="text-xs txt-secondary">
-                    ({{ apiKey.usageCount }} {{ $t('config.apiKeys.usageCount') }})
-                  </span>
                 </div>
               </td>
               <td class="px-6 py-4">
@@ -466,7 +463,6 @@ interface UIApiKey {
   status: 'active' | 'inactive'
   created: number
   lastUsed: number | null
-  usageCount: number
   scopes: string[]
   linkedPlatform: { client: string; host: string } | null
 }
@@ -502,7 +498,6 @@ const loadAPIKeys = async () => {
       status: key.status,
       created: key.created,
       lastUsed: key.last_used || null,
-      usageCount: 0, // Backend doesn't track this yet
       scopes: key.scopes,
       linkedPlatform: key.linked_platform ?? null,
     }))
@@ -551,7 +546,6 @@ const createAPIKey = async () => {
       status: 'active',
       created: response.api_key.created,
       lastUsed: null,
-      usageCount: 0,
       scopes: response.api_key.scopes,
       linkedPlatform: null,
     }

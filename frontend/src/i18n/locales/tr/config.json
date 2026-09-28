@@ -639,7 +639,6 @@
       "errorActivating": "API anahtarı etkinleştirilemedi",
       "errorDeleting": "API anahtarı silinemedi",
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
-      "usageCount": "istek",
       "scopes": {
         "hint": "Tam erişim için işaretlemeyin. Kişiler kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
         "iamRead": "Kişiler — grupları görüntüle",
