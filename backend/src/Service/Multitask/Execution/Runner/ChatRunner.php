@@ -96,7 +96,7 @@ final readonly class ChatRunner implements TaskRunner
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
         $systemPrompt = $this->systemPrompt($node, $language, $context, $topicBinding['systemPrompt']);
-        $systemPrompt = $this->decorateSelfAwareTopic($systemPrompt, $node, $context, $text);
+        $systemPrompt = $this->decorateSelfAwareTopic($systemPrompt, $node, $context, $text, $modelId);
         $ragChunks = 0;
         if (Capability::RagQuery === $node->capability) {
             $ragContext = $this->ragContext($text, $context, $ragChunks);
@@ -329,7 +329,7 @@ final readonly class ChatRunner implements TaskRunner
         return "\n\n".$urlContent;
     }
 
-    private function decorateSelfAwareTopic(string $systemPrompt, TaskNode $node, NodeContext $context, string $query): string
+    private function decorateSelfAwareTopic(string $systemPrompt, TaskNode $node, NodeContext $context, string $query, ?int $modelId): string
     {
         if (null === $this->selfAwarePromptDecorator) {
             return $systemPrompt;
@@ -366,6 +366,7 @@ final readonly class ChatRunner implements TaskRunner
             $context->userId ?? $context->message->getUserId(),
             $isWidget,
             $docsHits,
+            $modelId,
         );
     }
 

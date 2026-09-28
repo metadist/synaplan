@@ -671,6 +671,7 @@ import {
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { parseAIResponse } from '@/utils/responseParser'
+import { createSmoothStream, type SmoothStream } from '@/utils/smoothStream'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
 import {
   subscribeToWidgetSessionRealtime,
@@ -1603,6 +1604,17 @@ const sendMessage = async () => {
     })
   }
 
+  let assembled = ''
+  const replySmoother = createSmoothStream({
+    onRender: (text) => {
+      const bubble = messages.value.find((m) => m.id === assistantMessageId)
+      if (!bubble) return
+      bubble.content = text
+      void scrollToBottom()
+    },
+  })
+  activeStreamSmoother = replySmoother
+
   try {
     const result = await sendWidgetMessage(props.widgetId, userMessage, sessionId.value, {
       chatId: chatId.value ?? undefined,
@@ -1611,17 +1623,16 @@ const sendMessage = async () => {
       apiUrl: props.apiUrl,
       headers: testModeHeaders.value,
       onChunk: async (chunk: string) => {
-        if (!chunk) return
+        if (!chunk || !assistantMessageId) return
         if (isTyping.value) {
           isTyping.value = false
         }
-        const lastMessage = messages.value[messages.value.length - 1]
-        if (lastMessage && lastMessage.id === assistantMessageId) {
-          lastMessage.content += chunk
-          await scrollToBottom()
-        }
+        assembled += chunk
+        replySmoother.push(assembled)
       },
     })
+
+    replySmoother.flush()
 
     if (result.chatId && result.chatId > 0) {
       chatId.value = result.chatId
@@ -1675,6 +1686,7 @@ const sendMessage = async () => {
       subscribeToEvents()
     }
   } catch (error) {
+    replySmoother.flush()
     if (chatMode.value === 'ai') {
       messageCount.value = Math.max(0, messageCount.value - 1)
     }
@@ -1724,6 +1736,8 @@ const sendMessage = async () => {
       }
     }
   } finally {
+    replySmoother.cancel()
+    if (activeStreamSmoother === replySmoother) activeStreamSmoother = null
     isTyping.value = false
     isSending.value = false
   }
@@ -2014,6 +2028,20 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
   }
 
   let replayed = ''
+  const replaySmoother = createSmoothStream({
+    onRender: (text) => {
+      const bubble = findBubble()
+      if (!bubble) return
+      // The replay restarts the turn from its first token, so early chunks are
+      // shorter than the answer-so-far already painted above. Holding the
+      // painted text until the replay grows past it keeps the bubble moving
+      // forward only.
+      bubble.content = text.length >= partialText.length ? text : partialText
+      void scrollToBottom()
+    },
+    initialShown: partialText,
+  })
+  activeStreamSmoother = replaySmoother
 
   try {
     isTyping.value = partialText === ''
@@ -2024,17 +2052,11 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
         if (!chunk) return
         isTyping.value = false
         replayed += chunk
-        const bubble = findBubble()
-        if (!bubble) return
-        // The replay restarts the turn from its first token, so early chunks are
-        // shorter than the answer-so-far already painted above. Writing them
-        // straight through would rewind a long answer to its first word and
-        // re-type it; holding the painted text until the replay grows past it
-        // keeps the bubble moving forward only.
-        bubble.content = replayed.length >= partialText.length ? replayed : partialText
-        await scrollToBottom()
+        replaySmoother.push(replayed)
       },
     })
+
+    replaySmoother.flush()
 
     // Nothing was replayed and there was nothing to paint either — the turn
     // most likely finished between the history read and the attach. Mirror the
@@ -2044,12 +2066,15 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
       await loadConversationHistory(true)
     }
   } catch (error) {
+    replaySmoother.cancel()
     console.error('Failed to re-attach to the running answer:', error)
     // The turn may have finished while we were re-attaching — the persisted
     // history is authoritative, so drop the provisional bubble and reload.
     dropBubble()
     await loadConversationHistory(true)
   } finally {
+    replaySmoother.cancel()
+    if (activeStreamSmoother === replaySmoother) activeStreamSmoother = null
     isTyping.value = false
     await scrollToBottom()
   }
@@ -2371,7 +2396,10 @@ onMounted(() => {
   // once we know whether the session already has server-side messages.
 })
 
+let activeStreamSmoother: SmoothStream | null = null
+
 onBeforeUnmount(() => {
+  activeStreamSmoother?.cancel()
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateIsMobile)
     window.removeEventListener('orientationchange', updateIsMobile)

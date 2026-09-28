@@ -193,10 +193,12 @@ describe('ChatWidget — Thinking Block Filtering', () => {
   })
 
   it('strips completed thinking blocks from streamed responses', async () => {
-    let capturedOnChunk: ((chunk: string) => void) | undefined
     mockSendWidgetMessage.mockImplementation(
       (_wid: string, _msg: string, _sid: string, opts: { onChunk: (chunk: string) => void }) => {
-        capturedOnChunk = opts.onChunk
+        // Chunks arrive before the request settles. The widget flushes the
+        // type-out buffer when the request resolves, which is what the
+        // assertion reads.
+        opts.onChunk('<think>internal reasoning</think>The actual answer.')
         return Promise.resolve({ chatId: 1 })
       }
     )
@@ -209,9 +211,6 @@ describe('ChatWidget — Thinking Block Filtering', () => {
     await textarea.setValue('Hello')
     await wrapper.find('[data-testid="btn-send"]').trigger('click')
     await flushPromises()
-    await nextTick()
-
-    capturedOnChunk!('<think>internal reasoning</think>The actual answer.')
     await nextTick()
 
     const assistantMessages = wrapper.findAll('[data-testid="message-assistant"]')
@@ -222,10 +221,9 @@ describe('ChatWidget — Thinking Block Filtering', () => {
   })
 
   it('hides in-progress thinking blocks during streaming', async () => {
-    let capturedOnChunk: ((chunk: string) => void) | undefined
     mockSendWidgetMessage.mockImplementation(
       (_wid: string, _msg: string, _sid: string, opts: { onChunk: (chunk: string) => void }) => {
-        capturedOnChunk = opts.onChunk
+        opts.onChunk('<think>still thinking...')
         return Promise.resolve({ chatId: 1 })
       }
     )
@@ -238,9 +236,6 @@ describe('ChatWidget — Thinking Block Filtering', () => {
     await textarea.setValue('Hello')
     await wrapper.find('[data-testid="btn-send"]').trigger('click')
     await flushPromises()
-    await nextTick()
-
-    capturedOnChunk!('<think>still thinking...')
     await nextTick()
 
     const assistantMessages = wrapper.findAll('[data-testid="message-assistant"]')
@@ -250,10 +245,11 @@ describe('ChatWidget — Thinking Block Filtering', () => {
   })
 
   it('shows content after thinking block is closed', async () => {
-    let capturedOnChunk: ((chunk: string) => void) | undefined
     mockSendWidgetMessage.mockImplementation(
       (_wid: string, _msg: string, _sid: string, opts: { onChunk: (chunk: string) => void }) => {
-        capturedOnChunk = opts.onChunk
+        opts.onChunk('<think>reasoning step 1')
+        opts.onChunk(' reasoning step 2</think>')
+        opts.onChunk('Here is the answer.')
         return Promise.resolve({ chatId: 1 })
       }
     )
@@ -268,11 +264,6 @@ describe('ChatWidget — Thinking Block Filtering', () => {
     await flushPromises()
     await nextTick()
 
-    capturedOnChunk!('<think>reasoning step 1')
-    capturedOnChunk!(' reasoning step 2</think>')
-    capturedOnChunk!('Here is the answer.')
-    await nextTick()
-
     const assistantMessages = wrapper.findAll('[data-testid="message-assistant"]')
     const lastMessage = assistantMessages[assistantMessages.length - 1]
     expect(lastMessage.text()).not.toContain('reasoning step')
@@ -280,10 +271,9 @@ describe('ChatWidget — Thinking Block Filtering', () => {
   })
 
   it('handles multiple thinking blocks in a single response', async () => {
-    let capturedOnChunk: ((chunk: string) => void) | undefined
     mockSendWidgetMessage.mockImplementation(
       (_wid: string, _msg: string, _sid: string, opts: { onChunk: (chunk: string) => void }) => {
-        capturedOnChunk = opts.onChunk
+        opts.onChunk('<think>thought 1</think>Part 1. <think>thought 2</think>Part 2.')
         return Promise.resolve({ chatId: 1 })
       }
     )
@@ -298,9 +288,6 @@ describe('ChatWidget — Thinking Block Filtering', () => {
     await flushPromises()
     await nextTick()
 
-    capturedOnChunk!('<think>thought 1</think>Part 1. <think>thought 2</think>Part 2.')
-    await nextTick()
-
     const assistantMessages = wrapper.findAll('[data-testid="message-assistant"]')
     const lastMessage = assistantMessages[assistantMessages.length - 1]
     expect(lastMessage.text()).not.toContain('thought 1')
@@ -310,10 +297,9 @@ describe('ChatWidget — Thinking Block Filtering', () => {
   })
 
   it('renders normally when no thinking blocks are present', async () => {
-    let capturedOnChunk: ((chunk: string) => void) | undefined
     mockSendWidgetMessage.mockImplementation(
       (_wid: string, _msg: string, _sid: string, opts: { onChunk: (chunk: string) => void }) => {
-        capturedOnChunk = opts.onChunk
+        opts.onChunk('A simple answer without reasoning.')
         return Promise.resolve({ chatId: 1 })
       }
     )
@@ -326,9 +312,6 @@ describe('ChatWidget — Thinking Block Filtering', () => {
     await textarea.setValue('Simple question')
     await wrapper.find('[data-testid="btn-send"]').trigger('click')
     await flushPromises()
-    await nextTick()
-
-    capturedOnChunk!('A simple answer without reasoning.')
     await nextTick()
 
     const assistantMessages = wrapper.findAll('[data-testid="message-assistant"]')
