@@ -74,6 +74,7 @@
       <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
 
       <button
+        v-if="!hasReasoningLevels"
         ref="itemRefs"
         :class="[
           'dropdown-item',
@@ -215,6 +216,8 @@ import { useConfigStore } from '@/stores/config'
 interface Props {
   activeCommand?: string | null
   thinkingEnabled?: boolean
+  /** The composer shows a level menu, so the on/off Thinking row stays hidden. */
+  hasReasoningLevels?: boolean
   voiceReply?: boolean
   supportsReasoning?: boolean
   enhanceEnabled?: boolean
@@ -348,7 +351,9 @@ const isMobileViewport = ref(mobileMq.matches)
 const onMobileMqChange = (e: MediaQueryListEvent) => (isMobileViewport.value = e.matches)
 
 const activeToggleCount = computed(
-  () => Number(props.thinkingEnabled ?? false) + Number(props.voiceReply ?? false)
+  () =>
+    Number((props.thinkingEnabled ?? false) && !props.hasReasoningLevels) +
+    Number(props.voiceReply ?? false)
 )
 
 const isToolActive = (commandName: string): boolean => {

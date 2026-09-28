@@ -749,6 +749,8 @@ export const chatApi = {
     chatId?: number
     onUpdate: (data: StreamUpdatePayload) => void
     includeReasoning?: boolean
+    /** Chosen level when the model publishes one. Omitted keeps the model default. */
+    reasoningEffort?: string
     webSearch?: boolean
     /** Active vue-i18n locale — seeds inbound BLANG / Brave search language. */
     language?: string
@@ -781,6 +783,7 @@ export const chatApi = {
     }
     if (opts.trackId) paramsObj.trackId = opts.trackId.toString()
     if (opts.includeReasoning) paramsObj.reasoning = '1'
+    if (opts.reasoningEffort) paramsObj.reasoningEffort = opts.reasoningEffort
     if (opts.webSearch) paramsObj.webSearch = '1'
     if (opts.language) paramsObj.language = opts.language
     if (opts.modelId) paramsObj.modelId = opts.modelId.toString()

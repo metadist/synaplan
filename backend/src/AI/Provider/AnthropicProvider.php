@@ -335,6 +335,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
             $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyChosenEffort($requestBody, $model, $options);
             $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
 
             $this->logger->info('Anthropic: Chat request', [
@@ -514,6 +515,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
             $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyChosenEffort($requestBody, $model, $options);
             $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
 
             // Only accumulate when the request really declares tools. A forced
@@ -938,6 +940,69 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         ]);
 
         return $requestBody;
+    }
+
+    /**
+     * Send a chosen reasoning level as output_config.effort.
+     *
+     * Absent when the caller did not pick a level, so reasoning-on stays
+     * adaptive with no forced effort. xhigh and max clamp to high — Claude
+     * rejects those names. Medium and high turn thinking on when the model
+     * supports it; low stays a real (cheapest) level and does not force it.
+     *
+     * @param array<string, mixed> $requestBody
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function applyChosenEffort(array $requestBody, string $model, array $options): array
+    {
+        if (!$this->usesAdaptiveThinking($model)) {
+            return $requestBody;
+        }
+
+        $requested = $options['reasoning_effort'] ?? null;
+        if (!is_string($requested) || '' === $requested) {
+            return $requestBody;
+        }
+
+        $effort = match (strtolower($requested)) {
+            'low' => 'low',
+            'medium' => 'medium',
+            'high', 'xhigh', 'max' => 'high',
+            default => null,
+        };
+        if (null === $effort) {
+            return $requestBody;
+        }
+
+        $outputConfig = $requestBody['output_config'] ?? [];
+        if (!\is_array($outputConfig)) {
+            $outputConfig = [];
+        }
+        $outputConfig['effort'] = $effort;
+        $requestBody['output_config'] = $outputConfig;
+
+        if (\in_array($effort, ['medium', 'high'], true) && $this->supportsThinking($model) && !isset($requestBody['thinking'])) {
+            $requestBody['thinking'] = $this->buildThinkingConfig($model);
+        }
+
+        if (isset($requestBody['thinking'])) {
+            unset($requestBody['temperature']);
+        }
+
+        return $requestBody;
+    }
+
+    private function usesAdaptiveThinking(string $model): bool
+    {
+        foreach (self::ADAPTIVE_THINKING_MODELS as $adaptiveModel) {
+            if (str_starts_with($model, $adaptiveModel)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function thinkingCannotBeDisabled(string $model): bool

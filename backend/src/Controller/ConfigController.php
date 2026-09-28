@@ -6,6 +6,7 @@ use App\AI\Credential\ChatReadinessService;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Bundle\BundleConfig;
@@ -915,6 +916,8 @@ class ConfigController extends AbstractController
                                     new OA\Property(property: 'name', type: 'string', example: 'Qwen 3.6 27B'),
                                     new OA\Property(property: 'quality', type: 'integer', example: 9),
                                     new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
+                                    new OA\Property(property: 'reasoningLevels', type: 'array', items: new OA\Items(type: 'string', example: 'medium'), description: 'Discrete reasoning levels this model accepts, cheapest first. Absent when the model has no level knob and the chat keeps the on/off Thinking control.'),
+                                    new OA\Property(property: 'reasoningEffortDefault', type: 'string', example: 'medium', description: 'Level selected when the person has not chosen one. Present only together with reasoningLevels.'),
                                     new OA\Property(property: 'available', type: 'boolean', example: true, description: 'False only in the admin includeUnavailable view: the provider has no key/URL, or the Ollama model is not pulled.'),
                                     new OA\Property(property: 'unavailableReason', type: 'string', nullable: true, enum: ['provider_unavailable', 'not_pulled'], example: null),
                                 ]
@@ -998,7 +1001,7 @@ class ConfigController extends AbstractController
                 continue;
             }
 
-            $modelList[] = [
+            $row = [
                 'id' => $model->getId(),
                 'service' => $model->getService(),
                 'name' => $model->getName(),
@@ -1014,6 +1017,12 @@ class ConfigController extends AbstractController
                 'available' => $available,
                 'unavailableReason' => $unavailableReason,
             ];
+            $reasoningLevels = ReasoningLevelCatalog::levels($model->getService(), $model->getProviderId(), $model->getFeatures());
+            if (null !== $reasoningLevels) {
+                $row['reasoningLevels'] = $reasoningLevels;
+                $row['reasoningEffortDefault'] = ReasoningLevelCatalog::defaultLevel($reasoningLevels, $model->getJson());
+            }
+            $modelList[] = $row;
         }
 
         // Group models by their appropriate capability based on tag

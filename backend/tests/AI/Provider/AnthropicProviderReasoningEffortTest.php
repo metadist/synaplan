@@ -69,6 +69,52 @@ final class AnthropicProviderReasoningEffortTest extends TestCase
         self::assertSame('thinking-display-updates-2026-08-18', $captured['headers']['anthropic-beta'] ?? null);
     }
 
+    public function testChosenHighEffortIsSentAndEnablesThinking(): void
+    {
+        $captured = $this->captureChat('claude-sonnet-4-6', [
+            'reasoning' => false,
+            'reasoning_effort' => 'high',
+        ]);
+
+        self::assertSame('high', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(['type' => 'adaptive'], $captured['body']['thinking'] ?? null);
+    }
+
+    public function testChosenLowEffortOnOpusOverridesTheMinimum(): void
+    {
+        $captured = $this->captureChat('claude-opus-5-5', [
+            'reasoning' => true,
+            'reasoning_effort' => 'low',
+        ]);
+
+        self::assertSame('low', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(
+            ['type' => 'adaptive', 'display' => 'summarized'],
+            $captured['body']['thinking'] ?? null,
+        );
+        self::assertArrayNotHasKey('anthropic-beta', $captured['headers']);
+    }
+
+    public function testUnknownEffortAboveHighClampsDown(): void
+    {
+        $captured = $this->captureChat('claude-opus-4-6', [
+            'reasoning_effort' => 'max',
+        ]);
+
+        self::assertSame('high', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(['type' => 'adaptive'], $captured['body']['thinking'] ?? null);
+    }
+
+    public function testBudgetModelsIgnoreAChosenEffort(): void
+    {
+        $captured = $this->captureChat('claude-haiku-4-5', [
+            'reasoning' => true,
+            'reasoning_effort' => 'high',
+        ]);
+
+        self::assertArrayNotHasKey('output_config', $captured['body']);
+    }
+
     public function testReasoningOffLeavesOtherModelsUntouched(): void
     {
         $captured = $this->captureChat('claude-sonnet-4-6', []);
