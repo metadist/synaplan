@@ -1112,6 +1112,9 @@
     "telegram": {
       "label": "Canal de Telegram"
     },
+    "opendesk_stt": {
+      "label": "Notas de la reunión"
+    },
     "compute": {
       "label": "Cómputo seguro (trabajo con archivos)",
       "running": "El trabajo con archivos está en marcha.",

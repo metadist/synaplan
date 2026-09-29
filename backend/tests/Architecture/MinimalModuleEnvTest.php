@@ -40,6 +40,7 @@ final class MinimalModuleEnvTest extends TestCase
         'whatsapp' => ['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN'],
         'telegram' => ['TELEGRAM_ENABLED'],
         'compute' => ['COMPUTE_URL', 'COMPUTE_TOKEN'],
+        'opendesk_stt' => ['OPENDESK_STT_URL'],
     ];
 
     public function testEveryDeclaredModuleHasADecisiveEnvList(): void

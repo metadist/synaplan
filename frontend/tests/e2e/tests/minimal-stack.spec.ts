@@ -73,7 +73,9 @@ test.describe('@minimal @ci Minimal stack', () => {
     const modules = await runtimeModules(request)
     const expectedIds = Object.keys(modules).sort()
     expect(expectedIds).toContain('compute')
-    expect(expectedIds).toHaveLength(14)
+    expect(expectedIds).toContain('opendesk_stt')
+    expect(expectedIds).toContain('telegram')
+    expect(expectedIds).toHaveLength(15)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -140,8 +142,11 @@ test.describe('@minimal @ci Minimal stack', () => {
     const modules = await runtimeModules(request)
     const ids = Object.keys(modules).sort()
     expect(ids).toContain('compute')
-    expect(ids).toHaveLength(14)
+    expect(ids).toContain('opendesk_stt')
+    expect(ids).toContain('telegram')
+    expect(ids).toHaveLength(15)
     expect(modules.tika?.configured).toBe(false)
+    expect(modules.opendesk_stt?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)
     expect(modules.whatsapp?.configured).toBe(false)
     expect(modules.compute?.configured).toBe(false)

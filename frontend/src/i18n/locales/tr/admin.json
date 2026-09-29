@@ -1112,6 +1112,9 @@
     "telegram": {
       "label": "Telegram kanalı"
     },
+    "opendesk_stt": {
+      "label": "Toplantı notları"
+    },
     "compute": {
       "label": "Güvenli dosya çalışması",
       "running": "Dosya çalışması çalışıyor.",

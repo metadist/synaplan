@@ -1116,6 +1116,9 @@
     "telegram": {
       "label": "Telegram-Kanal"
     },
+    "opendesk_stt": {
+      "label": "Besprechungsnotizen"
+    },
     "compute": {
       "label": "Sichere Dateiarbeit",
       "running": "Dateiarbeit läuft.",

@@ -114,6 +114,10 @@ Local programs can transcribe against any configured SOUND2TEXT model (whisper.c
 
 → [OpenAI-compatible API](OPENAI_COMPATIBLE_API.md)
 
+Meeting notes for an openDesk install use that same speech-to-text API. A sidecar speaks Jitsi’s caption socket and Element voice messages, then throws the audio away. It stays off until `OPENDESK_STT_URL` is set.
+
+→ [Meeting notes](OPENDESK_MEETING_NOTES.md)
+
 ## File Management
 
 - Upload and organize files

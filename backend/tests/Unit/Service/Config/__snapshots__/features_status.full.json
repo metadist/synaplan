@@ -372,6 +372,29 @@
             "mobile_class": "ota-candidate"
         },
         {
+            "id": "opendesk_stt",
+            "label_key": "modules.opendesk_stt.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "OPENDESK_STT_URL is unset or disabled",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "OPENDESK_STT_URL",
+                    "OPENDESK_STT_PUBLIC_URL",
+                    "OPENDESK_STT_LANGUAGE",
+                    "OPENDESK_STT_MODE"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/opendesk-stt",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "piper_tts",
             "label_key": "modules.piper_tts.label",
             "state": "absent",

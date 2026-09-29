@@ -1116,6 +1116,9 @@
     "telegram": {
       "label": "Telegram channel"
     },
+    "opendesk_stt": {
+      "label": "Meeting notes"
+    },
     "compute": {
       "label": "Secure compute (file work)",
       "running": "File work is running.",

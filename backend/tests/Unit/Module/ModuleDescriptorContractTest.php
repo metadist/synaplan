@@ -34,6 +34,7 @@ final class ModuleDescriptorContractTest extends TestCase
         'whatsapp',
         'telegram',
         'compute',
+        'opendesk_stt',
     ];
 
     public function testTheDescriptorSetIsExactlyThePlan(): void
