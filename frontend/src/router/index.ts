@@ -702,6 +702,28 @@ const router = createRouter({
       beforeEnter: aiInfrastructureRedirect,
     },
     {
+      path: '/admin/partners',
+      name: 'admin-partners',
+      component: () => import('@/views/PartnersView.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.adminPartners',
+        i18n: ['admin'],
+      },
+    },
+    {
+      path: '/partners/join/:token',
+      name: 'partners-join',
+      component: () => import('@/views/PartnersJoinView.vue'),
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.adminPartners',
+        i18n: ['admin'],
+      },
+    },
+    {
       path: '/admin/people',
       name: 'admin-people',
       component: () => import('@/views/PeopleView.vue'),

@@ -33,6 +33,7 @@ final class ModuleDescriptorContractTest extends TestCase
         'mobile_iap',
         'whatsapp',
         'telegram',
+        'federation',
         'compute',
         'opendesk_stt',
     ];

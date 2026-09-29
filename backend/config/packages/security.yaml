@@ -66,6 +66,7 @@ security:
         # MCP: public discovery (RFC 9728 metadata) + CORS preflight; the
         # endpoint itself requires authentication.
         - { path: ^/\.well-known/oauth-protected-resource, roles: PUBLIC_ACCESS }
+        - { path: ^/\.well-known/synaplan-federation, roles: PUBLIC_ACCESS }
         - { path: ^/mcp, methods: [OPTIONS], roles: PUBLIC_ACCESS }
         - { path: ^/mcp, roles: IS_AUTHENTICATED_FULLY }
 
@@ -145,6 +146,12 @@ security:
         - { path: ^/api/v1/platform-links/instances/self$, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/instances/[^/]+/public$, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/exchange$, methods: [POST], roles: PUBLIC_ACCESS }
+
+        # Partner handshake. The invite preview and the signed connect call
+        # prove themselves (unguessable token, Ed25519 signature). Admin routes
+        # stay behind the catch-all below.
+        - { path: ^/api/v1/federation/invites/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/federation/connect$, methods: [POST], roles: PUBLIC_ACCESS }
 
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }

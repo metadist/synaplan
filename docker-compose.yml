@@ -380,6 +380,7 @@ services:
       TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org}
       TELEGRAM_WEBHOOK_BASE_URL: ${TELEGRAM_WEBHOOK_BASE_URL:-}
       TELEGRAM_ALLOW_LOCAL_WEBHOOK: ${TELEGRAM_ALLOW_LOCAL_WEBHOOK:-false}
+      FEDERATION_ALLOW_LOCAL: ${FEDERATION_ALLOW_LOCAL:-false}
       # AI Provider API Keys (loaded from backend/.env via env_file above)
       # GROQ_API_KEY is automatically loaded from backend/.env
       AUTO_DOWNLOAD_MODELS: "false"
@@ -570,6 +571,7 @@ services:
       TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org}
       TELEGRAM_WEBHOOK_BASE_URL: ${TELEGRAM_WEBHOOK_BASE_URL:-}
       TELEGRAM_ALLOW_LOCAL_WEBHOOK: ${TELEGRAM_ALLOW_LOCAL_WEBHOOK:-false}
+      FEDERATION_ALLOW_LOCAL: ${FEDERATION_ALLOW_LOCAL:-false}
     entrypoint: ["bash", "-c"]
     command:
       - |

@@ -111,6 +111,7 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'aiInfra',
     'iam',
     'modules',
+    'partners',
     'people',
     'platformConnect',
     'providerHelp',

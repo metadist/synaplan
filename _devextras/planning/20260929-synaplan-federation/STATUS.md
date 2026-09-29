@@ -20,7 +20,7 @@ Reading order for the rest of this folder:
 | Step | State | Notes |
 | ---- | ----- | ----- |
 | M0 | queued | §12 is decided. Left: confirm §1 translations, EN copy + wireframes for J-P1–J-P8, name two design partners. Docs only |
-| M1 | queued | Open to partners, invite link, connect card, partner page, Pause, Disconnect. Check `ext-sodium` first |
+| M1 | in progress | Open to partners, invite link, connect, pause, disconnect. `ext-sodium` is present in the backend image |
 | M2 | queued | Share a topic (*Can ask*), Sources → From partners, consent line, answer card |
 | M3 | queued | Share an assistant to chat (*Can chat*), limits, Assistants → From partners |
 | M4 | queued | Share a copy (*Can copy*) for assistants, prompts, widgets. Needs `04` P1–P3 |

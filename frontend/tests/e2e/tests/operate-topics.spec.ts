@@ -2,8 +2,8 @@
  * Operate is grouped by topic.
  *
  * Journey J-OP-1 (admin): "Where do I set up the AI, and where does the rest
- * of the server live?" — Operate lists five entries (Overview, System status,
- * AI infrastructure, People, System configuration). AI infrastructure holds
+ * of the server live?" — Operate lists six entries (Overview, System status,
+ * AI infrastructure, People, Partners, System configuration). AI infrastructure holds
  * everything the AI needs: providers and keys, model health, document reading
  * with its reading services, knowledge search with embeddings, vector database
  * and reranking, chat behaviour and system prompts. System configuration keeps
@@ -37,7 +37,7 @@ test.describe('@ci Operate topics', () => {
     await test.step('Operate lists one entry per topic', async () => {
       const flyout = await openOperateFlyout(page)
       const links = flyout.locator('[data-testid^="link-sidebar-v2-admin-"]')
-      await expect(links).toHaveCount(5)
+      await expect(links).toHaveCount(6)
       expect(
         await links.evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')))
       ).toEqual([
@@ -45,6 +45,7 @@ test.describe('@ci Operate topics', () => {
         'link-sidebar-v2-admin-features',
         'link-sidebar-v2-admin-setup',
         'link-sidebar-v2-admin-people',
+        'link-sidebar-v2-admin-partners',
         'link-sidebar-v2-admin-config',
       ])
       await flyout.locator(NAV.flyoutLinkAdminSetup).click()
@@ -128,5 +129,13 @@ test.describe('@ci Operate topics', () => {
         timeout: TIMEOUTS.STANDARD,
       })
     })
+  })
+
+  test('a private address cannot be opened to partners', async ({ page }) => {
+    await page.goto('/admin/partners')
+    await expect(page.locator('[data-testid="partners-unreachable"]')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator('[data-testid="btn-partners-open"]')).toBeDisabled()
   })
 })
