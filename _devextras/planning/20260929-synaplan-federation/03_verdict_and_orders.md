@@ -1,5 +1,10 @@
 # Federation — second review: cut it to one product, then ship (2026-09-29)
 
+> **Partly superseded by [`05_partners.md`](./05_partners.md).** The safety
+> findings in §3 stay binding. The directory, sharing UI, scope and build
+> order changed; `05` §11 lists every difference. Build from `05` §9, not
+> from the Orders below.
+
 > Binding for the next sprint. [`00_master_plan.md`](./00_master_plan.md) stays the
 > vision document. This file is the verdict on it and the only order list that
 > matters until two installs can ask each other one question.

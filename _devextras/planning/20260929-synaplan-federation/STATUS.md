@@ -1,67 +1,57 @@
-# Federation v1.0 — status
+# Synaplan Partners (federation) — status
 
-Reviewed 2026-09-29. **Queued for the next sprint** as the knowledge
-link only. The review and the cut are in [`01_review.md`](./01_review.md),
-the binding simplification + orders in
-[`03_verdict_and_orders.md`](./03_verdict_and_orders.md).
-Portable sharing + client migration (prompts, widgets, data) is planned in
-[`04_portable_sharing_migration.md`](./04_portable_sharing_migration.md).
-No product code yet.
+**Start here: [`05_partners.md`](./05_partners.md).** It is the binding plan:
+open to partners, invite links, the Synaplan Directory on `web.synaplan.com`,
+topics, assistants, copies. No product code yet.
 
-## Next sprint — live knowledge link (`03`, Orders 0–7)
+Reading order for the rest of this folder:
 
-| Step | State | Notes |
-| ---- | ----- | ----- |
-| Order 0 | queued | Name the first two operators + folders. No code |
-| Order 1 | queued | Shrink the plan (docs-only) |
-| Order 2 | queued | Sodium + well-known spike. No migration |
-| Order 3 | queued | Link invite / accept / revoke. 1 table |
-| Order 4 | queued | Knowledge query over one `RagScope`. 1 table |
-| Order 5 | queued | Admin UI, after Order 4 is green |
-| Order 6 | queued | Chat palette + source card, after Order 5 is green |
-| Order 7 | queued | Harden, measure, freeze `protocol: 1` |
+| File | Role now |
+| ---- | -------- |
+| [`05_partners.md`](./05_partners.md) | **Binding plan and build order (M0–M6)** |
+| [`04_portable_sharing_migration.md`](./04_portable_sharing_migration.md) | Binding for the portable format: `widgets` + `knowledge` bundle sections, client migration. Feeds M4 |
+| [`03_verdict_and_orders.md`](./03_verdict_and_orders.md) | Safety findings (§3) still binding; its Orders are replaced by `05` §9 (differences in `05` §11) |
+| [`01_review.md`](./01_review.md) | First review; findings 1–13 still true |
+| [`00_master_plan.md`](./00_master_plan.md), [`02_federation_data_model.md`](./02_federation_data_model.md) | Vision and history. Token market, payments and gossip are parked |
 
-Old F-labels (F0/F1/F3–F6) map to Orders 2–6; see `03` for the mapping.
-
-## Next after that — portable sharing + migration (`04`, P0–P7)
+## Build order — `05` §9
 
 | Step | State | Notes |
 | ---- | ----- | ----- |
-| P0 | queued | Plan review + §2 decisions + EN copy before Vue |
-| P1 | queued | `widgets` bundle section (backend-only) |
-| P2 | queued | `knowledge` manifest + file archive + re-vectorize (backend-only) |
-| P3 | queued | Prompt/agent folder rebinding in the same bundle (backend-only) |
-| P4 | queued | Export/Import panel + morning-after report (J-PM-1..3). **May ship before federation P5** |
-| P5 | queued | Federation share transport (needs `03` Orders 3–5 green) |
-| P6 | queued | Share UI + incoming-shares inbox (J-PM-4) |
-| P7 | queued | `docs/PORTABLE_SETUP.md` migration runbook |
+| M0 | queued | Decide (`05` §12), confirm words (`05` §1), EN copy + wireframes for J-P1–J-P8, name two design partners. Docs only |
+| M1 | queued | Open to partners, invite link, connect card, partner page, Pause, Disconnect. Check `ext-sodium` first |
+| M2 | queued | Share a topic (*Can ask*), Sources → From partners, consent line, answer card |
+| M3 | queued | Share an assistant to chat (*Can chat*), limits, Assistants → From partners |
+| M4 | queued | Share a copy (*Can copy*) for assistants, prompts, widgets. Needs `04` P1–P3 |
+| M5 | queued | Synaplan Directory + `synaplan-platform` rollout. May start after M1; goes live after M2 |
+| M6 | queued | Harden, two weeks of real use, freeze `protocol: 1`, admin docs |
 
-## Parked until two installs can query each other
+## Portable format + migration — `04` §8
 
 | Step | State | Notes |
 | ---- | ----- | ----- |
-| F2 | parked | Gossip. Two partners sync on accept |
-| F7 | parked | Capacity market and `peer` key source in `MessagesGateway` |
-| F8 | parked | Ledger and receipts |
-| F9 | parked | Settlement. `StripeBillingModule` is not this seam |
-| F10 | parked | Market UI and Cursor routing |
-| F11 | parked | Denylists, anti-Sybil |
-| F12 | parked | Directory browse and health view |
-| F13 | parked | Third-party protocol doc beyond the knowledge link |
+| P0 | queued | Plan review, EN copy before Vue |
+| P1 | queued | `widgets` bundle section |
+| P2 | queued | `knowledge` manifest + file archive + re-vectorize |
+| P3 | queued | Folder rebinding for prompts/assistants in the same bundle |
+| P4 | queued | Export/Import panel + morning-after report. **Independent of M1–M6; may ship any time** |
+| P5–P6 | replaced | Sending a bundle to a partner is now *Can copy* in `05` M4 |
+| P7 | queued | `docs/PORTABLE_SETUP.md` |
 
-## Open before the first migration
+## Parked (re-entry rules in `03` §7)
 
-- Federation link (`03`): schema for `federation_link` + `federation_publication`
-  + instance identity (keypair in secret store, no table).
-- `ext-sodium` in the backend image (check inside the container first).
-- Portable sharing (`04` P1–P4): no schema expected (bundle sections only).
-- Seeds stay empty. No money, no gossip, no jobs in v1.
+Token market and `peer` key source, ledger and settlement, gossip directory,
+remote tool calls (MCP bridge), transitive trust, `@*` fan-out, the Discord
+bot. Business accounts on shared servers are **later**, not parked: `05` §10
+item 1, separate plan.
 
-## Data model
+## Open before the first migration (Ask-First)
 
-What is published, how updates spread, storage/bandwidth for a 15k-instance
-network, the zero-trust model, and MCP/API-call sharing are specified in
-[`02_federation_data_model.md`](./02_federation_data_model.md) (vision; mostly
-parked by `03`). Portable sharing + migration (widgets, knowledge manifest +
-file archive, federation share transport) is specified in
-[`04_portable_sharing_migration.md`](./04_portable_sharing_migration.md).
+- Schema: the five `federation_*` tables in `05` §9, plus `directory_listing`
+  on the Directory server only.
+- IAM: `BSHARES` subject type `partner` with permissions `ask` / `chat` /
+  `copy`.
+- Product default: module present when `APP_URL` is public https, feature
+  closed until an admin opens it.
+- Ops: Directory on `web.synaplan.com` through `synaplan-platform`.
+- `ext-sodium` in the backend image.

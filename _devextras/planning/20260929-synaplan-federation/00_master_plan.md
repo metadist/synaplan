@@ -1,5 +1,9 @@
 # Synaplan Federation — Version 1.0 plan
 
+> **Vision and history.** The binding plan is [`05_partners.md`](./05_partners.md).
+> Where this file differs (directory, sharing UI, assistants, build order),
+> `05` wins. Token market, payments and gossip below are parked.
+
 > **Wir föderieren.** Two or more Synaplan installations opt in to share two
 > things across a trusted link: **knowledge** (RAG excerpts) and **capacity**
 > (model tokens). No central server, no data leaves without an explicit

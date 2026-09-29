@@ -8,9 +8,11 @@
 | **Scope** | **Share a copy** (prompt / widget + its knowledge) with a peer over a federation link, and **migrate a client** (all prompts, widgets, knowledge data) from instance A to instance B. File download + re-upload already works; this plan makes *the whole working setup* move. |
 | **Binding contracts** | UX rules U1–U12 ([`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)); AGENTS.md "Perfect UX & Stability"; bundle rules in `BundleEnvelopeValidator` (5 MB JSON cap, 200 items/section). |
 
-Files in this folder: `00` vision · `01` first review · `02` full data model ·
-`03` binding simplification + orders for the live knowledge link ·
-**`04` (this) portable sharing + migration** · `STATUS.md` step log.
+Files in this folder: start with [`05_partners.md`](./05_partners.md) (binding
+plan). This file stays binding for the portable format (§1–§4) and client
+migration (§6). The federation share transport in §5 and steps P5–P6 are
+replaced by *Can copy* in `05` §4.2 / M4: the partner's admin clicks
+**Get a copy** instead of accepting a pushed offer.
 
 ---
 
