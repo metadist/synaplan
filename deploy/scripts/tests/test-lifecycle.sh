@@ -1605,7 +1605,10 @@ assert_resolves_secrets_before_compose() {
 }
 
 for script in "$SCRIPT_DIR"/*.sh; do
-    [[ "$script" == */lib.sh || "$script" == */secrets-init.sh ]] && continue
+    # local-tls.sh writes a certificate and the public URL. It does not start
+    # containers, so generating deployment secrets there would be a side effect
+    # of a command that never reaches the stack.
+    [[ "$script" == */lib.sh || "$script" == */secrets-init.sh || "$script" == */local-tls.sh ]] && continue
     assert_resolves_secrets_before_compose "$script"
 done
 

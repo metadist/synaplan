@@ -3,6 +3,10 @@
 
 set -Eeuo pipefail
 
+# Compose prefers an exported value over the file. Keep the suite independent
+# of whatever this shell happens to export.
+unset COMPOSE_PROFILES
+
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$ROOT/scripts/local-tls.sh"
 CADDYFILE="$ROOT/local-network/Caddyfile"
@@ -15,6 +19,9 @@ fail() {
 }
 
 [[ -x "$SCRIPT" ]] || fail "local-tls.sh is not executable"
+if grep -Fq 'docker compose' "$SCRIPT"; then
+    fail "local-tls.sh names docker compose; lifecycle scripts reach Compose through lib.sh"
+fi
 [[ -f "$CADDYFILE" ]] || fail "missing $CADDYFILE"
 
 grep -Fq 'auto_https off' "$CADDYFILE" || fail "Caddyfile must disable automatic certificates"
@@ -129,6 +136,85 @@ sed -i 's/^SYNAPLAN_HTTP_BIND=.*/SYNAPLAN_HTTP_BIND=0.0.0.0/' "$bind"
 bash "$SCRIPT" --env-file "$bind" --cert-dir "$tmp/tls-bind" 169.254.10.9 >/dev/null
 grep -Fxq 'SYNAPLAN_HTTP_BIND=127.0.0.1' "$bind" || fail "a wide HTTP bind was left in place"
 grep -Fxq 'APP_URL=https://169.254.10.9' "$bind" || fail "link-local address was rejected"
+
+commented="$tmp/comment.env"
+cp "$EXAMPLE" "$commented"
+sed -i 's/^COMPOSE_PROFILES=.*/COMPOSE_PROFILES=local-ai # optional/' "$commented"
+bash "$SCRIPT" --env-file "$commented" --cert-dir "$tmp/tls-comment" 10.4.4.4 >/dev/null
+grep -Fxq 'COMPOSE_PROFILES=local-ai,local-tls' "$commented" || fail "an inline comment was glued onto the profile name"
+
+quoted="$tmp/quoted.env"
+cp "$EXAMPLE" "$quoted"
+sed -i 's/^COMPOSE_PROFILES=.*/COMPOSE_PROFILES="local-ai, office"/' "$quoted"
+bash "$SCRIPT" --env-file "$quoted" --cert-dir "$tmp/tls-quoted" 10.4.4.5 >/dev/null
+grep -Fxq 'COMPOSE_PROFILES=local-ai,office,local-tls' "$quoted" || fail "a quoted profile list was not parsed"
+
+shell_env="$tmp/shell.env"
+shell_log="$tmp/shell.log"
+cp "$EXAMPLE" "$shell_env"
+sed -i 's/^COMPOSE_PROFILES=.*/COMPOSE_PROFILES=local-ai/' "$shell_env"
+COMPOSE_PROFILES=office bash "$SCRIPT" --env-file "$shell_env" --cert-dir "$tmp/tls-shell" 10.4.4.6 >"$shell_log"
+grep -Fxq 'COMPOSE_PROFILES=office,local-tls' "$shell_env" || fail "the shell profile list was ignored"
+grep -Fq 'COMPOSE_PROFILES is set in this shell' "$shell_log" || fail "the shell override was silent"
+
+pair="$tmp/tls-pair"
+pair_env="$tmp/pair.env"
+cp "$EXAMPLE" "$pair_env"
+bash "$SCRIPT" --env-file "$pair_env" --cert-dir "$pair" 10.8.8.8 >/dev/null
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:prime256v1 -out "$pair/key.pem"
+chmod 600 "$pair/key.pem"
+pair_before="$(sha256sum "$pair/cert.pem")"
+bash "$SCRIPT" --env-file "$pair_env" --cert-dir "$pair" 10.8.8.8 >/dev/null
+[[ "$(sha256sum "$pair/cert.pem")" != "$pair_before" ]] || fail "a mismatched private key was kept"
+[[ "$(openssl x509 -in "$pair/cert.pem" -noout -pubkey)" == "$(openssl pkey -in "$pair/key.pem" -pubout)" ]] || fail "the replacement certificate does not match its key"
+
+expired="$tmp/tls-expired"
+expired_env="$tmp/expired.env"
+cp "$EXAMPLE" "$expired_env"
+mkdir -p "$expired/ca/newcerts"
+touch "$expired/ca/index.txt"
+echo 01 > "$expired/ca/serial"
+cat > "$expired/ca.cnf" <<'EOF'
+[ca]
+default_ca = CA_default
+[CA_default]
+dir = ca
+database = $dir/index.txt
+new_certs_dir = $dir/newcerts
+certificate = $dir/cacert.pem
+serial = $dir/serial
+private_key = $dir/cakey.pem
+default_md = sha256
+policy = policy_any
+x509_extensions = v3
+[policy_any]
+commonName = supplied
+[req]
+distinguished_name = dn
+prompt = no
+[dn]
+CN = synaplan
+[v3]
+subjectAltName = IP:10.7.7.7,IP:127.0.0.1,DNS:localhost
+basicConstraints = CA:true
+EOF
+(
+    cd "$expired"
+    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+        -keyout ca/cakey.pem -out ca/cacert.pem -days 1 -subj '/CN=synaplan' \
+        -config ca.cnf -extensions v3 >/dev/null 2>&1
+    openssl req -new -key ca/cakey.pem -out req.pem -subj '/CN=synaplan' -config ca.cnf >/dev/null 2>&1
+    openssl ca -selfsign -config ca.cnf -in req.pem -keyfile ca/cakey.pem \
+        -out cert.pem -startdate 20200101000000Z -enddate 20200102000000Z \
+        -batch -notext >/dev/null 2>&1
+    cp ca/cakey.pem key.pem
+    chmod 600 key.pem
+)
+[[ -s "$expired/cert.pem" ]] || fail "could not build an expired certificate for the test"
+expired_before="$(sha256sum "$expired/cert.pem")"
+bash "$SCRIPT" --env-file "$expired_env" --cert-dir "$expired" 10.7.7.7 >/dev/null
+[[ "$(sha256sum "$expired/cert.pem")" != "$expired_before" ]] || fail "an expired certificate was kept"
+openssl x509 -in "$expired/cert.pem" -noout -checkend 86400 >/dev/null || fail "the replacement certificate is still inside its last day"
 
 if [[ "$preexisting" == false && -d "$ROOT/data/tls" ]]; then
     fail "tests wrote deploy/data/tls"

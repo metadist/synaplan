@@ -125,10 +125,33 @@ upsert_env() {
     mv "$tmp" "$file"
 }
 
+# The profile list Compose will actually use. An exported COMPOSE_PROFILES
+# wins over the file. In the file, Compose trims the value, strips one pair of
+# surrounding quotes, and treats " #" as a comment. Spaces next to a comma are
+# not part of a profile name.
+compose_profile_list() {
+    local value="$1" quote=""
+    value="${value%$'\r'}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    if [[ ${#value} -ge 2 ]]; then
+        quote="${value:0:1}"
+        if [[ ( "$quote" == '"' || "$quote" == "'" ) && "${value: -1}" == "$quote" ]]; then
+            value="${value:1:${#value}-2}"
+        elif [[ "$value" == *" #"* ]]; then
+            value="${value%% #*}"
+            value="${value%"${value##*[![:space:]]}"}"
+        fi
+    fi
+    while [[ "$value" == *", "* || "$value" == *" ,"* ]]; do
+        value="${value//, /,}"
+        value="${value// ,/,}"
+    done
+    printf '%s\n' "$value"
+}
+
 merge_profile() {
     local current="$1" profile="$2" item rebuilt="" found=false
-    current="${current%$'\r'}"
-    current="${current// /}"
     if [[ -z "$current" ]]; then
         printf '%s\n' "$profile"
         return
@@ -157,10 +180,23 @@ san_names() {
     printf '%s\n' "$san"
 }
 
+# A pair is reusable only while the certificate stays valid for at least a day
+# and the key on disk is the key that certificate was signed with. Anything
+# else is replaced, so Caddy does not start against an expired or mismatched pair.
+certificate_usable() {
+    local cert="$1" key cert_pub key_pub
+    key="$(dirname "$cert")/key.pem"
+    [[ -s "$cert" && -s "$key" ]] || return 1
+    openssl x509 -in "$cert" -noout -checkend 86400 >/dev/null 2>&1 || return 1
+    cert_pub="$(openssl x509 -in "$cert" -noout -pubkey 2>/dev/null || true)"
+    key_pub="$(openssl pkey -in "$key" -pubout 2>/dev/null || true)"
+    [[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]]
+}
+
 certificate_covers() {
     local cert="$1" san ip escaped
     shift
-    [[ -s "$cert" && -s "$(dirname "$cert")/key.pem" ]] || return 1
+    certificate_usable "$cert" || return 1
     san="$(openssl x509 -in "$cert" -noout -ext subjectAltName 2>/dev/null || true)"
     [[ -n "$san" ]] || return 1
     for ip in "$@"; do
@@ -291,6 +327,9 @@ command -v openssl >/dev/null 2>&1 || die "openssl is required to create the cer
 if [[ "$FORCE" == false ]] && certificate_covers "$CERT_DIR/cert.pem" "${addresses[@]}"; then
     log "Keeping the existing certificate. It already names: ${addresses[*]}."
 else
+    if [[ "$FORCE" == false && -s "$CERT_DIR/cert.pem" && -s "$CERT_DIR/key.pem" ]] && ! certificate_usable "$CERT_DIR/cert.pem"; then
+        log "Replacing the certificate. It is expired, or its private key does not match."
+    fi
     mint_certificate "$CERT_DIR" "${addresses[@]}"
     if [[ "$FORCE" == true ]]; then
         log "Browsers that already accepted the previous certificate will warn again."
@@ -300,12 +339,23 @@ fi
 if [[ "$SKIP_ENV" == false ]]; then
     public_url="https://${primary}"
     previous_bind="$(env_file_raw_value "$ENV_FILE" SYNAPLAN_HTTP_BIND || true)"
-    profiles="$(env_file_raw_value "$ENV_FILE" COMPOSE_PROFILES || true)"
+    if host_environment_defines COMPOSE_PROFILES; then
+        profiles="$(compose_profile_list "$COMPOSE_PROFILES")"
+        profiles_from_env=true
+    else
+        profiles="$(compose_profile_list "$(env_file_raw_value "$ENV_FILE" COMPOSE_PROFILES || true)")"
+        profiles_from_env=false
+    fi
+    merged_profiles="$(merge_profile "$profiles" local-tls)"
     upsert_env "$ENV_FILE" APP_URL "$public_url"
     upsert_env "$ENV_FILE" FRONTEND_URL "$public_url"
     upsert_env "$ENV_FILE" REALTIME_ALLOWED_ORIGINS "$public_url"
     upsert_env "$ENV_FILE" SYNAPLAN_HTTP_BIND "127.0.0.1"
-    upsert_env "$ENV_FILE" COMPOSE_PROFILES "$(merge_profile "$profiles" local-tls)"
+    upsert_env "$ENV_FILE" COMPOSE_PROFILES "$merged_profiles"
+    if [[ "$profiles_from_env" == true && "$COMPOSE_PROFILES" != "$merged_profiles" ]]; then
+        log "COMPOSE_PROFILES is set in this shell, and that value wins over the file."
+        log "Unset it, or set COMPOSE_PROFILES=${merged_profiles}, before starting the stack."
+    fi
     if [[ -n "$previous_bind" && "$previous_bind" != "127.0.0.1" ]]; then
         log "Set SYNAPLAN_HTTP_BIND back to 127.0.0.1. The network reaches the app through HTTPS."
     fi
@@ -331,5 +381,6 @@ log "The browser warns once. That is expected: the certificate was created on th
 log "On this machine the app also answers at http://127.0.0.1:${http_port}"
 log "Back up ${CERT_DIR} with the rest of the data directory. Creating the certificate again makes every browser warn again."
 if [[ "$SKIP_ENV" == false ]]; then
-    log "Start or restart with: docker compose --env-file ${ENV_FILE} -f ${DEPLOY_DIR}/compose.yaml up -d"
+    log "Start the stack again so the local-tls profile is applied."
+    log "Env file: ${ENV_FILE}. Compose file: ${DEPLOY_DIR}/compose.yaml."
 fi
