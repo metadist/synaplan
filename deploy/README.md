@@ -11,7 +11,8 @@ other development services.
 - Optional `local-ai` profile: at least 16 GB RAM and substantially more disk
 - Optional `office` profile (Collabora CODE sidecar): about +2 GB RAM; off by
   default so the 8 GB Cloud-AI floor stays valid
-- A reverse proxy terminating HTTPS in front of `127.0.0.1:8000`
+- HTTPS for anyone off this machine: your own reverse proxy, or the opt-in
+  [local network](#local-network) certificate when the network has no public route
 
 All database, cache, vector, upload, model, and backup data lives below
 `deploy/data/`. Back up that directory only through the lifecycle hooks so the
@@ -210,7 +211,7 @@ the web nodes. Details: [docs/COMPUTE.md](../docs/COMPUTE.md).
 
 ## Network and persistence
 
-Only the web service binds a host port. MariaDB, Redis, Centrifugo, Tika, Qdrant,
+By default only the web service binds a host port. The opt-in `local-tls` profile also publishes 443 and 80. MariaDB, Redis, Centrifugo, Tika, Qdrant,
 Ollama, Whisper, and Collabora (when the `office` profile is on) remain on the Compose network. The default bind is
 `127.0.0.1:8000`. A managed platform whose HTTPS proxy runs in its own container
 cannot reach that address and needs `SYNAPLAN_HTTP_BIND` set to the host
@@ -219,6 +220,25 @@ interface the proxy connects to — the Docker bridge gateway, usually
 publishes ports through its own iptables rules, which a host firewall such as
 ufw does not close, so the app would be reachable as plain HTTP from the
 internet and the HTTPS proxy could be bypassed.
+
+## Local network
+
+Opt-in. Off until `deploy/scripts/local-tls.sh` runs.
+
+Use it on a network with no route to the public internet, when people open the app by the machine's address. Any IPv4 address on that network is accepted: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `169.254.0.0/16`, and any other block you assigned and do not announce.
+
+```bash
+deploy/scripts/local-tls.sh 10.0.0.15
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+The command writes `deploy/data/tls/` (`key.pem` mode `0600`), adds `local-tls` to `COMPOSE_PROFILES`, and sets `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` to `https://10.0.0.15`. Colleagues open that URL. The browser warns once. Ports 80 and 443 must be free. `SYNAPLAN_HTTP_BIND` stays `127.0.0.1`.
+
+A further address on another interface is another argument (`deploy/scripts/local-tls.sh 10.0.0.15 192.168.1.20`). Back up `data/tls` with the rest of `deploy/data`. Creating the certificate again makes every browser warn again.
+
+A public name keeps your own HTTPS proxy. Leave `local-tls` out of `COMPOSE_PROFILES` for that install.
+
+Walkthrough: [Local network](https://docs.synaplan.com/local-network).
 
 Persistent paths:
 
@@ -230,6 +250,8 @@ Persistent paths:
 - `data/backups`: restricted MariaDB dumps and Qdrant collection snapshots
 - `data/secrets.env`: the deployment's generated secrets, mode `0600` — required
   to open the restored database, so it must be in every backup
+- `data/tls`: the opt-in local-network certificate and its private key. Back it
+  up with the rest of `data/` so browsers keep the exception they already stored
 
 `deploy/data/` must never be committed.
 

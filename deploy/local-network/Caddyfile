@@ -1,0 +1,44 @@
+# HTTPS for a local network, in front of the Synaplan web container.
+#
+# A browser that opens the app by a bare address (https://10.0.0.15/) sends no
+# server name. Caddy's `tls internal` issuer then has no name to mint a
+# certificate for and aborts the handshake. The certificate is created on the
+# host by deploy/scripts/local-tls.sh, with that address in the subject
+# alternative names, and loaded from the files below.
+#
+# No automatic certificates and no HSTS. A public name belongs on a normal
+# HTTPS proxy; pinning a self-signed certificate to an address would stick
+# after this proxy is removed.
+
+{
+	auto_https off
+}
+
+:443 {
+	tls /etc/caddy/selfsigned/cert.pem /etc/caddy/selfsigned/key.pem
+
+	# Compressing the chat stream or the WebSocket upgrade buffers tokens and
+	# makes Firefox refuse the realtime handshake. The same paths are excluded
+	# in the application server.
+	@not_streaming {
+		not path /api/v1/messages/stream /api/v1/widget/*/message /v1/messages /connection/*
+	}
+	encode @not_streaming zstd gzip
+
+	@not_realtime {
+		not path /connection/*
+	}
+	header @not_realtime {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy backend:80 {
+		flush_interval -1
+	}
+}
+
+:80 {
+	redir https://{host}{uri} permanent
+}

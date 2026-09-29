@@ -52,7 +52,7 @@ Leave the eight secret lines commented out. The first start generates them into 
 docker compose up -d
 ```
 
-Open **<http://127.0.0.1:8000>**. That address is `SYNAPLAN_HTTP_BIND` plus `SYNAPLAN_HTTP_PORT`.
+Open **<http://127.0.0.1:8000>**. That address is `SYNAPLAN_HTTP_BIND` plus `SYNAPLAN_HTTP_PORT`. People on a closed network use the opt-in [local network](#local-network) certificate and open `https://<address>/`.
 
 To move to another release later, back up `./data` first, change `SYNAPLAN_VERSION`, and run `docker compose up -d` again. If the newer version already migrated the database, switching the tag back is not enough — restore the backup as described in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#roll-back).
 
@@ -117,6 +117,40 @@ deploy/scripts/smoke-test.sh
 The installer also accepts `--admin-email`, `--admin-password` (auto-generated when omitted), `--version` (defaults to the latest release), `--dir`, `--branch` and `--yes` — see `bash install.sh --help`.
 
 After login, the **same first-run provider screen** applies. Full walkthrough: [Installation](docs/INSTALLATION.md) · [deploy/README.md](deploy/README.md).
+
+## Local network
+
+Opt-in. The default install stays on this machine at `http://127.0.0.1:8000`.
+
+Turn it on when the network has **no route to the public internet** and people open Synaplan by the machine's address. Chat needs `https://<address>/`. The machine creates the certificate. The browser warns once; continue past that warning.
+
+Any IPv4 address on that network works. That includes every unrouted block:
+
+| Address | Block |
+| --- | --- |
+| `10.0.0.15` | `10.0.0.0/8` |
+| `172.16.5.4` | `172.16.0.0/12` |
+| `192.168.1.20` | `192.168.0.0/16` |
+| `100.64.0.8` | `100.64.0.0/10` (shared) |
+| `169.254.1.20` | `169.254.0.0/16` (link-local) |
+
+Another block you assigned and do not announce is accepted the same way. Pass the address people will type:
+
+```bash
+cp deploy/selfhost.env.example deploy/.env
+# Set SYNAPLAN_VERSION. Leave SYNAPLAN_HTTP_BIND at 127.0.0.1.
+deploy/scripts/local-tls.sh 10.0.0.15
+deploy/scripts/prepare.sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml pull
+deploy/scripts/validate-release.sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+Colleagues open **https://10.0.0.15/**. Ports 80 and 443 must be free. The command adds the `local-tls` profile and sets `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` to that URL. The app itself stays on `127.0.0.1:8000`.
+
+A second interface is another argument: `deploy/scripts/local-tls.sh 10.0.0.15 192.168.1.20`. Back up `deploy/data/tls` with the rest of `deploy/data`. A public name keeps your own HTTPS proxy and leaves `local-tls` off.
+
+Details: [docs.synaplan.com/local-network](https://docs.synaplan.com/local-network) · [deploy/README.md](deploy/README.md#local-network).
 
 ---
 
