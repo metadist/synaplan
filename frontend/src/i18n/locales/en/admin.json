@@ -1113,6 +1113,9 @@
     "whatsapp": {
       "label": "WhatsApp channel"
     },
+    "telegram": {
+      "label": "Telegram channel"
+    },
     "compute": {
       "label": "Secure compute (file work)",
       "running": "File work is running.",

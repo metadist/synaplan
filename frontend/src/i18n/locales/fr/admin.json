@@ -1113,6 +1113,9 @@
     "whatsapp": {
       "label": "Canal WhatsApp"
     },
+    "telegram": {
+      "label": "Canal Telegram"
+    },
     "compute": {
       "label": "Calcul sécurisé (travail sur fichiers)",
       "running": "Le travail sur fichiers est en cours.",

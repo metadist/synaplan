@@ -73,7 +73,7 @@ test.describe('@minimal @ci Minimal stack', () => {
     const modules = await runtimeModules(request)
     const expectedIds = Object.keys(modules).sort()
     expect(expectedIds).toContain('compute')
-    expect(expectedIds).toHaveLength(13)
+    expect(expectedIds).toHaveLength(14)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -89,6 +89,28 @@ test.describe('@minimal @ci Minimal stack', () => {
       await expect(row).toHaveAttribute('data-state', 'absent')
       expect(modules[id]?.configured, `runtime ${id} must be unconfigured`).toBe(false)
     }
+  })
+
+  test('Telegram webhook answers the uniform 404 and the card is absent', async ({
+    page,
+    request,
+  }) => {
+    const res = await request.post(`${getApiUrl()}/api/v1/webhooks/telegram/missing`, {
+      data: { update_id: 1 },
+    })
+    expect(res.status()).toBe(404)
+    expect(await res.json()).toEqual({
+      error: 'feature_not_configured',
+      module: 'telegram',
+      docs: 'modules/telegram',
+    })
+
+    await openApp(page)
+    await page.goto('/channels')
+    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.inboundConfig.telegramSection)).toHaveCount(0)
   })
 
   test('WhatsApp webhook answers the uniform 404', async ({ request }) => {
@@ -118,7 +140,7 @@ test.describe('@minimal @ci Minimal stack', () => {
     const modules = await runtimeModules(request)
     const ids = Object.keys(modules).sort()
     expect(ids).toContain('compute')
-    expect(ids).toHaveLength(13)
+    expect(ids).toHaveLength(14)
     expect(modules.tika?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)
     expect(modules.whatsapp?.configured).toBe(false)

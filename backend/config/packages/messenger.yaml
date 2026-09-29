@@ -128,6 +128,9 @@ framework:
             # slow gateway cannot hold the reply, and one worker broadcast
             # reaches the owner plus current share subjects.
             'App\Message\PublishChatActivity': async_index
+            # Telegram webhook → chat turn. Off the HTTP request so a slow
+            # reply does not make Telegram retry the same update.
+            'App\Message\ProcessTelegramUpdateCommand': async_ai_high
 
 when@test:
     framework:
@@ -149,3 +152,6 @@ when@test:
                 # Only this key is overridden — the rest of the routing map
                 # from the base config is merged in unchanged.
                 'App\Message\ExtractMemoriesCommand': sync
+                # The test stack has no messenger worker. Run the turn in the
+                # webhook request so Playwright can see the reply.
+                'App\Message\ProcessTelegramUpdateCommand': sync

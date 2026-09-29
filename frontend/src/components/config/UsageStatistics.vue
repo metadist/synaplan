@@ -709,6 +709,8 @@ const getSourceIcon = (source: string) => {
   switch (source.toUpperCase()) {
     case 'WHATSAPP':
       return 'mdi:whatsapp'
+    case 'TELEGRAM':
+      return 'mdi:telegram'
     case 'EMAIL':
       return 'heroicons:envelope'
     case 'WEB':
@@ -733,6 +735,8 @@ const getSourceIconBg = (source: string) => {
   switch (source.toUpperCase()) {
     case 'WHATSAPP':
       return 'bg-green-500/10'
+    case 'TELEGRAM':
+      return 'bg-[color-mix(in_srgb,var(--channel-telegram)_12%,transparent)]'
     case 'EMAIL':
       return 'bg-blue-500/10'
     case 'WEB':
@@ -757,6 +761,8 @@ const getSourceIconColor = (source: string) => {
   switch (source.toUpperCase()) {
     case 'WHATSAPP':
       return 'text-green-500'
+    case 'TELEGRAM':
+      return 'text-[var(--channel-telegram)]'
     case 'EMAIL':
       return 'text-blue-500'
     case 'WEB':

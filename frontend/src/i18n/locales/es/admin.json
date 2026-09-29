@@ -1109,6 +1109,9 @@
     "whatsapp": {
       "label": "Canal de WhatsApp"
     },
+    "telegram": {
+      "label": "Canal de Telegram"
+    },
     "compute": {
       "label": "Cómputo seguro (trabajo con archivos)",
       "running": "El trabajo con archivos está en marcha.",

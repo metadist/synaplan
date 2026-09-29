@@ -176,6 +176,9 @@
     --plan-business-accent: #15803d;
     --plan-business-soft: rgba(21, 128, 61, 0.08);
     --plan-business-ink: #14532d;
+
+    /* Telegram channel mark. Dark ink on light cards (6.4:1 on #f5f5f5). */
+    --channel-telegram: #0b5f86;
   }
 
   .dark {
@@ -236,6 +239,9 @@
     --plan-business-accent: #4ade80;
     --plan-business-soft: rgba(74, 222, 128, 0.14);
     --plan-business-ink: #bbf7d0;
+
+    /* Telegram channel mark. Light ink on dark cards (10.3:1 on #121b2e). */
+    --channel-telegram: #7fd4f5;
   }
 
   select {

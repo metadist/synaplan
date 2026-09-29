@@ -13,7 +13,7 @@ Live order: [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d
 | E1 #2204 quieter model placeholder | done 2026-09-28 | Closed trigger uses `txt-model-placeholder` when no model is set. J-EASY-1 walked as admin@synaplan.com: light V2 contrast 5.29:1, dark V2 5.94:1, row fits at 320 px (238 px wide, no overflow). Selected model name stays the louder line. [#2214](https://github.com/metadist/synaplan/pull/2214), [#2241](https://github.com/metadist/synaplan/pull/2241). |
 | E1 #2205 host ports | done 2026-09-28 | `SYNAPLAN_TTS_PORT` publishes spoken answers (default 10200, bound to 127.0.0.1). J-EASY-2 walked: `.env` set `SYNAPLAN_FRONTEND_PORT=15173`, `docker compose up -d frontend` published `0.0.0.0:15173`, and `http://127.0.0.1:15173/login` loaded. Frontend restored to 5173. [#2215](https://github.com/metadist/synaplan/pull/2215), [#2242](https://github.com/metadist/synaplan/pull/2242). |
 | E1 #2206 two-file compose docs | done 2026-09-28 | Centrifugo via env plus `secrets-init`. Dev compose unchanged. |
-| E2 Telegram channel | planned | After E1 starts. [#2202](https://github.com/metadist/synaplan/issues/2202). |
+| E2 Telegram channel | walked 2026-09-29 | J-TG-1: invalid token stays on the card with the BotFather sentence; valid token pairs via the stub and the reply `2 + 2 = 4` is in History as `Telegram: @synaplan_test_bot` (Telegram icon). J-TG-2: Disconnect on the card, confirm says the history stays, a later webhook sends nothing, the thread remains. J-TG-3: the token sentence names the fix (no HTTP code). Public-URL rejection is covered by `PublicWebhookUrlValidatorTest` (this dev stack uses `TELEGRAM_WEBHOOK_BASE_URL`). Light, dark, 320 px; de, en, tr on the card, es on the login screen. `telegram.spec.ts` passed in the local `@ci` run (111 passed, 17 failed elsewhere: MailHog `:8026`, WhatsApp stub `:3999`, Stripe signature, a few unrelated timeouts). [#2202](https://github.com/metadist/synaplan/issues/2202). |
 | openDesk OD-0 | waiting on E1 | Then [`../20260917-backend-integrations/04_opendesk_audio_transcriber.md`](../20260917-backend-integrations/04_opendesk_audio_transcriber.md). |
 
 ## Decisions
@@ -21,6 +21,8 @@ Live order: [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d
 | Date | Decision |
 | ---- | -------- |
 | 2026-09-27 | Sound transcription is the next feature sprint (row 1b) beside the UX close-out from [#2211](https://github.com/metadist/synaplan/pull/2211). Telegram is row 1d. #2204, #2205, #2206 are row 1c. openDesk meeting notes (row 2) wait until J-STT-1 is walked. |
+| 2026-09-29 | Telegram is a per-user BotFather bot (core `TelegramModule`, default off), not a plugin and not an operator env token. Threads land in the chat history, not Incoming chats. Text and webhook only. `MessageForwardingService` stays WhatsApp-only. |
+| 2026-09-29 | J-TG-1, J-TG-2 and the invalid-token half of J-TG-3 walked on the dev stack (stub, light/dark, 320 px). `Bot @{name}` was rendered literally because vue-i18n treats `@` as a linked message; the five locales now use `{'@'}`. A stored Telegram turn updates the card's last-message time. |
 | 2026-09-28 | #2206 two-file = Centrifugo via env + secrets-init. README download URLs stay on `main` until the release tag that contains this change exists; pinning them is the follow-up after that tag. |
 
 ## Review log

@@ -1109,6 +1109,9 @@
     "whatsapp": {
       "label": "WhatsApp kanalı"
     },
+    "telegram": {
+      "label": "Telegram kanalı"
+    },
     "compute": {
       "label": "Güvenli dosya çalışması",
       "running": "Dosya çalışması çalışıyor.",

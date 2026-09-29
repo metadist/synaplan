@@ -17,8 +17,8 @@ channel screen plus `backend-only` for the webhook.
 | 1 | E1 does not add a new speech engine. Local model is whisper.cpp (`WHISPER_DEFAULT_MODEL`, recommend `base`). | Locked | |
 | 2 | E1 does not add a new page. Transcription stays in chat and Files. | Locked | |
 | 3 | #2204, #2205, #2206 ship as their own commits inside the E1 window. They do not share a PR with Telegram. | Locked | |
-| 4 | Telegram is a channel: inbound update → the same pipeline as WhatsApp → Bot API reply. Flag off ⇒ the channel is absent. | Locked | |
-| 5 | Telegram does not implement OpenClaw tools. | Locked | |
+| 4 | Telegram is a per-user channel: inbound update → the same pipeline as WhatsApp → Bot API reply. Flag off ⇒ the channel is absent. The thread is in the chat history, not Incoming chats. | Locked | |
+| 5 | Telegram does not implement OpenClaw tools. It is a core FeatureModule, not a plugin. | Locked | |
 | 6 | openDesk Jitsi work does not start in E1. It starts after J-STT-1 is walked. | Locked | |
 
 ---
@@ -33,8 +33,9 @@ channel screen plus `backend-only` for the webhook.
 | **J-EASY-1** | Model settings: the empty “-- Select Model --” row is quieter than a real model, in light and dark, at 320 px. | E1 |
 | **J-EASY-2** | A person whose machine already uses port 5173 sets one env value, runs `docker compose up`, and opens the new URL. They do not edit YAML. | E1 |
 | **J-EASY-3** | A person who never cloned the repo copies two files, sets `SYNAPLAN_VERSION`, and starts the published image. | E1 |
-| **J-TG-1** | A person pastes a bot token, messages the bot, and finds the thread under Incoming chats. | E2 |
-| **J-TG-2** | Disconnect on that row stops new replies and says history stays. | E2 |
+| **J-TG-1** | A person pastes their own bot token, pairs it with `/start`, and finds the thread in the chat history with a Telegram icon. | E2 |
+| **J-TG-2** | Disconnect on that card stops new replies and says history stays. | E2 |
+| **J-TG-3** | No public URL, or a token BotFather did not accept: one sentence names the fix. The screen never shows a raw Telegram error. | E2 |
 
 ---
 

@@ -142,6 +142,10 @@ parameters:
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
     env(WHATSAPP_ENABLED): 'false'
+    env(TELEGRAM_ENABLED): 'false'
+    env(TELEGRAM_API_BASE_URL): 'https://api.telegram.org'
+    env(TELEGRAM_WEBHOOK_BASE_URL): ''
+    env(TELEGRAM_ALLOW_LOCAL_WEBHOOK): 'false'
     env(CLOUDFLARE_ACCOUNT_ID): ''
     env(CLOUDFLARE_API_TOKEN): ''
     env(EMBEDDING_FALLBACK_PROVIDER): ''
@@ -1178,6 +1182,23 @@ services:
             $enabled: '%env(bool:WHATSAPP_ENABLED)%'
             $accessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
             $webhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+
+    App\Module\Channel\TelegramModule:
+        arguments:
+            $enabled: '%env(bool:TELEGRAM_ENABLED)%'
+
+    App\Service\Telegram\TelegramBotApi:
+        arguments:
+            $baseUrl: '%env(TELEGRAM_API_BASE_URL)%'
+
+    App\Service\Telegram\PublicWebhookUrlValidator:
+        arguments:
+            $allowLocal: '%env(bool:TELEGRAM_ALLOW_LOCAL_WEBHOOK)%'
+
+    App\Service\Telegram\TelegramConnectionService:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+            $webhookBaseUrl: '%env(TELEGRAM_WEBHOOK_BASE_URL)%'
 
     App\Service\File\Office\StructuredTextExtractor:
         arguments:

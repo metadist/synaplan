@@ -31,6 +31,7 @@ export type ModuleId =
   | 'stripe_billing'
   | 'mobile_iap'
   | 'whatsapp'
+  | 'telegram'
 
 type RuntimeModules = NonNullable<
   z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>['modules']

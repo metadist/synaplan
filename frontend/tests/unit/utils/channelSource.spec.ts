@@ -5,6 +5,8 @@ describe('isChannelSource', () => {
   it('returns true for known channel tokens (case-insensitive)', () => {
     expect(isChannelSource('WHATSAPP')).toBe(true)
     expect(isChannelSource('whatsapp')).toBe(true)
+    expect(isChannelSource('telegram')).toBe(true)
+    expect(isChannelSource('TELEGRAM')).toBe(true)
     expect(isChannelSource('WhatsApp')).toBe(true)
     expect(isChannelSource('EMAIL')).toBe(true)
     expect(isChannelSource('WEB')).toBe(true)

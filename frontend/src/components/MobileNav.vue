@@ -800,6 +800,8 @@ const getChannelIcon = (chat: StoreChat): string | null => {
   switch (chat.source) {
     case 'whatsapp':
       return 'mdi:whatsapp'
+    case 'telegram':
+      return 'mdi:telegram'
     case 'email':
       return 'mdi:email-outline'
     case 'widget':
@@ -815,6 +817,8 @@ const getChannelIconClass = (chat: StoreChat): string => {
   switch (chat.source) {
     case 'whatsapp':
       return 'text-green-500'
+    case 'telegram':
+      return 'text-[var(--channel-telegram)]'
     case 'email':
       return 'text-blue-500'
     case 'widget':
