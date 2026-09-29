@@ -82,11 +82,20 @@ final readonly class ModelHealthEvaluator
         $now = time();
 
         $wanted = array_map(mb_strtolower(...), $onlyServices);
+        $seen = [];
 
         foreach ($this->models->findAllServices() as $service) {
-            if ([] !== $wanted && !in_array(mb_strtolower($service), $wanted, true)) {
+            $serviceKey = mb_strtolower($service);
+            if ([] !== $wanted && !in_array($serviceKey, $wanted, true)) {
                 continue;
             }
+            // BSERVICE can hold "Ollama" (catalog) and "ollama" (import) side
+            // by side, and the row lookup below already matches both. A second
+            // pass would probe the provider again and judge every row twice.
+            if (isset($seen[$serviceKey])) {
+                continue;
+            }
+            $seen[$serviceKey] = true;
 
             $catalogModels = $this->models->findByServiceIndexedByProviderId($service);
             if ([] === $catalogModels) {
@@ -140,6 +149,7 @@ final readonly class ModelHealthEvaluator
         if (!$dryRun) {
             $this->em->flush();
             $this->healthRepository->pruneOrphans();
+            $this->healthRepository->pruneRetired();
         }
 
         return new ModelHealthRun($verdicts, $skipped, $raised, $resolved, $dryRun);

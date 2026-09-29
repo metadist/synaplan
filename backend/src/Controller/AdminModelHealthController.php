@@ -56,7 +56,7 @@ final class AdminModelHealthController extends AbstractController
     #[OA\Get(
         path: '/api/v1/admin/model-health',
         summary: 'Availability of every catalogued AI model (admin only)',
-        description: 'Returns the last stored verdict per model together with the rolling success/failure counters from live traffic. Reads stored state only and never calls a provider.',
+        description: 'Returns the last stored verdict per model together with the rolling success/failure counters from live traffic. Retired models are listed separately and never counted as needing attention. Reads stored state only and never calls a provider.',
         security: [['Bearer' => []]],
         tags: ['Admin Model Health']
     )]
@@ -64,19 +64,20 @@ final class AdminModelHealthController extends AbstractController
         response: 200,
         description: 'Model availability snapshot',
         content: new OA\JsonContent(
-            required: ['success', 'summary', 'providers'],
+            required: ['success', 'summary', 'providers', 'retired'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(
                     property: 'summary',
-                    required: ['total', 'online', 'degraded', 'offline', 'unconfigured', 'unknown', 'needsAttention', 'lastCheck', 'autoDisableEnabled', 'monitoringEnabled'],
+                    required: ['total', 'online', 'degraded', 'offline', 'unconfigured', 'unknown', 'retired', 'needsAttention', 'lastCheck', 'autoDisableEnabled', 'monitoringEnabled'],
                     properties: [
-                        new OA\Property(property: 'total', type: 'integer', example: 84),
+                        new OA\Property(property: 'total', type: 'integer', description: 'Every catalogued model, retired ones included', example: 99),
                         new OA\Property(property: 'online', type: 'integer', example: 71),
                         new OA\Property(property: 'degraded', type: 'integer', example: 2),
                         new OA\Property(property: 'offline', type: 'integer', example: 3),
                         new OA\Property(property: 'unconfigured', type: 'integer', example: 8),
                         new OA\Property(property: 'unknown', type: 'integer', example: 0),
+                        new OA\Property(property: 'retired', type: 'integer', description: 'Models the provider no longer offers; listed in `retired`, not in `providers`', example: 15),
                         new OA\Property(property: 'needsAttention', type: 'integer', example: 5),
                         new OA\Property(property: 'lastCheck', type: 'integer', description: 'Unix timestamp of the most recent check, 0 when none ran yet', example: 1755600000),
                         new OA\Property(property: 'autoDisableEnabled', type: 'boolean', example: false),
@@ -120,6 +121,25 @@ final class AdminModelHealthController extends AbstractController
                                     type: 'object'
                                 )
                             ),
+                        ],
+                        type: 'object'
+                    )
+                ),
+                new OA\Property(
+                    property: 'retired',
+                    description: 'Retired models, most recent first. They are no longer checked, so no health state is reported for them.',
+                    type: 'array',
+                    items: new OA\Items(
+                        required: ['id', 'name', 'providerId', 'capability', 'provider', 'providerDisplayName', 'retiredOn', 'successorName'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 92),
+                            new OA\Property(property: 'name', type: 'string', example: 'Claude 3 Haiku'),
+                            new OA\Property(property: 'providerId', type: 'string', example: 'claude-3-haiku-20240307'),
+                            new OA\Property(property: 'capability', type: 'string', example: 'chat'),
+                            new OA\Property(property: 'provider', type: 'string', description: 'Internal service key', example: 'anthropic'),
+                            new OA\Property(property: 'providerDisplayName', type: 'string', description: 'Branded provider name for display', example: 'Anthropic'),
+                            new OA\Property(property: 'retiredOn', type: 'string', format: 'date', example: '2026-05-08'),
+                            new OA\Property(property: 'successorName', type: 'string', description: 'Name of the model that replaces it, null when there is no replacement', nullable: true, example: 'Claude Haiku 4.5'),
                         ],
                         type: 'object'
                     )

@@ -11,6 +11,7 @@ use App\Entity\Model;
 use App\Entity\ModelHealth;
 use App\Entity\User;
 use App\Model\ModelCatalog;
+use App\Repository\ModelHealthRepository;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -30,6 +31,9 @@ class AdminModelHealthControllerTest extends WebTestCase
 
     /** @var list<int> */
     private array $createdHealthIds = [];
+
+    /** @var array<int, array{retiredOn: ?\DateTimeImmutable, successorId: ?int}> model id => retirement fields before the test */
+    private array $originalRetirements = [];
 
     protected function setUp(): void
     {
@@ -55,9 +59,58 @@ class AdminModelHealthControllerTest extends WebTestCase
                 $em->remove($entity);
             }
         }
+        foreach ($this->originalRetirements as $modelId => $original) {
+            $model = $em->find(Model::class, $modelId);
+            if ($model) {
+                $model->setRetiredOn($original['retiredOn'])->setSuccessorId($original['successorId']);
+            }
+        }
         $em->flush();
 
         parent::tearDown();
+    }
+
+    /**
+     * A live model (not retired) plus a second live row to stand in as its
+     * successor, retired for the duration of the test and restored after.
+     *
+     * @return array{0: Model, 1: Model}
+     */
+    private function retireALiveModel(): array
+    {
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        /** @var list<Model> $live */
+        $live = $em->getRepository(Model::class)->findBy(['retiredOn' => null], ['id' => 'ASC'], 2);
+        self::assertCount(2, $live, 'The catalog needs two live models for this test');
+        [$model, $successor] = $live;
+
+        $this->originalRetirements[(int) $model->getId()] = [
+            'retiredOn' => $model->getRetiredOn(),
+            'successorId' => $model->getSuccessorId(),
+        ];
+        $model->setRetiredOn(new \DateTimeImmutable('2026-09-01'))->setSuccessorId((int) $successor->getId());
+
+        return [$model, $successor];
+    }
+
+    private function markOffline(int $modelId): ModelHealth
+    {
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $health = $em->getRepository(ModelHealth::class)->findOneBy(['modelId' => $modelId]);
+        if (null === $health) {
+            $health = (new ModelHealth())->setModelId($modelId);
+            $em->persist($health);
+        }
+        $health
+            ->setState(ModelHealthState::Offline)
+            ->setSource(ModelHealth::SOURCE_PROBE)
+            ->setKind(FailureKind::Permanent->value)
+            ->setMessage('Provider no longer serves this model.')
+            ->setUpdated(time());
+        $em->flush();
+        $this->createdHealthIds[] = (int) $health->getId();
+
+        return $health;
     }
 
     /**
@@ -84,7 +137,7 @@ class AdminModelHealthControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
         self::assertTrue($data['success']);
 
-        foreach (['total', 'online', 'degraded', 'offline', 'unconfigured', 'unknown', 'needsAttention', 'lastCheck', 'autoDisableEnabled', 'monitoringEnabled'] as $key) {
+        foreach (['total', 'online', 'degraded', 'offline', 'unconfigured', 'unknown', 'retired', 'needsAttention', 'lastCheck', 'autoDisableEnabled', 'monitoringEnabled'] as $key) {
             self::assertArrayHasKey($key, $data['summary'], $key);
         }
 
@@ -92,9 +145,20 @@ class AdminModelHealthControllerTest extends WebTestCase
         $catalogued = (int) $em->getRepository(Model::class)->count([]);
         self::assertSame($catalogued, $data['summary']['total']);
 
+        $retiredInCatalog = (int) $em->getRepository(Model::class)->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->where('m.retiredOn IS NOT NULL')
+            ->getQuery()
+            ->getSingleScalarResult();
+        self::assertIsArray($data['retired']);
+        self::assertCount($retiredInCatalog, $data['retired']);
+        self::assertSame($retiredInCatalog, $data['summary']['retired']);
+
         // Every model has to appear exactly once, whatever its state — a status
-        // page that silently drops rows is worse than no status page.
-        $listed = 0;
+        // page that silently drops rows is worse than no status page. Retired
+        // rows are the one split: they sit in their own list, never in a
+        // provider section.
+        $listed = count($data['retired']);
         foreach ($data['providers'] as $provider) {
             self::assertArrayHasKey('name', $provider);
             self::assertArrayHasKey('needsAttention', $provider);
@@ -114,6 +178,68 @@ class AdminModelHealthControllerTest extends WebTestCase
             }
         }
         self::assertSame($catalogued, $listed);
+    }
+
+    /**
+     * The evaluator stops checking a model once BRETIREDON is set, so the
+     * verdict stored before the retirement is frozen. Reading it as live state
+     * is how fifteen long-retired models kept "19 model(s) need attention" on
+     * the page and the Operate badge.
+     */
+    public function testARetiredModelIsListedApartAndNeverNeedsAttention(): void
+    {
+        [$model, $successor] = $this->retireALiveModel();
+        $modelId = (int) $model->getId();
+
+        $model->setRetiredOn(null);
+        $this->markOffline($modelId);
+        $before = $this->request('GET', '/api/v1/admin/model-health');
+
+        // The request rebooted the kernel; work on a freshly loaded row.
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $model = $em->find(Model::class, $modelId);
+        self::assertNotNull($model);
+        $model->setRetiredOn(new \DateTimeImmutable('2026-09-01'));
+        $em->flush();
+        $after = $this->request('GET', '/api/v1/admin/model-health');
+
+        self::assertSame($before['summary']['needsAttention'] - 1, $after['summary']['needsAttention']);
+        self::assertSame($before['summary']['offline'] - 1, $after['summary']['offline']);
+        self::assertSame($before['summary']['retired'] + 1, $after['summary']['retired']);
+
+        foreach ($after['providers'] as $provider) {
+            self::assertNotContains($modelId, array_column($provider['models'], 'id'), 'A retired model must not sit in a provider section');
+        }
+
+        $entry = null;
+        foreach ($after['retired'] as $retired) {
+            if ($modelId === $retired['id']) {
+                $entry = $retired;
+            }
+        }
+        self::assertNotNull($entry, 'The retired model must be listed');
+        self::assertSame('2026-09-01', $entry['retiredOn']);
+        self::assertSame($successor->getName(), $entry['successorName']);
+        self::assertSame($model->getProviderId(), $entry['providerId']);
+        self::assertNotSame('', $entry['providerDisplayName']);
+    }
+
+    public function testPruneRetiredDropsOnlyTheFrozenVerdictsOfRetiredModels(): void
+    {
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        [$model, $successor] = $this->retireALiveModel();
+        $em->flush();
+
+        $retiredHealthId = (int) $this->markOffline((int) $model->getId())->getId();
+        $liveHealthId = (int) $this->markOffline((int) $successor->getId())->getId();
+
+        $repository = $em->getRepository(ModelHealth::class);
+        self::assertInstanceOf(ModelHealthRepository::class, $repository);
+        self::assertGreaterThanOrEqual(1, $repository->pruneRetired());
+
+        $em->clear();
+        self::assertNull($em->find(ModelHealth::class, $retiredHealthId));
+        self::assertNotNull($em->find(ModelHealth::class, $liveHealthId));
     }
 
     /**
