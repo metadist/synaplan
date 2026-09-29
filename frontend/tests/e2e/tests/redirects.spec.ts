@@ -150,4 +150,39 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
       { timeout: TIMEOUTS.STANDARD }
     )
   })
+
+  // Operate is grouped by topic: every bookmark from the old layout lands on
+  // the page and tab that now shows the same thing.
+  test('@ci Operate bookmarks land on their topic page', async ({ page }) => {
+    test.setTimeout(90_000)
+    await login(page, CREDENTIALS.getAdminCredentials())
+
+    const operateRedirects: Array<[string, RegExp]> = [
+      ['/admin/model-status', /\/admin\/setup\?tab=health$/],
+      ['/admin?tab=prompts', /\/admin\/setup\?tab=prompts$/],
+      ['/admin?tab=moderation', /\/admin\/people\?tab=moderation$/],
+      ['/admin/setup?tab=models', /\/admin\/setup\?tab=providers$/],
+      ['/admin/setup?tab=extraction', /\/admin\/setup\?tab=documents$/],
+      ['/admin/setup?tab=rerank', /\/admin\/setup\?tab=search$/],
+      ['/admin/setup?tab=web-search', /\/admin\/config\?tab=web_search$/],
+      ['/admin/config?tab=vectordb', /\/admin\/setup\?tab=search$/],
+      [
+        '/admin/config?tab=processing&section=docling',
+        /\/admin\/setup\?tab=documents&section=docling$/,
+      ],
+      [
+        '/admin/config?tab=processing&section=compute',
+        /\/admin\/config\?tab=tools&section=compute$/,
+      ],
+    ]
+
+    for (const [oldPath, expected] of operateRedirects) {
+      await test.step(`${oldPath} → ${expected}`, async () => {
+        await page.goto(oldPath, { waitUntil: 'commit' })
+        await expect(page, `${oldPath} should land on ${expected}`).toHaveURL(expected, {
+          timeout: TIMEOUTS.STANDARD,
+        })
+      })
+    }
+  })
 })

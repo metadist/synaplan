@@ -25,14 +25,16 @@ const ProviderKeysListResponseSchema = z.object({
 })
 
 /**
- * NV05 / D2 — Models & keys is the one editor for instance provider keys.
+ * NV05 / D2 — AI infrastructure › Providers & keys is the one editor for
+ * instance provider keys.
  *
- * Journey J-NV-3 (admin): "Where do I put the OpenAI key?" ⇒ System config
- * › AI Services does not offer a password box for it any more; it shows
- * which keys are already set from the environment / a Helm chart and links
- * to AI infrastructure › Models & keys, where every provider in the catalog
- * (chat, media and speech) has a card. A key injected via the environment
- * is already "set" — no UI save is needed.
+ * Journey J-NV-3 (admin): "Where do I put the OpenAI key?" ⇒ every AI setting
+ * lives on AI infrastructure. An old System configuration › AI Services
+ * bookmark lands on Providers & keys, where every provider in the catalog
+ * (chat, media and speech) has a card and the instance settings of the same
+ * topic (Ollama address, speech output, Vertex token) sit next to them —
+ * never a second password box for a provider key. A key injected via the
+ * environment is already "set" — no UI save is needed.
  *
  * Deterministic and provider-free (@ci): nothing is saved, tested or removed;
  * only read endpoints are hit. Auth: the worker storageState is a non-admin
@@ -43,49 +45,50 @@ test.describe('@ci Provider keys — one editor', () => {
     await login(page, CREDENTIALS.getAdminCredentials())
   })
 
-  test('System config › AI Services shows the status card instead of key inputs', async ({
+  test('the old AI Services bookmark lands on Providers & keys without duplicate key inputs', async ({
     page,
   }) => {
-    await page.goto('/admin/config?tab=ai')
-    await expect(page.locator('[data-testid="view-admin-config"]')).toBeVisible({
+    await page.goto('/admin/config?tab=ai', { waitUntil: 'commit' })
+    await expect(page).toHaveURL(/\/admin\/setup\?tab=providers$/, {
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator('[data-testid="view-admin-setup"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
 
-    await page.locator('[data-testid="btn-jump-section-cloud"]').click()
-    const openaiChip = page.locator('[data-testid="managed-key-OPENAI_API_KEY"]')
-    await expect(openaiChip).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expect(openaiChip).toHaveAttribute('data-state', /^(env|db|none)$/)
+    // The settings load next to the provider list; wait until they are listed.
+    await expect(page.locator('[data-testid="btn-jump-section-tts"]')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await page.locator('[data-testid="btn-setup-accordion-toggle-all"]').click()
+    await expect(page.locator('[data-testid="provider-card-openai"]')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
 
-    await test.step('no password input is offered for any managed key', async () => {
-      const section = page.locator('#config-section-cloud')
-      await expect(section).toBeVisible()
-      // The section keeps its one unmanaged field (the Vertex access token);
-      // every *_API_KEY password box is gone.
-      for (const key of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY']) {
-        await expect(section.locator(`input[name="${key}"], #${key}`)).toHaveCount(0)
-        await expect(section.locator(`[data-testid="managed-key-${key}"]`)).toBeVisible()
+    await test.step('instance settings of the same topic sit next to the cards', async () => {
+      const localAi = page.locator('[data-testid="setup-local-ai-settings"]')
+      await expect(localAi).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(localAi.locator('#OLLAMA_BASE_URL')).toBeVisible()
+      await expect(localAi.locator('[data-testid="btn-config-test-ollama"]')).toBeVisible()
+      await expect(page.locator('#setup-section-tts #SYNAPLAN_TTS_URL')).toBeVisible()
+      // The Vertex token is a token, not a provider key: it stays editable.
+      await expect(page.locator('#GOOGLE_VERTEX_ACCESS_TOKEN')).toBeVisible()
+    })
+
+    await test.step('no provider key is offered a second time', async () => {
+      for (const key of [
+        'OPENAI_API_KEY',
+        'ANTHROPIC_API_KEY',
+        'GROQ_API_KEY',
+        'THEHIVE_API_KEY',
+      ]) {
+        await expect(page.locator(`input[name="${key}"], #${key}`)).toHaveCount(0)
       }
-      await expect(section.getByText('AI infrastructure › Models & keys')).toBeVisible()
-      await expect(section.getByText(/chart install does not need this page/)).toBeVisible()
-    })
-
-    await test.step('a fully managed section renders no input at all', async () => {
-      await page.locator('[data-testid="btn-jump-section-media"]').click()
-      const media = page.locator('#config-section-media')
-      await expect(media).toBeVisible()
-      await expect(media.locator('input')).toHaveCount(0)
-      await expect(media.locator('[data-testid="managed-key-HIGGSFIELD_API_SECRET"]')).toBeVisible()
-    })
-
-    await test.step('the card links to the one editor', async () => {
-      const link = page.locator('#config-section-cloud [data-testid="managed-keys-link"]')
-      await expect(link).toHaveAttribute('href', '/admin/setup')
-      await link.click()
-      await expect(page).toHaveURL(/\/admin\/setup/, { timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator('[data-testid="managed-keys-status-card"]')).toHaveCount(0)
     })
   })
 
-  test('Models & keys shows a card for every provider in the catalog', async ({
+  test('Providers & keys shows a card for every provider in the catalog', async ({
     page,
     request,
   }) => {
@@ -102,7 +105,7 @@ test.describe('@ci Provider keys — one editor', () => {
     }
 
     await page.goto('/admin/setup')
-    await expect(page.locator('[data-testid="admin-setup-tab-models"]')).toBeVisible({
+    await expect(page.locator('[data-testid="admin-setup-tab-providers"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
     await page.locator('[data-testid="btn-setup-section-providers"]').click()
