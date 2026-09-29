@@ -329,6 +329,8 @@
       "deleting": "Deleting..."
     },
     "privacyNotice": "All data is stored securely and used only for invoicing purposes according to German law (DSGVO).",
+    "loading": "Loading your profile.",
+    "loadFailed": "Your profile could not be loaded. Nothing was changed.",
     "saveFailed": "Could not save your profile.",
     "saveChanges": "Save Changes",
     "cancel": "Cancel"

@@ -9,10 +9,37 @@
           data-testid="section-header"
         />
 
+        <p
+          v-if="loading && !profileLoaded"
+          class="txt-secondary text-sm mb-4"
+          data-testid="state-profile-loading"
+        >
+          {{ $t('profile.loading') }}
+        </p>
+
+        <div
+          v-else-if="profileLoadFailed"
+          class="surface-card rounded-lg p-6"
+          role="alert"
+          data-testid="state-profile-load-failed"
+        >
+          <p class="txt-primary text-sm">{{ $t('profile.loadFailed') }}</p>
+          <button
+            type="button"
+            class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-profile-retry"
+            :disabled="loading"
+            @click="loadProfile"
+          >
+            {{ $t('common.retry') }}
+          </button>
+        </div>
+
         <form
+          v-show="!profileLoadFailed"
           autocomplete="off"
           data-testid="comp-profile-form"
-          :aria-busy="!profileLoaded"
+          :aria-busy="loading"
           @submit.prevent="handleSave"
         >
           <!-- Disabled until the profile arrives. The empty defaults must not
@@ -792,6 +819,7 @@ const passwordData = ref({
 const loading = ref(false)
 const canChangePassword = ref(true)
 const profileLoaded = ref(false)
+const profileLoadFailed = ref(false)
 const authProvider = ref<string>('Email/Password')
 const isExternalAuth = ref(false)
 const emailPassword = ref('')
@@ -867,39 +895,43 @@ function markPasswordTouched() {
 
 let cleanupGuard: (() => void) | undefined
 
-onMounted(async () => {
-  cleanupGuard = setupNavigationGuard()
-
-  // Load profile from backend
+async function loadProfile() {
+  loading.value = true
   try {
-    loading.value = true
     const response = await profileApi.getProfile()
-    if (response.success && response.profile) {
-      Object.assign(formData.value, response.profile)
-      originalData.value = { ...formData.value }
-
-      // Set auth info
-      canChangePassword.value = response.profile.canChangePassword ?? true
-      authProvider.value = response.profile.authProvider ?? 'Email/Password'
-      isExternalAuth.value = response.profile.isExternalAuth ?? false
-      profileLoaded.value = true
-      externalAuthLastLogin.value = response.profile.externalAuthInfo?.lastLogin ?? null
-
-      // Sync isAdmin to auth store if needed
-      if (response.profile.isAdmin !== undefined && authStore.user) {
-        authStore.user.isAdmin = response.profile.isAdmin
-      }
-
-      // Sync per-user memories toggle to auth store (used across UI)
-      if (authStore.user) {
-        authStore.user.memoriesEnabled = response.profile.memoriesEnabled
-      }
+    if (!response.success || !response.profile) {
+      profileLoadFailed.value = true
+      return
     }
-  } catch (err: unknown) {
-    error(getErrorMessage(err) || 'Failed to load profile')
+
+    Object.assign(formData.value, response.profile)
+    originalData.value = { ...formData.value }
+
+    canChangePassword.value = response.profile.canChangePassword ?? true
+    authProvider.value = response.profile.authProvider ?? 'Email/Password'
+    isExternalAuth.value = response.profile.isExternalAuth ?? false
+    externalAuthLastLogin.value = response.profile.externalAuthInfo?.lastLogin ?? null
+
+    if (response.profile.isAdmin !== undefined && authStore.user) {
+      authStore.user.isAdmin = response.profile.isAdmin
+    }
+
+    if (authStore.user) {
+      authStore.user.memoriesEnabled = response.profile.memoriesEnabled
+    }
+
+    profileLoaded.value = true
+    profileLoadFailed.value = false
+  } catch {
+    profileLoadFailed.value = true
   } finally {
     loading.value = false
   }
+}
+
+onMounted(async () => {
+  cleanupGuard = setupNavigationGuard()
+  await loadProfile()
 
   // Check if we should scroll to and highlight memories section
   if (route.query.highlight === 'memories') {

@@ -24,16 +24,29 @@ test.describe('@ci Profile Password Change', () => {
 
     try {
       await test.step('Act: change the password on the profile page', async () => {
+        let releaseProfile: () => void = () => {}
+        const profileArrived = new Promise<void>((resolve) => {
+          releaseProfile = resolve
+        })
+        await page.route('**/api/v1/profile', async (route) => {
+          const url = new URL(route.request().url())
+          if (route.request().method() === 'GET' && url.pathname === '/api/v1/profile') {
+            await profileArrived
+          }
+          await route.continue()
+        })
+
         await page.goto('/profile')
-        await page
-          .locator(selectors.profile.inputCurrentPassword)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-        // The form stays disabled until the profile response fills the
-        // sign-in email. Saving earlier sends a blank address and the
-        // password fields never reset.
+        const currentPassword = page.locator(selectors.profile.inputCurrentPassword)
+        await currentPassword.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        await expect(currentPassword).toBeDisabled()
+        await expect(page.locator(selectors.unsavedBar.save)).toHaveCount(0)
+        releaseProfile()
+
         await expect(page.locator(selectors.profile.inputEmail)).toHaveValue(email, {
           timeout: TIMEOUTS.STANDARD,
         })
+        await expect(currentPassword).toBeEnabled()
         await page.locator(selectors.profile.inputCurrentPassword).fill(oldPassword)
         await page.locator(selectors.profile.inputNewPassword).fill(newPassword)
         await page.locator(selectors.profile.inputConfirmPassword).fill(newPassword)

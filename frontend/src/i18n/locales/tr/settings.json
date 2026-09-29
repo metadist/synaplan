@@ -128,6 +128,8 @@
       "deleting": "Siliniyor..."
     },
     "privacyNotice": "Tüm veriler güvenli bir şekilde saklanır ve yalnızca Alman yasalarına (GDPR) uygun olarak fatura amaçları için kullanılır.",
+    "loading": "Profil yükleniyor.",
+    "loadFailed": "Profil yüklenemedi. Hiçbir şey değiştirilmedi.",
     "saveFailed": "Profil kaydedilemedi.",
     "saveChanges": "Değişiklikleri Kaydet",
     "cancel": "İptal"
