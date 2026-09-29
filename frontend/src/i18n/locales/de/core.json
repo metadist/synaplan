@@ -273,7 +273,11 @@
     "expand": "Erweitern",
     "noResults": "Keine Ergebnisse",
     "skipToContent": "Zum Inhalt springen",
-    "loadingMessages": "Nachrichten werden geladen…"
+    "loadingMessages": "Nachrichten werden geladen…",
+    "adminPreview": {
+      "badge": "Admin-Vorschau",
+      "hint": "Nur Admins sehen das. Andere Personen sehen es erst, wenn es freigegeben ist."
+    }
   },
   "search": {
     "sources": "Quellen",

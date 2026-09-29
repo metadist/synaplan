@@ -90,6 +90,18 @@ try {
 }
 ```
 
+## Admin preview
+
+A feature that should exist only for admins until it is released is marked in code. There is no operator toggle.
+
+1. Add a constant and list it in `App\Service\Feature\AdminPreview::FEATURES` (`backend/src/Service/Feature/AdminPreview.php`).
+2. Put `#[AdminPreview(AdminPreviewFeature::TELEGRAM)]` on the controller class or action (`App\Attribute\AdminPreview`). A non-admin then gets `404 {"error":"not_found"}`. An anonymous request to a protected route still gets 401.
+3. In worker or webhook code, where there is no session, call `AdminPreview::allowsUserId()`. Drop the work. Do not answer 404 on a webhook that must stay 200.
+
+`ROLE_ADMIN` is the check, so an admin whose role comes from OIDC is included.
+
+Release the feature by removing its id from `FEATURES` and every attribute, `allows()` / `allowsUserId()` call that names it, in the same change, then deploy. A call site left behind throws, instead of opening the feature by accident.
+
 ## Commands
 
 ```bash

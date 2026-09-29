@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Telegram;
 
 use App\Entity\TelegramBot;
+use App\Entity\User;
 use App\Repository\TelegramBotRepository;
+use App\Repository\UserRepository;
+use App\Service\Feature\AdminPreview;
 use App\Service\Telegram\TelegramWebhookAcceptor;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
@@ -67,6 +70,24 @@ final class TelegramWebhookAcceptorTest extends TestCase
         $this->assertTrue($retry->dispatch);
     }
 
+    public function testANonAdminOwnerIsDroppedWithoutReservingTheUpdate(): void
+    {
+        $secret = 'webhook-secret';
+        $member = new User();
+        $member->setUserLevel('NEW');
+        $admin = new User();
+        $admin->setUserLevel('ADMIN');
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturnOnConsecutiveCalls($member, $admin);
+        $acceptor = $this->acceptor($this->bot($secret), preview: new AdminPreview($users));
+
+        $dropped = $acceptor->decide('bot-key', $secret, ['update_id' => 7]);
+        $accepted = $acceptor->decide('bot-key', $secret, ['update_id' => 7]);
+
+        $this->assertFalse($dropped->dispatch);
+        $this->assertTrue($accepted->dispatch);
+    }
+
     public function testAParallelDeliveryHoldingTheLockIsDropped(): void
     {
         $secret = 'webhook-secret';
@@ -80,7 +101,7 @@ final class TelegramWebhookAcceptorTest extends TestCase
         $this->assertFalse($decision->dispatch);
     }
 
-    private function acceptor(TelegramBot $bot, ?LockFactory $locks = null): TelegramWebhookAcceptor
+    private function acceptor(TelegramBot $bot, ?LockFactory $locks = null, ?AdminPreview $preview = null): TelegramWebhookAcceptor
     {
         $bots = $this->createMock(TelegramBotRepository::class);
         $bots->method('findOneByBotKey')->willReturn($bot);
@@ -90,7 +111,18 @@ final class TelegramWebhookAcceptorTest extends TestCase
             new ArrayAdapter(),
             $locks ?? new LockFactory(new InMemoryStore()),
             new NullLogger(),
+            $preview ?? $this->adminPreview(),
         );
+    }
+
+    private function adminPreview(): AdminPreview
+    {
+        $admin = new User();
+        $admin->setUserLevel('ADMIN');
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn($admin);
+
+        return new AdminPreview($users);
     }
 
     private function bot(string $secret): TelegramBot

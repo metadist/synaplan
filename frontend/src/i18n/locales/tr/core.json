@@ -209,7 +209,11 @@
     "expand": "Genişlet",
     "noResults": "Sonuç bulunamadı",
     "skipToContent": "İçeriğe geç",
-    "loadingMessages": "Mesajlar yükleniyor…"
+    "loadingMessages": "Mesajlar yükleniyor…",
+    "adminPreview": {
+      "badge": "Yönetici önizlemesi",
+      "hint": "Bunu yalnızca yöneticiler görür. Diğer kişiler, yayınlanana kadar bunu görmez."
+    }
   },
   "search": {
     "sources": "Kaynaklar",

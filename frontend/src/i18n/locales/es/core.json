@@ -209,7 +209,11 @@
     "expand": "Expandir",
     "noResults": "Sin resultados",
     "skipToContent": "Saltar al contenido",
-    "loadingMessages": "Cargando mensajes…"
+    "loadingMessages": "Cargando mensajes…",
+    "adminPreview": {
+      "badge": "Vista previa de admin",
+      "hint": "Solo los administradores pueden ver esto. Las demás personas no lo verán hasta que se publique."
+    }
   },
   "search": {
     "sources": "Fuentes",

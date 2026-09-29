@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Attribute\AdminPreview;
 use App\DTO\TelegramChannelState;
 use App\Entity\User;
+use App\Service\Feature\AdminPreview as AdminPreviewFeature;
 use App\Service\Telegram\TelegramChannelException;
 use App\Service\Telegram\TelegramConnectionService;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -22,6 +24,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  */
 #[Route('/api/v1/channels/telegram')]
 #[OA\Tag(name: 'Telegram')]
+#[AdminPreview(AdminPreviewFeature::TELEGRAM)]
 final class TelegramChannelController extends AbstractController
 {
     public function __construct(

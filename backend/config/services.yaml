@@ -269,6 +269,7 @@ services:
         exclude:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
+            - '../src/Attribute/'
             - '../src/Kernel.php'
             - '../src/Test/'
             # Feature-module value objects and the compiler pass are not services.

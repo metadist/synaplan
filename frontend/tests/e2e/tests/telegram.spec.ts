@@ -5,7 +5,8 @@
 
 import { test, expect } from '../test-setup'
 import { getApiUrl, TIMEOUTS } from '../config/config'
-import { getAuthHeaders } from '../helpers/auth'
+import { CREDENTIALS } from '../config/credentials'
+import { getAuthHeaders, login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import {
   getTelegramStubRequests,
@@ -22,13 +23,29 @@ const INVALID_TOKEN = '123456789:AAHINVALIDTOKEN'
 test.describe('@ci @telegram Telegram channel', () => {
   test.describe.configure({ mode: 'serial' })
 
-  test.beforeEach(async ({ request, credentials }, testInfo) => {
-    const auth = await getAuthHeaders(request, credentials)
+  test.beforeEach(async ({ request }, testInfo) => {
+    const auth = await getAuthHeaders(request, CREDENTIALS.getAdminCredentials())
     const cleared = await request.delete(`${getApiUrl()}/api/v1/channels/telegram`, {
       headers: auth,
     })
     expect(cleared.status()).toBe(200)
     await resetTelegramStub(request, testInfo.testId)
+  })
+
+  test('a regular user does not see Telegram', async ({ page, request, credentials }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('language', 'en')
+    })
+    await page.goto('/channels')
+    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.inboundConfig.telegramSection)).toHaveCount(0)
+
+    const auth = await getAuthHeaders(request, credentials)
+    const hidden = await request.get(`${getApiUrl()}/api/v1/channels/telegram`, { headers: auth })
+    expect(hidden.status()).toBe(404)
+    expect(await hidden.json()).toEqual({ error: 'not_found' })
   })
 
   test('invalid token stays on the form as one sentence', async ({ page }) => {
@@ -374,12 +391,14 @@ async function openChannels(page: import('@playwright/test').Page): Promise<void
   await page.addInitScript(() => {
     localStorage.setItem('language', 'en')
   })
+  await login(page, CREDENTIALS.getAdminCredentials())
   await page.goto('/channels')
   await page.evaluate(() => localStorage.setItem('language', 'en'))
   await page.reload()
   await expect(page.locator(selectors.inboundConfig.telegramSection)).toBeVisible({
     timeout: TIMEOUTS.STANDARD,
   })
+  await expect(page.getByTestId('badge-admin-preview')).toBeVisible()
 }
 
 async function readWebhook(
