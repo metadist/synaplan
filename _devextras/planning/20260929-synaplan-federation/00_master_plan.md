@@ -7,20 +7,23 @@
 
 | | |
 | - | - |
-| **Status** | Draft for review — 2026-09-29. Research + plan only, no product code in this change. |
+| **Status** | Reviewed 2026-09-29. Queued for the next sprint. See [`01_review.md`](./01_review.md). No product code yet. |
 | **Branch** | `feat/synaplan-network` |
 | **Type** | Vibe-coding sprint plan (F0–F13), backend-first, UI behind a default-off module. |
 | **Scope v1.0** | **Pure opt-in.** Pairwise *Federation Links* between operators. Two goods: **Knowledge exchange** (RAG) and **Token exchange** (brokered inference). |
 | **Supersedes** | The federation half of [`../discord_ai_buddy.md`](../discord_ai_buddy.md). That file's Discord bot becomes a *consumer* of this network, planned separately later. |
 | **Binding contracts** | UX rules U1–U12 in [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) and AGENTS.md "Perfect UX & Stability". |
-| **Owners of the surfaces** | `App\Module\FederationModule` + `App\Service\Federation\*` (backend); `Manage → Federation` + chat composer (frontend). |
+| **Owners of the surfaces** | `App\Module\Federation\FederationModule` + `App\Service\Federation\*` (backend); `Manage → Federation` + chat composer (frontend). |
 
 Files in this folder:
 
 | File | Content |
 | ---- | ------- |
 | `00_master_plan.md` (this) | Goal, decisions (§0), topology, protocol, exchange goods, payments, steps, gates |
-| `STATUS.md` | Step log — all steps planned until §0 is ticked |
+| [`01_review.md`](./01_review.md) | Review + the slice that is actually the next sprint |
+| `STATUS.md` | Step log — next sprint is the knowledge link; the rest stays planned |
+
+**Next sprint** (the only slice to build): two installs, one mutual link, one published folder, one `@domain:keyword` answer. Barter. No token market, no Stripe, no gossip mesh. Detail and the review findings are in [`01_review.md`](./01_review.md).
 
 ---
 
@@ -38,7 +41,7 @@ payment).
 | 4 | **Goods exchanged** | (a) **Knowledge**: signed query → quoted excerpts, never files/vectors. (b) **Capacity**: brokered inference over a peer's model key. (§6, §7) | no | open |
 | 5 | **Token exchange shape** | **Metered brokered inference** — a new `peer` key source in `MessagesGateway`. No transfer of prepaid credits between vendors' accounts. (§7) | no | open |
 | 6 | **Accounting** | Internal **credit ledger** with a signed per-request **receipt**; both sides reconcile. Pegged unit (1 credit = €0.0001). (§8) | no | open |
-| 7 | **Settlement** | **Prepaid credit line per link** (cap-limited, no escrow) for v1; net balances optionally settled via **Stripe** (reuse `StripeBillingModule`). Pluggable `SettlementProvider` so IOTA/ETH-L2 can be added later. A **free/barter** mode needs no money at all. (§8) | **yes** | open |
+| 7 | **Settlement** | Next sprint is **barter only** (price 0). Prepaid caps and Stripe netting stay later. `StripeBillingModule` is end-user PRO billing and is **not** the settlement seam (§8). | **yes** | open |
 | 8 | **Health / decay** | Local exponential-decay reputation; unreachable ⇒ probation ⇒ quarantine ⇒ drop. Records carry a TTL so dead nodes expire network-wide on their own. Gossip *hints* never evict directly (anti-poisoning). (§5) | no | open |
 | 9 | **Gossip cadence** | Anti-entropy every 5 min to 3 random healthy peers + push-on-change. Convergence in minutes, not hours. (§5) | no | open |
 | 10 | **Address scheme** | `@domain.tld[:account]:keyword` in chat, alongside the existing `@`-file-mention palette. (§6.1) | no | open |
@@ -253,10 +256,9 @@ Each node keeps its **own** health view — gossip only *hints*, it never evicts
 ### 6.1 Addressing in chat
 
 - `ChatInput.vue` already opens the mention palette on `@`
-  (`FileMentionPalette.vue`). Extend the trigger: once the token after `@`
-  contains `.` or `:`, show a **Federation** section (from the local directory)
-  beside the existing **Files** section. `@` alone still lists files, so nothing
-  regresses.
+  (`FileMentionPalette.vue`). A federation token is `@` plus a **domain and a
+  colon** (`@telekom.de:org`). A dot alone is not enough: `@report.pdf` and
+  `@notes.zip` stay file mentions. `@` alone still lists files.
 - Grammar: `@domain.tld[:account]:keyword`. Up to 3 per message; recognised only
   after start-of-text/whitespace so `mail@telekom.de` in prose never triggers.
 - v1 resolves only domains reachable through an accepted **link**. An unlinked
@@ -380,7 +382,7 @@ request, exact) from **settlement** (periodic, netted).
 | Option | Per-query fit | Pros | Cons | Verdict |
 | ------ | ------------- | ---- | ---- | ------- |
 | **Credit ledger (internal)** | ✅ exact, zero fee | No dependency, instant, works offline of any chain | It's IOUs — needs eventual real settlement or trust | **v1 core** |
-| **Stripe (net settlement)** | ⚠️ not per-query (fees) | Real money, invoices, we already ship `StripeBillingModule`, KYC handled | ~2.9 %+30¢/txn ⇒ only viable on **netted** balances, not per call | **v1 money path** |
+| **Stripe (net settlement)** | ⚠️ not per-query (fees) | Real money, invoices, tax handled by Stripe | `StripeBillingModule` bills end users, not peer operators. Needs Connect or invoicing, plus VAT. Fees only work on **netted** balances | **later**, after the knowledge link |
 | **IOTA** | ✅ feeless microtx | Designed for machine micropayments | Wallet UX, on/off-ramp, ecosystem/regulatory maturity | **later**, behind provider iface |
 | **ETH L2 (Base/OP)** | ⚠️ sub-cent, not free | Programmable escrow, sub-cent gas | Volatility, KYC, wallet/key mgmt, complexity | **later**, optional |
 | **ETH mainnet** | ❌ | — | Gas ≫ a query's value | **no** |
@@ -396,10 +398,12 @@ request, exact) from **settlement** (periodic, netted).
 - **v1 default = prepaid credit line per link, cap-limited.** The buyer pre-funds
   a balance (or the pair agrees a cap of unbacked credits, i.e. barter/trust).
   No escrow, no third party. Exposure is bounded by the cap.
-- **v1 money = optional Stripe net settlement.** At period end, net the two
-  ledgers to a single number and raise one Stripe invoice from creditor to
-  debtor (reuse `BillingService` + `StripeBillingModule`). One charge per period,
-  not per query — fees stay negligible.
+- **v1 money = optional Stripe net settlement, and it is not a reuse of
+  today's billing.** `StripeBillingModule` charges Synaplan end users for a
+  PRO plan. Operator-to-operator settlement is a different product (Stripe
+  Connect or invoicing, VAT, who is the merchant). Next sprint does not build
+  it. When it is built, it is a new `StripeSettlement`, one netted charge per
+  period.
 - **Free/barter mode:** set price 0 and skip settlement entirely. Two partner
   companies who just want to share know-how never touch money.
 - **Pluggable `SettlementProvider` interface** (`settleNet(linkId, amount)`):
@@ -416,7 +420,7 @@ request, exact) from **settlement** (periodic, netted).
 ## 9. Backend building blocks
 
 ```
-backend/src/Module/FederationModule.php          FeatureModule (FEDERATION_ENABLED, FEDERATION_SEEDS)
+backend/src/Module/Federation/FederationModule.php   FeatureModule (FEDERATION_ENABLED, FEDERATION_SEEDS)
 backend/src/Service/Federation/
   InstanceIdentityService.php   keypair, well-known, DNS proof, rotation
   FederationLinkService.php     invite / accept / revoke, per-link offers + caps
@@ -446,7 +450,7 @@ Integration seams (extend, don't fork):
   `KnowledgeResponder`.
 - `App\Service\RateLimitService::recordUsage()` → `BUSELOG`/`BCOST` — brokered
   calls meter here with the peer price as raw cost.
-- `App\Service\BillingService` + `StripeBillingModule` — net settlement.
+- `App\Service\BillingService` — end-user metering only. Peer settlement does not call it until a later sprint.
 - `App\Model\ModelCatalog` / `ModelRepository` — capacity offers by model key.
 
 DB (one Galera-safe migration, `CREATE TABLE IF NOT EXISTS`, no Schema API,

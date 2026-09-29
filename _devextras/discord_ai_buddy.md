@@ -2,11 +2,11 @@
 
 | | |
 | - | - |
-| **Status** | Draft for review, 2026-09-29 |
+| **Status** | Draft for review, 2026-09-29. The federation half is superseded by [`planning/20260929-synaplan-federation/`](./planning/20260929-synaplan-federation/00_master_plan.md) (reviewed, queued). This file's Discord bot stays parked until that link works. |
 | **Branch** | `feat/synaplan-network` |
 | **Parts** | A — Synaplan Network (federation + replicated directory) · B — Network knowledge in chat · C — Discordyai plugin |
 | **Order** | A → B → C. Discordyai is one way into the network, not the core. |
-| **First scope** | *Public* federation of instances and accounts. Private circles are v2 (§9). |
+| **First scope** | Parked. Build [`planning/20260929-synaplan-federation/`](./planning/20260929-synaplan-federation/01_review.md) first (pairwise knowledge link). |
 | **Contract** | UX rules U1–U12 in [`planning/20260907_ux_user_flows.md`](./planning/20260907_ux_user_flows.md); every `ota-candidate` sprint below carries the five exit bullets from its §6. |
 
 ---

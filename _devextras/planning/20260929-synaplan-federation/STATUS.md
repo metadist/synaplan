@@ -1,27 +1,34 @@
 # Federation v1.0 — status
 
-Step log for [`00_master_plan.md`](./00_master_plan.md). All steps are
-**planned** until the §0 decision checklist is ticked and the Ask-First items
-(§14) are approved. No product code has landed yet.
+Reviewed 2026-09-29. **Queued for the next sprint** as the knowledge
+link only. The review and the cut are in [`01_review.md`](./01_review.md).
+No product code yet.
 
-| Step | Type | State | Notes |
-| ---- | ---- | ----- | ----- |
-| F0 | plan | in review | This plan; §0 open, `docs/FEDERATION_PROTOCOL.md` not yet written |
-| F1 | backend | planned | Module, identity, well-known, signer, address parser, health engine |
-| F2 | backend | planned | Directory store + migration, digest, gossip replication |
-| F3 | backend | planned | Federation link invite/accept/revoke |
-| F4 | backend | planned | Knowledge responder/client + excerpt sanitizer |
-| F5 | ota-candidate | planned | Admin UI: membership + links + publications |
-| F6 | ota-candidate | planned | Chat palette federation section + source card |
-| F7 | backend | planned | Capacity market, quote, broker responder/client, `peer` key source |
-| F8 | backend | planned | Ledger: receipts, balances, reconcile |
-| F9 | backend | planned | Settlement provider + null + Stripe (Ask-First) |
-| F10 | ota-candidate | planned | Capacity market UI + ledger view + transparent routing |
-| F11 | backend | planned | Health hardening, anti-Sybil, denylists, reports |
-| F12 | ota-candidate | planned | Directory browse + activity + peer-health view |
-| F13 | docs | planned | Finalise protocol doc for third-party implementers |
+## Next sprint
 
-## Open decisions (from §0)
+| Step | State | Notes |
+| ---- | ----- | ----- |
+| F0 | queued | Protocol doc: identity, link, query. No `/infer` |
+| F1 | queued | Module, identity, signer, address parser. Check `ext-sodium` first |
+| F3 | queued | Invite / accept / revoke. Peer record stored on accept |
+| F4 | queued | Knowledge query over one `RagScope`, SSRF checks, excerpt fence |
+| F5 | queued | Admin UI, after F4 is green |
+| F6 | queued | Chat palette + source card, after F5 is green |
 
-All 13 rows open. Blocking Ask-First items: schema migration (#12), payments /
-Stripe (#7), `ext-sodium` verification (#13), seeds (#4/§14), governance docs.
+## Parked until two installs can query each other
+
+| Step | State | Notes |
+| ---- | ----- | ----- |
+| F2 | parked | Gossip. Two partners sync on accept |
+| F7 | parked | Capacity market and `peer` key source in `MessagesGateway` |
+| F8 | parked | Ledger and receipts |
+| F9 | parked | Settlement. `StripeBillingModule` is not this seam |
+| F10 | parked | Market UI and Cursor routing |
+| F11 | parked | Denylists, anti-Sybil |
+| F12 | parked | Directory browse and health view |
+| F13 | parked | Third-party protocol doc beyond the knowledge link |
+
+## Open before the first migration
+
+Schema for `federation_link` + `federation_topic` + instance identity.
+`ext-sodium` in the backend image. Seeds may stay empty.
