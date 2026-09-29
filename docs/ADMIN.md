@@ -410,6 +410,38 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 
 ---
 
+## The Operate area
+
+Operate is grouped by topic. Each entry answers one question; the tabs
+inside it are the sub-topics.
+
+| Entry | Path | What it holds |
+| ----- | ---- | ------------- |
+| **Overview** | `/admin` | Server info, people and sign-ups, **Usage (all users)**, subscription plans |
+| **System status** | `/admin/features` | Health of every service and optional module (badge: disabled services) |
+| **AI infrastructure** | `/admin/setup` | Everything the AI needs — see below (badge: models that need attention) |
+| **People** | `/admin/people` | Users, groups, policies, platform instances, **Moderation**, audit log |
+| **System configuration** | `/admin/config` | Platform settings — see below |
+
+**AI infrastructure** tabs: **Providers & keys** (provider key cards, local
+AI with its Ollama address, self-hosted AI, speech output), **Model health**,
+**Document reading** (extraction chains plus the Tika, Docling, PDF rasterizer
+and Whisper services), **Knowledge search** (embeddings, vector database,
+search thresholds, reranking), **Chat behavior** (multi-step routing,
+conversation summary, deep memory, background media generation) and
+**System prompts**.
+
+**System configuration** topics: **Access** (sign-in & registration, sharing &
+audit), **Features & tools** (feature switches, web search, tools &
+automation — saved tasks, tool approval rules, file work), **Channels &
+apps** (email, channels & integrations, mobile app) and **Appearance**
+(branding, interface, guest landing page). A setting the page cannot sort
+into a topic appears under **More settings**.
+
+Old links keep working: `/admin/model-status`, `/admin?tab=prompts`,
+`/admin?tab=moderation`, `/admin/setup?tab=models|extraction|rerank|web-search`
+and `/admin/config?tab=ai|processing|vectordb|routing` land on the new home.
+
 ## People and groups
 
 Groups, the People page under Operate, and the group API are gated by
@@ -493,8 +525,8 @@ Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
 
 **Directory groups** is on by default; switch it under **Operate → System
 configuration → Features → People & sharing**
-(`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`). The claim settings stay under
-**Access → Sharing**. Optional settings:
+(`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`). The claim settings live under
+**Operate → System configuration → Access → Sharing & audit**. Optional settings:
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
@@ -720,7 +752,7 @@ Rollback is the same statement with `'0'`. Rows in `BPLATFORMINSTANCES` and
 **Approving instances.** A partner instance registered by a signed-in
 administrator is `active` immediately. One registered anonymously or by a
 regular user is `pending` and cannot issue link codes until an administrator
-approves it under **Operate → People → Linked platforms** (host, client,
+approves it under **Operate → People → Platform instances** (host, client,
 status, last seen; *Approve* / *Revoke*). Anonymous registration is limited to
 10 per hour per address. Revoking an instance also revokes every key it
 issued.
@@ -754,21 +786,21 @@ through if they fail, so a down sidecar never blocks an upload.
 
 Web search defaults to Brave (`WEB_SEARCH.PROVIDER=brave`). An admin
 picks Brave, SearXNG, Tavily, Exa, Firecrawl or Perplexity on
-**Operate → AI infrastructure → Web search**, plus an optional
-fallback. The next chat search uses the new provider with no restart.
+**Operate → System configuration → Web search**, plus an optional
+fallback. The Brave API key and result count sit on the same tab. The next chat search uses the new provider with no restart.
 **Test query** shows up to five titles. Per-user override is
 **Settings → Use my own search**, only when
 `WEB_SEARCH.USER_OVERRIDE_ALLOWED=1`.
 
 Rerank stays **off** by default (`RERANK.ENABLED=0`) until a live eval
 shows recall@5 up and p95 latency inside the budget. An admin turns it
-on under **Operate → AI infrastructure → Reranking**: pick a catalog
+on under **Operate → AI infrastructure → Knowledge search → Reranking**: pick a catalog
 rerank model (TEI / Jina / Cohere / Voyage), set how many extra
 snippets to fetch and the millisecond budget, optionally allow the
 summary model as a costly fallback, and run **Test order** on sample
 snippets. Chat search is unchanged while rerank is off.
 
-Importing models saves typing each row by hand. On **Models & keys**,
+Importing models saves typing each row by hand. On **Providers & keys**,
 an OpenAI-compatible endpoint card has **Import models** and the local
 AI card has **Import pulled models**. The preview lists what the
 endpoint offers with a guessed capability tag you can edit, and an
@@ -793,14 +825,15 @@ draws with that model. The endpoint does not edit an attached picture;
 remove the attachment or pick another image model for edits.
 
 The Operate page is **AI infrastructure** (`/admin/setup`). The
-**Extraction** tab shows adapter health, lets an admin reorder a family
-chain, and offers **Test with a file**. Tika and Docling have the same
-sidecar controls: a connection test on that tab, and URL / timeout
-(plus Docling max file size) under **System configuration →
-Processing**. Models & keys is the previous provider-key UI and now
-includes Perplexity as an optional chat provider. The **Web search**
-tab is the provider picker. The **Reranking** tab is the rerank
-settings and test.
+**Document reading** tab shows adapter health, lets an admin reorder a
+family chain, and offers **Test with a file**; below it, **Reading
+services** holds the URL, timeout and a connection test for Tika and
+Docling (plus Docling max file size), the PDF rasterizer and Whisper.
+**Providers & keys** holds the provider key cards (Perplexity included as
+an optional chat provider). **Knowledge search** holds embeddings, the
+vector database, the search thresholds and the rerank settings and test.
+The web search picker is a platform setting on **System configuration →
+Web search**.
 
 Settings table: [CONFIGURATION.md — AI plugs](CONFIGURATION.md#ai-plugs-plugs).
 

@@ -88,7 +88,7 @@ candidate set and keep the top `k`. It is **off** by default.
 
 `RERANK.LLM_FALLBACK=1` uses the summary model only when **no** rerank
 model is bound — not when the HTTP call fails. Configure and test under
-**Operate → AI infrastructure → Reranking**.
+**Operate → AI infrastructure → Knowledge search → Reranking**.
 
 Compare off vs on against a user's vector store:
 
@@ -181,6 +181,6 @@ owner's name. **Can view** alone never adds chunks to a search.
 - **Embedding Model**: bge-m3 (1024 dimensions)
 - **Vector Storage**: MariaDB 11.8 native VECTOR type
 - **Similarity**: VEC_DISTANCE_COSINE function
-- **Text Extraction**: Apache Tika by default. Optional Docling (`docling` Compose profile + Extraction tab) returns markdown with tables and headings; those files are chunked heading-aware. See [CONFIGURATION.md](CONFIGURATION.md#ai-plugs-plugs).
+- **Text Extraction**: Apache Tika by default. Optional Docling (`docling` Compose profile + Document reading tab) returns markdown with tables and headings; those files are chunked heading-aware. See [CONFIGURATION.md](CONFIGURATION.md#ai-plugs-plugs).
 - **OCR**: Tesseract (via Tika); Docling can OCR when the sidecar is on
 - **Audio**: Whisper.cpp with FFmpeg

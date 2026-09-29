@@ -527,7 +527,7 @@ Media generation (image, video, audio) can run as **background jobs** instead of
 blocking the chat turn: the assistant shows a live status banner, a completion
 toast fires when the render is ready, and a global Jobs tray tracks everything.
 Configured via **BCONFIG** (not env vars). Admins manage the master switch in the
-UI (**Settings → Processing → Async media generation**); the rest can be set per
+UI (**Operate → AI infrastructure → Chat behavior → Background media generation**); the rest can be set per
 group in the `BCONFIG` table. Resolution is per-user row → global row
 (`BOWNERID=0`) → built-in code default.
 
@@ -541,7 +541,7 @@ group in the `BCONFIG` table. Resolution is per-user row → global row
 
 ¹ Existing installations are grandfathered to `0` by migration
 (`Version20260629120000`) so behavior doesn't change on upgrade — each user
-opts in via **Settings → Processing → Async media generation** (or set the
+opts in via **Operate → AI infrastructure → Chat behavior → Background media generation** (or set the
 group/per-user row directly).
 
 > **Requires the `worker` container.** Async jobs are consumed by the dedicated
@@ -707,7 +707,7 @@ AUTH_COOKIE_SECURE=
 ## People, sharing and directory (`IAM`)
 
 The four feature switches live in **Operate → System configuration → Features
-→ People & sharing**, the remaining settings under **Access → Sharing**
+→ People & sharing**, the remaining settings under **Access → Sharing & audit**
 (`BCONFIG` group `IAM`, owner 0). They take effect immediately — no restart.
 The switches are **on by default**; pin one off for an automated deployment
 with its `FEATURE_*` environment variable (see
@@ -795,19 +795,19 @@ Unknown chain keys are skipped. Keys that FileProcessor does not already
 implement (today: `docling`) run first, then the built-in strategies. A
 down extra adapter never fails an upload. Fresh installs do **not** put
 `docling` on the document chain — an admin adds it under **Operate →
-AI infrastructure → Extraction**.
+AI infrastructure → Document reading**.
 
 `DOCLING_BASE_URL` (empty = off) points at the optional `docling`
 Compose profile (`docker compose --profile docling up -d`). The CPU
 image needs about 4 GB during OCR; there is no `mem_limit` in dev.
 `DOCLING_TIMEOUT_MS` defaults to `120000`; `DOCLING_MAX_BYTES` defaults
-to 50 MB. Admins edit those the same way as Tika: **System
-configuration → Processing → Docling** (URL, timeout, max bytes, then
-**Test connection**). Markdown from Docling is chunked heading-aware
+to 50 MB. Admins edit those the same way as Tika: **Operate → AI
+infrastructure → Document reading → Reading services → Docling** (URL,
+timeout, max bytes, then **Test connection**). Markdown from Docling is chunked heading-aware
 (tables stay together; oversized tables repeat the header row).
 
-Web search providers (admin picker on **Operate → AI infrastructure →
-Web search**):
+Web search providers (admin picker on **Operate → System configuration →
+Web search**, next to the Brave key and result count):
 
 | Key | Sovereignty | Capabilities | Key / URL |
 | --- | ----------- | ------------ | --------- |
@@ -826,7 +826,7 @@ present”, not a live probe — **Test query** is the live call.
 
 Rerank models are catalog rows with tag `rerank` (TEI
 `openaicompatible`, Jina, Cohere, Voyage). Bind one on
-**Operate → AI infrastructure → Reranking** (`DEFAULTMODEL.RERANK`).
+**Operate → AI infrastructure → Knowledge search → Reranking** (`DEFAULTMODEL.RERANK`).
 Jina / Cohere / Voyage keys use `JINA_API_KEY`, `COHERE_API_KEY`,
 `VOYAGE_API_KEY` or **plug_keys**. A TEI `/rerank` endpoint is an
 OpenAI-compatible endpoint with the `rerank` capability. With rerank
