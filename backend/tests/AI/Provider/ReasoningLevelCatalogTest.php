@@ -49,6 +49,18 @@ final class ReasoningLevelCatalogTest extends TestCase
             ['low', 'medium', 'high'],
             ReasoningLevelCatalog::levels('Anthropic', 'claude-opus-5-5', ['reasoning']),
         );
+        self::assertSame(
+            ['low', 'medium', 'high'],
+            ReasoningLevelCatalog::levels('Anthropic', 'claude-sonnet-5', ['reasoning']),
+        );
+        self::assertSame(
+            ['low', 'medium', 'high', 'xhigh', 'max'],
+            ReasoningLevelCatalog::levels('Anthropic', 'claude-sonnet-5-5', ['reasoning']),
+        );
+        self::assertSame(
+            ['low', 'medium', 'high', 'xhigh', 'max'],
+            ReasoningLevelCatalog::levels('Anthropic', 'claude-sonnet-5-5-20260928', ['reasoning']),
+        );
         self::assertNull(ReasoningLevelCatalog::levels('Anthropic', 'claude-haiku-4-5', ['reasoning']));
     }
 

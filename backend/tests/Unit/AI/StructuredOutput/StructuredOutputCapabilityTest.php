@@ -96,6 +96,8 @@ final class StructuredOutputCapabilityTest extends TestCase
             'mythos 5.1' => ['claude-mythos-5-1'],
             'opus 5.5' => ['claude-opus-5-5'],
             'opus 5.5 dated alias' => ['claude-opus-5-5-20260922'],
+            'sonnet 5.5' => ['claude-sonnet-5-5'],
+            'sonnet 5.5 dated alias' => ['claude-sonnet-5-5-20260928'],
         ];
     }
 

@@ -87,7 +87,7 @@
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
       >
-        <Icon icon="mdi:lightbulb-on-outline" class="w-5 h-5 flex-shrink-0" />
+        <LightBulbIcon class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
           <span class="text-sm font-medium">{{ $t('chatInput.thinking') }}</span>
           <div class="text-xs txt-secondary">
@@ -200,7 +200,12 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
-import { WrenchScrewdriverIcon, ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import {
+  WrenchScrewdriverIcon,
+  ChevronUpIcon,
+  CheckIcon,
+  LightBulbIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { type Command, useCommandsStore } from '@/stores/commands'

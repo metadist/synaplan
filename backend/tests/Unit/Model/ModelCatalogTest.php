@@ -809,6 +809,34 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Claude Sonnet 5.5 — released 2026-09-28. Same $2/$10 rate as Sonnet 5.
+     * Cache reads stay the Anthropic-wide 0.1x, so the rows carry no
+     * cache_read_price_per_1M override. The chat row's default effort is high.
+     */
+    public function testClaudeSonnet55ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $sonnet55 = ModelCatalog::find('anthropic:claude-sonnet-5-5');
+
+        $this->assertCount(2, $sonnet55, 'Expected claude-sonnet-5-5 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($sonnet55, 'tag'));
+        $this->assertSame(379, ModelCatalog::findBidByKey('anthropic:claude-sonnet-5-5:chat'));
+        $this->assertSame(380, ModelCatalog::findBidByKey('anthropic:claude-sonnet-5-5:pic2text'));
+
+        foreach ($sonnet55 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-sonnet-5-5', $variant['providerId']);
+            $this->assertSame('claude-sonnet-5-5', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertArrayNotHasKey('cache_read_price_per_1M', $variant['json']);
+        }
+
+        $chat = ModelCatalog::find('anthropic:claude-sonnet-5-5:chat')[0];
+        $this->assertSame('high', $chat['json']['meta']['reasoning_effort_default'] ?? null);
+        $this->assertSame(128000, $chat['json']['max_tokens'] ?? null);
+    }
+
+    /**
      * Sonnet 5 also backs the MEM-tagged memory-extraction row (BID 222), so the
      * bare `service:providerId` key resolves to three variants — capability
      * bindings must therefore always use the tag-qualified key.

@@ -19,6 +19,18 @@ final class ReasoningLevelCatalog
     private const LADDER = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
     /**
+     * Claude Sonnet 5.5 accepts xhigh and max in addition to low|medium|high.
+     *
+     * Checked before {@see self::ANTHROPIC_EFFORT_MODELS}: `claude-sonnet-5`
+     * is a prefix of `claude-sonnet-5-5`.
+     *
+     * @var list<string>
+     */
+    private const ANTHROPIC_EXTENDED_EFFORT_MODELS = [
+        'claude-sonnet-5-5',
+    ];
+
+    /**
      * Adaptive Claude models accept output_config.effort low|medium|high.
      * Must stay aligned with AnthropicProvider::ADAPTIVE_THINKING_MODELS.
      * Budget-token models are omitted on purpose: they keep the toggle.
@@ -233,6 +245,12 @@ final class ReasoningLevelCatalog
      */
     private static function anthropicLevels(string $providerId): ?array
     {
+        foreach (self::ANTHROPIC_EXTENDED_EFFORT_MODELS as $prefix) {
+            if (str_starts_with($providerId, $prefix)) {
+                return ['low', 'medium', 'high', 'xhigh', 'max'];
+            }
+        }
+
         foreach (self::ANTHROPIC_EFFORT_MODELS as $prefix) {
             if (str_starts_with($providerId, $prefix)) {
                 return ['low', 'medium', 'high'];

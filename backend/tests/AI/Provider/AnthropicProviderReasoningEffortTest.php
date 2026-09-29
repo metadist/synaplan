@@ -115,6 +115,71 @@ final class AnthropicProviderReasoningEffortTest extends TestCase
         self::assertArrayNotHasKey('output_config', $captured['body']);
     }
 
+    public function testReasoningOffSendsBetweenToolsForSonnet55(): void
+    {
+        $captured = $this->captureChat('claude-sonnet-5-5', []);
+
+        self::assertSame('low', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(['type' => 'between_tools'], $captured['body']['thinking'] ?? null);
+        self::assertArrayNotHasKey('anthropic-beta', $captured['headers']);
+    }
+
+    public function testReasoningOffSendsBetweenToolsForDatedSonnet55(): void
+    {
+        $captured = $this->captureChat('claude-sonnet-5-5-20260928', []);
+
+        self::assertSame('low', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(['type' => 'between_tools'], $captured['body']['thinking'] ?? null);
+        self::assertArrayNotHasKey('display', $captured['body']['thinking']);
+    }
+
+    public function testChosenHighEffortOnSonnet55StaysBetweenToolsWhenReasoningIsOff(): void
+    {
+        $captured = $this->captureChat('claude-sonnet-5-5', [
+            'reasoning' => false,
+            'reasoning_effort' => 'high',
+        ]);
+
+        self::assertSame('high', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(['type' => 'between_tools'], $captured['body']['thinking'] ?? null);
+    }
+
+    public function testMaxEffortOnSonnet55KeepsAdaptiveThinking(): void
+    {
+        $captured = $this->captureChat('claude-sonnet-5-5', [
+            'reasoning' => false,
+            'reasoning_effort' => 'max',
+        ]);
+
+        self::assertSame('max', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(
+            ['type' => 'adaptive', 'display' => 'summarized'],
+            $captured['body']['thinking'] ?? null,
+        );
+    }
+
+    public function testReasoningOnSonnet55SendsAdaptiveThinkingAtChosenEffort(): void
+    {
+        $captured = $this->captureChat('claude-sonnet-5-5', [
+            'reasoning' => true,
+            'reasoning_effort' => 'xhigh',
+        ]);
+
+        self::assertSame('xhigh', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(
+            ['type' => 'adaptive', 'display' => 'summarized'],
+            $captured['body']['thinking'] ?? null,
+        );
+    }
+
+    public function testSonnet5ReasoningOffDoesNotUseBetweenTools(): void
+    {
+        $captured = $this->captureChat('claude-sonnet-5', []);
+
+        self::assertArrayNotHasKey('thinking', $captured['body']);
+        self::assertArrayNotHasKey('output_config', $captured['body']);
+    }
+
     public function testReasoningOffLeavesOtherModelsUntouched(): void
     {
         $captured = $this->captureChat('claude-sonnet-4-6', []);
