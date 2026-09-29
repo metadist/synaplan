@@ -177,10 +177,16 @@ mint_certificate() {
     local san
     san="$(san_names "$@")"
     install -d -m 0700 "$dir"
-    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+    if ! openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
         -keyout "$dir/key.pem.new" -out "$dir/cert.pem.new" \
         -days 3650 -subj '/CN=synaplan' \
-        -addext "subjectAltName=${san}"
+        -addext "subjectAltName=${san}" \
+        2>"$dir/openssl.err"; then
+        cat "$dir/openssl.err" >&2
+        rm -f "$dir/openssl.err" "$dir/key.pem.new" "$dir/cert.pem.new"
+        die "openssl could not create the certificate."
+    fi
+    rm -f "$dir/openssl.err"
     chmod 0600 "$dir/key.pem.new"
     chmod 0644 "$dir/cert.pem.new"
     mv -f "$dir/key.pem.new" "$dir/key.pem"
