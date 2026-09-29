@@ -32,3 +32,9 @@ No product code yet.
 
 Schema for `federation_link` + `federation_topic` + instance identity.
 `ext-sodium` in the backend image. Seeds may stay empty.
+
+## Data model
+
+What is published, how updates spread, storage/bandwidth for a 15k-instance
+network, the zero-trust model, and MCP/API-call sharing are specified in
+[`02_federation_data_model.md`](./02_federation_data_model.md).

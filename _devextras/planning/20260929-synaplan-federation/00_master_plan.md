@@ -21,6 +21,7 @@ Files in this folder:
 | ---- | ------- |
 | `00_master_plan.md` (this) | Goal, decisions (§0), topology, protocol, exchange goods, payments, steps, gates |
 | [`01_review.md`](./01_review.md) | Review + the slice that is actually the next sprint |
+| [`02_federation_data_model.md`](./02_federation_data_model.md) | Exactly what is published, how updates spread, storage/bandwidth for 15k, zero-trust, MCP/API sharing |
 | `STATUS.md` | Step log — next sprint is the knowledge link; the rest stays planned |
 
 **Next sprint** (the only slice to build): two installs, one mutual link, one published folder, one `@domain:keyword` answer. Barter. No token market, no Stripe, no gossip mesh. Detail and the review findings are in [`01_review.md`](./01_review.md).
@@ -38,7 +39,7 @@ payment).
 | 1 | **Topology** | Federated **server-to-server HTTPS** for live queries + **epidemic gossip** for the directory. Not DHT/P2P, not hour-batched FIDO. (§2) | no | open |
 | 2 | **Trust model** | **Pairwise opt-in Federation Links** (mutual handshake). A *circle* is the transitive set you choose to trust. Nothing is queryable without a link. (§3) | no | open |
 | 3 | **Identity** | Domain + **Ed25519** keypair (`ext-sodium`), proven at `/.well-known/synaplan-federation`, optional DNS `TXT`. (§4) | no | open |
-| 4 | **Goods exchanged** | (a) **Knowledge**: signed query → quoted excerpts, never files/vectors. (b) **Capacity**: brokered inference over a peer's model key. (§6, §7) | no | open |
+| 4 | **Goods exchanged** | Three, all metadata-published / result-only over a link: (a) **Knowledge** — signed query → excerpts, never files/vectors; (b) **Capacity** — brokered inference over a peer's model key; (c) **Capability** — a remote MCP tool / API call run on the peer's credentials. Full data model in [`02_federation_data_model.md`](./02_federation_data_model.md). (§6, §7) | no | open |
 | 5 | **Token exchange shape** | **Metered brokered inference** — a new `peer` key source in `MessagesGateway`. No transfer of prepaid credits between vendors' accounts. (§7) | no | open |
 | 6 | **Accounting** | Internal **credit ledger** with a signed per-request **receipt**; both sides reconcile. Pegged unit (1 credit = €0.0001). (§8) | no | open |
 | 7 | **Settlement** | Next sprint is **barter only** (price 0). Prepaid caps and Stripe netting stay later. `StripeBillingModule` is end-user PRO billing and is **not** the settlement seam (§8). | **yes** | open |
