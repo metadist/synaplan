@@ -1,13 +1,18 @@
 <template>
   <div ref="dropdownRef" class="relative" data-testid="comp-reasoning-level">
     <button
+      ref="triggerRef"
       type="button"
       :class="['pill', isOpen && 'pill--active']"
       :aria-label="ariaLabel"
+      aria-haspopup="listbox"
+      :aria-controls="listboxId"
       :aria-expanded="isOpen"
       data-testid="btn-reasoning-toggle"
       @click="toggleOpen"
-      @keydown.escape="closeDropdown"
+      @keydown.down.prevent="openFromKeyboard"
+      @keydown.up.prevent="openFromKeyboard"
+      @keydown.escape.stop="closeAndRestoreFocus"
     >
       <LightBulbIcon class="w-4 h-4 md:w-5 md:h-5" />
       <span class="text-xs md:text-sm font-medium">{{ $t('chatInput.reasoningLevel.label') }}</span>
@@ -22,24 +27,28 @@
     </button>
     <div
       v-if="isOpen"
+      :id="listboxId"
       class="dropdown-up left-0 w-[calc(100vw-2rem)] sm:w-64 max-h-[60vh] overflow-y-auto scroll-thin"
       data-testid="dropdown-reasoning-panel"
       role="listbox"
       :aria-label="$t('chatInput.reasoningLevel.label')"
-      @keydown.escape="closeDropdown"
+      @keydown.escape.stop.prevent="closeAndRestoreFocus"
     >
       <button
-        v-for="level in levels"
+        v-for="(level, index) in levels"
         :key="level"
         ref="itemRefs"
         :class="['dropdown-item', modelValue === level && 'dropdown-item--active']"
         type="button"
         role="option"
+        tabindex="-1"
         :aria-selected="modelValue === level"
         :data-testid="`btn-reasoning-${level}`"
         @click="selectLevel(level)"
-        @keydown.down.prevent="focusNext"
-        @keydown.up.prevent="focusPrevious"
+        @keydown.down.prevent="focusAt(index + 1)"
+        @keydown.up.prevent="focusAt(index - 1)"
+        @keydown.home.prevent="focusAt(0)"
+        @keydown.end.prevent="focusAt(levels.length - 1)"
       >
         <span class="flex-1 min-w-0 text-sm font-medium">{{ levelLabel(level) }}</span>
         <Transition name="check-fade">
@@ -54,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { CheckIcon, ChevronUpIcon, LightBulbIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
@@ -69,9 +78,11 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const listboxId = useId()
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLElement | null>(null)
 
 const levelLabel = (level: string) => t(`chatInput.reasoningLevel.${level}`)
 
@@ -83,30 +94,55 @@ const ariaLabel = computed(() =>
     : t('chatInput.reasoningLevel.label')
 )
 
+const focusAt = (index: number) => {
+  const items = itemRefs.value
+  if (items.length === 0) return
+  const wrapped = ((index % items.length) + items.length) % items.length
+  items[wrapped]?.focus()
+}
+
+const focusSelected = async () => {
+  await nextTick()
+  const selected = props.levels.indexOf(props.modelValue)
+  focusAt(selected >= 0 ? selected : 0)
+}
+
+const openMenu = async () => {
+  isOpen.value = true
+  await focusSelected()
+}
+
 const toggleOpen = () => {
   triggerHapticImpact('light')
-  isOpen.value = !isOpen.value
+  if (isOpen.value) {
+    closeAndRestoreFocus()
+    return
+  }
+  void openMenu()
+}
+
+/** Arrow keys from the trigger open the list on the current choice. */
+const openFromKeyboard = () => {
+  if (!isOpen.value) {
+    void openMenu()
+    return
+  }
+  void focusSelected()
 }
 
 const closeDropdown = () => {
   isOpen.value = false
 }
 
+const closeAndRestoreFocus = () => {
+  if (!isOpen.value) return
+  triggerRef.value?.focus()
+  isOpen.value = false
+}
+
 const selectLevel = (level: string) => {
   emit('update:modelValue', level)
-  closeDropdown()
-}
-
-const focusNext = () => {
-  const currentIndex = itemRefs.value.findIndex((el) => el === document.activeElement)
-  const nextIndex = (currentIndex + 1) % itemRefs.value.length
-  itemRefs.value[nextIndex]?.focus()
-}
-
-const focusPrevious = () => {
-  const currentIndex = itemRefs.value.findIndex((el) => el === document.activeElement)
-  const prevIndex = currentIndex <= 0 ? itemRefs.value.length - 1 : currentIndex - 1
-  itemRefs.value[prevIndex]?.focus()
+  closeAndRestoreFocus()
 }
 
 const handleClickOutside = (e: MouseEvent) => {
