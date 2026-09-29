@@ -32,6 +32,14 @@
     "provider": {
       "affected": "{count} betroffen"
     },
+    "retired": {
+      "label": "Stillgelegt",
+      "title": "Stillgelegte Modelle",
+      "hint": "Der Anbieter bietet diese Modelle nicht mehr an. Sie sind abgeschaltet, werden nicht mehr geprüft und zählen nie als Problem.",
+      "retiredOn": "Stillgelegt am {date}",
+      "successor": "Ersetzt durch {name}",
+      "noSuccessor": "Kein Ersatz"
+    },
     "model": {
       "lastSuccess": "Zuletzt funktioniert",
       "errorRate": "{percent} % der letzten {total} Aufrufe sind fehlgeschlagen",

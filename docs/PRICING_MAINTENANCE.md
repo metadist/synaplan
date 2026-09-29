@@ -548,7 +548,9 @@ replacement.
 
 **What the seeder does**, idempotently and on every container start, for each entry whose row exists and still matches `providerId`: stamps `BRETIREDON` and `BSUCCESSORID`, and forces `BACTIVE = BSELECTABLE = BISDEFAULT = 0`. A re-run writes nothing. A BID an operator repurposed is skipped with a warning. Rows are never deleted — `BMESSAGES` has FKs into `BMODELS` and **BIDs must never be reused**.
 
-The health monitor (`app:model:health-check`) skips every row that carries `BRETIREDON`. A recorded retirement is expected to be missing, so it is not probed and it must not raise the hourly incident mail. Operator-disabled rows without a date stay in the check.
+The health monitor (`app:model:health-check`) skips every row that carries `BRETIREDON`. A recorded retirement is expected to be missing, so it is not probed and it must not raise the hourly incident mail. Operator-disabled rows without a date stay in the check so a recovery shows, but they never raise an alert and the status page counts them as "Switched off", not in the "need attention" count. A row the monitor switched off itself (auto-disable) still counts.
+
+Because nothing checks a retired row any more, its last `BMODELHEALTH` verdict would be frozen at whatever held before the retirement. Each health run therefore deletes the health rows of retired models (`ModelHealthRepository::pruneRetired()`), and the status page (`ModelHealthOverview`) lists retired models in their own collapsed "Retired models" section — with the retirement date and the successor — never inside a provider section and never in the "need attention" count or the Operate badge.
 
 **Why a separate seeder from `ModelSeeder`:** that one treats `BACTIVE`/`BSELECTABLE`/`BISDEFAULT` as operator-owned and never overwrites them, which is right for a live model and wrong for a dead one. A retirement outranks an operator preference — "please keep offering this" on a model the provider switched off only produces a failing request. Keeping the override in its own seeder makes it explicit instead of punching a hole in `ModelSeeder`'s preservation rules.
 

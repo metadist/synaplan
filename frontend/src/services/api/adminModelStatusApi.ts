@@ -13,6 +13,7 @@ export type ModelStatusSnapshot = z.infer<typeof GetAdminModelHealthStatusRespon
 export type ModelStatusProvider = ModelStatusSnapshot['providers'][number]
 export type ModelStatusEntry = ModelStatusProvider['models'][number]
 export type ModelStatusState = ModelStatusEntry['state']
+export type ModelStatusRetiredEntry = ModelStatusSnapshot['retired'][number]
 export type ModelStatusRefreshResult = z.infer<typeof PostAdminModelHealthRefreshResponseSchema>
 
 /**

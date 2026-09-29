@@ -42,6 +42,8 @@ const snapshot = {
     offline: 0,
     unconfigured: 0,
     unknown: 0,
+    switchedOff: 0,
+    retired: 0,
     needsAttention: 0,
     lastCheck: 1_700_000_000,
     autoDisableEnabled: false,
@@ -59,6 +61,7 @@ const snapshot = {
           providerId: 'gpt-4o',
           capability: 'chat',
           state: 'online',
+          needsAttention: false,
           reason: '',
           source: 'probe',
           lastCheck: 1_700_000_000,
@@ -73,6 +76,43 @@ const snapshot = {
           exemptUntil: 0,
         },
       ],
+    },
+  ],
+  retired: [] as Array<{
+    id: number
+    name: string
+    providerId: string
+    capability: string
+    provider: string
+    providerDisplayName: string
+    retiredOn: string
+    successorName: string | null
+  }>,
+}
+
+const withRetired = {
+  ...snapshot,
+  summary: { ...snapshot.summary, total: 3, retired: 2 },
+  retired: [
+    {
+      id: 92,
+      name: 'Claude 3 Haiku',
+      providerId: 'claude-3-haiku-20240307',
+      capability: 'chat',
+      provider: 'anthropic',
+      providerDisplayName: 'Anthropic',
+      retiredOn: '2026-05-08',
+      successorName: 'Claude Haiku 4.5',
+    },
+    {
+      id: 320,
+      name: 'Grok TTS',
+      providerId: 'grok-tts',
+      capability: 'text2sound',
+      provider: 'xai',
+      providerDisplayName: 'xAI',
+      retiredOn: '2026-08-20',
+      successorName: null,
     },
   ],
 }
@@ -140,6 +180,75 @@ describe('ModelHealthPanel', () => {
 
     expect(wrapper.find('[data-testid="state-load-error"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="item-model"]').text()).toContain('import source listing')
+    wrapper.unmount()
+  })
+
+  it('lists retired models apart, with their replacement, never as a problem', async () => {
+    mockGetStatus.mockResolvedValue(withRetired)
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="summary-counts"]').text()).toContain('2 Retired')
+    expect(wrapper.findAll('[data-testid="item-model"]')).toHaveLength(1)
+
+    const section = wrapper.get('[data-testid="section-retired"]')
+    expect(section.attributes('data-open')).toBe('false')
+    await wrapper.get('[data-testid="btn-retired"]').trigger('click')
+
+    const items = wrapper.findAll('[data-testid="item-retired-model"]')
+    expect(items).toHaveLength(2)
+    expect(items[0].text()).toContain('Claude 3 Haiku')
+    expect(items[0].text()).toContain('Replaced by Claude Haiku 4.5')
+    expect(items[1].text()).toContain('No replacement')
+    expect(setModelsNeedingAttention).toHaveBeenCalledWith(0)
+    wrapper.unmount()
+  })
+
+  it('counts a model an operator switched off apart and keeps it out of the problems', async () => {
+    const online = snapshot.providers[0].models[0]
+    mockGetStatus.mockResolvedValue({
+      ...snapshot,
+      summary: { ...snapshot.summary, total: 2, switchedOff: 1 },
+      providers: [
+        {
+          ...snapshot.providers[0],
+          models: [
+            { ...online, state: 'degraded', needsAttention: true },
+            {
+              ...online,
+              id: 43,
+              name: 'GPT-OSS 20B',
+              state: 'offline',
+              needsAttention: false,
+              active: false,
+            },
+          ],
+        },
+      ],
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="summary-counts"]').text()).toContain('1 Switched off')
+    expect(wrapper.findAll('[data-testid="item-model"]')).toHaveLength(2)
+
+    await wrapper.get('[data-testid="filter-only-problems"]').setValue(true)
+
+    const problems = wrapper.findAll('[data-testid="item-model"]')
+    expect(problems).toHaveLength(1)
+    expect(problems[0].text()).toContain('GPT-4o')
+    wrapper.unmount()
+  })
+
+  it('hides retired models when only problems are shown', async () => {
+    mockGetStatus.mockResolvedValue(withRetired)
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="filter-only-problems"]').setValue(true)
+
+    expect(wrapper.find('[data-testid="section-retired"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="state-empty"]').exists()).toBe(true)
     wrapper.unmount()
   })
 })

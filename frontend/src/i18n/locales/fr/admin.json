@@ -32,6 +32,14 @@
     "provider": {
       "affected": "{count} concernés"
     },
+    "retired": {
+      "label": "Retiré",
+      "title": "Modèles retirés",
+      "hint": "Le fournisseur ne propose plus ces modèles. Ils sont désactivés, ne sont plus vérifiés et ne comptent jamais comme un problème.",
+      "retiredOn": "Retiré le {date}",
+      "successor": "Remplacé par {name}",
+      "noSuccessor": "Aucun remplacement"
+    },
     "model": {
       "lastSuccess": "Dernier fonctionnement",
       "errorRate": "{percent} % des {total} derniers appels ont échoué",

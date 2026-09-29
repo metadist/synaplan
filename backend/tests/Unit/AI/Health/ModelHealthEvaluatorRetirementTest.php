@@ -19,6 +19,7 @@ use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderDisplayNames;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
+use App\Entity\ModelHealth;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
@@ -54,8 +55,9 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
      * @param Model|list<Model>               $catalog       one model or every model of the service
      * @param array<string, ModelProbeResult> $confirmations provider model id => what the provider says
      * @param list<string>                    $listed        model ids the bulk listing returns
+     * @param array<int, ModelHealth>         $healthByModel stored health rows, by model id
      */
-    private function evaluatorFor(Model|array $catalog, array $listed, array $confirmations, bool $authoritative = false): ModelHealthEvaluator
+    private function evaluatorFor(Model|array $catalog, array $listed, array $confirmations, bool $authoritative = false, array $healthByModel = []): ModelHealthEvaluator
     {
         $rows = $catalog instanceof Model ? [$catalog] : $catalog;
         $indexed = [];
@@ -122,9 +124,12 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
             new NullLogger(),
         );
 
+        $healthRepository = $this->createStub(ModelHealthRepository::class);
+        $healthRepository->method('findIndexedByModelId')->willReturn($healthByModel);
+
         return new ModelHealthEvaluator(
             $models,
-            $this->createMock(ModelHealthRepository::class),
+            $healthRepository,
             new ModelListProbeRegistry([$probe]),
             $recorder,
             $config,
@@ -282,8 +287,10 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
     /**
      * An operator-disabled row without a retirement date is a different claim
      * ("we switched this off") and must still be checked — it can come back.
+     * But switching it off was the operator's answer already, so it must not
+     * page anyone about the model they chose not to use.
      */
-    public function testAnOperatorDisabledRowWithoutRetirementIsStillChecked(): void
+    public function testAnOperatorDisabledRowWithoutRetirementIsStillCheckedButNeverAlerts(): void
     {
         $model = self::model(320, 'xAI', 'grok-tts', 'text2sound');
         $model->setActive(0);
@@ -295,6 +302,31 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
         )->run(dryRun: true);
 
         self::assertSame(ModelHealthState::Offline, $run->verdicts[0]->state);
+        self::assertTrue($run->verdicts[0]->switchedOff);
+        self::assertFalse($run->verdicts[0]->needsAttention());
+        self::assertSame([], $run->alertsRaised);
+    }
+
+    /**
+     * A row the automation switched off is off because it failed. That is
+     * exactly what an operator has to hear about.
+     */
+    public function testAnAutoDisabledRowStillAlerts(): void
+    {
+        $model = self::model(320, 'xAI', 'grok-tts', 'text2sound');
+        $model->setActive(0);
+        $health = (new ModelHealth())->setModelId(320)->setAutoDisabled(true);
+
+        $run = $this->evaluatorFor(
+            $model,
+            ['grok-4.5'],
+            ['grok-tts' => ModelProbeResult::Gone],
+            healthByModel: [320 => $health],
+        )->run(dryRun: true);
+
+        self::assertSame(ModelHealthState::Offline, $run->verdicts[0]->state);
+        self::assertFalse($run->verdicts[0]->switchedOff);
+        self::assertTrue($run->verdicts[0]->needsAttention());
         self::assertCount(1, $run->alertsRaised);
     }
 

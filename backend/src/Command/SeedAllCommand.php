@@ -39,6 +39,7 @@ use App\Seed\ToolsConfigSeeder;
 use App\Seed\UpdateConfigSeeder;
 use App\Seed\UsageTaximeterConfigSeeder;
 use App\Seed\WorkflowsConfigSeeder;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -86,6 +87,13 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
+ *
+ * A failing step does not stop the others. The entrypoint keeps the container
+ * running when this command fails, so an abort would leave every later step —
+ * model retirements included — silently unapplied until someone reads the
+ * startup log. Each step is idempotent and catalog-keyed (the defaults
+ * reference catalog BIDs, not rows read back from step 1), so running the rest
+ * is safe; the command still exits non-zero and names the failed steps.
  */
 #[AsCommand(
     name: 'app:seed',
@@ -128,6 +136,7 @@ final class SeedAllCommand extends Command
         private readonly WorkflowsConfigSeeder $workflowsConfigSeeder,
         private readonly ComputeConfigSeeder $computeConfigSeeder,
         private readonly ModuleGateSeeder $moduleGateSeeder,
+        private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
     }
@@ -168,7 +177,8 @@ final class SeedAllCommand extends Command
             "  24b. workflows builder flag    (BCONFIG, group=WORKFLOWS, ownerId=0 — default ON)\n".
             "  25. module-gates               (BCONFIG, group=MODULES, defaults from ModuleGateSeeder)\n".
             "  26. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
-            'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
+            "All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.\n".
+            'A failing step does not stop the others; the command then exits non-zero and names the failed steps.'
         );
     }
 
@@ -215,8 +225,18 @@ final class SeedAllCommand extends Command
         ];
 
         $rows = [];
+        $failed = [];
         foreach ($steps as [$label, $callable]) {
-            $result = $this->runStep($io, $label, $callable);
+            try {
+                $result = $this->runStep($io, $label, $callable);
+            } catch (\Throwable $e) {
+                $failed[] = $label;
+                $this->logger->error('Seed step failed', ['step' => $label, 'exception' => $e]);
+                $io->error(sprintf('Seed step "%s" failed: %s', $label, $e->getMessage()));
+                $rows[] = [$label, 'failed', '-', '-', '-'];
+                continue;
+            }
+
             $rows[] = [
                 $label,
                 (string) $result->inserted,
@@ -227,6 +247,17 @@ final class SeedAllCommand extends Command
         }
 
         $io->table(['Step', 'Inserted', 'Updated', 'Skipped', 'Preserved'], $rows);
+
+        if ([] !== $failed) {
+            $io->error(sprintf(
+                '%d of %d seed steps failed: %s. All other steps completed.',
+                count($failed),
+                count($steps),
+                implode(', ', $failed),
+            ));
+
+            return Command::FAILURE;
+        }
 
         $io->success('All seed steps completed.');
 

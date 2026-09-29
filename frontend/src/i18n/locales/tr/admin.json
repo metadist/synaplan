@@ -32,6 +32,14 @@
     "provider": {
       "affected": "{count} etkilendi"
     },
+    "retired": {
+      "label": "Kullanımdan kaldırıldı",
+      "title": "Kullanımdan kaldırılan modeller",
+      "hint": "Sağlayıcı bu modelleri artık sunmuyor. Kapatıldılar, artık kontrol edilmiyorlar ve hiçbir zaman sorun olarak sayılmıyorlar.",
+      "retiredOn": "{date} tarihinde kullanımdan kaldırıldı",
+      "successor": "Yerine gelen: {name}",
+      "noSuccessor": "Yerine gelen model yok"
+    },
     "model": {
       "lastSuccess": "Son çalıştığı zaman",
       "errorRate": "Son {total} çağrının %{percent} kadarı başarısız oldu",

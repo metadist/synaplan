@@ -201,6 +201,17 @@ class ModelHealth
         return $this;
     }
 
+    /**
+     * BACTIVE = 0 set by a person, not by the automation. Such a row stays in
+     * the check so a recovery is visible, but it is a decision already taken:
+     * it never needs attention and never pages. A row the automation switched
+     * off is still a problem somebody has to look at.
+     */
+    public static function isSwitchedOffByOperator(Model $model, ?self $health): bool
+    {
+        return 0 === $model->getActive() && !($health?->isAutoDisabled() ?? false);
+    }
+
     public function getAutoDisabledAt(): int
     {
         return $this->autoDisabledAt;

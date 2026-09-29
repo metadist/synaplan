@@ -34,7 +34,7 @@ use Psr\Log\LoggerInterface;
  * Rows that already carry BRETIREDON are skipped: a recorded retirement is
  * expected to be missing, so probing it again is wasted work and alerting on
  * it trains operators to ignore the mail. Operator-disabled rows without a
- * date stay in the check.
+ * date stay in the check so a recovery shows, but never page anyone.
  */
 final readonly class ModelHealthEvaluator
 {
@@ -82,11 +82,21 @@ final readonly class ModelHealthEvaluator
         $now = time();
 
         $wanted = array_map(mb_strtolower(...), $onlyServices);
+        $seen = [];
+        $healthByModel = $this->healthRepository->findIndexedByModelId();
 
         foreach ($this->models->findAllServices() as $service) {
-            if ([] !== $wanted && !in_array(mb_strtolower($service), $wanted, true)) {
+            $serviceKey = mb_strtolower($service);
+            if ([] !== $wanted && !in_array($serviceKey, $wanted, true)) {
                 continue;
             }
+            // BSERVICE can hold "Ollama" (catalog) and "ollama" (import) side
+            // by side, and the row lookup below already matches both. A second
+            // pass would probe the provider again and judge every row twice.
+            if (isset($seen[$serviceKey])) {
+                continue;
+            }
+            $seen[$serviceKey] = true;
 
             $catalogModels = $this->models->findByServiceIndexedByProviderId($service);
             if ([] === $catalogModels) {
@@ -109,6 +119,7 @@ final readonly class ModelHealthEvaluator
                 // and turns the hourly incident mail into a reminder about work
                 // that is already done. Operator-disabled rows (BACTIVE=0, no
                 // retirement date) stay in the check: those can come back.
+                // Their verdict is marked, so it is shown but never alerted.
                 $liveRows = array_values(array_filter(
                     $rows,
                     static fn (Model $model): bool => !$model->isRetired()
@@ -122,7 +133,8 @@ final readonly class ModelHealthEvaluator
                 $presence = $this->presence($service, $probe, $result, (string) $providerId, $budget);
 
                 foreach ($liveRows as $model) {
-                    $verdict = $this->judge($service, $model, (string) $providerId, $result, $presence, $now);
+                    $switchedOff = ModelHealth::isSwitchedOffByOperator($model, $healthByModel[(int) $model->getId()] ?? null);
+                    $verdict = $this->judge($service, $model, (string) $providerId, $result, $presence, $now, $switchedOff);
                     if (!$dryRun) {
                         $verdict = $this->commit($verdict, $model, $now);
                     }
@@ -140,6 +152,7 @@ final readonly class ModelHealthEvaluator
         if (!$dryRun) {
             $this->em->flush();
             $this->healthRepository->pruneOrphans();
+            $this->healthRepository->pruneRetired();
         }
 
         return new ModelHealthRun($verdicts, $skipped, $raised, $resolved, $dryRun);
@@ -249,7 +262,7 @@ final readonly class ModelHealthEvaluator
     /**
      * Decide the state of a single model.
      */
-    private function judge(string $service, Model $model, string $providerId, ProbeResult $probe, ModelProbeResult $presence, int $now): ModelHealthVerdict
+    private function judge(string $service, Model $model, string $providerId, ProbeResult $probe, ModelProbeResult $presence, int $now, bool $switchedOff): ModelHealthVerdict
     {
         $modelId = (int) $model->getId();
         $counters = $this->recorder->snapshot($modelId);
@@ -265,6 +278,7 @@ final readonly class ModelHealthEvaluator
             message: $message,
             source: $source,
             safeToDisable: $safeToDisable,
+            switchedOff: $switchedOff,
         );
 
         // A provider nobody configured is not broken. Saying otherwise would
@@ -363,11 +377,11 @@ final readonly class ModelHealthEvaluator
 
         $offline = array_values(array_filter(
             $verdicts,
-            static fn (ModelHealthVerdict $v): bool => ModelHealthState::Offline === $v->state
+            static fn (ModelHealthVerdict $v): bool => $v->needsAttention() && ModelHealthState::Offline === $v->state
         ));
         $degraded = array_values(array_filter(
             $verdicts,
-            static fn (ModelHealthVerdict $v): bool => ModelHealthState::Degraded === $v->state
+            static fn (ModelHealthVerdict $v): bool => $v->needsAttention() && ModelHealthState::Degraded === $v->state
         ));
 
         $buckets = [
@@ -441,6 +455,7 @@ final readonly class ModelHealthEvaluator
             safeToDisable: $verdict->safeToDisable,
             autoDisabled: $applied['disabled'],
             reEnabled: $applied['reEnabled'],
+            switchedOff: $verdict->switchedOff,
         );
     }
 }

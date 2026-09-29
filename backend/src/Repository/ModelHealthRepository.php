@@ -123,4 +123,17 @@ class ModelHealthRepository extends ServiceEntityRepository
             'DELETE h FROM BMODELHEALTH h LEFT JOIN BMODELS m ON m.BID = h.BMODELID WHERE m.BID IS NULL'
         );
     }
+
+    /**
+     * Drop rows of retired models. The evaluator no longer checks those, so
+     * their last verdict (and any auto-disable flag) is frozen at whatever was
+     * true before the retirement and would otherwise stay in the offline list
+     * this repository hands to model routing.
+     */
+    public function pruneRetired(): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'DELETE h FROM BMODELHEALTH h INNER JOIN BMODELS m ON m.BID = h.BMODELID WHERE m.BRETIREDON IS NOT NULL'
+        );
+    }
 }

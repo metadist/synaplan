@@ -70,11 +70,11 @@
         <div class="flex flex-wrap gap-2 mt-4" data-testid="summary-counts">
           <span
             v-for="tile in summaryTiles"
-            :key="tile.state"
+            :key="tile.key"
             class="px-3 py-1.5 rounded-lg text-xs font-semibold"
-            :class="badgeClass(tile.state)"
+            :class="tile.badgeClass"
           >
-            {{ tile.count }} {{ $t(`adminModelStatus.states.${tile.state}`) }}
+            {{ tile.count }} {{ tile.label }}
           </span>
         </div>
       </div>
@@ -121,7 +121,7 @@
       </div>
 
       <div
-        v-if="visibleProviders.length === 0"
+        v-if="visibleProviders.length === 0 && visibleRetired.length === 0"
         class="surface-card p-8 text-center txt-secondary"
         data-testid="state-empty"
       >
@@ -257,6 +257,8 @@
           </AccordionStack>
         </AccordionSection>
       </AccordionStack>
+
+      <ModelHealthRetiredList v-if="visibleRetired.length > 0" :models="visibleRetired" />
     </template>
   </div>
 </template>
@@ -268,6 +270,7 @@ import { useI18n } from 'vue-i18n'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
 import SectionJumpNav from '@/components/SectionJumpNav.vue'
+import ModelHealthRetiredList from '@/components/admin/ModelHealthRetiredList.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
@@ -304,13 +307,32 @@ const ORDERED_STATES: ModelStatusState[] = [
   'unknown',
 ]
 
+const NEUTRAL_BADGE_CLASS = 'bg-[var(--status-neutral-muted)] text-[var(--status-neutral-text)]'
+
 const summaryTiles = computed(() => {
   const summary = snapshot.value?.summary
   if (!summary) return []
 
-  return ORDERED_STATES.map((state) => ({ state, count: summary[state] })).filter(
-    (tile) => tile.count > 0
-  )
+  const tiles = ORDERED_STATES.map((state) => ({
+    key: state as string,
+    count: summary[state],
+    label: t(`adminModelStatus.states.${state}`),
+    badgeClass: badgeClass(state),
+  }))
+  tiles.push({
+    key: 'switchedOff',
+    count: summary.switchedOff,
+    label: t('adminModelStatus.model.switchedOff'),
+    badgeClass: NEUTRAL_BADGE_CLASS,
+  })
+  tiles.push({
+    key: 'retired',
+    count: summary.retired,
+    label: t('adminModelStatus.retired.label'),
+    badgeClass: NEUTRAL_BADGE_CLASS,
+  })
+
+  return tiles.filter((tile) => tile.count > 0)
 })
 
 const capabilities = computed(() => {
@@ -320,7 +342,18 @@ const capabilities = computed(() => {
       seen.add(model.capability)
     }
   }
+  for (const model of snapshot.value?.retired ?? []) {
+    seen.add(model.capability)
+  }
   return [...seen].sort()
+})
+
+/** Retired models are never a problem, so the problem filter hides them. */
+const visibleRetired = computed(() => {
+  if (onlyProblems.value) return []
+  return (snapshot.value?.retired ?? []).filter(
+    (model) => !capabilityFilter.value || model.capability === capabilityFilter.value
+  )
 })
 
 const visibleProviders = computed(() => {
@@ -329,8 +362,7 @@ const visibleProviders = computed(() => {
       ...provider,
       models: provider.models.filter((model) => {
         if (capabilityFilter.value && model.capability !== capabilityFilter.value) return false
-        if (onlyProblems.value && model.state !== 'offline' && model.state !== 'degraded')
-          return false
+        if (onlyProblems.value && !model.needsAttention) return false
         return true
       }),
     }))
@@ -386,7 +418,7 @@ const badgeClass = (state: ModelStatusState): string => {
     case 'offline':
       return 'bg-[var(--status-error-muted)] text-[var(--status-error-text)]'
     default:
-      return 'bg-[var(--status-neutral-muted)] text-[var(--status-neutral-text)]'
+      return NEUTRAL_BADGE_CLASS
   }
 }
 
