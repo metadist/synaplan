@@ -453,6 +453,33 @@ services:
     restart: unless-stopped
     networks: [internal]
 
+  # Local network, off by default. Run deploy/scripts/local-tls.sh <address>
+  # first: it writes deploy/data/tls and adds the local-tls profile. The
+  # application port stays on 127.0.0.1. This proxy is the only listener on
+  # the network. It runs as root so it can read the mode-0600 key; it does
+  # not run the application.
+  tls-proxy:
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    profiles: [local-tls]
+    user: "0:0"
+    ports:
+      - "${SYNAPLAN_TLS_BIND:-0.0.0.0}:443:443"
+      - "${SYNAPLAN_TLS_BIND:-0.0.0.0}:80:80"
+    volumes:
+      - ./local-network/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/tls:/etc/caddy/selfsigned:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--no-check-certificate", "https://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks: [internal]
+
   worker:
     image: *app-image
     pull_policy: "${SYNAPLAN_PULL_POLICY:-always}"

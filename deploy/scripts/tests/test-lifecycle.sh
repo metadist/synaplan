@@ -1854,4 +1854,6 @@ else
     echo "Bootstrap email contract test skipped; set SYNAPLAN_CONTRACT_PHP_IMAGE to a PHP-capable image to run it."
 fi
 
+bash "$(dirname "$0")/test-local-tls.sh"
+
 echo "Lifecycle contract tests passed."

@@ -24,11 +24,16 @@ Synaplan has been accepted into Elestio's Fully Managed Catalog.
 
 - Docker Engine and Docker Compose v2
 - A Linux server with at least 4 vCPU, 8 GB RAM, and sufficient persistent disk
-- A DNS name and HTTPS-capable reverse proxy or managed platform
+- HTTPS for anyone off this machine. A public name uses your own reverse proxy.
+  A network with no public route uses the opt-in local-network certificate
+  ([Local network](../README.md#local-network)): any IPv4 address that network
+  uses, including `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+  `100.64.0.0/10`, `169.254.0.0/16`, and any other block you do not announce.
 - A released Synaplan version to pin instead of `latest`
 
-The production stack exposes only the web service. MariaDB, Redis, Centrifugo,
-Tika, and Qdrant remain on its internal network.
+By default the production stack exposes only the web service, on
+`127.0.0.1:8000`. The opt-in `local-tls` profile also publishes ports 80 and
+443. MariaDB, Redis, Centrifugo, Tika, and Qdrant remain on its internal network.
 
 ### Start the Cloud-AI Stack
 
