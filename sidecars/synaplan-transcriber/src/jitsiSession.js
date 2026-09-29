@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto'
 import { muxOpusPackets, opusPacketSamples } from './oggOpus.js'
 import { STT_DOWN } from './matrix.js'
 
 function transcriptionResult(tag, text, language) {
   return {
     type: 'transcription-result',
+    event: 'transcription-result',
+    message_id: randomUUID(),
     is_interim: false,
     transcript: [{ text }],
     participant: { id: tag || 'speaker' },

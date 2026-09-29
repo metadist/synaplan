@@ -45,7 +45,7 @@ final readonly class OpendeskConnectSnippet
             'language' => $language,
             'consent' => 'A named person starts notes. Everyone sees captions. Stop ends them. Audio is not kept.',
             'undo' => 'Stop ends this meeting. Disconnect removes the key. Saved notes stay. Audio was not kept.',
-            'find' => 'Notes land in the Nextcloud folder, in the Element room when one is set, and under Meeting notes for this account.',
+            'find' => 'Notes land in the Nextcloud folder, and in the Element room when one is set. There is no Meeting notes screen in Synaplan yet.',
             'jitsi' => [
                 'url_template' => $template,
                 'jicofo' => "transcription {\n  url-template = \"{$template}\"\n  http-headers {\n    \"Authorization\" = \"Bearer <TRANSCRIBER_AUTH_TOKEN>\"\n  }\n}",

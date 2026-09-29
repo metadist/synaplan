@@ -146,8 +146,10 @@ final class ApiKeyScopeTest extends TestCase
         self::assertTrue(ApiKeyScope::isRestricted($scopes));
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/audio/transcriptions'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/audio/transcriptions/sessions/stt_sess_1/audio'));
-        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/opendesk/meeting-notes'));
-        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/opendesk/meeting-notes/connect'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/opendesk/meeting-notes', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/opendesk/meeting-notes', 'GET'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/opendesk/meeting-notes/note_abc', 'GET'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/opendesk/meeting-notes/connect', 'GET'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/v1/messages'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/v1/audio/speech'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/files'));

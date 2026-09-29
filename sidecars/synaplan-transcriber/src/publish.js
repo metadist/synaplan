@@ -27,7 +27,17 @@ async function postMatrixNotice({ homeserver, accessToken, roomId, body, fetchIm
  * After Stop or hangup: keep the text, discard the audio, and say
  * exactly where the notes went.
  */
-export async function publishMeeting({ config, synaplan, meetingId, lines, when = new Date(), fetchImpl = fetch }) {
+export async function publishMeeting({
+  config,
+  synaplan,
+  meetingId,
+  lines,
+  when = new Date(),
+  fetchImpl = fetch,
+  source = 'jitsi',
+  room = null,
+  postToMatrixRoom = true,
+}) {
   const markdown = meetingMarkdown({
     title: 'Meeting notes',
     when: when.toISOString(),
@@ -43,13 +53,13 @@ export async function publishMeeting({ config, synaplan, meetingId, lines, when 
   if (config.saveToSynaplan) {
     try {
       await synaplan.saveNote({
-        source: 'jitsi',
+        source,
         text,
-        room: config.matrixRoom || meetingId,
+        room: room || config.matrixRoom || meetingId,
         folder: config.nextcloudFolder,
         language: config.language,
         meeting_id: String(meetingId || ''),
-        started_by: 'jitsi',
+        started_by: source,
       })
       destinations.push({ name: 'Synaplan', ok: true, detail: 'Notes saved in Synaplan.' })
     } catch {
@@ -75,7 +85,7 @@ export async function publishMeeting({ config, synaplan, meetingId, lines, when 
     }
   }
 
-  if (config.matrixReady && config.matrixRoom) {
+  if (postToMatrixRoom && config.matrixReady && config.matrixRoom) {
     const clock = when.toISOString().slice(11, 16)
     const line = filePath
       ? `Notes from ${clock} — open in Files ${filePath}. Audio was not kept.`

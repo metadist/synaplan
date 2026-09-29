@@ -22,6 +22,7 @@ if (config.element) {
     synaplan,
     model: config.model,
     language: config.language,
+    config,
     onLog: log,
   })
   bot.run()

@@ -24,12 +24,14 @@ OPENDESK_STT_MODE=opendesk
 
 `OPENDESK_STT_MODE` is `jitsi`, `element`, or `opendesk` (both). Language is `auto`, `de`, `en`, `es`, `fr`, or `tr`. Empty language means auto. On a sovereign install, leave `SYNAPLAN_STT_MODEL` empty so the sidecar uses the local speech-to-text model. A cloud model is opt-in.
 
-Create an API key with only the scope `audio:transcribe`. That key can transcribe and save notes. It cannot chat, and it cannot read files.
+Create an API key with only the scope `audio:transcribe`. That key can transcribe and save a finished note. It cannot chat, list notes, or read the operator snippet.
+
+`TRANSCRIBER_AUTH_TOKEN` is required for `jitsi` and `opendesk`. Jicofo sends it as `Authorization: Bearer`. The local Compose port is bound to `127.0.0.1`.
 
 Start the sidecar (it is not part of a plain `docker compose up`):
 
 ```bash
-SYNAPLAN_API_KEY=sk_... docker compose --profile transcriber up -d transcriber
+SYNAPLAN_API_KEY=sk_... TRANSCRIBER_AUTH_TOKEN=... docker compose --profile transcriber up -d transcriber
 ```
 
 The same variables are listed in `sidecars/synaplan-transcriber/env.example` and, for Helm, in `sidecars/synaplan-transcriber/helm/opendesk-values.example.yaml`.
@@ -87,9 +89,11 @@ Element Call (MatrixRTC / LiveKit) is how openDesk does 1:1 and small video. Liv
 
 After a meeting the sidecar, if you configured them:
 
-1. Saves the transcript on Synaplan (`POST /api/v1/opendesk/meeting-notes`). List them with `GET /api/v1/opendesk/meeting-notes`.
-2. Writes a Markdown file into Nextcloud (`NEXTCLOUD_URL`, user, app password, `NOTES_NEXTCLOUD_FOLDER`, default `/Meetings`).
-3. Posts one line in `NOTES_MATRIX_ROOM`, for example “Notes from 10:00 — open in Files /Meetings/2026-09-28-standup.md. Audio was not kept.”
+1. Saves a copy through Synaplan (`POST /api/v1/opendesk/meeting-notes`). That copy is on the server that received it. There is no Meeting notes screen yet, and a multi-server install should treat Nextcloud as the copy people open.
+2. Writes a Markdown file into Nextcloud (`NEXTCLOUD_URL`, user, app password, `NOTES_NEXTCLOUD_FOLDER`, default `/Meetings`). The file name includes the time, so a second session the same day does not replace the first.
+3. Posts one line in `NOTES_MATRIX_ROOM`, for example “Notes from 10:00 — open in Files /Meetings/2026-09-28-100000-standup.md. Audio was not kept.”
+
+An Element voice message uses the same Nextcloud folder and the same Synaplan copy. The reply in the thread is the text, plus the Files path when that write succeeded.
 
 The sentence at the end says what was saved. A destination that was configured and failed is named. A destination you never configured is left out.
 

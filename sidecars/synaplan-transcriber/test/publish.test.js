@@ -20,11 +20,16 @@ test('the end sentence names what was saved and what was not', () => {
 
 test('openDesk mode requires a Synaplan key and can run Jitsi without Element', () => {
   assert.throws(() => loadConfig({ SYNAPLAN_URL: 'http://synaplan', SYNAPLAN_API_KEY: '' }), /SYNAPLAN_API_KEY/)
+  assert.throws(
+    () => loadConfig({ SYNAPLAN_URL: 'http://synaplan', SYNAPLAN_API_KEY: 'sk_test', TRANSCRIBER_MODE: 'jitsi' }),
+    /TRANSCRIBER_AUTH_TOKEN/,
+  )
   const config = loadConfig({
     SYNAPLAN_URL: 'http://synaplan/',
     SYNAPLAN_API_KEY: 'sk_test',
     TRANSCRIBER_MODE: 'opendesk',
     TRANSCRIBER_LANGUAGE: 'de',
+    TRANSCRIBER_AUTH_TOKEN: 'socket-secret',
   })
   assert.equal(config.jitsi, true)
   assert.equal(config.element, false)
@@ -64,10 +69,10 @@ test('a finished meeting is stored and the audio is not', async () => {
   })
   assert.equal(calls[0].note.source, 'jitsi')
   assert.equal(calls[0].note.text, 'Ada: Hello')
-  assert.match(calls[1].url, /\/remote.php\/dav\/files\/notes\/Meetings\/2026-09-28-standup\.md$/)
+  assert.match(calls[1].url, /\/remote.php\/dav\/files\/notes\/Meetings\/2026-09-28-100000-standup\.md$/)
   assert.match(calls[2].url, /\/send\/m\.room\.message\//)
   assert.match(result.sentence, /Notes saved in Synaplan/)
-  assert.match(result.sentence, /Files \/Meetings\/2026-09-28-standup\.md/)
+  assert.match(result.sentence, /Files \/Meetings\/2026-09-28-100000-standup\.md/)
   assert.match(result.sentence, /!room:example/)
   assert.match(result.markdown, /Audio was not kept/)
   assert.doesNotMatch(result.markdown, /app-secret/)

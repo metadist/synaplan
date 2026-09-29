@@ -1226,7 +1226,7 @@ services:
     container_name: synaplan-transcriber
     restart: unless-stopped
     ports:
-      - "${SYNAPLAN_TRANSCRIBER_PORT:-8095}:8095"
+      - "127.0.0.1:${SYNAPLAN_TRANSCRIBER_PORT:-8095}:8095"
     environment:
       TRANSCRIBER_MODE: ${TRANSCRIBER_MODE:-opendesk}
       TRANSCRIBER_LANGUAGE: ${TRANSCRIBER_LANGUAGE:-auto}

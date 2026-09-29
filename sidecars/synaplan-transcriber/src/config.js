@@ -45,6 +45,12 @@ export function loadConfig(env) {
     throw new Error('COMMIT_AFTER_MS must be between 1000 and 60000')
   }
 
+  const jitsi = mode === 'jitsi' || mode === 'opendesk'
+  const authToken = clean(env.TRANSCRIBER_AUTH_TOKEN)
+  if (jitsi && authToken === '') {
+    throw new Error('TRANSCRIBER_AUTH_TOKEN is required when Jitsi captions are on')
+  }
+
   const matrixHomeserver = clean(env.MATRIX_HOMESERVER).replace(/\/$/, '')
   const matrixToken = clean(env.MATRIX_ACCESS_TOKEN)
   const matrixUserId = clean(env.MATRIX_USER_ID)
@@ -55,7 +61,7 @@ export function loadConfig(env) {
     mode,
     host: clean(env.TRANSCRIBER_HOST || '0.0.0.0') || '0.0.0.0',
     port,
-    jitsi: mode === 'jitsi' || mode === 'opendesk',
+    jitsi,
     element: elementRequested && matrixReady,
     elementRequested,
     matrixReady,
@@ -63,7 +69,7 @@ export function loadConfig(env) {
     apiKey,
     model: clean(env.SYNAPLAN_STT_MODEL),
     language,
-    authToken: clean(env.TRANSCRIBER_AUTH_TOKEN),
+    authToken,
     commitAfterMs,
     matrixHomeserver,
     matrixToken,

@@ -7,12 +7,13 @@ export function meetingMarkdown({ title, when, language, lines }) {
 
 export function safeFilename(meetingId, when = new Date()) {
   const day = when.toISOString().slice(0, 10)
+  const clock = when.toISOString().slice(11, 19).replace(/:/g, '')
   const slug = String(meetingId || 'meeting')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 40) || 'meeting'
-  return `${day}-${slug}.md`
+  return `${day}-${clock}-${slug}.md`
 }
 
 /**

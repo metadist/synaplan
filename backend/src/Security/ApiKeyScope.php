@@ -274,7 +274,7 @@ final class ApiKeyScope
      *
      * @param list<string>|array<int|string, mixed> $scopes
      */
-    public static function allows(array $scopes, string $path): bool
+    public static function allows(array $scopes, string $path, string $method = ''): bool
     {
         if (\in_array($path, self::SELF_SERVICE_PATHS, true)) {
             return true;
@@ -286,7 +286,7 @@ final class ApiKeyScope
             return true;
         }
 
-        foreach (self::requiredScopesForPath($path) as $required) {
+        foreach (self::requiredScopesForPath($path, $method) as $required) {
             if (self::grants($normalized, $required)) {
                 return true;
             }
@@ -312,7 +312,7 @@ final class ApiKeyScope
      *
      * @return list<string>
      */
-    public static function requiredScopesForPath(string $path): array
+    public static function requiredScopesForPath(string $path, string $method = ''): array
     {
         if (self::matchesPrefix($path, '/v1/audio/transcriptions')) {
             return [self::AUDIO_TRANSCRIBE, self::DESKTOP_MESSAGES];
@@ -374,7 +374,9 @@ final class ApiKeyScope
             return [self::AGENTS_ALL];
         }
 
-        if (self::matchesPrefix($path, '/api/v1/opendesk/meeting-notes')) {
+        // The sidecar key may save a transcript. Listing notes and the
+        // operator snippet stay on a signed-in session, not this key.
+        if ('POST' === strtoupper($method) && '/api/v1/opendesk/meeting-notes' === $path) {
             return [self::AUDIO_TRANSCRIBE];
         }
 

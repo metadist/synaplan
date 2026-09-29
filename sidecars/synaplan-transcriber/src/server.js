@@ -14,15 +14,11 @@ function json(response, status, body) {
   response.end(payload)
 }
 
-function authorized(request, url, token) {
+function authorized(request, token) {
   if (!token) {
-    return true
+    return false
   }
-  const header = request.headers.authorization || ''
-  if (header === `Bearer ${token}`) {
-    return true
-  }
-  return url.searchParams.get('token') === token
+  return (request.headers.authorization || '') === `Bearer ${token}`
 }
 
 export function createApp(config, { synaplan, log = () => {} } = {}) {
@@ -73,7 +69,7 @@ export function createApp(config, { synaplan, log = () => {} } = {}) {
       socket.destroy()
       return
     }
-    if (!authorized(request, url, config.authToken)) {
+    if (!authorized(request, config.authToken)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n')
       socket.destroy()
       return

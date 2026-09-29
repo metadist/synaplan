@@ -30,6 +30,8 @@ test('a Jitsi socket returns pong and a final caption', async () => {
 
   assert.deepEqual(out[0], { event: 'pong', id: 7 })
   assert.equal(out[1].type, 'transcription-result')
+  assert.equal(out[1].event, 'transcription-result')
+  assert.match(out[1].message_id, /^[0-9a-f-]{36}$/)
   assert.equal(out[1].is_interim, false)
   assert.equal(out[1].transcript[0].text, 'Guten Morgen')
   assert.equal(out[1].participant.id, 'ada')

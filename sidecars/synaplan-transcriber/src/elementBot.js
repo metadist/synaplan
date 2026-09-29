@@ -1,4 +1,5 @@
 import { LOCKED_ROOM, NO_SPEECH, mxcPath, planSync, roomNotice, threadReply } from './matrix.js'
+import { publishMeeting } from './publish.js'
 
 function txn() {
   return `synaplan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -14,6 +15,7 @@ export function createElementBot({
   synaplan,
   model,
   language,
+  config = null,
   fetchImpl = fetch,
   onLog = () => {},
 }) {
@@ -86,7 +88,26 @@ export function createElementBot({
       }
       return
     }
-    const body = text || NO_SPEECH
+    let filePath = ''
+    if (config) {
+      try {
+        const published = await publishMeeting({
+          config,
+          synaplan,
+          meetingId: job.eventId || 'voice',
+          lines: [{ speaker: 'Voice message', text: text || NO_SPEECH }],
+          source: 'element',
+          room: job.roomId,
+          postToMatrixRoom: false,
+          fetchImpl,
+        })
+        filePath = published.filePath || ''
+      } catch (error) {
+        onLog(`Voice message was transcribed but not saved: ${error.message}`)
+      }
+    }
+    const saved = filePath ? `\n\nSaved to Files ${filePath}. Audio was not kept.` : ''
+    const body = `${text || NO_SPEECH}${saved}`
     if (job.eventId) {
       await send(job.roomId, threadReply(job.eventId, body))
     } else {
