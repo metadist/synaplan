@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\AI\Credential\ChatReadinessService;
+use App\AI\Import\ModelDiscoveryService;
 use App\AI\Import\ModelImportService;
 use App\AI\Import\UnknownImportSourceException;
 use App\Entity\User;
@@ -204,9 +205,17 @@ final class AdminModelsImportEndpointController extends AbstractController
 
         // Imported rows are invisible in the picker until the availability
         // snapshot is rebuilt. A snapshot taken before this endpoint existed
-        // still says the provider is offline for up to 30 s.
+        // still says the provider is offline for up to 30 s. Ollama rows are
+        // judged by a separate per-model cache, so that has to go too.
         $this->chatReadiness->invalidate();
         $this->capabilityInventory?->forget();
+        if (ModelDiscoveryService::SOURCE_OLLAMA === $data['source']) {
+            $providerIds = [];
+            foreach ($rows as $row) {
+                $providerIds[] = $row['providerId'];
+            }
+            $this->chatReadiness->forgetOllamaPulled($providerIds);
+        }
 
         return $this->json($applied);
     }

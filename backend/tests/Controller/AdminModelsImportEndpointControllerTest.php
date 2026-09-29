@@ -93,6 +93,27 @@ final class AdminModelsImportEndpointControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testOllamaApplyDropsANegativePulledCache(): void
+    {
+        $this->loginAdmin();
+        $readiness = static::getContainer()->get(ChatReadinessService::class);
+        self::assertFalse($readiness->isOllamaModelPulled(self::PROVIDER_ID));
+
+        /** @var CacheItemPoolInterface $cache */
+        $cache = static::getContainer()->get('cache.model_config');
+        $key = 'ollama_model_pulled.'.hash('xxh128', strtolower(self::PROVIDER_ID));
+        self::assertTrue($cache->getItem($key)->isHit());
+        self::assertFalse($cache->getItem($key)->get());
+
+        $this->postJson('/api/v1/admin/models/import/endpoint/apply', [
+            'source' => 'ollama',
+            'rows' => [['providerId' => self::PROVIDER_ID, 'name' => 'Import Test', 'tags' => ['chat']]],
+        ]);
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertFalse($cache->getItem($key)->isHit());
+    }
+
     public function testApplyDropsTheProviderAvailabilitySnapshot(): void
     {
         $this->loginAdmin();

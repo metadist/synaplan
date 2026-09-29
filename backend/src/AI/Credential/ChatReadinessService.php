@@ -208,6 +208,21 @@ final class ChatReadinessService
     }
 
     /**
+     * Drop cached "not pulled" answers for Ollama models that were just imported.
+     *
+     * {@see modelAvailability()} does not use the provider snapshot for Ollama,
+     * so {@see invalidate()} alone leaves a model hidden for up to 30 seconds.
+     *
+     * @param list<string> $models provider ids (Ollama model names)
+     */
+    public function forgetOllamaPulled(array $models): void
+    {
+        foreach ($models as $model) {
+            $this->ollamaModelInventory->forget($model);
+        }
+    }
+
+    /**
      * @return array{available: array<string, bool>, displayNames: array<string, string>}
      */
     private function snapshot(bool $fresh): array

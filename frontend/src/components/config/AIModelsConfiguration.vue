@@ -63,7 +63,7 @@
           type="button"
           class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
           data-testid="btn-retry-models"
-          @click="loadData"
+          @click="retryLoadModels"
         >
           {{ $t('config.aiModels.retry') }}
         </button>
@@ -339,7 +339,7 @@
             type="button"
             class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
             data-testid="btn-retry-models-list"
-            @click="loadData"
+            @click="retryLoadModels"
           >
             {{ $t('config.aiModels.retry') }}
           </button>
@@ -1019,8 +1019,22 @@ const scrollToCapability = (capability: Capability) => {
   }
 }
 
-const loadData = async (options?: { background?: boolean }) => {
+/**
+ * Bumps when a choice is saved. A catalog refresh that started before the
+ * save must not write the old server defaults back over the choice.
+ */
+let savedChoiceEpoch = 0
+
+function choicesMatch(
+  left: Record<Capability, number | null>,
+  right: Record<Capability, number | null>
+): boolean {
+  return (Object.keys(left) as Capability[]).every((key) => left[key] === right[key])
+}
+
+const loadData = async (options?: { background?: boolean; replaceDefaults?: boolean }) => {
   const requestId = ++catalogRequest
+  const choiceEpochAtStart = savedChoiceEpoch
   const background = options?.background === true && !modelsLoadFailed.value && !loading.value
   if (!background) {
     loading.value = true
@@ -1057,14 +1071,23 @@ const loadData = async (options?: { background?: boolean }) => {
     }
 
     if (defaultsResult.status === 'fulfilled' && defaultsResult.value.success) {
-      const mergedDefaults: Record<Capability, number | null> = {
-        ...defaultConfig.value,
-        ...(defaultsResult.value.defaults as Partial<Record<Capability, number | null>>),
+      // selectModel() stores the new id, waits for the availability check,
+      // then saves every default. A refresh that lands in that window used
+      // to replace the id with the old server value, and the save stored it.
+      const choiceMoved =
+        !options?.replaceDefaults &&
+        (!choicesMatch(defaultConfig.value, originalConfig.value) ||
+          choiceEpochAtStart !== savedChoiceEpoch)
+      if (!choiceMoved) {
+        const mergedDefaults: Record<Capability, number | null> = {
+          ...defaultConfig.value,
+          ...(defaultsResult.value.defaults as Partial<Record<Capability, number | null>>),
+        }
+        defaultConfig.value = mergedDefaults
+        originalConfig.value = { ...mergedDefaults }
+        defaultLocked.value = defaultsResult.value.locked ?? {}
+        defaultSources.value = defaultsResult.value.sources ?? {}
       }
-      defaultConfig.value = mergedDefaults
-      originalConfig.value = { ...mergedDefaults }
-      defaultLocked.value = defaultsResult.value.locked ?? {}
-      defaultSources.value = defaultsResult.value.sources ?? {}
     } else if (defaultsResult.status === 'rejected') {
       console.error('Failed to load default models:', defaultsResult.reason)
     }
@@ -1073,6 +1096,10 @@ const loadData = async (options?: { background?: boolean }) => {
       loading.value = false
     }
   }
+}
+
+function retryLoadModels(): void {
+  void loadData()
 }
 
 catalogLoad = loadData()
@@ -1453,6 +1480,7 @@ const saveConfiguration = async () => {
     const response = await saveDefaultModels({ defaults })
 
     if (response.success) {
+      savedChoiceEpoch += 1
       originalConfig.value = { ...defaultConfig.value }
       success(t('config.aiModels.saveSuccess'))
     }
@@ -1505,7 +1533,7 @@ const confirmResetDefaults = async () => {
       } else {
         success(t('config.aiModels.resetDefaultsSuccess'))
       }
-      await loadData()
+      await loadData({ replaceDefaults: true })
     }
   } catch {
     showError(t('config.aiModels.resetDefaultsError'))

@@ -46,7 +46,7 @@ final readonly class OllamaModelInventory
 
         // Ollama names carry the characters PSR-6 reserves for its own use
         // ("llama3:latest"), so the name is hashed instead of embedded.
-        $item = $this->cache->getItem(self::CACHE_PREFIX.hash('xxh128', $model));
+        $item = $this->cache->getItem(self::cacheKey($model));
 
         if ($item->isHit()) {
             return (bool) $item->get();
@@ -60,6 +60,28 @@ final readonly class OllamaModelInventory
         $this->cache->save($item);
 
         return $pulled;
+    }
+
+    /**
+     * Drop one cached pulled/not-pulled answer.
+     *
+     * Importing a model that was cached as not pulled would stay hidden in the
+     * picker for the rest of the 30 second TTL. The provider-availability
+     * snapshot does not cover this cache.
+     */
+    public function forget(string $model): void
+    {
+        $model = strtolower(trim($model));
+        if ('' === $model) {
+            return;
+        }
+
+        $this->cache->deleteItem(self::cacheKey($model));
+    }
+
+    private static function cacheKey(string $model): string
+    {
+        return self::CACHE_PREFIX.hash('xxh128', $model);
     }
 
     /**
