@@ -36,10 +36,10 @@ export function adminDashboardRedirect(to: RouteLocationNormalized): true | Rout
 
   const tab = queryString(to.query.tab)
   if (tab === 'prompts') {
-    return { path: AI_INFRA_PATH, query: { tab: 'prompts' } }
+    return { path: AI_INFRA_PATH, query: { ...to.query, tab: 'prompts' }, hash: to.hash }
   }
   if (tab === 'moderation') {
-    return { name: 'admin-people', query: { tab: 'moderation' } }
+    return { name: 'admin-people', query: { ...to.query, tab: 'moderation' }, hash: to.hash }
   }
   return true
 }

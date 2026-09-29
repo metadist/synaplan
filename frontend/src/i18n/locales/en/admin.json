@@ -312,6 +312,7 @@
       "aiPointerLink": "Open AI infrastructure",
       "loadError": "Failed to load configuration",
       "saveError": "Failed to save configuration",
+      "savedButNotRefreshed": "Saved, but the menus could not be refreshed. Reload the page to see the change.",
       "saved": "Configuration saved",
       "savedLive": "Saved — takes effect immediately",
       "dbOverridesEnv": "Stored encrypted in the database — overrides any matching value in .env.",

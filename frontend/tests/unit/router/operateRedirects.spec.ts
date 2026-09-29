@@ -12,8 +12,12 @@ import {
   systemConfigRedirect,
 } from '@/router/operateRedirects'
 
-function route(path: string, query: Record<string, string> = {}): RouteLocationNormalized {
-  return { path, query, hash: '' } as RouteLocationNormalized
+function route(
+  path: string,
+  query: Record<string, string> = {},
+  hash = ''
+): RouteLocationNormalized {
+  return { path, query, hash } as RouteLocationNormalized
 }
 
 describe('Operate redirects (topic regrouping)', () => {
@@ -24,13 +28,32 @@ describe('Operate redirects (topic regrouping)', () => {
     expect(adminDashboardRedirect(route('/admin', { tab: 'prompts' }))).toEqual({
       path: '/admin/setup',
       query: { tab: 'prompts' },
+      hash: '',
     })
     expect(adminDashboardRedirect(route('/admin', { tab: 'moderation' }))).toEqual({
       name: 'admin-people',
       query: { tab: 'moderation' },
+      hash: '',
     })
     expect(adminDashboardRedirect(route('/admin', { tab: 'usage' }))).toBe(true)
     expect(adminDashboardRedirect(route('/admin'))).toBe(true)
+  })
+
+  it('keeps the rest of the URL when Prompts and Moderation move', () => {
+    expect(
+      adminDashboardRedirect(route('/admin', { tab: 'prompts', connected: '1' }, '#details'))
+    ).toEqual({
+      path: '/admin/setup',
+      query: { tab: 'prompts', connected: '1' },
+      hash: '#details',
+    })
+    expect(
+      adminDashboardRedirect(route('/admin', { tab: 'moderation', report: '4' }, '#open'))
+    ).toEqual({
+      name: 'admin-people',
+      query: { tab: 'moderation', report: '4' },
+      hash: '#open',
+    })
   })
 
   it('maps the old AI infrastructure tab ids and keeps the rest of the query', () => {

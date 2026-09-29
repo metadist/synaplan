@@ -311,6 +311,7 @@
       "aiPointerLink": "AI altyapısını aç",
       "loadError": "Yapılandırma yüklenemedi",
       "saveError": "Yapılandırma kaydedilemedi",
+      "savedButNotRefreshed": "Kaydedildi, ancak menüler yenilenemedi. Değişikliği görmek için sayfayı yeniden yükleyin.",
       "saved": "Yapılandırma kaydedildi",
       "dbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",
       "managedKeys": {

@@ -312,6 +312,7 @@
       "aiPointerLink": "KI-Infrastruktur öffnen",
       "loadError": "Konfiguration konnte nicht geladen werden",
       "saveError": "Konfiguration konnte nicht gespeichert werden",
+      "savedButNotRefreshed": "Gespeichert, aber die Menüs konnten nicht aktualisiert werden. Lade die Seite neu, um die Änderung zu sehen.",
       "saved": "Konfiguration gespeichert",
       "savedLive": "Gespeichert — sofort wirksam",
       "dbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",

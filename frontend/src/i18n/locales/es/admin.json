@@ -311,6 +311,7 @@
       "aiPointerLink": "Abrir Infraestructura de IA",
       "loadError": "Error al cargar la configuración",
       "saveError": "Error al guardar la configuración",
+      "savedButNotRefreshed": "Guardado, pero los menús no se pudieron actualizar. Recarga la página para ver el cambio.",
       "saved": "Configuración guardada",
       "dbOverridesEnv": "Guardada cifrada en la base de datos — tiene prioridad sobre cualquier valor coincidente en .env.",
       "managedKeys": {

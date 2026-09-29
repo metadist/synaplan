@@ -312,6 +312,7 @@
       "aiPointerLink": "Ouvrir Infrastructure IA",
       "loadError": "Échec du chargement de la configuration",
       "saveError": "Échec de l’enregistrement de la configuration",
+      "savedButNotRefreshed": "Enregistré, mais les menus n’ont pas pu être actualisés. Rechargez la page pour voir le changement.",
       "saved": "Configuration enregistrée",
       "savedLive": "Enregistré — prend effet immédiatement",
       "dbOverridesEnv": "Stocké chiffré dans la base de données — remplace toute valeur correspondante dans .env.",

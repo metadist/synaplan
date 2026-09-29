@@ -118,7 +118,10 @@ export function useSystemConfig() {
       fields,
       managedFields,
       allManaged: managedFields.length > 0 && fields.length === 0,
-      isLive: all.some((f) => f.schema.source === 'database'),
+      // The badge promises "saving takes effect immediately". Only the fields
+      // actually rendered as inputs count, and every one of them must be
+      // database-backed — a hidden provider key must not badge an env field.
+      isLive: fields.length > 0 && fields.every((f) => f.schema.source === 'database'),
       testService: SECTION_TEST_SERVICE[sectionKey(ref)] ?? null,
     }
   }
@@ -145,8 +148,15 @@ export function useSystemConfig() {
       }
       // Feature flags feed the runtime config (navigation, share buttons,
       // Steps editor, …) — reload it so the change is visible at once.
+      // A reload failure is not a save failure: the value is already stored,
+      // so the message must not invite a retry of the write.
       if (field?.tab === 'features') {
-        await configStore.reload()
+        try {
+          await configStore.reload()
+        } catch (err) {
+          console.error('Saved, but the runtime config could not be reloaded:', err)
+          showError(t('admin.config.savedButNotRefreshed'))
+        }
       }
     } catch (err) {
       console.error('Failed to update config:', err)
