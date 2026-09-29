@@ -1,6 +1,5 @@
 {
   "adminModelStatus": {
-    "title": "Model Durumu",
     "subtitle": "Hangi AI modelleri şu anda çalışıyor, hangileri çalışmıyor.",
     "loading": "Model durumu yükleniyor…",
     "loadFailed": "Model durumu yüklenemedi.",
@@ -92,13 +91,11 @@
   },
   "admin": {
     "title": "İşlet",
-    "description": "Sistem yönetimi ve yapılandırma",
+    "description": "Sunucunuza genel bakış: kişiler, kayıtlar ve kullanım.",
     "tabs": {
       "overview": "Genel Bakış",
       "users": "Kullanıcılar",
-      "prompts": "Promptlar",
       "usage": "Kullanım",
-      "moderation": "Moderasyon",
       "appServer": "Uygulama sunucusu"
     },
     "overview": {
@@ -308,30 +305,35 @@
       }
     },
     "config": {
-      "title": "Sistem Yapılandırması",
-      "description": "Ortam değişkenlerini ve servis bağlantılarını yönetin",
+      "title": "Sistem yapılandırması",
+      "description": "Bu sunucunun oturum açma, özellikler ve araçlar, kanallar ve görünüm ayarları.",
+      "aiPointer": "AI sağlayıcıları, anahtarlar, modeller, belge okuma ve arama AI altyapısı altında ayarlanır.",
+      "aiPointerLink": "AI altyapısını aç",
       "loadError": "Yapılandırma yüklenemedi",
       "saveError": "Yapılandırma kaydedilemedi",
+      "savedButNotRefreshed": "Kaydedildi, ancak menüler yenilenemedi. Değişikliği görmek için sayfayı yeniden yükleyin.",
       "saved": "Yapılandırma kaydedildi",
       "dbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",
       "managedKeys": {
-        "title": "Sağlayıcı anahtarları AI altyapısı › Modeller ve anahtarlar altında yönetilir.",
-        "helm": "Ortamda veya bir Helm chart'ında tanımlanan anahtarlar otomatik olarak alınır — chart kurulumunun bu sayfaya ihtiyacı yoktur. Modeller ve anahtarları yalnızca arayüzden bir anahtar eklemek veya geçersiz kılmak için kullanın.",
+        "title": "Sağlayıcı anahtarları AI altyapısı › Sağlayıcılar ve anahtarlar altında yönetilir.",
+        "helm": "Ortamda veya bir Helm chart'ında tanımlanan anahtarlar otomatik olarak alınır — chart kurulumunun bu sayfaya ihtiyacı yoktur. Sağlayıcılar ve anahtarları yalnızca arayüzden bir anahtar eklemek veya geçersiz kılmak için kullanın.",
         "stateNone": "ayarlanmadı",
         "stateDb": "arayüzde geçersiz kılındı",
         "stateEnv": "ortam / Helm",
         "summary": "{env} ortamdan, {db} arayüzde geçersiz kılındı.",
-        "cta": "Modeller ve anahtarları aç"
+        "cta": "Sağlayıcılar ve anahtarları aç"
       },
       "envOverridesDb": "{key} ortam değişkeni tarafından sabitlendi. Şu anda: {value}. Bu ayarı burada yönetmek için değişkeni ortamdan kaldırın.",
       "unsaved": "Kaydedilmemiş değişiklikler",
-      "testConnection": "Bağlantıyı Test Et",
+      "testConnection": "Bağlantıyı test et",
       "testFailed": "Bağlantı testi başarısız",
       "commandCopied": "Komut panoya kopyalandı",
-      "tabGroups": {
-        "aiData": "AI ve Veri",
-        "communication": "İletişim",
-        "security": "Özellikler ve Erişim"
+      "groups": {
+        "access": "Erişim",
+        "features": "Özellikler ve araçlar",
+        "channels": "Kanallar ve uygulamalar",
+        "appearance": "Görünüm",
+        "more": "Diğer ayarlar"
       },
       "accordion": {
         "expandAll": "Tümünü genişlet",
@@ -345,7 +347,8 @@
       "restartBanner": {
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
-        "copyCommand": "Komutu Kopyala"
+        "copyCommand": "Komutu Kopyala",
+        "copyFailed": "Kopyalanamadı. Komutu seçip elle kopyalayın."
       },
       "m365": {
         "title": "Bu alanlar işe yaramadan önce: Azure’da bir uygulama kaydet",
@@ -382,28 +385,57 @@
         "resetFailed": "Sıfırlama başarısız oldu. Lütfen tekrar deneyin."
       },
       "tabs": {
-        "ai": "Yapay zeka hizmetleri",
-        "email": "E-posta",
-        "branding": "Marka görünümü",
-        "mobile": "Mobil uygulama",
-        "auth": "Kimlik doğrulama",
-        "channels": "Gelen kanallar",
-        "processing": "İşleme",
+        "auth": "Oturum açma ve kayıt olma",
+        "sharing": "Paylaşım ve denetim kaydı",
         "features": "Özellikler",
-        "sharing": "Paylaşım",
-        "routing": "Yönlendirme",
+        "web_search": "Web araması",
+        "tools": "Araçlar ve otomasyon",
+        "email": "E-posta",
+        "channels": "Kanallar ve entegrasyonlar",
+        "mobile": "Mobil uygulama",
+        "branding": "Marka görünümü",
         "interface": "Arayüz",
-        "guest_landing": "Misafir karşılama",
-        "vectordb": "Vektör veritabanı"
+        "guest_landing": "Misafir karşılama sayfası"
+      },
+      "tabIntro": {
+        "auth": "Kimlerin kayıt olup oturum açabileceği ve hangi oturum açma sağlayıcılarının sunulduğu.",
+        "sharing": "Kişilerin herkesle neleri paylaşabileceği, hangi oturum açma gruplarının eşitlendiği ve denetim kaydının ne kadar süre saklandığı.",
+        "features": "Bu sunucudaki herkes için özellikleri tamamen açın veya kapatın. Değişiklikler hemen geçerli olur.",
+        "web_search": "Sohbet için web'de kimin arama yapacağını seçin ve bir sorguyla test edin.",
+        "tools": "AI'ın kendi başına yapabilecekleri: kayıtlı görevler, araçlar için onay kuralları ve korumalı alanda dosya çalışması.",
+        "email": "Kayıt, parola ve bildirim e-postalarını gönderen posta sunucusu.",
+        "channels": "WhatsApp ve e-posta gibi gelen kanallar ile Microsoft 365, Dropbox ve MCP bağlantıları.",
+        "mobile": "Bağlanabilecek en eski uygulama sürümü ve uygulamaların nereden indirileceği.",
+        "branding": "Ad, renkler, yazı tipleri, logolar ve yasal bağlantılar.",
+        "interface": "Kullanımın gösterilip gösterilmediği ve sohbetin çalışırken neler gösterdiği.",
+        "guest_landing": "Misafir karşılama sayfasında ziyaretçilere gösterilen haberler.",
+        "more": "Henüz bir konuya ayrılmamış ayarlar."
+      },
+      "panelSettings": {
+        "web_search": {
+          "title": "Brave Search ayarları",
+          "hint": "Varsayılan sağlayıcı Brave Search için API anahtarı ve sonuç sayısı."
+        }
       },
       "sections": {
-        "tika": "Apache Tika",
-        "docling": "Docling",
-        "rasterize": "PDF rasterleştirici",
-        "whisper": "Whisper (ses)",
-        "brave": "Web araması (Brave)",
-        "media": "Arka planda medya üretimi",
-        "compute": "Dosya çalışması"
+        "ai_selfhosted": "Kendi barındırılan AI (NVIDIA Triton)",
+        "ai_tts": "Sesli çıktı (metinden sese)",
+        "ai_cloud": "Ek sağlayıcı ayarları",
+        "ai_embeddings": "Embedding'ler (Cloudflare Workers AI)",
+        "processing_tika": "Apache Tika",
+        "processing_docling": "Docling",
+        "processing_rasterize": "PDF rasterleştirici",
+        "processing_whisper": "Whisper (ses dökümü)",
+        "vectordb_qdrant": "Vektör veritabanı (Qdrant)",
+        "vectordb_qdrant_search": "Arama eşikleri ve sınırları",
+        "routing_multitask": "Çok adımlı yönlendirme",
+        "routing_conversation_summary": "Sürekli sohbet özeti",
+        "routing_deep_memory": "Derin hafıza (mesaj özetleri)",
+        "processing_media": "Arka planda medya üretimi",
+        "processing_brave": "Brave Search",
+        "routing_saved_tasks": "Kayıtlı görevler",
+        "routing_tools": "Araç onay kuralları",
+        "processing_compute": "Dosya çalışması"
       },
       "fields": {
         "TIKA_BASE_URL": "Apache Tika URL’si",
@@ -510,13 +542,10 @@
       "addPlaceholder": "Bir bağdaştırıcı ekle…",
       "healthAvailable": "kullanılabilir",
       "healthUnavailable": "kullanılamıyor",
-      "testSidecar": {
-        "tika": "Tika’yı dene",
-        "docling": "Docling’i dene"
-      },
-      "testingSidecar": "Deneniyor…",
-      "sidecarSettings": "Tika ve Docling için URL, zaman aşımı ve bağlantı testi Sistem yapılandırması → İşleme altında.",
-      "sidecarSettingsLink": "İşleme ayarlarını aç",
+      "sidecarSettings": "Her hizmet için adresler, zaman aşımları ve bağlantı testi bu sekmedeki Okuma hizmetleri altında.",
+      "sidecarSettingsLink": "Okuma hizmetlerine git",
+      "servicesTitle": "Okuma hizmetleri",
+      "servicesHint": "Tika, Docling, PDF rasterleştirici ve Whisper'ın nerede çalıştığı ve sınırları.",
       "testTitle": "Bir dosyayla dene",
       "testHint": "Bir örnek yükleyin. Hangi bağdaştırıcının kazandığını ve diğerlerinin neden kaybettiğini görürsünüz.",
       "testButton": "Bir dosyayla dene",
@@ -586,6 +615,7 @@
       "testProviderFallback": "{provider} yanıtladı ({from} yerine)"
     },
     "rerank": {
+      "title": "Yeniden sıralama",
       "lead": "Arama birçok parçayı bulduktan sonra bir yeniden sıralayıcı en yararlı olanları öne alır. Bir test faydasını gösterene kadar kapalı bırakın. Kapalıyken sohbet değişmez.",
       "enable": "Belge aramasında yeniden sıralamayı kullan",
       "model": "Yeniden sıralama modeli",
@@ -668,7 +698,7 @@
     },
     "perplexity": {
       "title": "Perplexity API anahtarı",
-      "message": "Perplexity hesabınızda bir API anahtarı oluşturun ve Sonar modellerini kullanmak için buraya yapıştırın. Web araması sekmesinde Perplexity seçerseniz aynı anahtar web araması için de kullanılır."
+      "message": "Perplexity hesabınızda bir API anahtarı oluşturun ve Sonar modellerini kullanmak için buraya yapıştırın. Sistem yapılandırması › Web araması altında Perplexity seçerseniz aynı anahtar web araması için de kullanılır."
     },
     "ollama": {
       "title": "Ollama ile yerel AI",
@@ -677,12 +707,13 @@
   },
   "people": {
     "title": "Kişiler",
-    "subtitle": "Bu kuruluştaki kullanıcılar ve gruplar.",
+    "subtitle": "Bu sunucudaki hesaplar, gruplar, kurallar ve bildirilen içerikler.",
     "tabs": {
       "users": "Kullanıcılar",
       "groups": "Gruplar",
       "policies": "Kurallar",
       "linkedPlatforms": "Platform örnekleri",
+      "moderation": "Moderasyon",
       "audit": "Kayıt"
     },
     "openPeople": "Kişiler’i aç",
@@ -1115,7 +1146,7 @@
     "compute": {
       "label": "Güvenli dosya çalışması",
       "running": "Dosya çalışması çalışıyor.",
-      "runningOff": "Sidecar çalışıyor; dosya çalışması Sistem yapılandırmasında kapalı.",
+      "runningOff": "Sidecar çalışıyor; dosya çalışması Sistem yapılandırması › Araçlar ve otomasyon altında kapalı.",
       "unreachable": "Dosya çalışması sidecar’ına ulaşılamıyor.",
       "unset": "COMPUTE_URL veya COMPUTE_TOKEN ayarlı değil."
     },
@@ -1128,7 +1159,7 @@
       "title": "{module} bu kurulumda kullanılamıyor",
       "body": "Bu özellik isteğe bağlıdır. Bu kurulumun yöneticisi tarafından açılır.",
       "howToEnable": "Nasıl etkinleştirilir",
-      "openFeatureStatus": "Özellik durumunu aç"
+      "openFeatureStatus": "Sistem durumunu aç"
     }
   }
 }

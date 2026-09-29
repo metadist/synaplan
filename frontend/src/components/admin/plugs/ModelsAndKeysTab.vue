@@ -1,5 +1,7 @@
 <template>
   <div>
+    <p class="text-sm txt-secondary mb-4">{{ $t('adminSetup.intro.providers') }}</p>
+
     <LocalAiDownloadCard class="mb-6" />
 
     <div
@@ -89,27 +91,6 @@
         </AccordionSection>
 
         <AccordionSection
-          panel-id="setup-section-own-service"
-          :title="$t('adminSetup.ownService.title')"
-          :open="isSetupSectionOpen('own-service')"
-          header-testid="btn-setup-section-own-service"
-          @toggle="toggleSetupSection('own-service')"
-        >
-          <template #leading>
-            <Icon icon="mdi:puzzle-plus-outline" class="w-5 h-5 txt-brand flex-shrink-0" />
-          </template>
-          <p class="text-sm txt-secondary">{{ $t('adminSetup.ownService.description') }}</p>
-          <RouterLink
-            :to="{ path: '/ai/models', query: { tab: 'edit' } }"
-            class="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-[var(--brand)] hover:underline"
-            data-testid="setup-own-service"
-          >
-            {{ $t('adminSetup.ownService.cta') }}
-            <Icon icon="mdi:arrow-right" class="w-4 h-4" aria-hidden="true" />
-          </RouterLink>
-        </AccordionSection>
-
-        <AccordionSection
           panel-id="setup-section-local-ai"
           :title="$t('adminSetup.localAi.title')"
           :open="isSetupSectionOpen('local-ai')"
@@ -155,6 +136,48 @@
               {{ $t('aiInfra.modelImport.importPulled') }}
             </button>
           </div>
+          <div v-if="ollamaSettings && config" class="mt-5" data-testid="setup-local-ai-settings">
+            <h4 class="text-sm font-semibold txt-primary mb-2">
+              {{ $t('adminSetup.localAi.serverTitle') }}
+            </h4>
+            <ConfigSectionBody :section="ollamaSettings" :config="config" />
+          </div>
+        </AccordionSection>
+
+        <AccordionSection
+          v-for="section in extraSettings"
+          :key="section.id"
+          :panel-id="`setup-section-${section.id}`"
+          :title="section.label"
+          :open="isSetupSectionOpen(section.id)"
+          :header-testid="`btn-setup-section-${section.id}`"
+          @toggle="toggleSetupSection(section.id)"
+        >
+          <template #leading>
+            <Icon icon="mdi:folder-cog" class="w-5 h-5 txt-secondary flex-shrink-0" />
+          </template>
+          <ConfigSectionBody v-if="config" :section="section" :config="config" />
+        </AccordionSection>
+
+        <AccordionSection
+          panel-id="setup-section-own-service"
+          :title="$t('adminSetup.ownService.title')"
+          :open="isSetupSectionOpen('own-service')"
+          header-testid="btn-setup-section-own-service"
+          @toggle="toggleSetupSection('own-service')"
+        >
+          <template #leading>
+            <Icon icon="mdi:puzzle-plus-outline" class="w-5 h-5 txt-brand flex-shrink-0" />
+          </template>
+          <p class="text-sm txt-secondary">{{ $t('adminSetup.ownService.description') }}</p>
+          <RouterLink
+            :to="{ path: '/ai/models', query: { tab: 'edit' } }"
+            class="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-[var(--brand)] hover:underline"
+            data-testid="setup-own-service"
+          >
+            {{ $t('adminSetup.ownService.cta') }}
+            <Icon icon="mdi:arrow-right" class="w-4 h-4" aria-hidden="true" />
+          </RouterLink>
         </AccordionSection>
       </AccordionStack>
     </template>
@@ -170,26 +193,47 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
 import SectionJumpNav from '@/components/SectionJumpNav.vue'
+import ConfigSectionBody from '@/components/admin/ConfigSectionBody.vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
 import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import { useNotification } from '@/composables/useNotification'
+import type { ResolvedConfigSection, SystemConfigHandle } from '@/composables/useSystemConfig'
+import type { ConfigSectionRef } from '@/constants/operateSettings'
 import { useConfigStore } from '@/stores/config'
 import { listProviderKeys, type ProviderKeyStatus } from '@/services/api/providerKeysApi'
 import { adminModelsApi } from '@/services/api/adminModelsApi'
 
+const props = withDefaults(
+  defineProps<{
+    /** Instance settings shown next to the provider cards (Ollama address, speech output, …). */
+    config?: SystemConfigHandle
+    settings?: readonly ConfigSectionRef[]
+    /** `?section=` of the page: opens and scrolls to that section. */
+    focusSection?: string
+  }>(),
+  {
+    config: undefined,
+    settings: () => [],
+    focusSection: undefined,
+  }
+)
+
+/** Backend section whose fields belong inside the Local AI card. */
+const LOCAL_AI_SECTION = 'ollama'
+
 const { t } = useI18n()
 const { error: showError } = useNotification()
-const config = useConfigStore()
+const configStore = useConfigStore()
 
 const loading = ref(true)
 const loadFailed = ref(false)
@@ -202,13 +246,34 @@ const importOllama = ref(false)
 // failed pre-flight never blocks the page; the dialog reports it with Retry.
 const ollamaState = ref<'unknown' | 'ok' | 'unreachable'>('unknown')
 
-const chatReady = computed(() => config.setup.chatReady)
+const chatReady = computed(() => configStore.setup.chatReady)
 
-const setupSectionIds = ['providers', 'own-service', 'local-ai'] as const
+// Provider keys are edited on the cards above, so the settings never repeat them.
+const resolvedSettings = computed<ResolvedConfigSection[]>(() => {
+  const handle = props.config
+  if (!handle) return []
+  return props.settings
+    .map((ref) => handle.resolveSection(ref, { hideManaged: true }))
+    .filter((section): section is ResolvedConfigSection => section !== null)
+})
+const ollamaSettings = computed(
+  () => resolvedSettings.value.find((section) => section.id === LOCAL_AI_SECTION) ?? null
+)
+const extraSettings = computed(() =>
+  resolvedSettings.value.filter((section) => section.id !== LOCAL_AI_SECTION)
+)
+
+const setupSectionIds = computed(() => [
+  'providers',
+  'local-ai',
+  ...extraSettings.value.map((section) => section.id),
+  'own-service',
+])
 const setupSectionItems = computed(() => [
   { id: 'providers', label: t('adminSetup.cloudProviders') },
-  { id: 'own-service', label: t('adminSetup.ownService.title') },
   { id: 'local-ai', label: t('adminSetup.localAi.title') },
+  ...extraSettings.value.map((section) => ({ id: section.id, label: section.label })),
+  { id: 'own-service', label: t('adminSetup.ownService.title') },
 ])
 const {
   isOpen: isSetupSectionOpen,
@@ -217,7 +282,7 @@ const {
   expandAll: expandAllSetupSections,
   collapseAll: collapseAllSetupSections,
   allOpen: allSetupSectionsOpen,
-} = useAccordion(() => [...setupSectionIds])
+} = useAccordion(setupSectionIds)
 
 async function jumpToSetupSection(id: string) {
   openSetupSection(id)
@@ -227,6 +292,16 @@ async function jumpToSetupSection(id: string) {
     block: 'start',
   })
 }
+
+watch(
+  () => [props.focusSection, loading.value, setupSectionIds.value.join('\0')] as const,
+  ([wanted, isLoading]) => {
+    if (!wanted || isLoading) return
+    const id = wanted === LOCAL_AI_SECTION ? 'local-ai' : wanted
+    if (setupSectionIds.value.includes(id)) void jumpToSetupSection(id)
+  },
+  { immediate: true }
+)
 
 const sortedProviders = computed(() =>
   [...providers.value].sort((a, b) => {
@@ -261,7 +336,7 @@ const checkOllama = async () => {
 }
 
 const refresh = async () => {
-  await Promise.all([load(), config.reload(), checkOllama()])
+  await Promise.all([load(), configStore.reload(), checkOllama()])
 }
 
 onMounted(refresh)

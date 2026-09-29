@@ -32,7 +32,7 @@ class HiggsfieldCredentialResolverTest extends TestCase
 
     private function resolver(string $platformKey = '', string $platformSecret = ''): HiggsfieldCredentialResolver
     {
-        // The instance pair comes from ProviderKeyStore (Models & keys / env
+        // The instance pair comes from ProviderKeyStore (Providers & keys / env
         // bootstrap); the store itself is covered by ProviderKeyStoreTest.
         $store = $this->createStub(ProviderKeyStore::class);
         $store->method('getKey')->willReturn('' === $platformKey ? null : $platformKey);

@@ -82,7 +82,7 @@ That is the source-checkout onboarding. After chat works, open **Manage → Conn
 
 ### Key management, the short version
 
-- **The first-run screen is the setup.** You do not have to hunt through Admin: an empty install blocks chat with a single **Go to AI provider setup** button. The same wizard lives at **Operate → AI infrastructure → Models & keys** (`/admin/setup`) later.
+- **The first-run screen is the setup.** You do not have to hunt through Admin: an empty install blocks chat with a single **Go to AI provider setup** button. The same wizard lives at **Operate → AI infrastructure → Providers & keys** (`/admin/setup`) later.
 - **Tested before it's saved.** The key is validated against the live provider API, so a typo fails immediately instead of at your first chat.
 - **Encrypted at rest.** It lives encrypted in your own database, not in a plaintext file on disk.
 - **Active instantly.** No restart and no rebuild — the next message already uses it.
@@ -331,7 +331,7 @@ make up
 
 ## AI Providers & Models
 
-Synaplan is provider-neutral: connect the providers you want in **Operate → AI infrastructure → Models & keys** (keys are validated live and stored encrypted in the database, active without a restart), or set the env variables below in `backend/.env` — those are read at container start and imported into the encrypted store on first use. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
+Synaplan is provider-neutral: connect the providers you want in **Operate → AI infrastructure → Providers & keys** (keys are validated live and stored encrypted in the database, active without a restart), or set the env variables below in `backend/.env` — those are read at container start and imported into the encrypted store on first use. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
 
 | Provider | Variable in `backend/.env` | Models |
 |----------|---------------------------|--------|
@@ -358,7 +358,7 @@ Synaplan is provider-neutral: connect the providers you want in **Operate → AI
 
 ## Lean by design: core vs optional building blocks
 
-`make up` starts a complete platform, but the **core is deliberately small**: the app, its database and Redis. Everything else is a building block that adds one capability and costs RAM. Switch a block on when you need it and off when you don't — Synaplan keeps running either way and simply hides the matching feature. The boot status screen at <http://localhost:5173> lists the live on/off state of every block, and **Operate → Feature Status** (`/admin/features`) does the same after login.
+`make up` starts a complete platform, but the **core is deliberately small**: the app, its database and Redis. Everything else is a building block that adds one capability and costs RAM. Switch a block on when you need it and off when you don't — Synaplan keeps running either way and simply hides the matching feature. The boot status screen at <http://localhost:5173> lists the live on/off state of every block, and **Operate → System status** (`/admin/features`) does the same after login.
 
 | Block | Gives you | Default | Switch |
 |-------|-----------|---------|--------|

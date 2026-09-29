@@ -1,6 +1,5 @@
 {
   "adminModelStatus": {
-    "title": "État des modèles",
     "subtitle": "Quels modèles IA fonctionnent actuellement, et lesquels ne fonctionnent pas.",
     "loading": "Chargement de l’état des modèles…",
     "loadFailed": "L’état des modèles n’a pas pu être chargé.",
@@ -92,14 +91,12 @@
   },
   "admin": {
     "title": "Exploitation",
-    "description": "Gestion et configuration du système",
+    "description": "Votre serveur en un coup d’œil : personnes, inscriptions et utilisation.",
     "tabs": {
       "overview": "Aperçu",
       "users": "Utilisateurs",
-      "prompts": "Instructions",
       "usage": "Utilisation",
       "subscriptions": "Abonnements",
-      "moderation": "Modération",
       "appServer": "Serveur de l’application"
     },
     "overview": {
@@ -310,30 +307,35 @@
     },
     "config": {
       "title": "Configuration système",
-      "description": "Gérez les variables d’environnement et les connexions aux services",
+      "description": "Connexion, fonctionnalités et outils, canaux et apparence de ce serveur.",
+      "aiPointer": "Les fournisseurs IA, les clés, les modèles, la lecture des documents et la recherche se règlent sous Infrastructure IA.",
+      "aiPointerLink": "Ouvrir Infrastructure IA",
       "loadError": "Échec du chargement de la configuration",
       "saveError": "Échec de l’enregistrement de la configuration",
+      "savedButNotRefreshed": "Enregistré, mais les menus n’ont pas pu être actualisés. Rechargez la page pour voir le changement.",
       "saved": "Configuration enregistrée",
       "savedLive": "Enregistré — prend effet immédiatement",
       "dbOverridesEnv": "Stocké chiffré dans la base de données — remplace toute valeur correspondante dans .env.",
       "managedKeys": {
-        "title": "Les clés des fournisseurs sont gérées sous Infrastructure IA › Modèles et clés.",
-        "helm": "Les clés définies dans l'environnement ou par un chart Helm sont prises en compte automatiquement — une installation par chart n'a pas besoin de cette page. Utilisez Modèles et clés uniquement pour ajouter ou remplacer une clé depuis l'interface.",
+        "title": "Les clés des fournisseurs sont gérées sous Infrastructure IA › Fournisseurs et clés.",
+        "helm": "Les clés définies dans l'environnement ou par un chart Helm sont prises en compte automatiquement — une installation par chart n'a pas besoin de cette page. Utilisez Fournisseurs et clés uniquement pour ajouter ou remplacer une clé depuis l'interface.",
         "stateNone": "non définie",
         "stateDb": "remplacée dans l'interface",
         "stateEnv": "environnement / Helm",
         "summary": "{env} depuis l'environnement, {db} remplacée(s) dans l'interface.",
-        "cta": "Ouvrir Modèles et clés"
+        "cta": "Ouvrir Fournisseurs et clés"
       },
       "envOverridesDb": "Verrouillé par la variable d’environnement {key}. Valeur actuelle : {value}. Retirez la variable de votre environnement pour gérer ce réglage ici.",
       "unsaved": "Modifications non enregistrées",
       "testConnection": "Tester la connexion",
       "testFailed": "Le test de connexion a échoué",
       "commandCopied": "Commande copiée dans le presse-papiers",
-      "tabGroups": {
-        "aiData": "IA et données",
-        "communication": "Communication",
-        "security": "Fonctions et accès"
+      "groups": {
+        "access": "Accès",
+        "features": "Fonctionnalités et outils",
+        "channels": "Canaux et applications",
+        "appearance": "Apparence",
+        "more": "Autres réglages"
       },
       "accordion": {
         "expandAll": "Tout développer",
@@ -349,7 +351,8 @@
       "restartBanner": {
         "title": "Configuration mise à jour — redémarrage requis",
         "message": "Vos modifications ont été enregistrées dans le fichier .env. Pour qu’elles prennent effet, vous devez redémarrer vos conteneurs Docker.",
-        "copyCommand": "Copier la commande"
+        "copyCommand": "Copier la commande",
+        "copyFailed": "Copie impossible. Sélectionnez la commande et copiez-la manuellement."
       },
       "m365": {
         "title": "Avant que ces champs fonctionnent : enregistrez une application dans Azure",
@@ -386,28 +389,57 @@
         "resetFailed": "La réinitialisation a échoué. Veuillez réessayer."
       },
       "tabs": {
-        "ai": "Services IA",
-        "email": "E-mail",
-        "branding": "Identité visuelle",
-        "mobile": "Application mobile",
-        "auth": "Authentification",
-        "channels": "Canaux entrants",
-        "processing": "Traitement",
+        "auth": "Connexion et inscription",
+        "sharing": "Partage et journal",
         "features": "Fonctionnalités",
-        "sharing": "Partage",
-        "routing": "Routage",
+        "web_search": "Recherche web",
+        "tools": "Outils et automatisation",
+        "email": "E-mail",
+        "channels": "Canaux et intégrations",
+        "mobile": "Application mobile",
+        "branding": "Identité visuelle",
         "interface": "Interface",
-        "guest_landing": "Accueil invités",
-        "vectordb": "Base vectorielle"
+        "guest_landing": "Page d’accueil invités"
+      },
+      "tabIntro": {
+        "auth": "Qui peut s’inscrire et se connecter, et quels fournisseurs de connexion sont proposés.",
+        "sharing": "Ce que les personnes peuvent partager avec tout le monde, quels groupes de connexion sont synchronisés et combien de temps le journal est conservé.",
+        "features": "Activez ou désactivez des fonctionnalités entières pour tout le monde sur ce serveur. Les changements s’appliquent immédiatement.",
+        "web_search": "Choisissez qui cherche sur le web pour le chat, et testez-le avec une requête.",
+        "tools": "Ce que l’IA peut faire seule : tâches enregistrées, règles d’approbation des outils et travail sur fichiers dans un bac à sable.",
+        "email": "Le serveur de messagerie qui envoie les e-mails d’inscription, de mot de passe et de notification.",
+        "channels": "Canaux entrants comme WhatsApp et l’e-mail, ainsi que les connexions Microsoft 365, Dropbox et MCP.",
+        "mobile": "La plus ancienne version de l’application autorisée à se connecter, et où télécharger les applications.",
+        "branding": "Nom, couleurs, polices, logos et liens légaux.",
+        "interface": "Si l’utilisation est affichée et ce que le chat montre pendant qu’il travaille.",
+        "guest_landing": "Les actualités affichées aux visiteurs sur la page d’accueil invités.",
+        "more": "Réglages qui ne sont pas encore classés dans un thème."
+      },
+      "panelSettings": {
+        "web_search": {
+          "title": "Réglages de Brave Search",
+          "hint": "Clé API et nombre de résultats pour Brave Search, le fournisseur par défaut."
+        }
       },
       "sections": {
-        "tika": "Apache Tika",
-        "docling": "Docling",
-        "rasterize": "Rasteriseur PDF",
-        "whisper": "Whisper (audio)",
-        "brave": "Recherche web (Brave)",
-        "media": "Génération de médias en arrière-plan",
-        "compute": "Travail sur fichiers"
+        "ai_selfhosted": "IA auto-hébergée (NVIDIA Triton)",
+        "ai_tts": "Sortie vocale (synthèse vocale)",
+        "ai_cloud": "Réglages supplémentaires des fournisseurs",
+        "ai_embeddings": "Embeddings (Cloudflare Workers AI)",
+        "processing_tika": "Apache Tika",
+        "processing_docling": "Docling",
+        "processing_rasterize": "Rasteriseur PDF",
+        "processing_whisper": "Whisper (transcription audio)",
+        "vectordb_qdrant": "Base de données vectorielle (Qdrant)",
+        "vectordb_qdrant_search": "Seuils et limites de recherche",
+        "routing_multitask": "Routage en plusieurs étapes",
+        "routing_conversation_summary": "Résumé glissant de la conversation",
+        "routing_deep_memory": "Mémoire profonde (condensés de messages)",
+        "processing_media": "Génération de médias en arrière-plan",
+        "processing_brave": "Brave Search",
+        "routing_saved_tasks": "Tâches enregistrées",
+        "routing_tools": "Règles d’approbation des outils",
+        "processing_compute": "Travail sur fichiers"
       },
       "fields": {
         "TIKA_BASE_URL": "URL Apache Tika",
@@ -514,13 +546,10 @@
       "addPlaceholder": "Ajouter un adaptateur…",
       "healthAvailable": "disponible",
       "healthUnavailable": "indisponible",
-      "testSidecar": {
-        "tika": "Tester Tika",
-        "docling": "Tester Docling"
-      },
-      "testingSidecar": "Test en cours…",
-      "sidecarSettings": "L’URL, le délai et le test de connexion de Tika et Docling sont dans Configuration système → Traitement.",
-      "sidecarSettingsLink": "Ouvrir les réglages de traitement",
+      "sidecarSettings": "Les adresses, les délais et un test de connexion pour chaque service se trouvent sous Services de lecture dans cet onglet.",
+      "sidecarSettingsLink": "Aller aux services de lecture",
+      "servicesTitle": "Services de lecture",
+      "servicesHint": "Où tournent Tika, Docling, le rasteriseur PDF et Whisper, et leurs limites.",
       "testTitle": "Tester avec un fichier",
       "testHint": "Envoyez un exemple. Vous verrez quel adaptateur a gagné et pourquoi les autres n’ont pas été retenus.",
       "testButton": "Tester avec un fichier",
@@ -590,6 +619,7 @@
       "testProviderFallback": "Répondu par {provider} (secours depuis {from})"
     },
     "rerank": {
+      "title": "Réordonnancement",
       "lead": "Après la recherche, un réordonnanceur place les extraits les plus utiles en premier. Laissez cette option désactivée tant qu’un test n’a pas montré qu’elle aide. Le chat ne change pas tant qu’elle est désactivée.",
       "enable": "Utiliser le réordonnancement pour la recherche de documents",
       "model": "Modèle de réordonnancement",
@@ -672,7 +702,7 @@
     },
     "perplexity": {
       "title": "Clé API Perplexity",
-      "message": "Créez une clé API dans votre compte Perplexity, puis collez-la ici pour utiliser les modèles Sonar. La même clé sert à la recherche web si vous choisissez Perplexity dans l’onglet Recherche web."
+      "message": "Créez une clé API dans votre compte Perplexity, puis collez-la ici pour utiliser les modèles Sonar. La même clé sert à la recherche web si vous choisissez Perplexity sous Configuration système › Recherche web."
     },
     "ollama": {
       "title": "IA locale avec Ollama",
@@ -681,12 +711,13 @@
   },
   "people": {
     "title": "Personnes",
-    "subtitle": "Utilisateurs et groupes de cette instance.",
+    "subtitle": "Comptes, groupes, règles et contenus signalés sur ce serveur.",
     "tabs": {
       "users": "Utilisateurs",
       "groups": "Groupes",
       "policies": "Règles",
       "linkedPlatforms": "Instances de plateforme",
+      "moderation": "Modération",
       "audit": "Journal"
     },
     "openPeople": "Ouvrir Personnes",
@@ -1119,7 +1150,7 @@
     "compute": {
       "label": "Calcul sécurisé (travail sur fichiers)",
       "running": "Le travail sur fichiers est en cours.",
-      "runningOff": "Le sidecar tourne ; le travail sur fichiers est désactivé dans la configuration système.",
+      "runningOff": "Le sidecar tourne ; le travail sur fichiers est désactivé sous Configuration système › Outils et automatisation.",
       "unreachable": "Le sidecar de travail sur fichiers n’est pas joignable.",
       "unset": "COMPUTE_URL ou COMPUTE_TOKEN n’est pas défini."
     },
@@ -1132,7 +1163,7 @@
       "title": "{module} n’est pas disponible sur cette installation",
       "body": "Cette fonctionnalité est optionnelle. Elle est activée par l’administrateur de cette installation.",
       "howToEnable": "Comment l’activer",
-      "openFeatureStatus": "Ouvrir l’état des fonctionnalités"
+      "openFeatureStatus": "Ouvrir l’état du système"
     }
   }
 }

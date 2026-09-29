@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Read-only status for system-config fields that Models & keys owns (D2,
+ * Read-only status for system-config fields that Providers & keys owns (D2,
  * Helm-first). Instance provider keys are never edited here: the card says
  * which keys come from the environment / a chart install, which have a UI
  * override, and links to the one editor. A chart install needs no UI save.

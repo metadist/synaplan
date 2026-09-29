@@ -90,7 +90,7 @@
 
     <div class="flex items-center gap-3 flex-wrap pt-1">
       <RouterLink
-        :to="{ path: '/admin/config', query: { tab: 'processing', section: 'compute' } }"
+        :to="{ path: SYSTEM_CONFIG_PATH, query: { tab: 'tools', section: 'compute' } }"
         class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
         data-testid="link-compute-config"
       >
@@ -113,6 +113,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ComputeStatus } from '@/services/featuresService'
+import { SYSTEM_CONFIG_PATH } from '@/constants/operateSettings'
 
 const props = defineProps<{
   compute: ComputeStatus

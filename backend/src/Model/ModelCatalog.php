@@ -5430,7 +5430,7 @@ class ModelCatalog
             'quality' => 8,
             'rating' => 1,
             'json' => [
-                'description' => 'Perplexity Sonar — lightweight web-grounded chat. Seeded unselectable; enable it on Models & keys after adding a Perplexity key.',
+                'description' => 'Perplexity Sonar — lightweight web-grounded chat. Seeded unselectable; add a Perplexity key under AI infrastructure › Providers & keys, then enable it in the model catalog.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'sonar'],
                 'features' => ['web_search'],
@@ -5452,7 +5452,7 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'Perplexity Sonar Pro — deeper web-grounded chat. Seeded unselectable; enable it on Models & keys after adding a Perplexity key.',
+                'description' => 'Perplexity Sonar Pro — deeper web-grounded chat. Seeded unselectable; add a Perplexity key under AI infrastructure › Providers & keys, then enable it in the model catalog.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'sonar-pro'],
                 'features' => ['web_search'],

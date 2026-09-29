@@ -91,7 +91,7 @@ const selectedName = ref('')
 
 /**
  * Only providers whose key makes chat possible belong on the "connect one
- * provider so chat works" step; media and speech keys live in Models & keys.
+ * provider so chat works" step; media and speech keys live in AI infrastructure › Providers & keys.
  */
 const chatProviders = computed(() => providers.value.filter((p) => p.chat))
 

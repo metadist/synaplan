@@ -8,7 +8,7 @@ import { useAccordion } from '@/composables/useAccordion'
 import type { FeatureModule } from '@/services/featuresService'
 
 /**
- * Operate → Feature status: the declared feature modules of this installation.
+ * Operate → System status: the declared feature modules of this installation.
  * One row per module with its state, what configures it (key names only —
  * never values) and the way to the enable guide. Admin-only page, so the
  * env-key names are safe to show here.

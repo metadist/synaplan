@@ -143,15 +143,6 @@
           </div>
         </div>
 
-        <!-- Prompts Tab. Stays mounted after the first visit so an unsaved draft survives a tab switch. -->
-        <div
-          v-if="promptsTabMounted"
-          v-show="activeTab === 'prompts'"
-          data-testid="section-prompts"
-        >
-          <AdminPromptsPanel />
-        </div>
-
         <!-- Usage Tab -->
         <div v-if="activeTab === 'usage'" data-testid="section-usage">
           <!-- Period Selector -->
@@ -412,11 +403,6 @@
           <AdminSubscriptionsPanel />
         </div>
 
-        <!-- Moderation Tab -->
-        <div v-if="activeTab === 'moderation'" data-testid="section-moderation">
-          <AdminModerationPanel />
-        </div>
-
         <!-- App server Tab (native shell only) -->
         <div v-if="activeTab === 'appServer'">
           <NativeServerControl />
@@ -444,14 +430,8 @@ import {
   type SystemOverview,
   type RegistrationAnalytics,
 } from '@/services/api/adminApi'
-const AdminPromptsPanel = defineAsyncComponent(
-  () => import('@/components/admin/AdminPromptsPanel.vue')
-)
 const AdminSubscriptionsPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSubscriptionsPanel.vue')
-)
-const AdminModerationPanel = defineAsyncComponent(
-  () => import('@/components/admin/AdminModerationPanel.vue')
 )
 const AdminSystemInfoPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSystemInfoPanel.vue')
@@ -463,13 +443,14 @@ import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { adminDashboardRedirect } from '@/router/operateRedirects'
 
 const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
 const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
-type TabId = 'overview' | 'prompts' | 'usage' | 'subscriptions' | 'moderation' | 'appServer'
+type TabId = 'overview' | 'usage' | 'subscriptions' | 'appServer'
 interface AdminTab {
   id: TabId
   label: string
@@ -477,12 +458,7 @@ interface AdminTab {
 }
 
 const isValidTab = (tab: unknown): tab is TabId =>
-  tab === 'overview' ||
-  tab === 'prompts' ||
-  tab === 'usage' ||
-  tab === 'subscriptions' ||
-  tab === 'moderation' ||
-  tab === 'appServer'
+  tab === 'overview' || tab === 'usage' || tab === 'subscriptions' || tab === 'appServer'
 
 const tabFromQuery = (): TabId => {
   const tab = route.query.tab
@@ -497,16 +473,11 @@ const tabFromQuery = (): TabId => {
 
 // Tabs
 const activeTab = ref<TabId>(tabFromQuery())
-// Once the prompts tab has been opened, keep the panel mounted so a tab
-// switch does not throw away an unsaved draft.
-const promptsTabMounted = ref(activeTab.value === 'prompts')
 const tabs = computed<AdminTab[]>(() => {
   const baseTabs: AdminTab[] = [
     { id: 'overview', label: t('admin.tabs.overview'), icon: 'mdi:view-dashboard' },
-    { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
     { id: 'usage', label: t('admin.tabs.usage'), icon: 'mdi:chart-bar' },
     { id: 'subscriptions', label: t('admin.tabs.subscriptions'), icon: 'mdi:credit-card-outline' },
-    { id: 'moderation', label: t('admin.tabs.moderation'), icon: 'mdi:flag-outline' },
   ]
   // Native shell only: the backend the app connects to is a client-side bootstrap
   // value with no meaning on the web build, so the tab is hidden there.
@@ -577,9 +548,6 @@ const {
 
 // Load data based on active tab
 watch(activeTab, (newTab: string) => {
-  if (newTab === 'prompts') {
-    promptsTabMounted.value = true
-  }
   if (newTab === 'overview') {
     if (!overview.value) loadOverview()
     if (!registrationAnalytics.value) loadRegistrationAnalytics()
@@ -681,8 +649,10 @@ function formatDate(dateStr: string): string {
 watch(
   () => route.query.tab,
   () => {
-    if (route.query.tab === 'users') {
-      void router.replace({ name: 'admin-people' })
+    // Users, Prompts and Moderation moved to their topic pages.
+    const redirect = adminDashboardRedirect(route)
+    if (redirect !== true) {
+      void router.replace(redirect)
       return
     }
     activeTab.value = tabFromQuery()

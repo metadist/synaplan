@@ -18,10 +18,6 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ error: notifyError, success: vi.fn() }),
 }))
 
-vi.mock('@/services/api/adminConfigApi', () => ({
-  testConnection: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
-}))
-
 describe('ExtractionPlugTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -62,7 +58,10 @@ describe('ExtractionPlugTab', () => {
       global: {
         stubs: {
           Icon: true,
-          RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+          RouterLink: {
+            template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
+            props: ['to'],
+          },
         },
       },
     })
@@ -71,11 +70,14 @@ describe('ExtractionPlugTab', () => {
     expect(wrapper.text()).toContain('Choose how documents are turned into text')
     expect(wrapper.get('[data-testid="extraction-health-docling"]').text()).toContain('Docling')
     expect(wrapper.get('[data-testid="extraction-health-docling"]').text()).toContain('down')
-    expect(wrapper.get('[data-testid="extraction-test-docling"]').text()).toContain('Test Docling')
-    expect(wrapper.get('[data-testid="extraction-test-tika"]').text()).toContain('Test Tika')
-    expect(wrapper.get('[data-testid="extraction-sidecar-settings"]').text()).toContain(
-      'Open Processing settings'
-    )
+    // The connection tests live next to each service's address on the same tab.
+    expect(wrapper.find('[data-testid="extraction-test-docling"]').exists()).toBe(false)
+    const settings = wrapper.get('[data-testid="extraction-sidecar-settings"]')
+    expect(settings.text()).toContain('Go to reading services')
+    expect(JSON.parse(settings.attributes('data-to') ?? '{}')).toEqual({
+      path: '/admin/setup',
+      query: { tab: 'documents', section: 'tika' },
+    })
     expect(wrapper.get('[data-testid="extraction-test-button"]').text()).toContain(
       'Test with a file'
     )

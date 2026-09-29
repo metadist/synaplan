@@ -389,7 +389,7 @@
       "model": "modèle",
       "models": "modèles",
       "adminOnlyTitle": "Accès administrateur requis",
-      "adminOnlyMessage": "L’état des fonctionnalités n’est disponible que pour les administrateurs.",
+      "adminOnlyMessage": "L’état du système n’est disponible que pour les administrateurs.",
       "modulesTitle": "Modules de fonctionnalités",
       "modulesSubtitle": "Fonctionnalités optionnelles déclarées par cette installation. Chacune est activée par sa configuration ; la liste affiche les clés, jamais leurs valeurs.",
       "modulesConfigured": "{configured} sur {total} configurés",
@@ -405,7 +405,7 @@
         "statusOff": "Désactivé",
         "statusDown": "En panne",
         "stateRunning": "Le traitement de fichiers est en cours.",
-        "stateDisabled": "Désactivé dans la configuration système. Le traitement de fichiers reste masqué.",
+        "stateDisabled": "Désactivé sous Configuration système › Outils et automatisation. Le travail sur fichiers reste masqué.",
         "stateUnreachable": "Activé, mais le sidecar ne répond pas. Le traitement de fichiers est indisponible.",
         "postureWarning": "Ce service signale {tier} ; cette instance exige une isolation plus forte.",
         "capacity": "Capacité",
@@ -414,7 +414,7 @@
         "images": "Images",
         "runs24": "{count} exécutions (24h)",
         "failed24": "{count} échouées (24h)",
-        "openConfig": "Réglages compute",
+        "openConfig": "Réglages du travail sur fichiers",
         "stateTierBlocked": "Activé, mais sous l'isolation requise. Le traitement de fichiers reste masqué."
       }
     },

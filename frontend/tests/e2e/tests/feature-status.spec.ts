@@ -5,7 +5,7 @@ import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS, getApiUrl } from '../config/config'
 
 /**
- * Operate → Feature status: the declared feature modules of the installation.
+ * Operate → System status: the declared feature modules of the installation.
  *
  * Spans the module registry (`App\Module\ModuleRegistry`), the status API
  * (`/api/v1/features/status` → `modules[]`) and the rendered section, so the
@@ -17,7 +17,7 @@ import { TIMEOUTS, getApiUrl } from '../config/config'
  * Deterministic and provider-free (@ci); read-only. Auth: the worker
  * `storageState` is a non-admin user, so this spec logs in as the seeded admin.
  */
-test.describe('@ci Feature status', () => {
+test.describe('@ci System status', () => {
   test.beforeEach(async ({ page }) => {
     await login(page, CREDENTIALS.getAdminCredentials())
     await page.goto('/admin/features')
@@ -92,7 +92,7 @@ test.describe('@ci Feature status', () => {
     await expect(card.locator(selectors.featureStatus.computeStatusPill)).not.toHaveText('')
     await expect(card.locator(selectors.featureStatus.computeConfigLink)).toHaveAttribute(
       'href',
-      /\/admin\/config\?tab=processing&section=compute/
+      /\/admin\/config\?tab=tools&section=compute/
     )
   })
 })

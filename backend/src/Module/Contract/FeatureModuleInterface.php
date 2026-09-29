@@ -8,7 +8,7 @@ namespace App\Module\Contract;
  * One optional feature, declared in one place.
  *
  * A feature module says what it is, what configures it and what it exposes.
- * Everything else — the Feature status page, the capability inventory, the
+ * Everything else — the System status page, the capability inventory, the
  * request gate and the frontend's "hide what is absent" — derives from these
  * answers, so adding an optional feature means adding one class and nothing
  * else (feature modules master plan §1, §4.1).
@@ -45,7 +45,7 @@ interface FeatureModuleInterface
      */
     public function isConfigured(): bool;
 
-    /** Live status for the admin Feature status page. May probe the feature; keep it bounded (short timeouts). */
+    /** Live status for the admin System status page. May probe the feature; keep it bounded (short timeouts). */
     public function status(): ModuleStatus;
 
     /**

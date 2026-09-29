@@ -250,7 +250,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $this->assertNotNull($webSearch);
         $this->assertSame(CapabilityState::NeedsSetup, $webSearch->state);
         $this->assertStringNotContainsString('Brave', (string) $webSearch->detail);
-        $this->assertStringContainsString('Operate → AI infrastructure', (string) $webSearch->adminHint);
+        $this->assertStringContainsString('Operate → System configuration → Web search', (string) $webSearch->adminHint);
     }
 
     public function testUploadFormatsStayCompactWithOverflowCount(): void

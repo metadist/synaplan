@@ -30,13 +30,14 @@
       <GroupsTab v-else-if="activeTab === 'groups'" />
       <PoliciesTab v-else-if="activeTab === 'policies'" />
       <PlatformInstancesTab v-else-if="activeTab === 'linked-platforms'" />
+      <AdminModerationPanel v-else-if="activeTab === 'moderation'" />
       <AuditTab v-else-if="activeTab === 'audit'" />
     </div>
   </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
@@ -51,11 +52,15 @@ import { isIamGroupsEnabled, isIamPoliciesEnabled } from '@/composables/useIamFe
 import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
 import { useI18n } from 'vue-i18n'
 
+const AdminModerationPanel = defineAsyncComponent(
+  () => import('@/components/admin/AdminModerationPanel.vue')
+)
+
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-type PeopleTab = 'users' | 'groups' | 'policies' | 'linked-platforms' | 'audit'
+type PeopleTab = 'users' | 'groups' | 'policies' | 'linked-platforms' | 'moderation' | 'audit'
 
 function isPeopleTab(id: string): id is PeopleTab {
   return (
@@ -63,6 +68,7 @@ function isPeopleTab(id: string): id is PeopleTab {
     id === 'groups' ||
     id === 'policies' ||
     id === 'linked-platforms' ||
+    id === 'moderation' ||
     id === 'audit'
   )
 }
@@ -100,6 +106,12 @@ const tabNavItems = computed<TabNavItem[]>(() => {
       testid: 'tab-linked-platforms',
     })
   }
+  tabs.push({
+    id: 'moderation',
+    label: t('people.tabs.moderation'),
+    icon: 'mdi:flag-outline',
+    testid: 'tab-moderation',
+  })
   if (isIamGroupsEnabled()) {
     tabs.push({
       id: 'audit',
