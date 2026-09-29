@@ -459,7 +459,7 @@ services:
   # the network. It runs as root so it can read the mode-0600 key; it does
   # not run the application.
   tls-proxy:
-    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    image: caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     profiles: [local-tls]
     user: "0:0"
     ports:
@@ -656,7 +656,7 @@ services:
   # official 8 GB self-host floor stays valid. Enable with COMPOSE_PROFILES=office
   # (or `--profile office`). No published port.
   collabora:
-    image: collabora/code:26.04.4.1.1@sha256:1efda3043e8b9cb437d1b6c6efe20cc3753760e634de012b8dac391da488bf97
+    image: collabora/code:26.04.4.2.1@sha256:4e983196eb9878f339cc506c38c21f1cc3473bca3d6de883c5de08f9c0cc3a6c
     profiles: [office]
     environment:
       extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
