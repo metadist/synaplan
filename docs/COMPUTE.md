@@ -40,8 +40,8 @@ with `NetworkMode=none` and refuses any non-empty allow-list (`CP22`, the
 egress proxy, is not built yet). The PHP side (resolver, pinning, approval)
 is complete and waits for that sidecar release.
 
-Operators switch them under **Operate → System configuration → Processing →
-File work**. Seeders insert missing rows and never overwrite an existing value.
+Operators switch them under **Operate → System configuration → Tools &
+automation → File work**. Seeders insert missing rows and never overwrite an existing value.
 
 ```sql
 -- what ComputeConfigSeeder runs (BConfigSeeder::insertIfMissing): a no-op
@@ -184,7 +184,7 @@ the two join on the approval id. The owner finds a pending ask under
 Turning file work off is two independent switches; either one alone
 disables it:
 
-1. **Flag off** (`COMPUTE.ENABLED = 0`, Operate → System config): the
+1. **Flag off** (`COMPUTE.ENABLED = 0`, Operate → System configuration → Tools & automation): the
    planner stops offering `code_run` on the next turn, gateways stop
    offering `code_execution`, `/api/v1/compute/*` answers 404, and both
    reaper commands exit idle. Run history (`BCOMPUTERUNS`) and artefacts

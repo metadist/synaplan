@@ -1,9 +1,8 @@
 {
   "adminModelStatus": {
-    "title": "Modell-Status",
     "subtitle": "Welche KI-Modelle gerade funktionieren und welche nicht.",
-    "loading": "Modell-Status wird geladen…",
-    "loadFailed": "Der Modell-Status konnte nicht geladen werden.",
+    "loading": "Modell-Zustand wird geladen…",
+    "loadFailed": "Der Modell-Zustand konnte nicht geladen werden.",
     "never": "nie",
     "noMatches": "Keine Modelle passen zu den gewählten Filtern.",
     "freeHint": "Die Prüfung ist kostenlos: Es wird nur abgefragt, welche Modelle ein Anbieter veröffentlicht. Dafür wird nie ein KI-Modell ausgeführt.",
@@ -92,14 +91,12 @@
   },
   "admin": {
     "title": "Betrieb",
-    "description": "Systemverwaltung und Konfiguration",
+    "description": "Dein Server auf einen Blick: Personen, Registrierungen und Nutzung.",
     "tabs": {
       "overview": "Übersicht",
       "users": "Benutzer",
-      "prompts": "Prompts",
       "usage": "Nutzung",
       "subscriptions": "Abonnements",
-      "moderation": "Moderation",
       "appServer": "App-Server"
     },
     "overview": {
@@ -310,30 +307,35 @@
     },
     "config": {
       "title": "Systemkonfiguration",
-      "description": "Umgebungsvariablen und Service-Verbindungen verwalten",
+      "description": "Anmeldung, Funktionen und Werkzeuge, Kanäle und das Erscheinungsbild dieses Servers.",
+      "aiPointer": "KI-Anbieter, Schlüssel, Modelle, das Lesen von Dokumenten und die Suche richtest du unter KI-Infrastruktur ein.",
+      "aiPointerLink": "KI-Infrastruktur öffnen",
       "loadError": "Konfiguration konnte nicht geladen werden",
       "saveError": "Konfiguration konnte nicht gespeichert werden",
+      "savedButNotRefreshed": "Gespeichert, aber die Menüs konnten nicht aktualisiert werden. Lade die Seite neu, um die Änderung zu sehen.",
       "saved": "Konfiguration gespeichert",
       "savedLive": "Gespeichert — sofort wirksam",
       "dbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",
       "managedKeys": {
-        "title": "Anbieter-Schlüssel werden unter KI-Infrastruktur › Modelle & Schlüssel verwaltet.",
-        "helm": "Schlüssel aus der Umgebung oder einem Helm-Chart werden automatisch übernommen — eine Chart-Installation braucht diese Seite nicht. Nutze Modelle & Schlüssel nur, um einen Schlüssel über die Oberfläche hinzuzufügen oder zu überschreiben.",
+        "title": "Anbieter-Schlüssel werden unter KI-Infrastruktur › Anbieter & Schlüssel verwaltet.",
+        "helm": "Schlüssel aus der Umgebung oder einem Helm-Chart werden automatisch übernommen — eine Chart-Installation braucht diese Seite nicht. Nutze Anbieter & Schlüssel nur, um einen Schlüssel über die Oberfläche hinzuzufügen oder zu überschreiben.",
         "stateNone": "nicht gesetzt",
         "stateDb": "UI-Überschreibung",
         "stateEnv": "Umgebung / Helm",
         "summary": "{env} aus der Umgebung, {db} in der Oberfläche überschrieben.",
-        "cta": "Modelle & Schlüssel öffnen"
+        "cta": "Anbieter & Schlüssel öffnen"
       },
       "envOverridesDb": "Von der Umgebungsvariablen {key} festgelegt. Aktuell: {value}. Entferne die Variable aus der Umgebung, um diese Einstellung hier zu verwalten.",
       "unsaved": "Nicht gespeicherte Änderungen",
       "testConnection": "Verbindung testen",
       "testFailed": "Verbindungstest fehlgeschlagen",
       "commandCopied": "Befehl in Zwischenablage kopiert",
-      "tabGroups": {
-        "aiData": "KI & Daten",
-        "communication": "Kommunikation",
-        "security": "Funktionen & Zugang"
+      "groups": {
+        "access": "Zugang",
+        "features": "Funktionen & Werkzeuge",
+        "channels": "Kanäle & Apps",
+        "appearance": "Erscheinungsbild",
+        "more": "Weitere Einstellungen"
       },
       "accordion": {
         "expandAll": "Alle ausklappen",
@@ -349,7 +351,8 @@
       "restartBanner": {
         "title": "Konfiguration aktualisiert — Neustart erforderlich",
         "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",
-        "copyCommand": "Befehl kopieren"
+        "copyCommand": "Befehl kopieren",
+        "copyFailed": "Kopieren fehlgeschlagen. Markiere den Befehl und kopiere ihn manuell."
       },
       "m365": {
         "title": "Damit diese Felder wirken: App in Azure registrieren",
@@ -386,28 +389,57 @@
         "resetFailed": "Das Zurücksetzen ist fehlgeschlagen. Bitte erneut versuchen."
       },
       "tabs": {
-        "ai": "KI-Dienste",
-        "email": "E-Mail",
-        "branding": "Erscheinungsbild",
-        "mobile": "Mobile App",
-        "auth": "Anmeldung",
-        "channels": "Eingangskanäle",
-        "processing": "Verarbeitung",
+        "auth": "Anmeldung & Registrierung",
+        "sharing": "Teilen & Protokoll",
         "features": "Funktionen",
-        "sharing": "Teilen",
-        "routing": "Routing",
+        "web_search": "Websuche",
+        "tools": "Werkzeuge & Automatisierung",
+        "email": "E-Mail",
+        "channels": "Kanäle & Integrationen",
+        "mobile": "Mobile App",
+        "branding": "Branding",
         "interface": "Oberfläche",
-        "guest_landing": "Gäste-Startseite",
-        "vectordb": "Vektordatenbank"
+        "guest_landing": "Gäste-Startseite"
+      },
+      "tabIntro": {
+        "auth": "Wer sich registrieren und anmelden darf und welche Anmeldeanbieter angeboten werden.",
+        "sharing": "Was Personen mit allen teilen dürfen, welche Login-Gruppen übernommen werden und wie lange das Protokoll aufbewahrt wird.",
+        "features": "Schalte ganze Funktionen für alle auf diesem Server ein oder aus. Änderungen gelten sofort.",
+        "web_search": "Wähle, wer für den Chat im Web sucht, und teste es mit einer Anfrage.",
+        "tools": "Was die KI selbstständig tun darf: gespeicherte Aufgaben, Freigaberegeln für Werkzeuge und Dateiarbeit in einer Sandbox.",
+        "email": "Der Mailserver für Registrierungs-, Passwort- und Benachrichtigungs-E-Mails.",
+        "channels": "Eingangskanäle wie WhatsApp und E-Mail sowie Verbindungen zu Microsoft 365, Dropbox und MCP.",
+        "mobile": "Die älteste App-Version, die sich verbinden darf, und wo man die Apps herunterlädt.",
+        "branding": "Name, Farben, Schriften, Logos und rechtliche Links.",
+        "interface": "Ob die Nutzung angezeigt wird und was der Chat während der Arbeit zeigt.",
+        "guest_landing": "Die Neuigkeiten, die Besucher auf der Gäste-Startseite sehen.",
+        "more": "Einstellungen, die noch keinem Thema zugeordnet sind."
+      },
+      "panelSettings": {
+        "web_search": {
+          "title": "Einstellungen für Brave Search",
+          "hint": "API-Schlüssel und Anzahl der Ergebnisse für Brave Search, den Standardanbieter."
+        }
       },
       "sections": {
-        "tika": "Apache Tika",
-        "docling": "Docling",
-        "rasterize": "PDF-Rasterizer",
-        "whisper": "Whisper (Audio)",
-        "brave": "Websuche (Brave)",
-        "media": "Medien im Hintergrund",
-        "compute": "Dateiarbeit"
+        "ai_selfhosted": "Selbst gehostete KI (NVIDIA Triton)",
+        "ai_tts": "Sprachausgabe (Text-to-Speech)",
+        "ai_cloud": "Weitere Anbieter-Einstellungen",
+        "ai_embeddings": "Embeddings (Cloudflare Workers AI)",
+        "processing_tika": "Apache Tika",
+        "processing_docling": "Docling",
+        "processing_rasterize": "PDF-Rasterizer",
+        "processing_whisper": "Whisper (Audio-Transkription)",
+        "vectordb_qdrant": "Vektordatenbank (Qdrant)",
+        "vectordb_qdrant_search": "Suchschwellen und Grenzen",
+        "routing_multitask": "Mehrstufiges Routing",
+        "routing_conversation_summary": "Fortlaufende Gesprächszusammenfassung",
+        "routing_deep_memory": "Tiefes Gedächtnis (Nachrichten-Digests)",
+        "processing_media": "Medien im Hintergrund",
+        "processing_brave": "Brave Search",
+        "routing_saved_tasks": "Gespeicherte Aufgaben",
+        "routing_tools": "Freigaberegeln für Werkzeuge",
+        "processing_compute": "Dateiarbeit"
       },
       "fields": {
         "TIKA_BASE_URL": "Apache-Tika-URL",
@@ -514,13 +546,10 @@
       "addPlaceholder": "Adapter hinzufügen…",
       "healthAvailable": "verfügbar",
       "healthUnavailable": "nicht verfügbar",
-      "testSidecar": {
-        "tika": "Tika testen",
-        "docling": "Docling testen"
-      },
-      "testingSidecar": "Test läuft…",
-      "sidecarSettings": "URL, Timeout und der Verbindungstest für Tika und Docling liegen unter Systemkonfiguration → Verarbeitung.",
-      "sidecarSettingsLink": "Verarbeitungseinstellungen öffnen",
+      "sidecarSettings": "Adressen, Timeouts und ein Verbindungstest für jeden Dienst stehen unter Lesedienste auf diesem Tab.",
+      "sidecarSettingsLink": "Zu den Lesediensten",
+      "servicesTitle": "Lesedienste",
+      "servicesHint": "Wo Tika, Docling, der PDF-Rasterizer und Whisper laufen, und ihre Grenzen.",
       "testTitle": "Mit einer Datei testen",
       "testHint": "Laden Sie eine Beispieldatei hoch. Sie sehen, welcher Adapter gewonnen hat und warum die anderen nicht.",
       "testButton": "Mit einer Datei testen",
@@ -590,6 +619,7 @@
       "testProviderFallback": "Beantwortet von {provider} (Ersatz für {from})"
     },
     "rerank": {
+      "title": "Neuordnung",
       "lead": "Nach der Suche rückt ein Neuordner die nützlichsten Textstellen nach vorne. Lass dies aus, bis ein Test zeigt, dass es hilft. Der Chat bleibt unverändert, solange es aus ist.",
       "enable": "Neuordnung bei der Dokumentsuche verwenden",
       "model": "Neuordnungsmodell",
@@ -672,7 +702,7 @@
     },
     "perplexity": {
       "title": "Perplexity-API-Schlüssel",
-      "message": "Erstelle einen API-Schlüssel in deinem Perplexity-Konto und füge ihn hier ein, um Sonar-Modelle zu nutzen. Derselbe Schlüssel gilt für die Websuche, wenn du Perplexity auf dem Tab Websuche wählst."
+      "message": "Erstelle einen API-Schlüssel in deinem Perplexity-Konto und füge ihn hier ein, um Sonar-Modelle zu nutzen. Derselbe Schlüssel gilt für die Websuche, wenn du Perplexity unter Systemkonfiguration › Websuche wählst."
     },
     "ollama": {
       "title": "Lokale KI mit Ollama",
@@ -681,12 +711,13 @@
   },
   "people": {
     "title": "Personen",
-    "subtitle": "Benutzer und Gruppen auf dieser Instanz.",
+    "subtitle": "Konten, Gruppen, Richtlinien und gemeldete Inhalte auf diesem Server.",
     "tabs": {
       "users": "Benutzer",
       "groups": "Gruppen",
       "policies": "Richtlinien",
       "linkedPlatforms": "Plattform-Instanzen",
+      "moderation": "Moderation",
       "audit": "Protokoll"
     },
     "openPeople": "Personen öffnen",
@@ -1122,7 +1153,7 @@
     "compute": {
       "label": "Sichere Dateiarbeit",
       "running": "Dateiarbeit läuft.",
-      "runningOff": "Der Sidecar läuft; Dateiarbeit ist in der Systemkonfiguration ausgeschaltet.",
+      "runningOff": "Der Sidecar läuft; Dateiarbeit ist unter Systemkonfiguration › Werkzeuge & Automatisierung ausgeschaltet.",
       "unreachable": "Der Dateiarbeits-Sidecar ist nicht erreichbar.",
       "unset": "COMPUTE_URL oder COMPUTE_TOKEN ist nicht gesetzt."
     },
@@ -1135,7 +1166,7 @@
       "title": "{module} ist auf dieser Installation nicht verfügbar",
       "body": "Diese Funktion ist optional. Sie wird vom Administrator dieser Installation eingeschaltet.",
       "howToEnable": "So wird sie aktiviert",
-      "openFeatureStatus": "Feature-Status öffnen"
+      "openFeatureStatus": "System-Status öffnen"
     }
   }
 }

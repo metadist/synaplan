@@ -59,7 +59,7 @@ final class AdminSystemConfigController extends AbstractController
                         new OA\Property(
                             property: 'fields',
                             type: 'object',
-                            description: 'Field key => definition. A definition may carry "managedBy" (enum: ai-infrastructure): the field then has another editor (AI infrastructure › Models & keys), is reported read-only here and PUT /values answers 422 for it.',
+                            description: 'Field key => definition. A definition may carry "managedBy" (enum: ai-infrastructure): the field then has another editor (AI infrastructure › Providers & keys), is reported read-only here and PUT /values answers 422 for it.',
                             additionalProperties: new OA\AdditionalProperties(
                                 type: 'object',
                                 properties: [
@@ -72,7 +72,7 @@ final class AdminSystemConfigController extends AbstractController
                                     new OA\Property(property: 'source', type: 'string', enum: ['env', 'database'], nullable: true),
                                     new OA\Property(property: 'options', type: 'array', items: new OA\Items(type: 'string'), nullable: true),
                                     new OA\Property(property: 'placeholder', type: 'string', nullable: true),
-                                    new OA\Property(property: 'managedBy', type: 'string', enum: ['ai-infrastructure'], nullable: true, description: 'Set for instance provider keys: edit them under AI infrastructure › Models & keys'),
+                                    new OA\Property(property: 'managedBy', type: 'string', enum: ['ai-infrastructure'], nullable: true, description: 'Set for instance provider keys: edit them under AI infrastructure › Providers & keys'),
                                 ],
                             ),
                         ),
@@ -148,7 +148,7 @@ final class AdminSystemConfigController extends AbstractController
                                 type: 'string',
                                 enum: ['db', 'env', 'none'],
                                 nullable: true,
-                                description: 'For managedBy provider keys: where the key in force comes from (db = saved under Models & keys, env = environment / Helm, none = not set)'
+                                description: 'For managedBy provider keys: where the key in force comes from (db = saved under Providers & keys, env = environment / Helm, none = not set)'
                             ),
                         ]
                     )
@@ -203,12 +203,12 @@ final class AdminSystemConfigController extends AbstractController
     #[OA\Response(response: 403, description: 'Admin access required')]
     #[OA\Response(
         response: 422,
-        description: 'Validation error, or the field is managed elsewhere (managedBy names the editor: AI infrastructure › Models & keys)',
+        description: 'Validation error, or the field is managed elsewhere (managedBy names the editor: AI infrastructure › Providers & keys)',
         content: new OA\JsonContent(
             required: ['success', 'error'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: false),
-                new OA\Property(property: 'error', type: 'string', example: 'OPENAI_API_KEY is managed under AI infrastructure › Models & keys (/admin/setup). Save, test or remove the key there.'),
+                new OA\Property(property: 'error', type: 'string', example: 'OPENAI_API_KEY is managed under AI infrastructure › Providers & keys (/admin/setup). Save, test or remove the key there.'),
                 new OA\Property(property: 'managedBy', type: 'string', enum: ['ai-infrastructure'], nullable: true),
             ]
         )

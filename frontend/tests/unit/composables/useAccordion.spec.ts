@@ -47,4 +47,18 @@ describe('useAccordion', () => {
     expect(isOpen('y')).toBe(false)
     expect(isOpen('b')).toBe(false)
   })
+
+  it('keeps open panels that are still listed when the list grows', async () => {
+    const ids = ref(['a', 'b'])
+    const { isOpen, expandAll, allOpen } = useAccordion(ids)
+
+    expandAll()
+    ids.value = ['a', 'late', 'b']
+    await nextTick()
+
+    expect(isOpen('a')).toBe(true)
+    expect(isOpen('b')).toBe(true)
+    expect(isOpen('late')).toBe(false)
+    expect(allOpen.value).toBe(false)
+  })
 })

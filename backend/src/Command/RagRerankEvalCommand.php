@@ -79,7 +79,7 @@ final class RagRerankEvalCommand extends Command
             // store misleading numbers in RERANK.LAST_EVAL.
             $active = $this->registry->active();
             if (null === $active) {
-                $io->error('No rerank adapter is active: bind a rerank model (Operate → Setup → Reranking) or enable the chat-model fallback, then re-run.');
+                $io->error('No rerank adapter is active: bind a rerank model (Operate → AI infrastructure → Knowledge search → Reranking) or enable the chat-model fallback, then re-run.');
 
                 return Command::FAILURE;
             }

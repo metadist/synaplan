@@ -131,7 +131,7 @@ describe('FeatureModulesSection', () => {
       }),
     ])
     expect(off.get('[data-testid="item-module"]').text()).toContain(
-      'The sidecar is running; file work is turned off in System configuration.'
+      'The sidecar is running; file work is turned off under System configuration › Tools & automation.'
     )
 
     const down = mountSection([

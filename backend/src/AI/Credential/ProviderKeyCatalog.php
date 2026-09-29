@@ -25,7 +25,7 @@ namespace App\AI\Credential;
  *    model health and the model inventory must not read it as a listing.
  *
  * Every env var listed here is *managed*: the legacy system-config page shows
- * it read-only and points at Models & keys ({@see SystemConfigService}).
+ * it read-only and points at Providers & keys ({@see SystemConfigService}).
  */
 final class ProviderKeyCatalog
 {
@@ -239,7 +239,7 @@ final class ProviderKeyCatalog
     /**
      * Reverse lookup: which provider does an env var (e.g. "GROQ_API_KEY" or
      * "HIGGSFIELD_API_SECRET") bootstrap? Used by the admin system-config
-     * surface to mark those fields as managed by Models & keys.
+     * surface to mark those fields as managed by Providers & keys.
      */
     public static function providerForEnvVar(string $envVar): ?string
     {

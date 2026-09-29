@@ -268,7 +268,7 @@
             "state": "absent",
             "configured": false,
             "healthy": false,
-            "message": "No Higgsfield key + secret pair — add it under AI infrastructure › Models & keys or set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET",
+            "message": "No Higgsfield key + secret pair — add it under AI infrastructure › Providers & keys or set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET",
             "details": [],
             "configured_by": {
                 "env": [
@@ -500,7 +500,7 @@
             "state": "absent",
             "configured": false,
             "healthy": false,
-            "message": "No TheHive API key — add one under AI infrastructure › Models & keys or set THEHIVE_API_KEY",
+            "message": "No TheHive API key — add one under AI infrastructure › Providers & keys or set THEHIVE_API_KEY",
             "details": [],
             "configured_by": {
                 "env": [

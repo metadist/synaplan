@@ -2652,6 +2652,60 @@ class ModelCatalog
             ],
         ],
         [
+            // Snapshot 2026-09-29 (https://platform.claude.com/docs/en/models/sonnet-5-5/overview
+            // and https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
+            // Claude Sonnet 5.5 — released 2026-09-28. Faster, lower-cost
+            // complement to Opus 5.5 for everyday tasks. Same $2/$10 rate as
+            // Sonnet 5; cache reads stay the Anthropic-wide 0.1x ($0.20/1M),
+            // so no cache_read_price_per_1M override. Adaptive thinking is on
+            // when the field is omitted; the lowest setting is
+            // thinking.type between_tools (low/medium/high only). Effort also
+            // accepts xhigh and max. No temperature. Rejects forced
+            // tool_choice — see AnthropicProvider / StructuredOutputCapability.
+            'id' => 379,
+            'service' => 'Anthropic',
+            'name' => 'Claude Sonnet 5.5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-sonnet-5-5',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Sonnet 5.5 - faster Sonnet for everyday tasks, bug fixes, and polished documents. Adaptive thinking. 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-sonnet-5-5'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30', 'reasoning_effort_default' => 'high'],
+            ],
+        ],
+        [
+            'id' => 380,
+            'service' => 'Anthropic',
+            'name' => 'Claude Sonnet 5.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-sonnet-5-5',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Sonnet 5.5 for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-sonnet-5-5'],
+                'features' => ['vision'],
+                'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
             // Snapshot 2026-05-27 (https://platform.claude.com/docs/en/about-claude/models/overview).
             'id' => 235,
             'service' => 'Anthropic',
@@ -5430,7 +5484,7 @@ class ModelCatalog
             'quality' => 8,
             'rating' => 1,
             'json' => [
-                'description' => 'Perplexity Sonar — lightweight web-grounded chat. Seeded unselectable; enable it on Models & keys after adding a Perplexity key.',
+                'description' => 'Perplexity Sonar — lightweight web-grounded chat. Seeded unselectable; add a Perplexity key under AI infrastructure › Providers & keys, then enable it in the model catalog.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'sonar'],
                 'features' => ['web_search'],
@@ -5452,7 +5506,7 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'Perplexity Sonar Pro — deeper web-grounded chat. Seeded unselectable; enable it on Models & keys after adding a Perplexity key.',
+                'description' => 'Perplexity Sonar Pro — deeper web-grounded chat. Seeded unselectable; add a Perplexity key under AI infrastructure › Providers & keys, then enable it in the model catalog.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'sonar-pro'],
                 'features' => ['web_search'],

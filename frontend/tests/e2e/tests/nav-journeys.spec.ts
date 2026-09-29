@@ -195,30 +195,31 @@ test.describe('@ci Navigation journeys', () => {
   test('J-NV-3 One key, one place', async ({ page, credentials }) => {
     await login(page, CREDENTIALS.getAdminCredentials())
 
-    await test.step('Operate › Models & keys is the instance editor', async () => {
+    await test.step('Operate › AI infrastructure › Providers & keys is the instance editor', async () => {
       await openOperateLink(page, NAV.flyoutLinkAdminSetup)
       await expect(page).toHaveURL(/\/admin\/setup/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator('[data-testid="view-admin-setup"]')).toBeVisible()
-      await expect(page.locator('[data-testid="admin-setup-tab-models"]')).toBeVisible()
+      await expect(page.locator('[data-testid="admin-setup-tab-providers"]')).toBeVisible()
+      await page.locator('[data-testid="btn-setup-section-providers"]').click()
+      await expect(page.locator('[data-testid="provider-card-openai"]')).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
     })
 
-    await test.step('System configuration › AI services has status, not password fields', async () => {
+    await test.step('System configuration holds no AI settings and points to AI infrastructure', async () => {
       await openOperateLink(page, NAV.flyoutLinkAdminConfig)
       await expect(page.locator('[data-testid="view-admin-config"]')).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
-      await page.locator('[data-testid="btn-config-group-ai-data"]').click()
-      await page.locator('[data-testid="btn-config-tab-ai"]').click()
-      await page.locator('[data-testid="btn-jump-section-cloud"]').click()
-      const openaiChip = page.locator('[data-testid="managed-key-OPENAI_API_KEY"]')
-      await expect(openaiChip).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      const section = page.locator('#config-section-cloud')
-      await expect(section).toBeVisible()
+      await expect(page.locator('[data-testid="config-topic-nav"]')).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page.locator('[data-testid="btn-config-tab-ai"]')).toHaveCount(0)
       for (const key of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY']) {
-        await expect(section.locator(`input[name="${key}"], #${key}`)).toHaveCount(0)
+        await expect(page.locator(`input[name="${key}"], #${key}`)).toHaveCount(0)
       }
-      await expect(section.getByText('AI infrastructure › Models & keys')).toBeVisible()
-      await expect(section.getByText(/chart install does not need this page/)).toBeVisible()
+      await page.locator('[data-testid="config-ai-pointer-link"]').click()
+      await expect(page).toHaveURL(/\/admin\/setup$/, { timeout: TIMEOUTS.STANDARD })
     })
 
     await login(page, credentials)

@@ -6,10 +6,10 @@ import AdminConfigView from '@/views/AdminConfigView.vue'
 import type { ConfigSchema, ConfigValue } from '@/services/api/adminConfigApi'
 
 /**
- * D2 / NV05: instance provider keys have exactly one editor (AI infrastructure
- * › Models & keys). System config still *reports* them, but must never render
- * a password input for a `managedBy` field — a Helm/env-injected key is
- * already "set" without any UI save.
+ * System configuration holds the platform settings, grouped by topic
+ * (Access · Features & tools · Channels & apps · Appearance). Everything the
+ * AI needs lives on AI infrastructure, so none of those sections render here,
+ * and instance provider keys are never an input on this page (D2 / NV05).
  */
 
 const getConfigSchema = vi.hoisted(() => vi.fn())
@@ -32,53 +32,91 @@ vi.mock('@/composables/useNotification', () => ({
 }))
 vi.mock('@/services/api/nativeHaptics', () => ({ triggerHapticImpact: vi.fn() }))
 
-const password = (section: string, managed = true) => ({
-  tab: 'ai',
+const field = (tab: string, section: string, extra: Record<string, unknown> = {}) => ({
+  tab,
   section,
-  type: 'password' as const,
-  sensitive: true,
+  type: 'text' as const,
+  sensitive: false,
   description: '',
   default: '',
-  source: 'database' as const,
-  ...(managed ? { managedBy: 'ai-infrastructure' as const } : {}),
+  ...extra,
 })
+
+const managedKey = (tab: string, section: string) =>
+  field(tab, section, {
+    type: 'password',
+    sensitive: true,
+    source: 'database',
+    managedBy: 'ai-infrastructure',
+  })
 
 const schema: ConfigSchema = {
   tabs: {
     ai: {
       label: 'AI Services',
       sections: {
-        openai: { label: 'OpenAI', fields: ['OPENAI_API_KEY'] },
-        higgsfield: {
-          label: 'Higgsfield',
-          fields: ['HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET'],
-        },
-        google: {
-          label: 'Google',
-          fields: ['GOOGLE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN'],
-        },
+        ollama: { label: 'Local AI (Ollama)', fields: ['OLLAMA_BASE_URL'] },
+        cloud: { label: 'Cloud AI Providers', fields: ['OPENAI_API_KEY'] },
       },
+    },
+    email: {
+      label: 'Email',
+      sections: { mailer: { label: 'Primary Mailer', fields: ['MAILER_DSN'] } },
+    },
+    auth: {
+      label: 'Authentication',
+      sections: {
+        access: { label: 'Who can use this instance', fields: ['REGISTRATION_ENABLED'] },
+        google: { label: 'Google OAuth 2.0', fields: ['GOOGLE_CLIENT_ID', 'GOOGLE_API_KEY'] },
+      },
+    },
+    channels: {
+      label: 'Inbound Channels',
+      sections: { whatsapp: { label: 'WhatsApp Business API', fields: ['WHATSAPP_ENABLED'] } },
+    },
+    processing: {
+      label: 'Processing',
+      sections: {
+        tika: { label: 'Apache Tika', fields: ['TIKA_BASE_URL'] },
+        brave: { label: 'Web Search (Brave)', fields: ['BRAVE_SEARCH_API_KEY'] },
+        compute: { label: 'File work', fields: ['COMPUTE_ENABLED'] },
+      },
+    },
+    routing: {
+      label: 'Routing',
+      sections: {
+        multitask: { label: 'Multi-task routing', fields: ['MULTITASK_ROUTING_ENABLED'] },
+        tools: { label: 'Tool policies', fields: ['TOOLS_POLICY_READ'] },
+      },
+    },
+    experimental: {
+      label: 'Experimental',
+      sections: { lab: { label: 'Lab', fields: ['LAB_FLAG'] } },
     },
   },
   fields: {
-    OPENAI_API_KEY: password('openai'),
-    HIGGSFIELD_API_KEY: password('higgsfield'),
-    HIGGSFIELD_API_SECRET: password('higgsfield'),
-    GOOGLE_API_KEY: password('google'),
-    // A token, not a key: stays an ordinary editable field.
-    GOOGLE_VERTEX_ACCESS_TOKEN: password('google', false),
+    OLLAMA_BASE_URL: field('ai', 'ollama', { type: 'url' }),
+    OPENAI_API_KEY: managedKey('ai', 'cloud'),
+    MAILER_DSN: field('email', 'mailer'),
+    REGISTRATION_ENABLED: field('auth', 'access', { type: 'boolean', source: 'database' }),
+    GOOGLE_CLIENT_ID: field('auth', 'google'),
+    GOOGLE_API_KEY: managedKey('auth', 'google'),
+    WHATSAPP_ENABLED: field('channels', 'whatsapp', { type: 'boolean' }),
+    TIKA_BASE_URL: field('processing', 'tika', { type: 'url' }),
+    BRAVE_SEARCH_API_KEY: field('processing', 'brave', { type: 'password', sensitive: true }),
+    COMPUTE_ENABLED: field('processing', 'compute', { type: 'boolean' }),
+    MULTITASK_ROUTING_ENABLED: field('routing', 'multitask', { type: 'boolean' }),
+    TOOLS_POLICY_READ: field('routing', 'tools', { type: 'select', options: ['auto', 'approve'] }),
+    LAB_FLAG: field('experimental', 'lab', { type: 'boolean' }),
   },
 }
 
 const values: Record<string, ConfigValue> = {
   OPENAI_API_KEY: { value: '', isSet: true, isMasked: true, keySource: 'env' },
-  HIGGSFIELD_API_KEY: { value: '', isSet: true, isMasked: true, keySource: 'db' },
-  HIGGSFIELD_API_SECRET: { value: '', isSet: true, isMasked: true, keySource: 'db' },
   GOOGLE_API_KEY: { value: '', isSet: false, isMasked: false, keySource: 'none' },
-  GOOGLE_VERTEX_ACCESS_TOKEN: { value: '', isSet: false, isMasked: false },
 }
 
-async function mountView() {
+async function mountView(path = '/admin/config') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -88,7 +126,7 @@ async function mountView() {
       { path: '/admin/setup', component: { template: '<div />' } },
     ],
   })
-  await router.push('/admin/config?tab=ai')
+  await router.push(path)
   await router.isReady()
   const wrapper = mount(AdminConfigView, {
     global: {
@@ -97,78 +135,124 @@ async function mountView() {
         MainLayout: { template: '<div><slot /></div>' },
         PageHeader: true,
         UpdatePanel: true,
-        ExportImportPanel: true,
         M365SetupGuide: true,
         DropboxSetupGuide: true,
+        WebSearchPlugTab: { template: '<div data-testid="web-search-plug-tab-stub" />' },
         Icon: true,
       },
     },
   })
   await flushPromises()
-  return wrapper
+  return { wrapper, router }
 }
 
-describe('AdminConfigView — managed provider keys (D2)', () => {
+const tabIds = (wrapper: Awaited<ReturnType<typeof mountView>>['wrapper'], group: string) =>
+  wrapper
+    .get(`[data-testid="config-group-${group}"]`)
+    .findAll('button')
+    .map((button) => button.attributes('data-testid'))
+
+describe('AdminConfigView — topics', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     getConfigSchema.mockResolvedValue(schema)
     getConfigValues.mockResolvedValue(values)
   })
 
-  it('replaces an all-managed section with the status card and renders no password input', async () => {
-    const wrapper = await mountView()
+  it('lists every tab under its topic, all visible at once', async () => {
+    const { wrapper } = await mountView()
 
-    const cards = wrapper.findAll('[data-testid="managed-keys-status-card"]')
-    // openai + higgsfield are fully managed, google is mixed ⇒ three cards.
-    expect(cards).toHaveLength(3)
-
-    const openai = wrapper.get('[data-testid="managed-key-OPENAI_API_KEY"]')
-    expect(openai.attributes('data-state')).toBe('env')
-    expect(
-      wrapper.get('[data-testid="managed-key-HIGGSFIELD_API_SECRET"]').attributes('data-state')
-    ).toBe('db')
-
-    // The only password input left on the tab is the (unmanaged) Vertex token.
-    const passwordInputs = wrapper.findAll('input[type="password"]')
-    expect(passwordInputs).toHaveLength(1)
-    expect(wrapper.html()).not.toMatch(/name="OPENAI_API_KEY"|id="OPENAI_API_KEY"/)
-    expect(wrapper.text()).toContain('AI infrastructure › Models & keys')
-    expect(wrapper.text()).toContain('a chart install does not need this page')
+    expect(tabIds(wrapper, 'access')).toEqual(['btn-config-tab-auth'])
+    expect(tabIds(wrapper, 'features')).toEqual([
+      'btn-config-tab-web_search',
+      'btn-config-tab-tools',
+    ])
+    expect(tabIds(wrapper, 'channels')).toEqual(['btn-config-tab-email', 'btn-config-tab-channels'])
+    expect(wrapper.get('[data-testid="btn-config-tab-channels"]').text()).toContain(
+      'Channels & integrations'
+    )
   })
 
-  it('links every card to the one editor', async () => {
-    const wrapper = await mountView()
+  it('shows no AI settings and points to AI infrastructure instead', async () => {
+    const { wrapper } = await mountView()
 
-    const links = wrapper.findAll('[data-testid="managed-keys-link"]')
-    expect(links.length).toBeGreaterThan(0)
-    for (const link of links) expect(link.attributes('href')).toBe('/admin/setup')
+    for (const tab of ['ai', 'processing', 'routing', 'vectordb']) {
+      expect(wrapper.find(`[data-testid="btn-config-tab-${tab}"]`).exists()).toBe(false)
+    }
+    const pointer = wrapper.get('[data-testid="config-ai-pointer-link"]')
+    expect(pointer.attributes('href')).toBe('/admin/setup')
+    expect(wrapper.get('[data-testid="config-ai-pointer"]').text()).toContain('AI infrastructure')
   })
 
-  it('keeps editable fields in a mixed section and lists the hidden keys below them', async () => {
-    const wrapper = await mountView()
+  it('opens the first topic tab by default', async () => {
+    const { wrapper } = await mountView()
 
-    // Vertex token field is still rendered as a ConfigField…
-    expect(wrapper.text()).toContain('GOOGLE_VERTEX_ACCESS_TOKEN')
-    // …while GOOGLE_API_KEY is only named in the status card, never as a field.
+    expect(wrapper.find('[data-testid="config-tab-auth"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Who may register and sign in')
+  })
+
+  it('pairs the web search picker with the Brave settings', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('[data-testid="btn-config-tab-web_search"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query.tab).toBe('web_search')
+    expect(wrapper.find('[data-testid="web-search-plug-tab-stub"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Brave Search settings')
+    expect(wrapper.find('#config-section-brave').exists()).toBe(true)
+  })
+
+  it('collects tool rules and file work under Tools & automation', async () => {
+    const { wrapper } = await mountView('/admin/config?tab=tools&section=compute')
+
+    expect(wrapper.find('#config-section-tools').exists()).toBe(true)
+    expect(wrapper.get('#config-section-compute').attributes('data-open')).toBe('true')
+    expect(wrapper.text()).toContain('Tool approval rules')
+  })
+
+  it('keeps a section no topic claims reachable under More settings', async () => {
+    const { wrapper } = await mountView()
+
+    expect(tabIds(wrapper, 'more')).toEqual(['btn-config-tab-more_experimental'])
+    await wrapper.get('[data-testid="btn-config-tab-more_experimental"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('LAB_FLAG')
+  })
+
+  it('reports a provider key in a platform section read-only, never as an input', async () => {
+    const { wrapper } = await mountView('/admin/config?tab=auth&section=google')
+
     const chip = wrapper.get('[data-testid="managed-key-GOOGLE_API_KEY"]')
     expect(chip.attributes('data-state')).toBe('none')
     expect(wrapper.find('input[name="GOOGLE_API_KEY"], #GOOGLE_API_KEY').exists()).toBe(false)
-    expect(wrapper.text()).toContain('AI infrastructure › Models & keys')
+    expect(wrapper.text()).toContain('AI infrastructure › Providers & keys')
+    expect(wrapper.get('[data-testid="managed-keys-link"]').attributes('href')).toBe('/admin/setup')
   })
 
-  it('folds later sections and opens them from the header or jump nav', async () => {
-    const wrapper = await mountView()
+  it('offers a connection test next to the mail server settings', async () => {
+    const { wrapper } = await mountView('/admin/config?tab=email')
 
-    expect(wrapper.get('#config-section-openai').attributes('data-open')).toBe('false')
-    expect(wrapper.get('#config-section-higgsfield').attributes('data-open')).toBe('false')
+    expect(wrapper.find('[data-testid="btn-config-test-mailer"]').exists()).toBe(true)
+  })
+
+  it('folds sections and opens them from the header or jump nav', async () => {
+    const { wrapper } = await mountView('/admin/config?tab=auth')
+
+    expect(wrapper.get('#config-section-access').attributes('data-open')).toBe('false')
     expect(wrapper.find('[data-testid="btn-jump-section-google"]').exists()).toBe(true)
 
-    await wrapper.get('[data-testid="btn-config-section-higgsfield"]').trigger('click')
-    expect(wrapper.get('#config-section-higgsfield').attributes('data-open')).toBe('true')
+    await wrapper.get('[data-testid="btn-config-section-access"]').trigger('click')
+    expect(wrapper.get('#config-section-access').attributes('data-open')).toBe('true')
 
     await wrapper.get('[data-testid="btn-config-accordion-toggle-all"]').trigger('click')
-    expect(wrapper.get('#config-section-openai').attributes('data-open')).toBe('true')
-    expect(wrapper.get('#config-section-higgsfield').attributes('data-open')).toBe('true')
     expect(wrapper.get('#config-section-google').attributes('data-open')).toBe('true')
+  })
+
+  it('shows one sentence and a retry when the settings cannot be loaded', async () => {
+    getConfigSchema.mockRejectedValue(new Error('down'))
+    const { wrapper } = await mountView()
+
+    expect(wrapper.find('[data-testid="config-load-error"]').exists()).toBe(true)
   })
 })

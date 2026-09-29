@@ -651,7 +651,7 @@ final class SystemConfigServiceTest extends TestCase
     }
 
     /**
-     * NV05 (D2): instance provider keys have one editor — Models & keys. The
+     * NV05 (D2): instance provider keys have one editor — Providers & keys. The
      * legacy field stays readable but a write is refused and the message
      * names the new home, so an API client learns where to go.
      */
@@ -664,7 +664,7 @@ final class SystemConfigServiceTest extends TestCase
 
             self::assertFalse($result['success'], $key.' must not be writable here');
             self::assertSame(ProviderKeyCatalog::MANAGED_BY, $result['managedBy'] ?? null);
-            self::assertStringContainsString('Models & keys', $result['message'] ?? '');
+            self::assertStringContainsString('Providers & keys', $result['message'] ?? '');
             self::assertStringContainsString($key, $result['message'] ?? '');
         }
     }
@@ -684,7 +684,7 @@ final class SystemConfigServiceTest extends TestCase
             if (!isset($fields[$envVar])) {
                 continue; // aliases like GEMINI_API_KEY have no config field
             }
-            self::assertSame(ProviderKeyCatalog::MANAGED_BY, $fields[$envVar]['managedBy'] ?? null, $envVar.' must be managed by Models & keys');
+            self::assertSame(ProviderKeyCatalog::MANAGED_BY, $fields[$envVar]['managedBy'] ?? null, $envVar.' must be managed by Providers & keys');
             self::assertSame('database', $fields[$envVar]['source'] ?? null, $envVar.' is stored by the key store, not .env');
         }
 

@@ -77,7 +77,7 @@ final readonly class SystemConfigService
 
     /**
      * Instance provider keys have exactly one editor: AI infrastructure ›
-     * Models & keys ({@see ProviderKeyStore}). Every field whose key is an env
+     * Providers & keys ({@see ProviderKeyStore}). Every field whose key is an env
      * var the {@see ProviderKeyCatalog} manages stays readable here — so the
      * response shape of /api/v1/admin/system-config does not change — but is
      * flagged `managedBy` so the UI renders a pointer instead of an input and
@@ -171,7 +171,7 @@ final readonly class SystemConfigService
                 'tab' => 'features', 'section' => 'modules', 'type' => 'boolean',
                 'sensitive' => false,
                 'description' => sprintf(
-                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. %s Configure the module first — see Operate → Feature status.',
+                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. %s Configure the module first — see Operate → System status.',
                     $id,
                     $onByDefault
                         ? 'On is the shipped default for new installs.'
@@ -386,7 +386,7 @@ final readonly class SystemConfigService
 
             // Instance provider keys live in the encrypted ProviderKeyStore
             // (BCONFIG), not in .env — report their status from there so this
-            // legacy surface and Models & keys agree. The secret half of a
+            // legacy surface and Providers & keys agree. The secret half of a
             // key + secret pair reports its own presence.
             $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
             if (null !== $storeProvider) {
@@ -515,7 +515,7 @@ final readonly class SystemConfigService
      * Update a single configuration value.
      *
      * `managedBy` in a failed result means the field has another editor
-     * (Models & keys); the controller answers 422 and the message names it.
+     * (Providers & keys); the controller answers 422 and the message names it.
      *
      * @return array{success: bool, requiresRestart: bool, message?: string, managedBy?: string}
      */
@@ -529,14 +529,14 @@ final readonly class SystemConfigService
         $source = $field['source'] ?? 'env';
 
         // One editor per key: instance provider keys are saved, tested and
-        // removed under AI infrastructure › Models & keys. Writing them here
+        // removed under AI infrastructure › Providers & keys. Writing them here
         // would bypass the live check and the key + secret pairing rule.
         if (isset($field['managedBy'])) {
             return [
                 'success' => false,
                 'requiresRestart' => false,
                 'managedBy' => $field['managedBy'],
-                'message' => sprintf('%s is managed under AI infrastructure › Models & keys (/admin/setup). Save, test or remove the key there.', $key),
+                'message' => sprintf('%s is managed under AI infrastructure › Providers & keys (/admin/setup). Save, test or remove the key there.', $key),
             ];
         }
 
@@ -1437,7 +1437,7 @@ final readonly class SystemConfigService
             'FEATURE_PLATFORM_LINKS_ENABLED' => [
                 'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → Linked platforms, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
+                'description' => 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → People → Platform instances, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => PlatformLinksConfig::CONFIG_GROUP,
@@ -2275,7 +2275,7 @@ final readonly class SystemConfigService
             // stored encrypted in BCONFIG by ProviderKeyStore and applies without
             // a restart. markManagedFields() flags them `managedBy` (and forces
             // 'source' => 'database'): getValues() reads their status from the
-            // store, setValue() refuses the write and points at Models & keys.
+            // store, setValue() refuses the write and points at Providers & keys.
             'OPENAI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'OpenAI API key',

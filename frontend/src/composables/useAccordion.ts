@@ -5,9 +5,11 @@ export type AccordionDefaultOpen = 'first' | 'all' | 'none'
 /**
  * Independent accordion state (several panels may be open at once).
  * A fresh page starts with every panel closed. A deep link or jump-nav
- * call to `open()` is what unfolds one. Replaces the panel set when `ids`
- * changes (tab switch) so a leftover open id from the previous page never
- * silently hides the new one.
+ * call to `open()` is what unfolds one. When `ids` changes, panels that are
+ * still listed keep their state (a list that grows as data arrives must not
+ * snap an open panel shut); when none is left (tab switch) the default
+ * applies again, so a leftover id from the previous page never hides the
+ * new one.
  */
 export function useAccordion(
   ids: MaybeRefOrGetter<string[]>,
@@ -31,7 +33,13 @@ export function useAccordion(
   watch(
     () => toValue(ids).join('\0'),
     () => {
-      applyDefault(toValue(ids))
+      const list = toValue(ids)
+      const kept = [...openIds.value].filter((id) => list.includes(id))
+      if (kept.length > 0) {
+        openIds.value = new Set(kept)
+        return
+      }
+      applyDefault(list)
     },
     { immediate: true }
   )

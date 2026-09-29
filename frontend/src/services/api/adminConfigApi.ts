@@ -21,7 +21,7 @@ const ConfigFieldSchemaZ = z.object({
   placeholder: z.string().optional(),
   /**
    * Set when another surface is the one editor for this field (instance
-   * provider keys → AI infrastructure › Models & keys). The value is still
+   * provider keys → AI infrastructure › Providers & keys). The value is still
    * reported read-only; PUT /values answers 422 for it.
    */
   managedBy: z.enum(['ai-infrastructure']).optional(),

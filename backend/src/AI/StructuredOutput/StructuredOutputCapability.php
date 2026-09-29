@@ -59,8 +59,10 @@ final class StructuredOutputCapability
      * they fall back to the prose-instruction path. Matched by prefix because
      * Anthropic ships dated aliases of the same model
      * (`claude-fable-5-1-20260812` and friends), all of which share the
-     * restriction. Claude Opus 5.5 carries the same restriction
-     * (https://platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5).
+     * restriction. Claude Opus 5.5 and Claude Sonnet 5.5 carry the same
+     * restriction
+     * (https://platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5,
+     * https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
      *
      * Only the forcing is affected: the native tool-calling routing path sends
      * `tool_choice: auto` and works on these models normally.
@@ -69,6 +71,7 @@ final class StructuredOutputCapability
         'claude-fable-5-1',
         'claude-mythos-5-1',
         'claude-opus-5-5',
+        'claude-sonnet-5-5',
     ];
 
     /**

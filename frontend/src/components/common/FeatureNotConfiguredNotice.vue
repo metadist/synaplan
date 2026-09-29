@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/auth'
  * Shared notice for a feature module this installation does not provide.
  * Rendered in place of a module-owned surface (FM15) and wherever a request
  * came back as the gate's `404 feature_not_configured` (FM17), so the sentence
- * exists once. Admins additionally get the way to the Feature status page,
+ * exists once. Admins additionally get the way to the System status page,
  * which lists what configures the module; a docs anchor, when known, links to
  * the enable guide.
  */

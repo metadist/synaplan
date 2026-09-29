@@ -250,7 +250,7 @@
                group fall back to their absolute overlay positions relative to
                the card. -->
           <div class="flex items-center gap-2 px-3 pb-2.5 md:contents">
-            <!-- Plus menu: attach + per-message controls (Model / Tools / Knowledge).
+            <!-- Plus menu: attach + per-message controls (Model / Reasoning / Tools / Knowledge).
              Exempt from the guest lock rule — the menu always opens; gated items
              inside surface the guest hint popover. -->
             <div
@@ -347,6 +347,11 @@
 
                 <template v-else>
                   <ModelDropdown v-model="selectedModelId" />
+                  <ReasoningLevelMenu
+                    v-if="reasoningLevels.length > 0"
+                    v-model="reasoningEffort"
+                    :levels="reasoningLevels"
+                  />
                   <ToolsDropdown
                     :active-command="activeTool"
                     :thinking-enabled="thinkingEnabled"
@@ -467,28 +472,6 @@
       >
         {{ $t('chatInput.modelCaption', { name: selectedModelName }) }}
       </div>
-
-      <!-- Always on the open composer, including the default model. Models
-           without discrete levels keep the Thinking toggle in the + menu. -->
-      <div
-        v-if="reasoningLevels.length > 0"
-        class="mt-2 flex flex-wrap items-center justify-center gap-2 px-3"
-        data-testid="reasoning-level-row"
-      >
-        <label for="select-reasoning-effort" class="text-sm txt-secondary">
-          {{ $t('chatInput.reasoningLevel.label') }}
-        </label>
-        <select
-          id="select-reasoning-effort"
-          v-model="reasoningEffort"
-          data-testid="select-reasoning-effort"
-          class="max-w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-        >
-          <option v-for="level in reasoningLevels" :key="level" :value="level">
-            {{ $t(`chatInput.reasoningLevel.${level}`) }}
-          </option>
-        </select>
-      </div>
     </div>
 
     <!-- File Selection Modal -->
@@ -524,6 +507,7 @@ import ToolsDropdown from './ToolsDropdown.vue'
 import ToolBadge from './ToolBadge.vue'
 import DesktopJobCard from './DesktopJobCard.vue'
 import ModelDropdown from './ModelDropdown.vue'
+import ReasoningLevelMenu from './ReasoningLevelMenu.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import PastedTextCard from './chat/PastedTextCard.vue'

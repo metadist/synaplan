@@ -345,7 +345,7 @@
     },
     "logout": "Cerrar Sesión",
     "features": {
-      "title": "Estado del Sistema",
+      "title": "Estado del sistema",
       "subtitle": "Monitorea todos los servicios y funciones",
       "loading": "Cargando funciones...",
       "requiredConfig": "Configuración Requerida:",
@@ -358,7 +358,7 @@
       "model": "modelo",
       "models": "modelos",
       "adminOnlyTitle": "Se requiere acceso de administrador",
-      "adminOnlyMessage": "El estado de las funciones solo está disponible para administradores.",
+      "adminOnlyMessage": "El estado del sistema solo está disponible para administradores.",
       "modulesTitle": "Módulos de funciones",
       "modulesSubtitle": "Funciones opcionales que declara esta instalación. Cada una se activa mediante su configuración; la lista muestra las claves, nunca sus valores.",
       "modulesConfigured": "{configured} de {total} configurados",
@@ -374,7 +374,7 @@
         "statusOff": "Desactivado",
         "statusDown": "Caído",
         "stateRunning": "El trabajo con archivos está en marcha.",
-        "stateDisabled": "Desactivado en la configuración del sistema. El trabajo con archivos está oculto.",
+        "stateDisabled": "Desactivado en Configuración del sistema › Herramientas y automatización. El trabajo con archivos está oculto.",
         "stateUnreachable": "Activado, pero el sidecar no responde. El trabajo con archivos no está disponible.",
         "postureWarning": "Este servicio informa {tier}; esta instancia requiere un aislamiento más fuerte.",
         "capacity": "Capacidad",
@@ -383,7 +383,7 @@
         "images": "Imágenes",
         "runs24": "{count} ejecuciones (24h)",
         "failed24": "{count} fallidas (24h)",
-        "openConfig": "Ajustes de cómputo",
+        "openConfig": "Ajustes de trabajo con archivos",
         "stateTierBlocked": "Activado, pero por debajo del aislamiento requerido. El trabajo con archivos está oculto."
       }
     },

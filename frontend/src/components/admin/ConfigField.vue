@@ -168,7 +168,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 <template>
   <!--
     A field with another editor (managedBy: instance provider keys live under
-    AI infrastructure › Models & keys) is never rendered as an input here —
+    AI infrastructure › Providers & keys) is never rendered as an input here —
     the parent shows ManagedKeysStatusCard instead. This guard keeps that
     true for any caller.
   -->

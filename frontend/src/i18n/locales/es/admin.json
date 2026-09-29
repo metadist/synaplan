@@ -1,6 +1,5 @@
 {
   "adminModelStatus": {
-    "title": "Estado de modelos",
     "subtitle": "Qué modelos de IA funcionan ahora mismo y cuáles no.",
     "loading": "Cargando el estado de los modelos…",
     "loadFailed": "No se pudo cargar el estado de los modelos.",
@@ -92,13 +91,11 @@
   },
   "admin": {
     "title": "Operar",
-    "description": "Gestión y configuración del sistema",
+    "description": "Tu servidor de un vistazo: personas, registros y uso.",
     "tabs": {
       "overview": "Resumen",
       "users": "Usuarios",
-      "prompts": "Prompts",
       "usage": "Uso",
-      "moderation": "Moderación",
       "appServer": "Servidor de la app"
     },
     "overview": {
@@ -308,30 +305,35 @@
       }
     },
     "config": {
-      "title": "Configuración del Sistema",
-      "description": "Gestionar variables de entorno y conexiones de servicios",
+      "title": "Configuración del sistema",
+      "description": "Inicio de sesión, funciones y herramientas, canales y la apariencia de este servidor.",
+      "aiPointer": "Los proveedores de IA, las claves, los modelos, la lectura de documentos y la búsqueda se configuran en Infraestructura de IA.",
+      "aiPointerLink": "Abrir Infraestructura de IA",
       "loadError": "Error al cargar la configuración",
       "saveError": "Error al guardar la configuración",
+      "savedButNotRefreshed": "Guardado, pero los menús no se pudieron actualizar. Recarga la página para ver el cambio.",
       "saved": "Configuración guardada",
       "dbOverridesEnv": "Guardada cifrada en la base de datos — tiene prioridad sobre cualquier valor coincidente en .env.",
       "managedKeys": {
-        "title": "Las claves de proveedores se gestionan en Infraestructura de IA › Modelos y claves.",
-        "helm": "Las claves definidas en el entorno o por un chart de Helm se detectan automáticamente — una instalación con chart no necesita esta página. Usa Modelos y claves solo para añadir o sobrescribir una clave desde la interfaz.",
+        "title": "Las claves de proveedores se gestionan en Infraestructura de IA › Proveedores y claves.",
+        "helm": "Las claves definidas en el entorno o por un chart de Helm se detectan automáticamente — una instalación con chart no necesita esta página. Usa Proveedores y claves solo para añadir o sobrescribir una clave desde la interfaz.",
         "stateNone": "sin definir",
         "stateDb": "sobrescrita en la interfaz",
         "stateEnv": "entorno / Helm",
         "summary": "{env} del entorno, {db} sobrescritas en la interfaz.",
-        "cta": "Abrir Modelos y claves"
+        "cta": "Abrir Proveedores y claves"
       },
       "envOverridesDb": "Fijado por la variable de entorno {key}. Actualmente: {value}. Elimina la variable del entorno para gestionar este ajuste aquí.",
       "unsaved": "Cambios sin guardar",
-      "testConnection": "Probar Conexión",
+      "testConnection": "Probar conexión",
       "testFailed": "Prueba de conexión fallida",
       "commandCopied": "Comando copiado al portapapeles",
-      "tabGroups": {
-        "aiData": "IA y datos",
-        "communication": "Comunicación",
-        "security": "Funciones y acceso"
+      "groups": {
+        "access": "Acceso",
+        "features": "Funciones y herramientas",
+        "channels": "Canales y apps",
+        "appearance": "Apariencia",
+        "more": "Más ajustes"
       },
       "accordion": {
         "expandAll": "Expandir todo",
@@ -345,7 +347,8 @@
       "restartBanner": {
         "title": "Configuración Actualizada — Reinicio Requerido",
         "message": "Sus cambios se han guardado en el archivo .env. Para que los cambios surtan efecto, debe reiniciar sus contenedores Docker.",
-        "copyCommand": "Copiar Comando"
+        "copyCommand": "Copiar Comando",
+        "copyFailed": "No se pudo copiar. Selecciona el comando y cópialo manualmente."
       },
       "m365": {
         "title": "Antes de que estos campos sirvan: registra una aplicación en Azure",
@@ -382,28 +385,57 @@
         "resetFailed": "El restablecimiento ha fallado. Inténtalo de nuevo."
       },
       "tabs": {
-        "ai": "Servicios de IA",
-        "email": "Correo",
-        "branding": "Identidad visual",
-        "mobile": "App móvil",
-        "auth": "Autenticación",
-        "channels": "Canales de entrada",
-        "processing": "Procesamiento",
+        "auth": "Inicio de sesión y registro",
+        "sharing": "Uso compartido y auditoría",
         "features": "Funciones",
-        "sharing": "Uso compartido",
-        "routing": "Enrutado",
+        "web_search": "Búsqueda web",
+        "tools": "Herramientas y automatización",
+        "email": "Correo",
+        "channels": "Canales e integraciones",
+        "mobile": "App móvil",
+        "branding": "Identidad visual",
         "interface": "Interfaz",
-        "guest_landing": "Página de invitados",
-        "vectordb": "Base vectorial"
+        "guest_landing": "Página de invitados"
+      },
+      "tabIntro": {
+        "auth": "Quién puede registrarse e iniciar sesión, y qué proveedores de inicio de sesión se ofrecen.",
+        "sharing": "Qué pueden compartir las personas con todos, qué grupos de inicio de sesión se sincronizan y cuánto tiempo se guarda el registro de auditoría.",
+        "features": "Activa o desactiva funciones completas para todos en este servidor. Los cambios se aplican al instante.",
+        "web_search": "Elige quién busca en la web para el chat y pruébalo con una consulta.",
+        "tools": "Lo que la IA puede hacer por su cuenta: tareas guardadas, reglas de aprobación de herramientas y trabajo con archivos en un entorno aislado.",
+        "email": "El servidor de correo que envía los correos de registro, contraseña y notificaciones.",
+        "channels": "Canales de entrada como WhatsApp y correo, además de conexiones con Microsoft 365, Dropbox y MCP.",
+        "mobile": "La versión más antigua de la app que puede conectarse y dónde se descargan las apps.",
+        "branding": "Nombre, colores, fuentes, logotipos y enlaces legales.",
+        "interface": "Si se muestra el uso y qué muestra el chat mientras trabaja.",
+        "guest_landing": "Las noticias que ven los visitantes en la página de invitados.",
+        "more": "Ajustes que todavía no están ordenados en un tema."
+      },
+      "panelSettings": {
+        "web_search": {
+          "title": "Ajustes de Brave Search",
+          "hint": "Clave API y número de resultados de Brave Search, el proveedor predeterminado."
+        }
       },
       "sections": {
-        "tika": "Apache Tika",
-        "docling": "Docling",
-        "rasterize": "Rasterizador PDF",
-        "whisper": "Whisper (audio)",
-        "brave": "Búsqueda web (Brave)",
-        "media": "Generación de medios en segundo plano",
-        "compute": "Trabajo con archivos"
+        "ai_selfhosted": "IA autoalojada (NVIDIA Triton)",
+        "ai_tts": "Salida de voz (texto a voz)",
+        "ai_cloud": "Ajustes adicionales de proveedores",
+        "ai_embeddings": "Embeddings (Cloudflare Workers AI)",
+        "processing_tika": "Apache Tika",
+        "processing_docling": "Docling",
+        "processing_rasterize": "Rasterizador PDF",
+        "processing_whisper": "Whisper (transcripción de audio)",
+        "vectordb_qdrant": "Base de datos vectorial (Qdrant)",
+        "vectordb_qdrant_search": "Umbrales y límites de búsqueda",
+        "routing_multitask": "Enrutado en varios pasos",
+        "routing_conversation_summary": "Resumen continuo de la conversación",
+        "routing_deep_memory": "Memoria profunda (resúmenes de mensajes)",
+        "processing_media": "Generación de medios en segundo plano",
+        "processing_brave": "Brave Search",
+        "routing_saved_tasks": "Tareas guardadas",
+        "routing_tools": "Reglas de aprobación de herramientas",
+        "processing_compute": "Trabajo con archivos"
       },
       "fields": {
         "TIKA_BASE_URL": "URL de Apache Tika",
@@ -510,13 +542,10 @@
       "addPlaceholder": "Añadir un adaptador…",
       "healthAvailable": "disponible",
       "healthUnavailable": "no disponible",
-      "testSidecar": {
-        "tika": "Probar Tika",
-        "docling": "Probar Docling"
-      },
-      "testingSidecar": "Probando…",
-      "sidecarSettings": "La URL, el tiempo de espera y la prueba de conexión de Tika y Docling están en Configuración del sistema → Procesamiento.",
-      "sidecarSettingsLink": "Abrir ajustes de procesamiento",
+      "sidecarSettings": "Las direcciones, los tiempos de espera y la prueba de conexión de cada servicio están en Servicios de lectura, en esta pestaña.",
+      "sidecarSettingsLink": "Ir a servicios de lectura",
+      "servicesTitle": "Servicios de lectura",
+      "servicesHint": "Dónde se ejecutan Tika, Docling, el rasterizador PDF y Whisper, y sus límites.",
       "testTitle": "Probar con un archivo",
       "testHint": "Suba un ejemplo. Verá qué adaptador ganó y por qué los demás no.",
       "testButton": "Probar con un archivo",
@@ -586,6 +615,7 @@
       "testProviderFallback": "Respondido por {provider} (reserva de {from})"
     },
     "rerank": {
+      "title": "Reordenación",
       "lead": "Tras la búsqueda, un reordenador pone primero los fragmentos más útiles. Déjalo apagado hasta que una prueba demuestre que ayuda. El chat no cambia mientras esté apagado.",
       "enable": "Usar reordenación en la búsqueda de documentos",
       "model": "Modelo de reordenación",
@@ -668,7 +698,7 @@
     },
     "perplexity": {
       "title": "Clave API de Perplexity",
-      "message": "Crea una clave API en tu cuenta de Perplexity y pégala aquí para usar los modelos Sonar. La misma clave sirve para la búsqueda web si eliges Perplexity en la pestaña Búsqueda web."
+      "message": "Crea una clave API en tu cuenta de Perplexity y pégala aquí para usar los modelos Sonar. La misma clave sirve para la búsqueda web si eliges Perplexity en Configuración del sistema › Búsqueda web."
     },
     "ollama": {
       "title": "IA local con Ollama",
@@ -677,12 +707,13 @@
   },
   "people": {
     "title": "Personas",
-    "subtitle": "Usuarios y grupos de esta instancia.",
+    "subtitle": "Cuentas, grupos, políticas y contenido denunciado en este servidor.",
     "tabs": {
       "users": "Usuarios",
       "groups": "Grupos",
       "policies": "Políticas",
       "linkedPlatforms": "Instancias de plataforma",
+      "moderation": "Moderación",
       "audit": "Auditoría"
     },
     "openPeople": "Abrir Personas",
@@ -1118,7 +1149,7 @@
     "compute": {
       "label": "Cómputo seguro (trabajo con archivos)",
       "running": "El trabajo con archivos está en marcha.",
-      "runningOff": "El sidecar está en marcha; el trabajo con archivos está desactivado en la configuración del sistema.",
+      "runningOff": "El sidecar está en marcha; el trabajo con archivos está desactivado en Configuración del sistema › Herramientas y automatización.",
       "unreachable": "El sidecar de trabajo con archivos no es accesible.",
       "unset": "COMPUTE_URL o COMPUTE_TOKEN no está definido."
     },
@@ -1131,7 +1162,7 @@
       "title": "{module} no está disponible en esta instalación",
       "body": "Esta función es opcional. La activa el administrador de esta instalación.",
       "howToEnable": "Cómo activarla",
-      "openFeatureStatus": "Abrir estado de funciones"
+      "openFeatureStatus": "Abrir estado del sistema"
     }
   }
 }

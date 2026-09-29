@@ -51,7 +51,7 @@ environment pin → per-user → global → code fallback **false**:
 The seeder inserts the global flag as `1` if missing and never overwrites an
 existing value (`App\Seed\DesktopAgentConfigSeeder`); a migration turns the row
 on for installs that predate the default. Operators switch it under **Operate →
-System configuration → Features → Platforms & desktop**
+System configuration → Features → Desktop & partner platforms**
 (`FEATURE_DESKTOP_AGENT_ENABLED`), or pin it for an automated deployment with
 `FEATURE_DESKTOP_AGENT_ENABLED=false`. To turn it off for everyone by SQL:
 

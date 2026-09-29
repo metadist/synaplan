@@ -21,7 +21,7 @@ final class ProviderModulesTest extends TestCase
         $absent = new TheHiveModule($this->keyStore(['configured' => false, 'source' => 'none']));
         $this->assertFalse($absent->isConfigured());
         $this->assertSame('absent', $absent->status()->state());
-        $this->assertStringContainsString('Models & keys', $absent->status()->message, 'the absent message names the one editor');
+        $this->assertStringContainsString('Providers & keys', $absent->status()->message, 'the absent message names the one editor');
 
         $present = new TheHiveModule($this->keyStore(['configured' => true, 'source' => 'db', 'maskedKey' => 'sk-l…cret']));
         $this->assertTrue($present->isConfigured(), 'a key saved at runtime counts without a restart');

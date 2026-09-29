@@ -41,10 +41,11 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * declared tools are dropped
  * ({@see ToolCallingCapability::conflictsWithStructuredOutput()}).
  *
- * Note on Claude Fable 5.1 / Claude Mythos 5.1 / Claude Opus 5.5: those models
- * reject forced tool_choice ({"type": "any"} or {"type": "tool", "name": ...})
- * with a 400 invalid_request_error — only "auto" (default) and "none" are
- * accepted. That rules out the structured-output dialect for them, so
+ * Note on Claude Fable 5.1 / Claude Mythos 5.1 / Claude Opus 5.5 / Claude
+ * Sonnet 5.5: those models reject forced tool_choice ({"type": "any"} or
+ * {"type": "tool", "name": ...}) with a 400 invalid_request_error — only
+ * "auto" (default) and "none" are accepted. That rules out the
+ * structured-output dialect for them, so
  * {@see StructuredOutputCapability} reports it as unsupported and callers
  * fall back to the prose-instruction path. Ordinary tool declarations are
  * unaffected: they send tool_choice `auto`. For `required` / named tools
@@ -86,10 +87,28 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
      * field is omitted. Reasoning off sends `output_config.effort: low`.
      *
      * Measured on Claude Opus 5.5. Opus 5 and Fable 5.1 are omitted until the
-     * same rejection is confirmed.
+     * same rejection is confirmed. Claude Sonnet 5.5 is listed separately
+     * ({@see self::BETWEEN_TOOLS_MODELS}): omitting the field turns adaptive
+     * thinking on, and `disabled` is a 400.
      */
     private const ALWAYS_ON_THINKING_MODELS = [
         'claude-opus-5-5',
+    ];
+
+    /**
+     * Models whose lowest thinking setting is `thinking.type: between_tools`.
+     *
+     * Omitting the field runs adaptive thinking. `disabled` and a `display`
+     * field next to `between_tools` are both 400. `between_tools` is accepted
+     * only at low, medium, and high effort; xhigh and max require adaptive
+     * thinking.
+     *
+     * Longer prefixes must be listed before shorter ones. `claude-sonnet-5`
+     * is a prefix of `claude-sonnet-5-5`, so this list is matched on its own
+     * and never via the Sonnet 5 entries above.
+     */
+    private const BETWEEN_TOOLS_MODELS = [
+        'claude-sonnet-5-5',
     ];
 
     /**
@@ -337,6 +356,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
             $requestBody = $this->applyChosenEffort($requestBody, $model, $options);
             $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyBetweenToolsThinking($requestBody, $model, $thinkingEnabled);
 
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
@@ -517,6 +537,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
             $requestBody = $this->applyChosenEffort($requestBody, $model, $options);
             $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyBetweenToolsThinking($requestBody, $model, $thinkingEnabled);
 
             // Only accumulate when the request really declares tools. A forced
             // schema tool also streams its `input` as `input_json_delta`, but
@@ -947,8 +968,10 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
      *
      * Absent when the caller did not pick a level, so reasoning-on stays
      * adaptive with no forced effort. xhigh and max clamp to high — Claude
-     * rejects those names. Medium and high turn thinking on when the model
-     * supports it; low stays a real (cheapest) level and does not force it.
+     * rejects those names — except on models that accept the extended ladder
+     * ({@see self::BETWEEN_TOOLS_MODELS}). Medium and high turn thinking on
+     * when the model supports it; low stays a real (cheapest) level and does
+     * not force it.
      *
      * @param array<string, mixed> $requestBody
      * @param array<string, mixed> $options
@@ -966,12 +989,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             return $requestBody;
         }
 
-        $effort = match (strtolower($requested)) {
-            'low' => 'low',
-            'medium' => 'medium',
-            'high', 'xhigh', 'max' => 'high',
-            default => null,
-        };
+        $effort = $this->normalizeEffort($model, strtolower($requested));
         if (null === $effort) {
             return $requestBody;
         }
@@ -994,6 +1012,82 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         return $requestBody;
     }
 
+    /**
+     * Lowest thinking setting on models that reject `thinking.type: disabled`.
+     *
+     * Reasoning off sends `between_tools` and, when the caller picked no
+     * level, effort `low`. `display` is omitted: the API rejects it next to
+     * `between_tools`. xhigh and max are not valid with `between_tools`, so
+     * those stay on adaptive thinking.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function applyBetweenToolsThinking(array $requestBody, string $model, bool $thinkingEnabled): array
+    {
+        if ($thinkingEnabled || !$this->usesBetweenToolsThinking($model)) {
+            return $requestBody;
+        }
+
+        $outputConfig = $requestBody['output_config'] ?? [];
+        if (!\is_array($outputConfig)) {
+            $outputConfig = [];
+        }
+
+        $effort = isset($outputConfig['effort']) && \is_string($outputConfig['effort'])
+            ? strtolower($outputConfig['effort'])
+            : null;
+
+        if (\in_array($effort, ['xhigh', 'max'], true)) {
+            $requestBody['thinking'] = $this->buildThinkingConfig($model);
+            unset($requestBody['temperature']);
+
+            $this->logger->info('Anthropic: extended effort keeps adaptive thinking', [
+                'model' => $model,
+                'effort' => $effort,
+            ]);
+
+            return $requestBody;
+        }
+
+        if (null === $effort) {
+            $outputConfig['effort'] = 'low';
+            $requestBody['output_config'] = $outputConfig;
+        }
+
+        $requestBody['thinking'] = ['type' => 'between_tools'];
+        unset($requestBody['temperature']);
+
+        $this->logger->info('Anthropic: reasoning off uses between_tools', [
+            'model' => $model,
+            'effort' => $requestBody['output_config']['effort'] ?? null,
+        ]);
+
+        return $requestBody;
+    }
+
+    /**
+     * xhigh and max pass through only on the extended ladder. Every other
+     * adaptive model still clamps them to high.
+     */
+    private function normalizeEffort(string $model, string $requested): ?string
+    {
+        if ($this->usesBetweenToolsThinking($model)) {
+            return match ($requested) {
+                'low', 'medium', 'high', 'xhigh', 'max' => $requested,
+                default => null,
+            };
+        }
+
+        return match ($requested) {
+            'low' => 'low',
+            'medium' => 'medium',
+            'high', 'xhigh', 'max' => 'high',
+            default => null,
+        };
+    }
+
     private function usesAdaptiveThinking(string $model): bool
     {
         foreach (self::ADAPTIVE_THINKING_MODELS as $adaptiveModel) {
@@ -1009,6 +1103,17 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     {
         foreach (self::ALWAYS_ON_THINKING_MODELS as $alwaysOn) {
             if (str_starts_with($model, $alwaysOn)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function usesBetweenToolsThinking(string $model): bool
+    {
+        foreach (self::BETWEEN_TOOLS_MODELS as $betweenToolsModel) {
+            if (str_starts_with($model, $betweenToolsModel)) {
                 return true;
             }
         }

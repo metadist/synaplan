@@ -103,7 +103,11 @@ describe('ChatInput reasoning level', () => {
     setActivePinia(createPinia())
   })
 
-  it('shows the model default on the open composer and sends that level', async () => {
+  const openPlusMenu = async (wrapper: ReturnType<typeof mountInput>) => {
+    await wrapper.get('[data-testid="btn-chat-plus"]').trigger('click')
+  }
+
+  it('shows the model default in the plus menu and sends that level', async () => {
     const store = useAiConfigStore()
     store.models.CHAT = [chatModel()]
     store.defaults.CHAT = 55
@@ -111,12 +115,16 @@ describe('ChatInput reasoning level', () => {
     const wrapper = mountInput()
     await flushPromises()
 
-    const select = wrapper.get('[data-testid="select-reasoning-effort"]')
-    expect((select.element as HTMLSelectElement).value).toBe('medium')
-    expect(wrapper.text()).toContain('chatInput.reasoningLevel.medium')
+    expect(wrapper.find('[data-testid="btn-reasoning-toggle"]').exists()).toBe(false)
 
+    await openPlusMenu(wrapper)
+    expect(wrapper.get('[data-testid="reasoning-level-current"]').text()).toBe(
+      'chatInput.reasoningLevel.medium'
+    )
+
+    await wrapper.get('[data-testid="btn-reasoning-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="btn-reasoning-xhigh"]').trigger('click')
     await wrapper.get('[data-testid="input-chat-message"]').setValue('Explain this')
-    await select.setValue('xhigh')
     await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
 
     const sent = wrapper.emitted('send')?.[0] as [
@@ -133,8 +141,10 @@ describe('ChatInput reasoning level', () => {
 
     const wrapper = mountInput()
     await flushPromises()
+    await openPlusMenu(wrapper)
     await wrapper.get('[data-testid="input-chat-message"]').setValue('Hi')
-    await wrapper.get('[data-testid="select-reasoning-effort"]').setValue('none')
+    await wrapper.get('[data-testid="btn-reasoning-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="btn-reasoning-none"]').trigger('click')
     await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
 
     const sent = wrapper.emitted('send')?.[0] as [
@@ -158,7 +168,8 @@ describe('ChatInput reasoning level', () => {
 
     const wrapper = mountInput()
     await flushPromises()
+    await openPlusMenu(wrapper)
 
-    expect(wrapper.find('[data-testid="select-reasoning-effort"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-reasoning-toggle"]').exists()).toBe(false)
   })
 })

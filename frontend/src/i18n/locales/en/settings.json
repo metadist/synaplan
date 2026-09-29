@@ -376,7 +376,7 @@
     },
     "logout": "Logout",
     "features": {
-      "title": "System Status",
+      "title": "System status",
       "subtitle": "Monitor all services and features",
       "loading": "Loading features...",
       "requiredConfig": "Required Configuration:",
@@ -389,7 +389,7 @@
       "model": "model",
       "models": "models",
       "adminOnlyTitle": "Admin access required",
-      "adminOnlyMessage": "Feature status is available to administrators only.",
+      "adminOnlyMessage": "System status is available to administrators only.",
       "modulesTitle": "Feature modules",
       "modulesSubtitle": "Optional features this installation declares. Each one is switched on by its configuration; the list shows which keys, never their values.",
       "modulesConfigured": "{configured} of {total} configured",
@@ -405,7 +405,7 @@
         "statusOff": "Off",
         "statusDown": "Down",
         "stateRunning": "File work is running.",
-        "stateDisabled": "Turned off in System configuration. File work stays hidden.",
+        "stateDisabled": "Turned off under System configuration › Tools & automation. File work stays hidden.",
         "stateUnreachable": "On, but the sidecar is not answering. File work is unavailable.",
         "postureWarning": "This service reports {tier}; this instance requires stronger isolation.",
         "capacity": "Capacity",
@@ -414,7 +414,7 @@
         "images": "Images",
         "runs24": "{count} runs (24h)",
         "failed24": "{count} failed (24h)",
-        "openConfig": "Compute settings",
+        "openConfig": "File work settings",
         "stateTierBlocked": "On, but below the required isolation. File work stays hidden."
       }
     },
