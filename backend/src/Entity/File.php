@@ -37,6 +37,7 @@ class File
         'nextcloud',
         'opencloud',
         'whatsapp',
+        'telegram',
         'widget',
         'api',
         'generated',

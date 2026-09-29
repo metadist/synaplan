@@ -153,7 +153,7 @@
       "whoElseLabel": "Wer sonst",
       "connectedWhoElse": "Nur Ihr Telegram-Konto. Alle anderen bekommen einen Satz, und es wird nichts gespeichert.",
       "touchesLabel": "Was es berührt",
-      "connectedTouches": "Textnachrichten in diesem Chat. Ihr KI-Assistent beantwortet sie wie im Web-Chat, und sie zählen zu Ihrem Nachrichtenlimit. Fotos und Sprachnachrichten bekommen einen Satz und werden nicht gespeichert.",
+      "connectedTouches": "Nachrichten, Fotos, Dateien, Sprachnachrichten, Videos und Standorte in diesem Chat. Ihr KI-Assistent beantwortet sie wie im Web-Chat, schickt erstellte Bilder, Videos, Audios und Dokumente zurück, und alles zählt zu Ihren Limits. Dateien werden in Ihren Synaplan-Dateien gespeichert.",
       "stopLabel": "Wie Sie es stoppen",
       "connectedStop": "Trennen Sie auf dieser Karte. Der Bot antwortet nicht mehr. Ihr Chatverlauf bleibt.",
       "fromLabel": "Woher es kommt",

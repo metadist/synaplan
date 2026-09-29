@@ -160,7 +160,7 @@
       "whoElseLabel": "Quién más",
       "connectedWhoElse": "Solo tu cuenta de Telegram. Cualquier otra persona recibe una frase y no se guarda nada.",
       "touchesLabel": "Qué toca",
-      "connectedTouches": "Mensajes de texto en este chat. Tu asistente de IA los responde como en el chat web y cuentan para tu límite de mensajes. Las fotos y las notas de voz reciben una frase y no se guardan.",
+      "connectedTouches": "Mensajes, fotos, archivos, mensajes de voz, vídeos y ubicaciones en este chat. Tu asistente de IA los responde como en el chat web, devuelve las imágenes, vídeos, audios y documentos creados, y todo cuenta para tus límites. Los archivos se guardan en tus archivos de Synaplan.",
       "stopLabel": "Cómo detenerlo",
       "connectedStop": "Desconecta en esta tarjeta. El bot deja de responder. Tu historial de chat se queda.",
       "fromLabel": "De dónde viene",

@@ -13,12 +13,14 @@ use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobRealtimeNotifier;
 use App\Service\Media\MediaJobService;
+use App\Service\Media\MediaJobTerminalEvent;
 use App\Service\Media\MediaJobUsageRecorder;
 use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 
 /**
  * #1251: the ASYNC (detached-job) media path must persist the spoken TTS script
@@ -61,6 +63,31 @@ final class MediaJobMessageSyncTest extends TestCase
             $this->em,
             new NullLogger(),
         );
+    }
+
+    public function testTheTerminalStateIsAnnouncedOnceTheAnswerIsUpdated(): void
+    {
+        $events = new EventDispatcher();
+        $seen = [];
+        $events->addListener(MediaJobTerminalEvent::class, static function (MediaJobTerminalEvent $event) use (&$seen): void {
+            $seen[] = [$event->job->getJobKey(), $event->messageId];
+        });
+        $sync = new MediaJobMessageSync(
+            $this->messageRepository,
+            $this->mediaJobService,
+            $this->fileRegistrar,
+            $this->realtimeNotifier,
+            $this->usageRecorder,
+            $this->taskPlanStore,
+            $this->thumbnailService,
+            $this->em,
+            new NullLogger(),
+            $events,
+        );
+
+        $sync->syncTerminalState($this->completedJob(MediaJob::TYPE_IMAGE, 'a fox'));
+
+        self::assertSame([['job-key-1', 55]], $seen);
     }
 
     public function testCompletedAudioJobPersistsSpokenScriptAsFileText(): void

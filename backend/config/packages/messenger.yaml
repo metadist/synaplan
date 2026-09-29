@@ -131,6 +131,10 @@ framework:
             # Telegram webhook → chat turn. Off the HTTP request so a slow
             # reply does not make Telegram retry the same update.
             'App\Message\ProcessTelegramUpdateCommand': async_ai_high
+            # Album parts wait here until the whole album arrived.
+            'App\Message\ProcessTelegramAlbumCommand': async_ai_high
+            # Finished render → Telegram upload, off the media worker.
+            'App\Message\DeliverTelegramMediaCommand': async_ai_high
 
 when@test:
     framework:
@@ -155,3 +159,5 @@ when@test:
                 # The test stack has no messenger worker. Run the turn in the
                 # webhook request so Playwright can see the reply.
                 'App\Message\ProcessTelegramUpdateCommand': sync
+                'App\Message\ProcessTelegramAlbumCommand': sync
+                'App\Message\DeliverTelegramMediaCommand': sync

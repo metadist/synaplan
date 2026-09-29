@@ -320,7 +320,7 @@
       "whoElseLabel": "Who else",
       "connectedWhoElse": "Only your Telegram account. Anyone else gets one sentence and nothing is saved.",
       "touchesLabel": "What it touches",
-      "connectedTouches": "Text messages in this chat. Your AI assistant answers them like in the web chat, and they count toward your message limit. Photos and voice notes get one sentence and are not saved.",
+      "connectedTouches": "Messages, photos, files, voice messages, videos and locations in this chat. Your AI assistant answers them like in the web chat, sends created images, videos, audio and documents back, and everything counts toward your limits. Files are saved in your Synaplan files.",
       "stopLabel": "How to stop it",
       "connectedStop": "Disconnect on this card. The bot stops replying. Your chat history stays.",
       "fromLabel": "Where it came from",

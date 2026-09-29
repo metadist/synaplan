@@ -17,6 +17,10 @@ use Psr\Log\LoggerInterface;
 final readonly class TelegramConnectionService
 {
     public const PAIR_CODE_TTL_SECONDS = 1800;
+    private const COMMANDS = ['pic', 'vid', 'tts', 'search', 'docs', 'help'];
+    /** English is also the menu for every language without its own. */
+    private const DEFAULT_COMMAND_LOCALE = 'en';
+    private const COMMAND_LOCALES = ['en', 'de', 'es', 'fr', 'tr'];
 
     public function __construct(
         private TelegramBotRepository $bots,
@@ -26,6 +30,7 @@ final readonly class TelegramConnectionService
         private LoggerInterface $logger,
         private string $appUrl,
         private string $webhookBaseUrl = '',
+        private ?TelegramCopy $copy = null,
     ) {
     }
 
@@ -96,8 +101,66 @@ final readonly class TelegramConnectionService
         $bot->setStatus(TelegramBot::STATUS_PENDING);
         $bot->setErrorCode(null);
         $this->bots->save($bot);
+        $this->registerCommands($token);
 
         return $this->present($bot);
+    }
+
+    /**
+     * Points the webhook of a working bot at the current URL with the
+     * current update types and menu. Returns false when Telegram refused.
+     */
+    public function refresh(TelegramBot $bot): bool
+    {
+        $token = $this->revealToken($bot);
+        if (null === $token || !in_array($bot->getStatus(), [TelegramBot::STATUS_PENDING, TelegramBot::STATUS_CONNECTED], true)) {
+            return false;
+        }
+        $base = '' !== trim($this->webhookBaseUrl) ? trim($this->webhookBaseUrl) : trim($this->appUrl);
+        $secret = bin2hex(random_bytes(32));
+        try {
+            $this->urls->assertPublic($base);
+            $this->api->setWebhook($token, $this->webhookUrl($base, $bot->getBotKey()), $secret);
+        } catch (TelegramChannelException $e) {
+            $this->logger->warning('Telegram webhook refresh failed', [
+                'bot_id' => $bot->getId(),
+                'error' => $e->errorCode,
+            ]);
+
+            return false;
+        }
+        $bot->setSecretHash(hash('sha256', $secret));
+        $this->bots->save($bot);
+        $this->registerCommands($token);
+
+        return true;
+    }
+
+    /**
+     * The "/" menu in Telegram, in every language we support. Best effort:
+     * the bot answers commands without the menu too.
+     */
+    public function registerCommands(string $token): void
+    {
+        if (null === $this->copy) {
+            return;
+        }
+        foreach (self::COMMAND_LOCALES as $locale) {
+            $commands = [];
+            foreach (self::COMMANDS as $command) {
+                $commands[] = ['command' => $command, 'description' => $this->copy->say($locale, 'command_'.$command)];
+            }
+            try {
+                $this->api->setMyCommands($token, $commands, self::DEFAULT_COMMAND_LOCALE === $locale ? null : $locale);
+            } catch (TelegramChannelException $e) {
+                $this->logger->info('Telegram setMyCommands skipped', [
+                    'locale' => $locale,
+                    'error' => $e->errorCode,
+                ]);
+
+                return;
+            }
+        }
     }
 
     public function pair(TelegramBot $bot, string $code, string $tgUserId, string $tgChatId): TelegramPairResult

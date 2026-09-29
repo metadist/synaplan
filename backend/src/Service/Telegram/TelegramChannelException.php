@@ -17,6 +17,8 @@ final class TelegramChannelException extends \RuntimeException
     public const BOT_IN_USE = 'telegram_bot_in_use';
     public const WEBHOOK_FAILED = 'telegram_webhook_failed';
     public const SEND_FAILED = 'telegram_send_failed';
+    public const FILE_TOO_LARGE = 'telegram_file_too_large';
+    public const DOWNLOAD_FAILED = 'telegram_download_failed';
 
     public function __construct(public readonly string $errorCode)
     {

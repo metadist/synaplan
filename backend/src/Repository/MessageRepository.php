@@ -617,6 +617,76 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * The owner's stored Telegram message for a Telegram message id in one
+     * Telegram chat.
+     */
+    public function findTelegramInbound(int $userId, string $tgChatId, string $externalId): ?Message
+    {
+        $result = $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'externalMeta', 'WITH', 'externalMeta.metaKey = :externalKey AND externalMeta.metaValue = :externalId')
+            ->innerJoin('m.metadata', 'chatMeta', 'WITH', 'chatMeta.metaKey = :chatKey AND chatMeta.metaValue = :tgChatId')
+            ->where('m.userId = :userId')
+            ->andWhere('m.messageType = :messageType')
+            ->andWhere('m.direction = :direction')
+            ->setParameter('externalKey', 'external_id')
+            ->setParameter('externalId', $externalId)
+            ->setParameter('chatKey', 'tg_chat_id')
+            ->setParameter('tgChatId', $tgChatId)
+            ->setParameter('userId', $userId)
+            ->setParameter('messageType', 'TGRM')
+            ->setParameter('direction', 'IN')
+            ->orderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result instanceof Message ? $result : null;
+    }
+
+    /**
+     * The current bot answer to one Telegram inbound message: the newest
+     * reply that was not replaced by a later one.
+     */
+    public function findTelegramAnswer(int $userId, int $inboundId): ?Message
+    {
+        $result = $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'replyMeta', 'WITH', 'replyMeta.metaKey = :replyKey AND replyMeta.metaValue = :inboundId')
+            ->leftJoin('m.metadata', 'supersededMeta', 'WITH', 'supersededMeta.metaKey = :supersededKey')
+            ->where('m.userId = :userId')
+            ->andWhere('m.messageType = :messageType')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('supersededMeta.id IS NULL')
+            ->setParameter('replyKey', 'tg_reply_to')
+            ->setParameter('inboundId', (string) $inboundId)
+            ->setParameter('supersededKey', 'superseded_by')
+            ->setParameter('userId', $userId)
+            ->setParameter('messageType', 'TGRM')
+            ->setParameter('direction', 'OUT')
+            ->orderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result instanceof Message ? $result : null;
+    }
+
+    public function hasInboundAfter(int $chatId, int $messageId): bool
+    {
+        $count = $this->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('m.id > :messageId')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('direction', 'IN')
+            ->setParameter('messageId', $messageId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
+    /**
      * Find a recent incoming email by deterministic fingerprint.
      *
      * Used as a fallback idempotency strategy when external message ID is missing.

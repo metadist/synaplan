@@ -40,6 +40,7 @@ const icon = computed(() => {
     nextcloud: 'mdi:cloud-outline',
     opencloud: 'mdi:cloud-outline',
     whatsapp: 'mdi:whatsapp',
+    telegram: 'mdi:telegram',
     widget: 'mdi:puzzle-outline',
     api: 'mdi:api',
     generated: 'mdi:auto-fix',

@@ -1227,6 +1227,15 @@ services:
             $appUrl: '%env(APP_URL)%'
             $webhookBaseUrl: '%env(TELEGRAM_WEBHOOK_BASE_URL)%'
 
+    App\Service\Telegram\TelegramMediaSender:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Telegram\TelegramConversation:
+        arguments:
+            # Workers often run without FRONTEND_URL; a missing value must not stop replies.
+            $frontendUrl: '%env(default:synaplan_url:FRONTEND_URL)%'
+
     App\Service\File\Office\StructuredTextExtractor:
         arguments:
             $officeTextMaxRows: '%env(int:OFFICE_TEXT_MAX_ROWS)%'

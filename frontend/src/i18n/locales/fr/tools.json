@@ -320,7 +320,7 @@
       "whoElseLabel": "Qui d'autre",
       "connectedWhoElse": "Uniquement votre compte Telegram. Toute autre personne reçoit une phrase et rien n'est enregistré.",
       "touchesLabel": "Ce que cela touche",
-      "connectedTouches": "Les messages texte de cette conversation. Votre assistant IA y répond comme dans le chat web, et ils comptent dans votre limite de messages. Les photos et les notes vocales reçoivent une phrase et ne sont pas enregistrées.",
+      "connectedTouches": "Les messages, photos, fichiers, messages vocaux, vidéos et positions de cette conversation. Votre assistant IA y répond comme dans le chat web, renvoie les images, vidéos, audios et documents créés, et tout compte dans vos limites. Les fichiers sont enregistrés dans vos fichiers Synaplan.",
       "stopLabel": "Comment l'arrêter",
       "connectedStop": "Déconnectez sur cette carte. Le bot cesse de répondre. Votre historique reste.",
       "fromLabel": "D'où cela vient",

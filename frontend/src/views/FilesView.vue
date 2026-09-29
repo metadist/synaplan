@@ -508,6 +508,7 @@
                       <option value="nextcloud">{{ $t('files.sourceLabel.nextcloud') }}</option>
                       <option value="opencloud">{{ $t('files.sourceLabel.opencloud') }}</option>
                       <option value="whatsapp">{{ $t('files.sourceLabel.whatsapp') }}</option>
+                      <option value="telegram">{{ $t('files.sourceLabel.telegram') }}</option>
                       <option value="widget">{{ $t('files.sourceLabel.widget') }}</option>
                       <option value="api">{{ $t('files.sourceLabel.api') }}</option>
                       <option value="generated">{{ $t('files.sourceLabel.generated') }}</option>

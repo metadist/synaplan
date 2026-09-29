@@ -4,52 +4,43 @@ declare(strict_types=1);
 
 namespace App\Service\Telegram;
 
-use App\Entity\Chat;
-use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Entity\User;
-use App\Realtime\Notifier\ChatActivityNotifier;
+use App\Message\ProcessTelegramAlbumCommand;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
-use App\Service\Digest\MessageReferenceResolver;
-use App\Service\Message\ChatErrorPresenter;
-use App\Service\Message\MessageProcessor;
-use App\Service\RateLimitService;
-use App\Service\Usage\RecordedUsage;
-use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
-use Symfony\Contracts\Translation\TranslatorInterface;
+use Symfony\Component\Lock\LockInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 /**
- * Turns one Telegram update into a chat turn for the paired owner.
- * Strangers and non-text messages get one sentence and nothing is stored.
- * A redelivered update (Messenger retry) that already stored its turn is skipped.
+ * Routes one Telegram update: a message becomes a chat turn for the paired
+ * owner, an edit answers again, a button acts on an answer. Strangers get
+ * one sentence and nothing is stored. A redelivered update is skipped.
  */
 final readonly class TelegramInboundService
 {
-    public const META_UPDATE = 'tg_update';
+    public const META_UPDATE = TelegramMessageStore::META_UPDATE;
 
     private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
     private const LOCK_SECONDS = 300.0;
-    private const DOMAIN = 'telegram';
+    /** Telegram sends the parts of an album within about a second. */
+    private const ALBUM_WAIT_MS = 1500;
 
     public function __construct(
         private EntityManagerInterface $em,
         private UserRepository $users,
         private MessageRepository $messages,
         private TelegramConnectionService $connections,
-        private TelegramBotApi $api,
-        private MessageProcessor $processor,
-        private ChatErrorPresenter $errors,
-        private RateLimitService $rateLimits,
-        private UserMemoryService $memories,
-        private MessageReferenceResolver $references,
-        private ChatActivityNotifier $activity,
-        private TranslatorInterface $translator,
+        private TelegramMessageStore $store,
+        private TelegramConversation $conversation,
+        private TelegramCallbackService $callbacks,
+        private TelegramAlbumBuffer $albums,
+        private TelegramState $state,
+        private MessageBusInterface $bus,
         private LockFactory $lockFactory,
-        private LoggerInterface $logger,
     ) {
     }
 
@@ -68,45 +59,331 @@ final readonly class TelegramInboundService
         if (!$lock->acquire()) {
             return;
         }
+        // Album parts only land in the buffer; the album turn takes the chat lock itself.
+        $albumPart = isset($update['message']['media_group_id']);
+        $chatLock = $albumPart ? null : $this->chatLock($botRowId, $this->updateChatId($update));
         try {
-            if ($this->messages->hasTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $updateKey)) {
+            if ($this->state->wasHandled($updateKey) || $this->messages->hasTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $updateKey)) {
                 return;
             }
-            $this->process($bot, $updateKey, $update);
+            $this->process($bot, $updateKey, $updateId, $update);
         } finally {
+            $chatLock?->release();
             $lock->release();
         }
     }
 
     /**
+     * Turns of one chat run one after another, so an edit or a button press
+     * never races the answer it refers to.
+     */
+    private function chatLock(int $botRowId, ?string $chatId): ?LockInterface
+    {
+        if (null === $chatId) {
+            return null;
+        }
+        $lock = $this->lockFactory->createLock('telegram_chat_'.$botRowId.'_'.$chatId, self::LOCK_SECONDS);
+        $lock->acquire(true);
+
+        return $lock;
+    }
+
+    /**
      * @param array<string, mixed> $update
      */
-    private function process(TelegramBot $bot, string $updateKey, array $update): void
+    private function updateChatId(array $update): ?string
     {
-        $incoming = $update['message'] ?? null;
-        if (!is_array($incoming)) {
+        $message = $update['message'] ?? $update['edited_message'] ?? ($update['callback_query']['message'] ?? null);
+        $chatId = is_array($message) && is_array($message['chat'] ?? null) ? ($message['chat']['id'] ?? null) : null;
+
+        return is_int($chatId) || is_string($chatId) ? (string) $chatId : null;
+    }
+
+    public function handleAlbum(int $botRowId, string $groupId): void
+    {
+        $bot = $this->em->find(TelegramBot::class, $botRowId);
+        if (!$bot instanceof TelegramBot) {
             return;
         }
-        $chatPayload = $incoming['chat'] ?? null;
-        $from = $incoming['from'] ?? null;
-        if (!is_array($chatPayload) || !is_array($from)) {
+        $parts = $this->albums->take($botRowId, $groupId);
+        if ([] === $parts) {
             return;
         }
 
+        $chatLock = $this->chatLock($botRowId, $this->updateChatId(['message' => reset($parts)]));
+        try {
+            $this->answerAlbum($bot, $parts);
+        } finally {
+            $chatLock?->release();
+        }
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $parts
+     */
+    private function answerAlbum(TelegramBot $bot, array $parts): void
+    {
+        $updateIds = array_keys($parts);
+        $firstKey = $bot->getBotId().':'.min($updateIds);
+        foreach ($updateIds as $updateId) {
+            $this->state->markHandled($bot->getBotId().':'.$updateId);
+        }
+        if ($this->messages->hasTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $firstKey)) {
+            return;
+        }
+
+        $first = reset($parts);
+        $turn = $this->ownerTurn($bot, $first, $firstKey);
+        if (null === $turn) {
+            return;
+        }
+
+        $media = [];
+        $caption = null;
+        $externalId = null;
+        foreach ($parts as $part) {
+            $incoming = TelegramIncoming::fromMessage($part);
+            $externalId ??= $incoming->messageId;
+            if (null !== $incoming->media) {
+                $media[] = $incoming->media;
+            }
+            if (null === $caption && '' !== $incoming->text) {
+                $caption = $this->commandPrompt($incoming->text);
+            }
+        }
+        $this->conversation->answer($turn, $caption ?? TelegramIncoming::albumPrompt($media), $media, $externalId);
+    }
+
+    /**
+     * @param array<string, mixed> $update
+     */
+    private function process(TelegramBot $bot, string $updateKey, int $updateId, array $update): void
+    {
+        if (is_array($update['callback_query'] ?? null)) {
+            $this->state->markHandled($updateKey);
+            $this->handleCallback($bot, $updateKey, $update['callback_query']);
+
+            return;
+        }
+        if (is_array($update['edited_message'] ?? null)) {
+            $this->state->markHandled($updateKey);
+            $this->handleEdit($bot, $updateKey, $update['edited_message']);
+
+            return;
+        }
+        if (is_array($update['message'] ?? null)) {
+            $this->handleMessage($bot, $updateKey, $updateId, $update['message']);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     */
+    private function handleMessage(TelegramBot $bot, string $updateKey, int $updateId, array $message): void
+    {
+        $context = $this->context($bot, $message['chat'] ?? null, $message['from'] ?? null, $updateKey);
+        if (null === $context) {
+            return;
+        }
+        [$turn, $tgUserId, $private] = $context;
+
+        if (!$private) {
+            $this->conversation->reply($turn, $this->conversation->say($turn, 'private_only'));
+
+            return;
+        }
+
+        $incoming = TelegramIncoming::fromMessage($message);
+        if ($incoming->isCommand() && preg_match('/^\/start(?:@\w+)?(?:\s+(\S+))?$/u', $incoming->text, $matches)) {
+            $this->handleStart($turn, $tgUserId, $matches[1] ?? '', $incoming->messageId);
+
+            return;
+        }
+
+        if (!$this->isOwner($bot, $tgUserId)) {
+            $key = TelegramBot::STATUS_PENDING === $bot->getStatus() ? 'finish_pairing' : 'owner_only';
+            $this->conversation->reply($turn, $this->conversation->say($turn, $key));
+
+            return;
+        }
+
+        if ($incoming->isCommand() && preg_match('/^\/help(?:@\w+)?$/u', $incoming->text)) {
+            $this->state->markHandled($updateKey);
+            $this->state->clearFeedback((int) $bot->getId());
+            $this->conversation->reply($turn, $this->conversation->say($turn, 'help'));
+
+            return;
+        }
+
+        if (!$incoming->isCommand() && null === $incoming->media && null === $incoming->shared && '' !== $incoming->text
+            && $this->callbacks->saveFeedback($turn, $incoming->text)) {
+            $this->state->markHandled($updateKey);
+
+            return;
+        }
+        $this->state->clearFeedback((int) $bot->getId());
+
+        if ($incoming->isEmpty()) {
+            $this->conversation->reply($turn, $this->conversation->say($turn, 'unsupported_message'));
+
+            return;
+        }
+
+        if (null !== $incoming->mediaGroupId && null !== $incoming->media) {
+            $first = $this->albums->add((int) $bot->getId(), $incoming->mediaGroupId, $updateId, $message);
+            if (true === $first) {
+                $this->bus->dispatch(
+                    new ProcessTelegramAlbumCommand((int) $bot->getId(), $incoming->mediaGroupId),
+                    [new DelayStamp(self::ALBUM_WAIT_MS)],
+                );
+            }
+            if (null !== $first) {
+                return;
+            }
+        }
+
+        $this->conversation->answer(
+            $turn,
+            $this->commandPrompt($incoming->prompt()),
+            null !== $incoming->media ? [$incoming->media] : [],
+            $incoming->messageId,
+            $incoming->payload,
+        );
+    }
+
+    /**
+     * An edited question is answered again. The newest question replaces its
+     * answer; an older one gets a fresh reply so later turns stay intact.
+     *
+     * @param array<string, mixed> $message
+     */
+    private function handleEdit(TelegramBot $bot, string $updateKey, array $message): void
+    {
+        $context = $this->context($bot, $message['chat'] ?? null, $message['from'] ?? null, $updateKey);
+        if (null === $context || !$context[2] || !$this->isOwner($bot, $context[1])) {
+            return;
+        }
+        $turn = $context[0];
+        $incoming = TelegramIncoming::fromMessage($message);
+        if (null === $incoming->messageId) {
+            return;
+        }
+        $inbound = $this->messages->findTelegramInbound((int) $turn->owner->getId(), $turn->tgChatId, $incoming->messageId);
+        if (null === $inbound) {
+            return;
+        }
+
+        // A live location sends an edit every few seconds; it only moves the pin.
+        if (null !== $incoming->payload) {
+            $this->store->updatePayload($inbound, $incoming->payload);
+
+            return;
+        }
+
+        $prompt = $this->commandPrompt($incoming->prompt());
+        if ('' === $prompt || $prompt === $inbound->getText()) {
+            return;
+        }
+        $this->store->recordEdit($inbound, $prompt);
+
+        $chatId = $inbound->getChatId();
+        $isLatest = null !== $chatId && !$this->messages->hasInboundAfter($chatId, (int) $inbound->getId());
+        $previous = $isLatest ? $this->messages->findTelegramAnswer((int) $turn->owner->getId(), (int) $inbound->getId()) : null;
+        $this->conversation->regenerate($turn, $inbound, $previous, [], (int) $incoming->messageId);
+    }
+
+    /**
+     * @param array<string, mixed> $callback
+     */
+    private function handleCallback(TelegramBot $bot, string $updateKey, array $callback): void
+    {
+        $chat = $callback['message']['chat'] ?? null;
+        $context = $this->context($bot, $chat, $callback['from'] ?? null, $updateKey);
+        if (null === $context) {
+            return;
+        }
+        [$turn, $tgUserId, $private] = $context;
+        $fromOwner = $private && $this->isOwner($bot, $tgUserId) && $bot->getTgChatId() === $turn->tgChatId;
+        $this->callbacks->handle($turn, $callback, $fromOwner);
+    }
+
+    private function handleStart(TelegramTurn $turn, string $tgUserId, string $code, ?string $externalId): void
+    {
+        $bot = $turn->bot;
+        if ($this->isOwner($bot, $tgUserId)) {
+            $this->conversation->reply($turn, $this->conversation->say($turn, 'already_connected'));
+
+            return;
+        }
+        if (TelegramBot::STATUS_CONNECTED === $bot->getStatus()) {
+            $this->conversation->reply($turn, $this->conversation->say($turn, 'owner_only'));
+
+            return;
+        }
+
+        $result = $this->connections->pair($bot, $code, $tgUserId, $turn->tgChatId);
+        if (TelegramPairResult::Expired === $result) {
+            $this->conversation->reply($turn, $this->conversation->say($turn, 'code_expired'));
+
+            return;
+        }
+        if (TelegramPairResult::Paired !== $result) {
+            $this->conversation->reply($turn, $this->conversation->say($turn, 'code_mismatch'));
+
+            return;
+        }
+
+        $chat = $this->store->chatFor($turn);
+        $this->store->store($turn, $chat, $this->conversation->say($turn, 'connected_in'), 'IN', 'complete', $externalId);
+        $reply = $this->conversation->say($turn, 'connected');
+        $this->store->store($turn, $chat, $reply, 'OUT', 'complete', null);
+        $this->connections->noteExchange($bot);
+        $this->conversation->reply($turn, $reply);
+    }
+
+    /**
+     * Telegram appends the bot name to commands tapped in the menu
+     * ("/pic@my_bot a cat"); the chat pipeline expects "/pic a cat".
+     */
+    private function commandPrompt(string $prompt): string
+    {
+        return (string) (preg_replace('/^(\/[a-z]+)@\w+/i', '$1', $prompt) ?? $prompt);
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     */
+    private function ownerTurn(TelegramBot $bot, array $message, string $updateKey): ?TelegramTurn
+    {
+        $context = $this->context($bot, $message['chat'] ?? null, $message['from'] ?? null, $updateKey);
+        if (null === $context || !$context[2] || !$this->isOwner($bot, $context[1])) {
+            return null;
+        }
+
+        return $context[0];
+    }
+
+    /**
+     * @return array{0: TelegramTurn, 1: string, 2: bool}|null turn, sender id, private chat
+     */
+    private function context(TelegramBot $bot, mixed $chatPayload, mixed $from, string $updateKey): ?array
+    {
+        if (!is_array($chatPayload) || !is_array($from)) {
+            return null;
+        }
         $tgChatId = $this->scalarId($chatPayload['id'] ?? null);
         $tgUserId = $this->scalarId($from['id'] ?? null);
         if (null === $tgChatId || null === $tgUserId) {
-            return;
+            return null;
         }
 
         $owner = $this->users->find($bot->getOwnerId());
         if (!$owner instanceof User) {
-            return;
+            return null;
         }
-
         $token = $this->connections->revealToken($bot);
         if (null === $token) {
-            return;
+            return null;
         }
 
         // Telegram only delivers after the owner unblocked the bot, so the
@@ -121,400 +398,12 @@ final readonly class TelegramInboundService
 
         $turn = new TelegramTurn($bot, $owner, $token, $tgChatId, $updateKey, $this->localeFor($bot, $owner, $tgUserId, $from));
 
-        if ('private' !== (string) ($chatPayload['type'] ?? '')) {
-            $this->reply($turn, $this->say($turn, 'private_only'));
-
-            return;
-        }
-
-        if (!$this->isTextMessage($incoming)) {
-            $this->reply($turn, $this->say($turn, 'text_only'));
-
-            return;
-        }
-
-        $text = trim((string) $incoming['text']);
-        if (preg_match('/^\/start(?:@\w+)?(?:\s+(\S+))?$/u', $text, $matches)) {
-            $this->handleStart($turn, $tgUserId, $matches[1] ?? '', $incoming);
-
-            return;
-        }
-
-        if (TelegramBot::STATUS_CONNECTED !== $bot->getStatus() || $bot->getTgUserId() !== $tgUserId) {
-            $key = TelegramBot::STATUS_PENDING === $bot->getStatus() ? 'finish_pairing' : 'owner_only';
-            $this->reply($turn, $this->say($turn, $key));
-
-            return;
-        }
-
-        $this->answer($turn, $text, $incoming);
+        return [$turn, $tgUserId, 'private' === (string) ($chatPayload['type'] ?? '')];
     }
 
-    /**
-     * @param array<string, mixed> $incoming
-     */
-    private function handleStart(TelegramTurn $turn, string $tgUserId, string $code, array $incoming): void
+    private function isOwner(TelegramBot $bot, string $tgUserId): bool
     {
-        $bot = $turn->bot;
-        if (TelegramBot::STATUS_CONNECTED === $bot->getStatus() && $bot->getTgUserId() === $tgUserId) {
-            $this->reply($turn, $this->say($turn, 'already_connected'));
-
-            return;
-        }
-        if (TelegramBot::STATUS_CONNECTED === $bot->getStatus()) {
-            $this->reply($turn, $this->say($turn, 'owner_only'));
-
-            return;
-        }
-
-        $result = $this->connections->pair($bot, $code, $tgUserId, $turn->tgChatId);
-        if (TelegramPairResult::Expired === $result) {
-            $this->reply($turn, $this->say($turn, 'code_expired'));
-
-            return;
-        }
-        if (TelegramPairResult::Paired !== $result) {
-            $this->reply($turn, $this->say($turn, 'code_mismatch'));
-
-            return;
-        }
-
-        $chat = $this->chatFor($turn);
-        $externalId = $this->scalarId($incoming['message_id'] ?? null);
-        $this->storeMessage($turn, $chat, $this->say($turn, 'connected_in'), 'IN', 'complete', $externalId);
-        $reply = $this->say($turn, 'connected');
-        $this->storeMessage($turn, $chat, $reply, 'OUT', 'complete', null);
-        $this->connections->noteExchange($bot);
-        $this->reply($turn, $reply);
-    }
-
-    /**
-     * @param array<string, mixed> $incoming
-     */
-    private function answer(TelegramTurn $turn, string $text, array $incoming): void
-    {
-        $owner = $turn->owner;
-        $chat = $this->chatFor($turn);
-        $externalId = $this->scalarId($incoming['message_id'] ?? null);
-        $limit = $this->rateLimits->checkLimit($owner, 'MESSAGES');
-        if (empty($limit['allowed'])) {
-            $sentence = $this->say($turn, 'limit_reached');
-            $this->storeMessage($turn, $chat, $text, 'IN', 'complete', $externalId);
-            $this->storeMessage($turn, $chat, $sentence, 'OUT', 'complete', null);
-            $this->reply($turn, $sentence);
-
-            return;
-        }
-
-        $message = $this->storeMessage($turn, $chat, $text, 'IN', 'processing', $externalId);
-        $this->activity->publishActivity($chat, (int) $owner->getId(), 'IN', $text);
-
-        try {
-            $this->api->sendChatAction($turn->token, $turn->tgChatId);
-        } catch (TelegramChannelException $e) {
-            $this->noteDeliveryFailure($turn->bot, $e);
-        }
-
-        // A retried job skips this update because its inbound row exists, so
-        // every failure below must still end the turn and tell the person.
-        try {
-            $this->respond($turn, $chat, $message, $text);
-        } catch (\Throwable $e) {
-            $this->logger->error('Telegram message processing failed', [
-                'message_id' => $message->getId(),
-                'exception_class' => $e::class,
-                'error' => $e->getMessage(),
-            ]);
-            $this->failTurn($turn, $chat, $message);
-        }
-    }
-
-    private function respond(TelegramTurn $turn, Chat $chat, Message $message, string $text): void
-    {
-        $owner = $turn->owner;
-        $result = $this->processor->process($message);
-
-        if (empty($result['success'])) {
-            $sentence = $this->errors->presentFromResult($result, $turn->locale, false)->userText;
-            $this->finish($turn, $chat, $message, $sentence, 'failed');
-            $this->reply($turn, $sentence);
-
-            return;
-        }
-
-        $classification = is_array($result['classification'] ?? null) ? $result['classification'] : [];
-        $response = is_array($result['response'] ?? null) ? $result['response'] : [];
-        $metadata = is_array($response['metadata'] ?? null) ? $response['metadata'] : [];
-        $file = $this->generatedFile($metadata);
-
-        $reply = trim((string) ($response['content'] ?? ''));
-        if ('' !== $reply) {
-            $reply = $this->memories->resolveMemoryTags($reply, $owner);
-            $reply = $this->references->resolveMessageTags($reply, $owner);
-        }
-
-        $recorded = null;
-        try {
-            $recorded = $this->rateLimits->recordUsage($owner, 'MESSAGES', [
-                'provider' => $metadata['provider'] ?? 'unknown',
-                'model' => $metadata['model'] ?? 'unknown',
-                'usage' => $metadata['usage'] ?? [],
-                'model_id' => $metadata['model_id'] ?? null,
-                'source' => 'TELEGRAM',
-                'response_text' => $reply,
-                'input_text' => $text,
-            ]);
-        } catch (\Throwable $e) {
-            $this->logger->warning('Telegram usage record failed', [
-                'user_id' => $owner->getId(),
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        $this->applyClassification($message, $classification);
-        $outbound = $this->finish($turn, $chat, $message, $reply, 'complete', $classification, $file);
-        $this->storeModelMeta($outbound, $metadata, $classification, $recorded);
-
-        $telegramText = $reply;
-        if (null !== $file) {
-            $note = $this->say($turn, 'file_in_synaplan');
-            $telegramText = '' === $telegramText ? $note : $telegramText."\n\n".$note;
-        }
-        if ('' === $telegramText) {
-            $telegramText = $this->say($turn, 'empty_reply');
-        }
-        $this->reply($turn, $telegramText);
-    }
-
-    /**
-     * @param array<string, mixed>                   $classification
-     * @param array{path: string, type: string}|null $file
-     */
-    private function finish(
-        TelegramTurn $turn,
-        Chat $chat,
-        Message $inbound,
-        string $reply,
-        string $inboundStatus,
-        array $classification = [],
-        ?array $file = null,
-    ): Message {
-        if ('processing' === $inbound->getStatus()) {
-            $inbound->setStatus($inboundStatus);
-            $this->em->flush();
-        }
-
-        $stored = '' !== $reply || null !== $file ? $reply : $this->say($turn, 'empty_reply');
-        $outbound = $this->storeMessage($turn, $chat, $stored, 'OUT', 'complete', null, $classification, $file);
-        $this->connections->noteExchange($turn->bot);
-
-        return $outbound;
-    }
-
-    private function failTurn(TelegramTurn $turn, Chat $chat, Message $inbound): void
-    {
-        $sentence = $this->say($turn, 'failed');
-        try {
-            $inbound->setStatus('failed');
-            $this->em->flush();
-            $this->storeMessage($turn, $chat, $sentence, 'OUT', 'complete', null);
-        } catch (\Throwable $e) {
-            $this->logger->error('Telegram failed turn could not be stored', [
-                'message_id' => $inbound->getId(),
-                'exception_class' => $e::class,
-            ]);
-        }
-        $this->reply($turn, $sentence);
-    }
-
-    /**
-     * @param array<string, mixed> $classification
-     */
-    private function applyClassification(Message $message, array $classification): void
-    {
-        $topic = $classification['topic'] ?? null;
-        $language = $classification['language'] ?? null;
-        if (is_string($topic) && '' !== $topic) {
-            $message->setTopic($topic);
-        }
-        if (is_string($language) && '' !== $language) {
-            $message->setLanguage($language);
-        }
-    }
-
-    /**
-     * Same keys as the web and WhatsApp replies, so the chat shows which
-     * models produced the answer.
-     *
-     * @param array<string, mixed> $metadata
-     * @param array<string, mixed> $classification
-     */
-    private function storeModelMeta(Message $outbound, array $metadata, array $classification, ?RecordedUsage $recorded): void
-    {
-        $outbound->setMeta('ai_chat_provider', (string) ($metadata['provider'] ?? 'unknown'));
-        $outbound->setMeta('ai_chat_model', (string) ($metadata['model'] ?? 'unknown'));
-        if (!empty($metadata['model_id']) && is_scalar($metadata['model_id'])) {
-            $outbound->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
-        }
-        if (!empty($metadata['usage']) && is_array($metadata['usage'])) {
-            $outbound->setMeta('ai_chat_usage', (string) json_encode($metadata['usage']));
-        }
-        if (null !== $recorded) {
-            $outbound->setMeta('ai_chat_cost', $recorded->chargedCost);
-        }
-        foreach (['sorting_provider' => 'ai_sorting_provider', 'sorting_model_name' => 'ai_sorting_model', 'sorting_model_id' => 'ai_sorting_model_id'] as $source => $key) {
-            $value = $classification[$source] ?? null;
-            if (!empty($value) && is_scalar($value)) {
-                $outbound->setMeta($key, (string) $value);
-            }
-        }
-        $this->em->flush();
-    }
-
-    /**
-     * @param array<string, mixed> $metadata
-     *
-     * @return array{path: string, type: string}|null
-     */
-    private function generatedFile(array $metadata): ?array
-    {
-        $file = $metadata['file'] ?? null;
-        if (!is_array($file)) {
-            return null;
-        }
-        $path = $file['path'] ?? null;
-        if (!is_string($path) || '' === $path) {
-            return null;
-        }
-        $type = $file['type'] ?? '';
-
-        return ['path' => $path, 'type' => is_string($type) ? $type : ''];
-    }
-
-    private function chatFor(TelegramTurn $turn): Chat
-    {
-        $bot = $turn->bot;
-        $title = 'Telegram: @'.$bot->getBotUsername();
-        $chatId = $bot->getChatId();
-        if (null !== $chatId) {
-            $existing = $this->em->find(Chat::class, $chatId);
-            if (
-                $existing instanceof Chat
-                && $existing->getUserId() === (int) $turn->owner->getId()
-                && 'telegram' === $existing->getSource()
-            ) {
-                if ($existing->getTitle() !== $title) {
-                    $existing->setTitle($title);
-                    $this->em->flush();
-                }
-
-                return $existing;
-            }
-        }
-
-        $chat = new Chat();
-        $chat->setUserId((int) $turn->owner->getId());
-        $chat->setTitle($title);
-        $chat->setSource('telegram');
-        $this->em->persist($chat);
-        $this->em->flush();
-        $id = $chat->getId();
-        if (null === $id) {
-            throw new \RuntimeException('Telegram chat persist did not assign an id');
-        }
-        $this->connections->attachChat($bot, $id);
-
-        return $chat;
-    }
-
-    /**
-     * @param array<string, mixed>                   $classification
-     * @param array{path: string, type: string}|null $file
-     */
-    private function storeMessage(
-        TelegramTurn $turn,
-        Chat $chat,
-        string $text,
-        string $direction,
-        string $status,
-        ?string $externalId,
-        array $classification = [],
-        ?array $file = null,
-    ): Message {
-        $now = time();
-        $message = new Message();
-        $message->setUserId((int) $turn->owner->getId());
-        $message->setChat($chat);
-        $message->setTrackingId($now);
-        $message->setProviderIndex('TELEGRAM');
-        $message->setUnixTimestamp($now);
-        $message->setDateTime(date('YmdHis', $now));
-        $message->setMessageType('TGRM');
-        $message->setFile(null !== $file ? 1 : 0);
-        if (null !== $file) {
-            $message->setFilePath($file['path']);
-            $message->setFileType($file['type']);
-        }
-        $message->setTopic('CHAT');
-        $message->setLanguage($turn->locale);
-        $this->applyClassification($message, $classification);
-        $message->setText($text);
-        $message->setDirection($direction);
-        $message->setStatus($status);
-
-        // The row and its update marker land together, so a retried job
-        // either finds the marker or finds nothing stored at all.
-        $connection = $this->em->getConnection();
-        $connection->beginTransaction();
-        try {
-            $this->em->persist($message);
-            $this->em->flush();
-            $message->setMeta('channel', 'telegram');
-            if (null !== $externalId && '' !== $externalId) {
-                $message->setMeta('external_id', $externalId);
-            }
-            $message->setMeta('tg_chat_id', $turn->tgChatId);
-            if ('IN' === $direction) {
-                $message->setMeta(self::META_UPDATE, $turn->updateKey);
-            }
-            $chat->updateTimestamp();
-            $this->em->flush();
-            $connection->commit();
-        } catch (\Throwable $e) {
-            $connection->rollBack();
-            throw $e;
-        }
-
-        return $message;
-    }
-
-    private function reply(TelegramTurn $turn, string $text): void
-    {
-        try {
-            $this->api->sendMessage($turn->token, $turn->tgChatId, $text);
-        } catch (TelegramChannelException $e) {
-            $this->noteDeliveryFailure($turn->bot, $e);
-        }
-    }
-
-    /**
-     * Only a revoked token or a blocked bot changes the card. A timeout or a
-     * rate limit must not lock the owner out of the next message.
-     */
-    private function noteDeliveryFailure(TelegramBot $bot, TelegramChannelException $e): void
-    {
-        if (!in_array($e->errorCode, [
-            TelegramChannelException::TOKEN_REVOKED,
-            TelegramChannelException::BOT_BLOCKED,
-        ], true)) {
-            $this->logger->warning('Telegram delivery failed', [
-                'bot_id' => $bot->getId(),
-                'error' => $e->errorCode,
-            ]);
-
-            return;
-        }
-        $this->connections->markError($bot, $e->errorCode);
+        return TelegramBot::STATUS_CONNECTED === $bot->getStatus() && $bot->getTgUserId() === $tgUserId;
     }
 
     /**
@@ -538,25 +427,6 @@ final readonly class TelegramInboundService
         }
 
         return $owner->getLocale();
-    }
-
-    private function say(TelegramTurn $turn, string $key): string
-    {
-        return $this->translator->trans('telegram.'.$key, [], self::DOMAIN, $turn->locale);
-    }
-
-    /**
-     * @param array<string, mixed> $incoming
-     */
-    private function isTextMessage(array $incoming): bool
-    {
-        foreach (['photo', 'voice', 'audio', 'video', 'video_note', 'document', 'sticker', 'animation', 'location', 'venue', 'contact', 'poll', 'dice'] as $key) {
-            if (isset($incoming[$key])) {
-                return false;
-            }
-        }
-
-        return isset($incoming['text']) && is_string($incoming['text']) && '' !== trim($incoming['text']);
     }
 
     private function scalarId(mixed $value): ?string

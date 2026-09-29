@@ -160,7 +160,7 @@
       "whoElseLabel": "Başka kim",
       "connectedWhoElse": "Yalnızca sizin Telegram hesabınız. Başka herkes bir cümle alır ve hiçbir şey kaydedilmez.",
       "touchesLabel": "Neyi etkiler",
-      "connectedTouches": "Bu sohbetteki metin mesajları. AI asistanınız bunları web sohbetindeki gibi yanıtlar ve mesaj sınırınıza sayılır. Fotoğraflar ve sesli notlar bir cümle alır ve kaydedilmez.",
+      "connectedTouches": "Bu sohbetteki mesajlar, fotoğraflar, dosyalar, sesli mesajlar, videolar ve konumlar. AI asistanınız bunları web sohbetindeki gibi yanıtlar, oluşturulan görselleri, videoları, sesleri ve belgeleri geri gönderir ve her şey sınırlarınıza sayılır. Dosyalar Synaplan dosyalarınıza kaydedilir.",
       "stopLabel": "Nasıl durdurulur",
       "connectedStop": "Bu kartta bağlantıyı kesin. Bot yanıt vermeyi bırakır. Sohbet geçmişiniz kalır.",
       "fromLabel": "Nereden geldi",

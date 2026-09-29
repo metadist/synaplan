@@ -45,6 +45,22 @@ class TelegramBotRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * @return list<TelegramBot>
+     */
+    public function findWithWebhook(): array
+    {
+        /** @var list<TelegramBot> $bots */
+        $bots = $this->createQueryBuilder('b')
+            ->where('b.status IN (:statuses)')
+            ->setParameter('statuses', [TelegramBot::STATUS_PENDING, TelegramBot::STATUS_CONNECTED])
+            ->orderBy('b.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $bots;
+    }
+
     public function save(TelegramBot $bot, bool $flush = true): void
     {
         $this->getEntityManager()->persist($bot);

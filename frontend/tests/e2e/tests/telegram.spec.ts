@@ -15,6 +15,8 @@ import {
 } from '../helpers/telegram-stub'
 
 const VALID_TOKEN = '123456789:AAHexampleToken'
+const UNREADABLE =
+  'I cannot read this kind of message. Send text, a photo, a file or a voice message.'
 const INVALID_TOKEN = '123456789:AAHINVALIDTOKEN'
 
 test.describe('@ci @telegram Telegram channel', () => {
@@ -86,18 +88,8 @@ test.describe('@ci @telegram Telegram channel', () => {
     await postUpdate(request, botKey, secret, messageUpdate(1002, 11, 555, 'What is 2 + 2?'))
     expect(await sendTexts(request, testInfo.testId)).toHaveLength(afterReply.length)
 
-    await postUpdate(request, botKey, secret, {
-      update_id: 1003,
-      message: {
-        message_id: 12,
-        from: { id: 555 },
-        chat: { id: 555, type: 'private' },
-        photo: [{ file_id: 'pic' }],
-      },
-    })
-    await waitForTexts(request, testInfo.testId, (texts) =>
-      texts.includes('Only text messages for now.')
-    )
+    await postUpdate(request, botKey, secret, unreadableUpdate(1003, 12, 555))
+    await waitForTexts(request, testInfo.testId, (texts) => texts.includes(UNREADABLE))
 
     await postUpdate(request, botKey, secret, messageUpdate(1004, 13, 777, 'hello'))
     await waitForTexts(request, testInfo.testId, (texts) =>
@@ -140,7 +132,7 @@ test.describe('@ci @telegram Telegram channel', () => {
     })
 
     await setTelegramStubBlocked(request, true)
-    await postUpdate(request, botKey, secret, photoUpdate(2002, 21, 555))
+    await postUpdate(request, botKey, secret, unreadableUpdate(2002, 21, 555))
     await page.reload()
     const blocked = page.getByTestId('text-telegram-state-error')
     await expect(blocked).toBeVisible({ timeout: TIMEOUTS.STANDARD })
@@ -149,26 +141,223 @@ test.describe('@ci @telegram Telegram channel', () => {
     await expect(blocked.getByTestId('btn-telegram-open-chat')).toBeVisible()
 
     await setTelegramStubBlocked(request, false)
-    await postUpdate(request, botKey, secret, photoUpdate(2003, 22, 555))
-    await waitForTexts(request, testInfo.testId, (texts) =>
-      texts.includes('Only text messages for now.')
-    )
+    await postUpdate(request, botKey, secret, unreadableUpdate(2003, 22, 555))
+    await waitForTexts(request, testInfo.testId, (texts) => texts.includes(UNREADABLE))
     await page.reload()
     await expect(page.getByTestId('text-telegram-connected')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
   })
+
+  test('photos, files, places, edits and buttons work like the web chat', async ({
+    page,
+    request,
+  }, testInfo) => {
+    test.setTimeout(180_000)
+    const runId = testInfo.testId
+    // Handled edits and button presses are remembered per update id, so every run needs fresh ids.
+    const firstUpdateId = Date.now()
+    const id = (offset: number) => firstUpdateId + offset
+    const { botKey, secret } = await connectAndPair(page, request, runId, firstUpdateId)
+    const post = (body: object) => postUpdate(request, botKey, secret, body)
+
+    const commands = (await getTelegramStubRequests(request, runId)).filter((entry) =>
+      entry.path.endsWith('/setMyCommands')
+    )
+    expect(commands.length).toBeGreaterThanOrEqual(5)
+
+    await post(update(id(2), { message_id: 31, photo: [{ file_id: 'photo_cat' }] }))
+    const photoReply = await waitForReply(request, runId, 1)
+    expect(photoReply.text).not.toBe('')
+    expect(callbackData(photoReply)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^a:\d+$/), expect.stringMatching(/^f:\d+$/)])
+    )
+    const downloads = await getTelegramStubRequests(request, runId)
+    expect(downloads.some((entry) => entry.path.startsWith('/file/bot'))).toBe(true)
+
+    await post(
+      update(id(3), {
+        message_id: 32,
+        caption: 'What is the total?',
+        document: {
+          file_id: 'doc_invoice',
+          file_name: 'invoice.pdf',
+          mime_type: 'application/pdf',
+        },
+      })
+    )
+    await waitForReply(request, runId, 2)
+
+    await post(
+      update(id(4), { message_id: 33, document: { file_id: 'huge_video', file_size: 30_000_000 } })
+    )
+    await waitForTexts(request, runId, (texts) =>
+      texts.some((text) => text.startsWith('This file is larger than 20 MB'))
+    )
+
+    await post(update(id(5), { message_id: 34, location: { latitude: 52.52, longitude: 13.405 } }))
+    await waitForReply(request, runId, 4)
+
+    await post(update(id(6), { message_id: 35, text: 'Say hello' }))
+    await waitForReply(request, runId, 5)
+    await post({
+      update_id: id(7),
+      edited_message: {
+        message_id: 35,
+        from: { id: 555 },
+        chat: { id: 555, type: 'private' },
+        text: 'Say goodbye',
+      },
+    })
+    await expect
+      .poll(async () => (await calls(request, runId, 'editMessageText')).length, {
+        timeout: 90_000,
+      })
+      .toBeGreaterThanOrEqual(1)
+
+    const edited = (await calls(request, runId, 'editMessageText')).at(-1)
+    const editedMarkup = (edited?.body as { reply_markup?: unknown } | null)?.reply_markup ?? null
+    const again =
+      callbackData({ text: '', markup: editedMarkup }).find((data) => data.startsWith('a:')) ?? ''
+    expect(again).not.toBe('')
+    await post(callbackUpdate(id(8), 'cb-stranger', again, 777))
+    await expect
+      .poll(async () => answeredTexts(request, runId), { timeout: TIMEOUTS.STANDARD })
+      .toContain('This button no longer works here.')
+
+    const editsBefore = (await calls(request, runId, 'editMessageText')).length
+    await post(callbackUpdate(id(9), 'cb-owner', again, 555))
+    await expect
+      .poll(async () => (await calls(request, runId, 'editMessageText')).length, {
+        timeout: 90_000,
+      })
+      .toBeGreaterThan(editsBefore)
+
+    await post(update(id(10), { message_id: 36, text: '/help' }))
+    await waitForTexts(request, runId, (texts) =>
+      texts.some((text) => text.startsWith('Send text, photos, files'))
+    )
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'History' }).click()
+    await page.getByText('Telegram: @synaplan_test_bot').first().click()
+    await expect(page.getByText('What is the total?').first()).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.getByText('Say goodbye').first()).toBeVisible()
+  })
 })
 
-function photoUpdate(updateId: number, messageId: number, userId: number): object {
+async function connectAndPair(
+  page: import('@playwright/test').Page,
+  request: import('@playwright/test').APIRequestContext,
+  runId: string,
+  firstUpdateId: number
+): Promise<{ botKey: string; secret: string }> {
+  await openChannels(page)
+  await page.getByTestId('input-telegram-token').fill(VALID_TOKEN)
+  await page.getByTestId('btn-telegram-connect').click()
+  const link = page.getByTestId('link-telegram-open')
+  await expect(link).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  const start = new URL((await link.getAttribute('href')) ?? 'https://t.me/x').searchParams.get(
+    'start'
+  )
+  const webhook = await readWebhook(request, runId)
+  await postUpdate(
+    request,
+    webhook.botKey,
+    webhook.secret,
+    messageUpdate(firstUpdateId, 30, 555, `/start ${start}`)
+  )
+  await expect(page.getByTestId('text-telegram-connected')).toBeVisible({
+    timeout: TIMEOUTS.LONG,
+  })
+  return webhook
+}
+
+function callbackUpdate(updateId: number, id: string, data: string, userId: number): object {
   return {
     update_id: updateId,
-    message: {
-      message_id: messageId,
+    callback_query: {
+      id,
       from: { id: userId },
-      chat: { id: userId, type: 'private' },
-      photo: [{ file_id: 'pic' }],
+      data,
+      message: { message_id: 1, chat: { id: userId, type: 'private' } },
     },
+  }
+}
+
+type Reply = { text: string; markup: unknown }
+
+/** The nth answer after pairing: a text message or an upload, with its buttons. */
+async function waitForReply(
+  request: import('@playwright/test').APIRequestContext,
+  runId: string,
+  nth: number
+): Promise<Reply> {
+  let replies: Reply[] = []
+  await expect
+    .poll(
+      async () => {
+        const recorded = await getTelegramStubRequests(request, runId)
+        replies = recorded
+          .filter((entry) =>
+            /\/(sendMessage|sendPhoto|sendDocument|sendVideo|sendVoice|sendAudio)$/.test(entry.path)
+          )
+          .slice(1)
+          .map((entry) => {
+            const body = (entry.body ?? {}) as Record<string, unknown>
+            const markup =
+              typeof body.reply_markup === 'string'
+                ? JSON.parse(body.reply_markup)
+                : (body.reply_markup ?? null)
+            return { text: String(body.text ?? body.caption ?? ''), markup }
+          })
+        return replies.length >= nth
+      },
+      { timeout: 90_000, intervals: [500, 1000, 2000] }
+    )
+    .toBe(true)
+  return replies[nth - 1] ?? { text: '', markup: null }
+}
+
+function callbackData(reply: Reply): string[] {
+  const rows = (reply.markup as { inline_keyboard?: { callback_data?: string }[][] } | null)
+    ?.inline_keyboard
+  return (rows ?? []).flat().map((button) => button.callback_data ?? '')
+}
+
+async function calls(
+  request: import('@playwright/test').APIRequestContext,
+  runId: string,
+  method: string
+): Promise<TelegramStubRequest[]> {
+  return (await getTelegramStubRequests(request, runId)).filter((entry) =>
+    entry.path.endsWith(`/${method}`)
+  )
+}
+
+async function answeredTexts(
+  request: import('@playwright/test').APIRequestContext,
+  runId: string
+): Promise<string[]> {
+  return (await calls(request, runId, 'answerCallbackQuery')).map((entry) =>
+    String((entry.body as { text?: unknown } | null)?.text ?? '')
+  )
+}
+
+function unreadableUpdate(updateId: number, messageId: number, userId: number): object {
+  return update(
+    updateId,
+    { message_id: messageId, from: { id: userId }, game: { title: 'x' } },
+    userId
+  )
+}
+
+function update(updateId: number, message: Record<string, unknown>, userId = 555): object {
+  return {
+    update_id: updateId,
+    message: { chat: { id: userId, type: 'private' }, from: { id: userId }, ...message },
   }
 }
 
