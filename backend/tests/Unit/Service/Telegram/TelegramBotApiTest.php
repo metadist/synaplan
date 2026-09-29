@@ -196,6 +196,36 @@ final class TelegramBotApiTest extends TestCase
         $this->assertSame('https://api.telegram.org/file/bot123456789%3AAAHexampleToken/photos/a.jpg', $urls[0]);
     }
 
+    public function testADownloadEncodesEachPathSegment(): void
+    {
+        $urls = [];
+        $api = $this->api(function (string $method, string $url) use (&$urls): MockResponse {
+            $urls[] = $url;
+
+            return new MockResponse('content');
+        });
+
+        $api->downloadFile('123456789:AAHexampleToken', 'documents/a b?x=1#y.pdf');
+
+        $this->assertSame('https://api.telegram.org/file/bot123456789%3AAAHexampleToken/documents/a%20b%3Fx%3D1%23y.pdf', $urls[0]);
+    }
+
+    public function testADownloadPathCannotLeaveTheBotFileFolder(): void
+    {
+        foreach (['../../bot999:x/getMe', 'photos/../a.jpg', 'photos//a.jpg', 'photos/a\\..\\b.jpg'] as $path) {
+            $api = $this->api(function (): MockResponse {
+                $this->fail('A rejected path must not be requested');
+            });
+
+            try {
+                $api->downloadFile('123456789:AAHexampleToken', $path);
+                $this->fail('Expected '.$path.' to be rejected');
+            } catch (TelegramChannelException $e) {
+                $this->assertSame(TelegramChannelException::DOWNLOAD_FAILED, $e->errorCode);
+            }
+        }
+    }
+
     public function testAFileIsUploadedAsMultipart(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'tg');

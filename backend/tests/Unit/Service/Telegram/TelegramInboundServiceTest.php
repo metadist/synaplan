@@ -58,6 +58,7 @@ use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\PersistingStoreInterface;
 use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Translation\Loader\YamlFileLoader;
 use Symfony\Component\Translation\Translator;
@@ -235,6 +236,41 @@ final class TelegramInboundServiceTest extends TestCase
 
         $this->assertSame([], $this->processed);
         $this->assertSame([], $this->sent);
+    }
+
+    public function testARedeliveredUpdateResumesATurnAKilledWorkerLeftProcessing(): void
+    {
+        $service = $this->service(reply: 'Four.');
+        $service->handle(5, 31, $this->update(['text' => 'What is 2+2?', 'message_id' => 15]));
+        [$in] = $this->messages;
+        $in->setStatus('processing');
+        $this->messages = [$in];
+        $this->sent = [];
+        $this->processed = [];
+
+        $service->handle(5, 31, $this->update(['text' => 'What is 2+2?', 'message_id' => 15]));
+
+        $this->assertCount(1, $this->processed);
+        $this->assertSame(['Four.'], $this->texts());
+        $this->assertSame([15], array_column($this->sent, 'replyTo'));
+        $this->assertSame('complete', $in->getStatus());
+        $this->assertCount(1, array_filter($this->messages, static fn (Message $message): bool => 'IN' === $message->getDirection()));
+    }
+
+    public function testAnUpdateHeldByAnotherWorkerIsRetriedInsteadOfDropped(): void
+    {
+        $service = $this->service(reply: 'never', persist: false);
+        $this->assertNotNull($this->locks);
+        $held = $this->locks->createLock('telegram_turn_5_31');
+        $this->assertTrue($held->acquire());
+
+        try {
+            $service->handle(5, 31, $this->update(['text' => 'What is 2+2?']));
+            $this->fail('A locked update must be retried.');
+        } catch (RecoverableMessageHandlingException $e) {
+            $this->assertSame(30_000, $e->getRetryDelay());
+        }
+        $this->assertSame([], $this->processed);
     }
 
     public function testInboundMessageIsAnnouncedToTheOpenBrowser(): void
@@ -848,17 +884,20 @@ final class TelegramInboundServiceTest extends TestCase
     private function messageRepository(bool $seen): MessageRepository
     {
         $repository = $this->createMock(MessageRepository::class);
-        $repository->method('hasTelegramUpdate')->willReturnCallback(function (int $userId, string $key, string $value) use ($seen): bool {
+        $repository->method('findTelegramUpdate')->willReturnCallback(function (int $userId, string $key, string $value) use ($seen): ?Message {
             if ($seen) {
-                return true;
+                $stored = new Message();
+                $stored->setStatus('complete');
+
+                return $stored;
             }
             foreach ($this->messages as $message) {
-                if ($message->getMeta($key) === $value) {
-                    return true;
+                if ('IN' === $message->getDirection() && $message->getMeta($key) === $value) {
+                    return $message;
                 }
             }
 
-            return false;
+            return null;
         });
         $repository->method('find')->willReturnCallback(function (mixed $id): ?Message {
             foreach ($this->messages as $message) {

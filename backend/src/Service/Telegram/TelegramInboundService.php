@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Telegram;
 
+use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Entity\User;
 use App\Message\ProcessTelegramAlbumCommand;
@@ -12,13 +13,15 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\LockInterface;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 /**
  * Routes one Telegram update: a message becomes a chat turn for the paired
  * owner, an edit answers again, a button acts on an answer. Strangers get
- * one sentence and nothing is stored. A redelivered update is skipped.
+ * one sentence and nothing is stored. A redelivered update is skipped once
+ * its turn ended and resumed while its turn is still unfinished.
  */
 final readonly class TelegramInboundService
 {
@@ -26,6 +29,7 @@ final readonly class TelegramInboundService
 
     private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
     private const LOCK_SECONDS = 300.0;
+    private const BUSY_RETRY_MS = 30_000;
     /** Telegram sends the parts of an album within about a second. */
     private const ALBUM_WAIT_MS = 1500;
 
@@ -58,15 +62,20 @@ final readonly class TelegramInboundService
         $updateKey = $bot->getBotId().':'.$updateId;
         $lock = $this->lockFactory->createLock('telegram_turn_'.$botRowId.'_'.$updateId, self::LOCK_SECONDS);
         if (!$lock->acquire()) {
-            return;
+            // The holder may be a worker that died; the lock expires, so try again later instead of dropping the update.
+            throw new RecoverableMessageHandlingException(sprintf('Telegram update %d of bot %d is locked by another worker.', $updateId, $botRowId), 0, null, self::BUSY_RETRY_MS);
         }
         $chatLock = null;
         try {
-            if ($this->state->wasHandled($updateKey) || $this->messages->hasTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $updateKey)) {
+            if ($this->state->wasHandled($updateKey)) {
+                return;
+            }
+            $stored = $this->messages->findTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $updateKey);
+            if (null !== $stored && !$this->isUnfinished($stored)) {
                 return;
             }
             $acknowledged = false;
-            if ($this->needsChatLock($update)) {
+            if (null !== $stored || $this->needsChatLock($update)) {
                 $callback = is_array($update['callback_query'] ?? null) ? $update['callback_query'] : null;
                 $chatLock = $this->chatLock(
                     $botRowId,
@@ -76,10 +85,32 @@ final readonly class TelegramInboundService
                     },
                 );
             }
-            $this->process($bot, $updateKey, $updateId, $update, $acknowledged);
+            if (null !== $stored) {
+                $this->resume($bot, $stored, $update['message'] ?? null, $updateKey);
+            } else {
+                $this->process($bot, $updateKey, $updateId, $update, $acknowledged);
+            }
         } finally {
             $chatLock?->release();
             $lock->release();
+        }
+    }
+
+    /**
+     * A turn stores its message as "processing" and always moves it on, even
+     * on error. A row still processing under a free update lock therefore
+     * belongs to a worker that was killed mid-turn.
+     */
+    private function isUnfinished(Message $inbound): bool
+    {
+        return 'processing' === $inbound->getStatus();
+    }
+
+    private function resume(TelegramBot $bot, Message $inbound, mixed $message, string $updateKey): void
+    {
+        $turn = is_array($message) ? $this->ownerTurn($bot, $message, $updateKey) : null;
+        if (null !== $turn) {
+            $this->conversation->resume($turn, $inbound);
         }
     }
 
@@ -146,6 +177,7 @@ final readonly class TelegramInboundService
         $chatLock = $this->chatLock($botRowId, $this->updateChatId(['message' => reset($parts)]));
         try {
             $this->answerAlbum($bot, $parts);
+            $this->albums->complete($botRowId, $groupId);
         } finally {
             $chatLock?->release();
         }
@@ -161,11 +193,16 @@ final readonly class TelegramInboundService
         foreach ($updateIds as $updateId) {
             $this->state->markHandled($bot->getBotId().':'.$updateId);
         }
-        if ($this->messages->hasTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $firstKey)) {
+        $first = reset($parts);
+        $stored = $this->messages->findTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $firstKey);
+        if (null !== $stored) {
+            if ($this->isUnfinished($stored)) {
+                $this->resume($bot, $stored, $first, $firstKey);
+            }
+
             return;
         }
 
-        $first = reset($parts);
         $turn = $this->ownerTurn($bot, $first, $firstKey);
         if (null === $turn) {
             return;

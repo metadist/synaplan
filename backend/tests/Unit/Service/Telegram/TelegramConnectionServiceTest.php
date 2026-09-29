@@ -18,6 +18,8 @@ use App\Service\Telegram\TelegramPairResult;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\Translation\Loader\YamlFileLoader;
 use Symfony\Component\Translation\Translator;
 
@@ -120,6 +122,24 @@ final class TelegramConnectionServiceTest extends TestCase
             $this->assertSame(TelegramChannelException::BOT_IN_USE, $e->errorCode);
         }
         $this->assertSame(TelegramBot::STATUS_CONNECTED, $other->getStatus());
+    }
+
+    public function testTwoConnectsOfOneBotCannotBothPassTheCheck(): void
+    {
+        $locks = new LockFactory(new InMemoryStore());
+        $heldDuringCheck = null;
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->method('findActiveByBotIdForOtherOwner')->willReturnCallback(function () use ($locks, &$heldDuringCheck): ?TelegramBot {
+            $heldDuringCheck = !$locks->createLock('telegram_connect_4242')->acquire();
+
+            return null;
+        });
+        $bots->method('findOneByOwner')->willReturn(null);
+
+        $this->service($this->identityApi(), $bots, $this->vault(), 'https://chat.example.com', $locks)->connect($this->user(), self::TOKEN);
+
+        $this->assertTrue($heldDuringCheck);
+        $this->assertTrue($locks->createLock('telegram_connect_4242')->acquire());
     }
 
     public function testThePairingLinkExpires(): void
@@ -314,6 +334,7 @@ final class TelegramConnectionServiceTest extends TestCase
         TelegramBotRepository $bots,
         CredentialVaultInterface $vault,
         string $appUrl,
+        ?LockFactory $locks = null,
     ): TelegramConnectionService {
         return new TelegramConnectionService(
             $bots,
@@ -322,6 +343,7 @@ final class TelegramConnectionServiceTest extends TestCase
             $vault,
             new NullLogger(),
             new TelegramCopy($this->translator()),
+            $locks ?? new LockFactory(new InMemoryStore()),
             $appUrl,
             '',
         );

@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\TelegramBotRepository;
 use App\Service\Credential\CredentialVaultInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * Connect, pair, and disconnect one bot per user. The token is stored in
@@ -21,6 +22,8 @@ final readonly class TelegramConnectionService
     /** English is also the menu for every language without its own. */
     private const DEFAULT_COMMAND_LOCALE = 'en';
     private const COMMAND_LOCALES = ['en', 'de', 'es', 'fr', 'tr'];
+    /** Covers the vault write, setWebhook and the menu calls of one connect. */
+    private const CONNECT_LOCK_SECONDS = 60.0;
 
     public function __construct(
         private TelegramBotRepository $bots,
@@ -29,6 +32,7 @@ final readonly class TelegramConnectionService
         private CredentialVaultInterface $vault,
         private LoggerInterface $logger,
         private TelegramCopy $copy,
+        private LockFactory $locks,
         private string $appUrl,
         private string $webhookBaseUrl = '',
     ) {
@@ -55,6 +59,21 @@ final readonly class TelegramConnectionService
         }
 
         $identity = $this->api->getMe($token);
+        // BBOTID is not unique (old rows keep it), so the check and the webhook switch run under one lock per bot.
+        $lock = $this->locks->createLock('telegram_connect_'.$identity->id, self::CONNECT_LOCK_SECONDS);
+        $lock->acquire(true);
+        try {
+            return $this->connectLocked($user, $token, $identity, $base);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function connectLocked(User $user, string $token, TelegramBotIdentity $identity, string $base): array
+    {
         $ownerId = (int) $user->getId();
         if (null !== $this->bots->findActiveByBotIdForOtherOwner($identity->id, $ownerId)) {
             throw new TelegramChannelException(TelegramChannelException::BOT_IN_USE);

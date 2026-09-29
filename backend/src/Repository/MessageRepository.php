@@ -593,13 +593,12 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Whether a Telegram update already stored its inbound row, so a retried
-     * worker job does not answer the same message twice.
+     * The inbound row a Telegram update already stored, so a retried worker
+     * job neither answers the same message twice nor leaves it unanswered.
      */
-    public function hasTelegramUpdate(int $userId, string $metaKey, string $updateKey): bool
+    public function findTelegramUpdate(int $userId, string $metaKey, string $updateKey): ?Message
     {
-        $count = $this->createQueryBuilder('m')
-            ->select('COUNT(m.id)')
+        $result = $this->createQueryBuilder('m')
             ->innerJoin('m.metadata', 'updateMeta', 'WITH', 'updateMeta.metaKey = :metaKey')
             ->where('m.userId = :userId')
             ->andWhere('m.messageType = :messageType')
@@ -610,10 +609,12 @@ class MessageRepository extends ServiceEntityRepository
             ->setParameter('messageType', 'TGRM')
             ->setParameter('direction', 'IN')
             ->setParameter('updateKey', $updateKey)
+            ->orderBy('m.id', 'ASC')
+            ->setMaxResults(1)
             ->getQuery()
-            ->getSingleScalarResult();
+            ->getOneOrNullResult();
 
-        return (int) $count > 0;
+        return $result instanceof Message ? $result : null;
     }
 
     /**

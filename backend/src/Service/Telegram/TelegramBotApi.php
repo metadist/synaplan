@@ -211,7 +211,7 @@ final readonly class TelegramBotApi
      */
     public function downloadFile(string $token, string $filePath, int $maxBytes = self::MAX_DOWNLOAD_BYTES): string
     {
-        $url = rtrim($this->baseUrl, '/').'/file/bot'.rawurlencode($token).'/'.ltrim($filePath, '/');
+        $url = rtrim($this->baseUrl, '/').'/file/bot'.rawurlencode($token).'/'.$this->filePathForUrl($filePath);
         try {
             $response = $this->http->request('GET', $url, ['timeout' => self::DOWNLOAD_TIMEOUT_SECONDS]);
             if (200 !== $response->getStatusCode()) {
@@ -233,6 +233,23 @@ final readonly class TelegramBotApi
         }
 
         return $content;
+    }
+
+    /**
+     * The path comes from getFile, but a bad response must not leave the
+     * bot's file folder or add a query to the URL.
+     */
+    private function filePathForUrl(string $filePath): string
+    {
+        $segments = explode('/', ltrim($filePath, '/'));
+        foreach ($segments as $segment) {
+            if ('' === $segment || '.' === $segment || '..' === $segment || 1 === preg_match('/[\x00-\x1F\x7F\\\\]/', $segment)) {
+                $this->logger->warning('Telegram file path rejected');
+                throw new TelegramChannelException(TelegramChannelException::DOWNLOAD_FAILED);
+            }
+        }
+
+        return implode('/', array_map(rawurlencode(...), $segments));
     }
 
     /**

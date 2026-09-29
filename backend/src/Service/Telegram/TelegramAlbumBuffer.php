@@ -54,7 +54,8 @@ final readonly class TelegramAlbumBuffer
 
     /**
      * Closes the album and returns its parts in the order they were sent,
-     * each with the update id it arrived in.
+     * each with the update id it arrived in. The parts stay until complete(),
+     * so a retried album job still finds them.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -65,12 +66,11 @@ final readonly class TelegramAlbumBuffer
         try {
             $item = $this->cache->getItem($this->key($botRowId, $groupId));
             $state = $this->state($item->get());
-            if ($state['flushed']) {
-                return [];
+            if (!$state['flushed']) {
+                $item->set(['flushed' => true, 'parts' => $state['parts']]);
+                $item->expiresAfter(self::TTL_SECONDS);
+                $this->cache->save($item);
             }
-            $item->set(['flushed' => true, 'parts' => []]);
-            $item->expiresAfter(self::TTL_SECONDS);
-            $this->cache->save($item);
 
             $parts = [];
             foreach ($state['parts'] as $updateId => $message) {
@@ -82,6 +82,17 @@ final readonly class TelegramAlbumBuffer
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Drops the parts once the album turn ended.
+     */
+    public function complete(int $botRowId, string $groupId): void
+    {
+        $item = $this->cache->getItem($this->key($botRowId, $groupId));
+        $item->set(['flushed' => true, 'parts' => []]);
+        $item->expiresAfter(self::TTL_SECONDS);
+        $this->cache->save($item);
     }
 
     /**

@@ -79,8 +79,8 @@ final readonly class TelegramConversation
         $this->activity->publishActivity($chat, (int) $owner->getId(), 'IN', '' !== $prompt ? $prompt : '📎');
         $this->typing($turn, [] !== $media ? 'upload_document' : 'typing');
 
-        // A retried job skips this update because its inbound row exists, so
-        // every failure below must still end the turn and tell the person.
+        // A retried job only resumes this row while it is still processing,
+        // so every failure below must end the turn and tell the person.
         try {
             $notes = $this->attach($turn, $inbound, $media);
             if ([] !== $media && 0 === $inbound->getFiles()->count()) {
@@ -122,6 +122,24 @@ final readonly class TelegramConversation
         $this->typing($turn, 'typing');
         try {
             $this->respond($turn, $chat, $inbound, $options, $previous, $replyTo, []);
+        } catch (\Throwable $e) {
+            $this->fail($turn, $chat, $inbound, $e);
+        }
+    }
+
+    /**
+     * Answers a message whose worker stopped before the turn ended (a
+     * killed process), so it neither stays "processing" nor goes unanswered.
+     * The limits were checked when the message arrived.
+     */
+    public function resume(TelegramTurn $turn, Message $inbound): void
+    {
+        $chat = $inbound->getChat() ?? $this->store->chatFor($turn);
+        $externalId = (string) $inbound->getMeta('external_id', '');
+        $replyTo = ctype_digit($externalId) ? (int) $externalId : null;
+        $this->typing($turn, 'typing');
+        try {
+            $this->respond($turn, $chat, $inbound, [], null, $replyTo, []);
         } catch (\Throwable $e) {
             $this->fail($turn, $chat, $inbound, $e);
         }
