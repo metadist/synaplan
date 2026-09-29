@@ -21,6 +21,8 @@ commands** for production-essential catalog data. Demo/test data lives in DataFi
 
 The orchestrator `app:seed` runs all idempotent seeders in the correct dependency order
 (models → prompts → defaults → rate-limits → subscriptions → multitask → demo-widget).
+A failing step does not stop the later ones; the command then exits non-zero and names
+the failed steps, so one broken seeder cannot silently skip model retirements.
 
 ## Daily Workflow
 
