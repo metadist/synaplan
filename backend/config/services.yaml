@@ -217,6 +217,12 @@ parameters:
     # per-instance password set this to true.
     env(BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE): 'false'
 
+    # Meeting notes stay off until an operator points at the sidecar.
+    env(OPENDESK_STT_URL): ''
+    env(OPENDESK_STT_PUBLIC_URL): ''
+    env(OPENDESK_STT_LANGUAGE): 'auto'
+    env(OPENDESK_STT_MODE): 'opendesk'
+
 services:
     _defaults:
         autowire: true
@@ -1138,6 +1144,24 @@ services:
         arguments:
             $baseUrl: '%env(COMPUTE_URL)%'
             $token: '%env(COMPUTE_TOKEN)%'
+
+    App\Module\Sidecar\OpendeskSttModule:
+        arguments:
+            $baseUrl: '%env(OPENDESK_STT_URL)%'
+            $publicUrl: '%env(OPENDESK_STT_PUBLIC_URL)%'
+            $language: '%env(OPENDESK_STT_LANGUAGE)%'
+            $mode: '%env(OPENDESK_STT_MODE)%'
+
+    App\Service\Opendesk\MeetingNoteStore:
+        arguments:
+            $directory: '%kernel.project_dir%/var/meeting-notes'
+
+    App\Service\Opendesk\OpendeskConnectSnippet:
+        arguments:
+            $publicUrl: '%env(OPENDESK_STT_PUBLIC_URL)%'
+            $internalUrl: '%env(OPENDESK_STT_URL)%'
+            $language: '%env(OPENDESK_STT_LANGUAGE)%'
+            $mode: '%env(OPENDESK_STT_MODE)%'
 
     App\Service\Compute\ComputeConfig:
         arguments:
