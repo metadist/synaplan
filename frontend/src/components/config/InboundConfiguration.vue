@@ -48,6 +48,8 @@
 
     <PhoneVerification v-if="whatsappAvailable" />
 
+    <TelegramChannelCard v-if="telegramAvailable" />
+
     <div class="surface-card p-6" data-testid="section-email">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <EnvelopeIcon class="w-5 h-5 text-blue-500" />
@@ -157,8 +159,10 @@ import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
+import TelegramChannelCard from '@/components/config/TelegramChannelCard.vue'
 import FeatureNotConfiguredNotice from '@/components/common/FeatureNotConfiguredNotice.vue'
 import { isModuleConfigured } from '@/composables/useModuleFeature'
+import { isAdminPreview } from '@/composables/useAdminPreview'
 import {
   featureNotConfigured,
   type FeatureNotConfigured,
@@ -201,6 +205,9 @@ const originalData = ref({
 const whatsappGate = ref<FeatureNotConfigured | null>(null)
 const whatsappAvailable = computed(
   () => isModuleConfigured('whatsapp') && whatsappGate.value === null
+)
+const telegramAvailable = computed(
+  () => isModuleConfigured('telegram') && isAdminPreview('telegram')
 )
 const whatsappAgentId = ref<number | null>(null)
 const whatsappChannels = computed(() => formData.value.whatsappChannels)

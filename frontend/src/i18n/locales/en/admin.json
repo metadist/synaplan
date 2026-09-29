@@ -1144,6 +1144,9 @@
     "whatsapp": {
       "label": "WhatsApp channel"
     },
+    "telegram": {
+      "label": "Telegram channel"
+    },
     "opendesk_stt": {
       "label": "Meeting notes"
     },

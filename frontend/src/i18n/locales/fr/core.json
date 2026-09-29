@@ -220,7 +220,11 @@
     "expand": "Développer",
     "noResults": "Aucun résultat",
     "skipToContent": "Aller au contenu",
-    "loadingMessages": "Chargement des messages…"
+    "loadingMessages": "Chargement des messages…",
+    "adminPreview": {
+      "badge": "Aperçu admin",
+      "hint": "Seuls les administrateurs voient ceci. Les autres personnes ne le verront qu'une fois la fonction publiée."
+    }
   },
   "search": {
     "sources": "Sources",

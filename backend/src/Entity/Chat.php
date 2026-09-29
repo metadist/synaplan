@@ -37,7 +37,7 @@ class Chat
     #[ORM\Column(name: 'BISPUBLIC', type: 'boolean', options: ['default' => false])]
     private bool $isPublic = false;
 
-    /** @var string Channel source: web, whatsapp, email, widget */
+    /** @var string Channel source: web, whatsapp, email, widget, telegram */
     #[ORM\Column(name: 'BSOURCE', type: 'string', length: 16, options: ['default' => 'web'])]
     private string $source = 'web';
 

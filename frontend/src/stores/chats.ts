@@ -52,7 +52,7 @@ export interface Chat {
     people: number
     groups: string[]
   }
-  source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api'
+  source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api' | 'telegram'
   widgetSession?: WidgetSessionInfo | null
   firstMessagePreview?: string | null
   access?: 'owner' | 'read' | 'use'

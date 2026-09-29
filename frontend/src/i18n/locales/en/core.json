@@ -220,7 +220,11 @@
     "expand": "Expand",
     "noResults": "No results",
     "skipToContent": "Skip to content",
-    "loadingMessages": "Loading messages…"
+    "loadingMessages": "Loading messages…",
+    "adminPreview": {
+      "badge": "Admin preview",
+      "hint": "Only admins can see this. Other people will not see it until it is released."
+    }
   },
   "search": {
     "sources": "Sources",

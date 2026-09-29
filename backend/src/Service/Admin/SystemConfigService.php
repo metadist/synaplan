@@ -245,6 +245,7 @@ final readonly class SystemConfigService
                 'label' => 'Inbound Channels',
                 'sections' => [
                     'whatsapp' => ['label' => 'WhatsApp Business API', 'fields' => ['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN']],
+                    'telegram' => ['label' => 'Telegram', 'fields' => ['TELEGRAM_ENABLED', 'TELEGRAM_API_BASE_URL', 'TELEGRAM_WEBHOOK_BASE_URL', 'TELEGRAM_ALLOW_LOCAL_WEBHOOK']],
                     'gmail' => ['label' => 'Smart Mail (Gmail IMAP)', 'fields' => ['GMAIL_USERNAME', 'GMAIL_PASSWORD']],
                     'm365' => ['label' => 'Microsoft 365 (Graph)', 'fields' => [
                         'M365_ENABLED', 'M365_CLIENT_ID', 'M365_CLIENT_SECRET', 'M365_TENANT', 'M365_REDIRECT_URI',
@@ -2518,6 +2519,26 @@ final readonly class SystemConfigService
                 'tab' => 'channels', 'section' => 'whatsapp', 'type' => 'password',
                 'sensitive' => true, 'description' => 'Webhook verification token',
                 'default' => '',
+            ],
+            'TELEGRAM_ENABLED' => [
+                'tab' => 'channels', 'section' => 'telegram', 'type' => 'boolean',
+                'sensitive' => false, 'description' => 'Let people connect their own Telegram bot',
+                'default' => 'false',
+            ],
+            'TELEGRAM_API_BASE_URL' => [
+                'tab' => 'channels', 'section' => 'telegram', 'type' => 'url',
+                'sensitive' => false, 'description' => 'Telegram Bot API base URL',
+                'default' => 'https://api.telegram.org',
+            ],
+            'TELEGRAM_WEBHOOK_BASE_URL' => [
+                'tab' => 'channels', 'section' => 'telegram', 'type' => 'url',
+                'sensitive' => false, 'description' => 'Public base URL Telegram calls. Empty uses APP_URL.',
+                'default' => '',
+            ],
+            'TELEGRAM_ALLOW_LOCAL_WEBHOOK' => [
+                'tab' => 'channels', 'section' => 'telegram', 'type' => 'boolean',
+                'sensitive' => false, 'description' => 'Allow a local APP_URL for the Telegram webhook (development only)',
+                'default' => 'false',
             ],
             'GMAIL_USERNAME' => [
                 'tab' => 'channels', 'section' => 'gmail', 'type' => 'email',

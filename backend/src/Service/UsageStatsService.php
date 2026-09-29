@@ -90,7 +90,7 @@ final readonly class UsageStatsService
             }
         }
 
-        // Get usage breakdown by source (WhatsApp, Email, Web)
+        // Get usage breakdown by source (WhatsApp, Telegram, Email, Web)
         $sourceBreakdown = $this->getUsageBySource($userId);
 
         // Breakdown by channel (WEB, WIDGET, WHATSAPP, EMAIL, MESSAGES_API, …)
@@ -180,7 +180,7 @@ final readonly class UsageStatsService
     }
 
     /**
-     * Get usage breakdown by channel (WEB, WIDGET, WHATSAPP, EMAIL,
+     * Get usage breakdown by channel (WEB, WIDGET, WHATSAPP, TELEGRAM, EMAIL,
      * MESSAGES_API, OPENAI_API, MCP, …) from the `source` metadata field.
      *
      * Legacy rows without a stored source fall back to 'WEB'. Any DB error

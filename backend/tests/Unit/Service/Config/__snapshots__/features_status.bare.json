@@ -466,6 +466,35 @@
             "mobile_class": "backend-only"
         },
         {
+            "id": "telegram",
+            "label_key": "modules.telegram.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Missing: TELEGRAM_ENABLED",
+            "details": {
+                "missing": [
+                    "TELEGRAM_ENABLED"
+                ]
+            },
+            "configured_by": {
+                "env": [
+                    "TELEGRAM_ENABLED",
+                    "TELEGRAM_API_BASE_URL",
+                    "TELEGRAM_WEBHOOK_BASE_URL",
+                    "TELEGRAM_ALLOW_LOCAL_WEBHOOK"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [
+                "channel_telegram"
+            ],
+            "docs_anchor": "modules/telegram",
+            "mobile_class": "ota-candidate"
+        },
+        {
             "id": "thehive",
             "label_key": "modules.thehive.label",
             "state": "absent",

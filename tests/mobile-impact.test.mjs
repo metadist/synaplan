@@ -282,6 +282,34 @@ test('classifies all server-side code and server-delivered plugins as backend-on
   }
 })
 
+test('classifies the telegram channel as backend-only plus ota-candidate', () => {
+  const backendPaths = [
+    'backend/src/Module/Channel/TelegramModule.php',
+    'backend/src/Controller/TelegramWebhookController.php',
+    'backend/src/Controller/TelegramChannelController.php',
+    'backend/src/Service/Telegram/TelegramInboundService.php',
+    'backend/src/Service/Telegram/TelegramMessageFormatter.php',
+    'backend/src/Service/Telegram/TelegramPairResult.php',
+    'backend/migrations/Version20260929120000.php',
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'backend-only', path)
+  }
+
+  const webPaths = [
+    'frontend/src/components/config/TelegramChannelCard.vue',
+    'frontend/src/components/config/TelegramChannelFacts.vue',
+    'frontend/src/components/config/TelegramConnectForm.vue',
+    'frontend/src/components/config/TelegramPairingPanel.vue',
+    'frontend/src/services/api/telegramChannelApi.ts',
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'ota-candidate', path)
+  }
+})
+
 test('classifies the model status surfaces as backend-only plus ota-candidate', () => {
   const backendPaths = [
     'backend/src/AI/Health/ModelHealthEvaluator.php',

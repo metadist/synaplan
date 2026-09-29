@@ -497,6 +497,7 @@ export const selectors = {
     page: '[data-testid="page-config-inbound"]',
     resetDefaults: '[data-testid="btn-reset-defaults"]',
     whatsappSection: '[data-testid="section-whatsapp"]',
+    telegramSection: '[data-testid="section-telegram"]',
     whatsappNotice: '[data-testid="notice-feature-not-configured"][data-module="whatsapp"]',
     emailSection: '[data-testid="section-email"]',
   },

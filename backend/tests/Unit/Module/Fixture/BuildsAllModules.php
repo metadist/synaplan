@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Module\Fixture;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Credential\ProviderKeyStore;
+use App\Module\Channel\TelegramModule;
 use App\Module\Channel\WhatsappModule;
 use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
@@ -67,6 +68,7 @@ trait BuildsAllModules
                 $this->createStub(GooglePlayVerifierInterface::class),
             ),
             new WhatsappModule(false, '', ''),
+            new TelegramModule(false),
             new ComputeModule($probe, $this->createStub(ComputeConfig::class), '', ''),
             new OpendeskSttModule($probe, '', '', '', ''),
         ];

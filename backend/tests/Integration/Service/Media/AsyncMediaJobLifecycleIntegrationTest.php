@@ -141,6 +141,7 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
             $container->get(\App\Service\File\ThumbnailService::class),
             $this->em,
             $jobLogger,
+            $container->get(\Symfony\Contracts\EventDispatcher\EventDispatcherInterface::class),
         );
 
         $this->aiFacade = $this->createMock(AiFacade::class);

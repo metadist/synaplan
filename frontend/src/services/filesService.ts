@@ -179,6 +179,7 @@ export const fileSourceSchema = z.enum([
   'nextcloud',
   'opencloud',
   'whatsapp',
+  'telegram',
   'widget',
   'api',
   'generated',

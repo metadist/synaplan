@@ -508,6 +508,9 @@
                       <option value="nextcloud">{{ $t('files.sourceLabel.nextcloud') }}</option>
                       <option value="opencloud">{{ $t('files.sourceLabel.opencloud') }}</option>
                       <option value="whatsapp">{{ $t('files.sourceLabel.whatsapp') }}</option>
+                      <option v-if="telegramSourceVisible" value="telegram">
+                        {{ $t('files.sourceLabel.telegram') }}
+                      </option>
                       <option value="widget">{{ $t('files.sourceLabel.widget') }}</option>
                       <option value="api">{{ $t('files.sourceLabel.api') }}</option>
                       <option value="generated">{{ $t('files.sourceLabel.generated') }}</option>
@@ -1589,6 +1592,7 @@ import {
   previewIconForName,
 } from '@/services/filePreview'
 import { isDocumentToolsEnabled } from '@/composables/useDocumentToolsFeature'
+import { isAdminPreview } from '@/composables/useAdminPreview'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { ApiError } from '@/services/api/httpClient'
@@ -1736,6 +1740,7 @@ const filterDateFrom = ref('')
 const filterDateTo = ref('')
 // Feature 2 (§4.4, §4.2, §4.5) — provenance / searchable / incoming filters.
 const filterSource = ref('')
+const telegramSourceVisible = computed(() => isAdminPreview('telegram'))
 const filterVectorized = ref('')
 const filterIncoming = ref(false)
 const filterSharedWithMe = ref(false)

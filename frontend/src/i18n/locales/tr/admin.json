@@ -1140,6 +1140,9 @@
     "whatsapp": {
       "label": "WhatsApp kanalı"
     },
+    "telegram": {
+      "label": "Telegram kanalı"
+    },
     "opendesk_stt": {
       "label": "Toplantı notları"
     },
