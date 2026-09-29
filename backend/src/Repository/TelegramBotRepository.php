@@ -28,6 +28,23 @@ class TelegramBotRepository extends ServiceEntityRepository
         return $this->findOneBy(['botKey' => $botKey]);
     }
 
+    /**
+     * Another owner's row that currently holds the webhook of this bot.
+     */
+    public function findActiveByBotIdForOtherOwner(int $botId, int $ownerId): ?TelegramBot
+    {
+        return $this->createQueryBuilder('b')
+            ->where('b.botId = :botId')
+            ->andWhere('b.ownerId != :ownerId')
+            ->andWhere('b.status IN (:statuses)')
+            ->setParameter('botId', $botId)
+            ->setParameter('ownerId', $ownerId)
+            ->setParameter('statuses', [TelegramBot::STATUS_PENDING, TelegramBot::STATUS_CONNECTED])
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function save(TelegramBot $bot, bool $flush = true): void
     {
         $this->getEntityManager()->persist($bot);

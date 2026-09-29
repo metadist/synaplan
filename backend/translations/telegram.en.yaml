@@ -5,6 +5,8 @@ telegram:
   finish_pairing: 'Finish connecting with the link from Channels.'
   already_connected: 'You are already connected. Send a message to get a reply.'
   code_mismatch: 'That code does not match. Use the link from Channels again.'
+  code_expired: 'This link has expired. Create a new link on the Channels page in Synaplan.'
+  file_in_synaplan: 'The file is in your Synaplan chat.'
   connected_in: 'Connected from Telegram.'
   connected: 'Connected. Send a message whenever you want a reply.'
   limit_reached: 'You have reached the message limit. Try again later.'

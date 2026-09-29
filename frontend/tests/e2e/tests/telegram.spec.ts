@@ -10,6 +10,7 @@ import { selectors } from '../helpers/selectors'
 import {
   getTelegramStubRequests,
   resetTelegramStub,
+  setTelegramStubBlocked,
   type TelegramStubRequest,
 } from '../helpers/telegram-stub'
 
@@ -119,7 +120,57 @@ test.describe('@ci @telegram Telegram channel', () => {
 
     await expectTelegramThread(page)
   })
+
+  test('a blocked bot shows on the card and reconnects when the owner writes again', async ({
+    page,
+    request,
+  }, testInfo) => {
+    await openChannels(page)
+    await page.getByTestId('input-telegram-token').fill(VALID_TOKEN)
+    await page.getByTestId('btn-telegram-connect').click()
+    const link = page.getByTestId('link-telegram-open')
+    await expect(link).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    const start = new URL((await link.getAttribute('href')) ?? 'https://t.me/x').searchParams.get(
+      'start'
+    )
+    const { botKey, secret } = await readWebhook(request, testInfo.testId)
+    await postUpdate(request, botKey, secret, messageUpdate(2001, 20, 555, `/start ${start}`))
+    await expect(page.getByTestId('text-telegram-connected')).toBeVisible({
+      timeout: TIMEOUTS.LONG,
+    })
+
+    await setTelegramStubBlocked(request, true)
+    await postUpdate(request, botKey, secret, photoUpdate(2002, 21, 555))
+    await page.reload()
+    const blocked = page.getByTestId('text-telegram-state-error')
+    await expect(blocked).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect(blocked).toContainText('You blocked this bot in Telegram')
+    await expect(blocked.getByTestId('btn-telegram-disconnect')).toBeVisible()
+    await expect(blocked.getByTestId('btn-telegram-open-chat')).toBeVisible()
+
+    await setTelegramStubBlocked(request, false)
+    await postUpdate(request, botKey, secret, photoUpdate(2003, 22, 555))
+    await waitForTexts(request, testInfo.testId, (texts) =>
+      texts.includes('Only text messages for now.')
+    )
+    await page.reload()
+    await expect(page.getByTestId('text-telegram-connected')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+  })
 })
+
+function photoUpdate(updateId: number, messageId: number, userId: number): object {
+  return {
+    update_id: updateId,
+    message: {
+      message_id: messageId,
+      from: { id: userId },
+      chat: { id: userId, type: 'private' },
+      photo: [{ file_id: 'pic' }],
+    },
+  }
+}
 
 async function expectTelegramThread(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/')

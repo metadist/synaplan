@@ -19,11 +19,13 @@ final readonly class TelegramBotApi
     private const MAX_TEXT = 4096;
     private const CONTEXT_CONNECT = 'connect';
     private const CONTEXT_SEND = 'send';
+    private const BAD_REQUEST = 400;
 
     public function __construct(
         private HttpClientInterface $http,
         private LoggerInterface $logger,
         private string $baseUrl = 'https://api.telegram.org',
+        private TelegramMessageFormatter $formatter = new TelegramMessageFormatter(),
     ) {
     }
 
@@ -66,9 +68,24 @@ final readonly class TelegramBotApi
         ], self::CONTEXT_SEND);
     }
 
+    /**
+     * Sends Markdown as Telegram HTML. When Telegram cannot parse the markup
+     * the same chunk goes out as plain text, so the reply is never lost.
+     */
     public function sendMessage(string $token, string $chatId, string $text): void
     {
         foreach ($this->chunks($text) as $chunk) {
+            [$status, $body] = $this->request($token, 'sendMessage', [
+                'chat_id' => $chatId,
+                'text' => $this->formatter->toHtml($chunk),
+                'parse_mode' => 'HTML',
+            ], self::CONTEXT_SEND);
+            if (true === ($body['ok'] ?? false)) {
+                continue;
+            }
+            if (self::BAD_REQUEST !== (int) ($body['error_code'] ?? $status)) {
+                $this->fail('sendMessage', $status, $body, self::CONTEXT_SEND);
+            }
             $this->call($token, 'sendMessage', [
                 'chat_id' => $chatId,
                 'text' => $chunk,
@@ -82,6 +99,23 @@ final readonly class TelegramBotApi
      * @return array<string, mixed>
      */
     private function call(string $token, string $method, array $payload, string $context): array
+    {
+        [$status, $body] = $this->request($token, $method, $payload, $context);
+        if (true !== ($body['ok'] ?? false)) {
+            $this->fail($method, $status, $body, $context);
+        }
+
+        $result = $body['result'] ?? [];
+
+        return is_array($result) ? $result : [];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return array{0: int, 1: array<string, mixed>}
+     */
+    private function request(string $token, string $method, array $payload, string $context): array
     {
         try {
             $response = $this->http->request('POST', $this->endpoint($token, $method), [
@@ -103,13 +137,7 @@ final readonly class TelegramBotApi
             throw new TelegramChannelException(self::CONTEXT_CONNECT === $context ? TelegramChannelException::WEBHOOK_FAILED : TelegramChannelException::SEND_FAILED);
         }
 
-        if (true !== ($body['ok'] ?? false)) {
-            $this->fail($method, $status, $body, $context);
-        }
-
-        $result = $body['result'] ?? [];
-
-        return is_array($result) ? $result : [];
+        return [$status, $body];
     }
 
     /**

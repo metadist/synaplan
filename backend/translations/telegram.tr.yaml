@@ -5,6 +5,8 @@ telegram:
   finish_pairing: 'Bağlantıyı Kanallar sayfasındaki bağlantıyla tamamlayın.'
   already_connected: 'Zaten bağlısınız. Yanıt almak için bir mesaj gönderin.'
   code_mismatch: 'Bu kod eşleşmiyor. Kanallar sayfasındaki bağlantıyı yeniden kullanın.'
+  code_expired: 'Bu bağlantının süresi doldu. Synaplan''daki Kanallar sayfasında yeni bir bağlantı oluşturun.'
+  file_in_synaplan: 'Dosya Synaplan sohbetinizde.'
   connected_in: 'Telegram üzerinden bağlandı.'
   connected: 'Bağlandı. Yanıt istediğinizde bir mesaj gönderin.'
   limit_reached: 'Mesaj sınırına ulaştınız. Daha sonra yeniden deneyin.'

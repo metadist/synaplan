@@ -13,6 +13,7 @@ use App\Service\Telegram\TelegramBotApi;
 use App\Service\Telegram\TelegramBotIdentity;
 use App\Service\Telegram\TelegramChannelException;
 use App\Service\Telegram\TelegramConnectionService;
+use App\Service\Telegram\TelegramPairResult;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -60,26 +61,126 @@ final class TelegramConnectionServiceTest extends TestCase
         $this->assertSame(9, $saved->getCredentialId());
     }
 
-    public function testReconnectKeepsTheBotKeyAndTheChat(): void
+    public function testReconnectingTheSameBotKeepsTheBotKeyAndTheChat(): void
     {
-        $existing = new TelegramBot(7, 'same-key', 1, 'old_bot');
+        $existing = new TelegramBot(7, 'same-key', 4242, 'synaplan_test_bot');
         $existing->setChatId(42);
+        $existing->setLastMessageAt(1_700_000_000);
         $existing->setCredentialId(3);
-        $existing->setStatus(TelegramBot::STATUS_CONNECTED);
-        $api = $this->createMock(TelegramBotApi::class);
-        $api->method('getMe')->willReturn(new TelegramBotIdentity(4242, 'synaplan_test_bot'));
-        $vault = $this->createMock(CredentialVaultInterface::class);
-        $vault->method('reveal')->willReturn(self::TOKEN);
-        $vault->method('store')->willReturn(9);
+        $existing->setStatus(TelegramBot::STATUS_ERROR);
         $bots = $this->createMock(TelegramBotRepository::class);
         $bots->method('findOneByOwner')->willReturn($existing);
 
-        $this->service($api, $bots, $vault, 'https://chat.example.com')->connect($this->user(), self::TOKEN);
+        $this->service($this->identityApi(), $bots, $this->vault(), 'https://chat.example.com')->connect($this->user(), self::TOKEN);
 
         $this->assertSame('same-key', $existing->getBotKey());
         $this->assertSame(42, $existing->getChatId());
+        $this->assertSame(1_700_000_000, $existing->getLastMessageAt());
         $this->assertSame(TelegramBot::STATUS_PENDING, $existing->getStatus());
         $this->assertNull($existing->getTgUserId());
+    }
+
+    public function testConnectingADifferentBotStartsANewThread(): void
+    {
+        $existing = new TelegramBot(7, 'same-key', 1, 'old_bot');
+        $existing->setChatId(42);
+        $existing->setLastMessageAt(1_700_000_000);
+        $existing->setCredentialId(3);
+        $existing->setStatus(TelegramBot::STATUS_DISCONNECTED);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->method('findOneByOwner')->willReturn($existing);
+
+        $state = $this->service($this->identityApi(), $bots, $this->vault(), 'https://chat.example.com')->connect($this->user(), self::TOKEN);
+
+        $this->assertNull($existing->getChatId());
+        $this->assertNull($state['lastMessageAt']);
+        $this->assertSame(4242, $existing->getBotId());
+        $this->assertSame('synaplan_test_bot', $existing->getBotUsername());
+    }
+
+    public function testABotThatAnotherAccountUsesIsRefusedWithoutTouchingIt(): void
+    {
+        $other = new TelegramBot(8, 'other-key', 4242, 'synaplan_test_bot');
+        $other->setStatus(TelegramBot::STATUS_CONNECTED);
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->method('getMe')->willReturn(new TelegramBotIdentity(4242, 'synaplan_test_bot'));
+        $api->expects($this->never())->method('setWebhook');
+        $vault = $this->createMock(CredentialVaultInterface::class);
+        $vault->expects($this->never())->method('store');
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->expects($this->once())->method('findActiveByBotIdForOtherOwner')->with(4242, 7)->willReturn($other);
+
+        try {
+            $this->service($api, $bots, $vault, 'https://chat.example.com')->connect($this->user(), self::TOKEN);
+            $this->fail('A bot held by another account must be refused');
+        } catch (TelegramChannelException $e) {
+            $this->assertSame(TelegramChannelException::BOT_IN_USE, $e->errorCode);
+        }
+        $this->assertSame(TelegramBot::STATUS_CONNECTED, $other->getStatus());
+    }
+
+    public function testThePairingLinkExpires(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setStatus(TelegramBot::STATUS_PENDING);
+        $bot->setPairCode('GOODCODE');
+        $bot->setPairCodeExpires(time() - 1);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->method('findOneByOwner')->willReturn($bot);
+        $service = $this->service($this->createMock(TelegramBotApi::class), $bots, $this->vault(), 'https://chat.example.com');
+
+        $state = $service->status($this->user());
+
+        $this->assertSame('pending_pairing', $state['status']);
+        $this->assertNull($state['pairingLink']);
+        $this->assertSame(TelegramPairResult::Expired, $service->pair($bot, 'GOODCODE', '555', '555'));
+        $this->assertSame(TelegramBot::STATUS_PENDING, $bot->getStatus());
+    }
+
+    public function testRenewingIssuesAFreshCodeWithoutTheToken(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setStatus(TelegramBot::STATUS_PENDING);
+        $bot->setPairCode('OLDCODE1');
+        $bot->setPairCodeExpires(time() - 1);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->method('findOneByOwner')->willReturn($bot);
+        $bots->expects($this->once())->method('save')->with($bot);
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->expects($this->never())->method('getMe');
+
+        $state = $this->service($api, $bots, $this->vault(), 'https://chat.example.com')->renewPairing($this->user());
+
+        $this->assertNotSame('OLDCODE1', $bot->getPairCode());
+        $this->assertIsString($state['pairingLink']);
+        $this->assertGreaterThan(time(), $state['pairingExpiresAt']);
+    }
+
+    public function testRenewingAConnectedBotChangesNothing(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setStatus(TelegramBot::STATUS_CONNECTED);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->method('findOneByOwner')->willReturn($bot);
+        $bots->expects($this->never())->method('save');
+
+        $state = $this->service($this->createMock(TelegramBotApi::class), $bots, $this->vault(), 'https://chat.example.com')->renewPairing($this->user());
+
+        $this->assertSame('connected', $state['status']);
+        $this->assertNull($state['pairingLink']);
+    }
+
+    public function testLastMessageAtIsTheLastExchangeNotTheLastChange(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setStatus(TelegramBot::STATUS_CONNECTED);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->method('findOneByOwner')->willReturn($bot);
+        $service = $this->service($this->createMock(TelegramBotApi::class), $bots, $this->vault(), 'https://chat.example.com');
+
+        $this->assertNull($service->status($this->user())['lastMessageAt']);
+        $service->noteExchange($bot);
+        $this->assertIsInt($service->status($this->user())['lastMessageAt']);
     }
 
     public function testWebhookFailureForgetsTheNewCredential(): void
@@ -112,17 +213,31 @@ final class TelegramConnectionServiceTest extends TestCase
     {
         $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
         $bot->setPairCode('GOODCODE');
-        $bot->setPairCodeHash(hash('sha256', 'GOODCODE'));
+        $bot->setPairCodeExpires(time() + 600);
         $bot->setStatus(TelegramBot::STATUS_PENDING);
         $bots = $this->createMock(TelegramBotRepository::class);
         $service = $this->service($this->createMock(TelegramBotApi::class), $bots, $this->createMock(CredentialVaultInterface::class), 'https://chat.example.com');
 
-        $this->assertFalse($service->pair($bot, 'BADCODE1', '555', '555'));
+        $this->assertSame(TelegramPairResult::Mismatch, $service->pair($bot, 'BADCODE1', '555', '555'));
         $this->assertSame(TelegramBot::STATUS_PENDING, $bot->getStatus());
-        $this->assertTrue($service->pair($bot, 'GOODCODE', '555', '555'));
+        $this->assertSame(TelegramPairResult::Paired, $service->pair($bot, 'GOODCODE', '555', '555'));
         $this->assertSame(TelegramBot::STATUS_CONNECTED, $bot->getStatus());
         $this->assertSame('555', $bot->getTgUserId());
         $this->assertNull($bot->getPairCode());
+        $this->assertNull($bot->getPairCodeExpires());
+    }
+
+    public function testRecoverClearsABlockedState(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setStatus(TelegramBot::STATUS_ERROR);
+        $bot->setErrorCode(TelegramChannelException::BOT_BLOCKED);
+        $service = $this->service($this->createMock(TelegramBotApi::class), $this->createMock(TelegramBotRepository::class), $this->vault(), 'https://chat.example.com');
+
+        $service->recover($bot);
+
+        $this->assertSame(TelegramBot::STATUS_CONNECTED, $bot->getStatus());
+        $this->assertNull($bot->getErrorCode());
     }
 
     public function testDisconnectKeepsTheChatAndDropsTheSecret(): void
@@ -206,6 +321,23 @@ final class TelegramConnectionServiceTest extends TestCase
             $appUrl,
             '',
         );
+    }
+
+    private function identityApi(): TelegramBotApi
+    {
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->method('getMe')->willReturn(new TelegramBotIdentity(4242, 'synaplan_test_bot'));
+
+        return $api;
+    }
+
+    private function vault(): CredentialVaultInterface
+    {
+        $vault = $this->createStub(CredentialVaultInterface::class);
+        $vault->method('reveal')->willReturn(self::TOKEN);
+        $vault->method('store')->willReturn(9);
+
+        return $vault;
     }
 
     private function user(): User

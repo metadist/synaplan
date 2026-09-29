@@ -16,6 +16,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class TelegramConnectionService
 {
+    public const PAIR_CODE_TTL_SECONDS = 1800;
+
     public function __construct(
         private TelegramBotRepository $bots,
         private TelegramBotApi $api,
@@ -49,6 +51,9 @@ final readonly class TelegramConnectionService
 
         $identity = $this->api->getMe($token);
         $ownerId = (int) $user->getId();
+        if (null !== $this->bots->findActiveByBotIdForOtherOwner($identity->id, $ownerId)) {
+            throw new TelegramChannelException(TelegramChannelException::BOT_IN_USE);
+        }
         $existing = $this->bots->findOneByOwner($ownerId);
         if (null !== $existing) {
             $this->dropRemoteWebhook($existing);
@@ -58,7 +63,6 @@ final readonly class TelegramConnectionService
         $credentialId = $this->vault->store($ownerId, TelegramBot::CREDENTIAL_KIND, $token);
         $botKey = $existing?->getBotKey() ?? bin2hex(random_bytes(16));
         $secret = bin2hex(random_bytes(32));
-        $pairCode = $this->newPairCode();
 
         try {
             $this->api->setWebhook($token, $this->webhookUrl($base, $botKey), $secret);
@@ -76,13 +80,17 @@ final readonly class TelegramConnectionService
 
         $bot = $existing ?? new TelegramBot($ownerId, $botKey, $identity->id, $identity->username);
         if (null !== $existing) {
+            if ($existing->getBotId() !== $identity->id) {
+                // A different bot starts a new thread; the old one stays in History under its own title.
+                $bot->setChatId(null);
+                $bot->setLastMessageAt(null);
+            }
             $bot->setBotId($identity->id);
             $bot->setBotUsername($identity->username);
         }
         $bot->setCredentialId($credentialId);
         $bot->setSecretHash(hash('sha256', $secret));
-        $bot->setPairCode($pairCode);
-        $bot->setPairCodeHash(hash('sha256', $pairCode));
+        $this->issuePairCode($bot);
         $bot->setTgUserId(null);
         $bot->setTgChatId(null);
         $bot->setStatus(TelegramBot::STATUS_PENDING);
@@ -92,26 +100,62 @@ final readonly class TelegramConnectionService
         return $this->present($bot);
     }
 
-    public function pair(TelegramBot $bot, string $code, string $tgUserId, string $tgChatId): bool
+    public function pair(TelegramBot $bot, string $code, string $tgUserId, string $tgChatId): TelegramPairResult
     {
         if (TelegramBot::STATUS_PENDING !== $bot->getStatus()) {
-            return false;
+            return TelegramPairResult::Mismatch;
         }
-        $expected = $bot->getPairCodeHash() ?? '';
-        $given = hash('sha256', $code);
-        if ('' === $expected || strlen($expected) !== strlen($given) || !hash_equals($expected, $given)) {
-            return false;
+        $expected = $bot->getPairCode() ?? '';
+        if ('' === $expected || !hash_equals($expected, $code)) {
+            return TelegramPairResult::Mismatch;
+        }
+        if ($bot->isPairCodeExpired(time())) {
+            return TelegramPairResult::Expired;
         }
 
         $bot->setTgUserId($tgUserId);
         $bot->setTgChatId($tgChatId);
         $bot->setStatus(TelegramBot::STATUS_CONNECTED);
         $bot->setPairCode(null);
-        $bot->setPairCodeHash(null);
+        $bot->setPairCodeExpires(null);
         $bot->setErrorCode(null);
         $this->bots->save($bot);
 
-        return true;
+        return TelegramPairResult::Paired;
+    }
+
+    /**
+     * A fresh pairing link for a bot that is still waiting, without asking
+     * for the token again.
+     *
+     * @return array<string, mixed>
+     */
+    public function renewPairing(User $user): array
+    {
+        $bot = $this->bots->findOneByOwner((int) $user->getId());
+        if (null !== $bot && TelegramBot::STATUS_PENDING === $bot->getStatus()) {
+            $this->issuePairCode($bot);
+            $this->bots->save($bot);
+        }
+
+        return $this->present($bot);
+    }
+
+    /**
+     * The paired owner wrote again after blocking the bot: Telegram delivers
+     * again, so the channel works again.
+     */
+    public function recover(TelegramBot $bot): void
+    {
+        $bot->setStatus(TelegramBot::STATUS_CONNECTED);
+        $bot->setErrorCode(null);
+        $this->bots->save($bot);
+    }
+
+    public function noteExchange(TelegramBot $bot): void
+    {
+        $bot->setLastMessageAt(time());
+        $this->bots->save($bot);
     }
 
     public function attachChat(TelegramBot $bot, int $chatId): void
@@ -135,7 +179,7 @@ final readonly class TelegramConnectionService
         $bot->setCredentialId(null);
         $bot->setSecretHash('');
         $bot->setPairCode(null);
-        $bot->setPairCodeHash(null);
+        $bot->setPairCodeExpires(null);
         $bot->setStatus(TelegramBot::STATUS_DISCONNECTED);
         $bot->setErrorCode(null);
         $this->bots->save($bot);
@@ -213,26 +257,30 @@ final readonly class TelegramConnectionService
                 'status' => 'none',
                 'botUsername' => null,
                 'pairingLink' => null,
+                'pairingExpiresAt' => null,
                 'chatId' => null,
                 'lastMessageAt' => null,
                 'errorCode' => null,
             ];
         }
 
+        $pending = TelegramBot::STATUS_PENDING === $bot->getStatus();
+
         return [
             'success' => true,
             'status' => $bot->getStatus(),
             'botUsername' => $bot->getBotUsername(),
             'pairingLink' => $this->pairingLink($bot),
+            'pairingExpiresAt' => $pending ? $bot->getPairCodeExpires() : null,
             'chatId' => $bot->getChatId(),
-            'lastMessageAt' => $bot->getUpdated(),
+            'lastMessageAt' => $bot->getLastMessageAt(),
             'errorCode' => $bot->getErrorCode(),
         ];
     }
 
     private function pairingLink(TelegramBot $bot): ?string
     {
-        if (TelegramBot::STATUS_PENDING !== $bot->getStatus()) {
+        if (TelegramBot::STATUS_PENDING !== $bot->getStatus() || $bot->isPairCodeExpired(time())) {
             return null;
         }
         $code = $bot->getPairCode();
@@ -286,6 +334,12 @@ final readonly class TelegramConnectionService
     private function webhookUrl(string $base, string $botKey): string
     {
         return rtrim($base, '/').'/api/v1/webhooks/telegram/'.$botKey;
+    }
+
+    private function issuePairCode(TelegramBot $bot): void
+    {
+        $bot->setPairCode($this->newPairCode());
+        $bot->setPairCodeExpires(time() + self::PAIR_CODE_TTL_SECONDS);
     }
 
     private function newPairCode(): string

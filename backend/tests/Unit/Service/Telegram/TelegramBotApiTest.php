@@ -61,6 +61,46 @@ final class TelegramBotApiTest extends TestCase
         $this->assertCount(2, $bodies);
     }
 
+    public function testSendMessageUsesTelegramHtml(): void
+    {
+        $bodies = [];
+        $api = $this->api(function (string $method, string $url, array $options) use (&$bodies): MockResponse {
+            $bodies[] = json_decode((string) ($options['body'] ?? ''), true);
+
+            return new MockResponse((string) json_encode(['ok' => true, 'result' => ['message_id' => 1]]));
+        });
+
+        $api->sendMessage('123456789:AAHexampleToken', '99', 'This is **bold** & <raw>');
+
+        $this->assertCount(1, $bodies);
+        $this->assertSame('HTML', $bodies[0]['parse_mode']);
+        $this->assertSame('This is <b>bold</b> &amp; &lt;raw&gt;', $bodies[0]['text']);
+    }
+
+    public function testUnparsableMarkupFallsBackToPlainText(): void
+    {
+        $bodies = [];
+        $api = $this->api(function (string $method, string $url, array $options) use (&$bodies): MockResponse {
+            $body = json_decode((string) ($options['body'] ?? ''), true);
+            $bodies[] = $body;
+            if (isset($body['parse_mode'])) {
+                return new MockResponse((string) json_encode([
+                    'ok' => false,
+                    'error_code' => 400,
+                    'description' => "Bad Request: can't parse entities",
+                ]), ['http_code' => 400]);
+            }
+
+            return new MockResponse((string) json_encode(['ok' => true, 'result' => ['message_id' => 2]]));
+        });
+
+        $api->sendMessage('123456789:AAHexampleToken', '99', 'This is **bold**');
+
+        $this->assertCount(2, $bodies);
+        $this->assertArrayNotHasKey('parse_mode', $bodies[1]);
+        $this->assertSame('This is **bold**', $bodies[1]['text']);
+    }
+
     public function testBlockedSendIsABotBlockedCode(): void
     {
         $api = $this->api([

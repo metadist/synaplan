@@ -2,6 +2,8 @@
  * Telegram Bot API stub. Backend uses TELEGRAM_API_BASE_URL=http://telegram-stub:3998.
  * The test runner uses http://localhost:3998 for __requests / __reset.
  * A token whose secret part contains INVALID makes getMe return 401.
+ * POST /__blocked?on=1 makes sendMessage and sendChatAction answer 403 like a
+ * bot the user blocked; /__reset clears it.
  */
 
 import http from 'http'
@@ -17,6 +19,7 @@ type RequestRecord = {
 
 const requestsByRunId: Record<string, RequestRecord[]> = { default: [] }
 let currentRunId = 'default'
+let blocked = false
 
 function getRequests(): RequestRecord[] {
   return requestsByRunId[currentRunId] ?? (requestsByRunId[currentRunId] = [])
@@ -76,7 +79,15 @@ const server = http.createServer((req, res) => {
       } else {
         requestsByRunId[currentRunId] = []
       }
+      blocked = false
       send(res, 200, { ok: true })
+      return
+    }
+
+    if (method === 'POST' && path === '/__blocked') {
+      const url = new URL(req.url ?? '/__blocked', 'http://x')
+      blocked = url.searchParams.get('on') === '1'
+      send(res, 200, { ok: true, blocked })
       return
     }
 
@@ -93,6 +104,15 @@ const server = http.createServer((req, res) => {
     const apiMethod = match[2]
     if (token.includes('INVALID') && apiMethod === 'getMe') {
       send(res, 401, { ok: false, error_code: 401, description: 'Unauthorized' })
+      return
+    }
+
+    if (blocked && (apiMethod === 'sendMessage' || apiMethod === 'sendChatAction')) {
+      send(res, 403, {
+        ok: false,
+        error_code: 403,
+        description: 'Forbidden: bot was blocked by the user',
+      })
       return
     }
 

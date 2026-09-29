@@ -17,6 +17,17 @@ final readonly class PublicWebhookUrlValidator
     ) {
     }
 
+    public function isPublic(string $url): bool
+    {
+        try {
+            $this->assertPublic($url);
+        } catch (TelegramChannelException) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function assertPublic(string $url): void
     {
         $parts = parse_url(trim($url));

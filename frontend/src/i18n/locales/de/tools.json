@@ -144,12 +144,16 @@
       "cancelPairingHint": "Falscher Bot? Brechen Sie ab, dann wird der Token aus Synaplan entfernt.",
       "pairingCancelled": "Das Verbinden wurde abgebrochen. Der Bot-Token ist nicht mehr gespeichert.",
       "cancelFailed": "Das Verbinden konnte nicht abgebrochen werden. Versuchen Sie es erneut.",
+      "pairingValidUntil": "Der Link gilt bis {time}.",
+      "pairingExpired": "Dieser Link ist abgelaufen. Erstellen Sie einen neuen Link, um das Verbinden abzuschließen.",
+      "renewPairing": "Neuen Link erstellen",
+      "renewFailed": "Es konnte kein neuer Link erstellt werden. Versuchen Sie es erneut.",
       "ownerLabel": "Wem gehört das",
       "connectedOwner": "Sie",
       "whoElseLabel": "Wer sonst",
       "connectedWhoElse": "Nur Ihr Telegram-Konto. Alle anderen bekommen einen Satz, und es wird nichts gespeichert.",
       "touchesLabel": "Was es berührt",
-      "connectedTouches": "Textnachrichten in diesem Chat. Fotos und Sprachnachrichten bekommen einen Satz und werden nicht gespeichert.",
+      "connectedTouches": "Textnachrichten in diesem Chat. Ihr KI-Assistent beantwortet sie wie im Web-Chat, und sie zählen zu Ihrem Nachrichtenlimit. Fotos und Sprachnachrichten bekommen einen Satz und werden nicht gespeichert.",
       "stopLabel": "Wie Sie es stoppen",
       "connectedStop": "Trennen Sie auf dieser Karte. Der Bot antwortet nicht mehr. Ihr Chatverlauf bleibt.",
       "fromLabel": "Woher es kommt",
@@ -162,14 +166,17 @@
       "disconnected": "Telegram ist getrennt. Ihr Chatverlauf ist noch hier.",
       "disconnectFailed": "Telegram konnte nicht getrennt werden. Der Bot antwortet vielleicht noch. Versuchen Sie es erneut.",
       "connectedToast": "Telegram ist verbunden.",
+      "errorHint": "Fügen Sie einen neuen Token ein, um erneut zu verbinden, oder trennen Sie den Bot, um ihn zu stoppen.",
+      "disconnectedHistory": "Ihr bisheriger Telegram-Chat bleibt im Verlauf.",
       "errors": {
-        "telegram_public_url_required": "Diese Installation hat keine öffentliche Webadresse. Setzen Sie APP_URL auf eine https-Adresse, die Telegram erreichen kann, und versuchen Sie es erneut.",
+        "telegram_public_url_required": "Telegram ist auf dieser Installation noch nicht eingerichtet. Wenden Sie sich an Ihre Administration.",
         "telegram_token_invalid": "Dieser Bot-Token wurde nicht akzeptiert. Kopieren Sie ihn erneut aus BotFather und versuchen Sie es noch einmal.",
         "telegram_token_revoked": "Telegram akzeptiert diesen Bot-Token nicht mehr. Erstellen Sie in BotFather einen neuen Token und verbinden Sie ihn erneut.",
-        "telegram_bot_blocked": "Telegram hat diesen Bot blockiert. Heben Sie die Blockierung in Telegram auf und verbinden Sie ihn erneut.",
+        "telegram_bot_blocked": "Sie haben diesen Bot in Telegram blockiert. Heben Sie die Blockierung auf und schreiben Sie ihm, dann verbindet er sich wieder.",
         "telegram_webhook_failed": "Der Bot konnte nicht verbunden werden. Prüfen Sie die öffentliche Adresse und versuchen Sie es erneut.",
         "telegram_send_failed": "Die Antwort konnte nicht an Telegram gesendet werden. Ihre Nachricht ist im Chat gespeichert.",
-        "generic": "Telegram konnte nicht verbunden werden. Prüfen Sie den Token und versuchen Sie es erneut."
+        "generic": "Telegram konnte nicht verbunden werden. Prüfen Sie den Token und versuchen Sie es erneut.",
+        "telegram_bot_in_use": "Dieser Bot ist bereits mit einem anderen Synaplan-Konto verbunden. Trennen Sie ihn dort zuerst oder erstellen Sie in BotFather einen neuen Bot."
       }
     }
   },

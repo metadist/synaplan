@@ -151,12 +151,16 @@
       "cancelPairingHint": "¿Bot equivocado? Cancela y el token se elimina de Synaplan.",
       "pairingCancelled": "Se canceló la conexión. El token del bot ya no está guardado.",
       "cancelFailed": "No se pudo cancelar la conexión. Inténtalo de nuevo.",
+      "pairingValidUntil": "El enlace funciona hasta {time}.",
+      "pairingExpired": "Este enlace ha caducado. Crea un enlace nuevo para terminar la conexión.",
+      "renewPairing": "Crear enlace nuevo",
+      "renewFailed": "No se pudo crear un enlace nuevo. Inténtalo de nuevo.",
       "ownerLabel": "Quién es el dueño",
       "connectedOwner": "Tú",
       "whoElseLabel": "Quién más",
       "connectedWhoElse": "Solo tu cuenta de Telegram. Cualquier otra persona recibe una frase y no se guarda nada.",
       "touchesLabel": "Qué toca",
-      "connectedTouches": "Mensajes de texto en este chat. Las fotos y las notas de voz reciben una frase y no se guardan.",
+      "connectedTouches": "Mensajes de texto en este chat. Tu asistente de IA los responde como en el chat web y cuentan para tu límite de mensajes. Las fotos y las notas de voz reciben una frase y no se guardan.",
       "stopLabel": "Cómo detenerlo",
       "connectedStop": "Desconecta en esta tarjeta. El bot deja de responder. Tu historial de chat se queda.",
       "fromLabel": "De dónde viene",
@@ -169,14 +173,17 @@
       "disconnected": "Telegram está desconectado. Tu historial de chat sigue aquí.",
       "disconnectFailed": "No se pudo desconectar Telegram. El bot puede seguir respondiendo. Inténtalo de nuevo.",
       "connectedToast": "Telegram está conectado.",
+      "errorHint": "Pega un token nuevo para volver a conectar, o desconecta para detener el bot.",
+      "disconnectedHistory": "Tu chat anterior de Telegram se queda en el Historial.",
       "errors": {
-        "telegram_public_url_required": "Esta instalación no tiene una dirección web pública. Configura APP_URL con una dirección https a la que Telegram pueda llegar y vuelve a intentarlo.",
+        "telegram_public_url_required": "Telegram todavía no está configurado en esta instalación. Consulta con tu administrador.",
         "telegram_token_invalid": "Ese token del bot no fue aceptado. Cópialo de nuevo desde BotFather e inténtalo otra vez.",
         "telegram_token_revoked": "Telegram ya no acepta este token del bot. Crea un token nuevo en BotFather y conéctalo de nuevo.",
-        "telegram_bot_blocked": "Telegram bloqueó este bot. Desbloquéalo en Telegram y conéctalo de nuevo.",
+        "telegram_bot_blocked": "Bloqueaste este bot en Telegram. Desbloquéalo y envíale un mensaje, y se vuelve a conectar.",
         "telegram_webhook_failed": "No se pudo conectar el bot. Revisa la dirección pública e inténtalo de nuevo.",
         "telegram_send_failed": "No se pudo enviar la respuesta a Telegram. Tu mensaje está guardado en el chat.",
-        "generic": "No se pudo conectar Telegram. Revisa el token e inténtalo de nuevo."
+        "generic": "No se pudo conectar Telegram. Revisa el token e inténtalo de nuevo.",
+        "telegram_bot_in_use": "Este bot ya está conectado a otra cuenta de Synaplan. Desconéctalo allí primero o crea un bot nuevo en BotFather."
       }
     }
   },

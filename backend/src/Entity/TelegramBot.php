@@ -15,6 +15,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'BTELEGRAMBOT')]
 #[ORM\UniqueConstraint(name: 'uq_telegrambot_owner', columns: ['BOWNERID'])]
 #[ORM\UniqueConstraint(name: 'uq_telegrambot_key', columns: ['BBOTKEY'])]
+#[ORM\Index(name: 'idx_telegrambot_botid', columns: ['BBOTID'])]
 class TelegramBot
 {
     public const STATUS_PENDING = 'pending_pairing';
@@ -50,8 +51,8 @@ class TelegramBot
     #[ORM\Column(name: 'BPAIRCODE', length: 16, nullable: true)]
     private ?string $pairCode = null;
 
-    #[ORM\Column(name: 'BPAIRCODEHASH', length: 64, nullable: true)]
-    private ?string $pairCodeHash = null;
+    #[ORM\Column(name: 'BPAIRCODEEXPIRES', type: 'bigint', nullable: true)]
+    private ?int $pairCodeExpires = null;
 
     #[ORM\Column(name: 'BTGUSERID', length: 32, nullable: true)]
     private ?string $tgUserId = null;
@@ -67,6 +68,9 @@ class TelegramBot
 
     #[ORM\Column(name: 'BERRORCODE', length: 64, nullable: true)]
     private ?string $errorCode = null;
+
+    #[ORM\Column(name: 'BLASTMESSAGEAT', type: 'bigint', nullable: true)]
+    private ?int $lastMessageAt = null;
 
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
     private int $created;
@@ -155,15 +159,20 @@ class TelegramBot
         $this->touch();
     }
 
-    public function getPairCodeHash(): ?string
+    public function getPairCodeExpires(): ?int
     {
-        return $this->pairCodeHash;
+        return $this->pairCodeExpires;
     }
 
-    public function setPairCodeHash(?string $pairCodeHash): void
+    public function setPairCodeExpires(?int $pairCodeExpires): void
     {
-        $this->pairCodeHash = $pairCodeHash;
+        $this->pairCodeExpires = $pairCodeExpires;
         $this->touch();
+    }
+
+    public function isPairCodeExpired(int $now): bool
+    {
+        return null === $this->pairCodeExpires || $this->pairCodeExpires <= $now;
     }
 
     public function getTgUserId(): ?string
@@ -218,6 +227,17 @@ class TelegramBot
     public function setErrorCode(?string $errorCode): void
     {
         $this->errorCode = $errorCode;
+        $this->touch();
+    }
+
+    public function getLastMessageAt(): ?int
+    {
+        return $this->lastMessageAt;
+    }
+
+    public function setLastMessageAt(?int $lastMessageAt): void
+    {
+        $this->lastMessageAt = $lastMessageAt;
         $this->touch();
     }
 

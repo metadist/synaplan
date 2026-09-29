@@ -288,6 +288,8 @@ test('classifies the telegram channel as backend-only plus ota-candidate', () =>
     'backend/src/Controller/TelegramWebhookController.php',
     'backend/src/Controller/TelegramChannelController.php',
     'backend/src/Service/Telegram/TelegramInboundService.php',
+    'backend/src/Service/Telegram/TelegramMessageFormatter.php',
+    'backend/src/Service/Telegram/TelegramPairResult.php',
     'backend/migrations/Version20260929120000.php',
   ]
 
@@ -297,6 +299,9 @@ test('classifies the telegram channel as backend-only plus ota-candidate', () =>
 
   const webPaths = [
     'frontend/src/components/config/TelegramChannelCard.vue',
+    'frontend/src/components/config/TelegramChannelFacts.vue',
+    'frontend/src/components/config/TelegramConnectForm.vue',
+    'frontend/src/components/config/TelegramPairingPanel.vue',
     'frontend/src/services/api/telegramChannelApi.ts',
   ]
 

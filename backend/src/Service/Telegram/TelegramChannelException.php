@@ -14,6 +14,7 @@ final class TelegramChannelException extends \RuntimeException
     public const TOKEN_INVALID = 'telegram_token_invalid';
     public const TOKEN_REVOKED = 'telegram_token_revoked';
     public const BOT_BLOCKED = 'telegram_bot_blocked';
+    public const BOT_IN_USE = 'telegram_bot_in_use';
     public const WEBHOOK_FAILED = 'telegram_webhook_failed';
     public const SEND_FAILED = 'telegram_send_failed';
 

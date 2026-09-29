@@ -8,13 +8,15 @@ use App\Module\Contract\ConfiguredBy;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Contract\MobileClass;
 use App\Module\Contract\ModuleStatus;
+use App\Service\Telegram\PublicWebhookUrlValidator;
 
 /**
  * Telegram channel — per-user BotFather bot, inbound webhook, chat reply.
  *
  * The bot token is a user credential, not an env secret. The install is
- * configured when TELEGRAM_ENABLED is on; a flag off means the card and
- * the webhook are absent.
+ * configured when TELEGRAM_ENABLED is on and Telegram can reach a public
+ * https address (TELEGRAM_WEBHOOK_BASE_URL, else APP_URL). Otherwise the
+ * card and the webhook are absent, so no one meets a form that cannot work.
  */
 final class TelegramModule implements FeatureModuleInterface
 {
@@ -22,6 +24,9 @@ final class TelegramModule implements FeatureModuleInterface
 
     public function __construct(
         private readonly bool $enabled,
+        private readonly string $appUrl = '',
+        private readonly string $webhookBaseUrl = '',
+        private readonly bool $allowLocalWebhook = false,
     ) {
     }
 
@@ -47,7 +52,7 @@ final class TelegramModule implements FeatureModuleInterface
 
     public function isConfigured(): bool
     {
-        return $this->enabled;
+        return $this->enabled && $this->hasPublicWebhookBase();
     }
 
     public function status(): ModuleStatus
@@ -57,12 +62,24 @@ final class TelegramModule implements FeatureModuleInterface
                 'missing' => ['TELEGRAM_ENABLED'],
             ]);
         }
+        if (!$this->hasPublicWebhookBase()) {
+            return ModuleStatus::absent('Missing: a public https APP_URL or TELEGRAM_WEBHOOK_BASE_URL that Telegram can reach', [
+                'missing' => ['TELEGRAM_WEBHOOK_BASE_URL'],
+            ]);
+        }
 
         return new ModuleStatus(
             configured: true,
             healthy: true,
             message: 'Telegram channel enabled',
         );
+    }
+
+    private function hasPublicWebhookBase(): bool
+    {
+        $base = '' !== trim($this->webhookBaseUrl) ? $this->webhookBaseUrl : $this->appUrl;
+
+        return (new PublicWebhookUrlValidator($this->allowLocalWebhook))->isPublic($base);
     }
 
     public function capabilityIds(): array
@@ -76,6 +93,7 @@ final class TelegramModule implements FeatureModuleInterface
             'api_webhooks_telegram',
             'api_telegram_channel_get',
             'api_telegram_channel_connect',
+            'api_telegram_channel_renew_pairing',
             'api_telegram_channel_disconnect',
         ];
     }
@@ -84,6 +102,7 @@ final class TelegramModule implements FeatureModuleInterface
     {
         return [
             'App\Service\Telegram\TelegramBotApi',
+            'App\Service\Telegram\TelegramMessageFormatter',
             'App\Service\Telegram\PublicWebhookUrlValidator',
             'App\Service\Telegram\TelegramConnectionService',
             'App\Service\Telegram\TelegramInboundService',

@@ -30,6 +30,16 @@ export async function resetTelegramStub(request: RequestLike, runId: string): Pr
   }
 }
 
+export async function setTelegramStubBlocked(
+  request: RequestLike,
+  blocked: boolean
+): Promise<void> {
+  const res = await request.post(`${getTelegramStubBaseUrl()}/__blocked?on=${blocked ? '1' : '0'}`)
+  if (res.status() !== 200) {
+    throw new Error(`Telegram stub __blocked returned ${res.status()}`)
+  }
+}
+
 export async function getTelegramStubRequests(
   request: RequestLike,
   runId?: string

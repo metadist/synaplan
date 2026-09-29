@@ -21,6 +21,8 @@ use App\Service\Telegram\TelegramBotApi;
 use App\Service\Telegram\TelegramChannelException;
 use App\Service\Telegram\TelegramConnectionService;
 use App\Service\Telegram\TelegramInboundService;
+use App\Service\Telegram\TelegramPairResult;
+use App\Service\Usage\RecordedUsage;
 use App\Service\UserMemoryService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -207,6 +209,100 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame(['The model is not available. Pick another model in Settings.'], $sent);
     }
 
+    public function testTheReplyCarriesTheModelsThatProducedIt(): void
+    {
+        $sent = [];
+        $messages = [];
+        $service = $this->service($this->connectedBot(), $sent, messages: $messages, reply: 'Four.');
+
+        $service->handle(5, 1, $this->update(['text' => 'What is 2+2?']));
+
+        $out = $messages[1];
+        $this->assertSame('test', $out->getMeta('ai_chat_provider'));
+        $this->assertSame('test-model', $out->getMeta('ai_chat_model'));
+        $this->assertSame('1', $out->getMeta('ai_chat_model_id'));
+        $this->assertSame('0.001000', $out->getMeta('ai_chat_cost'));
+        $this->assertSame('groq', $out->getMeta('ai_sorting_provider'));
+        $this->assertSame('sorter', $out->getMeta('ai_sorting_model'));
+        $this->assertSame('general', $messages[0]->getTopic());
+        $this->assertSame('general', $out->getTopic());
+    }
+
+    public function testAGeneratedFileIsKeptAndTheOwnerIsToldWhereItIs(): void
+    {
+        $sent = [];
+        $messages = [];
+        $service = $this->service(
+            $this->connectedBot(),
+            $sent,
+            messages: $messages,
+            reply: 'Here is your cat.',
+            extraMetadata: ['file' => ['path' => '7/cat.png', 'type' => 'image']],
+        );
+
+        $service->handle(5, 1, $this->update(['text' => 'Draw a cat']));
+
+        $this->assertSame(["Here is your cat.\n\nThe file is in your Synaplan chat."], $sent);
+        $this->assertSame(1, $messages[1]->getFile());
+        $this->assertSame('7/cat.png', $messages[1]->getFilePath());
+        $this->assertSame('image', $messages[1]->getFileType());
+    }
+
+    public function testAProcessorCrashEndsTheTurnAsFailed(): void
+    {
+        $sent = [];
+        $messages = [];
+        $processor = $this->createMock(MessageProcessor::class);
+        $processor->method('process')->willThrowException(new \RuntimeException('boom'));
+        $service = $this->service($this->connectedBot(), $sent, messages: $messages, processor: $processor);
+
+        $service->handle(5, 1, $this->update(['text' => 'hello']));
+
+        $this->assertSame(['Something went wrong. Try sending the message again.'], $sent);
+        $this->assertSame('failed', $messages[0]->getStatus());
+        $this->assertSame('OUT', $messages[1]->getDirection());
+    }
+
+    public function testTheOwnerWritingAfterUnblockingReconnects(): void
+    {
+        $sent = [];
+        $bot = $this->connectedBot();
+        $bot->setStatus(TelegramBot::STATUS_ERROR);
+        $bot->setErrorCode(TelegramChannelException::BOT_BLOCKED);
+        $service = $this->service($bot, $sent, reply: 'Hi.');
+
+        $service->handle(5, 1, $this->update(['text' => 'hello']));
+
+        $this->assertSame(TelegramBot::STATUS_CONNECTED, $bot->getStatus());
+        $this->assertSame(['Hi.'], $sent);
+    }
+
+    public function testARevokedTokenIsNotRecoveredByAMessage(): void
+    {
+        $sent = [];
+        $bot = $this->connectedBot();
+        $bot->setStatus(TelegramBot::STATUS_ERROR);
+        $bot->setErrorCode(TelegramChannelException::TOKEN_REVOKED);
+        $service = $this->service($bot, $sent, persist: false);
+
+        $service->handle(5, 1, $this->update(['text' => 'hello']));
+
+        $this->assertSame(TelegramBot::STATUS_ERROR, $bot->getStatus());
+    }
+
+    public function testAnExpiredCodeSaysSo(): void
+    {
+        $sent = [];
+        $bot = $this->connectedBot();
+        $bot->setStatus(TelegramBot::STATUS_PENDING);
+        $bot->setTgUserId(null);
+        $service = $this->service($bot, $sent, persist: false);
+
+        $service->handle(5, 1, $this->update(['text' => '/start OLDCODE1']));
+
+        $this->assertSame(['This link has expired. Create a new link on the Channels page in Synaplan.'], $sent);
+    }
+
     public function testRateLimitDoesNotCallTheModel(): void
     {
         $sent = [];
@@ -220,9 +316,10 @@ final class TelegramInboundServiceTest extends TestCase
     }
 
     /**
-     * @param list<string>     $sent
-     * @param list<Message>    $messages
-     * @param array<int, Chat> $chats
+     * @param list<string>         $sent
+     * @param list<Message>        $messages
+     * @param array<int, Chat>     $chats
+     * @param array<string, mixed> $extraMetadata
      */
     private function service(
         TelegramBot $bot,
@@ -240,6 +337,7 @@ final class TelegramInboundServiceTest extends TestCase
         array $chats = [],
         ?string $sendError = null,
         ?bool $expectMarkError = null,
+        array $extraMetadata = [],
     ): TelegramInboundService {
         /** @var list<object> $pending */
         $pending = [];
@@ -293,15 +391,22 @@ final class TelegramInboundServiceTest extends TestCase
 
         $connections = $this->createMock(TelegramConnectionService::class);
         $connections->method('revealToken')->willReturn('123456789:AAHexampleToken');
-        $connections->method('pair')->willReturnCallback(function (TelegramBot $row, string $code, string $tgUser, string $tgChat) use ($pair): bool {
+        $connections->method('pair')->willReturnCallback(function (TelegramBot $row, string $code, string $tgUser, string $tgChat) use ($pair): TelegramPairResult {
+            if ('OLDCODE1' === $code) {
+                return TelegramPairResult::Expired;
+            }
             if (!$pair || 'GOODCODE' !== $code) {
-                return false;
+                return TelegramPairResult::Mismatch;
             }
             $row->setStatus(TelegramBot::STATUS_CONNECTED);
             $row->setTgUserId($tgUser);
             $row->setTgChatId($tgChat);
 
-            return true;
+            return TelegramPairResult::Paired;
+        });
+        $connections->method('recover')->willReturnCallback(function (TelegramBot $row): void {
+            $row->setStatus(TelegramBot::STATUS_CONNECTED);
+            $row->setErrorCode(null);
         });
         $connections->method('attachChat')->willReturnCallback(function (TelegramBot $row, int $chatId): void {
             $row->setChatId($chatId);
@@ -327,9 +432,16 @@ final class TelegramInboundServiceTest extends TestCase
             } elseif (null !== $reply) {
                 $processor->method('process')->willReturn([
                     'success' => true,
+                    'classification' => [
+                        'topic' => 'general',
+                        'language' => 'en',
+                        'sorting_provider' => 'groq',
+                        'sorting_model_name' => 'sorter',
+                        'sorting_model_id' => 3,
+                    ],
                     'response' => [
                         'content' => $reply,
-                        'metadata' => ['provider' => 'test', 'model' => 'test', 'usage' => [], 'model_id' => 1],
+                        'metadata' => ['provider' => 'test', 'model' => 'test-model', 'usage' => ['prompt_tokens' => 1], 'model_id' => 1] + $extraMetadata,
                     ],
                 ]);
             }
@@ -346,6 +458,7 @@ final class TelegramInboundServiceTest extends TestCase
 
         $limits = $this->createMock(RateLimitService::class);
         $limits->method('checkLimit')->willReturn(['allowed' => $allowed]);
+        $limits->method('recordUsage')->willReturn(new RecordedUsage('0.001000', '0.000800', 1, 1, 2));
 
         $memories = $this->createMock(UserMemoryService::class);
         $memories->method('resolveMemoryTags')->willReturnArgument(0);

@@ -3,6 +3,7 @@ import {
   DeleteApiTelegramChannelDisconnectResponseSchema,
   GetApiTelegramChannelGetResponseSchema,
   PostApiTelegramChannelConnectResponseSchema,
+  PostApiTelegramChannelRenewPairingResponseSchema,
 } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
@@ -19,6 +20,13 @@ export function connectTelegram(token: string): Promise<TelegramChannelState> {
     method: 'POST',
     body: JSON.stringify({ token }),
     schema: PostApiTelegramChannelConnectResponseSchema,
+  })
+}
+
+export function renewTelegramPairing(): Promise<TelegramChannelState> {
+  return httpClient('/api/v1/channels/telegram/pairing', {
+    method: 'POST',
+    schema: PostApiTelegramChannelRenewPairingResponseSchema,
   })
 }
 

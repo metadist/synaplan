@@ -102,6 +102,24 @@ final class TelegramChannelController extends AbstractController
         }
     }
 
+    #[Route('/pairing', name: 'api_telegram_channel_renew_pairing', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/channels/telegram/pairing',
+        summary: 'Create a new pairing link for a bot that is still waiting',
+        security: [['Bearer' => []]],
+        tags: ['Telegram']
+    )]
+    #[OA\Response(response: 200, description: 'Current bot with a fresh pairing link while pairing', content: new OA\JsonContent(ref: new Model(type: TelegramChannelState::class)))]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function renewPairing(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user instanceof User) {
+            return $this->unauthorized();
+        }
+
+        return $this->json($this->connections->renewPairing($user));
+    }
+
     #[Route('', name: 'api_telegram_channel_disconnect', methods: ['DELETE'])]
     #[OA\Delete(
         path: '/api/v1/channels/telegram',

@@ -37,7 +37,7 @@ final readonly class TelegramWebhookAcceptor
             return TelegramWebhookDecision::drop();
         }
         if (!$this->secretMatches($bot->getSecretHash(), $secretHeader)) {
-            $this->logger->info('Telegram webhook secret rejected', ['bot_key' => $botKey]);
+            $this->logger->info('Telegram webhook secret rejected', ['bot_id' => $bot->getId()]);
 
             return TelegramWebhookDecision::drop();
         }

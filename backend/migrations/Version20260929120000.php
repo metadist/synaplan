@@ -39,17 +39,19 @@ final class Version20260929120000 extends AbstractMigration
               BCREDENTIALID BIGINT NULL,
               BSECRETHASH VARCHAR(64) NOT NULL,
               BPAIRCODE VARCHAR(16) NULL,
-              BPAIRCODEHASH VARCHAR(64) NULL,
+              BPAIRCODEEXPIRES BIGINT NULL,
               BTGUSERID VARCHAR(32) NULL,
               BTGCHATID VARCHAR(32) NULL,
               BCHATID INT NULL,
               BSTATUS VARCHAR(24) NOT NULL,
               BERRORCODE VARCHAR(64) NULL,
+              BLASTMESSAGEAT BIGINT NULL,
               BCREATED BIGINT NOT NULL,
               BUPDATED BIGINT NOT NULL,
               PRIMARY KEY (BID),
               UNIQUE KEY uq_telegrambot_owner (BOWNERID),
-              UNIQUE KEY uq_telegrambot_key (BBOTKEY)
+              UNIQUE KEY uq_telegrambot_key (BBOTKEY),
+              INDEX idx_telegrambot_botid (BBOTID)
             ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE = InnoDB
         SQL);
     }

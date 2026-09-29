@@ -1210,6 +1210,9 @@ services:
     App\Module\Channel\TelegramModule:
         arguments:
             $enabled: '%env(bool:TELEGRAM_ENABLED)%'
+            $appUrl: '%env(APP_URL)%'
+            $webhookBaseUrl: '%env(TELEGRAM_WEBHOOK_BASE_URL)%'
+            $allowLocalWebhook: '%env(bool:TELEGRAM_ALLOW_LOCAL_WEBHOOK)%'
 
     App\Service\Telegram\TelegramBotApi:
         arguments:

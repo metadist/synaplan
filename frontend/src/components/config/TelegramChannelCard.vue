@@ -5,47 +5,18 @@
       {{ t('channels.telegram.title') }}
     </h3>
 
-    <div v-if="status === 'pending_pairing'" class="space-y-4" data-testid="text-telegram-pairing">
-      <p class="text-sm txt-secondary">{{ t('channels.telegram.pairingHint') }}</p>
-      <div class="flex flex-wrap gap-2">
-        <a
-          v-if="state?.pairingLink"
-          :href="state.pairingLink"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
-          data-testid="link-telegram-open"
-        >
-          {{ t('channels.telegram.openTelegram') }}
-        </a>
-        <button
-          type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="btn-telegram-cancel"
-          :disabled="busy"
-          @click="cancelPairing"
-        >
-          {{ t('channels.telegram.cancelPairing') }}
-        </button>
-      </div>
-      <p class="text-sm txt-secondary">{{ t('channels.telegram.cancelPairingHint') }}</p>
-    </div>
+    <TelegramPairingPanel
+      v-if="status === 'pending_pairing'"
+      :expired="pairingExpired"
+      :link="state?.pairingLink"
+      :valid-until="validUntil"
+      :busy="busy"
+      @renew="renewPairing"
+      @cancel="stop('pairingCancelled', 'cancelFailed')"
+    />
 
     <div v-else-if="status === 'connected'" class="space-y-4" data-testid="text-telegram-connected">
-      <dl class="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
-        <dt class="txt-secondary">{{ t('channels.telegram.ownerLabel') }}</dt>
-        <dd class="txt-primary">{{ t('channels.telegram.connectedOwner') }}</dd>
-        <dt class="txt-secondary">{{ t('channels.telegram.whoElseLabel') }}</dt>
-        <dd class="txt-primary">{{ t('channels.telegram.connectedWhoElse') }}</dd>
-        <dt class="txt-secondary">{{ t('channels.telegram.touchesLabel') }}</dt>
-        <dd class="txt-primary">{{ t('channels.telegram.connectedTouches') }}</dd>
-        <dt class="txt-secondary">{{ t('channels.telegram.stopLabel') }}</dt>
-        <dd class="txt-primary">{{ t('channels.telegram.connectedStop') }}</dd>
-        <dt class="txt-secondary">{{ t('channels.telegram.fromLabel') }}</dt>
-        <dd class="txt-primary">
-          {{ t('channels.telegram.connectedFrom', { name: state?.botUsername }) }}
-        </dd>
-      </dl>
+      <TelegramChannelFacts :bot-username="state?.botUsername" />
       <p v-if="lastMessage" class="text-sm txt-secondary">
         {{ t('channels.telegram.lastMessage', { time: lastMessage }) }}
       </p>
@@ -61,7 +32,7 @@
         </button>
         <button
           type="button"
-          class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-telegram-disconnect"
           :disabled="busy"
           @click="disconnect"
@@ -71,47 +42,50 @@
       </div>
     </div>
 
-    <form v-else class="space-y-4" @submit.prevent="connect">
-      <p class="text-sm txt-secondary">{{ t('channels.telegram.empty') }}</p>
-      <a
-        href="https://t.me/BotFather"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="inline-flex text-sm font-medium text-[var(--channel-telegram)]"
-      >
-        {{ t('channels.telegram.botFather') }}
-      </a>
-      <div>
-        <label for="telegram-bot-token" class="block text-sm font-medium txt-primary">
-          {{ t('channels.telegram.tokenLabel') }}
-        </label>
-        <input
-          id="telegram-bot-token"
-          v-model="token"
-          type="password"
-          autocomplete="off"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-          :placeholder="t('channels.telegram.tokenPlaceholder')"
-          :disabled="busy"
-          data-testid="input-telegram-token"
-        />
+    <template v-else>
+      <div v-if="status === 'error'" class="space-y-4 mb-6" data-testid="text-telegram-state-error">
+        <p class="text-sm text-red-600 dark:text-red-400">{{ sentence(state?.errorCode) }}</p>
+        <p class="text-sm txt-secondary">{{ t('channels.telegram.errorHint') }}</p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-if="state?.chatId"
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            data-testid="btn-telegram-open-chat"
+            @click="openChat"
+          >
+            {{ t('channels.telegram.openChat') }}
+          </button>
+          <button
+            type="button"
+            class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-telegram-disconnect"
+            :disabled="busy"
+            @click="disconnect"
+          >
+            {{ t('channels.telegram.disconnect') }}
+          </button>
+        </div>
       </div>
-      <p
-        v-if="formError"
-        class="text-sm text-red-600 dark:text-red-400"
-        data-testid="text-telegram-error"
+
+      <div
+        v-else-if="status === 'disconnected' && state?.chatId"
+        class="flex flex-wrap items-center gap-3 mb-6"
+        data-testid="text-telegram-disconnected"
       >
-        {{ formError }}
-      </p>
-      <button
-        type="submit"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        data-testid="btn-telegram-connect"
-        :disabled="busy || token.trim() === ''"
-      >
-        {{ busy ? t('channels.telegram.connecting') : t('channels.telegram.connect') }}
-      </button>
-    </form>
+        <p class="text-sm txt-secondary">{{ t('channels.telegram.disconnectedHistory') }}</p>
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          data-testid="btn-telegram-open-chat"
+          @click="openChat"
+        >
+          {{ t('channels.telegram.openChat') }}
+        </button>
+      </div>
+
+      <TelegramConnectForm v-model="token" :busy="busy" :error="localError" @submit="connect" />
+    </template>
   </section>
 </template>
 
@@ -120,6 +94,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import TelegramChannelFacts from '@/components/config/TelegramChannelFacts.vue'
+import TelegramConnectForm from '@/components/config/TelegramConnectForm.vue'
+import TelegramPairingPanel from '@/components/config/TelegramPairingPanel.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { ApiError } from '@/services/api/httpClient'
@@ -127,8 +104,11 @@ import {
   connectTelegram,
   disconnectTelegram,
   getTelegramChannel,
+  renewTelegramPairing,
   type TelegramChannelState,
 } from '@/services/api/telegramChannelApi'
+
+const POLL_MS = 4000
 
 const { t, te, locale } = useI18n()
 const router = useRouter()
@@ -141,29 +121,33 @@ const localError = ref('')
 const loaded = ref(false)
 const absent = ref(false)
 const busy = ref(false)
+const now = ref(Date.now())
 let pollTimer: ReturnType<typeof setInterval> | undefined
 let inFlight = false
 
 const status = computed(() => state.value?.status ?? 'none')
 const visible = computed(() => loaded.value && !absent.value)
 
-const formError = computed(() => {
-  if (localError.value) return localError.value
-  if (status.value === 'error' && state.value?.errorCode) return sentence(state.value.errorCode)
-  return ''
+const pairingExpired = computed(() => {
+  if (status.value !== 'pending_pairing') return false
+  const expires = state.value?.pairingExpiresAt
+  if (!state.value?.pairingLink) return true
+  return typeof expires === 'number' && expires * 1000 <= now.value
 })
 
-const lastMessage = computed(() => {
-  const unix = state.value?.lastMessageAt
+const lastMessage = computed(() => formatTime(state.value?.lastMessageAt))
+const validUntil = computed(() => formatTime(state.value?.pairingExpiresAt))
+
+function formatTime(unix: number | null | undefined): string {
   if (typeof unix !== 'number') return ''
   return new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(
     new Date(unix * 1000)
   )
-})
+}
 
-function sentence(code: string): string {
-  const key = `channels.telegram.errors.${code}`
-  return te(key) ? t(key) : t('channels.telegram.errors.generic')
+function sentence(code: string | null | undefined): string {
+  const key = `channels.telegram.errors.${code ?? ''}`
+  return code && te(key) ? t(key) : t('channels.telegram.errors.generic')
 }
 
 function stopPolling(): void {
@@ -173,11 +157,28 @@ function stopPolling(): void {
   }
 }
 
-function ensurePolling(): void {
+function syncPolling(): void {
+  const waiting = status.value === 'pending_pairing' && !pairingExpired.value
+  if (!waiting || document.hidden) {
+    stopPolling()
+    return
+  }
   if (pollTimer !== undefined) return
   pollTimer = setInterval(() => {
+    now.value = Date.now()
+    if (pairingExpired.value) {
+      stopPolling()
+      return
+    }
     void load()
-  }, 4000)
+  }, POLL_MS)
+}
+
+function apply(next: TelegramChannelState): void {
+  state.value = next
+  loaded.value = true
+  now.value = Date.now()
+  syncPolling()
 }
 
 async function load(): Promise<void> {
@@ -186,13 +187,10 @@ async function load(): Promise<void> {
   try {
     const previous = state.value?.status
     const next = await getTelegramChannel()
-    state.value = next
-    loaded.value = true
+    apply(next)
     if (previous === 'pending_pairing' && next.status === 'connected') {
       success(t('channels.telegram.connectedToast'))
     }
-    if (next.status === 'pending_pairing') ensurePolling()
-    else stopPolling()
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
       stopPolling()
@@ -213,13 +211,34 @@ async function connect(): Promise<void> {
   localError.value = ''
   busy.value = true
   try {
-    state.value = await connectTelegram(token.value.trim())
+    apply(await connectTelegram(token.value.trim()))
     token.value = ''
-    loaded.value = true
-    if (state.value.status === 'pending_pairing') ensurePolling()
   } catch (err) {
     const code = err instanceof ApiError ? err.code : undefined
-    localError.value = code ? sentence(code) : t('channels.telegram.errors.generic')
+    localError.value = sentence(code)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function renewPairing(): Promise<void> {
+  busy.value = true
+  try {
+    apply(await renewTelegramPairing())
+  } catch {
+    notifyError(t('channels.telegram.renewFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
+async function stop(doneKey: string, failedKey: string): Promise<void> {
+  busy.value = true
+  try {
+    apply(await disconnectTelegram())
+    success(t(`channels.telegram.${doneKey}`))
+  } catch {
+    notifyError(t(`channels.telegram.${failedKey}`))
   } finally {
     busy.value = false
   }
@@ -231,30 +250,7 @@ async function disconnect(): Promise<void> {
     message: t('channels.telegram.confirmDisconnect'),
     danger: true,
   })
-  if (!accepted) return
-  busy.value = true
-  try {
-    state.value = await disconnectTelegram()
-    stopPolling()
-    success(t('channels.telegram.disconnected'))
-  } catch {
-    notifyError(t('channels.telegram.disconnectFailed'))
-  } finally {
-    busy.value = false
-  }
-}
-
-async function cancelPairing(): Promise<void> {
-  busy.value = true
-  try {
-    state.value = await disconnectTelegram()
-    stopPolling()
-    success(t('channels.telegram.pairingCancelled'))
-  } catch {
-    notifyError(t('channels.telegram.cancelFailed'))
-  } finally {
-    busy.value = false
-  }
+  if (accepted) await stop('disconnected', 'disconnectFailed')
 }
 
 function openChat(): void {
@@ -263,17 +259,23 @@ function openChat(): void {
   void router.push({ path: '/', query: { chat: String(chatId) } })
 }
 
-function onFocus(): void {
+function onVisible(): void {
+  if (document.hidden) {
+    stopPolling()
+    return
+  }
   if (status.value === 'pending_pairing') void load()
 }
 
 onMounted(() => {
-  window.addEventListener('focus', onFocus)
+  document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('focus', onVisible)
   void load()
 })
 
 onUnmounted(() => {
   stopPolling()
-  window.removeEventListener('focus', onFocus)
+  document.removeEventListener('visibilitychange', onVisible)
+  window.removeEventListener('focus', onVisible)
 })
 </script>

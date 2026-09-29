@@ -373,8 +373,9 @@ services:
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
       # Telegram channel is off until TELEGRAM_ENABLED=true and talks to the
-      # real Bot API. Set TELEGRAM_API_BASE_URL=http://telegram-stub:3998 on
-      # backend and worker to use the local stub instead.
+      # real Bot API. Start the `telegram-stub` profile and set
+      # TELEGRAM_API_BASE_URL=http://telegram-stub:3998 on backend and worker
+      # to use the local stub instead.
       TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
       TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org}
       TELEGRAM_WEBHOOK_BASE_URL: ${TELEGRAM_WEBHOOK_BASE_URL:-}
@@ -1040,9 +1041,11 @@ services:
     networks:
       - synaplan-network
 
-  # Telegram Bot API stub for local E2E runs. Point TELEGRAM_API_BASE_URL at
-  # http://telegram-stub:3998 on backend and worker to use it.
+  # Telegram Bot API stub for local E2E runs (opt-in):
+  #   docker compose --profile telegram-stub up -d telegram-stub
+  # and point TELEGRAM_API_BASE_URL at http://telegram-stub:3998 on backend and worker.
   telegram-stub:
+    profiles: [telegram-stub]
     image: node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
     container_name: synaplan-telegram-stub
     user: node

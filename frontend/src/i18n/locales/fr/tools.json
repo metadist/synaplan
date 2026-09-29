@@ -311,12 +311,16 @@
       "cancelPairingHint": "Mauvais bot ? Annulez, et le jeton est supprimé de Synaplan.",
       "pairingCancelled": "La connexion a été annulée. Le jeton du bot n'est plus enregistré.",
       "cancelFailed": "La connexion n'a pas pu être annulée. Réessayez.",
+      "pairingValidUntil": "Le lien fonctionne jusqu'à {time}.",
+      "pairingExpired": "Ce lien a expiré. Créez un nouveau lien pour terminer la connexion.",
+      "renewPairing": "Créer un nouveau lien",
+      "renewFailed": "Aucun nouveau lien n'a pu être créé. Réessayez.",
       "ownerLabel": "Qui en est le propriétaire",
       "connectedOwner": "Vous",
       "whoElseLabel": "Qui d'autre",
       "connectedWhoElse": "Uniquement votre compte Telegram. Toute autre personne reçoit une phrase et rien n'est enregistré.",
       "touchesLabel": "Ce que cela touche",
-      "connectedTouches": "Les messages texte de cette conversation. Les photos et les notes vocales reçoivent une phrase et ne sont pas enregistrées.",
+      "connectedTouches": "Les messages texte de cette conversation. Votre assistant IA y répond comme dans le chat web, et ils comptent dans votre limite de messages. Les photos et les notes vocales reçoivent une phrase et ne sont pas enregistrées.",
       "stopLabel": "Comment l'arrêter",
       "connectedStop": "Déconnectez sur cette carte. Le bot cesse de répondre. Votre historique reste.",
       "fromLabel": "D'où cela vient",
@@ -329,14 +333,17 @@
       "disconnected": "Telegram est déconnecté. Votre historique est toujours là.",
       "disconnectFailed": "Telegram n'a pas pu être déconnecté. Le bot répond peut-être encore. Réessayez.",
       "connectedToast": "Telegram est connecté.",
+      "errorHint": "Collez un nouveau jeton pour vous reconnecter, ou déconnectez pour arrêter le bot.",
+      "disconnectedHistory": "Votre ancienne conversation Telegram reste dans l'historique.",
       "errors": {
-        "telegram_public_url_required": "Cette installation n'a pas d'adresse web publique. Définissez APP_URL sur une adresse https que Telegram peut joindre, puis réessayez.",
+        "telegram_public_url_required": "Telegram n'est pas encore configuré sur cette installation. Contactez votre administrateur.",
         "telegram_token_invalid": "Ce jeton de bot n'a pas été accepté. Copiez-le à nouveau depuis BotFather et réessayez.",
         "telegram_token_revoked": "Telegram n'accepte plus ce jeton de bot. Créez un nouveau jeton dans BotFather et reconnectez-le.",
-        "telegram_bot_blocked": "Telegram a bloqué ce bot. Débloquez-le dans Telegram, puis reconnectez-le.",
+        "telegram_bot_blocked": "Vous avez bloqué ce bot dans Telegram. Débloquez-le et envoyez-lui un message, il se reconnecte alors.",
         "telegram_webhook_failed": "Le bot n'a pas pu être connecté. Vérifiez l'adresse publique et réessayez.",
         "telegram_send_failed": "La réponse n'a pas pu être envoyée à Telegram. Votre message est enregistré dans la conversation.",
-        "generic": "Telegram n'a pas pu être connecté. Vérifiez le jeton et réessayez."
+        "generic": "Telegram n'a pas pu être connecté. Vérifiez le jeton et réessayez.",
+        "telegram_bot_in_use": "Ce bot est déjà connecté à un autre compte Synaplan. Déconnectez-le d'abord là-bas, ou créez un nouveau bot dans BotFather."
       }
     }
   },
