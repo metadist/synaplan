@@ -33,11 +33,13 @@ final readonly class ModelHealthVerdict
         public bool $safeToDisable = false,
         public bool $autoDisabled = false,
         public bool $reEnabled = false,
+        /** {@see ModelHealth::isSwitchedOffByOperator()} */
+        public bool $switchedOff = false,
     ) {
     }
 
     public function needsAttention(): bool
     {
-        return $this->state->needsAttention();
+        return !$this->switchedOff && $this->state->needsAttention();
     }
 }

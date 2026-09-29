@@ -320,6 +320,12 @@ const summaryTiles = computed(() => {
     badgeClass: badgeClass(state),
   }))
   tiles.push({
+    key: 'switchedOff',
+    count: summary.switchedOff,
+    label: t('adminModelStatus.model.switchedOff'),
+    badgeClass: NEUTRAL_BADGE_CLASS,
+  })
+  tiles.push({
     key: 'retired',
     count: summary.retired,
     label: t('adminModelStatus.retired.label'),
@@ -356,8 +362,7 @@ const visibleProviders = computed(() => {
       ...provider,
       models: provider.models.filter((model) => {
         if (capabilityFilter.value && model.capability !== capabilityFilter.value) return false
-        if (onlyProblems.value && model.state !== 'offline' && model.state !== 'degraded')
-          return false
+        if (onlyProblems.value && !model.needsAttention) return false
         return true
       }),
     }))

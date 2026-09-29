@@ -35,6 +35,9 @@ class AdminModelHealthControllerTest extends WebTestCase
     /** @var array<int, array{retiredOn: ?\DateTimeImmutable, successorId: ?int}> model id => retirement fields before the test */
     private array $originalRetirements = [];
 
+    /** @var array<int, int> model id => BACTIVE before the test */
+    private array $originalActive = [];
+
     protected function setUp(): void
     {
         $this->client = static::createClient();
@@ -65,6 +68,12 @@ class AdminModelHealthControllerTest extends WebTestCase
                 $model->setRetiredOn($original['retiredOn'])->setSuccessorId($original['successorId']);
             }
         }
+        foreach ($this->originalActive as $modelId => $active) {
+            $model = $em->find(Model::class, $modelId);
+            if ($model) {
+                $model->setActive($active);
+            }
+        }
         $em->flush();
 
         parent::tearDown();
@@ -80,7 +89,7 @@ class AdminModelHealthControllerTest extends WebTestCase
     {
         $em = $this->client->getContainer()->get('doctrine')->getManager();
         /** @var list<Model> $live */
-        $live = $em->getRepository(Model::class)->findBy(['retiredOn' => null], ['id' => 'ASC'], 2);
+        $live = $em->getRepository(Model::class)->findBy(['retiredOn' => null, 'active' => 1], ['id' => 'ASC'], 2);
         self::assertCount(2, $live, 'The catalog needs two live models for this test');
         [$model, $successor] = $live;
 
@@ -137,13 +146,21 @@ class AdminModelHealthControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
         self::assertTrue($data['success']);
 
-        foreach (['total', 'online', 'degraded', 'offline', 'unconfigured', 'unknown', 'retired', 'needsAttention', 'lastCheck', 'autoDisableEnabled', 'monitoringEnabled'] as $key) {
+        foreach (['total', 'online', 'degraded', 'offline', 'unconfigured', 'unknown', 'switchedOff', 'retired', 'needsAttention', 'lastCheck', 'autoDisableEnabled', 'monitoringEnabled'] as $key) {
             self::assertArrayHasKey($key, $data['summary'], $key);
         }
 
         $em = $this->client->getContainer()->get('doctrine')->getManager();
         $catalogued = (int) $em->getRepository(Model::class)->count([]);
         self::assertSame($catalogued, $data['summary']['total']);
+
+        // The tiles partition the catalog: each model is counted exactly once.
+        $summary = $data['summary'];
+        self::assertSame(
+            $catalogued,
+            $summary['online'] + $summary['degraded'] + $summary['offline'] + $summary['unconfigured']
+                + $summary['unknown'] + $summary['switchedOff'] + $summary['retired'],
+        );
 
         $retiredInCatalog = (int) $em->getRepository(Model::class)->createQueryBuilder('m')
             ->select('COUNT(m.id)')
@@ -175,6 +192,7 @@ class AdminModelHealthControllerTest extends WebTestCase
                 );
                 self::assertIsInt($model['errorRatePercent']);
                 self::assertIsBool($model['active']);
+                self::assertIsBool($model['needsAttention']);
             }
         }
         self::assertSame($catalogued, $listed);
@@ -222,6 +240,66 @@ class AdminModelHealthControllerTest extends WebTestCase
         self::assertSame($successor->getName(), $entry['successorName']);
         self::assertSame($model->getProviderId(), $entry['providerId']);
         self::assertNotSame('', $entry['providerDisplayName']);
+    }
+
+    /**
+     * Switching a model off is the operator's own answer to "this one is
+     * broken". It stays listed with its real state so a recovery is visible,
+     * but it must stop counting — unless the monitor itself switched it off,
+     * because then the failure is still news.
+     */
+    public function testASwitchedOffModelStaysListedButNeverNeedsAttention(): void
+    {
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $model = $em->getRepository(Model::class)->findOneBy(['retiredOn' => null, 'active' => 1], ['id' => 'ASC']);
+        self::assertInstanceOf(Model::class, $model, 'The catalog needs a live, active model for this test');
+        $modelId = (int) $model->getId();
+        $this->originalActive[$modelId] = $model->getActive();
+
+        $this->markOffline($modelId);
+        $before = $this->request('GET', '/api/v1/admin/model-health');
+        self::assertTrue($this->entryFor($before, $modelId)['needsAttention']);
+
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $em->find(Model::class, $modelId)?->setActive(0);
+        $em->flush();
+        $after = $this->request('GET', '/api/v1/admin/model-health');
+
+        self::assertSame($before['summary']['needsAttention'] - 1, $after['summary']['needsAttention']);
+        self::assertSame($before['summary']['offline'] - 1, $after['summary']['offline']);
+        self::assertSame($before['summary']['switchedOff'] + 1, $after['summary']['switchedOff']);
+        $entry = $this->entryFor($after, $modelId);
+        self::assertSame('offline', $entry['state']);
+        self::assertFalse($entry['active']);
+        self::assertFalse($entry['needsAttention']);
+
+        $em = $this->client->getContainer()->get('doctrine')->getManager();
+        $health = $em->getRepository(ModelHealth::class)->findOneBy(['modelId' => $modelId]);
+        self::assertNotNull($health);
+        $health->setAutoDisabled(true);
+        $em->flush();
+        $autoDisabled = $this->request('GET', '/api/v1/admin/model-health');
+
+        self::assertSame($before['summary']['needsAttention'], $autoDisabled['summary']['needsAttention']);
+        self::assertTrue($this->entryFor($autoDisabled, $modelId)['needsAttention']);
+    }
+
+    /**
+     * @param array<string, mixed> $snapshot
+     *
+     * @return array<string, mixed>
+     */
+    private function entryFor(array $snapshot, int $modelId): array
+    {
+        foreach ($snapshot['providers'] as $provider) {
+            foreach ($provider['models'] as $model) {
+                if ($modelId === $model['id']) {
+                    return $model;
+                }
+            }
+        }
+
+        self::fail(sprintf('Model %d is not listed under any provider', $modelId));
     }
 
     public function testPruneRetiredDropsOnlyTheFrozenVerdictsOfRetiredModels(): void

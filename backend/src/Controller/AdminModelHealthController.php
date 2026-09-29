@@ -56,7 +56,7 @@ final class AdminModelHealthController extends AbstractController
     #[OA\Get(
         path: '/api/v1/admin/model-health',
         summary: 'Availability of every catalogued AI model (admin only)',
-        description: 'Returns the last stored verdict per model together with the rolling success/failure counters from live traffic. Retired models are listed separately and never counted as needing attention. Reads stored state only and never calls a provider.',
+        description: 'Returns the last stored verdict per model together with the rolling success/failure counters from live traffic. Retired models are listed separately; they and models an operator switched off never count as needing attention. Reads stored state only and never calls a provider.',
         security: [['Bearer' => []]],
         tags: ['Admin Model Health']
     )]
@@ -69,7 +69,7 @@ final class AdminModelHealthController extends AbstractController
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(
                     property: 'summary',
-                    required: ['total', 'online', 'degraded', 'offline', 'unconfigured', 'unknown', 'retired', 'needsAttention', 'lastCheck', 'autoDisableEnabled', 'monitoringEnabled'],
+                    required: ['total', 'online', 'degraded', 'offline', 'unconfigured', 'unknown', 'switchedOff', 'retired', 'needsAttention', 'lastCheck', 'autoDisableEnabled', 'monitoringEnabled'],
                     properties: [
                         new OA\Property(property: 'total', type: 'integer', description: 'Every catalogued model, retired ones included', example: 99),
                         new OA\Property(property: 'online', type: 'integer', example: 71),
@@ -77,6 +77,7 @@ final class AdminModelHealthController extends AbstractController
                         new OA\Property(property: 'offline', type: 'integer', example: 3),
                         new OA\Property(property: 'unconfigured', type: 'integer', example: 8),
                         new OA\Property(property: 'unknown', type: 'integer', example: 0),
+                        new OA\Property(property: 'switchedOff', type: 'integer', description: 'Models an operator switched off; listed in `providers` but not counted by state', example: 2),
                         new OA\Property(property: 'retired', type: 'integer', description: 'Models the provider no longer offers; listed in `retired`, not in `providers`', example: 15),
                         new OA\Property(property: 'needsAttention', type: 'integer', example: 5),
                         new OA\Property(property: 'lastCheck', type: 'integer', description: 'Unix timestamp of the most recent check, 0 when none ran yet', example: 1755600000),
@@ -98,13 +99,14 @@ final class AdminModelHealthController extends AbstractController
                                 property: 'models',
                                 type: 'array',
                                 items: new OA\Items(
-                                    required: ['id', 'name', 'providerId', 'capability', 'state', 'reason', 'source', 'lastCheck', 'lastSuccess', 'lastFailure', 'successes', 'failures', 'errorRatePercent', 'active', 'selectable', 'autoDisabled', 'exemptUntil'],
+                                    required: ['id', 'name', 'providerId', 'capability', 'state', 'needsAttention', 'reason', 'source', 'lastCheck', 'lastSuccess', 'lastFailure', 'successes', 'failures', 'errorRatePercent', 'active', 'selectable', 'autoDisabled', 'exemptUntil'],
                                     properties: [
                                         new OA\Property(property: 'id', type: 'integer', example: 42),
                                         new OA\Property(property: 'name', type: 'string', example: 'Llama 3.3 70B'),
                                         new OA\Property(property: 'providerId', type: 'string', example: 'llama-3.3-70b-versatile'),
                                         new OA\Property(property: 'capability', type: 'string', example: 'chat'),
                                         new OA\Property(property: 'state', type: 'string', enum: ['online', 'degraded', 'offline', 'unconfigured', 'unknown'], example: 'online'),
+                                        new OA\Property(property: 'needsAttention', type: 'boolean', description: 'Degraded or offline and not switched off by an operator', example: false),
                                         new OA\Property(property: 'reason', type: 'string', description: 'Human-readable explanation, empty when healthy', example: ''),
                                         new OA\Property(property: 'source', type: 'string', enum: ['probe', 'listing', 'traffic'], example: 'probe'),
                                         new OA\Property(property: 'lastCheck', type: 'integer', example: 1755600000),

@@ -23,6 +23,10 @@ use App\Repository\ModelRepository;
  * counted. The evaluator stops checking them, so whatever verdict is stored
  * predates the retirement and would show a dead model as "offline" — or a
  * superseded one as "online" — forever.
+ *
+ * Rows an operator switched off stay under their provider with their real
+ * state, but are counted as `switchedOff` instead of by state and never need
+ * attention.
  */
 final readonly class ModelHealthOverview
 {
@@ -37,7 +41,7 @@ final readonly class ModelHealthOverview
 
     /**
      * @return array{
-     *     summary: array{total: int, online: int, degraded: int, offline: int, unconfigured: int, unknown: int, retired: int, needsAttention: int, lastCheck: int, autoDisableEnabled: bool, monitoringEnabled: bool},
+     *     summary: array{total: int, online: int, degraded: int, offline: int, unconfigured: int, unknown: int, switchedOff: int, retired: int, needsAttention: int, lastCheck: int, autoDisableEnabled: bool, monitoringEnabled: bool},
      *     providers: list<array{name: string, displayName: string, needsAttention: int, models: list<array<string, mixed>>}>,
      *     retired: list<array{id: int, name: string, providerId: string, capability: string, provider: string, providerDisplayName: string, retiredOn: string, successorName: string|null}>
      * }
@@ -58,6 +62,7 @@ final readonly class ModelHealthOverview
         $lastCheck = 0;
         $byProvider = [];
         $retired = [];
+        $switchedOffCount = 0;
         $now = time();
 
         foreach ($models as $model) {
@@ -95,8 +100,17 @@ final readonly class ModelHealthOverview
             $counters = $this->recorder->snapshot($modelId);
 
             $state = $health?->getState() ?? ModelHealthState::Unknown;
-            ++$counts[$state->value];
             $lastCheck = max($lastCheck, $health?->getLastCheck() ?? 0);
+
+            // Still listed with its real state, so a recovery is visible, but
+            // counted apart: an operator's own decision is not a problem.
+            $switchedOff = ModelHealth::isSwitchedOffByOperator($model, $health);
+            $needsAttention = !$switchedOff && $state->needsAttention();
+            if ($switchedOff) {
+                ++$switchedOffCount;
+            } else {
+                ++$counts[$state->value];
+            }
 
             $byProvider[$service] ??= [
                 'name' => $service,
@@ -104,7 +118,7 @@ final readonly class ModelHealthOverview
                 'needsAttention' => 0,
                 'models' => [],
             ];
-            if ($state->needsAttention()) {
+            if ($needsAttention) {
                 ++$byProvider[$service]['needsAttention'];
             }
 
@@ -114,6 +128,7 @@ final readonly class ModelHealthOverview
                 'providerId' => $model->getProviderId(),
                 'capability' => $model->getTag(),
                 'state' => $state->value,
+                'needsAttention' => $needsAttention,
                 'reason' => $health?->getMessage() ?? '',
                 'source' => $health?->getSource() ?? ModelHealth::SOURCE_PROBE,
                 'lastCheck' => $health?->getLastCheck() ?? 0,
@@ -151,6 +166,7 @@ final readonly class ModelHealthOverview
                 'offline' => $counts[ModelHealthState::Offline->value],
                 'unconfigured' => $counts[ModelHealthState::Unconfigured->value],
                 'unknown' => $counts[ModelHealthState::Unknown->value],
+                'switchedOff' => $switchedOffCount,
                 'retired' => count($retired),
                 'needsAttention' => $counts[ModelHealthState::Degraded->value] + $counts[ModelHealthState::Offline->value],
                 'lastCheck' => $lastCheck,
