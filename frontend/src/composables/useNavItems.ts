@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Component } from 'vue'
+import { computed, readonly, ref, watch, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ClockIcon,
@@ -96,6 +96,13 @@ export interface NavItem {
 const disabledFeaturesCount = ref(0)
 const offlineModelsCount = ref(0)
 let featureStatusRequested = false
+
+/** Model health reports its latest count so the Operate badge never lags behind the page. */
+export function setModelsNeedingAttention(count: number): void {
+  offlineModelsCount.value = count
+}
+
+export const modelsNeedingAttention = readonly(offlineModelsCount)
 
 /**
  * Workspace seam — one named predicate per nav context
@@ -359,45 +366,35 @@ export function useNavItems() {
     }
 
     if (canSeeOperate(authStore.isAdmin)) {
+      // One entry per topic: status pages first, then AI, people and the
+      // remaining platform settings. Model health is a tab of AI
+      // infrastructure, so its badge sits on that entry.
+      const badge = (count: number) => (count > 0 ? String(count) : undefined)
       const adminChildren: NavChild[] = [
         { key: 'admin-dashboard', path: '/admin', label: t('nav.adminDashboard') },
+        {
+          key: 'admin-features',
+          path: '/admin/features',
+          label: t('nav.adminFeatureStatus'),
+          badge: badge(disabledFeaturesCount.value),
+        },
+        {
+          key: 'admin-setup',
+          path: '/admin/setup',
+          label: t('nav.adminProviderSetup'),
+          badge: badge(offlineModelsCount.value),
+        },
+        {
+          key: 'admin-people',
+          path: '/admin/people',
+          label: t('nav.adminPeople'),
+        },
+        {
+          key: 'admin-config',
+          path: '/admin/config',
+          label: t('nav.adminSystemConfig'),
+        },
       ]
-
-      const featureStatusItem: NavChild = {
-        key: 'admin-features',
-        path: '/admin/features',
-        label: t('nav.adminFeatureStatus'),
-      }
-      if (disabledFeaturesCount.value > 0) {
-        featureStatusItem.badge = String(disabledFeaturesCount.value)
-      }
-      adminChildren.push(featureStatusItem)
-
-      const modelStatusItem: NavChild = {
-        key: 'admin-model-status',
-        path: '/admin/model-status',
-        label: t('nav.adminModelStatus'),
-      }
-      if (offlineModelsCount.value > 0) {
-        modelStatusItem.badge = String(offlineModelsCount.value)
-      }
-      adminChildren.push(modelStatusItem)
-
-      adminChildren.push({
-        key: 'admin-setup',
-        path: '/admin/setup',
-        label: t('nav.adminProviderSetup'),
-      })
-      adminChildren.push({
-        key: 'admin-config',
-        path: '/admin/config',
-        label: t('nav.adminSystemConfig'),
-      })
-      adminChildren.push({
-        key: 'admin-people',
-        path: '/admin/people',
-        label: t('nav.adminPeople'),
-      })
 
       items.push({
         key: 'admin',

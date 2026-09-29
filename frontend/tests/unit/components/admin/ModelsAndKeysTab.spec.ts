@@ -103,6 +103,53 @@ describe('ModelsAndKeysTab local AI', () => {
     wrapper.unmount()
   })
 
+  it('embeds the Ollama address and opens a section named by ?section=', async () => {
+    const resolveSection = vi.fn((ref: { tab: string; section: string }) => ({
+      id: ref.section,
+      tab: ref.tab,
+      label: ref.section === 'tts' ? 'Speech output (text-to-speech)' : ref.section,
+      fields: [],
+      managedFields: [],
+      allManaged: false,
+      isLive: false,
+      testService: null,
+    }))
+    const config = { resolveSection, testingService: { value: null } }
+    const wrapper = mount(ModelsAndKeysTab, {
+      props: {
+        config: config as never,
+        settings: [
+          { tab: 'ai', section: 'ollama' },
+          { tab: 'ai', section: 'tts' },
+        ],
+        focusSection: 'tts',
+      },
+      global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+          ProviderHelpHint: { template: '<span />' },
+          ProviderKeyCard: { template: '<div />' },
+          ModelImportDialog: { template: '<div />' },
+          LocalAiDownloadCard: { template: '<div />' },
+          ConfigSectionBody: {
+            template: '<div data-testid="config-section-body-stub">{{ section.id }}</div>',
+            props: ['section', 'config'],
+          },
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(resolveSection).toHaveBeenCalledWith(
+      { tab: 'ai', section: 'ollama' },
+      { hideManaged: true }
+    )
+    expect(wrapper.get('[data-testid="setup-local-ai-settings"]').text()).toContain('ollama')
+    expect(wrapper.get('#setup-section-tts').attributes('data-open')).toBe('true')
+    expect(wrapper.find('[data-testid="btn-jump-section-tts"]').text()).toContain('Speech output')
+    wrapper.unmount()
+  })
+
   it('fails open when the pre-flight itself errors', async () => {
     mockImportEndpointPreview.mockRejectedValue(new Error('network down'))
     const wrapper = mountTab()

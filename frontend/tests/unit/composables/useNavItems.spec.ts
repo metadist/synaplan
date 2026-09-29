@@ -10,6 +10,7 @@ import {
   groupNavChildren,
   hasNestedNavGroups,
   isNavChildActive,
+  setModelsNeedingAttention,
   useNavItems,
 } from '@/composables/useNavItems'
 import { useAuthStore, type User } from '@/stores/auth'
@@ -86,8 +87,7 @@ const navMessages = {
     plugins: 'Plugins',
     admin: 'Operate',
     adminDashboard: 'Overview',
-    adminFeatureStatus: 'Feature Status',
-    adminModelStatus: 'Model Status',
+    adminFeatureStatus: 'System status',
     adminProviderSetup: 'AI infrastructure',
     adminSystemConfig: 'System configuration',
     adminPeople: 'People',
@@ -350,6 +350,45 @@ describe('useNavItems rail', () => {
     expect(children.find((child: { key: string }) => child.key === 'admin-people')?.path).toBe(
       '/admin/people'
     )
+  })
+
+  it('orders Operate by topic and drops the separate Model status entry', () => {
+    const wrapper = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
+    const operate = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
+    const children = (operate?.children ?? []) as Array<{
+      key: string
+      label: string
+      path: string
+    }>
+
+    expect(children.map((child) => child.key)).toEqual([
+      'admin-dashboard',
+      'admin-features',
+      'admin-setup',
+      'admin-people',
+      'admin-config',
+    ])
+    expect(children.find((child) => child.key === 'admin-features')?.label).toBe('System status')
+    expect(children.some((child) => child.path === '/admin/model-status')).toBe(false)
+  })
+
+  it('shows models that need attention as a badge on AI infrastructure', async () => {
+    setModelsNeedingAttention(3)
+    const wrapper = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
+    await flushPromises()
+    const operate = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
+    const setup = (operate?.children ?? []).find(
+      (child: { key: string }) => child.key === 'admin-setup'
+    )
+    expect(setup?.badge).toBe('3')
+
+    setModelsNeedingAttention(0)
+    await flushPromises()
+    const refreshed = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
+    expect(
+      (refreshed?.children ?? []).find((child: { key: string }) => child.key === 'admin-setup')
+        ?.badge
+    ).toBeUndefined()
   })
 
   it('People always points at /admin/people', () => {

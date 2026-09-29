@@ -36,7 +36,13 @@ import { inferNavContext } from '@/router/navContext'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
 import { desktopRouteGuard, savedTasksRouteGuard } from '@/router/featureSurfaceGuards'
 import { aiAccountsRouteGuard } from '@/composables/useAiAccounts'
-import { adminUsersTabRedirect, groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
+import { groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
+import {
+  adminDashboardRedirect,
+  aiInfrastructureRedirect,
+  modelStatusRedirect,
+  systemConfigRedirect,
+} from '@/router/operateRedirects'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
 
@@ -656,7 +662,7 @@ const router = createRouter({
         titleKey: 'pageTitles.admin',
         i18n: ['admin', 'config'],
       },
-      beforeEnter: adminUsersTabRedirect,
+      beforeEnter: adminDashboardRedirect,
     },
     {
       path: '/admin/features',
@@ -669,17 +675,8 @@ const router = createRouter({
         i18n: ['admin', 'config'],
       },
     },
-    {
-      path: '/admin/model-status',
-      name: 'admin-model-status',
-      component: () => import('@/views/ModelStatusView.vue'),
-      meta: {
-        requiresAuth: true,
-        requiresAdmin: true,
-        titleKey: 'pageTitles.adminModelStatus',
-        i18n: ['admin', 'config'],
-      },
-    },
+    // Model health is a tab of AI infrastructure (Operate topic regrouping).
+    { path: '/admin/model-status', redirect: modelStatusRedirect },
     {
       path: '/admin/config',
       name: 'admin-config',
@@ -690,6 +687,7 @@ const router = createRouter({
         titleKey: 'pageTitles.adminConfig',
         i18n: ['admin', 'config', ...BUNDLE_PANEL_I18N_NAMESPACES],
       },
+      beforeEnter: systemConfigRedirect,
     },
     {
       path: '/admin/setup',
@@ -701,6 +699,7 @@ const router = createRouter({
         titleKey: 'pageTitles.adminSetup',
         i18n: ['admin', 'config'],
       },
+      beforeEnter: aiInfrastructureRedirect,
     },
     {
       path: '/admin/people',

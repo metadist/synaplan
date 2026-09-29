@@ -58,6 +58,11 @@ vi.mock('@iconify/vue', () => ({
   Icon: { template: '<i />' },
 }))
 
+vi.mock('@/components/admin/AdminModerationPanel.vue', () => ({
+  __esModule: true,
+  default: { template: '<div data-testid="admin-moderation-panel-stub" />' },
+}))
+
 import PeopleView from '@/views/PeopleView.vue'
 
 function createPeopleRouter() {
@@ -152,17 +157,29 @@ describe('PeopleView', () => {
     expect(router.currentRoute.value.name).toBe('admin')
   })
 
-  it('hides the tab bar when only Users is available', async () => {
+  it('shows Users and Moderation when every People flag is off', async () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="tab-users"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-users"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-moderation"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-groups"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tab-audit"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tab-linked-platforms"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="section-users"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="section-audit"]').exists()).toBe(false)
+  })
+
+  it('opens reported content from ?tab=moderation', async () => {
+    const router = createPeopleRouter()
+    await router.push('/admin/people?tab=moderation')
+    await router.isReady()
+    const wrapper = mountView(router)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="admin-moderation-panel-stub"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-users"]').exists()).toBe(false)
   })
 
   it('renders Users, Groups and Audit tabs when IAM groups are on', async () => {
@@ -207,7 +224,7 @@ describe('PeopleView', () => {
     expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(true)
   })
 
-  it('shows all five tabs when every People flag is on', async () => {
+  it('shows all six tabs when every People flag is on', async () => {
     getConfigSync.mockReturnValue({
       features: { iamGroups: true, iamPolicies: true, platformLinksEnabled: true },
     })
@@ -218,6 +235,7 @@ describe('PeopleView', () => {
     expect(wrapper.find('[data-testid="tab-groups"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-linked-platforms"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-moderation"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-audit"]').exists()).toBe(true)
   })
 

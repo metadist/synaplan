@@ -1,9 +1,8 @@
 {
   "adminModelStatus": {
-    "title": "Model Status",
     "subtitle": "Which AI models are currently working, and which are not.",
-    "loading": "Loading model status…",
-    "loadFailed": "The model status could not be loaded.",
+    "loading": "Loading model health…",
+    "loadFailed": "Model health could not be loaded.",
     "never": "never",
     "noMatches": "No models match the current filters.",
     "freeHint": "Checking is free: providers are only asked which models they publish. No AI model is ever run for this.",
@@ -92,14 +91,12 @@
   },
   "admin": {
     "title": "Operate",
-    "description": "System management and configuration",
+    "description": "Your server at a glance: people, sign-ups and usage.",
     "tabs": {
       "overview": "Overview",
       "users": "Users",
-      "prompts": "Prompts",
       "usage": "Usage",
       "subscriptions": "Subscriptions",
-      "moderation": "Moderation",
       "appServer": "App server"
     },
     "overview": {
@@ -309,31 +306,35 @@
       }
     },
     "config": {
-      "title": "System Configuration",
-      "description": "Manage environment variables and service connections",
+      "title": "System configuration",
+      "description": "Sign-in, features and tools, channels and the look of this server.",
+      "aiPointer": "AI providers, keys, models, document reading and search are set up under AI infrastructure.",
+      "aiPointerLink": "Open AI infrastructure",
       "loadError": "Failed to load configuration",
       "saveError": "Failed to save configuration",
       "saved": "Configuration saved",
       "savedLive": "Saved — takes effect immediately",
       "dbOverridesEnv": "Stored encrypted in the database — overrides any matching value in .env.",
       "managedKeys": {
-        "title": "Provider keys are managed under AI infrastructure › Models & keys.",
-        "helm": "Keys set in the environment or by a Helm chart are picked up automatically — a chart install does not need this page. Use Models & keys only to add or override a key from the UI.",
+        "title": "Provider keys are managed under AI infrastructure › Providers & keys.",
+        "helm": "Keys set in the environment or by a Helm chart are picked up automatically — a chart install does not need this page. Use Providers & keys only to add or override a key from the UI.",
         "stateNone": "not set",
         "stateDb": "UI override",
         "stateEnv": "environment / Helm",
         "summary": "{env} from the environment, {db} overridden in the UI.",
-        "cta": "Open Models & keys"
+        "cta": "Open Providers & keys"
       },
       "envOverridesDb": "Locked by the environment variable {key}. It is currently {value}. Remove the variable from your environment to manage this setting here.",
       "unsaved": "Unsaved changes",
-      "testConnection": "Test Connection",
+      "testConnection": "Test connection",
       "testFailed": "Connection test failed",
       "commandCopied": "Command copied to clipboard",
-      "tabGroups": {
-        "aiData": "AI & Data",
-        "communication": "Communication",
-        "security": "Features & Access"
+      "groups": {
+        "access": "Access",
+        "features": "Features & tools",
+        "channels": "Channels & apps",
+        "appearance": "Appearance",
+        "more": "More settings"
       },
       "accordion": {
         "expandAll": "Expand all",
@@ -349,7 +350,8 @@
       "restartBanner": {
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
-        "copyCommand": "Copy Command"
+        "copyCommand": "Copy Command",
+        "copyFailed": "Could not copy. Select the command and copy it manually."
       },
       "m365": {
         "title": "Before these fields work: register an app in Azure",
@@ -386,28 +388,57 @@
         "resetFailed": "The reset failed. Please try again."
       },
       "tabs": {
-        "ai": "AI Services",
-        "email": "Email",
-        "branding": "Branding",
-        "mobile": "Mobile App",
-        "auth": "Authentication",
-        "channels": "Inbound Channels",
-        "processing": "Processing",
+        "auth": "Sign-in & registration",
+        "sharing": "Sharing & audit",
         "features": "Features",
-        "sharing": "Sharing",
-        "routing": "Routing",
+        "web_search": "Web search",
+        "tools": "Tools & automation",
+        "email": "Email",
+        "channels": "Channels & integrations",
+        "mobile": "Mobile app",
+        "branding": "Branding",
         "interface": "Interface",
-        "guest_landing": "Guest Landing",
-        "vectordb": "Vector DB"
+        "guest_landing": "Guest landing page"
+      },
+      "tabIntro": {
+        "auth": "Who may register and sign in, and which sign-in providers are offered.",
+        "sharing": "What people may share with everyone, which login groups are synced, and how long the audit log is kept.",
+        "features": "Switch whole features on or off for everyone on this server. Changes apply immediately.",
+        "web_search": "Choose who looks things up on the web for chat, and test it with a query.",
+        "tools": "What the AI may do on its own: saved tasks, approval rules for tools and file work in a sandbox.",
+        "email": "The mail server used to send sign-up, password and notification emails.",
+        "channels": "Inbound channels such as WhatsApp and email, plus Microsoft 365, Dropbox and MCP connections.",
+        "mobile": "The oldest app version that may connect, and where people download the apps.",
+        "branding": "Name, colors, fonts, logos and legal links.",
+        "interface": "Whether usage is shown and what chat displays while it works.",
+        "guest_landing": "The news shown to visitors on the guest landing page.",
+        "more": "Settings that are not sorted into a topic yet."
+      },
+      "panelSettings": {
+        "web_search": {
+          "title": "Brave Search settings",
+          "hint": "API key and number of results for Brave Search, the default provider."
+        }
       },
       "sections": {
-        "tika": "Apache Tika",
-        "docling": "Docling",
-        "rasterize": "PDF rasterizer",
-        "whisper": "Whisper (audio)",
-        "brave": "Web search (Brave)",
-        "media": "Background media generation",
-        "compute": "File work"
+        "ai_selfhosted": "Self-hosted AI (NVIDIA Triton)",
+        "ai_tts": "Speech output (text-to-speech)",
+        "ai_cloud": "Additional provider settings",
+        "ai_embeddings": "Embeddings (Cloudflare Workers AI)",
+        "processing_tika": "Apache Tika",
+        "processing_docling": "Docling",
+        "processing_rasterize": "PDF rasterizer",
+        "processing_whisper": "Whisper (audio transcription)",
+        "vectordb_qdrant": "Vector database (Qdrant)",
+        "vectordb_qdrant_search": "Search thresholds and limits",
+        "routing_multitask": "Multi-step routing",
+        "routing_conversation_summary": "Rolling conversation summary",
+        "routing_deep_memory": "Deep memory (message digests)",
+        "processing_media": "Background media generation",
+        "processing_brave": "Brave Search",
+        "routing_saved_tasks": "Saved tasks",
+        "routing_tools": "Tool approval rules",
+        "processing_compute": "File work"
       },
       "fields": {
         "TIKA_BASE_URL": "Apache Tika URL",
@@ -514,13 +545,10 @@
       "addPlaceholder": "Add an adapter…",
       "healthAvailable": "available",
       "healthUnavailable": "unavailable",
-      "testSidecar": {
-        "tika": "Test Tika",
-        "docling": "Test Docling"
-      },
-      "testingSidecar": "Testing…",
-      "sidecarSettings": "URL, timeout and a connection test for Tika and Docling live under System configuration → Processing.",
-      "sidecarSettingsLink": "Open Processing settings",
+      "sidecarSettings": "Addresses, timeouts and a connection test for each service are under Reading services on this tab.",
+      "sidecarSettingsLink": "Go to reading services",
+      "servicesTitle": "Reading services",
+      "servicesHint": "Where Tika, Docling, the PDF rasterizer and Whisper run, and their limits.",
       "testTitle": "Test with a file",
       "testHint": "Upload a sample. You will see which adapter won and why the others did not.",
       "testButton": "Test with a file",
@@ -590,6 +618,7 @@
       "testProviderFallback": "Answered by {provider} (fell back from {from})"
     },
     "rerank": {
+      "title": "Reranking",
       "lead": "After search finds many snippets, a reranker puts the most useful ones first. Leave this off until a test shows it helps. Chat stays the same while it is off.",
       "enable": "Use reranking on document search",
       "model": "Rerank model",
@@ -672,7 +701,7 @@
     },
     "perplexity": {
       "title": "Perplexity API key",
-      "message": "Create an API key in your Perplexity account, then paste it here to use Sonar models. The same key is used for web search if you pick Perplexity on the Web search tab."
+      "message": "Create an API key in your Perplexity account, then paste it here to use Sonar models. The same key is used for web search if you pick Perplexity under System configuration › Web search."
     },
     "ollama": {
       "title": "Local AI with Ollama",
@@ -681,12 +710,13 @@
   },
   "people": {
     "title": "People",
-    "subtitle": "Users and groups on this instance.",
+    "subtitle": "Accounts, groups, policies and reported content on this server.",
     "tabs": {
       "users": "Users",
       "groups": "Groups",
       "policies": "Policies",
       "linkedPlatforms": "Platform instances",
+      "moderation": "Moderation",
       "audit": "Audit"
     },
     "openPeople": "Open People",
@@ -1116,7 +1146,7 @@
     "compute": {
       "label": "Secure compute (file work)",
       "running": "File work is running.",
-      "runningOff": "The sidecar is running; file work is turned off in System configuration.",
+      "runningOff": "The sidecar is running; file work is turned off under System configuration › Tools & automation.",
       "unreachable": "The file-work sidecar is not reachable.",
       "unset": "COMPUTE_URL or COMPUTE_TOKEN is not set."
     },
@@ -1129,7 +1159,7 @@
       "title": "{module} is not available on this installation",
       "body": "This feature is optional. It is switched on by the administrator of this installation.",
       "howToEnable": "How to enable it",
-      "openFeatureStatus": "Open feature status"
+      "openFeatureStatus": "Open system status"
     }
   }
 }

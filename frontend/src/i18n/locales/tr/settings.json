@@ -346,7 +346,7 @@
     },
     "logout": "Çıkış Yap",
     "features": {
-      "title": "Sistem Durumu",
+      "title": "Sistem durumu",
       "subtitle": "Tüm servisleri ve özellikleri izleyin",
       "loading": "Özellikler yükleniyor...",
       "requiredConfig": "Gerekli Yapılandırma:",
@@ -359,7 +359,7 @@
       "model": "model",
       "models": "model",
       "adminOnlyTitle": "Yönetici erişimi gerekli",
-      "adminOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir.",
+      "adminOnlyMessage": "Sistem durumu yalnızca yöneticiler için kullanılabilir.",
       "modulesTitle": "Özellik modülleri",
       "modulesSubtitle": "Bu kurulumun bildirdiği isteğe bağlı özellikler. Her biri kendi yapılandırmasıyla açılır; liste anahtarları gösterir, değerlerini asla göstermez.",
       "modulesConfigured": "{total} modülden {configured} tanesi yapılandırıldı",
@@ -375,7 +375,7 @@
         "statusOff": "Kapalı",
         "statusDown": "Yanıt vermiyor",
         "stateRunning": "Dosya işleri çalışıyor.",
-        "stateDisabled": "Sistem yapılandırmasında kapalı. Dosya işleri gizli.",
+        "stateDisabled": "Sistem yapılandırması › Araçlar ve otomasyon altında kapalı. Dosya çalışması gizli.",
         "stateUnreachable": "Açık, ancak sidecar yanıt vermiyor. Dosya işleri kullanılamıyor.",
         "postureWarning": "Bu hizmet {tier} bildiriyor; bu kurulum daha güçlü yalıtım gerektiriyor.",
         "capacity": "Kapasite",
@@ -384,7 +384,7 @@
         "images": "İmajlar",
         "runs24": "{count} çalıştırma (24 sa)",
         "failed24": "{count} başarısız (24 sa)",
-        "openConfig": "İşlem ayarları",
+        "openConfig": "Dosya çalışması ayarları",
         "stateTierBlocked": "Açık, ancak gerekli yalıtımın altında. Dosya işleri gizli."
       }
     },

@@ -26,7 +26,12 @@ vi.mock('@iconify/vue', () => ({
   Icon: { template: '<i />' },
 }))
 
-import ModelStatusView from '@/views/ModelStatusView.vue'
+const setModelsNeedingAttention = vi.fn()
+vi.mock('@/composables/useNavItems', () => ({
+  setModelsNeedingAttention: (...args: unknown[]) => setModelsNeedingAttention(...args),
+}))
+
+import ModelHealthPanel from '@/components/admin/ModelHealthPanel.vue'
 
 const snapshot = {
   success: true,
@@ -73,14 +78,10 @@ const snapshot = {
 }
 
 function mountView() {
-  return mount(ModelStatusView, {
-    global: {
-      stubs: { MainLayout: { template: '<div><slot /></div>' } },
-    },
-  })
+  return mount(ModelHealthPanel)
 }
 
-describe('ModelStatusView', () => {
+describe('ModelHealthPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetStatus.mockResolvedValue(snapshot)
@@ -94,6 +95,21 @@ describe('ModelStatusView', () => {
 
     expect(wrapper.get('[data-testid="item-model"]').text()).toContain('Chat / General AI')
     expect(wrapper.get('[data-testid="item-model"]').text()).not.toMatch(/\bchat\b/)
+    wrapper.unmount()
+  })
+
+  it('keeps the Operate badge in step with the loaded snapshot', async () => {
+    mockGetStatus.mockResolvedValue({
+      ...snapshot,
+      summary: { ...snapshot.summary, offline: 2, online: 0, needsAttention: 2 },
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="panel-model-health"]').text()).toContain(
+      'Which AI models are currently working'
+    )
+    expect(setModelsNeedingAttention).toHaveBeenCalledWith(2)
     wrapper.unmount()
   })
 
