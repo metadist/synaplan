@@ -72,7 +72,7 @@
               :class="[
                 'max-w-[85%] rounded-2xl px-4 py-3',
                 message.role === 'user'
-                  ? 'bg-[var(--brand)] text-white rounded-br-md'
+                  ? 'bg-[var(--brand-fill)] text-white rounded-br-md'
                   : 'surface-chip txt-primary rounded-bl-md',
               ]"
             >

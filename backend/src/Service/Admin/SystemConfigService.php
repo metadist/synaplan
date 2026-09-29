@@ -551,6 +551,18 @@ final readonly class SystemConfigService
             ];
         }
 
+        // An empty value deletes the stored override. Booleans and selects
+        // always have a choice, so blank is a mistake rather than a clear.
+        if ('' === $value) {
+            if (\in_array($field['type'], ['boolean', 'select'], true)) {
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'This setting needs a value'];
+            }
+
+            return 'database' === $source
+                ? $this->clearDatabaseValue($key, $field, $actingUserId)
+                : $this->clearEnvValue($key);
+        }
+
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
             $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value)
@@ -606,6 +618,80 @@ final readonly class SystemConfigService
 
         // Log the change (mask sensitive values)
         $this->logChange($key, $value);
+
+        return ['success' => true, 'requiresRestart' => true];
+    }
+
+    /**
+     * Drop a stored override so readers fall back to the field default.
+     *
+     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string} $field
+     *
+     * @return array{success: bool, requiresRestart: bool, message?: string}
+     */
+    private function clearDatabaseValue(string $key, array $field, ?int $actingUserId): array
+    {
+        $group = $field['dbGroup'] ?? self::DB_GROUP;
+        $setting = $field['dbKey'] ?? $key;
+
+        try {
+            $this->configRepository->deleteValue(self::DB_OWNER_ID, $group, $setting);
+            $this->logChange($key, '');
+            $this->applyConfigSideEffects($group, $setting, $field['default'], $actingUserId);
+            $this->layeredConfigResolver?->reset();
+
+            return ['success' => true, 'requiresRestart' => false];
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to clear DB config', ['key' => $key, 'error' => $e->getMessage()]);
+
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Database write failed'];
+        }
+    }
+
+    /**
+     * Remove one KEY= line from .env. Absent keys are already clear.
+     *
+     * @return array{success: bool, requiresRestart: bool, message?: string}
+     */
+    private function clearEnvValue(string $key): array
+    {
+        $envFile = $this->projectDir.'/.env';
+        if (!file_exists($envFile)) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => '.env file not found'];
+        }
+
+        $content = file_get_contents($envFile);
+        if (false === $content) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to read .env file'];
+        }
+
+        $pattern = '/^'.preg_quote($key, '/').'=.*\n?/m';
+        if (!preg_match($pattern, $content)) {
+            return ['success' => true, 'requiresRestart' => false];
+        }
+
+        $backupFile = $this->createBackup();
+        if (!$backupFile) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to create backup'];
+        }
+
+        $newContent = preg_replace($pattern, '', $content);
+        if (!\is_string($newContent)) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to update .env file'];
+        }
+
+        $tempFile = $envFile.'.tmp';
+        if (false === file_put_contents($tempFile, $newContent)) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to write temp file'];
+        }
+
+        if (!rename($tempFile, $envFile)) {
+            @unlink($tempFile);
+
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to save .env file'];
+        }
+
+        $this->logChange($key, '');
 
         return ['success' => true, 'requiresRestart' => true];
     }

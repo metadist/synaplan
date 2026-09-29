@@ -63,6 +63,67 @@ describe('ConfigField — boolean pinned by an environment variable', () => {
   })
 })
 
+describe('ConfigField — clearing a saved value', () => {
+  const textSchema: ConfigFieldSchema = {
+    tab: 'branding',
+    section: 'colors',
+    type: 'text',
+    sensitive: false,
+    description: 'Primary accent color as a hex value.',
+    default: '#003fc7',
+    source: 'database',
+  }
+
+  const mountText = (value: Partial<ConfigValue> = {}) =>
+    mount(ConfigField, {
+      props: {
+        fieldKey: 'BRAND_PRIMARY_COLOR',
+        schema: textSchema,
+        value: { value: '#7ec8ff', isSet: true, isMasked: false, ...value } as ConfigValue,
+      },
+    })
+
+  let previousLocale: SupportedLanguage
+
+  beforeEach(() => {
+    previousLocale = i18n.global.locale.value as SupportedLanguage
+    i18n.global.locale.value = 'en'
+  })
+
+  afterEach(() => {
+    i18n.global.locale.value = previousLocale
+  })
+
+  it('offers a clear action that removes the saved value', async () => {
+    const wrapper = mountText()
+
+    await wrapper.get('[data-testid="config-field-clear"]').trigger('click')
+
+    expect(wrapper.emitted('update')).toEqual([['BRAND_PRIMARY_COLOR', '']])
+  })
+
+  it('hides clear when nothing has been saved', () => {
+    const wrapper = mountText({ value: '#003fc7', isSet: false })
+
+    expect(wrapper.find('[data-testid="config-field-clear"]').exists()).toBe(false)
+  })
+
+  it('treats saving an emptied field as a clear', async () => {
+    const wrapper = mountText()
+
+    await wrapper.get('input').setValue('')
+    await wrapper.get('button.btn-primary').trigger('click')
+
+    expect(wrapper.emitted('update')).toEqual([['BRAND_PRIMARY_COLOR', '']])
+  })
+
+  it('does not offer clear on a boolean switch', () => {
+    const wrapper = mountField({ value: 'true', isSet: true })
+
+    expect(wrapper.find('[data-testid="config-field-clear"]').exists()).toBe(false)
+  })
+})
+
 describe('ConfigField — locale overlay for backend schema copy', () => {
   const mountOverlay = (
     fieldKey: string,

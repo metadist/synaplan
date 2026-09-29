@@ -63,7 +63,7 @@
             'rounded-2xl',
             fullscreen ? 'max-w-[75%] px-5 py-3 text-[15px]' : 'max-w-[85%] px-4 py-2.5 text-sm',
             msg.role === 'user'
-              ? 'bg-[var(--brand)] text-white rounded-br-md'
+              ? 'bg-[var(--brand-fill)] text-white rounded-br-md'
               : 'bg-gray-100 dark:bg-white/5 txt-primary rounded-bl-md',
           ]"
         >

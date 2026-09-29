@@ -28,8 +28,47 @@ function appleTouchIcon(): HTMLLinkElement | null {
   return document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
 }
 
+describe('applyBrandingTheme — colors', () => {
+  beforeEach(() => {
+    branding.primaryColor = '#003fc7'
+    branding.primaryColorDark = ''
+    branding.secondaryColor = ''
+    branding.secondaryColorDark = ''
+    branding.accentColor = ''
+    branding.accentColorDark = ''
+    document.getElementById('brand-color-vars')?.remove()
+  })
+
+  it('leaves the stock palette when the primary is the default', () => {
+    applyBrandingTheme()
+
+    expect(document.getElementById('brand-color-vars')).toBeNull()
+  })
+
+  it('keeps the saturated primary as the dark bubble fill', () => {
+    branding.primaryColor = '#0b3d91'
+    applyBrandingTheme()
+
+    const css = document.getElementById('brand-color-vars')?.textContent ?? ''
+    expect(css).toContain('--brand-fill:#0b3d91')
+    expect(css).toContain('color-mix(in srgb, #0b3d91 58%, white)')
+    expect(css).not.toContain('--brand-fill:color-mix')
+  })
+
+  it('removes an injected palette when the brand returns to stock', () => {
+    branding.primaryColor = '#0b3d91'
+    applyBrandingTheme()
+    branding.primaryColor = '#003fc7'
+    applyBrandingTheme()
+
+    expect(document.getElementById('brand-color-vars')).toBeNull()
+  })
+})
+
 describe('applyBrandingTheme — icon', () => {
   beforeEach(() => {
+    branding.primaryColor = '#003fc7'
+    branding.primaryColorDark = ''
     branding.iconUrl = ''
     document.head.innerHTML = `
       <link rel="icon" type="image/svg+xml" href="/single_bird.svg" />

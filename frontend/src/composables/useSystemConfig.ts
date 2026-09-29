@@ -16,6 +16,7 @@ import {
   sectionKey,
   type ConfigSectionRef,
 } from '@/constants/operateSettings'
+import { applyBrandingTheme } from '@/utils/brandingTheme'
 
 export interface ResolvedConfigField {
   key: string
@@ -134,25 +135,38 @@ export function useSystemConfig() {
         return
       }
       const field = schema.value?.fields[key]
-      success(t(field?.source === 'database' ? 'admin.config.savedLive' : 'admin.config.saved'))
+      const cleared = value === ''
+      success(
+        t(
+          cleared
+            ? 'admin.config.cleared'
+            : field?.source === 'database'
+              ? 'admin.config.savedLive'
+              : 'admin.config.saved'
+        )
+      )
+      const previous = values.value[key]
       values.value = {
         ...values.value,
         [key]: {
-          value: field?.sensitive ? '' : value,
-          isSet: true,
-          isMasked: field?.sensitive || false,
+          ...previous,
+          value: cleared ? (field?.default ?? '') : field?.sensitive ? '' : value,
+          isSet: !cleared,
+          isMasked: !cleared && Boolean(field?.sensitive),
         },
       }
       if (result.requiresRestart) {
         restartRequired.value = true
       }
-      // Feature flags feed the runtime config (navigation, share buttons,
-      // Steps editor, …) — reload it so the change is visible at once.
-      // A reload failure is not a save failure: the value is already stored,
-      // so the message must not invite a retry of the write.
-      if (field?.tab === 'features') {
+      // Feature flags and branding feed the runtime config — reload it so the
+      // change is visible at once. A reload failure is not a save failure:
+      // the value is already stored, so the message must not invite a retry.
+      if (field?.tab === 'features' || field?.tab === 'branding') {
         try {
           await configStore.reload()
+          if (field.tab === 'branding') {
+            applyBrandingTheme()
+          }
         } catch (err) {
           console.error('Saved, but the runtime config could not be reloaded:', err)
           showError(t('admin.config.savedButNotRefreshed'))
