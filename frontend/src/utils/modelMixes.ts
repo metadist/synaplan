@@ -107,16 +107,19 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
       CHAT: [
         anthropic('claude-fable-5-1'),
         anthropic('claude-fable-5'),
+        anthropic('claude-sonnet-5-5'),
         anthropic('claude-sonnet-5'),
       ],
       ANALYZE: [
         anthropic('claude-fable-5-1'),
         anthropic('claude-fable-5'),
+        anthropic('claude-sonnet-5-5'),
         anthropic('claude-sonnet-5'),
       ],
       PIC2TEXT: [
         anthropic('claude-fable-5-1'),
         anthropic('claude-fable-5'),
+        anthropic('claude-sonnet-5-5'),
         anthropic('claude-sonnet-5'),
       ],
     },
