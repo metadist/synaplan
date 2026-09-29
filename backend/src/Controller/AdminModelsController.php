@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Credential\ChatReadinessService;
 use App\Entity\User;
 use App\Service\Admin\AdminModelsService;
 use App\Service\Admin\ModelConflictException;
 use App\Service\Admin\ModelNotFoundException;
+use App\Service\SelfAware\CapabilityInventory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,6 +24,8 @@ final class AdminModelsController extends AbstractController
 {
     public function __construct(
         private readonly AdminModelsService $modelsService,
+        private readonly ChatReadinessService $chatReadiness,
+        private readonly ?CapabilityInventory $capabilityInventory = null,
     ) {
     }
 
@@ -133,6 +137,7 @@ final class AdminModelsController extends AbstractController
 
         try {
             $model = $this->modelsService->createModel($data);
+            $this->refreshModelPicker();
 
             return $this->json([
                 'success' => true,
@@ -192,6 +197,7 @@ final class AdminModelsController extends AbstractController
 
         try {
             $model = $this->modelsService->updateModel($id, $data);
+            $this->refreshModelPicker();
 
             return $this->json([
                 'success' => true,
@@ -225,6 +231,7 @@ final class AdminModelsController extends AbstractController
 
         try {
             $this->modelsService->deleteModel($id);
+            $this->refreshModelPicker();
 
             return $this->json(['success' => true]);
         } catch (ModelNotFoundException $e) {
@@ -362,6 +369,7 @@ final class AdminModelsController extends AbstractController
                 $user->getId(),
                 $request->getClientIp()
             );
+            $this->refreshModelPicker();
 
             return $this->json([
                 'success' => true,
@@ -371,5 +379,11 @@ final class AdminModelsController extends AbstractController
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
+    }
+
+    private function refreshModelPicker(): void
+    {
+        $this->chatReadiness->invalidate();
+        $this->capabilityInventory?->forget();
     }
 }

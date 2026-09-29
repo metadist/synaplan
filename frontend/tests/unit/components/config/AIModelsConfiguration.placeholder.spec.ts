@@ -3,6 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 import AIModelsConfiguration from '@/components/config/AIModelsConfiguration.vue'
+import { useAuthStore } from '@/stores/auth'
 import type { AIModel } from '@/types/ai-models'
 
 const { getModels, getDefaultModels, saveDefaultModels, checkModelAvailability } = vi.hoisted(
@@ -25,6 +26,12 @@ vi.mock('@/composables/useNotification', () => ({
 
 vi.mock('@/composables/useDialog', () => ({
   useDialog: () => ({ confirm: vi.fn() }),
+}))
+
+vi.mock('@/services/api/adminEmbeddingApi', () => ({
+  adminEmbeddingApi: {
+    getStatus: vi.fn().mockResolvedValue({ guard: null }),
+  },
 }))
 
 vi.mock('@/services/api/configApi', () => ({
@@ -239,5 +246,88 @@ describe('AIModelsConfiguration empty model row', () => {
     expect(wrapper!.find('[data-testid="section-models-load-error"]').exists()).toBe(false)
     expect(wrapper!.find('[data-testid="btn-model-dropdown"]').exists()).toBe(true)
     errorSpy.mockRestore()
+  })
+
+  it('reloads the picker when an endpoint changes and when the choice tab is opened again', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    useAuthStore().user = {
+      id: 1,
+      email: 'admin@example.com',
+      level: 'ADMIN',
+      isAdmin: true,
+    }
+
+    wrapper = mount(AIModelsConfiguration, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          PageHeader: { template: '<div><slot /><slot name="actions" /></div>' },
+          TabNav: {
+            props: ['modelValue'],
+            emits: ['update:modelValue'],
+            template:
+              '<div><button type="button" data-testid="stub-tab-list" @click="$emit(\'update:modelValue\', \'list\')">list</button><button type="button" data-testid="stub-tab-choice" @click="$emit(\'update:modelValue\', \'choice\')">choice</button><button type="button" data-testid="stub-tab-edit" @click="$emit(\'update:modelValue\', \'edit\')">edit</button></div>',
+          },
+          ServiceIcon: { template: '<span />' },
+          ModelCostBadge: { template: '<span />' },
+          EmbeddingSwitchModal: { template: '<div />' },
+          EmbeddingRunsPanel: { template: '<div />' },
+          AIModelsAdminPanel: {
+            emits: ['changed'],
+            template:
+              '<button type="button" data-testid="stub-catalog-changed" @click="$emit(\'changed\')">changed</button>',
+          },
+          AddModelForm: { template: '<div />' },
+          OpenAiCompatibleEndpointsPanel: {
+            emits: ['changed'],
+            template:
+              '<button type="button" data-testid="stub-endpoint-changed" @click="$emit(\'changed\')">changed</button>',
+          },
+          AccordionStack: { template: '<div><slot /></div>' },
+          AccordionSection: { template: '<div><slot /></div>' },
+          SectionJumpNav: { template: '<div />' },
+        },
+      },
+    })
+    await flushPromises()
+    expect(getModels).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-testid="stub-tab-edit"]').trigger('click')
+    await flushPromises()
+    expect(getModels).toHaveBeenCalledTimes(1)
+
+    const qwen: AIModel = {
+      ...chatModel,
+      id: 381,
+      service: 'OpenAICompatible',
+      name: 'qwen3.6:27b',
+      providerId: 'qwen3.6:27b',
+    }
+    getModels.mockResolvedValue({
+      success: true,
+      models: { CHAT: [qwen] },
+      providers: [],
+    })
+
+    await wrapper.get('[data-testid="stub-endpoint-changed"]').trigger('click')
+    await flushPromises()
+    expect(getModels).toHaveBeenCalledTimes(2)
+
+    await wrapper.get('[data-testid="stub-catalog-changed"]').trigger('click')
+    await flushPromises()
+    expect(getModels).toHaveBeenCalledTimes(3)
+
+    await wrapper.get('[data-testid="stub-tab-choice"]').trigger('click')
+    await flushPromises()
+    expect(getModels).toHaveBeenCalledTimes(4)
+
+    const row = wrapper
+      .findAll('[data-testid="item-capability"]')
+      .find((item) => item.text().includes('Chat / General AI'))
+    expect(row).toBeTruthy()
+    await row!.get('[data-testid="btn-model-dropdown"]').trigger('click')
+    expect(row!.text()).toContain('qwen3.6:27b')
+    expect(wrapper.find('[data-testid="section-loading"]').exists()).toBe(false)
   })
 })

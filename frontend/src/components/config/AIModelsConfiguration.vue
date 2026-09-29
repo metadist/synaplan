@@ -562,7 +562,7 @@
           header-testid="btn-ai-models-section-endpoints"
           @toggle="toggleEditSection('endpoints')"
         >
-          <OpenAiCompatibleEndpointsPanel embedded />
+          <OpenAiCompatibleEndpointsPanel embedded @changed="onEndpointChanged" />
         </AccordionSection>
         <AccordionSection
           panel-id="ai-models-section-add"
@@ -580,7 +580,7 @@
           header-testid="btn-ai-models-section-catalog"
           @toggle="toggleEditSection('catalog')"
         >
-          <AIModelsAdminPanel ref="adminPanelRef" embedded />
+          <AIModelsAdminPanel ref="adminPanelRef" embedded @changed="onCatalogChanged" />
         </AccordionSection>
       </AccordionStack>
     </div>
@@ -694,7 +694,9 @@ function canOpenModelsTab(tab: ModelsTabId): boolean {
 function applyTabFromQuery(): void {
   const tab = parseModelsTab(route.query.tab)
   if (!tab || !canOpenModelsTab(tab)) return
+  const previous = activeTab.value
   activeTab.value = tab
+  refreshPickerIfShown(tab, previous)
 }
 
 function syncTabToUrl(tab: ModelsTabId): void {
@@ -747,12 +749,30 @@ const tabNavItems = computed<TabNavItem[]>(() => {
 function onModelsTabChange(id: string) {
   const tab = id as ModelsTabId
   if (!canOpenModelsTab(tab)) return
+  const previous = activeTab.value
   activeTab.value = tab
   syncTabToUrl(tab)
+  refreshPickerIfShown(tab, previous)
 }
 
 function onAdminModelCreated() {
-  void adminPanelRef.value?.refresh()
+  void adminPanelRef.value?.refresh?.()
+  void loadData({ background: true })
+}
+
+function onCatalogChanged() {
+  void loadData({ background: true })
+}
+
+function onEndpointChanged() {
+  void adminPanelRef.value?.refresh?.()
+  void loadData({ background: true })
+}
+
+function refreshPickerIfShown(tab: ModelsTabId, previous: ModelsTabId): void {
+  if (tab !== previous && (tab === 'choice' || tab === 'list')) {
+    void loadData({ background: true })
+  }
 }
 
 const purposeLabels = computed<Record<Capability, string>>(() => ({
@@ -900,6 +920,7 @@ const canSwitchEmbedding = computed(() => {
 })
 
 let catalogLoad: Promise<void> = Promise.resolve()
+let catalogRequest = 0
 
 onMounted(async () => {
   await Promise.all([catalogLoad, loadEmbeddingGuard()])
@@ -998,14 +1019,22 @@ const scrollToCapability = (capability: Capability) => {
   }
 }
 
-const loadData = async () => {
-  loading.value = true
-  modelsLoadFailed.value = false
+const loadData = async (options?: { background?: boolean }) => {
+  const requestId = ++catalogRequest
+  const background = options?.background === true && !modelsLoadFailed.value && !loading.value
+  if (!background) {
+    loading.value = true
+    modelsLoadFailed.value = false
+  }
   try {
     const [modelsResult, defaultsResult] = await Promise.allSettled([
       getModels(),
       getDefaultModels(),
     ])
+
+    if (requestId !== catalogRequest) {
+      return
+    }
 
     if (modelsResult.status === 'fulfilled' && modelsResult.value.success) {
       availableModels.value = modelsResult.value.models
@@ -1013,10 +1042,16 @@ const loadData = async () => {
       restrictedCapabilities.value = modelsResult.value.restricted ?? []
       groupLimitNames.value = modelsResult.value.groupLimits?.names ?? []
       groupLimitsCombined.value = modelsResult.value.groupLimits?.combined === true
-    } else {
+      modelsLoadFailed.value = false
+    } else if (!background) {
       modelsLoadFailed.value = true
       console.error(
         'Failed to load models:',
+        modelsResult.status === 'rejected' ? modelsResult.reason : modelsResult.value
+      )
+    } else {
+      console.error(
+        'Failed to refresh models:',
         modelsResult.status === 'rejected' ? modelsResult.reason : modelsResult.value
       )
     }
@@ -1034,7 +1069,9 @@ const loadData = async () => {
       console.error('Failed to load default models:', defaultsResult.reason)
     }
   } finally {
-    loading.value = false
+    if (requestId === catalogRequest) {
+      loading.value = false
+    }
   }
 }
 

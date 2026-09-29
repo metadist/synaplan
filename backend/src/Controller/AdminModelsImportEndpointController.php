@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Credential\ChatReadinessService;
 use App\AI\Import\ModelImportService;
 use App\AI\Import\UnknownImportSourceException;
 use App\Entity\User;
+use App\Service\SelfAware\CapabilityInventory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,6 +29,8 @@ final class AdminModelsImportEndpointController extends AbstractController
 {
     public function __construct(
         private readonly ModelImportService $importService,
+        private readonly ChatReadinessService $chatReadiness,
+        private readonly ?CapabilityInventory $capabilityInventory = null,
     ) {
     }
 
@@ -193,10 +197,18 @@ final class AdminModelsImportEndpointController extends AbstractController
         }
 
         try {
-            return $this->json($this->importService->apply($data['source'], $rows));
+            $applied = $this->importService->apply($data['source'], $rows);
         } catch (UnknownImportSourceException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
         }
+
+        // Imported rows are invisible in the picker until the availability
+        // snapshot is rebuilt. A snapshot taken before this endpoint existed
+        // still says the provider is offline for up to 30 s.
+        $this->chatReadiness->invalidate();
+        $this->capabilityInventory?->forget();
+
+        return $this->json($applied);
     }
 
     private function requireAdmin(?User $user): ?JsonResponse
