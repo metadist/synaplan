@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Telegram;
 
+use App\Service\Telegram\TelegramCopy;
 use App\Service\Telegram\TelegramIncoming;
 use App\Service\Telegram\TelegramMediaRef;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Translation\Loader\YamlFileLoader;
+use Symfony\Component\Translation\Translator;
 
 final class TelegramIncomingTest extends TestCase
 {
     public function testTheCaptionIsTheQuestionAboutTheFile(): void
     {
-        $incoming = TelegramIncoming::fromMessage(['message_id' => 3, 'caption' => ' What is this? ', 'document' => ['file_id' => 'd', 'file_name' => 'a.pdf']]);
+        $incoming = self::parse(['message_id' => 3, 'caption' => ' What is this? ', 'document' => ['file_id' => 'd', 'file_name' => 'a.pdf']]);
 
         $this->assertSame('What is this?', $incoming->prompt());
         $this->assertSame(TelegramMediaRef::DOCUMENT, $incoming->media?->kind);
@@ -22,7 +25,7 @@ final class TelegramIncomingTest extends TestCase
 
     public function testTheLargestPhotoTelegramStillHandsOutIsUsed(): void
     {
-        $incoming = TelegramIncoming::fromMessage(['photo' => [
+        $incoming = self::parse(['photo' => [
             ['file_id' => 's', 'file_size' => 100],
             ['file_id' => 'm', 'file_size' => 1000],
             ['file_id' => 'huge', 'file_size' => 30_000_000],
@@ -33,7 +36,7 @@ final class TelegramIncomingTest extends TestCase
 
     public function testAMovingStickerIsReadThroughItsThumbnail(): void
     {
-        $incoming = TelegramIncoming::fromMessage(['sticker' => [
+        $incoming = self::parse(['sticker' => [
             'file_id' => 'animated',
             'is_animated' => true,
             'emoji' => '😂',
@@ -46,25 +49,24 @@ final class TelegramIncomingTest extends TestCase
 
     public function testAVoiceMessageHasNoPromptUntilItIsTranscribed(): void
     {
-        $incoming = TelegramIncoming::fromMessage(['voice' => ['file_id' => 'v']]);
+        $incoming = self::parse(['voice' => ['file_id' => 'v']]);
 
         $this->assertSame('', $incoming->prompt());
         $this->assertTrue($incoming->media?->isSpoken());
         $this->assertFalse($incoming->isEmpty());
     }
 
-    public function testALiveLocationIsMarked(): void
+    public function testALiveLocationIsNamedAsSuch(): void
     {
-        $incoming = TelegramIncoming::fromMessage(['location' => ['latitude' => 48.1374, 'longitude' => 11.5755, 'live_period' => 900]]);
+        $incoming = self::parse(['location' => ['latitude' => 48.1374, 'longitude' => 11.5755, 'live_period' => 900]]);
 
-        $this->assertTrue($incoming->liveLocation);
         $this->assertStringStartsWith('Shared live location: 48.1374, 11.5755', $incoming->prompt());
         $this->assertSame(['location' => ['latitude' => 48.1374, 'longitude' => 11.5755, 'live_period' => 900]], $incoming->payload);
     }
 
     public function testAQuizNamesTheCorrectAnswer(): void
     {
-        $incoming = TelegramIncoming::fromMessage(['poll' => [
+        $incoming = self::parse(['poll' => [
             'type' => 'quiz',
             'question' => 'Capital of France?',
             'options' => [['text' => 'Rome'], ['text' => 'Paris']],
@@ -76,8 +78,8 @@ final class TelegramIncomingTest extends TestCase
 
     public function testAContactAndDiceBecomeText(): void
     {
-        $contact = TelegramIncoming::fromMessage(['contact' => ['first_name' => 'Ada', 'last_name' => 'Lovelace', 'phone_number' => '+44 1']]);
-        $dice = TelegramIncoming::fromMessage(['dice' => ['emoji' => '🎯', 'value' => 6]]);
+        $contact = self::parse(['contact' => ['first_name' => 'Ada', 'last_name' => 'Lovelace', 'phone_number' => '+44 1']]);
+        $dice = self::parse(['dice' => ['emoji' => '🎯', 'value' => 6]]);
 
         $this->assertSame('Shared contact: Ada Lovelace, +44 1', $contact->prompt());
         $this->assertSame('Rolled 🎯: 6', $dice->prompt());
@@ -85,10 +87,9 @@ final class TelegramIncomingTest extends TestCase
 
     public function testAGameIsNothingWeCanRead(): void
     {
-        $incoming = TelegramIncoming::fromMessage(['game' => ['title' => 'x']]);
+        $incoming = self::parse(['game' => ['title' => 'x']]);
 
         $this->assertTrue($incoming->isEmpty());
-        $this->assertTrue($incoming->unsupported);
     }
 
     public function testAnAlbumOfPhotosAsksForAllOfThem(): void
@@ -96,7 +97,36 @@ final class TelegramIncomingTest extends TestCase
         $photo = new TelegramMediaRef(TelegramMediaRef::PHOTO, 'a', null, null, null);
         $document = new TelegramMediaRef(TelegramMediaRef::DOCUMENT, 'b', null, null, null);
 
-        $this->assertSame('Describe what you see in these images.', TelegramIncoming::albumPrompt([$photo, $photo]));
-        $this->assertSame('Summarize these files.', TelegramIncoming::albumPrompt([$photo, $document]));
+        $this->assertSame('Describe what you see in these images.', TelegramIncoming::albumPrompt([$photo, $photo], self::say()));
+        $this->assertSame('Summarize these files.', TelegramIncoming::albumPrompt([$photo, $document], self::say()));
+    }
+
+    public function testTheQuestionAboutAFileFollowsTheLanguage(): void
+    {
+        $incoming = TelegramIncoming::fromMessage(['document' => ['file_id' => 'd']], self::say('fr'));
+
+        $this->assertSame('Résume ce fichier.', $incoming->prompt());
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     */
+    private static function parse(array $message): TelegramIncoming
+    {
+        return TelegramIncoming::fromMessage($message, self::say());
+    }
+
+    /**
+     * @return callable(string, array<string, string|int>): string
+     */
+    private static function say(string $locale = 'en'): callable
+    {
+        $translator = new Translator('en');
+        $translator->addLoader('yaml', new YamlFileLoader());
+        foreach (['en', 'fr'] as $language) {
+            $translator->addResource('yaml', dirname(__DIR__, 4).'/translations/telegram.'.$language.'.yaml', $language, 'telegram');
+        }
+
+        return (new TelegramCopy($translator))->sayer($locale);
     }
 }

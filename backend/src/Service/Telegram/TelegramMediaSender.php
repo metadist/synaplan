@@ -9,7 +9,8 @@ use Psr\Log\LoggerInterface;
 /**
  * Sends a reply with its generated files as real Telegram uploads, so it
  * works without a public file URL. Files Telegram cannot take stay in
- * Synaplan and are returned as unsent.
+ * Synaplan and are returned as too large or failed. Nothing is sent when
+ * there is neither text nor a file to send.
  */
 final readonly class TelegramMediaSender
 {
@@ -32,11 +33,16 @@ final readonly class TelegramMediaSender
     public function deliver(string $token, string $chatId, string $text, array $files, ?array $keyboard = null, ?int $replyTo = null): TelegramDelivery
     {
         $sendable = [];
-        $unsent = [];
+        $tooLarge = [];
+        $failed = [];
         foreach ($files as $file) {
             $absolute = $this->resolve($file);
-            if (null === $absolute || (int) filesize($absolute) > TelegramBotApi::MAX_UPLOAD_BYTES) {
-                $unsent[] = $file;
+            if (null === $absolute) {
+                $failed[] = $file;
+                continue;
+            }
+            if ((int) filesize($absolute) > TelegramBotApi::MAX_UPLOAD_BYTES) {
+                $tooLarge[] = $file;
                 continue;
             }
             $sendable[] = [$file, $absolute];
@@ -47,8 +53,8 @@ final readonly class TelegramMediaSender
         $ids = [];
         if (1 === count($sendable) && '' !== $text && mb_strlen($text) <= TelegramBotApi::MAX_CAPTION) {
             $caption = $text;
-        } elseif ('' !== $text || [] === $sendable) {
-            $ids = $this->api->sendMessage($token, $chatId, '' !== $text ? $text : '…', [] === $sendable ? $keyboard : null, $replyTo);
+        } elseif ('' !== $text) {
+            $ids = $this->api->sendMessage($token, $chatId, $text, [] === $sendable ? $keyboard : null, $replyTo);
             $replyTo = null;
         }
 
@@ -57,7 +63,7 @@ final readonly class TelegramMediaSender
         foreach ($sendable as $index => [$file, $absolute]) {
             $id = $this->sendOne($token, $chatId, $file, $absolute, 0 === $index ? $caption : '', $index === $last ? $keyboard : null, $replyTo);
             if (null === $id) {
-                $unsent[] = $file;
+                $failed[] = $file;
                 continue;
             }
             $ids[] = $id;
@@ -73,7 +79,7 @@ final readonly class TelegramMediaSender
             }
         }
 
-        return new TelegramDelivery($ids, $unsent, 0 === $sent);
+        return new TelegramDelivery($ids, $tooLarge, $failed, 0 === $sent);
     }
 
     /**

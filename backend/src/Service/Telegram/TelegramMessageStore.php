@@ -246,9 +246,4 @@ final readonly class TelegramMessageStore
         $inbound->setMeta(self::META_PAYLOAD, (string) json_encode($payload));
         $this->em->flush();
     }
-
-    public function flush(): void
-    {
-        $this->em->flush();
-    }
 }

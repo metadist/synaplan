@@ -1231,6 +1231,10 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    App\Service\Telegram\TelegramVoiceConverter:
+        arguments:
+            $ffmpegBinary: '%env(FFMPEG_BINARY)%'
+
     App\Service\Telegram\TelegramConversation:
         arguments:
             # Workers often run without FRONTEND_URL; a missing value must not stop replies.

@@ -28,9 +28,9 @@ final readonly class TelegramConnectionService
         private PublicWebhookUrlValidator $urls,
         private CredentialVaultInterface $vault,
         private LoggerInterface $logger,
+        private TelegramCopy $copy,
         private string $appUrl,
         private string $webhookBaseUrl = '',
-        private ?TelegramCopy $copy = null,
     ) {
     }
 
@@ -142,9 +142,6 @@ final readonly class TelegramConnectionService
      */
     public function registerCommands(string $token): void
     {
-        if (null === $this->copy) {
-            return;
-        }
         foreach (self::COMMAND_LOCALES as $locale) {
             $commands = [];
             foreach (self::COMMANDS as $command) {

@@ -7,14 +7,13 @@ namespace App\Service\Telegram;
 /**
  * What one Telegram message carries: its text or caption, at most one file,
  * and shared content (location, contact, poll, dice) as text for the AI.
+ * Texts written for the person come in their language.
  */
 final readonly class TelegramIncoming
 {
-    /** Content we receive but cannot map to anything the web chat does. */
-    private const UNSUPPORTED_KEYS = ['game', 'story', 'invoice', 'paid_media', 'giveaway', 'giveaway_winners', 'checklist'];
-
     /**
-     * @param array<string, mixed>|null $payload raw shared content, kept on the stored message
+     * @param array<string, mixed>|null $payload     raw shared content, kept on the stored message
+     * @param string                    $mediaPrompt the question asked about a file sent without a caption
      */
     public function __construct(
         public string $text,
@@ -23,39 +22,28 @@ final readonly class TelegramIncoming
         public ?array $payload,
         public ?string $mediaGroupId,
         public ?string $messageId,
-        public ?int $replyToMessageId,
-        public bool $unsupported,
-        public bool $liveLocation,
+        public string $mediaPrompt,
     ) {
     }
 
     /**
-     * @param array<string, mixed> $message
+     * @param array<string, mixed>                                $message
+     * @param callable(string, array<string, string|int>): string $say     translation of a copy key
      */
-    public static function fromMessage(array $message): self
+    public static function fromMessage(array $message, callable $say): self
     {
         $text = self::string($message['text'] ?? null) ?? self::string($message['caption'] ?? null) ?? '';
-        $replyTo = $message['reply_to_message']['message_id'] ?? null;
         $group = $message['media_group_id'] ?? null;
-        [$shared, $payload, $live] = TelegramStructuredInput::describe($message);
-
-        $unsupported = false;
-        foreach (self::UNSUPPORTED_KEYS as $key) {
-            if (isset($message[$key])) {
-                $unsupported = true;
-            }
-        }
+        $media = self::media($message);
 
         return new self(
             trim($text),
-            self::media($message),
-            $shared,
-            $payload,
+            $media,
+            TelegramStructuredInput::describe($message, $say),
+            TelegramStructuredInput::payload($message),
             is_scalar($group) ? (string) $group : null,
             self::id($message['message_id'] ?? null),
-            is_int($replyTo) ? $replyTo : null,
-            $unsupported,
-            $live,
+            null !== $media ? self::mediaPrompt($media->kind, $say) : '',
         );
     }
 
@@ -83,40 +71,45 @@ final readonly class TelegramIncoming
         }
         if ('' !== $this->text) {
             $parts[] = $this->text;
-        } elseif (null !== $this->media) {
-            $default = self::defaultPrompt($this->media->kind);
-            if ('' !== $default) {
-                $parts[] = $default;
-            }
+        } elseif ('' !== $this->mediaPrompt) {
+            $parts[] = $this->mediaPrompt;
         }
 
         return implode("\n\n", $parts);
     }
 
     /**
-     * @param list<TelegramMediaRef> $media
+     * @param list<TelegramMediaRef>                              $media
+     * @param callable(string, array<string, string|int>): string $say
      */
-    public static function albumPrompt(array $media): string
+    public static function albumPrompt(array $media, callable $say): string
     {
         foreach ($media as $ref) {
             if (TelegramMediaRef::PHOTO !== $ref->kind) {
-                return 'Summarize these files.';
+                return $say('prompt_album_files', []);
             }
         }
 
-        return 1 === count($media) ? self::defaultPrompt(TelegramMediaRef::PHOTO) : 'Describe what you see in these images.';
+        return $say(1 === count($media) ? 'prompt_photo' : 'prompt_album_photos', []);
     }
 
-    private static function defaultPrompt(string $kind): string
+    /**
+     * Voice and audio have none: their transcript is the message.
+     *
+     * @param callable(string, array<string, string|int>): string $say
+     */
+    private static function mediaPrompt(string $kind, callable $say): string
     {
-        return match ($kind) {
-            TelegramMediaRef::PHOTO => 'Describe what you see in this image.',
-            TelegramMediaRef::STICKER => 'Describe this sticker. What does it show and what emotion or message does it convey?',
-            TelegramMediaRef::VIDEO, TelegramMediaRef::ANIMATION => 'Describe this video and summarize what is said in it.',
-            TelegramMediaRef::VIDEO_NOTE => 'Reply to what is said in this video message.',
-            TelegramMediaRef::DOCUMENT => 'Summarize this file.',
-            default => '',
+        $key = match ($kind) {
+            TelegramMediaRef::PHOTO => 'prompt_photo',
+            TelegramMediaRef::STICKER => 'prompt_sticker',
+            TelegramMediaRef::VIDEO, TelegramMediaRef::ANIMATION => 'prompt_video',
+            TelegramMediaRef::VIDEO_NOTE => 'prompt_video_note',
+            TelegramMediaRef::DOCUMENT => 'prompt_document',
+            default => null,
         };
+
+        return null !== $key ? $say($key, []) : '';
     }
 
     /**

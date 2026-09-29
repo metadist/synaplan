@@ -45,7 +45,7 @@ final readonly class MediaJobMessageSync
         private ThumbnailService $thumbnailService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private ?EventDispatcherInterface $events = null,
+        private EventDispatcherInterface $events,
     ) {
     }
 
@@ -161,7 +161,7 @@ final readonly class MediaJobMessageSync
         // fallback if realtime is disabled/unreachable).
         $this->realtimeNotifier->publishUpdate($job);
 
-        $this->events?->dispatch(new MediaJobTerminalEvent($job, $messageId));
+        $this->events->dispatch(new MediaJobTerminalEvent($job, $messageId));
     }
 
     /**

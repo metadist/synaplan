@@ -39,6 +39,7 @@ final readonly class TelegramInboundService
         private TelegramCallbackService $callbacks,
         private TelegramAlbumBuffer $albums,
         private TelegramState $state,
+        private TelegramCopy $copy,
         private MessageBusInterface $bus,
         private LockFactory $lockFactory,
     ) {
@@ -59,14 +60,23 @@ final readonly class TelegramInboundService
         if (!$lock->acquire()) {
             return;
         }
-        // Album parts only land in the buffer; the album turn takes the chat lock itself.
-        $albumPart = isset($update['message']['media_group_id']);
-        $chatLock = $albumPart ? null : $this->chatLock($botRowId, $this->updateChatId($update));
+        $chatLock = null;
         try {
             if ($this->state->wasHandled($updateKey) || $this->messages->hasTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $updateKey)) {
                 return;
             }
-            $this->process($bot, $updateKey, $updateId, $update);
+            $acknowledged = false;
+            if ($this->needsChatLock($update)) {
+                $callback = is_array($update['callback_query'] ?? null) ? $update['callback_query'] : null;
+                $chatLock = $this->chatLock(
+                    $botRowId,
+                    $this->updateChatId($update),
+                    null === $callback ? null : function () use ($bot, $callback, &$acknowledged): void {
+                        $acknowledged = $this->callbacks->acknowledgeEarly($bot, $callback);
+                    },
+                );
+            }
+            $this->process($bot, $updateKey, $updateId, $update, $acknowledged);
         } finally {
             $chatLock?->release();
             $lock->release();
@@ -74,16 +84,39 @@ final readonly class TelegramInboundService
     }
 
     /**
-     * Turns of one chat run one after another, so an edit or a button press
-     * never races the answer it refers to.
+     * Album parts only land in the buffer (the album turn takes the lock
+     * itself), and an edit of shared content only moves the stored pin, so
+     * neither waits for a running answer.
+     *
+     * @param array<string, mixed> $update
      */
-    private function chatLock(int $botRowId, ?string $chatId): ?LockInterface
+    private function needsChatLock(array $update): bool
+    {
+        if (isset($update['message']['media_group_id'])) {
+            return false;
+        }
+        $edited = $update['edited_message'] ?? null;
+
+        return !is_array($edited) || !TelegramStructuredInput::isShared($edited);
+    }
+
+    /**
+     * Turns of one chat run one after another, so an edit or a button press
+     * never races the answer it refers to. $whileWaiting runs once when
+     * another turn holds the chat.
+     */
+    private function chatLock(int $botRowId, ?string $chatId, ?\Closure $whileWaiting = null): ?LockInterface
     {
         if (null === $chatId) {
             return null;
         }
         $lock = $this->lockFactory->createLock('telegram_chat_'.$botRowId.'_'.$chatId, self::LOCK_SECONDS);
-        $lock->acquire(true);
+        if (!$lock->acquire()) {
+            if (null !== $whileWaiting) {
+                $whileWaiting();
+            }
+            $lock->acquire(true);
+        }
 
         return $lock;
     }
@@ -138,11 +171,12 @@ final readonly class TelegramInboundService
             return;
         }
 
+        $say = $this->copy->sayer($turn->locale);
         $media = [];
         $caption = null;
         $externalId = null;
         foreach ($parts as $part) {
-            $incoming = TelegramIncoming::fromMessage($part);
+            $incoming = TelegramIncoming::fromMessage($part, $say);
             $externalId ??= $incoming->messageId;
             if (null !== $incoming->media) {
                 $media[] = $incoming->media;
@@ -151,17 +185,17 @@ final readonly class TelegramInboundService
                 $caption = $this->commandPrompt($incoming->text);
             }
         }
-        $this->conversation->answer($turn, $caption ?? TelegramIncoming::albumPrompt($media), $media, $externalId);
+        $this->conversation->answer($turn, $caption ?? TelegramIncoming::albumPrompt($media, $say), $media, $externalId);
     }
 
     /**
      * @param array<string, mixed> $update
      */
-    private function process(TelegramBot $bot, string $updateKey, int $updateId, array $update): void
+    private function process(TelegramBot $bot, string $updateKey, int $updateId, array $update, bool $acknowledged): void
     {
         if (is_array($update['callback_query'] ?? null)) {
             $this->state->markHandled($updateKey);
-            $this->handleCallback($bot, $updateKey, $update['callback_query']);
+            $this->handleCallback($bot, $updateKey, $update['callback_query'], $acknowledged);
 
             return;
         }
@@ -193,7 +227,7 @@ final readonly class TelegramInboundService
             return;
         }
 
-        $incoming = TelegramIncoming::fromMessage($message);
+        $incoming = TelegramIncoming::fromMessage($message, $this->copy->sayer($turn->locale));
         if ($incoming->isCommand() && preg_match('/^\/start(?:@\w+)?(?:\s+(\S+))?$/u', $incoming->text, $matches)) {
             $this->handleStart($turn, $tgUserId, $matches[1] ?? '', $incoming->messageId);
 
@@ -264,7 +298,7 @@ final readonly class TelegramInboundService
             return;
         }
         $turn = $context[0];
-        $incoming = TelegramIncoming::fromMessage($message);
+        $incoming = TelegramIncoming::fromMessage($message, $this->copy->sayer($turn->locale));
         if (null === $incoming->messageId) {
             return;
         }
@@ -295,7 +329,7 @@ final readonly class TelegramInboundService
     /**
      * @param array<string, mixed> $callback
      */
-    private function handleCallback(TelegramBot $bot, string $updateKey, array $callback): void
+    private function handleCallback(TelegramBot $bot, string $updateKey, array $callback, bool $acknowledged): void
     {
         $chat = $callback['message']['chat'] ?? null;
         $context = $this->context($bot, $chat, $callback['from'] ?? null, $updateKey);
@@ -304,7 +338,7 @@ final readonly class TelegramInboundService
         }
         [$turn, $tgUserId, $private] = $context;
         $fromOwner = $private && $this->isOwner($bot, $tgUserId) && $bot->getTgChatId() === $turn->tgChatId;
-        $this->callbacks->handle($turn, $callback, $fromOwner);
+        $this->callbacks->handle($turn, $callback, $fromOwner, $acknowledged);
     }
 
     private function handleStart(TelegramTurn $turn, string $tgUserId, string $code, ?string $externalId): void

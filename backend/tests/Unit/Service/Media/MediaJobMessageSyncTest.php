@@ -62,6 +62,7 @@ final class MediaJobMessageSyncTest extends TestCase
             $this->thumbnailService,
             $this->em,
             new NullLogger(),
+            new EventDispatcher(),
         );
     }
 

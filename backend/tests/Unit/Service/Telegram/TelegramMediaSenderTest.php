@@ -80,9 +80,26 @@ final class TelegramMediaSenderTest extends TestCase
         $delivery = $this->sender()->deliver('t', '1', 'Here.', [new TelegramOutgoingFile('../../../etc/passwd', 'document')]);
 
         $this->assertSame([], $this->calls('sendFile'));
-        $this->assertCount(1, $delivery->unsent);
+        $this->assertCount(1, $delivery->failed);
+        $this->assertSame('file_not_sent', $delivery->unsentKey());
         $this->assertSame('Here.', $this->calls('sendMessage')[0][2]);
         $this->assertTrue($delivery->textOnly);
+    }
+
+    public function testAFileAboveTheUploadLimitIsNamedTooLargeAndNothingEmptyIsSent(): void
+    {
+        $handle = fopen($this->uploadDir.'/7/huge.mp4', 'w');
+        $this->assertNotFalse($handle);
+        ftruncate($handle, TelegramBotApi::MAX_UPLOAD_BYTES + 1);
+        fclose($handle);
+
+        $delivery = $this->sender()->deliver('t', '1', '', [new TelegramOutgoingFile('7/huge.mp4', 'video')], ['inline_keyboard' => []]);
+
+        $this->assertSame([], $this->calls('sendMessage'));
+        $this->assertSame([], $this->calls('sendFile'));
+        $this->assertSame([], $delivery->messageIds);
+        $this->assertCount(1, $delivery->tooLarge);
+        $this->assertSame('file_too_large_to_send', $delivery->unsentKey());
     }
 
     public function testAFailedUploadStillDeliversTheCaption(): void
@@ -90,7 +107,9 @@ final class TelegramMediaSenderTest extends TestCase
         $delivery = $this->sender(uploadError: TelegramChannelException::SEND_FAILED)->deliver('t', '1', 'Your cat.', [new TelegramOutgoingFile('7/a.png', 'image')]);
 
         $this->assertSame('Your cat.', $this->calls('sendMessage')[0][2]);
-        $this->assertCount(1, $delivery->unsent);
+        $this->assertCount(1, $delivery->failed);
+        $this->assertSame([], $delivery->tooLarge);
+        $this->assertSame('file_not_sent', $delivery->unsentKey());
     }
 
     public function testABlockedBotStopsTheDelivery(): void

@@ -18,6 +18,7 @@ use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\Digest\MessageReferenceResolver;
 use App\Service\FeedbackExampleService;
+use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobCanceller;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
@@ -51,7 +52,10 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Lock\Exception\LockConflictedException;
+use Symfony\Component\Lock\Key;
 use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\PersistingStoreInterface;
 use Symfony\Component\Lock\Store\InMemoryStore;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -73,6 +77,7 @@ final class TelegramInboundServiceTest extends TestCase
     private array $dispatched = [];
     private string $uploadDir = '';
     private ?LockFactory $locks = null;
+    private bool $chatBusy = false;
 
     protected function setUp(): void
     {
@@ -579,6 +584,81 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame(['This link has expired. Create a new link on the Channels page in Synaplan.'], $this->texts());
     }
 
+    public function testAPhotoWithoutCaptionIsAskedAboutInTheOwnersLanguage(): void
+    {
+        $service = $this->service(reply: 'Eine Katze.', locale: 'de');
+
+        $service->handle(5, 1, $this->update(['photo' => [['file_id' => 'p', 'file_size' => 10]]]));
+
+        $this->assertSame('Beschreibe, was du auf diesem Bild siehst.', $this->messages[0]->getText());
+    }
+
+    public function testASharedLocationIsDescribedInTheOwnersLanguage(): void
+    {
+        $service = $this->service(reply: 'Schön dort.', locale: 'de');
+
+        $service->handle(5, 1, $this->update(['location' => ['latitude' => 48.1374, 'longitude' => 11.5755]]));
+
+        $this->assertStringStartsWith('Geteilter Standort: 48.1374, 11.5755', $this->messages[0]->getText());
+    }
+
+    public function testCancelStopsEveryRunningRenderOfTheAnswer(): void
+    {
+        $running = $this->createStub(MediaJob::class);
+        $running->method('isTerminal')->willReturn(false);
+        $running->method('getUserId')->willReturn(7);
+        $done = $this->createStub(MediaJob::class);
+        $done->method('isTerminal')->willReturn(true);
+        $jobs = $this->createStub(MediaJobService::class);
+        $canceller = $this->createMock(MediaJobCanceller::class);
+        $service = $this->service(
+            reply: '',
+            extraMetadata: ['task_plan_render' => ['cards' => [['job_id' => 'card-1']]]],
+            mediaJobs: $jobs,
+            canceller: $canceller,
+        );
+        $service->handle(5, 1, $this->update(['text' => 'Make a poster']));
+        $out = $this->messages[1];
+        $running->method('getMessageId')->willReturn($out->getId());
+        $done->method('getMessageId')->willReturn($out->getId());
+        $jobs->method('findByMessage')->willReturn([$running, $done]);
+        $canceller->expects($this->once())->method('cancel')->with($running);
+
+        $service->handle(5, 2, $this->press('c:'.$out->getId()));
+
+        $this->assertSame([['text' => 'Cancel', 'callback_data' => 'c:'.$out->getId()]], $this->sent[0]['markup']['inline_keyboard'][0] ?? null);
+    }
+
+    public function testALiveLocationUpdateDoesNotWaitForARunningAnswer(): void
+    {
+        $service = $this->service(reply: 'Noted.');
+        $service->handle(5, 1, $this->update(['location' => ['latitude' => 1.0, 'longitude' => 2.0, 'live_period' => 900], 'message_id' => 60]));
+        $this->assertNotNull($this->locks);
+        $running = $this->locks->createLock('telegram_chat_5_555');
+        $this->assertTrue($running->acquire());
+
+        $service->handle(5, 2, $this->edit(['location' => ['latitude' => 3.0, 'longitude' => 4.0, 'live_period' => 900], 'message_id' => 60]));
+
+        $this->assertStringContainsString('"latitude":3', (string) $this->messages[0]->getMeta(TelegramMessageStore::META_PAYLOAD));
+        $this->assertCount(1, $this->processed);
+    }
+
+    public function testAButtonPressedWhileAnAnswerRunsStopsTheSpinnerAtOnce(): void
+    {
+        $service = $this->service(reply: 'Four.');
+        $service->handle(5, 1, $this->update(['text' => 'What is 2+2?']));
+        $out = $this->messages[1];
+        $this->chatBusy = true;
+
+        $service->handle(5, 2, $this->press('a:'.$out->getId()));
+
+        $acks = array_values(array_filter($this->calls, static fn (array $call): bool => 'answerCallbackQuery' === $call['method']));
+        $this->assertCount(1, $acks);
+        $this->assertSame('cb-1', $acks[0]['args'][1]);
+        $this->assertNull($acks[0]['args'][2]);
+        $this->assertCount(2, $this->processed);
+    }
+
     public function testRateLimitDoesNotCallTheModel(): void
     {
         $service = $this->service(reply: 'never', allowed: false);
@@ -586,7 +666,7 @@ final class TelegramInboundServiceTest extends TestCase
         $service->handle(5, 1, $this->update(['text' => 'hello']));
 
         $this->assertSame([], $this->processed);
-        $this->assertSame(['You have reached the message limit. Try again later.'], $this->texts());
+        $this->assertSame(['You have reached the message limit, so I did not answer. Try again once your limit resets.'], $this->texts());
     }
 
     /**
@@ -615,6 +695,7 @@ final class TelegramInboundServiceTest extends TestCase
         ?string $reject = null,
         ?MediaJobService $mediaJobs = null,
         ?FeedbackExampleService $feedback = null,
+        ?MediaJobCanceller $canceller = null,
     ): TelegramInboundService {
         $bot ??= $this->connectedBot();
         /** @var list<object> $pending */
@@ -710,7 +791,7 @@ final class TelegramInboundServiceTest extends TestCase
             $memories,
             $references,
             $activity ?? $this->createStub(ChatActivityNotifier::class),
-            $mediaJobs ?? $this->createStub(MediaJobService::class),
+            $mediaJobs ??= $this->createStub(MediaJobService::class),
             $this->createStub(MediaJobMessageSync::class),
             new NullLogger(),
             'https://app.example',
@@ -724,7 +805,7 @@ final class TelegramInboundServiceTest extends TestCase
         $models->method('findByTag')->willReturn([$model]);
 
         $cache = new ArrayAdapter();
-        $locks = $this->locks = new LockFactory(new InMemoryStore());
+        $locks = $this->locks = new LockFactory($this->chatBusyStore());
         $state = new TelegramState($cache);
         $callbacks = new TelegramCallbackService(
             $repository,
@@ -733,10 +814,11 @@ final class TelegramInboundServiceTest extends TestCase
             $store,
             $state,
             $api,
+            $connections,
             $copy,
             $feedback ?? $this->createStub(FeedbackExampleService::class),
-            $this->createStub(MediaJobService::class),
-            $this->createStub(MediaJobCanceller::class),
+            $mediaJobs,
+            $canceller ?? $this->createStub(MediaJobCanceller::class),
             new NullLogger(),
         );
 
@@ -757,6 +839,7 @@ final class TelegramInboundServiceTest extends TestCase
             $callbacks,
             new TelegramAlbumBuffer($cache, $locks),
             $state,
+            $copy,
             $bus,
             $locks,
         );
@@ -939,6 +1022,54 @@ final class TelegramInboundServiceTest extends TestCase
         }
 
         return $translator;
+    }
+
+    /**
+     * A store in which the chat lock is held by another turn once after
+     * {@see self::$chatBusy} is set, so the next attempt gets it.
+     */
+    private function chatBusyStore(): PersistingStoreInterface
+    {
+        $takeBusy = function (): bool {
+            $busy = $this->chatBusy;
+            $this->chatBusy = false;
+
+            return $busy;
+        };
+
+        return new class(new InMemoryStore(), $takeBusy) implements PersistingStoreInterface {
+            /**
+             * @param \Closure(): bool $takeBusy
+             */
+            public function __construct(
+                private readonly InMemoryStore $inner,
+                private readonly \Closure $takeBusy,
+            ) {
+            }
+
+            public function save(Key $key): void
+            {
+                if (str_starts_with((string) $key, 'telegram_chat_') && ($this->takeBusy)()) {
+                    throw new LockConflictedException();
+                }
+                $this->inner->save($key);
+            }
+
+            public function delete(Key $key): void
+            {
+                $this->inner->delete($key);
+            }
+
+            public function exists(Key $key): bool
+            {
+                return $this->inner->exists($key);
+            }
+
+            public function putOffExpiration(Key $key, float $ttl): void
+            {
+                $this->inner->putOffExpiration($key, $ttl);
+            }
+        };
     }
 
     private function connectedBot(): TelegramBot

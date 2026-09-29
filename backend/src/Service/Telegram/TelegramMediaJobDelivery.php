@@ -83,16 +83,17 @@ final readonly class TelegramMediaJobDelivery
         $type = in_array($job->getType(), self::MEDIA_TYPES, true) ? $job->getType() : 'image';
 
         try {
-            if ([] !== $delivered) {
+            if ([] !== $delivered && !$this->othersRunning($job, $answerId)) {
                 $this->api->editMessageReplyMarkup($turn->token, $turn->tgChatId, $delivered[array_key_last($delivered)], null);
             }
 
             $file = MediaJob::STATUS_COMPLETED === $job->getStatus() ? $this->resultFile($job) : null;
             if (null !== $file) {
                 $delivery = $this->sender->deliver($turn->token, $turn->tgChatId, '', [$file], $keyboard, $replyTo);
-                if ([] !== $delivery->unsent) {
+                $unsentKey = $delivery->unsentKey();
+                if (null !== $unsentKey) {
                     $link = $this->conversation->chatLink($answer->getChatId());
-                    $this->conversation->reply($turn, $this->copy->say($turn->locale, 'file_too_large_to_send', ['%link%' => $link]), $keyboard, $replyTo);
+                    $this->conversation->reply($turn, $this->copy->say($turn->locale, $unsentKey, ['%link%' => $link]), $keyboard, $replyTo);
                 }
 
                 return;
@@ -106,6 +107,20 @@ final readonly class TelegramMediaJobDelivery
         } catch (TelegramChannelException $e) {
             $this->conversation->noteDeliveryFailure($turn->bot, $e);
         }
+    }
+
+    /**
+     * The Cancel button stays on the answer while another of its renders runs.
+     */
+    private function othersRunning(MediaJob $job, int $answerId): bool
+    {
+        foreach ($this->mediaJobs->findByMessage($answerId) as $other) {
+            if ($other->getJobKey() !== $job->getJobKey() && !$other->isTerminal()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function resultFile(MediaJob $job): ?TelegramOutgoingFile

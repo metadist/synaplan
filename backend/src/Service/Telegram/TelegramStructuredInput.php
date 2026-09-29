@@ -6,84 +6,120 @@ namespace App\Service\Telegram;
 
 /**
  * Turns shared content (location, venue, contact, poll, dice) into a plain
- * text the AI can answer, plus the raw payload that is kept on the message.
+ * text the AI can answer, in the person's language, plus the raw payload
+ * that is kept on the message.
  */
 final class TelegramStructuredInput
 {
     private const COORDINATE_DECIMALS = 6;
 
     /**
+     * The raw shared content, or null when the message carries none.
+     *
      * @param array<string, mixed> $message
      *
-     * @return array{0: string|null, 1: array<string, mixed>|null, 2: bool} text, payload, live location
+     * @return array<string, mixed>|null
      */
-    public static function describe(array $message): array
+    public static function payload(array $message): ?array
     {
-        $venue = $message['venue'] ?? null;
-        if (is_array($venue)) {
-            $location = is_array($venue['location'] ?? null) ? $venue['location'] : [];
-            $coordinates = self::coordinates($location);
-            $lines = ['Shared place: '.self::text($venue['title'] ?? '')];
-            $address = self::text($venue['address'] ?? '');
-            if ('' !== $address) {
-                $lines[] = 'Address: '.$address;
+        foreach (['venue', 'location', 'contact', 'poll', 'dice'] as $kind) {
+            $value = $message[$kind] ?? null;
+            if (!is_array($value)) {
+                continue;
             }
-            if (null !== $coordinates) {
-                $lines[] = $coordinates;
+            if ('location' === $kind && null === self::coordinates($value)) {
+                return null;
             }
 
-            return [implode("\n", $lines), ['venue' => $venue], false];
+            return [$kind => $value];
         }
 
-        $location = $message['location'] ?? null;
-        if (is_array($location)) {
-            $coordinates = self::coordinates($location);
-            if (null === $coordinates) {
-                return [null, null, false];
-            }
-            $live = isset($location['live_period']);
-
-            return ['Shared '.($live ? 'live ' : '').'location: '.$coordinates, ['location' => $location], $live];
-        }
-
-        $contact = $message['contact'] ?? null;
-        if (is_array($contact)) {
-            $name = trim(self::text($contact['first_name'] ?? '').' '.self::text($contact['last_name'] ?? ''));
-            $phone = self::text($contact['phone_number'] ?? '');
-            $parts = array_values(array_filter([$name, $phone], static fn (string $part): bool => '' !== $part));
-
-            return ['Shared contact: '.implode(', ', $parts), ['contact' => $contact], false];
-        }
-
-        $poll = $message['poll'] ?? null;
-        if (is_array($poll)) {
-            return [self::poll($poll), ['poll' => $poll], false];
-        }
-
-        $dice = $message['dice'] ?? null;
-        if (is_array($dice)) {
-            $value = $dice['value'] ?? null;
-
-            return ['Rolled '.self::text($dice['emoji'] ?? '🎲').': '.(is_int($value) ? $value : '?'), ['dice' => $dice], false];
-        }
-
-        return [null, null, false];
+        return null;
     }
 
     /**
-     * @param array<string, mixed> $poll
+     * @param array<string, mixed> $message
      */
-    private static function poll(array $poll): string
+    public static function isShared(array $message): bool
+    {
+        return null !== self::payload($message);
+    }
+
+    /**
+     * @param array<string, mixed>                                $message
+     * @param callable(string, array<string, string|int>): string $say     translation of a copy key
+     */
+    public static function describe(array $message, callable $say): ?string
+    {
+        $payload = self::payload($message);
+        if (null === $payload) {
+            return null;
+        }
+        $kind = (string) array_key_first($payload);
+        $value = $payload[$kind];
+        if (!is_array($value)) {
+            return null;
+        }
+
+        return match ($kind) {
+            'venue' => self::venue($value, $say),
+            'location' => $say(isset($value['live_period']) ? 'shared_live_location' : 'shared_location', ['%coordinates%' => (string) self::coordinates($value)]),
+            'contact' => self::contact($value, $say),
+            'poll' => self::poll($value, $say),
+            default => $say('shared_dice', [
+                '%emoji%' => '' !== self::text($value['emoji'] ?? '') ? self::text($value['emoji']) : '🎲',
+                '%value%' => is_int($value['value'] ?? null) ? $value['value'] : '?',
+            ]),
+        };
+    }
+
+    /**
+     * @param array<mixed>                                        $venue
+     * @param callable(string, array<string, string|int>): string $say
+     */
+    private static function venue(array $venue, callable $say): string
+    {
+        $lines = [$say('shared_place', ['%title%' => self::text($venue['title'] ?? '')])];
+        $address = self::text($venue['address'] ?? '');
+        if ('' !== $address) {
+            $lines[] = $say('shared_address', ['%address%' => $address]);
+        }
+        $coordinates = self::coordinates(is_array($venue['location'] ?? null) ? $venue['location'] : []);
+        if (null !== $coordinates) {
+            $lines[] = $coordinates;
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param array<mixed>                                        $contact
+     * @param callable(string, array<string, string|int>): string $say
+     */
+    private static function contact(array $contact, callable $say): string
+    {
+        $name = trim(self::text($contact['first_name'] ?? '').' '.self::text($contact['last_name'] ?? ''));
+        $phone = self::text($contact['phone_number'] ?? '');
+        $parts = array_values(array_filter([$name, $phone], static fn (string $part): bool => '' !== $part));
+
+        return $say('shared_contact', ['%contact%' => implode(', ', $parts)]);
+    }
+
+    /**
+     * @param array<mixed>                                        $poll
+     * @param callable(string, array<string, string|int>): string $say
+     */
+    private static function poll(array $poll, callable $say): string
     {
         $quiz = 'quiz' === ($poll['type'] ?? null);
-        $lines = [($quiz ? 'Shared quiz: ' : 'Shared poll: ').self::text($poll['question'] ?? '')];
+        $lines = [$say($quiz ? 'shared_quiz' : 'shared_poll', ['%question%' => self::text($poll['question'] ?? '')])];
         $options = is_array($poll['options'] ?? null) ? $poll['options'] : [];
         $correct = $poll['correct_option_id'] ?? null;
         foreach (array_values($options) as $index => $option) {
             $label = is_array($option) ? self::text($option['text'] ?? '') : '';
             $line = ($index + 1).'. '.$label;
             if ($quiz && $correct === $index) {
-                $line .= ' (correct answer)';
+                $line .= ' '.$say('shared_correct_answer', []);
             }
             $lines[] = $line;
         }

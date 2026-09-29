@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Service\Telegram;
 
 use App\Entity\Message;
+use App\Entity\TelegramBot;
 use App\Repository\MessageRepository;
 use App\Repository\ModelRepository;
 use App\Service\FeedbackExampleService;
+use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobCanceller;
 use App\Service\Media\MediaJobService;
 use Psr\Log\LoggerInterface;
@@ -27,6 +29,7 @@ final readonly class TelegramCallbackService
         private TelegramMessageStore $store,
         private TelegramState $state,
         private TelegramBotApi $api,
+        private TelegramConnectionService $connections,
         private TelegramCopy $copy,
         private FeedbackExampleService $feedback,
         private MediaJobService $mediaJobs,
@@ -38,9 +41,9 @@ final readonly class TelegramCallbackService
     /**
      * @param array<string, mixed> $callback
      */
-    public function handle(TelegramTurn $turn, array $callback, bool $fromOwner): void
+    public function handle(TelegramTurn $turn, array $callback, bool $fromOwner, bool $acknowledged): void
     {
-        $callbackId = is_string($callback['id'] ?? null) ? $callback['id'] : '';
+        $callbackId = !$acknowledged && is_string($callback['id'] ?? null) ? $callback['id'] : '';
         $buttonMessageId = $callback['message']['message_id'] ?? null;
         $parsed = TelegramKeyboard::parse($callback['data'] ?? null);
         $answer = null !== $parsed && $fromOwner ? $this->answerFor($turn, $parsed['messageId']) : null;
@@ -61,6 +64,30 @@ final readonly class TelegramCallbackService
             TelegramKeyboard::CANCEL_JOB => $this->cancelJob($turn, $callbackId, $answer, $buttonMessageId),
             default => $this->acknowledge($turn, $callbackId, $this->say($turn, 'callback_not_allowed')),
         };
+    }
+
+    /**
+     * Stops the button spinner while an earlier answer of this chat is still
+     * running; Telegram drops the acknowledgement after a few seconds.
+     *
+     * @param array<string, mixed> $callback
+     */
+    public function acknowledgeEarly(TelegramBot $bot, array $callback): bool
+    {
+        $callbackId = is_string($callback['id'] ?? null) ? $callback['id'] : '';
+        $token = '' !== $callbackId ? $this->connections->revealToken($bot) : null;
+        if (null === $token) {
+            return false;
+        }
+        try {
+            $this->api->answerCallbackQuery($token, $callbackId, null);
+        } catch (TelegramChannelException $e) {
+            $this->conversation->noteDeliveryFailure($bot, $e);
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -191,17 +218,23 @@ final readonly class TelegramCallbackService
 
     private function cancelJob(TelegramTurn $turn, string $callbackId, Message $answer, int $buttonMessageId): void
     {
-        $meta = json_decode((string) $answer->getMeta('media_job', '{}'), true);
-        $jobKey = is_array($meta) && is_string($meta['job_id'] ?? null) ? $meta['job_id'] : '';
-        $job = '' !== $jobKey ? $this->mediaJobs->findForUser($jobKey, (int) $turn->owner->getId()) : null;
-        if (null === $job || $job->isTerminal()) {
+        $answerId = (int) $answer->getId();
+        $running = array_filter(
+            $this->mediaJobs->findByMessage($answerId),
+            static fn (MediaJob $job): bool => !$job->isTerminal()
+                && $job->getMessageId() === $answerId
+                && $job->getUserId() === $answer->getUserId(),
+        );
+        if ([] === $running) {
             $this->removeButtons($turn, $buttonMessageId);
             $this->acknowledge($turn, $callbackId, $this->say($turn, 'media_already_done'));
 
             return;
         }
         $this->acknowledge($turn, $callbackId, null);
-        $this->canceller->cancel($job);
+        foreach ($running as $job) {
+            $this->canceller->cancel($job);
+        }
     }
 
     private function previousModel(Message $answer): ?int

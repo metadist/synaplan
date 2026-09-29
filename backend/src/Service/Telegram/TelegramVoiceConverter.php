@@ -12,12 +12,13 @@ use Symfony\Component\Process\Process;
  * converted with ffmpeg; the caller sends it as a plain audio file when
  * the conversion is not possible.
  */
-class TelegramVoiceConverter
+final readonly class TelegramVoiceConverter
 {
     private const TIMEOUT_SECONDS = 60;
 
     public function __construct(
-        private readonly LoggerInterface $logger,
+        private LoggerInterface $logger,
+        private string $ffmpegBinary,
     ) {
     }
 
@@ -33,7 +34,7 @@ class TelegramVoiceConverter
         @unlink($target);
         $target .= '.ogg';
 
-        $process = new Process(['ffmpeg', '-y', '-loglevel', 'error', '-i', $absolutePath, '-vn', '-c:a', 'libopus', '-b:a', '48k', $target]);
+        $process = new Process([$this->ffmpegBinary, '-y', '-loglevel', 'error', '-i', $absolutePath, '-vn', '-c:a', 'libopus', '-b:a', '48k', $target]);
         $process->setTimeout(self::TIMEOUT_SECONDS);
         try {
             $process->run();

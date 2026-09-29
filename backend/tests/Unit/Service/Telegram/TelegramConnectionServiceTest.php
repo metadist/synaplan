@@ -13,10 +13,13 @@ use App\Service\Telegram\TelegramBotApi;
 use App\Service\Telegram\TelegramBotIdentity;
 use App\Service\Telegram\TelegramChannelException;
 use App\Service\Telegram\TelegramConnectionService;
+use App\Service\Telegram\TelegramCopy;
 use App\Service\Telegram\TelegramPairResult;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Translation\Loader\YamlFileLoader;
+use Symfony\Component\Translation\Translator;
 
 #[AllowMockObjectsWithoutExpectations]
 final class TelegramConnectionServiceTest extends TestCase
@@ -318,6 +321,7 @@ final class TelegramConnectionServiceTest extends TestCase
             new PublicWebhookUrlValidator(false),
             $vault,
             new NullLogger(),
+            new TelegramCopy($this->translator()),
             $appUrl,
             '',
         );
@@ -346,5 +350,16 @@ final class TelegramConnectionServiceTest extends TestCase
         $user->method('getId')->willReturn(7);
 
         return $user;
+    }
+
+    private function translator(): Translator
+    {
+        $translator = new Translator('en');
+        $translator->addLoader('yaml', new YamlFileLoader());
+        foreach (['de', 'en', 'es', 'fr', 'tr'] as $locale) {
+            $translator->addResource('yaml', dirname(__DIR__, 4).'/translations/telegram.'.$locale.'.yaml', $locale, 'telegram');
+        }
+
+        return $translator;
     }
 }

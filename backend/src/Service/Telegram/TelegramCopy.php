@@ -32,4 +32,12 @@ final readonly class TelegramCopy
     {
         return fn (string $key): string => $this->say($locale, $key);
     }
+
+    /**
+     * @return callable(string, array<string, string|int>): string
+     */
+    public function sayer(string $locale): callable
+    {
+        return fn (string $key, array $params = []): string => $this->say($locale, $key, $params);
+    }
 }

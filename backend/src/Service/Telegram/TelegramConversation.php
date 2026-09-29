@@ -275,7 +275,7 @@ final readonly class TelegramConversation
 
         $outId = (int) $outbound->getId();
         $labels = $this->copy->labels($turn->locale);
-        $keyboard = 1 === count($jobs) ? TelegramKeyboard::cancelJob($outId, $labels) : TelegramKeyboard::actions($outId, $labels);
+        $keyboard = [] !== $jobs ? TelegramKeyboard::cancelJob($outId, $labels) : TelegramKeyboard::actions($outId, $labels);
         $this->send($turn, $outbound, $text, $files, $previous, $replyTo, $keyboard);
 
         if (null !== $previous) {
@@ -339,7 +339,7 @@ final readonly class TelegramConversation
                 && time() - $previous->getUnixTimestamp() < self::EDIT_WINDOW_SECONDS
                 && $this->api->editMessageText($turn->token, $turn->tgChatId, $previousIds[0], $text, $keyboard)
             ) {
-                $delivery = new TelegramDelivery($previousIds, [], true);
+                $delivery = new TelegramDelivery($previousIds, [], [], true);
             }
             if (null === $delivery) {
                 if ([] !== $previousIds) {
@@ -347,10 +347,15 @@ final readonly class TelegramConversation
                 }
                 $delivery = $this->sender->deliver($turn->token, $turn->tgChatId, $text, $files, $keyboard, $replyTo);
             }
-            $this->store->recordDelivery($outbound, $delivery);
-            if ([] !== $delivery->unsent) {
-                $this->reply($turn, $this->say($turn, 'file_too_large_to_send', ['%link%' => $this->chatLink($outbound->getChatId())]));
+            $unsentKey = $delivery->unsentKey();
+            if (null !== $unsentKey) {
+                $sentence = $this->say($turn, $unsentKey, ['%link%' => $this->chatLink($outbound->getChatId())]);
+                $noticeIds = $this->reply($turn, $sentence, [] === $delivery->messageIds ? $keyboard : null, [] === $delivery->messageIds ? $replyTo : null);
+                if ([] === $delivery->messageIds) {
+                    $delivery = new TelegramDelivery($noticeIds, $delivery->tooLarge, $delivery->failed, false);
+                }
             }
+            $this->store->recordDelivery($outbound, $delivery);
         } catch (TelegramChannelException $e) {
             $this->noteDeliveryFailure($turn->bot, $e);
         }
@@ -460,7 +465,8 @@ final readonly class TelegramConversation
             }
             $title = trim((string) (preg_replace('/\s+/', ' ', (string) ($result['title'] ?? '')) ?? ''));
             $title = str_replace(['[', ']'], ['(', ')'], '' !== $title ? $title : $url);
-            $lines[] = (count($lines) + 1).'. ['.$title.']('.$url.')';
+            $href = str_replace([' ', '(', ')'], ['%20', '%28', '%29'], $url);
+            $lines[] = (count($lines) + 1).'. ['.$title.']('.$href.')';
         }
 
         return [] === $lines ? $reply : $this->join($reply, $this->say($turn, 'sources')."\n".implode("\n", $lines));
