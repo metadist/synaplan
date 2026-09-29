@@ -89,7 +89,7 @@ final class ModuleOwnershipTest extends TestCase
             'XAI_API_KEY',
             'META_API_KEY',
             'PERPLEXITY_API_KEY',
-            // Speech provider key managed by ProviderKeyStore (Models & keys);
+            // Speech provider key managed by ProviderKeyStore (Providers & keys);
             // no module of its own until an ElevenLabs TTS provider ships.
             'ELEVENLABS_API_KEY',
             'CLOUDFLARE_ACCOUNT_ID',

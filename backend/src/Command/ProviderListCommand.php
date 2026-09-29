@@ -84,7 +84,7 @@ final class ProviderListCommand extends Command
         );
 
         $io->writeln('Availability is cached briefly; use <info>--fresh</info> to re-probe.');
-        $io->writeln('Configure keys in Admin → AI Providers (/admin/setup) or via environment variables.');
+        $io->writeln('Configure keys in Operate → AI infrastructure → Providers & keys (/admin/setup) or via environment variables.');
 
         return Command::SUCCESS;
     }

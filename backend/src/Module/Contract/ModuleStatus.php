@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Module\Contract;
 
 /**
- * Live state of one module for the admin Feature status page and the
+ * Live state of one module for the admin System status page and the
  * capability inventory.
  *
  * `configured` is the module's own `isConfigured()`; `healthy` is only

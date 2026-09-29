@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  *   1. Per-user encrypted BCONFIG row (group="higgsfield", setting="api_key"
  *      and "api_secret"). Per-user values are AES-256-CBC encrypted at rest
  *      via {@see EncryptionService} (which derives its key from APP_SECRET).
- *   2. The instance pair from Models & keys ({@see ProviderKeyStore}, provider
+ *   2. The instance pair from Providers & keys ({@see ProviderKeyStore}, provider
  *      `higgsfield`): a pair saved in the admin UI, or the
  *      HIGGSFIELD_API_KEY / HIGGSFIELD_API_SECRET bootstrap.
  *
