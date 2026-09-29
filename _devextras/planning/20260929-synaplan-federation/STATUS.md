@@ -2,7 +2,8 @@
 
 **Start here: [`05_partners.md`](./05_partners.md).** It is the binding plan:
 open to partners, invite links, the Synaplan Directory on `web.synaplan.com`,
-topics, assistants, copies. No product code yet.
+topics, assistants, copies. Product decisions are recorded in `05` §12
+(answered 2026-09-29). No product code yet.
 
 Reading order for the rest of this folder:
 
@@ -18,7 +19,7 @@ Reading order for the rest of this folder:
 
 | Step | State | Notes |
 | ---- | ----- | ----- |
-| M0 | queued | Decide (`05` §12), confirm words (`05` §1), EN copy + wireframes for J-P1–J-P8, name two design partners. Docs only |
+| M0 | queued | §12 is decided. Left: confirm §1 translations, EN copy + wireframes for J-P1–J-P8, name two design partners. Docs only |
 | M1 | queued | Open to partners, invite link, connect card, partner page, Pause, Disconnect. Check `ext-sodium` first |
 | M2 | queued | Share a topic (*Can ask*), Sources → From partners, consent line, answer card |
 | M3 | queued | Share an assistant to chat (*Can chat*), limits, Assistants → From partners |
@@ -45,13 +46,16 @@ remote tool calls (MCP bridge), transitive trust, `@*` fan-out, the Discord
 bot. Business accounts on shared servers are **later**, not parked: `05` §10
 item 1, separate plan.
 
-## Open before the first migration (Ask-First)
+## Decided 2026-09-29 (`05` §12)
 
-- Schema: the five `federation_*` tables in `05` §9, plus `directory_listing`
-  on the Directory server only.
-- IAM: `BSHARES` subject type `partner` with permissions `ask` / `chat` /
-  `copy`.
-- Product default: module present when `APP_URL` is public https, feature
-  closed until an admin opens it.
-- Ops: Directory on `web.synaplan.com` through `synaplan-platform`.
-- `ext-sodium` in the backend image.
+Partners, on public https servers, closed until an admin opens it. Partners
+are whole servers. Invite links first; Directory on `web.synaplan.com` goes
+live after topics work, listing opt-in. Share dialog with `BSHARES` subject
+`partner`. Hosted chats store counts only. Limits 500 / 200 / €20. Admins
+only may share. Build order M1 → M2 → M3 → M4, then M5 live.
+
+## Still open before code
+
+- Confirm the §1 translations, and the EN copy plus wireframes for J-P1–J-P8.
+- Name two design partners (needed before the M6 two-week run, not before M1).
+- `ext-sodium` in the backend image. M1 checks this and stops if it is missing.

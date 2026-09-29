@@ -2,7 +2,7 @@
 
 | | |
 | - | - |
-| **Status** | Plan, 2026-09-29. **Binding entry point** for this folder. Supersedes [`03_verdict_and_orders.md`](./03_verdict_and_orders.md) where they differ (listed in §11). Keeps every safety rule from `03` §3 and the portable format from [`04_portable_sharing_migration.md`](./04_portable_sharing_migration.md). No product code yet. |
+| **Status** | Plan, 2026-09-29. **Binding entry point** for this folder. Product decisions recorded in §12 the same day. Supersedes [`03_verdict_and_orders.md`](./03_verdict_and_orders.md) where they differ (listed in §11). Keeps every safety rule from `03` §3 and the portable format from [`04_portable_sharing_migration.md`](./04_portable_sharing_migration.md). No product code yet. |
 | **Branch** | `feat/synaplan-network` (one PR per step) |
 | **User-facing name** | **Partners.** Code keeps `Federation` (`App\Module\Federation\FederationModule`, `App\Service\Federation\*`). The words *federation, peer, node, link, gossip, realm, mount, RAG, vector, protocol* never appear in primary UI copy. |
 | **Binding contracts** | UX rules U1–U12 ([`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)), AGENTS.md "Perfect UX & Stability", `03` §3 safety findings, `04` §1 "what never travels". |
@@ -470,7 +470,7 @@ files go on the allow-list in the same PR.
 
 | # | Milestone | Journeys | Done when |
 | - | --------- | -------- | --------- |
-| **M0** | **Decide and draw** (docs only). Tick §12, confirm the §1 words, write the EN copy and wireframes for J-P1–J-P8 before any `.vue` (U1), name two design partners (for example the Swiss demo on `ch1` and one self-hosted customer). | — | Reviewer walks every journey on paper without asking "and then where?" |
+| **M0** | **Draw** (docs only). §12 is decided. Still open: confirm the §1 translations, write the EN copy and wireframes for J-P1–J-P8 before any `.vue` (U1), name two design partners (for example the Swiss demo on `ch1` and one self-hosted customer). | — | Reviewer walks every journey on paper without asking "and then where?" |
 | **M1** | **Open and connect.** Module, key pair, well-known, readiness check, Operate → Partners empty state, open card, invite link, connect card, partner page (empty columns), Pause, Disconnect, audit events. | J-P1, J-P8 | Two servers connect by invite link and disconnect again; localhost shows the honest "can't be reached" state |
 | **M2** | **Share a topic.** Partner recipient in the Share dialog for folders (*Can ask*), topic card with **Suggest**, **View as partner**, catalog + change notice, *New* and **Make available** on the receiver, Sources → From partners (list, remove, remove for everyone, browse), picker + `@` section, consent line, answer card. | J-P2, J-P3, J-P4 | A dealer asks Contoso's topic in chat, gets quotes, removes it from their list, Contoso revokes, it disappears |
 | **M3** | **Share an assistant to chat.** *Can chat*, hosted turns with streaming, per-partner limits and cost cap, Assistants → From partners chip, **Runs at** badge, partner topics in the assistant builder. | J-P5 | A dealer chats with Fitment advisor; the limit message appears when reached; publishing v2 reaches them |
@@ -599,20 +599,32 @@ until frozen, and design partners before code.
 
 ---
 
-## 12. Decisions before code (Ask-First per AGENTS.md)
+## 12. Decisions — answered 2026-09-29
 
-| # | Decision | Recommendation | Ask-First |
-| - | -------- | -------------- | --------- |
-| 1 | Module availability | Present when `APP_URL` is public https; the feature stays **closed** until the admin opens it | **yes** (product default) |
-| 2 | Who may share with partners, default | Admins only | no |
-| 3 | Directory default | `FEDERATION_DIRECTORY_URL=https://web.synaplan.com`; listing off until the admin opts in | **yes** (runs on the platform) |
-| 4 | Partner scope in v1 | Whole servers only; shared servers host the Directory but are not partners | no |
-| 5 | Sharing storage | `BSHARES` with subject `partner`, non-nesting permissions `ask` / `chat` / `copy` | **yes** (IAM change) |
-| 6 | Hosted chat content at the owner | Not stored; usage counts only; pseudonymous person ids | no |
-| 7 | Default limits | 500 questions/day, 200 assistant messages/day, €20/month AI cost per partner | no |
-| 8 | Schema | The five tables in §9 plus `directory_listing` on the Directory server | **yes** |
-| 9 | Platform rollout | Directory on `web.synaplan.com` via `synaplan-platform` env + docs, rolled one node at a time | **yes** (ops) |
-| 10 | Words on screen | §1 table, added to the `AGENTS.md` term list | no |
+Product owner answered the pre-implementation questionnaire. Every answer is
+the recommended option. These rows are closed. Do not reopen them in a sprint
+without a written reason.
+
+| # | Question | Answer | What it means in code |
+| - | -------- | ------ | --------------------- |
+| 1 | When is Partners available? | On every server whose `APP_URL` is public https. **Closed** until an admin clicks **Open to partners**. | `FederationModule` is present when the readiness check passes. No `FEDERATION_ENABLED` env flag. The open/closed state is a row the admin writes, default closed. Localhost shows the "can't be reached" card and the button stays disabled. |
+| 2 | Who can be a partner in v1? | A **whole Synaplan server** (self-hosted or a dedicated tenant such as `ch1`). | No organization entity in this work. `web.synaplan.com` customers are not partners. |
+| 3 | How do companies find each other? | **Invite links first.** The Synaplan Directory on `web.synaplan.com` is opt-in and goes live after topic sharing (M2) works. | M1 ships invite links with the Directory off. M5 may be built after M1 and goes live only after M2. Listing stays off until an admin opts in. Default `FEDERATION_DIRECTORY_URL=https://web.synaplan.com`; empty disables it. |
+| 4 | What ships first? | **Topics, then hosted assistant chat, then copies.** | Build order is M1 → M2 → M3 → M4. Do not start M3 until two servers can ask one topic. `04` P4 (download/upload migration) may still ship on its own. |
+| 5 | Where does an admin share? | In the **existing Share dialog**. A partner is a recipient next to a person, a group and everyone. | `BSHARES` subject type `partner`, permissions `ask` / `chat` / `copy`, non-nesting. This is the IAM change. The five tables in §9 and `directory_listing` on the Directory server are approved with it. |
+| 6 | What does the hosting server keep of a partner chat? | **Usage counts only**, not the chat text. People are anonymous ids. | No message rows for hosted partner chats. `federation_usage_day` stores questions, chats and cost. |
+| 7 | Default limits for a new partner? | **500 questions/day, 200 assistant messages/day, €20/month** of AI cost. Editable per partner. The owner pays. | Named constants. Enforced through existing metering with source `PARTNER`. |
+| 8 | Who may share with a partner? | **Admins only.** | The Share dialog offers partners only to admins. Widening to groups or everyone is a later switch (§7), not v1. |
+| 9 | What is it called on screen? | **Partners.** | §1 words. Add them to the `AGENTS.md` term list in the first UI PR. Code stays `Federation`. |
+
+Still open, and not a reason to reopen §12:
+
+- The German, Spanish, French and Turkish lines in §1 are a proposal until
+  the first UI PR.
+- Two design-partner names (M0). Journeys can be drawn without them; M6
+  cannot start its two-week run without them.
+- `ext-sodium` present in the backend image. M1 checks this first and stops
+  if it is missing.
 
 ---
 
