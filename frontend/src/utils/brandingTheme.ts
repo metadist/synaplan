@@ -64,26 +64,32 @@ function applyColors(): void {
       `--brand:${primaryColor}`,
       `--brand-hover:color-mix(in srgb, ${primaryColor} 88%, black)`,
       `--brand-light:color-mix(in srgb, ${primaryColor} 55%, white)`,
-      `--brand-alpha-light:color-mix(in srgb, ${primaryColor} 10%, transparent)`
+      `--brand-alpha-light:color-mix(in srgb, ${primaryColor} 10%, transparent)`,
+      // User bubbles use the saturated brand, not the lightened dark accent.
+      `--brand-fill:${primaryColor}`
     )
   }
 
   if (hasDarkPrimary) {
     // Operator picked the dark color explicitly — use it as-is and derive only
-    // the auxiliary tints from it.
+    // the auxiliary tints from it. The bubble fill follows that choice.
     darkVars.push(
       `--brand:${primaryColorDark}`,
       `--brand-hover:color-mix(in srgb, ${primaryColorDark} 82%, white)`,
       `--brand-light:color-mix(in srgb, ${primaryColorDark} 70%, white)`,
-      `--brand-alpha-light:color-mix(in srgb, ${primaryColorDark} 20%, transparent)`
+      `--brand-alpha-light:color-mix(in srgb, ${primaryColorDark} 20%, transparent)`,
+      `--brand-fill:${primaryColorDark}`
     )
   } else if (hasLightPrimary) {
-    // No explicit dark color: derive a dark-friendly tint from the light one.
+    // No explicit dark color: derive a dark-friendly tint from the light one
+    // for icons and buttons. The message bubble keeps the saturated primary
+    // so it does not turn into a bright wash.
     darkVars.push(
       `--brand:color-mix(in srgb, ${primaryColor} 58%, white)`,
       `--brand-hover:color-mix(in srgb, ${primaryColor} 46%, white)`,
       `--brand-light:color-mix(in srgb, ${primaryColor} 40%, white)`,
-      `--brand-alpha-light:color-mix(in srgb, ${primaryColor} 20%, transparent)`
+      `--brand-alpha-light:color-mix(in srgb, ${primaryColor} 20%, transparent)`,
+      `--brand-fill:${primaryColor}`
     )
   }
 
@@ -107,6 +113,7 @@ function applyColors(): void {
   }
 
   if (lightVars.length === 0 && darkVars.length === 0) {
+    document.getElementById(BRAND_COLOR_STYLE_ID)?.remove()
     return
   }
 

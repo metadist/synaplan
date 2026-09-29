@@ -63,7 +63,7 @@
           type="button"
           class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
           data-testid="btn-retry-models"
-          @click="loadData"
+          @click="retryLoadModels"
         >
           {{ $t('config.aiModels.retry') }}
         </button>
@@ -339,7 +339,7 @@
             type="button"
             class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
             data-testid="btn-retry-models-list"
-            @click="loadData"
+            @click="retryLoadModels"
           >
             {{ $t('config.aiModels.retry') }}
           </button>
@@ -562,7 +562,7 @@
           header-testid="btn-ai-models-section-endpoints"
           @toggle="toggleEditSection('endpoints')"
         >
-          <OpenAiCompatibleEndpointsPanel embedded />
+          <OpenAiCompatibleEndpointsPanel embedded @changed="onEndpointChanged" />
         </AccordionSection>
         <AccordionSection
           panel-id="ai-models-section-add"
@@ -580,7 +580,7 @@
           header-testid="btn-ai-models-section-catalog"
           @toggle="toggleEditSection('catalog')"
         >
-          <AIModelsAdminPanel ref="adminPanelRef" embedded />
+          <AIModelsAdminPanel ref="adminPanelRef" embedded @changed="onCatalogChanged" />
         </AccordionSection>
       </AccordionStack>
     </div>
@@ -694,7 +694,9 @@ function canOpenModelsTab(tab: ModelsTabId): boolean {
 function applyTabFromQuery(): void {
   const tab = parseModelsTab(route.query.tab)
   if (!tab || !canOpenModelsTab(tab)) return
+  const previous = activeTab.value
   activeTab.value = tab
+  refreshPickerIfShown(tab, previous)
 }
 
 function syncTabToUrl(tab: ModelsTabId): void {
@@ -747,12 +749,30 @@ const tabNavItems = computed<TabNavItem[]>(() => {
 function onModelsTabChange(id: string) {
   const tab = id as ModelsTabId
   if (!canOpenModelsTab(tab)) return
+  const previous = activeTab.value
   activeTab.value = tab
   syncTabToUrl(tab)
+  refreshPickerIfShown(tab, previous)
 }
 
 function onAdminModelCreated() {
-  void adminPanelRef.value?.refresh()
+  void adminPanelRef.value?.refresh?.()
+  void loadData({ background: true })
+}
+
+function onCatalogChanged() {
+  void loadData({ background: true })
+}
+
+function onEndpointChanged() {
+  void adminPanelRef.value?.refresh?.()
+  void loadData({ background: true })
+}
+
+function refreshPickerIfShown(tab: ModelsTabId, previous: ModelsTabId): void {
+  if (tab !== previous && (tab === 'choice' || tab === 'list')) {
+    void loadData({ background: true })
+  }
 }
 
 const purposeLabels = computed<Record<Capability, string>>(() => ({
@@ -900,6 +920,7 @@ const canSwitchEmbedding = computed(() => {
 })
 
 let catalogLoad: Promise<void> = Promise.resolve()
+let catalogRequest = 0
 
 onMounted(async () => {
   await Promise.all([catalogLoad, loadEmbeddingGuard()])
@@ -998,14 +1019,36 @@ const scrollToCapability = (capability: Capability) => {
   }
 }
 
-const loadData = async () => {
-  loading.value = true
-  modelsLoadFailed.value = false
+/**
+ * Bumps when a choice is saved. A catalog refresh that started before the
+ * save must not write the old server defaults back over the choice.
+ */
+let savedChoiceEpoch = 0
+
+function choicesMatch(
+  left: Record<Capability, number | null>,
+  right: Record<Capability, number | null>
+): boolean {
+  return (Object.keys(left) as Capability[]).every((key) => left[key] === right[key])
+}
+
+const loadData = async (options?: { background?: boolean; replaceDefaults?: boolean }) => {
+  const requestId = ++catalogRequest
+  const choiceEpochAtStart = savedChoiceEpoch
+  const background = options?.background === true && !modelsLoadFailed.value && !loading.value
+  if (!background) {
+    loading.value = true
+    modelsLoadFailed.value = false
+  }
   try {
     const [modelsResult, defaultsResult] = await Promise.allSettled([
       getModels(),
       getDefaultModels(),
     ])
+
+    if (requestId !== catalogRequest) {
+      return
+    }
 
     if (modelsResult.status === 'fulfilled' && modelsResult.value.success) {
       availableModels.value = modelsResult.value.models
@@ -1013,29 +1056,50 @@ const loadData = async () => {
       restrictedCapabilities.value = modelsResult.value.restricted ?? []
       groupLimitNames.value = modelsResult.value.groupLimits?.names ?? []
       groupLimitsCombined.value = modelsResult.value.groupLimits?.combined === true
-    } else {
+      modelsLoadFailed.value = false
+    } else if (!background) {
       modelsLoadFailed.value = true
       console.error(
         'Failed to load models:',
         modelsResult.status === 'rejected' ? modelsResult.reason : modelsResult.value
       )
+    } else {
+      console.error(
+        'Failed to refresh models:',
+        modelsResult.status === 'rejected' ? modelsResult.reason : modelsResult.value
+      )
     }
 
     if (defaultsResult.status === 'fulfilled' && defaultsResult.value.success) {
-      const mergedDefaults: Record<Capability, number | null> = {
-        ...defaultConfig.value,
-        ...(defaultsResult.value.defaults as Partial<Record<Capability, number | null>>),
+      // selectModel() stores the new id, waits for the availability check,
+      // then saves every default. A refresh that lands in that window used
+      // to replace the id with the old server value, and the save stored it.
+      const choiceMoved =
+        !options?.replaceDefaults &&
+        (!choicesMatch(defaultConfig.value, originalConfig.value) ||
+          choiceEpochAtStart !== savedChoiceEpoch)
+      if (!choiceMoved) {
+        const mergedDefaults: Record<Capability, number | null> = {
+          ...defaultConfig.value,
+          ...(defaultsResult.value.defaults as Partial<Record<Capability, number | null>>),
+        }
+        defaultConfig.value = mergedDefaults
+        originalConfig.value = { ...mergedDefaults }
+        defaultLocked.value = defaultsResult.value.locked ?? {}
+        defaultSources.value = defaultsResult.value.sources ?? {}
       }
-      defaultConfig.value = mergedDefaults
-      originalConfig.value = { ...mergedDefaults }
-      defaultLocked.value = defaultsResult.value.locked ?? {}
-      defaultSources.value = defaultsResult.value.sources ?? {}
     } else if (defaultsResult.status === 'rejected') {
       console.error('Failed to load default models:', defaultsResult.reason)
     }
   } finally {
-    loading.value = false
+    if (requestId === catalogRequest) {
+      loading.value = false
+    }
   }
+}
+
+function retryLoadModels(): void {
+  void loadData()
 }
 
 catalogLoad = loadData()
@@ -1416,6 +1480,7 @@ const saveConfiguration = async () => {
     const response = await saveDefaultModels({ defaults })
 
     if (response.success) {
+      savedChoiceEpoch += 1
       originalConfig.value = { ...defaultConfig.value }
       success(t('config.aiModels.saveSuccess'))
     }
@@ -1468,7 +1533,7 @@ const confirmResetDefaults = async () => {
       } else {
         success(t('config.aiModels.resetDefaultsSuccess'))
       }
-      await loadData()
+      await loadData({ replaceDefaults: true })
     }
   } catch {
     showError(t('config.aiModels.resetDefaultsError'))

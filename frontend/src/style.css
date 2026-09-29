@@ -116,6 +116,8 @@
     --brand: #003fc7;
     --brand-light: #6b8fd6;
     --brand-hover: #0035b0;
+    /* Large brand fills (user message). Same as --brand in light mode. */
+    --brand-fill: #003fc7;
     /* Readable ink for text/icons placed ON a --brand fill. White works on the
        deep light-mode brand; the dark theme flips brand to a light blue, so the
        ink flips to near-black there (see .dark). Both pass WCAG AA. */
@@ -185,6 +187,11 @@
     --brand: #6d9ae0;
     --brand-light: #93b8e8;
     --brand-hover: #83b0e8;
+    /* Dark brand stays a light blue so icons and labels stay readable on
+       near-black. A message bubble is a large fill: that same light blue
+       glows and white text on it is only ~2.9:1. The fill is a deeper brand
+       blue; white on #1a4db8 is ~7.5:1. */
+    --brand-fill: #1a4db8;
     /* Dark brand is a light blue, so on-brand ink is near-black (6.5:1). */
     --on-brand: #0a0e1a;
 
@@ -450,7 +457,7 @@
   }
 
   .bubble-user {
-    background: var(--brand) !important;
+    background: var(--brand-fill) !important;
     color: #ffffff !important;
     border-radius: 0.75rem;
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);

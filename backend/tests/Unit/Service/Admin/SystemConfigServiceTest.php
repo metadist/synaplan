@@ -785,4 +785,28 @@ final class SystemConfigServiceTest extends TestCase
             $this->assertSame(ModuleGateConfig::settingFor($id), $fields[$key]['dbKey']);
         }
     }
+
+    public function testEmptyBrandColorDeletesTheStoredRow(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('deleteValue')
+            ->with(0, 'BRANDING', 'BRAND_PRIMARY_COLOR');
+        $this->configRepository->expects($this->never())
+            ->method('setValue');
+
+        $result = $this->service->setValue('BRAND_PRIMARY_COLOR', '');
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['requiresRestart']);
+    }
+
+    public function testEmptyBooleanIsRejected(): void
+    {
+        $this->configRepository->expects($this->never())->method('deleteValue');
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $result = $this->service->setValue('REGISTRATION_ENABLED', '');
+
+        $this->assertFalse($result['success']);
+    }
 }

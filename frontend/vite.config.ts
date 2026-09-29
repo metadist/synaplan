@@ -170,6 +170,15 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true,
           ws: true,
+          // Browsers send `Connection: keep-alive, Upgrade`. Leaving that
+          // intact makes the upstream reject the handshake, and Firefox
+          // reports it as NS_ERROR_WEBSOCKET_CONNECTION_REFUSED.
+          configure: (proxy) => {
+            proxy.on('proxyReqWs', (proxyReq) => {
+              proxyReq.setHeader('Connection', 'Upgrade')
+              proxyReq.setHeader('Upgrade', 'websocket')
+            })
+          },
         },
       },
     },

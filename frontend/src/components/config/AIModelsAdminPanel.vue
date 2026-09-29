@@ -505,6 +505,8 @@ import { adminModelsApi, type AdminModel } from '@/services/api/adminModelsApi'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
+const emit = defineEmits<{ changed: [] }>()
+
 const { t } = useI18n()
 const dialog = useDialog()
 
@@ -684,6 +686,7 @@ async function applySql() {
     })
     success(t('config.aiModels.admin.appliedStatements', { count: res.applied }))
     await loadModels()
+    emit('changed')
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : t('config.aiModels.admin.failedApply')
     showError(msg)
@@ -733,6 +736,7 @@ async function saveEditingModel(id: number) {
     }
     editingId.value = null
     success(t('config.aiModels.admin.modelSaved'))
+    emit('changed')
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : t('config.aiModels.admin.failedSave')
     showError(msg)
@@ -764,6 +768,7 @@ async function deleteModel(m: AdminModel) {
     await adminModelsApi.delete(m.id)
     success(t('config.aiModels.admin.modelDeleted'))
     await loadModels()
+    emit('changed')
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : t('config.aiModels.admin.failedDelete')
     showError(msg)

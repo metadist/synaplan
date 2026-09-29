@@ -228,8 +228,35 @@ export class RealtimeClient {
   async connect(): Promise<void> {
     const c = await this.ensureCentrifuge()
     if (!c) return
+    this.openTransport(c)
+  }
+
+  /**
+   * Open the socket once the document has finished loading.
+   *
+   * Chat subscribes from `onMounted`, which runs while Firefox still
+   * considers the page to be loading. A WebSocket that fails or is
+   * replaced in that window is logged as a refused connection
+   * ("interrupted while the page was loading") and cannot be silenced
+   * from script. Waiting for `load` keeps the console clean; a later
+   * visit, when the document is already complete, connects immediately.
+   */
+  private openTransport(c: Centrifuge): void {
+    if (this.destroyed) return
     if (this.state === 'connected' || this.state === 'connecting') return
-    c.connect()
+
+    const start = () => {
+      if (this.destroyed) return
+      if (this.state === 'connected' || this.state === 'connecting') return
+      c.connect()
+    }
+
+    if (typeof document === 'undefined' || document.readyState === 'complete') {
+      start()
+      return
+    }
+
+    window.addEventListener('load', start, { once: true })
   }
 
   async disconnect(): Promise<void> {
@@ -350,9 +377,7 @@ export class RealtimeClient {
     this.subscriptions.set(channel, { sub, handlers: handlerSet })
 
     // Connect lazily on first subscription so callers don't have to remember.
-    if (this.state === 'disconnected') {
-      c.connect()
-    }
+    this.openTransport(c)
 
     return {
       unsubscribe: () => this.removeChannelHandler(channel, typedHandlers),

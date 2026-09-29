@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\AI\Credential\ChatReadinessService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -91,6 +93,41 @@ final class AdminModelsImportEndpointControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testOllamaApplyDropsANegativePulledCache(): void
+    {
+        $this->loginAdmin();
+        $readiness = static::getContainer()->get(ChatReadinessService::class);
+        self::assertFalse($readiness->isOllamaModelPulled(self::PROVIDER_ID));
+
+        /** @var CacheItemPoolInterface $cache */
+        $cache = static::getContainer()->get('cache.model_config');
+        $key = 'ollama_model_pulled.'.hash('xxh128', strtolower(self::PROVIDER_ID));
+        self::assertTrue($cache->getItem($key)->isHit());
+        self::assertFalse($cache->getItem($key)->get());
+
+        $this->postJson('/api/v1/admin/models/import/endpoint/apply', [
+            'source' => 'ollama',
+            'rows' => [['providerId' => self::PROVIDER_ID, 'name' => 'Import Test', 'tags' => ['chat']]],
+        ]);
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertFalse($cache->getItem($key)->isHit());
+    }
+
+    public function testApplyDropsTheProviderAvailabilitySnapshot(): void
+    {
+        $this->loginAdmin();
+        $this->warmAvailabilitySnapshot();
+
+        $this->postJson('/api/v1/admin/models/import/endpoint/apply', [
+            'source' => 'ollama',
+            'rows' => [['providerId' => self::PROVIDER_ID, 'name' => 'Import Test', 'tags' => ['chat']]],
+        ]);
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertFalse($this->availabilitySnapshotIsHit());
+    }
+
     public function testApplyCreatesThenIdempotent(): void
     {
         $this->loginAdmin();
@@ -156,6 +193,20 @@ final class AdminModelsImportEndpointControllerTest extends WebTestCase
         $decoded = json_decode((string) $this->client->getResponse()->getContent(), true);
 
         return \is_array($decoded) ? $decoded : [];
+    }
+
+    private function warmAvailabilitySnapshot(): void
+    {
+        static::getContainer()->get(ChatReadinessService::class)->providerAvailability();
+        self::assertTrue($this->availabilitySnapshotIsHit());
+    }
+
+    private function availabilitySnapshotIsHit(): bool
+    {
+        /** @var CacheItemPoolInterface $cache */
+        $cache = static::getContainer()->get('cache.model_config');
+
+        return $cache->getItem('provider_availability.snapshot')->isHit();
     }
 
     private function deleteTestRows(): void

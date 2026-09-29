@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
@@ -104,12 +105,17 @@ function handleToggle() {
   emit('update', props.fieldKey, newValue)
 }
 
-// Save changes
+// Save changes. An emptied field that already had a value is a clear.
 function saveChanges() {
-  if (isDirty.value && localValue.value !== '') {
-    emit('update', props.fieldKey, localValue.value)
-    isDirty.value = false
-  }
+  if (!isDirty.value) return
+  if (localValue.value === '' && !props.value.isSet) return
+  emit('update', props.fieldKey, localValue.value)
+  isDirty.value = false
+}
+
+function clearValue() {
+  isDirty.value = false
+  emit('update', props.fieldKey, '')
 }
 
 // Reset to original
@@ -147,6 +153,19 @@ const showDbOverrideHint = computed(
  * variable pins. Without this the toggle moves and nothing happens.
  */
 const isPinnedByEnv = computed(() => props.value.envOverride === true)
+
+/**
+ * Booleans and selects always have a value. Every other field can be emptied:
+ * an empty save deletes the stored row and the default applies again.
+ */
+const canClear = computed(
+  () =>
+    props.schema.type !== 'boolean' &&
+    props.schema.type !== 'select' &&
+    props.value.isSet &&
+    !props.disabled &&
+    !isPinnedByEnv.value
+)
 
 /**
  * What the instance actually does, which is what the toggle has to show while an
@@ -291,6 +310,17 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
       </div>
 
       <!-- Action buttons -->
+      <button
+        v-if="canClear"
+        type="button"
+        class="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
+        :title="$t('admin.config.clearHint')"
+        data-testid="config-field-clear"
+        @click="clearValue"
+      >
+        <TrashIcon class="w-4 h-4" />
+        {{ $t('admin.config.clear') }}
+      </button>
       <button
         v-if="isDirty"
         type="button"

@@ -315,7 +315,7 @@
       :source="importSource"
       :label="importLabel"
       @close="importSource = null"
-      @applied="load"
+      @applied="onImported"
     />
   </div>
 </template>
@@ -335,6 +335,8 @@ import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
 type AuthType = 'none' | 'bearer' | 'header'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
+const emit = defineEmits<{ changed: [] }>()
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -471,6 +473,11 @@ function formatTestResult(r: OpenAiEndpointTestResponse): string {
   return t('config.openaiEndpoints.testFail', { error: r.error ?? `HTTP ${r.status ?? '?'}` })
 }
 
+async function onImported() {
+  await load()
+  emit('changed')
+}
+
 async function load() {
   loading.value = true
   try {
@@ -512,6 +519,7 @@ async function save() {
     endpoints.value = res.endpoints
     success(t('config.openaiEndpoints.saved'))
     resetForm()
+    emit('changed')
   } catch (e: unknown) {
     showError(e instanceof Error ? e.message : t('config.openaiEndpoints.failedSave'))
   } finally {
@@ -568,6 +576,7 @@ async function remove(ep: OpenAiEndpoint) {
       resetForm()
     }
     await load()
+    emit('changed')
   } catch (e: unknown) {
     showError(e instanceof Error ? e.message : t('config.openaiEndpoints.failedDelete'))
   } finally {
