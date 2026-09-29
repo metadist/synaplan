@@ -28,6 +28,12 @@ test.describe('@ci Profile Password Change', () => {
         await page
           .locator(selectors.profile.inputCurrentPassword)
           .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        // The form stays disabled until the profile response fills the
+        // sign-in email. Saving earlier sends a blank address and the
+        // password fields never reset.
+        await expect(page.locator(selectors.profile.inputEmail)).toHaveValue(email, {
+          timeout: TIMEOUTS.STANDARD,
+        })
         await page.locator(selectors.profile.inputCurrentPassword).fill(oldPassword)
         await page.locator(selectors.profile.inputNewPassword).fill(newPassword)
         await page.locator(selectors.profile.inputConfirmPassword).fill(newPassword)

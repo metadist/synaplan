@@ -10,565 +10,581 @@
         />
 
         <form
-          class="space-y-6"
           autocomplete="off"
           data-testid="comp-profile-form"
+          :aria-busy="!profileLoaded"
           @submit.prevent="handleSave"
         >
-          <section class="surface-card rounded-lg p-6" data-testid="section-personal">
-            <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
-              <Icon icon="mdi:account" class="w-5 h-5" />
-              {{ $t('profile.personalInfo.title') }}
-            </h2>
+          <!-- Disabled until the profile arrives. The empty defaults must not
+               be saved: the server rejects a blank sign-in email, and a fast
+               save would otherwise look like a failed password change. -->
+          <fieldset
+            class="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-60"
+            :disabled="!profileLoaded"
+          >
+            <section class="surface-card rounded-lg p-6" data-testid="section-personal">
+              <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
+                <Icon icon="mdi:account" class="w-5 h-5" />
+                {{ $t('profile.personalInfo.title') }}
+              </h2>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div data-testid="field-first-name">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.personalInfo.firstName') }}
-                </label>
-                <input
-                  v-model="formData.firstName"
-                  type="text"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.personalInfo.firstNamePlaceholder')"
-                  data-testid="input-first-name"
-                />
-              </div>
-
-              <div data-testid="field-last-name">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.personalInfo.lastName') }}
-                </label>
-                <input
-                  v-model="formData.lastName"
-                  type="text"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.personalInfo.lastNamePlaceholder')"
-                  data-testid="input-last-name"
-                />
-              </div>
-
-              <div data-testid="field-email">
-                <label class="block txt-primary font-medium mb-2 flex items-center gap-2">
-                  {{ $t('profile.personalInfo.email') }}
-                  <span
-                    v-if="isExternalAuth"
-                    class="px-2 py-0.5 rounded text-xs font-semibold bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm"
-                  >
-                    {{ authProvider }}
-                  </span>
-                </label>
-                <input
-                  v-model="formData.email"
-                  type="email"
-                  autocomplete="email"
-                  :disabled="!canChangeEmail"
-                  :class="emailInputClass"
-                  data-testid="input-email"
-                />
-                <p class="text-sm txt-secondary mt-1">
-                  {{ emailFieldHint }}
-                </p>
-                <div
-                  v-if="canChangeEmail && emailChanged"
-                  class="mt-4"
-                  data-testid="field-email-password"
-                >
-                  <label class="block txt-primary font-medium mb-2" for="profile-email-password">
-                    {{ $t('profile.personalInfo.emailPasswordLabel') }}
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div data-testid="field-first-name">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.personalInfo.firstName') }}
                   </label>
                   <input
-                    id="profile-email-password"
-                    v-model="emailPassword"
-                    type="password"
-                    autocomplete="current-password"
-                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                    :placeholder="$t('profile.personalInfo.emailPasswordPlaceholder')"
-                    data-testid="input-email-password"
+                    v-model="formData.firstName"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.personalInfo.firstNamePlaceholder')"
+                    data-testid="input-first-name"
+                  />
+                </div>
+
+                <div data-testid="field-last-name">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.personalInfo.lastName') }}
+                  </label>
+                  <input
+                    v-model="formData.lastName"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.personalInfo.lastNamePlaceholder')"
+                    data-testid="input-last-name"
+                  />
+                </div>
+
+                <div data-testid="field-email">
+                  <label class="block txt-primary font-medium mb-2 flex items-center gap-2">
+                    {{ $t('profile.personalInfo.email') }}
+                    <span
+                      v-if="isExternalAuth"
+                      class="px-2 py-0.5 rounded text-xs font-semibold bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm"
+                    >
+                      {{ authProvider }}
+                    </span>
+                  </label>
+                  <input
+                    v-model="formData.email"
+                    type="email"
+                    autocomplete="email"
+                    :disabled="!canChangeEmail"
+                    :class="emailInputClass"
+                    data-testid="input-email"
                   />
                   <p class="text-sm txt-secondary mt-1">
-                    {{ $t('profile.personalInfo.emailPasswordHint') }}
+                    {{ emailFieldHint }}
                   </p>
-                </div>
-              </div>
-
-              <div data-testid="field-phone">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.personalInfo.phone') }}
-                </label>
-                <input
-                  v-model="formData.phone"
-                  type="tel"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.personalInfo.phonePlaceholder')"
-                  data-testid="input-phone"
-                />
-              </div>
-            </div>
-          </section>
-
-          <section class="surface-card rounded-lg p-6" data-testid="section-company">
-            <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="mdi:office-building" class="w-5 h-5" />
-              {{ $t('profile.companyInfo.title') }}
-            </h2>
-            <p class="txt-secondary text-sm mb-6">{{ $t('profile.companyInfo.subtitle') }}</p>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div data-testid="field-company-name">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.companyInfo.companyName') }}
-                </label>
-                <input
-                  v-model="formData.companyName"
-                  type="text"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.companyInfo.companyNamePlaceholder')"
-                  data-testid="input-company-name"
-                />
-              </div>
-
-              <div data-testid="field-vat-id">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.companyInfo.vatId') }}
-                </label>
-                <input
-                  v-model="formData.vatId"
-                  type="text"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.companyInfo.vatIdPlaceholder')"
-                  data-testid="input-vat-id"
-                />
-              </div>
-            </div>
-          </section>
-
-          <section
-            v-if="config.billing.enabled && purchaseAllowed"
-            class="surface-card rounded-lg p-6"
-            data-testid="section-billing"
-          >
-            <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
-              <Icon icon="mdi:map-marker" class="w-5 h-5" />
-              {{ $t('profile.billingAddress.title') }}
-            </h2>
-
-            <div class="grid grid-cols-1 gap-6" data-testid="group-address">
-              <div data-testid="field-street">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.billingAddress.street') }}
-                </label>
-                <input
-                  v-model="formData.street"
-                  type="text"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.billingAddress.streetPlaceholder')"
-                  data-testid="input-street"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div data-testid="field-zip">
-                  <label class="block txt-primary font-medium mb-2">
-                    {{ $t('profile.billingAddress.zipCode') }}
-                  </label>
-                  <input
-                    v-model="formData.zipCode"
-                    type="text"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                    :placeholder="$t('profile.billingAddress.zipCodePlaceholder')"
-                    data-testid="input-zip"
-                  />
-                </div>
-
-                <div class="md:col-span-2" data-testid="field-city">
-                  <label class="block txt-primary font-medium mb-2">
-                    {{ $t('profile.billingAddress.city') }}
-                  </label>
-                  <input
-                    v-model="formData.city"
-                    type="text"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                    :placeholder="$t('profile.billingAddress.cityPlaceholder')"
-                    data-testid="input-city"
-                  />
-                </div>
-              </div>
-
-              <div data-testid="field-country">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.billingAddress.country') }}
-                </label>
-                <select
-                  v-model="formData.country"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  data-testid="select-country"
-                >
-                  <option v-for="country in countries" :key="country.code" :value="country.code">
-                    {{ country.name }}
-                  </option>
-                </select>
-              </div>
-            </div>
-          </section>
-
-          <section class="surface-card rounded-lg p-6" data-testid="section-account-settings">
-            <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
-              <Icon icon="mdi:cog" class="w-5 h-5" />
-              {{ $t('profile.accountSettings.title') }}
-            </h2>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div data-testid="field-language">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.accountSettings.language') }}
-                </label>
-                <select
-                  v-model="formData.language"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  data-testid="select-language"
-                >
-                  <option v-for="lang in languages" :key="lang.code" :value="lang.code">
-                    {{ lang.name }}
-                  </option>
-                </select>
-              </div>
-
-              <div data-testid="field-timezone">
-                <label class="block txt-primary font-medium mb-2" for="profile-timezone">
-                  {{ $t('profile.accountSettings.timezone') }}
-                </label>
-                <input
-                  id="profile-timezone-search"
-                  v-model="timezoneQuery"
-                  type="search"
-                  autocomplete="off"
-                  class="mb-2 w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  :placeholder="$t('profile.accountSettings.timezoneSearch')"
-                  :aria-label="$t('profile.accountSettings.timezoneSearch')"
-                  data-testid="input-timezone-search"
-                />
-                <p class="txt-secondary text-sm mb-2">
-                  {{ $t('profile.accountSettings.timezoneHint') }}
-                </p>
-                <select
-                  id="profile-timezone"
-                  v-model="formData.timezone"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="select-timezone"
-                >
-                  <option v-if="formData.timezone === ''" value="">
-                    {{ $t('profile.accountSettings.timezonePlaceholder') }}
-                  </option>
-                  <optgroup
-                    v-for="group in timezoneGroups"
-                    :key="group.offset"
-                    :label="group.offset"
+                  <div
+                    v-if="canChangeEmail && emailChanged"
+                    class="mt-4"
+                    data-testid="field-email-password"
                   >
-                    <option v-for="tz in group.zones" :key="tz.value" :value="tz.value">
-                      {{ tz.label }}
-                    </option>
-                  </optgroup>
-                </select>
-                <p
-                  v-if="timezoneSearchMiss"
-                  class="text-sm txt-secondary mt-1"
-                  data-testid="timezone-no-match"
-                >
-                  {{ $t('profile.accountSettings.timezoneNoMatch') }}
-                </p>
+                    <label class="block txt-primary font-medium mb-2" for="profile-email-password">
+                      {{ $t('profile.personalInfo.emailPasswordLabel') }}
+                    </label>
+                    <input
+                      id="profile-email-password"
+                      v-model="emailPassword"
+                      type="password"
+                      autocomplete="current-password"
+                      class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      :placeholder="$t('profile.personalInfo.emailPasswordPlaceholder')"
+                      data-testid="input-email-password"
+                    />
+                    <p class="text-sm txt-secondary mt-1">
+                      {{ $t('profile.personalInfo.emailPasswordHint') }}
+                    </p>
+                  </div>
+                </div>
+
+                <div data-testid="field-phone">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.personalInfo.phone') }}
+                  </label>
+                  <input
+                    v-model="formData.phone"
+                    type="tel"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.personalInfo.phonePlaceholder')"
+                    data-testid="input-phone"
+                  />
+                </div>
               </div>
+            </section>
 
-              <div class="md:col-span-2" data-testid="field-invoice-email">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.accountSettings.invoiceEmail') }}
-                </label>
-                <input
-                  v-model="formData.invoiceEmail"
-                  type="email"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.accountSettings.invoiceEmailPlaceholder')"
-                  data-testid="input-invoice-email"
-                />
+            <section class="surface-card rounded-lg p-6" data-testid="section-company">
+              <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="mdi:office-building" class="w-5 h-5" />
+                {{ $t('profile.companyInfo.title') }}
+              </h2>
+              <p class="txt-secondary text-sm mb-6">{{ $t('profile.companyInfo.subtitle') }}</p>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div data-testid="field-company-name">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.companyInfo.companyName') }}
+                  </label>
+                  <input
+                    v-model="formData.companyName"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.companyInfo.companyNamePlaceholder')"
+                    data-testid="input-company-name"
+                  />
+                </div>
+
+                <div data-testid="field-vat-id">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.companyInfo.vatId') }}
+                  </label>
+                  <input
+                    v-model="formData.vatId"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.companyInfo.vatIdPlaceholder')"
+                    data-testid="input-vat-id"
+                  />
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section
-            ref="memoriesSection"
-            class="surface-card rounded-lg p-6 transition-all duration-500"
-            :class="{ 'ring-4 ring-brand-500/50 shadow-2xl': shouldHighlight }"
-            data-testid="section-memories-settings"
-          >
-            <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="mdi:brain" class="w-5 h-5" />
-              {{ $t('profile.memories.title') }}
-            </h2>
-            <p class="txt-secondary text-sm mb-6">
-              {{ $t('profile.memories.subtitle') }}
-            </p>
-
-            <div
-              class="flex items-start justify-between gap-4 p-4 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20"
+            <section
+              v-if="config.billing.enabled && purchaseAllowed"
+              class="surface-card rounded-lg p-6"
+              data-testid="section-billing"
             >
-              <div class="min-w-0">
-                <p class="txt-primary font-medium">
-                  {{ $t('profile.memories.toggleLabel') }}
-                </p>
-                <p class="txt-secondary text-sm mt-1">
-                  {{
-                    formData.memoriesEnabled
-                      ? $t('profile.memories.enabledHint')
-                      : $t('profile.memories.disabledHint')
-                  }}
-                </p>
+              <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
+                <Icon icon="mdi:map-marker" class="w-5 h-5" />
+                {{ $t('profile.billingAddress.title') }}
+              </h2>
+
+              <div class="grid grid-cols-1 gap-6" data-testid="group-address">
+                <div data-testid="field-street">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.billingAddress.street') }}
+                  </label>
+                  <input
+                    v-model="formData.street"
+                    type="text"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.billingAddress.streetPlaceholder')"
+                    data-testid="input-street"
+                  />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div data-testid="field-zip">
+                    <label class="block txt-primary font-medium mb-2">
+                      {{ $t('profile.billingAddress.zipCode') }}
+                    </label>
+                    <input
+                      v-model="formData.zipCode"
+                      type="text"
+                      class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                      :placeholder="$t('profile.billingAddress.zipCodePlaceholder')"
+                      data-testid="input-zip"
+                    />
+                  </div>
+
+                  <div class="md:col-span-2" data-testid="field-city">
+                    <label class="block txt-primary font-medium mb-2">
+                      {{ $t('profile.billingAddress.city') }}
+                    </label>
+                    <input
+                      v-model="formData.city"
+                      type="text"
+                      class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                      :placeholder="$t('profile.billingAddress.cityPlaceholder')"
+                      data-testid="input-city"
+                    />
+                  </div>
+                </div>
+
+                <div data-testid="field-country">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.billingAddress.country') }}
+                  </label>
+                  <select
+                    v-model="formData.country"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    data-testid="select-country"
+                  >
+                    <option v-for="country in countries" :key="country.code" :value="country.code">
+                      {{ country.name }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            <section class="surface-card rounded-lg p-6" data-testid="section-account-settings">
+              <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
+                <Icon icon="mdi:cog" class="w-5 h-5" />
+                {{ $t('profile.accountSettings.title') }}
+              </h2>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div data-testid="field-language">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.accountSettings.language') }}
+                  </label>
+                  <select
+                    v-model="formData.language"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    data-testid="select-language"
+                  >
+                    <option v-for="lang in languages" :key="lang.code" :value="lang.code">
+                      {{ lang.name }}
+                    </option>
+                  </select>
+                </div>
+
+                <div data-testid="field-timezone">
+                  <label class="block txt-primary font-medium mb-2" for="profile-timezone">
+                    {{ $t('profile.accountSettings.timezone') }}
+                  </label>
+                  <input
+                    id="profile-timezone-search"
+                    v-model="timezoneQuery"
+                    type="search"
+                    autocomplete="off"
+                    class="mb-2 w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    :placeholder="$t('profile.accountSettings.timezoneSearch')"
+                    :aria-label="$t('profile.accountSettings.timezoneSearch')"
+                    data-testid="input-timezone-search"
+                  />
+                  <p class="txt-secondary text-sm mb-2">
+                    {{ $t('profile.accountSettings.timezoneHint') }}
+                  </p>
+                  <select
+                    id="profile-timezone"
+                    v-model="formData.timezone"
+                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    data-testid="select-timezone"
+                  >
+                    <option v-if="formData.timezone === ''" value="">
+                      {{ $t('profile.accountSettings.timezonePlaceholder') }}
+                    </option>
+                    <optgroup
+                      v-for="group in timezoneGroups"
+                      :key="group.offset"
+                      :label="group.offset"
+                    >
+                      <option v-for="tz in group.zones" :key="tz.value" :value="tz.value">
+                        {{ tz.label }}
+                      </option>
+                    </optgroup>
+                  </select>
+                  <p
+                    v-if="timezoneSearchMiss"
+                    class="text-sm txt-secondary mt-1"
+                    data-testid="timezone-no-match"
+                  >
+                    {{ $t('profile.accountSettings.timezoneNoMatch') }}
+                  </p>
+                </div>
+
+                <div class="md:col-span-2" data-testid="field-invoice-email">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.accountSettings.invoiceEmail') }}
+                  </label>
+                  <input
+                    v-model="formData.invoiceEmail"
+                    type="email"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.accountSettings.invoiceEmailPlaceholder')"
+                    data-testid="input-invoice-email"
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section
+              ref="memoriesSection"
+              class="surface-card rounded-lg p-6 transition-all duration-500"
+              :class="{ 'ring-4 ring-brand-500/50 shadow-2xl': shouldHighlight }"
+              data-testid="section-memories-settings"
+            >
+              <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="mdi:brain" class="w-5 h-5" />
+                {{ $t('profile.memories.title') }}
+              </h2>
+              <p class="txt-secondary text-sm mb-6">
+                {{ $t('profile.memories.subtitle') }}
+              </p>
+
+              <div
+                class="flex items-start justify-between gap-4 p-4 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20"
+              >
+                <div class="min-w-0">
+                  <p class="txt-primary font-medium">
+                    {{ $t('profile.memories.toggleLabel') }}
+                  </p>
+                  <p class="txt-secondary text-sm mt-1">
+                    {{
+                      formData.memoriesEnabled
+                        ? $t('profile.memories.enabledHint')
+                        : $t('profile.memories.disabledHint')
+                    }}
+                  </p>
+                </div>
+
+                <label class="relative inline-flex items-center cursor-pointer select-none">
+                  <input v-model="formData.memoriesEnabled" type="checkbox" class="sr-only" />
+                  <div
+                    class="w-11 h-6 rounded-full transition-colors"
+                    :class="
+                      formData.memoriesEnabled
+                        ? 'bg-[var(--brand)]'
+                        : 'bg-gray-300 dark:bg-gray-700'
+                    "
+                  />
+                  <div
+                    class="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow"
+                    :class="formData.memoriesEnabled ? 'translate-x-5' : 'translate-x-0'"
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section class="surface-card rounded-lg p-6" data-testid="section-change-password">
+              <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="mdi:lock" class="w-5 h-5" />
+                {{ $t('profile.changePassword.title') }}
+              </h2>
+
+              <!-- External Auth Warning -->
+              <div v-if="isExternalAuth" class="mb-6 info-box-blue">
+                <div class="flex items-start gap-3">
+                  <Icon icon="mdi:shield-check" class="w-6 h-6 info-box-blue-icon flex-shrink-0" />
+                  <div class="flex-1">
+                    <p class="text-sm info-box-blue-title mb-1">
+                      {{ $t('profile.personalInfo.managedBy', { provider: authProvider }) }}
+                    </p>
+                    <p class="text-sm info-box-blue-text mb-2">
+                      {{ $t('profile.changePassword.externalAuth', { provider: authProvider }) }}
+                    </p>
+                    <p v-if="externalAuthLastLogin" class="text-xs info-box-blue-text">
+                      Last authenticated: {{ externalAuthLastLogin }}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <label class="relative inline-flex items-center cursor-pointer select-none">
-                <input v-model="formData.memoriesEnabled" type="checkbox" class="sr-only" />
-                <div
-                  class="w-11 h-6 rounded-full transition-colors"
-                  :class="
-                    formData.memoriesEnabled ? 'bg-[var(--brand)]' : 'bg-gray-300 dark:bg-gray-700'
-                  "
-                />
-                <div
-                  class="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow"
-                  :class="formData.memoriesEnabled ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </label>
-            </div>
-          </section>
+              <p v-else class="txt-secondary text-sm mb-6">
+                {{ $t('profile.changePassword.subtitle') }}
+              </p>
 
-          <section class="surface-card rounded-lg p-6" data-testid="section-change-password">
-            <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="mdi:lock" class="w-5 h-5" />
-              {{ $t('profile.changePassword.title') }}
-            </h2>
+              <div v-if="canChangePassword" class="grid grid-cols-1 gap-6 max-w-2xl">
+                <div data-testid="field-current-password">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.changePassword.currentPassword') }}
+                  </label>
+                  <input
+                    v-model="passwordData.current"
+                    type="password"
+                    autocomplete="current-password"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.changePassword.currentPasswordPlaceholder')"
+                    data-testid="input-current-password"
+                    @input="markPasswordTouched"
+                  />
+                </div>
 
-            <!-- External Auth Warning -->
-            <div v-if="isExternalAuth" class="mb-6 info-box-blue">
-              <div class="flex items-start gap-3">
-                <Icon icon="mdi:shield-check" class="w-6 h-6 info-box-blue-icon flex-shrink-0" />
-                <div class="flex-1">
-                  <p class="text-sm info-box-blue-title mb-1">
-                    {{ $t('profile.personalInfo.managedBy', { provider: authProvider }) }}
+                <div data-testid="field-new-password">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.changePassword.newPassword') }}
+                  </label>
+                  <input
+                    v-model="passwordData.new"
+                    type="password"
+                    autocomplete="new-password"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.changePassword.newPasswordPlaceholder')"
+                    data-testid="input-new-password"
+                    @input="markPasswordTouched"
+                  />
+                  <p class="txt-secondary text-sm mt-1">
+                    {{ $t('profile.changePassword.newPasswordHint') }}
                   </p>
-                  <p class="text-sm info-box-blue-text mb-2">
-                    {{ $t('profile.changePassword.externalAuth', { provider: authProvider }) }}
-                  </p>
-                  <p v-if="externalAuthLastLogin" class="text-xs info-box-blue-text">
-                    Last authenticated: {{ externalAuthLastLogin }}
+                </div>
+
+                <div data-testid="field-confirm-password">
+                  <label class="block txt-primary font-medium mb-2">
+                    {{ $t('profile.changePassword.confirmPassword') }}
+                  </label>
+                  <input
+                    v-model="passwordData.confirm"
+                    type="password"
+                    autocomplete="new-password"
+                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    :placeholder="$t('profile.changePassword.confirmPasswordPlaceholder')"
+                    data-testid="input-confirm-password"
+                    @input="markPasswordTouched"
+                  />
+                  <p class="txt-secondary text-sm mt-1">
+                    {{ $t('profile.changePassword.confirmPasswordHint') }}
                   </p>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <p v-else class="txt-secondary text-sm mb-6">
-              {{ $t('profile.changePassword.subtitle') }}
-            </p>
-
-            <div v-if="canChangePassword" class="grid grid-cols-1 gap-6 max-w-2xl">
-              <div data-testid="field-current-password">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.changePassword.currentPassword') }}
-                </label>
-                <input
-                  v-model="passwordData.current"
-                  type="password"
-                  autocomplete="current-password"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.changePassword.currentPasswordPlaceholder')"
-                  data-testid="input-current-password"
-                  @input="markPasswordTouched"
-                />
-              </div>
-
-              <div data-testid="field-new-password">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.changePassword.newPassword') }}
-                </label>
-                <input
-                  v-model="passwordData.new"
-                  type="password"
-                  autocomplete="new-password"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.changePassword.newPasswordPlaceholder')"
-                  data-testid="input-new-password"
-                  @input="markPasswordTouched"
-                />
-                <p class="txt-secondary text-sm mt-1">
-                  {{ $t('profile.changePassword.newPasswordHint') }}
-                </p>
-              </div>
-
-              <div data-testid="field-confirm-password">
-                <label class="block txt-primary font-medium mb-2">
-                  {{ $t('profile.changePassword.confirmPassword') }}
-                </label>
-                <input
-                  v-model="passwordData.confirm"
-                  type="password"
-                  autocomplete="new-password"
-                  class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                  :placeholder="$t('profile.changePassword.confirmPasswordPlaceholder')"
-                  data-testid="input-confirm-password"
-                  @input="markPasswordTouched"
-                />
-                <p class="txt-secondary text-sm mt-1">
-                  {{ $t('profile.changePassword.confirmPasswordHint') }}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section
-            v-if="showBiometricSection"
-            class="surface-card rounded-lg p-6"
-            data-testid="section-app-security"
-          >
-            <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="mdi:fingerprint" class="w-5 h-5" />
-              {{ $t('profile.appSecurity.title') }}
-            </h2>
-            <p class="txt-secondary text-sm mb-6">{{ $t('profile.appSecurity.subtitle') }}</p>
-
-            <div class="flex items-center justify-between gap-4">
-              <div class="min-w-0">
-                <p class="txt-primary font-medium">{{ $t('profile.appSecurity.biometricLock') }}</p>
-                <p class="txt-secondary text-sm">
-                  {{ $t('profile.appSecurity.biometricLockHint') }}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="biometricLockOn"
-                class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                :class="
-                  biometricLockOn
-                    ? 'bg-[var(--brand)]'
-                    : 'bg-light-border/50 dark:bg-dark-border/50'
-                "
-                data-testid="toggle-biometric-lock"
-                @click="toggleBiometricLock"
-              >
-                <span
-                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                  :class="biometricLockOn ? 'translate-x-6' : 'translate-x-1'"
-                />
-              </button>
-            </div>
-          </section>
-
-          <div class="info-box-blue" data-testid="section-privacy-notice">
-            <p class="text-sm info-box-blue-text flex items-start gap-2">
-              <Icon
-                icon="mdi:information"
-                class="w-5 h-5 info-box-blue-icon flex-shrink-0 mt-0.5"
-              />
-              <span>{{ $t('profile.privacyNotice') }}</span>
-            </p>
-          </div>
-
-          <!-- Legal links (store-policy: reachable in-app; configurable via branding) -->
-          <section class="surface-card rounded-lg p-6" data-testid="section-legal">
-            <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
-              <Icon icon="mdi:shield-check" class="w-5 h-5" />
-              {{ $t('profile.legal.title') }}
-            </h2>
-            <div class="flex flex-col gap-3">
-              <a
-                :href="config.branding.privacyUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
-                data-testid="link-privacy"
-              >
-                <Icon icon="mdi:lock-outline" class="w-5 h-5" />
-                {{ $t('profile.legal.privacy') }}
-                <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
-              </a>
-              <a
-                :href="config.branding.termsUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
-                data-testid="link-terms"
-              >
-                <Icon icon="mdi:file-document-outline" class="w-5 h-5" />
-                {{ $t('profile.legal.terms') }}
-                <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
-              </a>
-              <!-- Account-deletion info (Epic 9.1). Internal default route, or a
-                   brand's external deletion page when configured. -->
-              <a
-                v-if="isExternalDeletionUrl"
-                :href="config.branding.accountDeletionUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
-                data-testid="link-account-deletion"
-              >
-                <Icon icon="mdi:account-remove-outline" class="w-5 h-5" />
-                {{ $t('profile.legal.accountDeletion') }}
-                <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
-              </a>
-              <RouterLink
-                v-else
-                :to="config.branding.accountDeletionUrl"
-                class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
-                data-testid="link-account-deletion"
-              >
-                <Icon icon="mdi:account-remove-outline" class="w-5 h-5" />
-                {{ $t('profile.legal.accountDeletion') }}
-              </RouterLink>
-            </div>
-          </section>
-
-          <!-- Danger Zone -->
-          <section
-            class="surface-card rounded-lg p-6 border-2 border-red-200 dark:border-red-800/50"
-            data-testid="section-danger-zone"
-          >
-            <h2
-              class="text-xl font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2"
+            <section
+              v-if="showBiometricSection"
+              class="surface-card rounded-lg p-6"
+              data-testid="section-app-security"
             >
-              <Icon icon="mdi:alert" class="w-5 h-5" />
-              {{ $t('profile.dangerZone.title') }}
-            </h2>
-            <p class="txt-secondary text-sm mb-6">{{ $t('profile.dangerZone.subtitle') }}</p>
+              <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="mdi:fingerprint" class="w-5 h-5" />
+                {{ $t('profile.appSecurity.title') }}
+              </h2>
+              <p class="txt-secondary text-sm mb-6">{{ $t('profile.appSecurity.subtitle') }}</p>
 
-            <div class="flex items-start gap-4 info-box-red">
-              <Icon
-                icon="mdi:account-remove"
-                class="w-6 h-6 info-box-red-icon flex-shrink-0 mt-0.5"
-              />
-              <div class="flex-1">
-                <h3 class="info-box-red-title mb-1">
-                  {{ $t('profile.dangerZone.deleteAccount') }}
-                </h3>
-                <p class="text-sm info-box-red-text mb-4">
-                  {{ $t('profile.dangerZone.deleteAccountDesc') }}
-                </p>
+              <div class="flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="txt-primary font-medium">
+                    {{ $t('profile.appSecurity.biometricLock') }}
+                  </p>
+                  <p class="txt-secondary text-sm">
+                    {{ $t('profile.appSecurity.biometricLockHint') }}
+                  </p>
+                </div>
                 <button
                   type="button"
-                  class="btn-danger px-4 py-2 rounded-lg text-sm font-medium"
-                  data-testid="btn-delete-account"
-                  @click="showDeleteModal = true"
+                  role="switch"
+                  :aria-checked="biometricLockOn"
+                  class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  :class="
+                    biometricLockOn
+                      ? 'bg-[var(--brand)]'
+                      : 'bg-light-border/50 dark:bg-dark-border/50'
+                  "
+                  data-testid="toggle-biometric-lock"
+                  @click="toggleBiometricLock"
                 >
-                  {{ $t('profile.dangerZone.deleteButton') }}
+                  <span
+                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                    :class="biometricLockOn ? 'translate-x-6' : 'translate-x-1'"
+                  />
                 </button>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <div class="h-20"></div>
+            <div class="info-box-blue" data-testid="section-privacy-notice">
+              <p class="text-sm info-box-blue-text flex items-start gap-2">
+                <Icon
+                  icon="mdi:information"
+                  class="w-5 h-5 info-box-blue-icon flex-shrink-0 mt-0.5"
+                />
+                <span>{{ $t('profile.privacyNotice') }}</span>
+              </p>
+            </div>
+
+            <!-- Legal links (store-policy: reachable in-app; configurable via branding) -->
+            <section class="surface-card rounded-lg p-6" data-testid="section-legal">
+              <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
+                <Icon icon="mdi:shield-check" class="w-5 h-5" />
+                {{ $t('profile.legal.title') }}
+              </h2>
+              <div class="flex flex-col gap-3">
+                <a
+                  :href="config.branding.privacyUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
+                  data-testid="link-privacy"
+                >
+                  <Icon icon="mdi:lock-outline" class="w-5 h-5" />
+                  {{ $t('profile.legal.privacy') }}
+                  <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
+                </a>
+                <a
+                  :href="config.branding.termsUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
+                  data-testid="link-terms"
+                >
+                  <Icon icon="mdi:file-document-outline" class="w-5 h-5" />
+                  {{ $t('profile.legal.terms') }}
+                  <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
+                </a>
+                <!-- Account-deletion info (Epic 9.1). Internal default route, or a
+                   brand's external deletion page when configured. -->
+                <a
+                  v-if="isExternalDeletionUrl"
+                  :href="config.branding.accountDeletionUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
+                  data-testid="link-account-deletion"
+                >
+                  <Icon icon="mdi:account-remove-outline" class="w-5 h-5" />
+                  {{ $t('profile.legal.accountDeletion') }}
+                  <Icon icon="mdi:open-in-new" class="w-4 h-4 txt-secondary" />
+                </a>
+                <RouterLink
+                  v-else
+                  :to="config.branding.accountDeletionUrl"
+                  class="inline-flex items-center gap-2 txt-primary hover:text-[var(--brand)]"
+                  data-testid="link-account-deletion"
+                >
+                  <Icon icon="mdi:account-remove-outline" class="w-5 h-5" />
+                  {{ $t('profile.legal.accountDeletion') }}
+                </RouterLink>
+              </div>
+            </section>
+
+            <!-- Danger Zone -->
+            <section
+              class="surface-card rounded-lg p-6 border-2 border-red-200 dark:border-red-800/50"
+              data-testid="section-danger-zone"
+            >
+              <h2
+                class="text-xl font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2"
+              >
+                <Icon icon="mdi:alert" class="w-5 h-5" />
+                {{ $t('profile.dangerZone.title') }}
+              </h2>
+              <p class="txt-secondary text-sm mb-6">{{ $t('profile.dangerZone.subtitle') }}</p>
+
+              <div class="flex items-start gap-4 info-box-red">
+                <Icon
+                  icon="mdi:account-remove"
+                  class="w-6 h-6 info-box-red-icon flex-shrink-0 mt-0.5"
+                />
+                <div class="flex-1">
+                  <h3 class="info-box-red-title mb-1">
+                    {{ $t('profile.dangerZone.deleteAccount') }}
+                  </h3>
+                  <p class="text-sm info-box-red-text mb-4">
+                    {{ $t('profile.dangerZone.deleteAccountDesc') }}
+                  </p>
+                  <button
+                    type="button"
+                    class="btn-danger px-4 py-2 rounded-lg text-sm font-medium"
+                    data-testid="btn-delete-account"
+                    @click="showDeleteModal = true"
+                  >
+                    {{ $t('profile.dangerZone.deleteButton') }}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <div class="h-20"></div>
+          </fieldset>
         </form>
       </div>
     </div>
 
-    <UnsavedChangesBar :show="hasUnsavedChanges" @save="handleSave" @discard="handleDiscard" />
+    <UnsavedChangesBar
+      :show="profileLoaded && hasUnsavedChanges"
+      @save="handleSave"
+      @discard="handleDiscard"
+    />
 
     <!-- Delete Account Modal -->
     <Teleport to="#app">
@@ -936,6 +952,10 @@ function profileSaveError(err: unknown): string {
 }
 
 const handleSave = saveChanges(async () => {
+  if (!profileLoaded.value) {
+    throw new Error('Profile has not loaded')
+  }
+
   const changingEmail = emailChanged.value
   saveSuccessMessage.value = t('unsavedChanges.saved')
 
