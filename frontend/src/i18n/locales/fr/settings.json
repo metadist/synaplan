@@ -329,6 +329,8 @@
       "deleting": "Suppression…"
     },
     "privacyNotice": "Toutes les données sont stockées de façon sécurisée et utilisées uniquement à des fins de facturation conformément au droit allemand (DSGVO).",
+    "loading": "Chargement du profil.",
+    "loadFailed": "Le profil n'a pas pu être chargé. Rien n'a été modifié.",
     "saveFailed": "Le profil n'a pas pu être enregistré.",
     "saveChanges": "Enregistrer les modifications",
     "cancel": "Annuler"

@@ -154,6 +154,8 @@
       "deleting": "Wird gelöscht..."
     },
     "privacyNotice": "Alle Daten werden sicher gespeichert und nur für Abrechnungszwecke gemäß deutschem Recht (DSGVO) verwendet.",
+    "loading": "Das Profil wird geladen.",
+    "loadFailed": "Das Profil konnte nicht geladen werden. Es wurde nichts geändert.",
     "saveFailed": "Das Profil konnte nicht gespeichert werden.",
     "saveChanges": "Änderungen speichern",
     "cancel": "Abbrechen"

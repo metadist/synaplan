@@ -608,6 +608,7 @@ export const selectors = {
     cancel: '[data-testid="btn-confirm-cancel"]',
   },
   profile: {
+    inputEmail: '[data-testid="input-email"]',
     inputCurrentPassword: '[data-testid="input-current-password"]',
     inputNewPassword: '[data-testid="input-new-password"]',
     inputConfirmPassword: '[data-testid="input-confirm-password"]',

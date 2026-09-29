@@ -128,6 +128,8 @@
       "deleting": "Eliminando..."
     },
     "privacyNotice": "Todos los datos se almacenan de forma segura y se usan solo para propósitos de facturación según la ley alemana (RGPD).",
+    "loading": "Cargando el perfil.",
+    "loadFailed": "No se ha podido cargar el perfil. No se ha cambiado nada.",
     "saveFailed": "No se ha podido guardar el perfil.",
     "saveChanges": "Guardar Cambios",
     "cancel": "Cancelar"
