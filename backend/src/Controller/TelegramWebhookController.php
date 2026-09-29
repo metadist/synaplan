@@ -7,15 +7,18 @@ namespace App\Controller;
 use App\Message\ProcessTelegramUpdateCommand;
 use App\Service\Telegram\TelegramWebhookAcceptor;
 use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Telegram Bot API webhook. Always answers 200 so a refused or duplicate
- * update is not retried. Work happens in the worker.
+ * Telegram Bot API webhook. A refused or duplicate update gets 200 so it is
+ * not retried; only a failed enqueue answers 503 so Telegram delivers again.
+ * Work happens in the worker.
  */
 #[OA\Tag(name: 'Telegram')]
 final class TelegramWebhookController extends AbstractController
@@ -23,6 +26,7 @@ final class TelegramWebhookController extends AbstractController
     public function __construct(
         private readonly TelegramWebhookAcceptor $acceptor,
         private readonly MessageBusInterface $bus,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -43,6 +47,16 @@ final class TelegramWebhookController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(
+        response: 503,
+        description: 'The update could not be queued. Telegram retries it.',
+        content: new OA\JsonContent(
+            required: ['ok'],
+            properties: [
+                new OA\Property(property: 'ok', type: 'boolean', example: false),
+            ]
+        )
+    )]
     public function receive(string $botKey, Request $request): JsonResponse
     {
         try {
@@ -56,13 +70,19 @@ final class TelegramWebhookController extends AbstractController
             $request->headers->get('X-Telegram-Bot-Api-Secret-Token'),
             $update,
         );
-        if ($decision->dispatch && null !== $decision->botId) {
-            $updateId = $update['update_id'] ?? 0;
-            $this->bus->dispatch(new ProcessTelegramUpdateCommand(
-                $decision->botId,
-                is_int($updateId) ? $updateId : (int) $updateId,
-                $update,
-            ));
+        if ($decision->dispatch && null !== $decision->botId && null !== $decision->updateId) {
+            try {
+                $this->bus->dispatch(new ProcessTelegramUpdateCommand($decision->botId, $decision->updateId, $update));
+            } catch (\Throwable $e) {
+                $this->acceptor->release($decision);
+                $this->logger->error('Telegram update could not be queued', [
+                    'bot_id' => $decision->botId,
+                    'update_id' => $decision->updateId,
+                    'exception_class' => $e::class,
+                ]);
+
+                return $this->json(['ok' => false], Response::HTTP_SERVICE_UNAVAILABLE);
+            }
         }
 
         return $this->json(['ok' => true]);

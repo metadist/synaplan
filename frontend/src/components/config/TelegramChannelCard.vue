@@ -7,16 +7,28 @@
 
     <div v-if="status === 'pending_pairing'" class="space-y-4" data-testid="text-telegram-pairing">
       <p class="text-sm txt-secondary">{{ t('channels.telegram.pairingHint') }}</p>
-      <a
-        v-if="state?.pairingLink"
-        :href="state.pairingLink"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
-        data-testid="link-telegram-open"
-      >
-        {{ t('channels.telegram.openTelegram') }}
-      </a>
+      <div class="flex flex-wrap gap-2">
+        <a
+          v-if="state?.pairingLink"
+          :href="state.pairingLink"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
+          data-testid="link-telegram-open"
+        >
+          {{ t('channels.telegram.openTelegram') }}
+        </a>
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="btn-telegram-cancel"
+          :disabled="busy"
+          @click="cancelPairing"
+        >
+          {{ t('channels.telegram.cancelPairing') }}
+        </button>
+      </div>
+      <p class="text-sm txt-secondary">{{ t('channels.telegram.cancelPairingHint') }}</p>
     </div>
 
     <div v-else-if="status === 'connected'" class="space-y-4" data-testid="text-telegram-connected">
@@ -227,6 +239,19 @@ async function disconnect(): Promise<void> {
     success(t('channels.telegram.disconnected'))
   } catch {
     notifyError(t('channels.telegram.disconnectFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
+async function cancelPairing(): Promise<void> {
+  busy.value = true
+  try {
+    state.value = await disconnectTelegram()
+    stopPolling()
+    success(t('channels.telegram.pairingCancelled'))
+  } catch {
+    notifyError(t('channels.telegram.cancelFailed'))
   } finally {
     busy.value = false
   }

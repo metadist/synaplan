@@ -35,4 +35,12 @@ class TelegramBotRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    public function remove(TelegramBot $bot, bool $flush = true): void
+    {
+        $this->getEntityManager()->remove($bot);
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
 }

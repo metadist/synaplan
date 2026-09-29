@@ -11,6 +11,8 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 
 #[AllowMockObjectsWithoutExpectations]
 final class TelegramWebhookAcceptorTest extends TestCase
@@ -51,12 +53,44 @@ final class TelegramWebhookAcceptorTest extends TestCase
         $this->assertFalse($decision->dispatch);
     }
 
-    private function acceptor(TelegramBot $bot): TelegramWebhookAcceptor
+    public function testReleaseLetsTelegramsRetryThrough(): void
+    {
+        $secret = 'webhook-secret';
+        $acceptor = $this->acceptor($this->bot($secret));
+
+        $first = $acceptor->decide('bot-key', $secret, ['update_id' => 7]);
+        $acceptor->release($first);
+        $retry = $acceptor->decide('bot-key', $secret, ['update_id' => 7]);
+
+        $this->assertTrue($first->dispatch);
+        $this->assertSame(7, $first->updateId);
+        $this->assertTrue($retry->dispatch);
+    }
+
+    public function testAParallelDeliveryHoldingTheLockIsDropped(): void
+    {
+        $secret = 'webhook-secret';
+        $locks = new LockFactory(new InMemoryStore());
+        $acceptor = $this->acceptor($this->bot($secret), $locks);
+        $held = $locks->createLock('telegram_update_bot-key_7_lock');
+        $held->acquire();
+
+        $decision = $acceptor->decide('bot-key', $secret, ['update_id' => 7]);
+
+        $this->assertFalse($decision->dispatch);
+    }
+
+    private function acceptor(TelegramBot $bot, ?LockFactory $locks = null): TelegramWebhookAcceptor
     {
         $bots = $this->createMock(TelegramBotRepository::class);
         $bots->method('findOneByBotKey')->willReturn($bot);
 
-        return new TelegramWebhookAcceptor($bots, new ArrayAdapter(), new NullLogger());
+        return new TelegramWebhookAcceptor(
+            $bots,
+            new ArrayAdapter(),
+            $locks ?? new LockFactory(new InMemoryStore()),
+            new NullLogger(),
+        );
     }
 
     private function bot(string $secret): TelegramBot

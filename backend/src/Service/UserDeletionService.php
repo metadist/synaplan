@@ -38,6 +38,7 @@ use App\Service\File\FileStorageService;
 use App\Service\Iam\ResourceKind\AgentKind;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
+use App\Service\Telegram\TelegramConnectionService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -77,6 +78,7 @@ final readonly class UserDeletionService
         private AgentCascadeCleanup $agentCascade,
         private SavedTaskRepository $savedTaskRepository,
         private SavedTaskRunRepository $savedTaskRunRepository,
+        private TelegramConnectionService $telegramConnections,
         private LoggerInterface $logger,
     ) {
     }
@@ -126,6 +128,7 @@ final readonly class UserDeletionService
             $this->deleteMessageDigests($userId);
             $this->deleteGroupMemberships($userId);
             $this->deleteExternalIdentities($userId);
+            $telegramToken = $this->telegramConnections->removeForOwner($userId);
 
             // Finally, delete the user account
             $this->em->remove($user);
@@ -134,6 +137,7 @@ final readonly class UserDeletionService
             $this->em->getConnection()->commit();
 
             // Best-effort cleanup outside transaction (external services & filesystem)
+            $this->purgeTelegramWebhook($telegramToken);
             $this->purgeAgentExternal($agentExternal);
             $this->purgeMemoryIndex($userId);
             $this->purgeDigestIndex($userId);
@@ -204,11 +208,13 @@ final readonly class UserDeletionService
             $this->deleteMessageDigests($userId);
             $this->deleteGroupMemberships($userId);
             $this->deleteExternalIdentities($userId);
+            $telegramToken = $this->telegramConnections->removeForOwner($userId);
 
             $this->em->flush();
             $this->em->getConnection()->commit();
 
             // Best-effort cleanup outside transaction (external services & filesystem)
+            $this->purgeTelegramWebhook($telegramToken);
             $this->purgeAgentExternal($agentExternal);
             $this->purgeMemoryIndex($userId);
             $this->purgeDigestIndex($userId);
@@ -518,6 +524,13 @@ final readonly class UserDeletionService
                     'exception' => $e,
                 ]);
             }
+        }
+    }
+
+    private function purgeTelegramWebhook(?string $token): void
+    {
+        if (null !== $token) {
+            $this->telegramConnections->dropWebhookForToken($token);
         }
     }
 

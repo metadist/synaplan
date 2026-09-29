@@ -9,6 +9,8 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Entity\User;
+use App\Realtime\Notifier\ChatActivityNotifier;
+use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use App\Service\Digest\MessageReferenceResolver;
 use App\Service\Message\ChatErrorPresenter;
@@ -16,13 +18,19 @@ use App\Service\Message\ChatErrorView;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\Telegram\TelegramBotApi;
+use App\Service\Telegram\TelegramChannelException;
 use App\Service\Telegram\TelegramConnectionService;
 use App\Service\Telegram\TelegramInboundService;
 use App\Service\UserMemoryService;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
+use Symfony\Component\Translation\Loader\YamlFileLoader;
+use Symfony\Component\Translation\Translator;
 
 #[AllowMockObjectsWithoutExpectations]
 final class TelegramInboundServiceTest extends TestCase
@@ -32,7 +40,7 @@ final class TelegramInboundServiceTest extends TestCase
         $sent = [];
         $service = $this->service($this->connectedBot(), $sent, persist: false);
 
-        $service->handle(5, $this->update(['text' => 'look', 'photo' => [['file_id' => 'x']]]));
+        $service->handle(5, 1, $this->update(['text' => 'look', 'photo' => [['file_id' => 'x']]]));
 
         $this->assertSame(['Only text messages for now.'], $sent);
     }
@@ -44,9 +52,29 @@ final class TelegramInboundServiceTest extends TestCase
         $bot->setTgUserId('111');
         $service = $this->service($bot, $sent, persist: false);
 
-        $service->handle(5, $this->update(['text' => 'hello'], fromId: 999));
+        $service->handle(5, 1, $this->update(['text' => 'hello'], fromId: 999));
 
         $this->assertSame(['This bot only answers its owner.'], $sent);
+    }
+
+    public function testOwnerReadsTheirAppLanguage(): void
+    {
+        $sent = [];
+        $service = $this->service($this->connectedBot(), $sent, persist: false, locale: 'de');
+
+        $service->handle(5, 1, $this->update(['text' => 'look', 'photo' => [['file_id' => 'x']]]));
+
+        $this->assertSame(['Vorerst nur Textnachrichten.'], $sent);
+    }
+
+    public function testStrangerReadsTheirTelegramLanguage(): void
+    {
+        $sent = [];
+        $service = $this->service($this->connectedBot(), $sent, persist: false, locale: 'de');
+
+        $service->handle(5, 1, $this->update(['text' => 'hello'], fromId: 999, languageCode: 'fr-FR'));
+
+        $this->assertSame(['Ce bot ne répond qu\'à son propriétaire.'], $sent);
     }
 
     public function testPairingStoresTheTurnWithoutTheCode(): void
@@ -58,7 +86,7 @@ final class TelegramInboundServiceTest extends TestCase
         $bot->setTgUserId(null);
         $service = $this->service($bot, $sent, messages: $messages, pair: true);
 
-        $service->handle(5, $this->update(['text' => '/start GOODCODE', 'message_id' => 10]));
+        $service->handle(5, 1, $this->update(['text' => '/start GOODCODE', 'message_id' => 10]));
 
         $this->assertSame(TelegramBot::STATUS_CONNECTED, $bot->getStatus());
         $this->assertSame(['Connected. Send a message whenever you want a reply.'], $sent);
@@ -77,7 +105,7 @@ final class TelegramInboundServiceTest extends TestCase
         $messages = [];
         $service = $this->service($this->connectedBot(), $sent, messages: $messages, reply: 'Four.');
 
-        $service->handle(5, $this->update(['text' => 'What is 2+2?', 'message_id' => '15']));
+        $service->handle(5, 31, $this->update(['text' => 'What is 2+2?', 'message_id' => '15']));
 
         $this->assertSame(['Four.'], $sent);
         $this->assertCount(2, $messages);
@@ -86,6 +114,82 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame('Four.', $messages[1]->getText());
         $this->assertSame('telegram', $messages[0]->getMeta('channel'));
         $this->assertSame('15', $messages[0]->getMeta('external_id'));
+        $this->assertSame('4242:31', $messages[0]->getMeta(TelegramInboundService::META_UPDATE));
+        $this->assertNull($messages[1]->getMeta(TelegramInboundService::META_UPDATE));
+    }
+
+    public function testARedeliveredUpdateThatAlreadyStoredItsTurnIsSkipped(): void
+    {
+        $sent = [];
+        $processor = $this->createMock(MessageProcessor::class);
+        $processor->expects($this->never())->method('process');
+        $service = $this->service($this->connectedBot(), $sent, persist: false, processor: $processor, seen: true);
+
+        $service->handle(5, 31, $this->update(['text' => 'What is 2+2?']));
+
+        $this->assertSame([], $sent);
+    }
+
+    public function testInboundMessageIsAnnouncedToTheOpenBrowser(): void
+    {
+        $sent = [];
+        $activity = $this->createMock(ChatActivityNotifier::class);
+        $activity->expects($this->once())->method('publishActivity')
+            ->with($this->isInstanceOf(Chat::class), 7, 'IN', 'hello');
+        $service = $this->service($this->connectedBot(), $sent, reply: 'Hi.', activity: $activity);
+
+        $service->handle(5, 1, $this->update(['text' => 'hello']));
+
+        $this->assertSame(['Hi.'], $sent);
+    }
+
+    public function testReconnectedBotRenamesTheKeptChat(): void
+    {
+        $sent = [];
+        $old = new Chat();
+        $old->setUserId(7);
+        $old->setSource('telegram');
+        $old->setTitle('Telegram: @old_bot');
+        (new \ReflectionProperty(Chat::class, 'id'))->setValue($old, 90);
+        $bot = $this->connectedBot();
+        $bot->setChatId(90);
+        $service = $this->service($bot, $sent, reply: 'Hi.', chats: [90 => $old]);
+
+        $service->handle(5, 1, $this->update(['text' => 'hello']));
+
+        $this->assertSame('Telegram: @synaplan_test_bot', $old->getTitle());
+        $this->assertSame(90, $bot->getChatId());
+    }
+
+    public function testATransientSendFailureKeepsTheBotConnected(): void
+    {
+        $sent = [];
+        $bot = $this->connectedBot();
+        $service = $this->service(
+            $bot,
+            $sent,
+            persist: false,
+            sendError: TelegramChannelException::SEND_FAILED,
+            expectMarkError: false,
+        );
+
+        $service->handle(5, 1, $this->update(['text' => 'look', 'photo' => [['file_id' => 'x']]]));
+
+        $this->assertSame(TelegramBot::STATUS_CONNECTED, $bot->getStatus());
+    }
+
+    public function testARevokedTokenMarksTheBotErrored(): void
+    {
+        $sent = [];
+        $service = $this->service(
+            $this->connectedBot(),
+            $sent,
+            persist: false,
+            sendError: TelegramChannelException::TOKEN_REVOKED,
+            expectMarkError: true,
+        );
+
+        $service->handle(5, 1, $this->update(['text' => 'look', 'photo' => [['file_id' => 'x']]]));
     }
 
     public function testAiFailureSendsThePresenterSentence(): void
@@ -98,7 +202,7 @@ final class TelegramInboundServiceTest extends TestCase
             failure: 'The model is not available. Pick another model in Settings.',
         );
 
-        $service->handle(5, $this->update(['text' => 'hello']));
+        $service->handle(5, 1, $this->update(['text' => 'hello']));
 
         $this->assertSame(['The model is not available. Pick another model in Settings.'], $sent);
     }
@@ -110,14 +214,15 @@ final class TelegramInboundServiceTest extends TestCase
         $processor->expects($this->never())->method('process');
         $service = $this->service($this->connectedBot(), $sent, processor: $processor, allowed: false);
 
-        $service->handle(5, $this->update(['text' => 'hello']));
+        $service->handle(5, 1, $this->update(['text' => 'hello']));
 
         $this->assertSame(['You have reached the message limit. Try again later.'], $sent);
     }
 
     /**
-     * @param list<string>  $sent
-     * @param list<Message> $messages
+     * @param list<string>     $sent
+     * @param list<Message>    $messages
+     * @param array<int, Chat> $chats
      */
     private function service(
         TelegramBot $bot,
@@ -129,14 +234,19 @@ final class TelegramInboundServiceTest extends TestCase
         ?string $failure = null,
         ?MessageProcessor $processor = null,
         bool $allowed = true,
+        string $locale = 'en',
+        bool $seen = false,
+        ?ChatActivityNotifier $activity = null,
+        array $chats = [],
+        ?string $sendError = null,
+        ?bool $expectMarkError = null,
     ): TelegramInboundService {
         /** @var list<object> $pending */
         $pending = [];
-        /** @var array<int, Chat> $chats */
-        $chats = [];
-        $seq = 1;
+        $seq = 100;
 
         $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getConnection')->willReturn($this->createStub(Connection::class));
         $em->method('find')->willReturnCallback(function (string $class, mixed $id) use ($bot, &$chats): ?object {
             if (TelegramBot::class === $class) {
                 return $bot;
@@ -174,8 +284,12 @@ final class TelegramInboundServiceTest extends TestCase
 
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
+        $user->method('getLocale')->willReturn($locale);
         $users = $this->createMock(UserRepository::class);
         $users->method('find')->willReturn($user);
+
+        $messageRepository = $this->createMock(MessageRepository::class);
+        $messageRepository->method('hasTelegramUpdate')->willReturn($seen);
 
         $connections = $this->createMock(TelegramConnectionService::class);
         $connections->method('revealToken')->willReturn('123456789:AAHexampleToken');
@@ -192,9 +306,17 @@ final class TelegramInboundServiceTest extends TestCase
         $connections->method('attachChat')->willReturnCallback(function (TelegramBot $row, int $chatId): void {
             $row->setChatId($chatId);
         });
+        if (true === $expectMarkError) {
+            $connections->expects($this->once())->method('markError');
+        } elseif (false === $expectMarkError) {
+            $connections->expects($this->never())->method('markError');
+        }
 
         $api = $this->createMock(TelegramBotApi::class);
-        $api->method('sendMessage')->willReturnCallback(function (string $token, string $chatId, string $text) use (&$sent): void {
+        $api->method('sendMessage')->willReturnCallback(function (string $token, string $chatId, string $text) use (&$sent, $sendError): void {
+            if (null !== $sendError) {
+                throw new TelegramChannelException($sendError);
+            }
             $sent[] = $text;
         });
 
@@ -230,9 +352,10 @@ final class TelegramInboundServiceTest extends TestCase
         $references = $this->createMock(MessageReferenceResolver::class);
         $references->method('resolveMessageTags')->willReturnArgument(0);
 
-        $service = new TelegramInboundService(
+        return new TelegramInboundService(
             $em,
             $users,
+            $messageRepository,
             $connections,
             $api,
             $processor,
@@ -240,10 +363,22 @@ final class TelegramInboundServiceTest extends TestCase
             $limits,
             $memories,
             $references,
+            $activity ?? $this->createStub(ChatActivityNotifier::class),
+            $this->translator(),
+            new LockFactory(new InMemoryStore()),
             new NullLogger(),
         );
+    }
 
-        return $service;
+    private function translator(): Translator
+    {
+        $translator = new Translator('en');
+        $translator->addLoader('yaml', new YamlFileLoader());
+        foreach (['de', 'en', 'es', 'fr', 'tr'] as $locale) {
+            $translator->addResource('yaml', dirname(__DIR__, 4).'/translations/telegram.'.$locale.'.yaml', $locale, 'telegram');
+        }
+
+        return $translator;
     }
 
     private function connectedBot(): TelegramBot
@@ -263,13 +398,18 @@ final class TelegramInboundServiceTest extends TestCase
      *
      * @return array<string, mixed>
      */
-    private function update(array $message, int $fromId = 555): array
+    private function update(array $message, int $fromId = 555, ?string $languageCode = null): array
     {
+        $from = ['id' => $fromId];
+        if (null !== $languageCode) {
+            $from['language_code'] = $languageCode;
+        }
+
         return [
             'update_id' => 1,
             'message' => $message + [
                 'message_id' => 1,
-                'from' => ['id' => $fromId],
+                'from' => $from,
                 'chat' => ['id' => $fromId, 'type' => 'private'],
             ],
         ];

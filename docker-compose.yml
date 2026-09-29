@@ -372,11 +372,11 @@ services:
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
-      # Telegram channel is off until TELEGRAM_ENABLED=true. The stub is the
-      # local Bot API; set TELEGRAM_API_BASE_URL to https://api.telegram.org
-      # to talk to Telegram itself.
+      # Telegram channel is off until TELEGRAM_ENABLED=true and talks to the
+      # real Bot API. Set TELEGRAM_API_BASE_URL=http://telegram-stub:3998 on
+      # backend and worker to use the local stub instead.
       TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
-      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-http://telegram-stub:3998}
+      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org}
       TELEGRAM_WEBHOOK_BASE_URL: ${TELEGRAM_WEBHOOK_BASE_URL:-}
       TELEGRAM_ALLOW_LOCAL_WEBHOOK: ${TELEGRAM_ALLOW_LOCAL_WEBHOOK:-false}
       # AI Provider API Keys (loaded from backend/.env via env_file above)
@@ -564,7 +564,7 @@ services:
       FFMPEG_BINARY: /usr/bin/ffmpeg
       SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://tts:10200}
       TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
-      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-http://telegram-stub:3998}
+      TELEGRAM_API_BASE_URL: ${TELEGRAM_API_BASE_URL:-https://api.telegram.org}
       TELEGRAM_WEBHOOK_BASE_URL: ${TELEGRAM_WEBHOOK_BASE_URL:-}
       TELEGRAM_ALLOW_LOCAL_WEBHOOK: ${TELEGRAM_ALLOW_LOCAL_WEBHOOK:-false}
     entrypoint: ["bash", "-c"]
@@ -1040,9 +1040,8 @@ services:
     networks:
       - synaplan-network
 
-  # Telegram Bot API stub. The dev backend points TELEGRAM_API_BASE_URL here
-  # unless that variable is overridden. The channel stays off until
-  # TELEGRAM_ENABLED=true.
+  # Telegram Bot API stub for local E2E runs. Point TELEGRAM_API_BASE_URL at
+  # http://telegram-stub:3998 on backend and worker to use it.
   telegram-stub:
     image: node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
     container_name: synaplan-telegram-stub

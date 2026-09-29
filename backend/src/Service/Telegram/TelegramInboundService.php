@@ -8,6 +8,8 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Entity\User;
+use App\Realtime\Notifier\ChatActivityNotifier;
+use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use App\Service\Digest\MessageReferenceResolver;
 use App\Service\Message\ChatErrorPresenter;
@@ -16,16 +18,26 @@ use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * Turns one Telegram update into a chat turn for the paired owner.
  * Strangers and non-text messages get one sentence and nothing is stored.
+ * A redelivered update (Messenger retry) that already stored its turn is skipped.
  */
 final readonly class TelegramInboundService
 {
+    public const META_UPDATE = 'tg_update';
+
+    private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
+    private const LOCK_SECONDS = 300.0;
+    private const DOMAIN = 'telegram';
+
     public function __construct(
         private EntityManagerInterface $em,
         private UserRepository $users,
+        private MessageRepository $messages,
         private TelegramConnectionService $connections,
         private TelegramBotApi $api,
         private MessageProcessor $processor,
@@ -33,6 +45,9 @@ final readonly class TelegramInboundService
         private RateLimitService $rateLimits,
         private UserMemoryService $memories,
         private MessageReferenceResolver $references,
+        private ChatActivityNotifier $activity,
+        private TranslatorInterface $translator,
+        private LockFactory $lockFactory,
         private LoggerInterface $logger,
     ) {
     }
@@ -40,12 +55,33 @@ final readonly class TelegramInboundService
     /**
      * @param array<string, mixed> $update
      */
-    public function handle(int $botRowId, array $update): void
+    public function handle(int $botRowId, int $updateId, array $update): void
     {
         $bot = $this->em->find(TelegramBot::class, $botRowId);
         if (!$bot instanceof TelegramBot) {
             return;
         }
+
+        $updateKey = $bot->getBotId().':'.$updateId;
+        $lock = $this->lockFactory->createLock('telegram_turn_'.$botRowId.'_'.$updateId, self::LOCK_SECONDS);
+        if (!$lock->acquire()) {
+            return;
+        }
+        try {
+            if ($this->messages->hasTelegramUpdate($bot->getOwnerId(), self::META_UPDATE, $updateKey)) {
+                return;
+            }
+            $this->process($bot, $updateKey, $update);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $update
+     */
+    private function process(TelegramBot $bot, string $updateKey, array $update): void
+    {
         $incoming = $update['message'] ?? null;
         if (!is_array($incoming)) {
             return;
@@ -62,113 +98,103 @@ final readonly class TelegramInboundService
             return;
         }
 
-        $token = $this->connections->revealToken($bot);
-        if (null === $token) {
-            return;
-        }
-
-        if ('private' !== (string) ($chatPayload['type'] ?? '')) {
-            $this->reply($bot, $token, $tgChatId, 'This bot only answers private chats.');
-
-            return;
-        }
-
-        if (!$this->isTextMessage($incoming)) {
-            $this->reply($bot, $token, $tgChatId, 'Only text messages for now.');
-
-            return;
-        }
-
         $owner = $this->users->find($bot->getOwnerId());
         if (!$owner instanceof User) {
             return;
         }
 
+        $token = $this->connections->revealToken($bot);
+        if (null === $token) {
+            return;
+        }
+
+        $turn = new TelegramTurn($bot, $owner, $token, $tgChatId, $updateKey, $this->localeFor($bot, $owner, $tgUserId, $from));
+
+        if ('private' !== (string) ($chatPayload['type'] ?? '')) {
+            $this->reply($turn, $this->say($turn, 'private_only'));
+
+            return;
+        }
+
+        if (!$this->isTextMessage($incoming)) {
+            $this->reply($turn, $this->say($turn, 'text_only'));
+
+            return;
+        }
+
         $text = trim((string) $incoming['text']);
         if (preg_match('/^\/start(?:@\w+)?(?:\s+(\S+))?$/u', $text, $matches)) {
-            $this->handleStart($bot, $owner, $token, $tgUserId, $tgChatId, $matches[1] ?? '', $incoming);
+            $this->handleStart($turn, $tgUserId, $matches[1] ?? '', $incoming);
 
             return;
         }
 
         if (TelegramBot::STATUS_CONNECTED !== $bot->getStatus() || $bot->getTgUserId() !== $tgUserId) {
-            $sentence = TelegramBot::STATUS_PENDING === $bot->getStatus()
-                ? 'Finish connecting with the link from Channels.'
-                : 'This bot only answers its owner.';
-            $this->reply($bot, $token, $tgChatId, $sentence);
+            $key = TelegramBot::STATUS_PENDING === $bot->getStatus() ? 'finish_pairing' : 'owner_only';
+            $this->reply($turn, $this->say($turn, $key));
 
             return;
         }
 
-        $this->answer($bot, $owner, $token, $tgChatId, $text, $incoming);
+        $this->answer($turn, $text, $incoming);
     }
 
     /**
      * @param array<string, mixed> $incoming
      */
-    private function handleStart(
-        TelegramBot $bot,
-        User $owner,
-        string $token,
-        string $tgUserId,
-        string $tgChatId,
-        string $code,
-        array $incoming,
-    ): void {
+    private function handleStart(TelegramTurn $turn, string $tgUserId, string $code, array $incoming): void
+    {
+        $bot = $turn->bot;
         if (TelegramBot::STATUS_CONNECTED === $bot->getStatus() && $bot->getTgUserId() === $tgUserId) {
-            $this->reply($bot, $token, $tgChatId, 'You are already connected. Send a message to get a reply.');
+            $this->reply($turn, $this->say($turn, 'already_connected'));
 
             return;
         }
         if (TelegramBot::STATUS_CONNECTED === $bot->getStatus()) {
-            $this->reply($bot, $token, $tgChatId, 'This bot only answers its owner.');
+            $this->reply($turn, $this->say($turn, 'owner_only'));
 
             return;
         }
-        if (!$this->connections->pair($bot, $code, $tgUserId, $tgChatId)) {
-            $this->reply($bot, $token, $tgChatId, 'That code does not match. Use the link from Channels again.');
+        if (!$this->connections->pair($bot, $code, $tgUserId, $turn->tgChatId)) {
+            $this->reply($turn, $this->say($turn, 'code_mismatch'));
 
             return;
         }
 
-        $chat = $this->chatFor($bot, $owner);
+        $chat = $this->chatFor($turn);
         $externalId = $this->scalarId($incoming['message_id'] ?? null);
-        $this->storeMessage($owner, $chat, 'Connected from Telegram.', 'IN', 'complete', $externalId, $tgChatId);
-        $reply = 'Connected. Send a message whenever you want a reply.';
+        $this->storeMessage($turn, $chat, $this->say($turn, 'connected_in'), 'IN', 'complete', $externalId);
+        $reply = $this->say($turn, 'connected');
         $bot->touch();
-        $this->storeMessage($owner, $chat, $reply, 'OUT', 'complete', null, $tgChatId);
-        $this->reply($bot, $token, $tgChatId, $reply);
+        $this->storeMessage($turn, $chat, $reply, 'OUT', 'complete', null);
+        $this->reply($turn, $reply);
     }
 
     /**
      * @param array<string, mixed> $incoming
      */
-    private function answer(
-        TelegramBot $bot,
-        User $owner,
-        string $token,
-        string $tgChatId,
-        string $text,
-        array $incoming,
-    ): void {
-        $chat = $this->chatFor($bot, $owner);
+    private function answer(TelegramTurn $turn, string $text, array $incoming): void
+    {
+        $owner = $turn->owner;
+        $chat = $this->chatFor($turn);
         $externalId = $this->scalarId($incoming['message_id'] ?? null);
         $limit = $this->rateLimits->checkLimit($owner, 'MESSAGES');
         if (empty($limit['allowed'])) {
-            $sentence = 'You have reached the message limit. Try again later.';
-            $this->storeMessage($owner, $chat, $text, 'IN', 'complete', $externalId, $tgChatId);
-            $this->storeMessage($owner, $chat, $sentence, 'OUT', 'complete', null, $tgChatId);
-            $this->reply($bot, $token, $tgChatId, $sentence);
+            $sentence = $this->say($turn, 'limit_reached');
+            $this->storeMessage($turn, $chat, $text, 'IN', 'complete', $externalId);
+            $this->storeMessage($turn, $chat, $sentence, 'OUT', 'complete', null);
+            $this->reply($turn, $sentence);
 
             return;
         }
 
-        $message = $this->storeMessage($owner, $chat, $text, 'IN', 'processing', $externalId, $tgChatId);
+        $message = $this->storeMessage($turn, $chat, $text, 'IN', 'processing', $externalId);
+        $this->activity->publishActivity($chat, (int) $owner->getId(), 'IN', $text);
 
         try {
-            $this->api->sendChatAction($token, $tgChatId);
+            $this->api->sendChatAction($turn->token, $turn->tgChatId);
         } catch (TelegramChannelException $e) {
-            $this->noteDeliveryFailure($bot, $e);
+            $this->noteDeliveryFailure($turn->bot, $e);
         }
 
         try {
@@ -178,14 +204,14 @@ final readonly class TelegramInboundService
                 'message_id' => $message->getId(),
                 'error' => $e->getMessage(),
             ]);
-            $this->finish($bot, $owner, $chat, $message, $token, $tgChatId, 'Something went wrong. Try sending the message again.', null);
+            $this->finish($turn, $chat, $message, $this->say($turn, 'failed'));
 
             return;
         }
 
         if (empty($result['success'])) {
-            $sentence = $this->errors->presentFromResult($result, $message->getLanguage() ?: 'en', false)->userText;
-            $this->finish($bot, $owner, $chat, $message, $token, $tgChatId, $sentence, null);
+            $sentence = $this->errors->presentFromResult($result, $turn->locale, false)->userText;
+            $this->finish($turn, $chat, $message, $sentence);
 
             return;
         }
@@ -193,7 +219,7 @@ final readonly class TelegramInboundService
         $response = is_array($result['response'] ?? null) ? $result['response'] : [];
         $reply = trim((string) ($response['content'] ?? ''));
         if ('' === $reply) {
-            $reply = 'I could not write a reply. Try sending the message again.';
+            $reply = $this->say($turn, 'empty_reply');
         }
         $reply = $this->memories->resolveMemoryTags($reply, $owner);
         $reply = $this->references->resolveMessageTags($reply, $owner);
@@ -216,45 +242,44 @@ final readonly class TelegramInboundService
             ]);
         }
 
-        $this->finish($bot, $owner, $chat, $message, $token, $tgChatId, $reply, null);
+        $this->finish($turn, $chat, $message, $reply);
     }
 
-    private function finish(
-        TelegramBot $bot,
-        User $owner,
-        Chat $chat,
-        Message $inbound,
-        string $token,
-        string $tgChatId,
-        string $reply,
-        ?string $externalId,
-    ): void {
+    private function finish(TelegramTurn $turn, Chat $chat, Message $inbound, string $reply): void
+    {
         if ('processing' === $inbound->getStatus()) {
             $inbound->setStatus('complete');
             $this->em->flush();
         }
-        $bot->touch();
-        $this->storeMessage($owner, $chat, $reply, 'OUT', 'complete', $externalId, $tgChatId);
-        $this->reply($bot, $token, $tgChatId, $reply);
+        $turn->bot->touch();
+        $this->storeMessage($turn, $chat, $reply, 'OUT', 'complete', null);
+        $this->reply($turn, $reply);
     }
 
-    private function chatFor(TelegramBot $bot, User $owner): Chat
+    private function chatFor(TelegramTurn $turn): Chat
     {
+        $bot = $turn->bot;
+        $title = 'Telegram: @'.$bot->getBotUsername();
         $chatId = $bot->getChatId();
         if (null !== $chatId) {
             $existing = $this->em->find(Chat::class, $chatId);
             if (
                 $existing instanceof Chat
-                && $existing->getUserId() === (int) $owner->getId()
+                && $existing->getUserId() === (int) $turn->owner->getId()
                 && 'telegram' === $existing->getSource()
             ) {
+                if ($existing->getTitle() !== $title) {
+                    $existing->setTitle($title);
+                    $this->em->flush();
+                }
+
                 return $existing;
             }
         }
 
         $chat = new Chat();
-        $chat->setUserId((int) $owner->getId());
-        $chat->setTitle('Telegram: @'.$bot->getBotUsername());
+        $chat->setUserId((int) $turn->owner->getId());
+        $chat->setTitle($title);
         $chat->setSource('telegram');
         $this->em->persist($chat);
         $this->em->flush();
@@ -268,17 +293,16 @@ final readonly class TelegramInboundService
     }
 
     private function storeMessage(
-        User $owner,
+        TelegramTurn $turn,
         Chat $chat,
         string $text,
         string $direction,
         string $status,
         ?string $externalId,
-        string $tgChatId,
     ): Message {
         $now = time();
         $message = new Message();
-        $message->setUserId((int) $owner->getId());
+        $message->setUserId((int) $turn->owner->getId());
         $message->setChat($chat);
         $message->setTrackingId($now);
         $message->setProviderIndex('TELEGRAM');
@@ -287,42 +311,92 @@ final readonly class TelegramInboundService
         $message->setMessageType('TGRM');
         $message->setFile(0);
         $message->setTopic('CHAT');
-        $message->setLanguage('en');
+        $message->setLanguage($turn->locale);
         $message->setText($text);
         $message->setDirection($direction);
         $message->setStatus($status);
-        $this->em->persist($message);
-        $this->em->flush();
-        $message->setMeta('channel', 'telegram');
-        if (null !== $externalId && '' !== $externalId) {
-            $message->setMeta('external_id', $externalId);
+
+        // The row and its update marker land together, so a retried job
+        // either finds the marker or finds nothing stored at all.
+        $connection = $this->em->getConnection();
+        $connection->beginTransaction();
+        try {
+            $this->em->persist($message);
+            $this->em->flush();
+            $message->setMeta('channel', 'telegram');
+            if (null !== $externalId && '' !== $externalId) {
+                $message->setMeta('external_id', $externalId);
+            }
+            $message->setMeta('tg_chat_id', $turn->tgChatId);
+            if ('IN' === $direction) {
+                $message->setMeta(self::META_UPDATE, $turn->updateKey);
+            }
+            $chat->updateTimestamp();
+            $this->em->flush();
+            $connection->commit();
+        } catch (\Throwable $e) {
+            $connection->rollBack();
+            throw $e;
         }
-        $message->setMeta('tg_chat_id', $tgChatId);
-        $chat->updateTimestamp();
-        $this->em->flush();
 
         return $message;
     }
 
-    private function reply(TelegramBot $bot, string $token, string $tgChatId, string $text): void
+    private function reply(TelegramTurn $turn, string $text): void
     {
         try {
-            $this->api->sendMessage($token, $tgChatId, $text);
+            $this->api->sendMessage($turn->token, $turn->tgChatId, $text);
         } catch (TelegramChannelException $e) {
-            $this->noteDeliveryFailure($bot, $e);
+            $this->noteDeliveryFailure($turn->bot, $e);
         }
     }
 
+    /**
+     * Only a revoked token or a blocked bot changes the card. A timeout or a
+     * rate limit must not lock the owner out of the next message.
+     */
     private function noteDeliveryFailure(TelegramBot $bot, TelegramChannelException $e): void
     {
         if (!in_array($e->errorCode, [
             TelegramChannelException::TOKEN_REVOKED,
             TelegramChannelException::BOT_BLOCKED,
-            TelegramChannelException::SEND_FAILED,
         ], true)) {
+            $this->logger->warning('Telegram delivery failed', [
+                'bot_id' => $bot->getId(),
+                'error' => $e->errorCode,
+            ]);
+
             return;
         }
         $this->connections->markError($bot, $e->errorCode);
+    }
+
+    /**
+     * The owner reads their app language. Anyone else gets their Telegram
+     * language when we support it, else the owner's.
+     *
+     * @param array<string, mixed> $from
+     */
+    private function localeFor(TelegramBot $bot, User $owner, string $tgUserId, array $from): string
+    {
+        $isOwner = TelegramBot::STATUS_PENDING === $bot->getStatus() || $bot->getTgUserId() === $tgUserId;
+        if ($isOwner) {
+            return $owner->getLocale();
+        }
+        $code = $from['language_code'] ?? null;
+        if (is_string($code)) {
+            $language = strtolower(substr($code, 0, 2));
+            if (in_array($language, self::SUPPORTED_LOCALES, true)) {
+                return $language;
+            }
+        }
+
+        return $owner->getLocale();
+    }
+
+    private function say(TelegramTurn $turn, string $key): string
+    {
+        return $this->translator->trans('telegram.'.$key, [], self::DOMAIN, $turn->locale);
     }
 
     /**

@@ -1,0 +1,12 @@
+telegram:
+  private_only: 'Dieser Bot antwortet nur in privaten Chats.'
+  text_only: 'Vorerst nur Textnachrichten.'
+  owner_only: 'Dieser Bot antwortet nur seinem Besitzer.'
+  finish_pairing: 'Schließen Sie die Verbindung mit dem Link unter Kanäle ab.'
+  already_connected: 'Sie sind bereits verbunden. Senden Sie eine Nachricht, um eine Antwort zu bekommen.'
+  code_mismatch: 'Dieser Code passt nicht. Verwenden Sie erneut den Link unter Kanäle.'
+  connected_in: 'Von Telegram aus verbunden.'
+  connected: 'Verbunden. Senden Sie eine Nachricht, wann immer Sie eine Antwort möchten.'
+  limit_reached: 'Sie haben das Nachrichtenlimit erreicht. Versuchen Sie es später erneut.'
+  failed: 'Etwas ist schiefgelaufen. Senden Sie die Nachricht noch einmal.'
+  empty_reply: 'Ich konnte keine Antwort schreiben. Senden Sie die Nachricht noch einmal.'

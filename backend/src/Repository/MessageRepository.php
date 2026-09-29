@@ -593,6 +593,30 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Whether a Telegram update already stored its inbound row, so a retried
+     * worker job does not answer the same message twice.
+     */
+    public function hasTelegramUpdate(int $userId, string $metaKey, string $updateKey): bool
+    {
+        $count = $this->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->innerJoin('m.metadata', 'updateMeta', 'WITH', 'updateMeta.metaKey = :metaKey')
+            ->where('m.userId = :userId')
+            ->andWhere('m.messageType = :messageType')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('updateMeta.metaValue = :updateKey')
+            ->setParameter('metaKey', $metaKey)
+            ->setParameter('userId', $userId)
+            ->setParameter('messageType', 'TGRM')
+            ->setParameter('direction', 'IN')
+            ->setParameter('updateKey', $updateKey)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
+    /**
      * Find a recent incoming email by deterministic fingerprint.
      *
      * Used as a fallback idempotency strategy when external message ID is missing.

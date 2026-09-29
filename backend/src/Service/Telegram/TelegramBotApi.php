@@ -95,9 +95,10 @@ final readonly class TelegramBotApi
             $status = $response->getStatusCode();
             $body = $this->decode($response);
         } catch (ExceptionInterface $e) {
+            // The message can quote the request URL, which carries the token.
             $this->logger->warning('Telegram API transport failed', [
                 'method' => $method,
-                'error' => $e->getMessage(),
+                'exception_class' => $e::class,
             ]);
             throw new TelegramChannelException(self::CONTEXT_CONNECT === $context ? TelegramChannelException::WEBHOOK_FAILED : TelegramChannelException::SEND_FAILED);
         }

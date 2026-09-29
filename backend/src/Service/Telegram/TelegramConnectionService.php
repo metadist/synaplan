@@ -143,6 +143,39 @@ final readonly class TelegramConnectionService
         return $this->present($bot);
     }
 
+    /**
+     * Account deletion: removes the row and the stored token without a flush,
+     * so it commits with the rest of the account. Returns the token so the
+     * caller can drop the remote webhook once the commit succeeded.
+     */
+    public function removeForOwner(int $ownerId): ?string
+    {
+        $bot = $this->bots->findOneByOwner($ownerId);
+        if (null === $bot) {
+            return null;
+        }
+        $token = $this->revealToken($bot);
+        $this->forgetCredential($bot);
+        $this->bots->remove($bot, false);
+
+        return $token;
+    }
+
+    /**
+     * Best effort: the bot row is already gone, so a failure only leaves a
+     * webhook Telegram gives up on after its retries.
+     */
+    public function dropWebhookForToken(string $token): void
+    {
+        try {
+            $this->api->deleteWebhook($token);
+        } catch (TelegramChannelException $e) {
+            $this->logger->info('Telegram deleteWebhook after account deletion skipped', [
+                'error' => $e->errorCode,
+            ]);
+        }
+    }
+
     public function revealToken(TelegramBot $bot): ?string
     {
         $credentialId = $bot->getCredentialId();

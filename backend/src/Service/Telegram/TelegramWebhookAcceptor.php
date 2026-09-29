@@ -7,6 +7,7 @@ namespace App\Service\Telegram;
 use App\Repository\TelegramBotRepository;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * Decides whether a Telegram webhook call becomes a worker job.
@@ -16,10 +17,12 @@ use Psr\Log\LoggerInterface;
 final readonly class TelegramWebhookAcceptor
 {
     private const DEDUPE_SECONDS = 300;
+    private const LOCK_SECONDS = 10.0;
 
     public function __construct(
         private TelegramBotRepository $bots,
         private CacheItemPoolInterface $cache,
+        private LockFactory $lockFactory,
         private LoggerInterface $logger,
     ) {
     }
@@ -44,16 +47,39 @@ final readonly class TelegramWebhookAcceptor
             return TelegramWebhookDecision::drop();
         }
         $updateId = (int) $updateId;
+        $key = $this->cacheKey($botKey, $updateId);
 
-        $item = $this->cache->getItem($this->cacheKey($botKey, $updateId));
-        if ($item->isHit()) {
+        // Check and set must not interleave: a parallel delivery of the same
+        // update either waits out this lock or sees the marker afterwards.
+        $lock = $this->lockFactory->createLock($key.'_lock', self::LOCK_SECONDS);
+        if (!$lock->acquire()) {
             return TelegramWebhookDecision::drop();
         }
-        $item->set(1);
-        $item->expiresAfter(self::DEDUPE_SECONDS);
-        $this->cache->save($item);
+        try {
+            $item = $this->cache->getItem($key);
+            if ($item->isHit()) {
+                return TelegramWebhookDecision::drop();
+            }
+            $item->set(1);
+            $item->expiresAfter(self::DEDUPE_SECONDS);
+            $this->cache->save($item);
+        } finally {
+            $lock->release();
+        }
 
-        return TelegramWebhookDecision::dispatch((int) $bot->getId());
+        return TelegramWebhookDecision::dispatch((int) $bot->getId(), $updateId, $key);
+    }
+
+    /**
+     * Frees the update_id again so Telegram's retry is accepted, for when
+     * the job could not be queued.
+     */
+    public function release(TelegramWebhookDecision $decision): void
+    {
+        if (null === $decision->reservationKey) {
+            return;
+        }
+        $this->cache->deleteItem($decision->reservationKey);
     }
 
     private function secretMatches(string $storedHash, ?string $header): bool

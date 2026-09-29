@@ -1,0 +1,12 @@
+telegram:
+  private_only: 'Bu bot yalnızca özel sohbetlerde yanıt verir.'
+  text_only: 'Şimdilik yalnızca metin mesajları.'
+  owner_only: 'Bu bot yalnızca sahibine yanıt verir.'
+  finish_pairing: 'Bağlantıyı Kanallar sayfasındaki bağlantıyla tamamlayın.'
+  already_connected: 'Zaten bağlısınız. Yanıt almak için bir mesaj gönderin.'
+  code_mismatch: 'Bu kod eşleşmiyor. Kanallar sayfasındaki bağlantıyı yeniden kullanın.'
+  connected_in: 'Telegram üzerinden bağlandı.'
+  connected: 'Bağlandı. Yanıt istediğinizde bir mesaj gönderin.'
+  limit_reached: 'Mesaj sınırına ulaştınız. Daha sonra yeniden deneyin.'
+  failed: 'Bir sorun oluştu. Mesajı yeniden gönderin.'
+  empty_reply: 'Bir yanıt yazamadım. Mesajı yeniden gönderin.'

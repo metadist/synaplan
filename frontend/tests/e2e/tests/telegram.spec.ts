@@ -41,6 +41,20 @@ test.describe('@ci @telegram Telegram channel', () => {
     await expect(page.getByTestId('input-telegram-token')).toBeVisible()
   })
 
+  test('cancel while pairing returns to the form', async ({ page, request }, testInfo) => {
+    await openChannels(page)
+    await page.getByTestId('input-telegram-token').fill(VALID_TOKEN)
+    await page.getByTestId('btn-telegram-connect').click()
+    await expect(page.getByTestId('link-telegram-open')).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+    await page.getByTestId('btn-telegram-cancel').click()
+    await expect(page.getByTestId('input-telegram-token')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    const recorded = await getTelegramStubRequests(request, testInfo.testId)
+    expect(recorded.some((entry) => entry.path.endsWith('/deleteWebhook'))).toBe(true)
+  })
+
   test('pair, reply, find the chat, then disconnect', async ({ page, request }, testInfo) => {
     test.setTimeout(120_000)
     await openChannels(page)

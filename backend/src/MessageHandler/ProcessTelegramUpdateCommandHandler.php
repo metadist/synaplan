@@ -18,6 +18,6 @@ final readonly class ProcessTelegramUpdateCommandHandler
 
     public function __invoke(ProcessTelegramUpdateCommand $command): void
     {
-        $this->inbound->handle($command->getBotRowId(), $command->getUpdate());
+        $this->inbound->handle($command->getBotRowId(), $command->getUpdateId(), $command->getUpdate());
     }
 }

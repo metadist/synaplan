@@ -1,0 +1,12 @@
+telegram:
+  private_only: 'Ce bot ne répond que dans les conversations privées.'
+  text_only: 'Uniquement les messages texte pour le moment.'
+  owner_only: 'Ce bot ne répond qu''à son propriétaire.'
+  finish_pairing: 'Terminez la connexion avec le lien de la page Canaux.'
+  already_connected: 'Vous êtes déjà connecté. Envoyez un message pour recevoir une réponse.'
+  code_mismatch: 'Ce code ne correspond pas. Utilisez à nouveau le lien de la page Canaux.'
+  connected_in: 'Connecté depuis Telegram.'
+  connected: 'Connecté. Envoyez un message dès que vous voulez une réponse.'
+  limit_reached: 'Vous avez atteint la limite de messages. Réessayez plus tard.'
+  failed: 'Un problème est survenu. Renvoyez le message.'
+  empty_reply: 'Je n''ai pas pu écrire de réponse. Renvoyez le message.'

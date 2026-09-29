@@ -9,6 +9,8 @@ final readonly class TelegramWebhookDecision
     private function __construct(
         public bool $dispatch,
         public ?int $botId,
+        public ?int $updateId = null,
+        public ?string $reservationKey = null,
     ) {
     }
 
@@ -17,8 +19,8 @@ final readonly class TelegramWebhookDecision
         return new self(false, null);
     }
 
-    public static function dispatch(int $botId): self
+    public static function dispatch(int $botId, int $updateId, string $reservationKey): self
     {
-        return new self(true, $botId);
+        return new self(true, $botId, $updateId, $reservationKey);
     }
 }

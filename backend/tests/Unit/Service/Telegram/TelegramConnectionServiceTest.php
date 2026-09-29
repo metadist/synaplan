@@ -150,6 +150,47 @@ final class TelegramConnectionServiceTest extends TestCase
         $this->assertStringNotContainsString(self::TOKEN, (string) json_encode($state));
     }
 
+    public function testAccountDeletionRemovesTheRowAndTokenAndReturnsTheTokenForTheWebhook(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setCredentialId(3);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->expects($this->once())->method('findOneByOwner')->with(7)->willReturn($bot);
+        $bots->expects($this->once())->method('remove')->with($bot, false);
+        $vault = $this->createMock(CredentialVaultInterface::class);
+        $vault->method('reveal')->willReturn(self::TOKEN);
+        $vault->expects($this->once())->method('forget')->with(3, 7);
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->expects($this->never())->method('deleteWebhook');
+
+        $token = $this->service($api, $bots, $vault, 'https://chat.example.com')->removeForOwner(7);
+
+        $this->assertSame(self::TOKEN, $token);
+    }
+
+    public function testAccountDeletionWithoutABotDoesNothing(): void
+    {
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->method('findOneByOwner')->willReturn(null);
+        $bots->expects($this->never())->method('remove');
+
+        $token = $this->service($this->createMock(TelegramBotApi::class), $bots, $this->createMock(CredentialVaultInterface::class), 'https://chat.example.com')->removeForOwner(7);
+
+        $this->assertNull($token);
+    }
+
+    public function testWebhookDropAfterDeletionSwallowsTelegramErrors(): void
+    {
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->expects($this->once())->method('deleteWebhook')
+            ->willThrowException(new TelegramChannelException(TelegramChannelException::TOKEN_REVOKED));
+
+        $this->service($api, $this->createMock(TelegramBotRepository::class), $this->createMock(CredentialVaultInterface::class), 'https://chat.example.com')
+            ->dropWebhookForToken(self::TOKEN);
+
+        $this->addToAssertionCount(1);
+    }
+
     private function service(
         TelegramBotApi $api,
         TelegramBotRepository $bots,
