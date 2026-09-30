@@ -377,6 +377,55 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame(TelegramFileMethod::Document, $upload[2]);
         $this->assertSame('Report.docx', $upload[4]);
         $this->assertSame('Your report is ready.', $upload[5]);
+        $this->assertSame("Your report is ready.\n__FILE_GENERATED__:report.docx", $this->messages[1]->getText());
+    }
+
+    public function testAGeneratedDocumentMovesToTheAnswerAndIsNotALegacyFile(): void
+    {
+        $generated = new File();
+        $generated->setFileName('report.docx');
+        $id = new \ReflectionProperty(File::class, 'id');
+        $id->setValue($generated, 55);
+
+        $processor = $this->createMock(MessageProcessor::class);
+        $processor->method('process')->willReturnCallback(function (Message $message, array $options = []) use ($generated): array {
+            $this->assertIsCallable($options['heartbeat'] ?? null);
+            ($options['heartbeat'])();
+            $message->addFile($generated);
+
+            return [
+                'success' => true,
+                'classification' => ['topic' => 'officemaker', 'language' => 'en'],
+                'response' => [
+                    'content' => '__FILE_GENERATED__:report.docx',
+                    'metadata' => [
+                        'provider' => 'test',
+                        'model' => 'test-model',
+                        'model_id' => 1,
+                        'generated_file' => ['path' => '7/report.docx', 'filename' => 'Report.docx'],
+                    ],
+                ],
+                'search_results' => [],
+            ];
+        });
+
+        file_put_contents($this->uploadDir.'/7/report.docx', 'docx');
+        $service = $this->service(processor: $processor);
+
+        $service->handle(5, 1, $this->update(['text' => 'Write a report']));
+
+        $inbound = $this->messages[0];
+        $outbound = $this->messages[1];
+        $this->assertSame('__FILE_GENERATED__:report.docx', $outbound->getText());
+        $this->assertFalse($inbound->getFiles()->contains($generated));
+        $this->assertTrue($outbound->getFiles()->contains($generated));
+        $this->assertSame(0, $outbound->getFile());
+        $this->assertSame('', $outbound->getFilePath());
+        $upload = $this->call('sendFile');
+        $this->assertSame(TelegramFileMethod::Document, $upload[2]);
+        $this->assertSame('Report.docx', $upload[4]);
+        $this->assertSame('', $upload[5]);
+        $this->assertSame([], $this->texts());
     }
 
     public function testAFileThatIsGoneIsLinkedInstead(): void
@@ -470,7 +519,10 @@ final class TelegramInboundServiceTest extends TestCase
 
         $service->handle(5, 2, $this->press('a:'.$out->getId()));
 
-        $this->assertSame(['model_id' => 1, 'is_again' => true], $this->processed[1]);
+        $again = $this->processed[1];
+        $this->assertSame(1, $again['model_id']);
+        $this->assertTrue($again['is_again']);
+        $this->assertIsCallable($again['heartbeat']);
         $this->assertSame('cb-1', $this->call('answerCallbackQuery')[1]);
         $this->assertSame((string) $this->messages[2]->getId(), $out->getMeta(TelegramMessageStore::META_SUPERSEDED));
     }
@@ -576,7 +628,7 @@ final class TelegramInboundServiceTest extends TestCase
     public function testAProcessorCrashEndsTheTurnAsFailed(): void
     {
         $processor = $this->createMock(MessageProcessor::class);
-        $processor->method('processStream')->willThrowException(new \RuntimeException('boom'));
+        $processor->method('process')->willThrowException(new \RuntimeException('boom'));
         $service = $this->service(processor: $processor);
 
         $service->handle(5, 1, $this->update(['text' => 'hello']));
@@ -1066,15 +1118,18 @@ final class TelegramInboundServiceTest extends TestCase
     private function processor(?string $reply, ?string $failure, array $extraMetadata, array $search): MessageProcessor
     {
         $processor = $this->createMock(MessageProcessor::class);
-        $processor->method('processStream')->willReturnCallback(function (Message $message, callable $stream, ?callable $status = null, array $options = []) use ($reply, $failure, $extraMetadata, $search): array {
+        $processor->method('process')->willReturnCallback(function (Message $message, array $options = [], ?callable $status = null) use ($reply, $failure, $extraMetadata, $search): array {
             $this->processed[] = $options;
+            $heartbeat = $options['heartbeat'] ?? null;
+            if (is_callable($heartbeat)) {
+                $heartbeat();
+            }
             if (null !== $status) {
                 $status(['status' => 'generating', 'message' => 'Generating response...']);
             }
             if (null !== $failure || null === $reply) {
                 return ['success' => false];
             }
-            $stream($reply);
 
             return [
                 'success' => true,

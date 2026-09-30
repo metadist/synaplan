@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Telegram;
 
 use App\Entity\Chat;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
@@ -69,6 +70,7 @@ final readonly class TelegramMessageStore
     /**
      * @param array<string, mixed>  $classification
      * @param array<string, string> $meta
+     * @param list<File>            $attachments    generated documents for this answer
      */
     public function store(
         TelegramTurn $turn,
@@ -80,6 +82,7 @@ final readonly class TelegramMessageStore
         array $classification = [],
         ?TelegramOutgoingFile $file = null,
         array $meta = [],
+        array $attachments = [],
     ): Message {
         $now = time();
         $message = new Message();
@@ -90,10 +93,18 @@ final readonly class TelegramMessageStore
         $message->setUnixTimestamp($now);
         $message->setDateTime(date('YmdHis', $now));
         $message->setMessageType('TGRM');
-        $message->setFile(null !== $file ? 1 : 0);
-        if (null !== $file) {
+        // Pictures, video and audio use the legacy file columns the web chat
+        // renders as media. Documents ride the File relation only, same as
+        // the web stream, so a docx is not shown twice.
+        if (null !== $file && TelegramOutgoingFile::DOCUMENT !== $file->type) {
+            $message->setFile(1);
             $message->setFilePath($file->relativePath());
             $message->setFileType($file->type);
+        } else {
+            $message->setFile(0);
+        }
+        foreach ($attachments as $attachment) {
+            $message->addFile($attachment);
         }
         $message->setTopic('CHAT');
         $message->setLanguage($turn->locale);

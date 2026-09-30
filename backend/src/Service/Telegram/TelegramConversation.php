@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Telegram;
 
-use App\AI\Stream\StreamChunk;
 use App\Entity\Chat;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Realtime\Notifier\ChatActivityNotifier;
@@ -254,18 +254,20 @@ final readonly class TelegramConversation
     private function respond(TelegramTurn $turn, Chat $chat, Message $inbound, array $options, ?Message $previous, ?int $replyTo, array $notes): void
     {
         $owner = $turn->owner;
-        $collected = '';
+        $alreadyAttached = [];
+        foreach ($inbound->getFiles() as $existing) {
+            $alreadyAttached[spl_object_id($existing)] = true;
+        }
         $pulse = $this->typingPulse($turn);
-        $result = $this->processor->processStream(
+        $beat = static function () use ($pulse): void {
+            $pulse->beat();
+        };
+        $result = $this->processor->process(
             $inbound,
-            function (string|array $chunk) use (&$collected, $pulse): void {
-                $collected .= StreamChunk::visibleText($chunk);
-                $pulse->beat();
+            $options + ['heartbeat' => $beat],
+            static function (array $status) use ($beat): void {
+                $beat();
             },
-            function (array $status) use ($pulse): void {
-                $pulse->beat();
-            },
-            $options,
         );
 
         if (empty($result['success'])) {
@@ -282,25 +284,28 @@ final readonly class TelegramConversation
         $files = TelegramOutgoingFile::fromMetadata($metadata);
         $jobs = $this->pendingJobs($metadata);
 
-        $content = (string) ($response['content'] ?? $collected);
-        $reply = trim((string) (preg_replace(self::FILE_MARKER, '', $content) ?? ''));
-        if ('' !== $reply) {
-            $reply = $this->memories->resolveMemoryTags($reply, $owner);
-            $reply = $this->references->resolveMessageTags($reply, $owner);
+        $content = (string) ($response['content'] ?? '');
+        $stored = trim($content);
+        if ('' !== $stored) {
+            $stored = $this->memories->resolveMemoryTags($stored, $owner);
+            $stored = $this->references->resolveMessageTags($stored, $owner);
         }
+        $channelReply = trim((string) (preg_replace(self::FILE_MARKER, '', $stored) ?? ''));
 
-        $recorded = $this->recordUsage($turn, $inbound, $metadata, $reply);
+        $recorded = $this->recordUsage($turn, $inbound, $metadata, $channelReply);
         $this->store->applyClassification($inbound, $classification);
         $this->store->setStatus($inbound, 'complete');
 
-        $stored = '' !== $reply || [] !== $files || [] !== $jobs ? $reply : $this->say($turn, 'empty_reply');
-        $outbound = $this->store->store($turn, $chat, $stored, 'OUT', 'complete', null, $classification, $files[0] ?? null, [
+        $generated = $this->claimGeneratedFiles($inbound, $alreadyAttached);
+        $hasAnswer = '' !== $stored || [] !== $files || [] !== $jobs || [] !== $generated;
+        $storedText = $hasAnswer ? $stored : $this->say($turn, 'empty_reply');
+        $outbound = $this->store->store($turn, $chat, $storedText, 'OUT', 'complete', null, $classification, $files[0] ?? null, [
             TelegramMessageStore::META_REPLY_TO => (string) $inbound->getId(),
-        ]);
+        ], $generated);
         $this->store->storeAnswerMeta($outbound, $metadata, $classification, $recorded, $search);
         $this->connections->noteExchange($turn->bot);
 
-        $channelReply = '' !== $reply ? trim($this->docs->resolveDocTags($reply)) : '';
+        $channelReply = '' !== $channelReply ? trim($this->docs->resolveDocTags($channelReply)) : '';
         $text = $this->withSources($turn, $channelReply, $search);
         if ([] !== $jobs) {
             $text = $this->join($text, $this->jobAck($turn, $jobs));
@@ -319,6 +324,29 @@ final readonly class TelegramConversation
             $this->store->supersede($previous, $outbound);
         }
         $this->bindJobs($jobs, $outId);
+    }
+
+    /**
+     * Files created while answering (documents, exports, edits) start on the
+     * inbound message. They belong to the answer, so the web chat and the
+     * next turn see them there. Uploads the person sent stay on the inbound.
+     *
+     * @param array<int, true> $alreadyAttached spl_object_id of files present before processing
+     *
+     * @return list<File>
+     */
+    private function claimGeneratedFiles(Message $inbound, array $alreadyAttached): array
+    {
+        $claimed = [];
+        foreach ($inbound->getFiles()->toArray() as $file) {
+            if (isset($alreadyAttached[spl_object_id($file)])) {
+                continue;
+            }
+            $inbound->removeFile($file);
+            $claimed[] = $file;
+        }
+
+        return $claimed;
     }
 
     /**

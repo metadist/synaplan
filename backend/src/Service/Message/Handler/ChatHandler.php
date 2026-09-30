@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\AI\StructuredOutput\Schema\FileGenerationSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\ToolCalling\ToolCallingTranslator;
@@ -76,6 +77,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
 {
     /** Maximum length of a quoted-reference excerpt injected into the prompt. */
     private const MAX_QUOTED_REFERENCE_LENGTH = 4000;
+
+    /**
+     * Models copy the old "[YmdHis]: " history prefix into their answer.
+     * One leading stamp is removed so it never reaches the person.
+     */
+    private const ECHOED_HISTORY_STAMP = '/^\[\d{14}\]:\s*/';
 
     /** Flat attachment cut used only when no context budget is available. */
     private const LEGACY_ATTACHMENT_CHARS = 10000;
@@ -928,6 +935,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             !empty($options['incognito']),
         );
 
+        $heartbeat = $options['heartbeat'] ?? null;
         if (null !== $documentEdit) {
             $response = [
                 'content' => $documentEdit->content,
@@ -935,6 +943,27 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'model' => $modelName ?? 'unknown',
                 'usage' => $documentEdit->usage,
                 'response_id' => null,
+            ];
+        } elseif (is_callable($heartbeat)) {
+            // Channels without a stream (Telegram) still need a live signal
+            // while the model works. Collect the same text chat() would return.
+            $collected = '';
+            $streamMeta = $this->aiFacade->chatStream(
+                $messages,
+                function (string|array $chunk) use (&$collected, $heartbeat): void {
+                    $collected .= StreamChunk::visibleText($chunk);
+                    $heartbeat();
+                },
+                $message->getUserId(),
+                $aiOptions,
+            );
+            $response = [
+                'content' => $collected,
+                'provider' => $streamMeta['provider'] ?? ($provider ?? 'unknown'),
+                'model' => $streamMeta['model'] ?? ($modelName ?? 'unknown'),
+                'usage' => $streamMeta['usage'] ?? [],
+                'response_id' => $streamMeta['response_id'] ?? null,
+                'tool_calls' => $streamMeta['tool_calls'] ?? [],
             ];
         } else {
             $response = $this->aiFacade->chat(
@@ -967,6 +996,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ];
         if (null !== $documentEdit) {
             $content = $this->applyDocumentEditResult($documentEdit, $message, $metadata);
+        }
+
+        if (is_string($content)) {
+            $unstamped = preg_replace(self::ECHOED_HISTORY_STAMP, '', $content, 1);
+            if (is_string($unstamped)) {
+                $content = $unstamped;
+            }
         }
 
         // Check for file generation format first (for OfficeM maker)
@@ -2111,8 +2147,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
     private function isEmptyAssistantContent(string|array $content): bool
     {
         if (is_string($content)) {
-            // Non-streaming JSON path prefixes "[datetime]: " even when the body
-            // is empty — treat that as empty too.
+            // Older prompts prefixed "[datetime]: " and models echoed it back.
+            // A stamp with no body is still an empty turn.
             $stripped = preg_replace('/^\[[^\]]*\]:\s*/u', '', $content) ?? $content;
 
             return '' === trim($stripped);
@@ -2401,14 +2437,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     : $content."\n\n".$mediaReferences[$msg->getId()];
             }
 
-            $stamped = '['.$msg->getDateTime().']: '.$content;
-
             // For user messages in thread, include images for vision (if enabled)
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
-                $messageContent = $this->buildMultimodalContent($stamped, $imageUrls);
+                $messageContent = $this->buildMultimodalContent($content, $imageUrls);
             } else {
-                $messageContent = $stamped;
+                $messageContent = $content;
             }
 
             // #1115 — same empty-assistant filter as buildStreamingMessages.
