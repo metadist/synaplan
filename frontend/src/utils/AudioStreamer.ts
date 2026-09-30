@@ -8,7 +8,7 @@
  * This avoids MSE complexity and works reliably in all browsers.
  */
 export class AudioStreamer {
-  private queue: Array<{ text: string; language?: string }> = []
+  private queue: Array<{ text: string; language: string }> = []
   private isPlaying = false
   private stopped = false
   private currentAudio: HTMLAudioElement | null = null
@@ -16,6 +16,7 @@ export class AudioStreamer {
   private playIndex = 0
   private _allQueued = false
   private onFinished?: () => void
+  private onFailure?: (reason: 'missing_language' | 'provider_error') => void
 
   /**
    * Register a callback invoked once when all queued audio has finished playing
@@ -23,6 +24,14 @@ export class AudioStreamer {
    */
   public setOnFinished(cb: () => void): void {
     this.onFinished = cb
+  }
+
+  /**
+   * Register a callback for chunk failures (missing language, fetch error).
+   * One-shot: fires at most once, then clears.
+   */
+  public setOnFailure(cb: (reason: 'missing_language' | 'provider_error') => void): void {
+    this.onFailure = cb
   }
 
   /**
@@ -41,14 +50,20 @@ export class AudioStreamer {
   /**
    * Queue a sentence for TTS playback.
    * Starts prefetching immediately; playback begins as soon as first blob is ready.
+   * Language is required — never invent English (#2283).
    */
   public streamText(text: string, _voice?: string, language?: string): void {
     if (this.stopped) return
     const trimmed = text.trim()
     if (!trimmed) return
 
-    // Language is required by /api/v1/tts/stream so Piper picks the matching voice (#2283).
-    const lang = (language ?? '').trim() || 'en'
+    const lang = (language ?? '').trim()
+    if (!lang) {
+      console.warn('AudioStreamer: language is required; skipping chunk')
+      this.fireFailure('missing_language')
+      return
+    }
+
     this.queue.push({ text: trimmed, language: lang })
     const idx = this.queue.length - 1
 
@@ -60,7 +75,7 @@ export class AudioStreamer {
     const item = this.queue[idx]
     if (!item || this.stopped) return
 
-    const params = new URLSearchParams({ text: item.text, language: item.language ?? 'en' })
+    const params = new URLSearchParams({ text: item.text, language: item.language })
 
     try {
       const response = await fetch(`/api/v1/tts/stream?${params.toString()}`, {
@@ -69,8 +84,8 @@ export class AudioStreamer {
 
       if (!response.ok) {
         console.warn(`AudioStreamer: TTS fetch failed (${response.status}) for idx ${idx}`)
-        // Skip this segment, try to play next
         this.prefetchedBlobs.set(idx, '')
+        this.fireFailure('provider_error')
         this.tryPlayNext()
         return
       }
@@ -86,6 +101,7 @@ export class AudioStreamer {
     } catch (e) {
       if (!this.stopped) {
         console.warn('AudioStreamer: Prefetch error', e)
+        this.fireFailure('provider_error')
       }
       this.prefetchedBlobs.set(idx, '')
       this.tryPlayNext()
@@ -159,6 +175,12 @@ export class AudioStreamer {
     const cb = this.onFinished
     this.onFinished = undefined
     cb?.()
+  }
+
+  private fireFailure(reason: 'missing_language' | 'provider_error'): void {
+    const cb = this.onFailure
+    this.onFailure = undefined
+    cb?.(reason)
   }
 
   private checkFinished(): void {

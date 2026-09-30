@@ -89,4 +89,47 @@ final class DesktopMediaControllerTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
     }
+
+    public function testSpeechRejectsNonStringLanguage(): void
+    {
+        $user = $this->createMock(User::class);
+        $media = $this->createMock(DesktopGeneratedMediaService::class);
+        $media->expects($this->never())->method('speak');
+
+        $controller = new DesktopMediaController($media, $this->createMock(LoggerInterface::class));
+        $request = new Request(content: json_encode([
+            'text' => 'Guten Tag',
+            'model' => 'piper:piper-multi:text2sound',
+            'language' => ['de'],
+        ], JSON_THROW_ON_ERROR));
+        $response = $controller->speech($request, $user);
+
+        self::assertSame(400, $response->getStatusCode());
+        $data = json_decode((string) $response->getContent(), true);
+        self::assertSame('language must be a string', $data['error'] ?? null);
+    }
+
+    public function testSpeechOmitsLanguageFallsThroughToService(): void
+    {
+        $user = $this->createMock(User::class);
+        $media = $this->createMock(DesktopGeneratedMediaService::class);
+        $media->expects($this->once())
+            ->method('speak')
+            ->with($user, 'Hello', 'piper:piper-multi:text2sound', null)
+            ->willReturn([
+                'success' => true,
+                'file' => ['url' => '/api/v1/files/uploads/x.mp3', 'type' => 'audio', 'mimeType' => 'audio/mpeg', 'id' => 3],
+                'provider' => 'piper',
+                'model' => 'en_US-lessac-medium',
+            ]);
+
+        $controller = new DesktopMediaController($media, $this->createMock(LoggerInterface::class));
+        $request = new Request(content: json_encode([
+            'text' => 'Hello',
+            'model' => 'piper:piper-multi:text2sound',
+        ], JSON_THROW_ON_ERROR));
+        $response = $controller->speech($request, $user);
+
+        self::assertSame(200, $response->getStatusCode());
+    }
 }

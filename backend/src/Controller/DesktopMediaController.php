@@ -136,7 +136,10 @@ final class DesktopMediaController extends AbstractController
 
         $text = trim((string) ($data['text'] ?? ''));
         $model = trim((string) ($data['model'] ?? ''));
-        $language = isset($data['language']) && is_string($data['language'])
+        if (\array_key_exists('language', $data) && null !== $data['language'] && !\is_string($data['language'])) {
+            return new JsonResponse(['error' => 'language must be a string'], Response::HTTP_BAD_REQUEST);
+        }
+        $language = isset($data['language']) && \is_string($data['language'])
             ? trim($data['language'])
             : null;
         if (null !== $language && '' === $language) {

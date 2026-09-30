@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Service\AiFacade;
@@ -118,6 +119,46 @@ final class AiFacadeSynthesizeTest extends TestCase
         $this->expectExceptionMessage('TTS language is required');
 
         $this->facade->synthesize('Hello', '  ', null, ['provider' => 'piper']);
+    }
+
+    public function testSynthesizeRejectsThinkOnlyTextWithoutCallingProvider(): void
+    {
+        $provider = $this->createMock(TextToSpeechProviderInterface::class);
+        $provider->method('getName')->willReturn('piper');
+        $provider->expects(self::never())->method('synthesize');
+
+        $this->registry->expects(self::once())
+            ->method('getTextToSpeechProvider')
+            ->willReturn($provider);
+
+        $this->expectException(NoSpeakableTextException::class);
+
+        $this->facade->synthesize(
+            '<think>internal reasoning only</think>',
+            'de',
+            null,
+            ['provider' => 'piper'],
+        );
+    }
+
+    public function testSynthesizeStreamRejectsCodeOnlyTextWithoutCallingProvider(): void
+    {
+        $provider = $this->createMock(TextToSpeechProviderInterface::class);
+        $provider->method('getName')->willReturn('piper');
+        $provider->expects(self::never())->method('synthesizeStream');
+
+        $this->registry->expects(self::once())
+            ->method('getTextToSpeechProvider')
+            ->willReturn($provider);
+
+        $this->expectException(NoSpeakableTextException::class);
+
+        $this->facade->synthesizeStream(
+            "```\nconsole.log('hi');\n```",
+            'en',
+            null,
+            ['provider' => 'piper'],
+        );
     }
 
     public function testSynthesizeStreamSanitizesAndForwardsLanguage(): void

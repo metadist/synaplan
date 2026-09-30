@@ -3,6 +3,7 @@
 namespace App\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Health\ModelHealthRecorder;
@@ -1539,6 +1540,9 @@ class AiFacade
 
         // Always sanitize + truncate here so callers cannot skip it (#2283, #1665).
         $text = TtsTextSanitizer::prepareForSynthesis($text);
+        if ('' === $text) {
+            throw new NoSpeakableTextException();
+        }
 
         $this->logger->info('AI TTS request', [
             'provider' => $provider->getName(),
@@ -1622,6 +1626,9 @@ class AiFacade
         $provider = $this->registry->getTextToSpeechProvider($providerName);
 
         $text = TtsTextSanitizer::prepareForSynthesis($text);
+        if ('' === $text) {
+            throw new NoSpeakableTextException();
+        }
 
         $this->logger->info('AI TTS stream request', [
             'provider' => $provider->getName(),

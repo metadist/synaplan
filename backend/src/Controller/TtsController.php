@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Service\TtsTextSanitizer;
@@ -85,6 +86,8 @@ class TtsController extends AbstractController
                 'Cache-Control' => 'no-cache',
                 'X-TTS-Provider' => $result['provider'],
             ]);
+        } catch (NoSpeakableTextException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (\Throwable $e) {
             $this->logger->error('TTS audio streaming failed', [
                 'exception' => $e,
