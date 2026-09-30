@@ -350,16 +350,6 @@
         "summary": "Beliebiger MCP-Endpunkt",
         "hint": "Füge die HTTPS-URL eines beliebigen Streamable-HTTP-MCP-Servers ein und bei Bedarf ein Zugriffstoken. CRM, Wiki, Tickets, Automatisierung — spricht es MCP, funktioniert es hier."
       },
-      "jira": {
-        "name": "Jira",
-        "summary": "Tickets und Vorgänge",
-        "hint": "Verbinde einen Jira-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du Tickets auflisten und neue per Prompt anlegen."
-      },
-      "confluence": {
-        "name": "Confluence",
-        "summary": "Wiki-Seiten",
-        "hint": "Verbinde einen Confluence-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du Seiten durchsuchen, Zusammenfassungen holen und neue Seiten per Prompt anlegen."
-      },
       "github": {
         "name": "GitHub",
         "summary": "Repos, Issues, Pull Requests",

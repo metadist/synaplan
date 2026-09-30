@@ -353,16 +353,6 @@
         "summary": "Cualquier endpoint MCP",
         "hint": "Pega la URL HTTPS de cualquier servidor MCP Streamable HTTP y, si hace falta, un token de acceso. CRM, wiki, tickets, automatización: si habla MCP, funciona aquí."
       },
-      "jira": {
-        "name": "Jira",
-        "summary": "Tickets e incidencias",
-        "hint": "Conecta un servidor MCP compatible con Jira (por ejemplo, un servicio MCP de Atlassian autoalojado) e introduce su URL de endpoint y token de acceso. Con las acciones de escritura activadas puedes listar tickets y crear otros nuevos con un prompt."
-      },
-      "confluence": {
-        "name": "Confluence",
-        "summary": "Páginas wiki",
-        "hint": "Conecta un servidor MCP compatible con Confluence (por ejemplo, un servicio MCP de Atlassian autoalojado) e introduce su URL de endpoint y token de acceso. Con las acciones de escritura activadas puedes buscar páginas, obtener resúmenes y crear páginas nuevas con un prompt."
-      },
       "github": {
         "name": "GitHub",
         "summary": "Repos, issues, pull requests",

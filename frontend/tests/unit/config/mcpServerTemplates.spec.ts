@@ -14,8 +14,8 @@ describe('mcpServerTemplates', () => {
   })
 
   it('clears a named template when it is clicked again', () => {
-    expect(nextMcpServerTemplate('jira', 'jira')).toBe(MCP_CUSTOM_TEMPLATE)
-    expect(nextMcpServerTemplate('confluence', 'confluence')).toBe(MCP_CUSTOM_TEMPLATE)
+    expect(nextMcpServerTemplate('github', 'github')).toBe(MCP_CUSTOM_TEMPLATE)
+    expect(nextMcpServerTemplate('n8n', 'n8n')).toBe(MCP_CUSTOM_TEMPLATE)
   })
 
   it('does not clear Custom when it is already selected', () => {
@@ -25,7 +25,7 @@ describe('mcpServerTemplates', () => {
   })
 
   it('switches from one named template to another', () => {
-    expect(nextMcpServerTemplate('jira', 'confluence')).toBe('confluence')
+    expect(nextMcpServerTemplate('github', 'n8n')).toBe('n8n')
     expect(nextMcpServerTemplate(MCP_CUSTOM_TEMPLATE, 'github')).toBe('github')
   })
 

@@ -31,20 +31,6 @@ export const mcpServerTemplates: McpServerTemplate[] = [
     allowWrite: false,
   },
   {
-    key: 'jira',
-    icon: 'simple-icons:jira',
-    name: 'Jira',
-    authHeader: 'Authorization',
-    allowWrite: true,
-  },
-  {
-    key: 'confluence',
-    icon: 'simple-icons:confluence',
-    name: 'Confluence',
-    authHeader: 'Authorization',
-    allowWrite: true,
-  },
-  {
     key: 'github',
     icon: 'simple-icons:github',
     name: 'GitHub',

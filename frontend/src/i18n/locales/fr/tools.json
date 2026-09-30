@@ -427,16 +427,6 @@
         "summary": "N’importe quel point de terminaison MCP",
         "hint": "Collez l’URL HTTPS de n’importe quel serveur MCP Streamable HTTP et, si besoin, un jeton d’accès. CRM, wiki, tickets, automatisation — s’il parle MCP, cela fonctionne ici."
       },
-      "jira": {
-        "name": "Jira",
-        "summary": "Tickets et incidents",
-        "hint": "Connectez un serveur MCP compatible Jira (par exemple un service MCP Atlassian auto-hébergé) et collez son URL de point de terminaison et son jeton d’accès. Avec les actions d’écriture activées, vous pouvez lister des tickets et en créer de nouveaux à partir d’une consigne."
-      },
-      "confluence": {
-        "name": "Confluence",
-        "summary": "Pages wiki",
-        "hint": "Connectez un serveur MCP compatible Confluence (par exemple un service MCP Atlassian auto-hébergé) et collez son URL de point de terminaison et son jeton d’accès. Avec les actions d’écriture activées, vous pouvez chercher des pages, obtenir des résumés et créer de nouvelles pages à partir d’une consigne."
-      },
       "github": {
         "name": "GitHub",
         "summary": "Dépôts, incidents, pull requests",
