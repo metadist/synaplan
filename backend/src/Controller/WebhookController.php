@@ -15,9 +15,11 @@ use App\Service\EmailWebhookIdempotencyService;
 use App\Service\InternalEmailService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\TtsTextSanitizer;
 use App\Service\Usage\RecordedUsage;
 use App\Service\WhatsAppService;
@@ -53,6 +55,7 @@ class WebhookController extends AbstractController
         private InboundEmailAttachmentStore $inboundEmailAttachmentStore,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatErrorPresenter $chatErrorPresenter,
+        private ExternalReplyReferences $externalReplyReferences,
     ) {
     }
 
@@ -551,6 +554,12 @@ class WebhookController extends AbstractController
                 $outgoingMessage->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
             }
             $outgoingMessage->setMeta('ai_chat_cost', $recordedChatUsage->chargedCost);
+            if (is_array($metadata)) {
+                $docsMeta = PlatformDocReferenceResolver::encodeDocsMeta($metadata);
+                if (null !== $docsMeta) {
+                    $outgoingMessage->setMeta('docs', $docsMeta);
+                }
+            }
 
             $usageExtra = [];
             if (is_array($classification['sorting_usage'] ?? null)) {
@@ -595,7 +604,7 @@ class WebhookController extends AbstractController
                 $this->internalEmailService->sendAiResponseEmail(
                     $fromEmail,
                     $subject,
-                    $responseText,
+                    $this->externalReplyReferences->resolve($responseText, $user),
                     $messageId,
                     $provider,
                     $model,

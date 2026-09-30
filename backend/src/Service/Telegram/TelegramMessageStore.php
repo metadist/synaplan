@@ -6,6 +6,7 @@ namespace App\Service\Telegram;
 
 use App\Entity\Chat;
 use App\Entity\Message;
+use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -192,6 +193,10 @@ final readonly class TelegramMessageStore
             if (is_string($metadata[$key] ?? null) && '' !== $metadata[$key]) {
                 $outbound->setMeta($key, $metadata[$key]);
             }
+        }
+        $docs = PlatformDocReferenceResolver::encodeDocsMeta($metadata);
+        if (null !== $docs) {
+            $outbound->setMeta('docs', $docs);
         }
         $this->em->flush();
     }

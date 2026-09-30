@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Telegram;
 
+use App\AI\Stream\StreamChunk;
 use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\TelegramBot;
@@ -15,8 +16,10 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
+use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
 use App\Service\UserMemoryService;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -49,6 +52,8 @@ final readonly class TelegramConversation
         private MediaJobService $mediaJobs,
         private MediaJobMessageSync $mediaJobSync,
         private LoggerInterface $logger,
+        private PlatformDocReferenceResolver $docs,
+        private ClockInterface $clock,
         private string $frontendUrl,
     ) {
     }
@@ -249,7 +254,19 @@ final readonly class TelegramConversation
     private function respond(TelegramTurn $turn, Chat $chat, Message $inbound, array $options, ?Message $previous, ?int $replyTo, array $notes): void
     {
         $owner = $turn->owner;
-        $result = $this->processor->process($inbound, $options);
+        $collected = '';
+        $pulse = $this->typingPulse($turn);
+        $result = $this->processor->processStream(
+            $inbound,
+            function (string|array $chunk) use (&$collected, $pulse): void {
+                $collected .= StreamChunk::visibleText($chunk);
+                $pulse->beat();
+            },
+            function (array $status) use ($pulse): void {
+                $pulse->beat();
+            },
+            $options,
+        );
 
         if (empty($result['success'])) {
             $sentence = $this->errors->presentFromResult($result, $turn->locale, false)->userText;
@@ -265,7 +282,8 @@ final readonly class TelegramConversation
         $files = TelegramOutgoingFile::fromMetadata($metadata);
         $jobs = $this->pendingJobs($metadata);
 
-        $reply = trim((string) (preg_replace(self::FILE_MARKER, '', (string) ($response['content'] ?? '')) ?? ''));
+        $content = (string) ($response['content'] ?? $collected);
+        $reply = trim((string) (preg_replace(self::FILE_MARKER, '', $content) ?? ''));
         if ('' !== $reply) {
             $reply = $this->memories->resolveMemoryTags($reply, $owner);
             $reply = $this->references->resolveMessageTags($reply, $owner);
@@ -282,7 +300,8 @@ final readonly class TelegramConversation
         $this->store->storeAnswerMeta($outbound, $metadata, $classification, $recorded, $search);
         $this->connections->noteExchange($turn->bot);
 
-        $text = $this->withSources($turn, $reply, $search);
+        $channelReply = '' !== $reply ? trim($this->docs->resolveDocTags($reply)) : '';
+        $text = $this->withSources($turn, $channelReply, $search);
         if ([] !== $jobs) {
             $text = $this->join($text, $this->jobAck($turn, $jobs));
         }
@@ -506,5 +525,22 @@ final readonly class TelegramConversation
         } catch (TelegramChannelException $e) {
             $this->noteDeliveryFailure($turn->bot, $e);
         }
+    }
+
+    /**
+     * Repeats the typing action while tokens and status updates arrive.
+     * The first action is already sent before processing starts.
+     */
+    private function typingPulse(TelegramTurn $turn): TelegramTypingPulse
+    {
+        return new TelegramTypingPulse(
+            $this->clock,
+            function () use ($turn): void {
+                $this->api->sendChatAction($turn->token, $turn->tgChatId, 'typing');
+            },
+            function (TelegramChannelException $e) use ($turn): void {
+                $this->noteDeliveryFailure($turn->bot, $e);
+            },
+        );
     }
 }
