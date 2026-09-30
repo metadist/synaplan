@@ -401,7 +401,8 @@
         "statistics": "statistik nutzung kosten tokens",
         "chats": "alle chats verlauf unterhaltungen",
         "chats_incoming": "eingehend mit mir geteilt chats",
-        "my_groups": "gruppen teams mitglieder"
+        "my_groups": "gruppen teams mitglieder",
+        "search_models": "smart search suchmodell embedding modell suchindex ki suche palette"
       },
       "remote": {
         "searching": "Durchsuche deine Chats, Dateien und Erinnerungen…",

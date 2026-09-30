@@ -666,6 +666,59 @@
         "title": "Letzte Messung",
         "line": "Am {date}: richtige Stelle ohne Neuordnung {recallOff} der Fälle, mit {recallOn}. Langsamste Antworten {p95Off} ms ohne und {p95On} ms mit."
       }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "Die Modelle hinter der Suchpalette (Strg/Cmd+K). Solange du hier nichts wählst, folgen beide deinen übrigen KI-Einstellungen.",
+      "loading": "Suchmodelle werden geladen …",
+      "loadFailed": "Die Suchmodelle konnten nicht geladen werden.",
+      "noModel": "kein Modell",
+      "undo": "Rückgängig",
+      "ai": {
+        "label": "KI-Modell für Suchfragen",
+        "hint": "Liest eine Frage in der Palette und zeigt auf den besten Treffer. Es ändert selbst nichts.",
+        "inherit": "Wie das Tools-Modell: {model}",
+        "ready": "Suchfragen beantwortet {model}.",
+        "off": "Die KI-Hilfe in der Suche ist ausgeschaltet, deshalb zeigt die Palette keine KI-Zeile.",
+        "openFlag": "In den Funktionen einschalten",
+        "unavailable": "Das gewählte Modell kann gerade nicht antworten, deshalb zeigt die Palette keine KI-Zeile. Wähle ein anderes Modell oder richte seinen Anbieter ein.",
+        "saved": "Suchfragen nutzen jetzt {model}.",
+        "restored": "Suchfragen nutzen wieder {model}."
+      },
+      "embed": {
+        "label": "Embedding-Modell für den Suchindex",
+        "hint": "Findet Seiten, Einstellungen, Chats und Dateien nach Bedeutung. Ein Wechsel liest den ganzen Index im Hintergrund neu ein.",
+        "inherit": "Wie das Embedding-Modell der Dokumente: {model}",
+        "separate": "Suche und Dokumente nutzen verschiedene Embedding-Modelle, deshalb macht jede Suche zwei kurze Embedding-Aufrufe.",
+        "otherRun": "Gerade läuft ein anderer Embedding-Wechsel. Du kannst dieses Modell ändern, sobald er fertig ist.",
+        "confirmTitle": "Embedding-Modell der Suche wechseln?",
+        "confirmMessage": "Die Suche liest {count} Einträge im Hintergrund mit {model} neu ein, je ein kurzer Embedding-Aufruf. Bis ein Eintrag fertig ist, wird er nur über Stichwörter gefunden. Scheitert der Wechsel, bleibt die Suche bei {current}.",
+        "confirm": "Wechseln und neu einlesen",
+        "started": "Die Suche wechselt zu {model}. Den Fortschritt siehst du hier.",
+        "savedNoRun": "Die Suche nutzt {model}. Der Index passt schon, nichts musste neu eingelesen werden."
+      },
+      "reason": {
+        "notPulled": "in Ollama nicht heruntergeladen",
+        "providerUnavailable": "kein API-Schlüssel für {service}"
+      },
+      "index": {
+        "empty": "Der Suchindex ist noch leer. Er füllt sich, während Synaplan genutzt wird.",
+        "keywordOnly": "Die Suche findet nur über Stichwörter, bis der Index mit dem Embedding-Modell eingelesen ist.",
+        "coverage": "{embedded} von {rows} Indexeinträgen sind nach Bedeutung auffindbar."
+      },
+      "run": {
+        "running": "Der Index wird mit {model} neu eingelesen: {done} von {total}. Die Suche funktioniert währenddessen weiter.",
+        "completed": "Der Suchindex nutzt {model}.",
+        "partial": "Der Suchindex nutzt {model}. {count} Einträge konnten nicht eingelesen werden und werden nur über Stichwörter gefunden, bis sie sich ändern.",
+        "failed": "Der Wechsel des Index zu {model} ist gescheitert, die Suche nutzt wieder {previous}. Schon umgestellte Einträge werden nur über Stichwörter gefunden, bis sie neu eingelesen sind. Wähle oben ein Modell, um es erneut zu versuchen.",
+        "cancelled": "Der Wechsel des Index zu {model} wurde abgebrochen. Die Suche bleibt bei {previous}."
+      },
+      "refused": {
+        "invalid_model": "{model} kann gerade nicht für die Suche genutzt werden. Das bisherige Modell bleibt.",
+        "probe_failed": "{model} hat auf einen Testaufruf nicht geantwortet, deshalb wurde nichts geändert.",
+        "run_in_progress": "Gerade läuft ein anderer Embedding-Wechsel. Nichts wurde geändert; versuch es erneut, wenn er fertig ist.",
+        "unknown": "Das Modell konnte nicht geändert werden. Das bisherige bleibt."
+      }
     }
   },
   "providerHelp": {

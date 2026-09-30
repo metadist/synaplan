@@ -210,7 +210,8 @@
       "scopes": {
         "documents": "Documents (RAG)",
         "memories": "User Memories",
-        "all": "All Embeddings"
+        "all": "All Embeddings",
+        "search": "Smart Search index"
       },
       "breakdown": {
         "title": "Per-scope breakdown"

@@ -7,7 +7,7 @@ namespace App\Service\SmartSearch\Index;
 use App\AI\Service\AiFacade;
 use App\Entity\Model;
 use App\Repository\ModelRepository;
-use App\Service\ModelConfigService;
+use App\Service\SmartSearch\SearchModelConfigService;
 
 /**
  * The one embedding space of the search index. It is system-wide (never a
@@ -19,8 +19,10 @@ final readonly class SearchEmbeddingModel
     /** Same fixed width as the documents collection (see VectorSearchService). */
     public const DIMENSION = 1024;
 
+    private const PROBE_TEXT = 'Synaplan search';
+
     public function __construct(
-        private ModelConfigService $modelConfig,
+        private SearchModelConfigService $searchModels,
         private ModelRepository $models,
         private AiFacade $aiFacade,
     ) {
@@ -28,7 +30,7 @@ final readonly class SearchEmbeddingModel
 
     public function modelId(): ?int
     {
-        return $this->modelConfig->getDefaultModel('VECTORIZE');
+        return $this->searchModels->embedModelId();
     }
 
     /**
@@ -44,17 +46,22 @@ final readonly class SearchEmbeddingModel
             return null;
         }
 
-        $result = $this->aiFacade->embedBatch($texts, $userId, strtolower($model->getService()), [
-            'model' => $model->getProviderId(),
-        ]);
+        return $this->embedWith($model, $texts, $userId, $fit);
+    }
 
-        $vectors = [];
-        foreach ($result['embeddings'] as $embedding) {
-            $vector = array_values(array_map('floatval', $embedding));
-            $vectors[] = $fit ? self::fit($vector) : $vector;
+    /**
+     * One real call to a model before the index is moved onto it, so a
+     * switch to a model that does not answer never starts.
+     */
+    public function probe(Model $model): bool
+    {
+        try {
+            $result = $this->embedWith($model, [self::PROBE_TEXT], null, true);
+        } catch (\Throwable) {
+            return false;
         }
 
-        return ['modelId' => (int) $model->getId(), 'vectors' => $vectors];
+        return [] !== ($result['vectors'][0] ?? []);
     }
 
     /**
@@ -76,6 +83,26 @@ final readonly class SearchEmbeddingModel
         }
 
         return $vector;
+    }
+
+    /**
+     * @param list<string> $texts
+     *
+     * @return array{modelId: int, vectors: list<list<float>>}
+     */
+    private function embedWith(Model $model, array $texts, ?int $userId, bool $fit): array
+    {
+        $result = $this->aiFacade->embedBatch($texts, $userId, strtolower($model->getService()), [
+            'model' => $model->getProviderId(),
+        ]);
+
+        $vectors = [];
+        foreach ($result['embeddings'] as $embedding) {
+            $vector = array_values(array_map('floatval', $embedding));
+            $vectors[] = $fit ? self::fit($vector) : $vector;
+        }
+
+        return ['modelId' => (int) $model->getId(), 'vectors' => $vectors];
     }
 
     private function model(): ?Model

@@ -337,7 +337,8 @@
         "statistics": "estadísticas uso costes tokens",
         "chats": "todos los chats historial conversaciones",
         "chats_incoming": "entrantes compartidos conmigo chats",
-        "my_groups": "grupos equipos miembros"
+        "my_groups": "grupos equipos miembros",
+        "search_models": "búsqueda inteligente modelo de búsqueda modelo de embedding índice de búsqueda"
       },
       "remote": {
         "searching": "Buscando en tus chats, archivos y recuerdos…",

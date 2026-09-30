@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Service\SmartSearch\Interpret;
 
-use App\AI\Credential\ChatReadinessService;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\SmartSearchInterpretSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
 use App\Repository\PromptRepository;
-use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Service\SmartSearch\SearchModelConfigService;
 use App\Service\SmartSearch\SmartSearchConfig;
 use Psr\Log\LoggerInterface;
 
@@ -31,8 +30,7 @@ final readonly class SearchInterpreter
 
     public function __construct(
         private SmartSearchConfig $config,
-        private ModelConfigService $modelConfig,
-        private ChatReadinessService $readiness,
+        private SearchModelConfigService $searchModels,
         private AiFacade $aiFacade,
         private PromptRepository $prompts,
         private StructuredOutputConfig $structuredOutputConfig,
@@ -42,7 +40,7 @@ final readonly class SearchInterpreter
     }
 
     /**
-     * Flag on and a tools model whose provider can answer right now.
+     * Flag on and a search AI model whose provider can answer right now.
      */
     public function isAvailable(User $user): bool
     {
@@ -50,12 +48,9 @@ final readonly class SearchInterpreter
             return false;
         }
 
-        $tools = $this->modelConfig->getToolsModelConfig($user->getId());
-        if (null === $tools['provider'] || null === $tools['model']) {
-            return false;
-        }
+        $model = $this->searchModels->aiModel($user->getId());
 
-        return $this->readiness->modelAvailability($tools['provider'], $tools['model'])['available'];
+        return null !== $model && $this->searchModels->availability($model)['available'];
     }
 
     /**
@@ -63,12 +58,12 @@ final readonly class SearchInterpreter
      */
     public function interpret(User $user, string $query, array $candidates, string $language): InterpretResult
     {
-        $tools = $this->modelConfig->getToolsModelConfig($user->getId());
-        $options = array_filter([
-            'provider' => $tools['provider'],
-            'model' => $tools['model'],
-            'temperature' => self::TEMPERATURE,
-        ], static fn (mixed $value): bool => null !== $value);
+        $model = $this->searchModels->aiModel($user->getId());
+        $options = ['temperature' => self::TEMPERATURE];
+        if (null !== $model) {
+            $options['provider'] = strtolower($model->getService());
+            $options['model'] = $model->getProviderId() ?: $model->getName();
+        }
         if ($this->structuredOutputConfig->isEnabled($user->getId())) {
             $options['structured_output'] = SmartSearchInterpretSchema::build();
         }
@@ -93,7 +88,7 @@ final readonly class SearchInterpreter
         $this->rateLimitService->recordUsage($user, 'SMART_SEARCH', [
             'provider' => $response['provider'] ?? 'unknown',
             'model' => $response['model'] ?? 'unknown',
-            'model_id' => $tools['model_id'],
+            'model_id' => $model?->getId(),
             'usage' => $response['usage'] ?? [],
             'response_text' => $content,
             'input_text' => $userPrompt,

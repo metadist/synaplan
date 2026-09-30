@@ -31,12 +31,25 @@ final readonly class SearchIndexEmbedder
      */
     public function embedPending(int $userId, int $maxRows = 500): int
     {
+        return $this->embedPendingCounted($userId, $maxRows)['embedded'];
+    }
+
+    /**
+     * Like {@see embedPending()}, and also reports the rows a failed batch
+     * left without a vector, so a reindex run can tell partial from none.
+     *
+     * @return array{embedded: int, failed: int}
+     */
+    public function embedPendingCounted(int $userId, int $maxRows = 500): array
+    {
         $modelId = $this->embeddingModel->modelId();
         if (null === $modelId) {
-            return 0;
+            return ['embedded' => 0, 'failed' => 0];
         }
 
         $done = 0;
+        $embedded = 0;
+        $failed = 0;
         while ($done < $maxRows) {
             $rows = $this->repository->findPendingEmbeddings($userId, $modelId, min(self::BATCH_SIZE, $maxRows - $done));
             if ([] === $rows) {
@@ -51,6 +64,7 @@ final readonly class SearchIndexEmbedder
                     'rows' => count($rows),
                     'error' => $e->getMessage(),
                 ]);
+                $failed += count($rows);
 
                 break;
             }
@@ -62,12 +76,15 @@ final readonly class SearchIndexEmbedder
                 $vector = $result['vectors'][$i] ?? null;
                 if (null !== $vector) {
                     $this->repository->storeEmbedding($row['id'], $row['hash'], $vector, $result['modelId']);
+                    ++$embedded;
+                } else {
+                    ++$failed;
                 }
             }
             $done += count($rows);
         }
 
-        return $done;
+        return ['embedded' => $embedded, 'failed' => $failed];
     }
 
     /**

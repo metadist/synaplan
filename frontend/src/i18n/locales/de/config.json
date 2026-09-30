@@ -195,7 +195,8 @@
       "scopes": {
         "documents": "Dokumente (RAG)",
         "memories": "Nutzer-Erinnerungen",
-        "all": "Alle Embeddings"
+        "all": "Alle Embeddings",
+        "search": "Smart-Search-Index"
       },
       "breakdown": {
         "title": "Aufschlüsselung pro Bereich"

@@ -662,6 +662,59 @@
         "title": "Última medición",
         "line": "El {date}: encontró el fragmento correcto {recallOff} de las veces sin reordenación, {recallOn} con ella. Las respuestas más lentas tardaron {p95Off} ms sin y {p95On} ms con."
       }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "Los modelos detrás de la paleta de búsqueda (Ctrl/Cmd+K). Mientras no elijas uno aquí, ambos siguen tus demás ajustes de IA.",
+      "loading": "Cargando los modelos de búsqueda…",
+      "loadFailed": "No se pudieron cargar los modelos de búsqueda.",
+      "noModel": "ningún modelo",
+      "undo": "Deshacer",
+      "ai": {
+        "label": "Modelo de IA para preguntas de búsqueda",
+        "hint": "Lee una pregunta escrita en la paleta y señala el mejor resultado. Nunca cambia nada por sí mismo.",
+        "inherit": "Igual que el modelo de herramientas: {model}",
+        "ready": "{model} responde las preguntas de búsqueda.",
+        "off": "La ayuda de IA en la búsqueda está desactivada, por eso la paleta no muestra ninguna fila de IA.",
+        "openFlag": "Activarla en Funciones",
+        "unavailable": "El modelo elegido no puede responder ahora, por eso la paleta no muestra ninguna fila de IA. Elige otro modelo o configura su proveedor.",
+        "saved": "Las preguntas de búsqueda usan ahora {model}.",
+        "restored": "Las preguntas de búsqueda vuelven a usar {model}."
+      },
+      "embed": {
+        "label": "Modelo de embedding para el índice de búsqueda",
+        "hint": "Encuentra páginas, ajustes, chats y archivos por su significado. Cambiarlo vuelve a leer todo el índice en segundo plano.",
+        "inherit": "Igual que el modelo de embedding de los documentos: {model}",
+        "separate": "La búsqueda y los documentos usan modelos de embedding distintos, por eso cada búsqueda hace dos llamadas cortas de embedding.",
+        "otherRun": "Hay otro cambio de embedding en curso. Podrás cambiar este modelo cuando termine.",
+        "confirmTitle": "¿Cambiar el modelo de embedding de la búsqueda?",
+        "confirmMessage": "La búsqueda vuelve a leer {count} entradas con {model} en segundo plano, una llamada corta de embedding por entrada. Hasta que una entrada esté lista, solo se encuentra por palabras clave. Si el cambio falla, la búsqueda sigue con {current}.",
+        "confirm": "Cambiar y volver a leer",
+        "started": "La búsqueda se está pasando a {model}. Puedes seguir el progreso aquí.",
+        "savedNoRun": "La búsqueda usa {model}. El índice ya encaja, así que no hubo que volver a leer nada."
+      },
+      "reason": {
+        "notPulled": "no descargado en Ollama",
+        "providerUnavailable": "sin clave de API para {service}"
+      },
+      "index": {
+        "empty": "El índice de búsqueda aún está vacío. Se llena a medida que se usa Synaplan.",
+        "keywordOnly": "La búsqueda solo encuentra por palabras clave hasta que el índice se haya leído con el modelo de embedding.",
+        "coverage": "{embedded} de {rows} entradas del índice se pueden encontrar por su significado."
+      },
+      "run": {
+        "running": "Volviendo a leer el índice con {model}: {done} de {total}. La búsqueda sigue funcionando mientras tanto.",
+        "completed": "El índice de búsqueda usa {model}.",
+        "partial": "El índice de búsqueda usa {model}. {count} entradas no se pudieron leer y solo se encuentran por palabras clave hasta que cambien.",
+        "failed": "No se pudo pasar el índice a {model}, así que la búsqueda vuelve a usar {previous}. Las entradas ya pasadas solo se encuentran por palabras clave hasta que se vuelvan a leer. Elige un modelo arriba para intentarlo de nuevo.",
+        "cancelled": "Se detuvo el paso del índice a {model}. La búsqueda sigue con {previous}."
+      },
+      "refused": {
+        "invalid_model": "{model} no se puede usar para la búsqueda ahora. Se mantiene el modelo anterior.",
+        "probe_failed": "{model} no respondió a una llamada de prueba, así que no se cambió nada.",
+        "run_in_progress": "Hay otro cambio de embedding en curso. No se cambió nada; inténtalo de nuevo cuando termine.",
+        "unknown": "No se pudo cambiar el modelo. Se mantiene el anterior."
+      }
     }
   },
   "providerHelp": {

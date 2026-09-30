@@ -27,7 +27,11 @@ interface Destination {
   label: string
   breadcrumb: string
   icon: Component
+  /** i18n key of extra search words (all locales) for a section inside a page. */
+  synonymsKey?: string
 }
+
+const AI_SETUP_PATH = '/admin/setup'
 
 /**
  * Destinations the palette can open. Primary navigation comes from
@@ -48,12 +52,17 @@ export function usePageSources() {
         continue
       }
       for (const child of item.children) {
-        list.push({
-          path: child.path,
-          label: child.label,
-          breadcrumb: child.group ? `${item.label} › ${child.group}` : item.label,
-          icon: item.icon,
-        })
+        const breadcrumb = child.group ? `${item.label} › ${child.group}` : item.label
+        list.push({ path: child.path, label: child.label, breadcrumb, icon: item.icon })
+        if (child.path === AI_SETUP_PATH) {
+          list.push({
+            path: `${AI_SETUP_PATH}?tab=search`,
+            label: String(t('aiInfra.searchModels.title')),
+            breadcrumb: `${breadcrumb} › ${child.label} › ${String(t('adminSetup.tabs.search'))}`,
+            icon: item.icon,
+            synonymsKey: 'search.palette.synonyms.search_models',
+          })
+        }
       }
     }
 
@@ -136,6 +145,7 @@ export function usePageSources() {
         ...(routeName
           ? allLocaleTexts(`search.palette.synonyms.${routeName.replace(/-/g, '_')}`)
           : []),
+        ...(dest.synonymsKey ? allLocaleTexts(dest.synonymsKey) : []),
         dest.path.replace(/[/-]/g, ' '),
       ]
       const id = `page:${dest.path}`

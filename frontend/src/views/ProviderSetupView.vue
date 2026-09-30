@@ -73,6 +73,7 @@
             testid="ai-search-accordion"
           />
         </section>
+        <SmartSearchModelsCard />
         <section class="space-y-3" aria-labelledby="ai-search-rerank">
           <h2 id="ai-search-rerank" class="text-lg font-semibold txt-primary">
             {{ $t('aiInfra.rerank.title') }}
@@ -117,6 +118,7 @@ import RestartRequiredBanner from '@/components/admin/RestartRequiredBanner.vue'
 import ExtractionPlugTab from '@/components/admin/plugs/ExtractionPlugTab.vue'
 import ModelsAndKeysTab from '@/components/admin/plugs/ModelsAndKeysTab.vue'
 import RerankPlugTab from '@/components/admin/plugs/RerankPlugTab.vue'
+import SmartSearchModelsCard from '@/components/admin/search/SmartSearchModelsCard.vue'
 import { modelsNeedingAttention } from '@/composables/useNavItems'
 import { useSystemConfig } from '@/composables/useSystemConfig'
 import { AI_TAB_SECTIONS, isAiTabId, type AiTabId } from '@/constants/operateSettings'

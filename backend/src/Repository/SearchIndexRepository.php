@@ -210,6 +210,49 @@ final readonly class SearchIndexRepository
     }
 
     /**
+     * Rows per owner that still need a vector from `$modelId`.
+     *
+     * @return array<int, int> owner id => pending rows
+     */
+    public function pendingCountsByUser(int $modelId): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+                SELECT BUSERID, COUNT(*) AS PENDING
+                FROM BSEARCHINDEX
+                WHERE BEMBED IS NULL OR BEMBEDMODELID IS NULL OR BEMBEDMODELID <> :modelId
+                GROUP BY BUSERID
+            SQL,
+            ['modelId' => $modelId],
+            ['modelId' => ParameterType::INTEGER],
+        );
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(int) $row['BUSERID']] = (int) $row['PENDING'];
+        }
+
+        return $counts;
+    }
+
+    /**
+     * @return array{rows: int, embedded: int} embedded counts rows with a vector from `$modelId`
+     */
+    public function embeddingCoverage(?int $modelId): array
+    {
+        $row = $this->connection->fetchAssociative(
+            'SELECT COUNT(*) AS ROWS_TOTAL, COALESCE(SUM(BEMBED IS NOT NULL AND BEMBEDMODELID = :modelId), 0) AS ROWS_EMBEDDED FROM BSEARCHINDEX',
+            ['modelId' => $modelId ?? 0],
+            ['modelId' => ParameterType::INTEGER],
+        );
+
+        return [
+            'rows' => (int) ($row['ROWS_TOTAL'] ?? 0),
+            'embedded' => (int) ($row['ROWS_EMBEDDED'] ?? 0),
+        ];
+    }
+
+    /**
      * Stores a vector unless the row's text changed after it was read
      * (`$hash` guard), so a slow embed never overwrites a newer text.
      *

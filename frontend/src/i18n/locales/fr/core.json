@@ -348,7 +348,8 @@
         "statistics": "statistiques utilisation coûts jetons",
         "chats": "tous les chats historique conversations",
         "chats_incoming": "entrants partagés avec moi chats",
-        "my_groups": "groupes équipes membres"
+        "my_groups": "groupes équipes membres",
+        "search_models": "recherche intelligente modèle de recherche modèle d’embedding index de recherche"
       },
       "remote": {
         "searching": "Recherche dans vos chats, fichiers et souvenirs…",

@@ -662,6 +662,59 @@
         "title": "Son ölçüm",
         "line": "{date} tarihinde: doğru parça yeniden sıralama olmadan {recallOff}, onunla {recallOn}. En yavaş yanıtlar {p95Off} ms olmadan, {p95On} ms onunla."
       }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "Arama paletinin (Ctrl/Cmd+K) arkasındaki modeller. Burada bir model seçmediğin sürece ikisi de diğer AI ayarlarını izler.",
+      "loading": "Arama modelleri yükleniyor…",
+      "loadFailed": "Arama modelleri yüklenemedi.",
+      "noModel": "model yok",
+      "undo": "Geri al",
+      "ai": {
+        "label": "Arama soruları için AI modeli",
+        "hint": "Palete yazılan bir soruyu okur ve en iyi sonucu gösterir. Kendi başına hiçbir şeyi değiştirmez.",
+        "inherit": "Araç modeliyle aynı: {model}",
+        "ready": "Arama sorularını {model} yanıtlıyor.",
+        "off": "Aramada AI yardımı kapalı, bu yüzden palet AI satırı göstermiyor.",
+        "openFlag": "Özellikler bölümünden aç",
+        "unavailable": "Seçilen model şu anda yanıt veremiyor, bu yüzden palet AI satırı göstermiyor. Başka bir model seç veya sağlayıcısını kur.",
+        "saved": "Arama soruları artık {model} kullanıyor.",
+        "restored": "Arama soruları yeniden {model} kullanıyor."
+      },
+      "embed": {
+        "label": "Arama dizini için embedding modeli",
+        "hint": "Sayfaları, ayarları, sohbetleri ve dosyaları anlamlarına göre bulur. Değiştirmek tüm dizini arka planda yeniden okur.",
+        "inherit": "Belgelerin embedding modeliyle aynı: {model}",
+        "separate": "Arama ve belgeler farklı embedding modelleri kullanıyor, bu yüzden her arama iki kısa embedding çağrısı yapar.",
+        "otherRun": "Başka bir embedding değişikliği sürüyor. Bitince bu modeli değiştirebilirsin.",
+        "confirmTitle": "Aramanın embedding modeli değiştirilsin mi?",
+        "confirmMessage": "Arama {count} girdiyi arka planda {model} ile yeniden okur, her biri için kısa bir embedding çağrısı. Bir girdi bitene kadar yalnızca anahtar kelimelerle bulunur. Değişiklik başarısız olursa arama {current} ile devam eder.",
+        "confirm": "Değiştir ve yeniden oku",
+        "started": "Arama {model} modeline geçiyor. İlerlemeyi burada izleyebilirsin.",
+        "savedNoRun": "Arama {model} kullanıyor. Dizin zaten uygun, hiçbir şeyin yeniden okunması gerekmedi."
+      },
+      "reason": {
+        "notPulled": "Ollama'da indirilmedi",
+        "providerUnavailable": "{service} için API anahtarı yok"
+      },
+      "index": {
+        "empty": "Arama dizini henüz boş. Synaplan kullanıldıkça dolar.",
+        "keywordOnly": "Dizin embedding modeliyle okunana kadar arama yalnızca anahtar kelimelerle bulur.",
+        "coverage": "{rows} dizin girdisinden {embedded} tanesi anlamına göre bulunabilir."
+      },
+      "run": {
+        "running": "Dizin {model} ile yeniden okunuyor: {total} girdiden {done} tanesi. Arama bu sırada çalışmaya devam eder.",
+        "completed": "Arama dizini {model} kullanıyor.",
+        "partial": "Arama dizini {model} kullanıyor. {count} girdi okunamadı ve değişene kadar yalnızca anahtar kelimelerle bulunur.",
+        "failed": "Dizinin {model} modeline geçişi başarısız oldu, bu yüzden arama yeniden {previous} kullanıyor. Zaten geçirilmiş girdiler yeniden okunana kadar yalnızca anahtar kelimelerle bulunur. Yeniden denemek için yukarıdan bir model seç.",
+        "cancelled": "Dizinin {model} modeline geçişi durduruldu. Arama {previous} ile devam ediyor."
+      },
+      "refused": {
+        "invalid_model": "{model} şu anda arama için kullanılamıyor. Önceki model kalıyor.",
+        "probe_failed": "{model} bir test çağrısına yanıt vermedi, bu yüzden hiçbir şey değiştirilmedi.",
+        "run_in_progress": "Başka bir embedding değişikliği sürüyor. Hiçbir şey değiştirilmedi; bitince yeniden dene.",
+        "unknown": "Model değiştirilemedi. Önceki model kalıyor."
+      }
     }
   },
   "providerHelp": {

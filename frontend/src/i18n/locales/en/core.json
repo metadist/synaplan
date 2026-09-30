@@ -348,7 +348,8 @@
         "statistics": "statistics usage costs tokens analytics",
         "chats": "all chats history conversations",
         "chats_incoming": "incoming shared with me chats",
-        "my_groups": "groups teams members"
+        "my_groups": "groups teams members",
+        "search_models": "smart search search model embedding model search index ai search palette"
       },
       "remote": {
         "searching": "Searching your chats, files and memories…",

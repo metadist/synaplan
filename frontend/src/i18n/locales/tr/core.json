@@ -337,7 +337,8 @@
         "statistics": "istatistikler kullanım maliyet token",
         "chats": "tüm sohbetler geçmiş konuşmalar",
         "chats_incoming": "gelen benimle paylaşılan sohbetler",
-        "my_groups": "gruplar takımlar üyeler"
+        "my_groups": "gruplar takımlar üyeler",
+        "search_models": "akıllı arama arama modeli embedding modeli arama dizini"
       },
       "remote": {
         "searching": "Sohbetlerin, dosyaların ve anıların aranıyor…",

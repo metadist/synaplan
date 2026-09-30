@@ -11,6 +11,8 @@ use App\Repository\RevectorizeRunRepository;
 use App\Service\Embedding\EmbeddingReindexService;
 use App\Service\Embedding\VectorizeBindingService;
 use App\Service\ModelConfigService;
+use App\Service\SmartSearch\Index\SearchIndexReembedder;
+use App\Service\SmartSearch\SearchModelConfigService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -39,6 +41,8 @@ final class ReVectorizeMessageHandlerTest extends TestCase
     private QdrantClientInterface&MockObject $qdrantClient;
     private ModelConfigService&MockObject $modelConfigService;
     private EntityManagerInterface&MockObject $em;
+    private SearchIndexReembedder&MockObject $searchReembedder;
+    private SearchModelConfigService&MockObject $searchModels;
     private ReVectorizeMessageHandler $handler;
 
     protected function setUp(): void
@@ -49,6 +53,8 @@ final class ReVectorizeMessageHandlerTest extends TestCase
         $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->searchReembedder = $this->createMock(SearchIndexReembedder::class);
+        $this->searchModels = $this->createMock(SearchModelConfigService::class);
 
         $this->handler = new ReVectorizeMessageHandler(
             $this->runRepository,
@@ -58,7 +64,43 @@ final class ReVectorizeMessageHandlerTest extends TestCase
             $this->modelConfigService,
             $this->em,
             new NullLogger(),
+            $this->searchReembedder,
+            $this->searchModels,
         );
+    }
+
+    public function testSearchScopeRunsTheIndexReembedderOnly(): void
+    {
+        $run = $this->makeRun(RevectorizeRun::SCOPE_SEARCH, RevectorizeRun::STATUS_QUEUED, fromId: 10, toId: 20);
+        $this->runRepository->method('find')->willReturn($run);
+
+        $this->reindexService->expects($this->never())->method('execute');
+        $this->searchReembedder->expects($this->once())->method('execute')
+            ->willReturnCallback(static function (RevectorizeRun $r): void {
+                $r->incrementChunksProcessed(12);
+            });
+        $this->searchModels->expects($this->never())->method('restoreEmbedModel');
+
+        $this->handler->__invoke(new ReVectorizeMessage(1));
+
+        $this->assertSame(RevectorizeRun::STATUS_COMPLETED, $run->getStatus());
+    }
+
+    public function testSearchScopeFailureRestoresTheSearchSlotNotVectorize(): void
+    {
+        $run = $this->makeRun(RevectorizeRun::SCOPE_SEARCH, RevectorizeRun::STATUS_QUEUED, fromId: 10, toId: 20);
+        $this->runRepository->method('find')->willReturn($run);
+
+        $this->searchReembedder->method('execute')->willReturnCallback(static function (RevectorizeRun $r): void {
+            $r->incrementChunksFailed(8);
+        });
+        $this->searchModels->expects($this->once())->method('restoreEmbedModel')->with(10);
+        $this->bindingService->expects($this->never())->method('setVectorizeModel');
+        $this->qdrantClient->expects($this->never())->method('recreateMemoriesCollection');
+
+        $this->handler->__invoke(new ReVectorizeMessage(1));
+
+        $this->assertSame(RevectorizeRun::STATUS_FAILED, $run->getStatus());
     }
 
     public function testReturnsEarlyWhenRunIsMissing(): void
