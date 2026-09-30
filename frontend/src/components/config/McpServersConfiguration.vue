@@ -627,12 +627,19 @@ const startEdit = (server: McpServer) => {
   void revealEditor()
 }
 
-/** The form sits below the server list and the task switches, so opening it
- *  without scrolling leaves it off-screen. */
+/** The form sits below the server list and the task switches. Scroll it into
+ *  view, and move focus into the form so the next Tab stays there. */
 const revealEditor = async () => {
   editorOpen.value = true
   await nextTick()
-  editorSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const editor = editorSection.value
+  if (!editor) {
+    return
+  }
+  editor
+    .querySelector<HTMLElement>('input, textarea, select, button')
+    ?.focus({ preventScroll: true })
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 const closeEditor = () => {

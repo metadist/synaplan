@@ -105,6 +105,21 @@ const mountOptions = {
   },
 }
 
+// Opening the editor scrolls it into view. The environment does not have to
+// provide Element.scrollIntoView, and every test in this file that opens the
+// form (Edit and Add) hits that path.
+const scrollIntoView = vi.fn()
+const previousScrollIntoView = Element.prototype.scrollIntoView
+
+beforeEach(() => {
+  Element.prototype.scrollIntoView = scrollIntoView
+  scrollIntoView.mockClear()
+})
+
+afterEach(() => {
+  Element.prototype.scrollIntoView = previousScrollIntoView
+})
+
 describe('McpServersConfiguration — task usage panel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -137,20 +152,23 @@ describe('McpServersConfiguration — task usage panel', () => {
     expect((toggle.element as HTMLInputElement).checked).toBe(true)
   })
 
-  it('scrolls the edit form into view when Edit is pressed', async () => {
-    const scrollIntoView = vi
-      .spyOn(Element.prototype, 'scrollIntoView')
-      .mockImplementation(() => {})
-
+  it('scrolls the edit form into view and focuses its first field', async () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(() => {})
     const wrapper = mount(McpServersConfiguration, mountOptions)
     await flushPromises()
 
     await wrapper.find('[data-testid="btn-mcp-edit-3"]').trigger('click')
     await flushPromises()
 
+    const name = wrapper.get('[data-testid="input-mcp-name"]').element
     expect(wrapper.find('[data-testid="section-mcp-editor"]').exists()).toBe(true)
+    expect(focus.mock.instances).toContain(name)
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true })
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
-    scrollIntoView.mockRestore()
+    expect(focus.mock.invocationCallOrder[0]).toBeLessThan(
+      scrollIntoView.mock.invocationCallOrder[0]
+    )
+    focus.mockRestore()
   })
 
   it('hides the whole panel when no servers are connected', async () => {
