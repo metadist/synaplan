@@ -24,6 +24,7 @@ final class OpenAiReasoningEffortTest extends TestCase
         return [
             'gpt-6-sol' => ['gpt-6-sol', 'none'],
             'gpt-6-luna' => ['gpt-6-luna', 'none'],
+            'gpt-6.1-sol' => ['gpt-6.1-sol', 'low'],
             'gpt-6-astra' => ['gpt-6-astra', 'low'],
             'gpt-6' => ['gpt-6', 'low'],
             'gpt-5.6' => ['gpt-5.6', 'none'],

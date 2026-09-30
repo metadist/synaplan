@@ -180,7 +180,7 @@ Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped befor
 
 | Client request | `reasoning.effort` |
 | -------------- | ------------------ |
-| no `thinking`, or `thinking.type: "disabled"` | the family's cheapest tier (`none` on GPT-6 Sol / Luna, `low` on GPT-6 Astra) |
+| no `thinking`, or `thinking.type: "disabled"` | the family's cheapest tier (`none` on GPT-6 Sol / Luna, `low` on GPT-6 Astra and GPT-6.1 Sol) |
 | `output_config.effort` | that tier |
 | `thinking.budget_tokens` below 4096 / 16384 / 32768 / above | `low` / `medium` / `high` / `xhigh` |
 | `thinking` without effort or budget | `medium` |
