@@ -1422,9 +1422,14 @@ jobs:
     # way deploy/README.md tells an operator to, from the production template
     # deploy/compose.yaml and its pinned third-party images, and runs the same
     # smoke test the AMI release build runs.
+    #
+    # Pull requests only. Any failed job fails the CI run: on main that stops
+    # the release tag from promoting the tested images, and on a tag it stops
+    # release-publish.yml and the AMI build.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker-build]
+    if: github.event_name == 'pull_request'
     env:
       # Compose merges the host environment over deploy/.env, so the operator
       # file stays the unmodified example. The tag exists only locally, hence
@@ -2425,7 +2430,6 @@ jobs:
               require "Build Docker Image" "$DOCKER_BUILD"
               require "E2E Tests" "$E2E"
               require "E2E Visual Snapshots" "$E2E_VISUAL"
-              require "Deploy Smoke Test (self-host)" "$DEPLOY_SMOKE"
               if [ "$EVENT" = push ] && { [ "$REF" = refs/heads/main ] || [[ "$REF" == refs/tags/* ]]; }; then
                 require "Publish amd64 Image" "$PUSH_AMD64"
                 require "Publish arm64 Image" "$PUSH_ARM64"
@@ -2434,6 +2438,7 @@ jobs:
               fi
               if [ "$EVENT" = pull_request ]; then
                 require "Cloudflare Worker Check" "$CF_CHECK"
+                require "Deploy Smoke Test (self-host)" "$DEPLOY_SMOKE"
               fi
               ;;
             thin)
