@@ -16,10 +16,10 @@ use App\Service\EmailChatService;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
-use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -71,12 +71,14 @@ class WhatsAppServiceTest extends TestCase
     private $lockFactory;
     /** @var EmailChatService&\PHPUnit\Framework\MockObject\MockObject */
     private $emailChatService;
-    /** @var UserMemoryService&\PHPUnit\Framework\MockObject\MockObject */
-    private $memoryService;
-    /** @var \App\Service\Digest\MessageReferenceResolver&\PHPUnit\Framework\MockObject\MockObject */
-    private $messageReferenceResolver;
+    /** @var ExternalReplyReferences&\PHPUnit\Framework\MockObject\MockObject */
+    private $externalReplyReferences;
     /** @var ConversationSummaryRefreshDispatcher&\PHPUnit\Framework\MockObject\MockObject */
     private $summaryRefreshDispatcher;
+    /** @var list<object> */
+    private array $persisted = [];
+    /** @var (\Closure(string): string)|null */
+    private ?\Closure $docTags = null;
     private ChatErrorPresenter $chatErrorPresenter;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
@@ -113,10 +115,12 @@ class WhatsAppServiceTest extends TestCase
         $this->lockFactory->method('createLock')->willReturn($lock);
 
         $this->emailChatService = $this->createMock(EmailChatService::class);
-        $this->memoryService = $this->createMock(UserMemoryService::class);
-        $this->memoryService->method('resolveMemoryTags')->willReturnArgument(0);
-        $this->messageReferenceResolver = $this->createMock(\App\Service\Digest\MessageReferenceResolver::class);
-        $this->messageReferenceResolver->method('resolveMessageTags')->willReturnArgument(0);
+        $this->externalReplyReferences = $this->createMock(ExternalReplyReferences::class);
+        $this->externalReplyReferences->method('resolve')->willReturnArgument(0);
+        $this->externalReplyReferences->method('resolveStored')->willReturnArgument(0);
+        $this->externalReplyReferences->method('resolveDocTags')->willReturnCallback(
+            fn (string $text): string => null !== $this->docTags ? ($this->docTags)($text) : $text,
+        );
         $this->summaryRefreshDispatcher = $this->createMock(ConversationSummaryRefreshDispatcher::class);
         // Real presenter over an identity translator: classification stays under
         // test while the catalog lookup collapses to the translation key.
@@ -139,8 +143,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $this->lockFactory,
             $this->emailChatService,
-            $this->memoryService,
-            $this->messageReferenceResolver,
+            $this->externalReplyReferences,
             $this->summaryRefreshDispatcher,
             $this->chatErrorPresenter,
             'test_token',
@@ -171,8 +174,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $this->lockFactory,
             $this->emailChatService,
-            $this->memoryService,
-            $this->messageReferenceResolver,
+            $this->externalReplyReferences,
             $this->summaryRefreshDispatcher,
             $this->chatErrorPresenter,
             'test_token',
@@ -199,8 +201,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $this->lockFactory,
             $this->emailChatService,
-            $this->memoryService,
-            $this->messageReferenceResolver,
+            $this->externalReplyReferences,
             $this->summaryRefreshDispatcher,
             $this->chatErrorPresenter,
             'test_token',
@@ -418,8 +419,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $this->lockFactory,
             $this->emailChatService,
-            $this->memoryService,
-            $this->messageReferenceResolver,
+            $this->externalReplyReferences,
             $this->summaryRefreshDispatcher,
             $this->chatErrorPresenter,
             'test_token',
@@ -1247,8 +1247,7 @@ class WhatsAppServiceTest extends TestCase
             $cacheWithHit,
             $lockFactory,
             $this->emailChatService,
-            $this->memoryService,
-            $this->messageReferenceResolver,
+            $this->externalReplyReferences,
             $this->summaryRefreshDispatcher,
             $this->chatErrorPresenter,
             'test_token',
@@ -1592,8 +1591,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $lockFactory,
             $this->emailChatService,
-            $this->memoryService,
-            $this->messageReferenceResolver,
+            $this->externalReplyReferences,
             $this->summaryRefreshDispatcher,
             $this->chatErrorPresenter,
             'test_token',
@@ -1988,8 +1986,10 @@ class WhatsAppServiceTest extends TestCase
 
         // Doctrine would assign the id on flush; setMeta() needs it (MessageMeta
         // mirrors message.id into its typed int column). Simulate on persist.
+        $this->persisted = [];
         $nextId = 1000;
-        $this->em->method('persist')->willReturnCallback(static function (object $entity) use (&$nextId): void {
+        $this->em->method('persist')->willReturnCallback(function (object $entity) use (&$nextId): void {
+            $this->persisted[] = $entity;
             if ($entity instanceof Message && null === $entity->getId()) {
                 $idProp = new \ReflectionProperty(Message::class, 'id');
                 $idProp->setValue($entity, ++$nextId);
@@ -2041,6 +2041,42 @@ class WhatsAppServiceTest extends TestCase
             ->with(777, 1);
 
         $this->dispatchTurn(['content' => 'Hello back!', 'metadata' => []]);
+    }
+
+    public function testDocReferencesBecomeLinksOnWhatsAppAndStayTaggedInTheChat(): void
+    {
+        $this->docTags = static fn (string $text): string => str_replace(
+            '[Doc:using-synaplan]',
+            '[Using Synaplan](https://docs.example/using-synaplan)',
+            $text,
+        );
+
+        $docs = [[
+            'slug' => 'using-synaplan',
+            'title' => 'Using Synaplan',
+            'url' => 'https://docs.example/using-synaplan',
+        ]];
+        $sends = $this->dispatchTurn([
+            'content' => 'See [Doc:using-synaplan].',
+            'metadata' => ['docs' => $docs],
+        ]);
+
+        $this->assertSame('text', $sends[0]['type']);
+        $this->assertStringContainsString('Using Synaplan (https://docs.example/using-synaplan)', $sends[0]['text']['body']);
+        $this->assertStringNotContainsString('[Doc:', $sends[0]['text']['body']);
+
+        $outgoing = array_values(array_filter(
+            $this->persisted,
+            static fn (object $entity): bool => $entity instanceof Message && 'OUT' === $entity->getDirection(),
+        ));
+        $this->assertNotEmpty($outgoing);
+        $stored = $outgoing[array_key_last($outgoing)];
+        $this->assertInstanceOf(Message::class, $stored);
+        $this->assertSame('See [Doc:using-synaplan].', $stored->getText());
+        $this->assertSame(
+            json_encode($docs, JSON_UNESCAPED_SLASHES),
+            $stored->getMeta('docs'),
+        );
     }
 
     /**

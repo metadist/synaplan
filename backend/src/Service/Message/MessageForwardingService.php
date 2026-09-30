@@ -8,8 +8,6 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Service\AiResponseSanitizer;
-use App\Service\Digest\MessageReferenceResolver;
-use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -26,8 +24,7 @@ final readonly class MessageForwardingService
     public function __construct(
         private WhatsAppService $whatsAppService,
         private MessageRepository $messageRepository,
-        private UserMemoryService $memoryService,
-        private MessageReferenceResolver $messageReferenceResolver,
+        private ExternalReplyReferences $references,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -57,8 +54,7 @@ final readonly class MessageForwardingService
             return;
         }
 
-        $text = $this->resolveMemoryTagsForChat($chat, $text);
-        $text = $this->resolveMessageTagsForChat($chat, $text);
+        $text = $this->resolveForChannel($chat, $text);
 
         $this->forwardToWhatsApp($chat, $text);
     }
@@ -97,52 +93,42 @@ final readonly class MessageForwardingService
     }
 
     /**
-     * Replace [Memory:ID] tags with their actual values so external
-     * channel users see readable text instead of raw badge markers.
+     * Memory, message and doc tags become readable text. Doc tags do not need
+     * the chat owner; memory and message tags are stripped when the owner is
+     * gone, so a raw id never reaches the phone.
      */
-    private function resolveMemoryTagsForChat(Chat $chat, string $text): string
+    private function resolveForChannel(Chat $chat, string $text): string
     {
-        if (!str_contains($text, '[Memory:')) {
+        $needsOwner = str_contains($text, '[Memory:') || false !== stripos($text, '[message');
+        $hasDocs = false !== stripos($text, '[doc');
+        if (!$needsOwner && !$hasDocs) {
             return $text;
+        }
+        if (!$needsOwner) {
+            return $this->references->resolveDocTags($text);
         }
 
         $user = $this->em->getRepository(User::class)->find($chat->getUserId());
-        if (!$user) {
+        if (!$user instanceof User) {
             $this->logger->warning('Unable to resolve memory tags: chat owner user not found', [
                 'chat_id' => $chat->getId(),
                 'user_id' => $chat->getUserId(),
             ]);
 
-            return self::stripMemoryTags($text);
+            return $this->references->resolveDocTags(self::stripUnownedTags($text));
         }
 
-        return $this->memoryService->resolveMemoryTags($text, $user);
+        return $this->references->resolve($text, $user);
     }
 
     /**
-     * Strip [Memory:ID] tags from text when they cannot be safely resolved.
+     * Strip memory and message tags when they cannot be safely resolved.
      */
-    private static function stripMemoryTags(string $text): string
+    private static function stripUnownedTags(string $text): string
     {
-        return (string) preg_replace('/\[Memory\s*:\s*\d+\.{0,3}\]/i', '', $text);
-    }
+        $text = (string) preg_replace('/\[Memory\s*:\s*\d+\.{0,3}\]/i', '', $text);
 
-    /**
-     * Replace [Message:ID] digest-reference tags with a readable inline form
-     * (the digest title) so external channel users don't see raw markers.
-     */
-    private function resolveMessageTagsForChat(Chat $chat, string $text): string
-    {
-        if (false === stripos($text, '[message')) {
-            return $text;
-        }
-
-        $user = $this->em->getRepository(User::class)->find($chat->getUserId());
-        if (!$user) {
-            return (string) preg_replace('/\[Message\s*:\s*\d+\.{0,3}\]/i', '', $text);
-        }
-
-        return $this->messageReferenceResolver->resolveMessageTags($text, $user);
+        return (string) preg_replace('/\[Message\s*:\s*\d+\.{0,3}\]/i', '', $text);
     }
 
     private function forwardToWhatsApp(Chat $chat, string $text): void

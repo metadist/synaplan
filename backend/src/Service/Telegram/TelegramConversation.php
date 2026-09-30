@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Telegram;
 
 use App\Entity\Chat;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Realtime\Notifier\ChatActivityNotifier;
@@ -15,8 +16,10 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
+use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
 use App\Service\UserMemoryService;
+use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -49,6 +52,8 @@ final readonly class TelegramConversation
         private MediaJobService $mediaJobs,
         private MediaJobMessageSync $mediaJobSync,
         private LoggerInterface $logger,
+        private PlatformDocReferenceResolver $docs,
+        private ClockInterface $clock,
         private string $frontendUrl,
     ) {
     }
@@ -249,7 +254,21 @@ final readonly class TelegramConversation
     private function respond(TelegramTurn $turn, Chat $chat, Message $inbound, array $options, ?Message $previous, ?int $replyTo, array $notes): void
     {
         $owner = $turn->owner;
-        $result = $this->processor->process($inbound, $options);
+        $alreadyAttached = [];
+        foreach ($inbound->getFiles() as $existing) {
+            $alreadyAttached[spl_object_id($existing)] = true;
+        }
+        $pulse = $this->typingPulse($turn);
+        $beat = static function () use ($pulse): void {
+            $pulse->beat();
+        };
+        $result = $this->processor->process(
+            $inbound,
+            $options + ['heartbeat' => $beat],
+            static function (array $status) use ($beat): void {
+                $beat();
+            },
+        );
 
         if (empty($result['success'])) {
             $sentence = $this->errors->presentFromResult($result, $turn->locale, false)->userText;
@@ -265,24 +284,29 @@ final readonly class TelegramConversation
         $files = TelegramOutgoingFile::fromMetadata($metadata);
         $jobs = $this->pendingJobs($metadata);
 
-        $reply = trim((string) (preg_replace(self::FILE_MARKER, '', (string) ($response['content'] ?? '')) ?? ''));
-        if ('' !== $reply) {
-            $reply = $this->memories->resolveMemoryTags($reply, $owner);
-            $reply = $this->references->resolveMessageTags($reply, $owner);
+        $content = (string) ($response['content'] ?? '');
+        $stored = trim($content);
+        if ('' !== $stored) {
+            $stored = $this->memories->resolveMemoryTags($stored, $owner);
+            $stored = $this->references->resolveMessageTags($stored, $owner);
         }
+        $channelReply = trim((string) (preg_replace(self::FILE_MARKER, '', $stored) ?? ''));
 
-        $recorded = $this->recordUsage($turn, $inbound, $metadata, $reply);
+        $recorded = $this->recordUsage($turn, $inbound, $metadata, $channelReply);
         $this->store->applyClassification($inbound, $classification);
         $this->store->setStatus($inbound, 'complete');
 
-        $stored = '' !== $reply || [] !== $files || [] !== $jobs ? $reply : $this->say($turn, 'empty_reply');
-        $outbound = $this->store->store($turn, $chat, $stored, 'OUT', 'complete', null, $classification, $files[0] ?? null, [
+        $generated = $this->claimGeneratedFiles($inbound, $alreadyAttached);
+        $hasAnswer = '' !== $stored || [] !== $files || [] !== $jobs || [] !== $generated;
+        $storedText = $hasAnswer ? $stored : $this->say($turn, 'empty_reply');
+        $outbound = $this->store->store($turn, $chat, $storedText, 'OUT', 'complete', null, $classification, $files[0] ?? null, [
             TelegramMessageStore::META_REPLY_TO => (string) $inbound->getId(),
-        ]);
+        ], $generated);
         $this->store->storeAnswerMeta($outbound, $metadata, $classification, $recorded, $search);
         $this->connections->noteExchange($turn->bot);
 
-        $text = $this->withSources($turn, $reply, $search);
+        $channelReply = '' !== $channelReply ? trim($this->docs->resolveDocTags($channelReply)) : '';
+        $text = $this->withSources($turn, $channelReply, $search);
         if ([] !== $jobs) {
             $text = $this->join($text, $this->jobAck($turn, $jobs));
         }
@@ -300,6 +324,29 @@ final readonly class TelegramConversation
             $this->store->supersede($previous, $outbound);
         }
         $this->bindJobs($jobs, $outId);
+    }
+
+    /**
+     * Files created while answering (documents, exports, edits) start on the
+     * inbound message. They belong to the answer, so the web chat and the
+     * next turn see them there. Uploads the person sent stay on the inbound.
+     *
+     * @param array<int, true> $alreadyAttached spl_object_id of files present before processing
+     *
+     * @return list<File>
+     */
+    private function claimGeneratedFiles(Message $inbound, array $alreadyAttached): array
+    {
+        $claimed = [];
+        foreach ($inbound->getFiles()->toArray() as $file) {
+            if (isset($alreadyAttached[spl_object_id($file)])) {
+                continue;
+            }
+            $inbound->removeFile($file);
+            $claimed[] = $file;
+        }
+
+        return $claimed;
     }
 
     /**
@@ -506,5 +553,22 @@ final readonly class TelegramConversation
         } catch (TelegramChannelException $e) {
             $this->noteDeliveryFailure($turn->bot, $e);
         }
+    }
+
+    /**
+     * Repeats the typing action while tokens and status updates arrive.
+     * The first action is already sent before processing starts.
+     */
+    private function typingPulse(TelegramTurn $turn): TelegramTypingPulse
+    {
+        return new TelegramTypingPulse(
+            $this->clock,
+            function () use ($turn): void {
+                $this->api->sendChatAction($turn->token, $turn->tgChatId, 'typing');
+            },
+            function (TelegramChannelException $e) use ($turn): void {
+                $this->noteDeliveryFailure($turn->bot, $e);
+            },
+        );
     }
 }

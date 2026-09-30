@@ -27,6 +27,7 @@ use App\Service\Message\ChatErrorView;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
+use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Telegram\TelegramAlbumBuffer;
 use App\Service\Telegram\TelegramBotApi;
 use App\Service\Telegram\TelegramCallbackService;
@@ -50,8 +51,10 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Lock\Exception\LockConflictedException;
 use Symfony\Component\Lock\Key;
 use Symfony\Component\Lock\LockFactory;
@@ -374,6 +377,55 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame(TelegramFileMethod::Document, $upload[2]);
         $this->assertSame('Report.docx', $upload[4]);
         $this->assertSame('Your report is ready.', $upload[5]);
+        $this->assertSame("Your report is ready.\n__FILE_GENERATED__:report.docx", $this->messages[1]->getText());
+    }
+
+    public function testAGeneratedDocumentMovesToTheAnswerAndIsNotALegacyFile(): void
+    {
+        $generated = new File();
+        $generated->setFileName('report.docx');
+        $id = new \ReflectionProperty(File::class, 'id');
+        $id->setValue($generated, 55);
+
+        $processor = $this->createMock(MessageProcessor::class);
+        $processor->method('process')->willReturnCallback(function (Message $message, array $options = []) use ($generated): array {
+            $this->assertIsCallable($options['heartbeat'] ?? null);
+            ($options['heartbeat'])();
+            $message->addFile($generated);
+
+            return [
+                'success' => true,
+                'classification' => ['topic' => 'officemaker', 'language' => 'en'],
+                'response' => [
+                    'content' => '__FILE_GENERATED__:report.docx',
+                    'metadata' => [
+                        'provider' => 'test',
+                        'model' => 'test-model',
+                        'model_id' => 1,
+                        'generated_file' => ['path' => '7/report.docx', 'filename' => 'Report.docx'],
+                    ],
+                ],
+                'search_results' => [],
+            ];
+        });
+
+        file_put_contents($this->uploadDir.'/7/report.docx', 'docx');
+        $service = $this->service(processor: $processor);
+
+        $service->handle(5, 1, $this->update(['text' => 'Write a report']));
+
+        $inbound = $this->messages[0];
+        $outbound = $this->messages[1];
+        $this->assertSame('__FILE_GENERATED__:report.docx', $outbound->getText());
+        $this->assertFalse($inbound->getFiles()->contains($generated));
+        $this->assertTrue($outbound->getFiles()->contains($generated));
+        $this->assertSame(0, $outbound->getFile());
+        $this->assertSame('', $outbound->getFilePath());
+        $upload = $this->call('sendFile');
+        $this->assertSame(TelegramFileMethod::Document, $upload[2]);
+        $this->assertSame('Report.docx', $upload[4]);
+        $this->assertSame('', $upload[5]);
+        $this->assertSame([], $this->texts());
     }
 
     public function testAFileThatIsGoneIsLinkedInstead(): void
@@ -467,7 +519,10 @@ final class TelegramInboundServiceTest extends TestCase
 
         $service->handle(5, 2, $this->press('a:'.$out->getId()));
 
-        $this->assertSame(['model_id' => 1, 'is_again' => true], $this->processed[1]);
+        $again = $this->processed[1];
+        $this->assertSame(1, $again['model_id']);
+        $this->assertTrue($again['is_again']);
+        $this->assertIsCallable($again['heartbeat']);
         $this->assertSame('cb-1', $this->call('answerCallbackQuery')[1]);
         $this->assertSame((string) $this->messages[2]->getId(), $out->getMeta(TelegramMessageStore::META_SUPERSEDED));
     }
@@ -705,6 +760,47 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame(['You have reached the message limit, so I did not answer. Try again once your limit resets.'], $this->texts());
     }
 
+    public function testDocReferencesBecomeLinksWhileTheStoredReplyKeepsTheTag(): void
+    {
+        $docs = $this->createMock(PlatformDocReferenceResolver::class);
+        $docs->method('resolveDocTags')->willReturnCallback(
+            static fn (string $text): string => str_replace(
+                '[Doc:using-synaplan]',
+                '[Using Synaplan](https://docs.example/using-synaplan)',
+                $text,
+            ),
+        );
+        $catalog = [[
+            'slug' => 'using-synaplan',
+            'title' => 'Using Synaplan',
+            'url' => 'https://docs.example/using-synaplan',
+        ]];
+        $service = $this->service(
+            reply: 'See [Doc:using-synaplan].',
+            extraMetadata: ['docs' => $catalog],
+            docs: $docs,
+        );
+
+        $service->handle(5, 1, $this->update(['text' => 'How do I use Synaplan?']));
+
+        $outgoing = array_values(array_filter(
+            $this->messages,
+            static fn (Message $message): bool => 'OUT' === $message->getDirection(),
+        ));
+        $this->assertSame('See [Doc:using-synaplan].', $outgoing[0]->getText());
+        $this->assertSame(json_encode($catalog, JSON_UNESCAPED_SLASHES), $outgoing[0]->getMeta('docs'));
+        $this->assertSame(
+            ['See [Using Synaplan](https://docs.example/using-synaplan).'],
+            $this->texts(),
+        );
+        $actions = array_values(array_filter(
+            $this->calls,
+            static fn (array $call): bool => 'sendChatAction' === $call['method'],
+        ));
+        $this->assertNotEmpty($actions);
+        $this->assertSame('typing', $actions[0]['args'][2]);
+    }
+
     /**
      * @param array<int, Chat>     $chats
      * @param array<string, mixed> $extraMetadata
@@ -732,6 +828,8 @@ final class TelegramInboundServiceTest extends TestCase
         ?MediaJobService $mediaJobs = null,
         ?FeedbackExampleService $feedback = null,
         ?MediaJobCanceller $canceller = null,
+        ?PlatformDocReferenceResolver $docs = null,
+        ?ClockInterface $clock = null,
     ): TelegramInboundService {
         $bot ??= $this->connectedBot();
         /** @var list<object> $pending */
@@ -830,6 +928,8 @@ final class TelegramInboundServiceTest extends TestCase
             $mediaJobs ??= $this->createStub(MediaJobService::class),
             $this->createStub(MediaJobMessageSync::class),
             new NullLogger(),
+            $docs ?? $this->docResolver(),
+            $clock ?? new NativeClock(),
             'https://app.example',
         );
 
@@ -985,6 +1085,9 @@ final class TelegramInboundServiceTest extends TestCase
 
             return [$nextId++];
         });
+        $api->method('sendChatAction')->willReturnCallback(function (string $token, string $chatId, string $action): void {
+            $this->calls[] = ['method' => 'sendChatAction', 'args' => [$token, $chatId, $action]];
+        });
         foreach (['sendFile', 'editMessageText', 'editMessageReplyMarkup', 'answerCallbackQuery'] as $method) {
             $api->method($method)->willReturnCallback(function (mixed ...$args) use ($method, &$nextId): mixed {
                 $this->calls[] = ['method' => $method, 'args' => array_values($args)];
@@ -1000,6 +1103,14 @@ final class TelegramInboundServiceTest extends TestCase
         return $api;
     }
 
+    private function docResolver(): PlatformDocReferenceResolver
+    {
+        $docs = $this->createMock(PlatformDocReferenceResolver::class);
+        $docs->method('resolveDocTags')->willReturnArgument(0);
+
+        return $docs;
+    }
+
     /**
      * @param array<string, mixed> $extraMetadata
      * @param array<string, mixed> $search
@@ -1007,8 +1118,15 @@ final class TelegramInboundServiceTest extends TestCase
     private function processor(?string $reply, ?string $failure, array $extraMetadata, array $search): MessageProcessor
     {
         $processor = $this->createMock(MessageProcessor::class);
-        $processor->method('process')->willReturnCallback(function (Message $message, array $options = []) use ($reply, $failure, $extraMetadata, $search): array {
+        $processor->method('process')->willReturnCallback(function (Message $message, array $options = [], ?callable $status = null) use ($reply, $failure, $extraMetadata, $search): array {
             $this->processed[] = $options;
+            $heartbeat = $options['heartbeat'] ?? null;
+            if (is_callable($heartbeat)) {
+                $heartbeat();
+            }
+            if (null !== $status) {
+                $status(['status' => 'generating', 'message' => 'Generating response...']);
+            }
             if (null !== $failure || null === $reply) {
                 return ['success' => false];
             }

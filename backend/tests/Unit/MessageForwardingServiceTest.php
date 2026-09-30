@@ -8,8 +8,8 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\MessageForwardingService;
-use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -21,8 +21,7 @@ class MessageForwardingServiceTest extends TestCase
 {
     private WhatsAppService&MockObject $whatsAppService;
     private MessageRepository&MockObject $messageRepository;
-    private UserMemoryService&MockObject $memoryService;
-    private \App\Service\Digest\MessageReferenceResolver&MockObject $messageReferenceResolver;
+    private ExternalReplyReferences&MockObject $references;
     private EntityManagerInterface&MockObject $em;
     private LoggerInterface&MockObject $logger;
     private MessageForwardingService $service;
@@ -31,21 +30,17 @@ class MessageForwardingServiceTest extends TestCase
     {
         $this->whatsAppService = $this->createMock(WhatsAppService::class);
         $this->messageRepository = $this->createMock(MessageRepository::class);
-        $this->memoryService = $this->createMock(UserMemoryService::class);
-        $this->messageReferenceResolver = $this->createMock(\App\Service\Digest\MessageReferenceResolver::class);
+        $this->references = $this->createMock(ExternalReplyReferences::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
-        $this->memoryService->method('resolveMemoryTags')
-            ->willReturnArgument(0);
-        $this->messageReferenceResolver->method('resolveMessageTags')
-            ->willReturnArgument(0);
+        $this->references->method('resolve')->willReturnArgument(0);
+        $this->references->method('resolveDocTags')->willReturnArgument(0);
 
         $this->service = new MessageForwardingService(
             $this->whatsAppService,
             $this->messageRepository,
-            $this->memoryService,
-            $this->messageReferenceResolver,
+            $this->references,
             $this->em,
             $this->logger,
         );
@@ -178,17 +173,16 @@ class MessageForwardingServiceTest extends TestCase
         $userRepo->expects(self::any())->method('find')->with(7)->willReturn($user);
         $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepo);
 
-        $this->memoryService = $this->createMock(UserMemoryService::class);
-        $this->memoryService->expects($this->once())
-            ->method('resolveMemoryTags')
+        $this->references = $this->createMock(ExternalReplyReferences::class);
+        $this->references->expects($this->once())
+            ->method('resolve')
             ->with('Hallo [Memory:12345]!', $user)
             ->willReturn('Hallo Cristian!');
 
         $this->service = new MessageForwardingService(
             $this->whatsAppService,
             $this->messageRepository,
-            $this->memoryService,
-            $this->messageReferenceResolver,
+            $this->references,
             $this->em,
             $this->logger,
         );

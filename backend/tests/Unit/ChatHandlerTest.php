@@ -577,6 +577,106 @@ class ChatHandlerTest extends TestCase
         $this->handler->handle($message, $thread, $classification);
     }
 
+    public function testHeartbeatOptionUsesChatStreamAndKeepsTheContent(): void
+    {
+        $message = $this->plainMessage('Hello');
+        $beats = 0;
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(function (array|string $messages, callable $callback): array {
+                $callback('Hel');
+                $callback(['type' => 'content', 'content' => 'lo']);
+                $callback(['type' => 'reasoning', 'content' => 'hidden']);
+
+                return [
+                    'provider' => 'test',
+                    'model' => 'test-model',
+                    'usage' => ['prompt_tokens' => 2],
+                    'response_id' => 'resp-1',
+                    'tool_calls' => [],
+                ];
+            });
+
+        $result = $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en'], null, [
+            'heartbeat' => function () use (&$beats): void {
+                ++$beats;
+            },
+        ]);
+
+        $this->assertSame('Hello', $result['content']);
+        $this->assertSame('test', $result['metadata']['provider']);
+        $this->assertSame(3, $beats);
+    }
+
+    public function testHandleHistoryHasNoTimestampStamp(): void
+    {
+        $message = $this->plainMessage('What next?');
+        $previous = $this->createMock(Message::class);
+        $previous->method('getDirection')->willReturn('OUT');
+        $previous->method('getText')->willReturn('I created the document.');
+        $previous->method('getDateTime')->willReturn('20260930062622');
+        $previous->method('getId')->willReturn(9);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $seen = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$seen): array {
+                $seen = $messages;
+
+                return ['content' => 'Next.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle($message, [$previous], ['topic' => 'CHAT', 'language' => 'en']);
+
+        $this->assertIsArray($seen);
+        $encoded = (string) json_encode($seen);
+        $this->assertStringNotContainsString('[20260930062622]', $encoded);
+        $this->assertStringContainsString('I created the document.', $encoded);
+    }
+
+    public function testHandleStripsALeadingEchoedTimestamp(): void
+    {
+        $message = $this->plainMessage('Make an audio of that.');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '[20260930062622]: I can make an audio of the document.',
+            'provider' => 'test',
+            'model' => 'test',
+        ]);
+
+        $result = $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
+
+        $this->assertSame('I can make an audio of the document.', $result['content']);
+    }
+
+    private function plainMessage(string $text): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn($text);
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260930062700');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        return $message;
+    }
+
     public function testHandleCallsProgressCallback(): void
     {
         $message = $this->createMock(Message::class);

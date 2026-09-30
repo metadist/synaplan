@@ -11,12 +11,13 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Realtime\Notifier\ChatActivityNotifier;
 use App\Service\Agent\AgentConfig;
-use App\Service\Digest\MessageReferenceResolver;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
 use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\MessageProcessor;
+use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
 use App\Service\WhatsApp\WhatsAppAgentBinding;
 use Doctrine\ORM\EntityManagerInterface;
@@ -101,8 +102,7 @@ final class WhatsAppService
         private CacheInterface $cache,
         private LockFactory $lockFactory,
         private EmailChatService $emailChatService,
-        private UserMemoryService $memoryService,
-        private MessageReferenceResolver $messageReferenceResolver,
+        private ExternalReplyReferences $externalReplyReferences,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatErrorPresenter $chatErrorPresenter,
         string $whatsappAccessToken,
@@ -903,9 +903,11 @@ final class WhatsAppService
             ];
         }
 
-        $responseText = $result['response']['content'] ?? $collectedResponse;
-        $responseText = $this->memoryService->resolveMemoryTags($responseText, $user);
-        $responseText = $this->messageReferenceResolver->resolveMessageTags($responseText, $user);
+        $responseText = (string) ($result['response']['content'] ?? $collectedResponse);
+        // The stored reply keeps [Doc:slug] so the web chat can render the pill.
+        // The phone gets the same text with those tags turned into links.
+        $responseText = $this->externalReplyReferences->resolveStored($responseText, $user);
+        $channelText = $this->externalReplyReferences->resolveDocTags($responseText);
         $metadata = $result['response']['metadata'] ?? [];
         $classification = is_array($result['classification'] ?? null) ? $result['classification'] : null;
         $fileData = $metadata['file'] ?? null;
@@ -955,8 +957,8 @@ final class WhatsAppService
         // WhatsApp caps captions at 1024 chars and the platform view still
         // shows the sources via the metadata mirrored in storeOutgoingMessage.
         $textResponseWithSources = $hasSearchResults
-            ? $this->appendWhatsAppSources($responseText, $searchResultsItems)
-            : $responseText;
+            ? $this->appendWhatsAppSources($channelText, $searchResultsItems)
+            : $channelText;
 
         // PRIORITY 1: Check if AI generated media (image, video, audio, or
         // document — e.g. .ics / .docx from a multi-task plan)
@@ -987,11 +989,11 @@ final class WhatsAppService
                 $textSentSeparately = false;
                 $textMessageId = '';
                 $canUseCaption = in_array($generatedMediaType, ['image', 'video'], true)
-                    && !empty($responseText)
-                    && mb_strlen($responseText) <= 1024;
+                    && !empty($channelText)
+                    && mb_strlen($channelText) <= 1024;
 
                 if ($canUseCaption) {
-                    $caption = $responseText;
+                    $caption = $channelText;
                 } elseif ('' !== trim($textResponseWithSources)) {
                     $textSend = $this->sendMessage($dto->from, $textResponseWithSources, $dto->phoneNumberId);
                     $textSentSeparately = !empty($textSend['success']);
@@ -1145,9 +1147,9 @@ final class WhatsAppService
         }
 
         // PRIORITY 2: Audio/Video input → Generate TTS response
-        if (!$responseSent && $shouldSendAudioResponse && !empty($responseText) && !empty($this->appUrl)) {
+        if (!$responseSent && $shouldSendAudioResponse && !empty($channelText) && !empty($this->appUrl)) {
             $detectedLanguage = $message->getLanguage() ?: 'en';
-            $ttsResult = $this->generateTtsResponse($responseText, $effectiveUserId, $detectedLanguage);
+            $ttsResult = $this->generateTtsResponse($channelText, $effectiveUserId, $detectedLanguage);
 
             if ($ttsResult) {
                 $audioUrl = rtrim($this->appUrl, '/').'/api/v1/files/uploads/'.$ttsResult['relativePath'];
@@ -1900,6 +1902,12 @@ final class WhatsAppService
         if (is_array($resultsList) && [] !== $resultsList) {
             $outgoingMessage->setMeta('web_search_query', (string) ($searchResults['query'] ?? ''));
             $outgoingMessage->setMeta('web_search_results_count', (string) count($resultsList));
+        }
+        if (is_array($aiMetadata)) {
+            $docs = PlatformDocReferenceResolver::encodeDocsMeta($aiMetadata);
+            if (null !== $docs) {
+                $outgoingMessage->setMeta('docs', $docs);
+            }
         }
 
         $this->em->flush();
