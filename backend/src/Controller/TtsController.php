@@ -28,13 +28,13 @@ class TtsController extends AbstractController
     #[OA\Get(
         path: '/api/v1/tts/stream',
         summary: 'Stream TTS audio via configured provider',
-        description: 'Streams audio from the user\'s configured TTS provider (Piper, OpenAI, Google). The content type depends on the provider.',
+        description: 'Streams audio from the user\'s configured TTS provider (Piper, OpenAI, Google). The content type depends on the provider. The client must send the language of the text being spoken so Piper (and other providers) select the matching voice.',
         security: [['Bearer' => []]],
         tags: ['Text to Speech']
     )]
     #[OA\Parameter(name: 'text', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'language', in: 'query', required: true, description: 'Language of the spoken text (e.g. de, en). Required so the provider can select the matching voice.', schema: new OA\Schema(type: 'string', example: 'de'))]
     #[OA\Parameter(name: 'voice', in: 'query', required: false, schema: new OA\Schema(type: 'string'))]
-    #[OA\Parameter(name: 'language', in: 'query', required: false, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'format', in: 'query', required: false, description: 'Audio format (mp3, opus, aac, flac)', schema: new OA\Schema(type: 'string', default: 'mp3'))]
     #[OA\Parameter(name: 'speed', in: 'query', required: false, schema: new OA\Schema(type: 'number', default: 1.0))]
     public function streamAudio(Request $request, #[CurrentUser] ?User $user): Response
@@ -48,27 +48,29 @@ class TtsController extends AbstractController
             return $this->json(['error' => 'Text is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        $text = TtsTextSanitizer::sanitize($text);
+        $language = trim((string) $request->query->get('language', ''));
+        if ('' === $language) {
+            return $this->json(['error' => 'Language is required'], Response::HTTP_BAD_REQUEST);
+        }
 
-        if (empty(trim($text))) {
+        // Emptiness gate only — facade sanitizes again before synthesis (#2283).
+        if (empty(trim(TtsTextSanitizer::sanitize((string) $text)))) {
             return $this->json(['error' => 'No speakable text provided'], Response::HTTP_BAD_REQUEST);
         }
 
         $voice = $request->query->get('voice');
-        $language = $request->query->get('language');
         $format = $request->query->get('format');
         $speed = (float) $request->query->get('speed', '1.0');
         $speed = max(0.25, min(4.0, $speed));
 
         $options = array_filter([
             'voice' => $voice,
-            'language' => $language,
             'format' => $format,
             'speed' => $speed,
         ], fn ($v) => null !== $v);
 
         try {
-            $result = $this->aiFacade->synthesizeStream($text, $user->getId(), $options);
+            $result = $this->aiFacade->synthesizeStream((string) $text, $language, $user->getId(), $options);
             $generator = $result['generator'];
             $contentType = $result['contentType'];
 

@@ -576,11 +576,12 @@ final class RunnersTest extends TestCase
             ->expects(self::once())
             ->method('synthesize')
             ->with(
-                self::callback(static function (string $text): bool {
-                    return mb_strlen($text) <= \App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS;
+                $longText,
+                'en',
+                self::anything(),
+                self::callback(static function (array $opts): bool {
+                    return 'mp3' === ($opts['format'] ?? null);
                 }),
-                self::anything(),
-                self::anything(),
             )
             ->willReturn([
                 'relativePath' => '1/000/2026/06/tts_x.mp3',
@@ -595,6 +596,27 @@ final class RunnersTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertLessThanOrEqual(\App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS, mb_strlen((string) $result->files[0]['source_text']));
+    }
+
+    public function testText2SoundPassesClassificationLanguage(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade
+            ->expects(self::once())
+            ->method('synthesize')
+            ->with('Hallo Welt', 'de', self::anything(), self::anything())
+            ->willReturn([
+                'relativePath' => '1/000/2026/06/tts_de.mp3',
+                'provider' => 'piper',
+                'model' => 'piper-multi',
+            ]);
+
+        $runner = new Text2SoundRunner($aiFacade, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n3', Capability::Text2Sound, [], ['text' => 'Hallo Welt'], ['format' => 'mp3']);
+
+        $result = $runner->run($node, new NodeContext($this->message('Hallo Welt'), [], 1, ['language' => 'de']));
+
+        self::assertTrue($result->isSuccessful());
     }
 
     public function testMediaGenerationRunnerProducesImageFile(): void

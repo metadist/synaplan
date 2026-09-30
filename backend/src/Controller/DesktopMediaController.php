@@ -114,6 +114,7 @@ final class DesktopMediaController extends AbstractController
             properties: [
                 new OA\Property(property: 'text', type: 'string', example: 'Good morning'),
                 new OA\Property(property: 'model', type: 'string', example: 'openai:tts-1:text2sound'),
+                new OA\Property(property: 'language', type: 'string', description: 'Language of the spoken text (e.g. de, en). Defaults to the user locale when omitted.', example: 'de', nullable: true),
             ]
         )
     )]
@@ -135,9 +136,15 @@ final class DesktopMediaController extends AbstractController
 
         $text = trim((string) ($data['text'] ?? ''));
         $model = trim((string) ($data['model'] ?? ''));
+        $language = isset($data['language']) && is_string($data['language'])
+            ? trim($data['language'])
+            : null;
+        if (null !== $language && '' === $language) {
+            $language = null;
+        }
 
         try {
-            return new JsonResponse($this->media->speak($user, $text, $model));
+            return new JsonResponse($this->media->speak($user, $text, $model, $language));
         } catch (\InvalidArgumentException $e) {
             return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (RateLimitExceededException $e) {

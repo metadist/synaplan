@@ -788,6 +788,7 @@ class WhatsAppServiceTest extends TestCase
             ->method('synthesize')
             ->with(
                 $this->stringContains('AI response text'),
+                'en',
                 $this->anything(),
                 $this->anything()
             )
@@ -830,9 +831,9 @@ class WhatsAppServiceTest extends TestCase
     }
 
     /**
-     * Test TTS text is truncated for very long responses.
+     * Test TTS text is passed through to the facade (which sanitizes/truncates).
      */
-    public function testTtsTextTruncation(): void
+    public function testTtsTextPassedToFacadeWithLanguage(): void
     {
         $longText = str_repeat('A very long response. ', 500); // ~11,000 chars
 
@@ -840,12 +841,12 @@ class WhatsAppServiceTest extends TestCase
             ->expects($this->once())
             ->method('synthesize')
             ->with(
-                $this->callback(function ($text) {
-                    // Should be truncated to ~4000 chars
-                    return strlen($text) <= 4003; // 4000 + '...'
-                }),
-                $this->anything(),
-                $this->anything()
+                $longText,
+                'de',
+                2,
+                $this->callback(static function (array $opts): bool {
+                    return 'mp3' === ($opts['format'] ?? null);
+                })
             )
             ->willReturn([
                 'relativePath' => 'test/path/audio.mp3',
@@ -856,7 +857,7 @@ class WhatsAppServiceTest extends TestCase
         $method = $reflection->getMethod('generateTtsResponse');
         $method->setAccessible(true);
 
-        $method->invoke($this->service, $longText, 2);
+        $method->invoke($this->service, $longText, 2, 'de');
     }
 
     // ============================================

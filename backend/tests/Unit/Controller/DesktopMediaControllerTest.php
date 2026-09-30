@@ -64,4 +64,29 @@ final class DesktopMediaControllerTest extends TestCase
         self::assertTrue($data['success']);
         self::assertSame(1, $data['file']['id']);
     }
+
+    public function testSpeechDelegatesLanguage(): void
+    {
+        $user = $this->createMock(User::class);
+        $media = $this->createMock(DesktopGeneratedMediaService::class);
+        $media->expects($this->once())
+            ->method('speak')
+            ->with($user, 'Guten Tag', 'piper:piper-multi:text2sound', 'de')
+            ->willReturn([
+                'success' => true,
+                'file' => ['url' => '/api/v1/files/uploads/x.mp3', 'type' => 'audio', 'mimeType' => 'audio/mpeg', 'id' => 2],
+                'provider' => 'piper',
+                'model' => 'de_DE-kerstin-low',
+            ]);
+
+        $controller = new DesktopMediaController($media, $this->createMock(LoggerInterface::class));
+        $request = new Request(content: json_encode([
+            'text' => 'Guten Tag',
+            'model' => 'piper:piper-multi:text2sound',
+            'language' => 'de',
+        ], JSON_THROW_ON_ERROR));
+        $response = $controller->speech($request, $user);
+
+        self::assertSame(200, $response->getStatusCode());
+    }
 }

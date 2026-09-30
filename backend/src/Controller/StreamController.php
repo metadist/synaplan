@@ -52,7 +52,6 @@ use App\Service\PerfTimer;
 use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
-use App\Service\TtsTextSanitizer;
 use App\Service\Usage\RecordedUsage;
 use App\Service\UsageStatsService;
 use App\Service\UsageTaximeterConfig;
@@ -2329,12 +2328,10 @@ class StreamController extends AbstractController
 
                         $this->sendSSE('tts_generating', ['language' => $language]);
 
-                        $ttsText = TtsTextSanitizer::prepareForSynthesis($responseText);
-
-                        if (!empty(trim($ttsText))) {
-                            $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
+                        // Facade sanitizes + truncates; pass the answer language explicitly (#2283).
+                        if (!empty(trim($responseText))) {
+                            $ttsResult = $this->aiFacade->synthesize($responseText, $language, $user->getId(), [
                                 'format' => 'mp3',
-                                'language' => $language,
                             ]);
 
                             $audioUrl = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
@@ -2403,7 +2400,7 @@ class StreamController extends AbstractController
                                 'model' => $ttsModelName ?? 'unknown',
                                 'model_id' => $ttsModelId,
                                 'media_usage' => [
-                                    'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
+                                    'characters' => $ttsResult['text_length'] ?? mb_strlen($responseText),
                                 ],
                             ]);
 

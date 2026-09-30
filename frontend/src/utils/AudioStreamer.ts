@@ -47,7 +47,9 @@ export class AudioStreamer {
     const trimmed = text.trim()
     if (!trimmed) return
 
-    this.queue.push({ text: trimmed, language })
+    // Language is required by /api/v1/tts/stream so Piper picks the matching voice (#2283).
+    const lang = (language ?? '').trim() || 'en'
+    this.queue.push({ text: trimmed, language: lang })
     const idx = this.queue.length - 1
 
     // Prefetch audio blob in background
@@ -58,8 +60,7 @@ export class AudioStreamer {
     const item = this.queue[idx]
     if (!item || this.stopped) return
 
-    const params = new URLSearchParams({ text: item.text })
-    if (item.language) params.append('language', item.language)
+    const params = new URLSearchParams({ text: item.text, language: item.language ?? 'en' })
 
     try {
       const response = await fetch(`/api/v1/tts/stream?${params.toString()}`, {
