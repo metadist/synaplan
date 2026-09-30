@@ -261,6 +261,24 @@ jobs:
       - name: No docker.sock outside the compute service (C2)
         run: ./scripts/check-no-docker-sock.sh
 
+  transcriber-sidecar:
+    name: Transcriber Sidecar (Node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The tests run inside the built image, not on the runner's .nvmrc Node,
+      # so a base-image bump in the Dockerfile is what they exercise.
+      - name: Build the image and run the tests in it
+        working-directory: sidecars/synaplan-transcriber
+        run: |
+          set -euo pipefail
+          docker build -t synaplan-transcriber:ci .
+          docker run --rm -v "$PWD/test:/app/test:ro" synaplan-transcriber:ci node --test
+
   backend:
     name: Backend (PHP/Symfony)
     # Off the critical path (done around minute 2-3 while e2e runs until
@@ -2268,7 +2286,7 @@ jobs:
     name: All Checks Passed
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Check for failures
@@ -2282,6 +2300,7 @@ jobs:
           TEMPLATES: ${{ needs.deployment-templates.result }}
           MOBILE: ${{ needs.mobile-tooling.result }}
           COMPUTE: ${{ needs.compute-sidecar.result }}
+          TRANSCRIBER: ${{ needs.transcriber-sidecar.result }}
           BACKEND: ${{ needs.backend.result }}
           BACKEND_MINIMAL: ${{ needs.backend-minimal.result }}
           OPENAPI_IDENTICAL: ${{ needs.openapi-identical.result }}
@@ -2309,6 +2328,7 @@ jobs:
           require "Deployment Templates (AWS)" "$TEMPLATES"
           require "Mobile Release Tooling" "$MOBILE"
           require "Compute Sidecar (Go)" "$COMPUTE"
+          require "Transcriber Sidecar (Node)" "$TRANSCRIBER"
 
           allow_skip "Backend (PHP/Symfony)" "$BACKEND"
           allow_skip "Backend (minimal)" "$BACKEND_MINIMAL"
