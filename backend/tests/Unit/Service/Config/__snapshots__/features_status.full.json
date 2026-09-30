@@ -240,6 +240,26 @@
             "mobile_class": "backend-only"
         },
         {
+            "id": "federation",
+            "label_key": "modules.federation.label",
+            "state": "available",
+            "configured": true,
+            "healthy": true,
+            "message": "Partners can be opened by an admin",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "FEDERATION_ALLOW_LOCAL"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/federation",
+            "mobile_class": "ota-candidate"
+        },
+        {
             "id": "google_ai",
             "label_key": "modules.google_ai.label",
             "state": "absent",

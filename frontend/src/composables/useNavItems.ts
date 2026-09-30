@@ -390,6 +390,11 @@ export function useNavItems() {
           label: t('nav.adminPeople'),
         },
         {
+          key: 'admin-partners',
+          path: '/admin/partners',
+          label: t('nav.adminPartners'),
+        },
+        {
           key: 'admin-config',
           path: '/admin/config',
           label: t('nav.adminSystemConfig'),

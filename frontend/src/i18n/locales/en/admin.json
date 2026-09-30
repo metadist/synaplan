@@ -1158,6 +1158,9 @@
     "telegram": {
       "label": "Telegram channel"
     },
+    "federation": {
+      "label": "Partners"
+    },
     "opendesk_stt": {
       "label": "Meeting notes"
     },
@@ -1178,6 +1181,70 @@
       "body": "This feature is optional. It is switched on by the administrator of this installation.",
       "howToEnable": "How to enable it",
       "openFeatureStatus": "Open system status"
+    }
+  },
+  "partners": {
+    "title": "Partners",
+    "subtitle": "Connect with other companies. Nothing is shared until you choose it.",
+    "unreachable": "Your server runs on a private address, so other companies can't reach it. Partners need a public https address.",
+    "empty": "Work with other businesses. Send an invite, or paste one you received. Your files stay on your server.",
+    "companyName": "Company name",
+    "open": "Open to partners",
+    "openedLine": "Open to partners as {name}.",
+    "fingerprint": "Key {fingerprint}",
+    "close": "Close to partners",
+    "closeTitle": "Close to partners?",
+    "closeMessage": "New connections stop. Every current partner is disconnected. Nothing they already copied is deleted.",
+    "invite": "Invite a partner",
+    "inviteHelp": "Send this address to the other company's admin. It works once and expires in 7 days.",
+    "copy": "Copy address",
+    "copied": "Address copied.",
+    "pasteLabel": "Have an invite?",
+    "pastePlaceholder": "Paste the invite address",
+    "connect": "Connect",
+    "connected": "Connected. Nothing is shared yet, on either side.",
+    "pending": "Invite waiting",
+    "active": "Connected",
+    "paused": "Paused",
+    "pausedByThem": "They paused this connection.",
+    "pause": "Pause",
+    "resume": "Resume",
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect {name}?",
+    "disconnectMessage": "This connection stops now. Nothing already copied is deleted.",
+    "removeInvite": "Remove invite",
+    "removeInviteTitle": "Remove this invite?",
+    "removeInviteMessage": "The link stops working. Nothing was shared.",
+    "pausedHere": "Paused. They cannot use this connection until you resume.",
+    "pausedPending": "Paused here. The other server has not confirmed yet.",
+    "resumed": "Resumed.",
+    "resumedPending": "Resumed here. The other server has not confirmed yet.",
+    "disconnected": "Disconnected. This connection stops now.",
+    "disconnectedPending": "Disconnected here. The other server has not confirmed yet.",
+    "inviteRemoved": "Invite removed. The link no longer works.",
+    "closed": "Closed. New connections stop.",
+    "inviteReady": "Invite ready. Send the address to the other admin.",
+    "loadFailed": "Partners could not be loaded. Try again.",
+    "joinTitle": "You are invited",
+    "joinBody": "{name} ({domain}) invited your company. On your Synaplan, open Operate, then Partners, and paste this address.",
+    "joinInvalid": "This invite is not valid or has expired.",
+    "errors": {
+      "not_reachable": "Your server runs on a private address, so other companies can't reach it. Partners need a public https address.",
+      "not_open": "Open to partners before connecting.",
+      "invite_invalid": "This invite is not valid.",
+      "invite_expired": "This invite has expired. Ask for a new one.",
+      "already_partner": "You are already connected with this server.",
+      "self": "That invite was created on this server.",
+      "peer_unreachable": "The other server did not answer. Nothing was connected.",
+      "peer_rejected": "The other server refused the request.",
+      "bad_signature": "The request signature is not valid.",
+      "sodium_missing": "This server cannot sign partner requests. The signing library is missing.",
+      "invalid_name": "Enter a company name of up to 80 characters.",
+      "invite_limit": "You already have 20 unused invites. Use one, or wait until one expires.",
+      "not_paused_by_us": "They paused this connection. You can disconnect, or wait for them to resume.",
+      "not_partner": "That connection was not found.",
+      "bad_url": "That address is not a public https server.",
+      "replay": "This request was already used."
     }
   }
 }

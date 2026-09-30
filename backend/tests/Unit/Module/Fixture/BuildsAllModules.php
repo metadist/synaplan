@@ -11,6 +11,7 @@ use App\Module\Channel\WhatsappModule;
 use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
 use App\Module\Contract\FeatureModuleInterface;
+use App\Module\Federation\FederationModule;
 use App\Module\Provider\GoogleAiModule;
 use App\Module\Provider\HiggsfieldModule;
 use App\Module\Provider\TheHiveModule;
@@ -69,6 +70,7 @@ trait BuildsAllModules
             ),
             new WhatsappModule(false, '', ''),
             new TelegramModule(false),
+            new FederationModule('http://localhost:8000', false),
             new ComputeModule($probe, $this->createStub(ComputeConfig::class), '', ''),
             new OpendeskSttModule($probe, '', '', '', ''),
         ];
