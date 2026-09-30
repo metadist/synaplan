@@ -6,6 +6,7 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
+use App\AI\Stream\VisibleAnswer;
 use App\Entity\Prompt;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Knowledge\KnowledgeContextFormatter;
@@ -114,10 +115,25 @@ final readonly class ChatRunner implements TaskRunner
         // Only visible answer text passes through — structured reasoning chunks
         // (chain-of-thought from thinking models) must never reach the user (#1067).
         $full = '';
+        $finishReason = null;
+        $streamOptions = array_filter([
+            'provider' => $provider,
+            'model' => $modelName,
+            'temperature' => 0.3,
+        ], static fn ($v) => null !== $v);
+        if (is_string($provider) && 'openaicompatible' === strtolower($provider)
+            && is_string($modelName) && VisibleAnswer::modelHidesAnswerBehindThinking($modelName)) {
+            $streamOptions['disable_thinking'] = true;
+        }
         try {
             $response = $this->aiFacade->chatStream(
                 $messages,
-                static function ($chunk) use (&$full, $context): void {
+                static function ($chunk) use (&$full, &$finishReason, $context): void {
+                    if (is_array($chunk) && 'finish' === ($chunk['type'] ?? null) && is_string($chunk['finish_reason'] ?? null)) {
+                        $finishReason = $chunk['finish_reason'];
+
+                        return;
+                    }
                     $piece = StreamChunk::visibleText($chunk);
                     if ('' === $piece) {
                         return;
@@ -126,12 +142,11 @@ final readonly class ChatRunner implements TaskRunner
                     $context->streamChunk($piece);
                 },
                 $context->userId,
-                array_filter([
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.3,
-                ], static fn ($v) => null !== $v),
+                $streamOptions,
             );
+            if (is_string($response['finish_reason'] ?? null) && '' !== $response['finish_reason']) {
+                $finishReason = $response['finish_reason'];
+            }
         } catch (StreamCancelledException $e) {
             // Not a model failure: the user pressed Stop. Reporting it as a
             // failed node would drop the `cancelled` marker and make the turn
@@ -146,8 +161,15 @@ final readonly class ChatRunner implements TaskRunner
             return NodeResult::failed($node->capability->value.' failed: '.$e->getMessage());
         }
 
-        if ('' === trim($full)) {
-            return NodeResult::failed($node->capability->value.' produced empty output');
+        // A thinking model can fill the whole completion with reasoning, or cut
+        // a JSON tool call in half. That is not a finished answer — marking the
+        // step Done leaves the chat with nothing saved (#2264).
+        if ('' === trim($full) || VisibleAnswer::isUnusable($full, $finishReason)) {
+            $cutOff = VisibleAnswer::failedBecauseOutputWasCut($full, $finishReason);
+
+            return NodeResult::failed($cutOff
+                ? 'The model ran out of room before it finished the answer.'
+                : $node->capability->value.' produced empty output');
         }
 
         $metadata = [

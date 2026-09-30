@@ -824,6 +824,84 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * #2264: a thinking model that spends the whole completion budget inside
+     * `<think>` must not be stored as a finished empty reply.
+     */
+    public function testHandleStreamRejectsThinkBlockCutOffByTokenLimit(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('What is in Confluence?');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(static function ($messages, $cb, $userId, $options): array {
+                $cb('<think>I should query confluence');
+                $cb(['type' => 'finish', 'finish_reason' => 'length']);
+
+                return ['provider' => 'openaicompatible', 'model' => 'qwen3.8:27b', 'finish_reason' => 'length'];
+            });
+
+        $this->logger
+            ->expects($this->once())
+            ->method('warning')
+            ->with('ChatHandler: model output was cut off before a readable answer', $this->anything());
+
+        try {
+            $this->handler->handleStream(
+                $message,
+                [],
+                ['topic' => 'CHAT', 'language' => 'en'],
+                static function (): void {},
+            );
+            self::fail('A cut-off thinking block must not be stored as an answer');
+        } catch (ProviderException $e) {
+            self::assertSame('max_tokens', $e->getContext()['error_code'] ?? null);
+        }
+    }
+
+    /**
+     * A stream of structured reasoning with no answer text must not finish as
+     * a successful empty reply. Reasoning sets the first-token flag while the
+     * visible buffer stays blank.
+     */
+    public function testHandleStreamRejectsReasoningOnlyOutput(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('What is in Confluence?');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(static function ($messages, $cb): array {
+                $cb(['type' => 'reasoning', 'content' => 'still thinking']);
+                $cb(['type' => 'finish', 'finish_reason' => 'stop']);
+
+                return ['provider' => 'openaicompatible', 'model' => 'qwen3.8:27b', 'finish_reason' => 'stop'];
+            });
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('The AI model returned an empty response');
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+        );
+    }
+
+    /**
      * Rolling conversation summary: when MessageProcessor condenses older turns
      * and passes them via options['conversation_summary'], ChatHandler must fold
      * that text into the SYSTEM prompt so long threads keep their context.

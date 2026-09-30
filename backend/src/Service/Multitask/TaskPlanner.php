@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\Stream\VisibleAnswer;
 use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\TaskPlanSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
@@ -56,6 +57,12 @@ final readonly class TaskPlanner
      * spend.
      */
     private const PLANNING_MAX_TOKENS = 3000;
+
+    /**
+     * Second budget used only when the first plan JSON was cut off. Thinking
+     * models spend the first budget before the object starts (#2264).
+     */
+    private const PLANNING_RETRY_MAX_TOKENS = 8000;
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -133,6 +140,16 @@ final readonly class TaskPlanner
         }
 
         $decoded = $this->decodeJson($raw);
+        if (null === $decoded && $this->plannerOutputWasCut($raw, $response)) {
+            $retried = $this->retryCutOffPlan($messages, $userId, $modelId, $aiOptions);
+            if (null !== $retried) {
+                $decoded = $retried['decoded'];
+                $raw = $retried['raw'];
+                if (null !== $retried['planningUsage']) {
+                    $planningUsage = $this->combinePlanningUsage($planningUsage, $retried['planningUsage']);
+                }
+            }
+        }
         if (null === $decoded) {
             return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage);
         }
@@ -504,5 +521,84 @@ final readonly class TaskPlanner
     private function decodeJson(string $raw): ?array
     {
         return $this->jsonDecoder->decode($raw)->data;
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     */
+    private function plannerOutputWasCut(string $raw, array $response): bool
+    {
+        $finish = is_string($response['finish_reason'] ?? null) ? $response['finish_reason'] : null;
+
+        return VisibleAnswer::isUnusable($raw, $finish)
+            || VisibleAnswer::isCutJson(VisibleAnswer::withoutReasoning($raw));
+    }
+
+    /**
+     * One more planning call with thinking disabled and a larger completion
+     * budget. A gateway that rejects the flag throws; the caller keeps the
+     * single-chat fallback.
+     *
+     * @param list<array{role: string, content: string}> $messages
+     * @param array<string, mixed>                       $aiOptions
+     *
+     * @return array{decoded: array<string, mixed>, raw: string, planningUsage: array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null}|null
+     */
+    private function retryCutOffPlan(array $messages, ?int $userId, ?int $modelId, array $aiOptions): ?array
+    {
+        $this->logger->info('TaskPlanner: planner JSON was cut off, retrying without thinking', [
+            'model_id' => $modelId,
+        ]);
+
+        $aiOptions['max_tokens'] = self::PLANNING_RETRY_MAX_TOKENS;
+        $aiOptions['disable_thinking'] = true;
+
+        try {
+            $response = $this->aiFacade->chat($messages, $userId, $aiOptions);
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanner: truncated-plan retry failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $raw = (string) ($response['content'] ?? '');
+        $decoded = $this->decodeJson($raw);
+        if (null === $decoded) {
+            return null;
+        }
+
+        return [
+            'decoded' => $decoded,
+            'raw' => $raw,
+            'planningUsage' => $this->recordPlanningUsage($userId, $modelId, $response),
+        ];
+    }
+
+    /**
+     * The retry is a second billed call. The message badge stores one planning
+     * entry, so both attempts have to be added together or the first call's
+     * tokens and cost disappear from history.
+     *
+     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $first
+     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}      $second
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     */
+    private function combinePlanningUsage(?array $first, array $second): array
+    {
+        if (null === $first) {
+            return $second;
+        }
+
+        return [
+            'promptTokens' => $first['promptTokens'] + $second['promptTokens'],
+            'completionTokens' => $first['completionTokens'] + $second['completionTokens'],
+            'totalTokens' => $first['totalTokens'] + $second['totalTokens'],
+            'cost' => bcadd($first['cost'], $second['cost'], 6),
+            'modelKey' => '' !== $second['modelKey'] ? $second['modelKey'] : $first['modelKey'],
+            'kind' => $first['kind'],
+        ];
     }
 }

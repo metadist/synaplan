@@ -6,6 +6,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
+use App\AI\Stream\VisibleAnswer;
 use App\AI\StructuredOutput\Schema\FileGenerationSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\ToolCalling\ToolCallingTranslator;
@@ -252,6 +253,56 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $model->getFeatures(),
             $modelJson,
         );
+    }
+
+    /**
+     * Qwen3-class models on an OpenAI-compatible gateway (self-hosted Ollama)
+     * spend max_tokens on a thinking channel and cut the JSON answer off
+     * (#2264). Ask the gateway to skip that channel. Other providers are left
+     * alone — a cloud API that does not understand the flag must not see it.
+     *
+     * @param array<string, mixed> $aiOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function applyLocalThinkingBudget(array $aiOptions): array
+    {
+        $provider = strtolower((string) ($aiOptions['provider'] ?? ''));
+        $model = (string) ($aiOptions['model'] ?? '');
+        if ('openaicompatible' === $provider && VisibleAnswer::modelHidesAnswerBehindThinking($model)) {
+            $aiOptions['disable_thinking'] = true;
+        }
+
+        return $aiOptions;
+    }
+
+    /**
+     * A thinking model that ran out of room must not be stored as a finished
+     * reply. The step would show Done and the chat would say the answer was
+     * never saved (#2264).
+     */
+    private function rejectCutOffAnswer(string $content, ?string $finishReason, string $provider, string $model): void
+    {
+        if (!VisibleAnswer::isUnusable($content, $finishReason)) {
+            return;
+        }
+
+        if (VisibleAnswer::failedBecauseOutputWasCut($content, $finishReason)) {
+            $this->logger->warning('ChatHandler: model output was cut off before a readable answer', [
+                'provider' => $provider,
+                'model' => $model,
+                'finish_reason' => $finishReason,
+            ]);
+
+            throw new ProviderException('The model ran out of room before it finished the answer.', $provider, ['error_code' => 'max_tokens', 'model' => $model]);
+        }
+
+        $this->logger->warning('ChatHandler: Provider returned no visible streaming content', [
+            'provider' => $provider,
+            'model' => $model,
+        ]);
+
+        throw new ProviderException('The AI model returned an empty response. Please try again or select a different model.', $provider, ['model' => $model]);
     }
 
     /**
@@ -924,6 +975,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $aiOptions = $this->applyProfileGenerationOptions($aiOptions, $profile, $message->getUserId());
         $aiOptions = $this->applyReasoningLevel($aiOptions, $loadedModel, $options);
+        $aiOptions = $this->applyLocalThinkingBudget($aiOptions);
 
         $documentEdit = $this->tryDocumentToolsEdit(
             $topic,
@@ -948,9 +1000,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             // Channels without a stream (Telegram) still need a live signal
             // while the model works. Collect the same text chat() would return.
             $collected = '';
+            $streamFinishReason = null;
             $streamMeta = $this->aiFacade->chatStream(
                 $messages,
-                function (string|array $chunk) use (&$collected, $heartbeat): void {
+                function (string|array $chunk) use (&$collected, &$streamFinishReason, $heartbeat): void {
+                    if (is_array($chunk) && 'finish' === ($chunk['type'] ?? null) && is_string($chunk['finish_reason'] ?? null)) {
+                        $streamFinishReason = $chunk['finish_reason'];
+                    }
                     $collected .= StreamChunk::visibleText($chunk);
                     $heartbeat();
                 },
@@ -964,6 +1020,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'usage' => $streamMeta['usage'] ?? [],
                 'response_id' => $streamMeta['response_id'] ?? null,
                 'tool_calls' => $streamMeta['tool_calls'] ?? [],
+                'finish_reason' => is_string($streamMeta['finish_reason'] ?? null) && '' !== $streamMeta['finish_reason']
+                    ? $streamMeta['finish_reason']
+                    : $streamFinishReason,
             ];
         } else {
             $response = $this->aiFacade->chat(
@@ -996,6 +1055,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ];
         if (null !== $documentEdit) {
             $content = $this->applyDocumentEditResult($documentEdit, $message, $metadata);
+        }
+
+        if (is_string($content)) {
+            $nonStreamFinish = is_string($response['finish_reason'] ?? null) ? $response['finish_reason'] : null;
+            $this->rejectCutOffAnswer($content, $nonStreamFinish, (string) ($metadata['provider'] ?? 'unknown'), (string) ($metadata['model'] ?? 'unknown'));
         }
 
         if (is_string($content)) {
@@ -1718,6 +1782,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $aiOptions = $this->applyProfileGenerationOptions($aiOptions, $profile, $message->getUserId());
         $aiOptions = $this->applyReasoningLevel($aiOptions, $loadedModel, $options);
+        $aiOptions = $this->applyLocalThinkingBudget($aiOptions);
 
         $this->logger->info('ChatHandler: Calling AiFacade chatStream', [
             'provider' => $provider,
@@ -1741,7 +1806,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $fullResponseText = '';
         $sawFirstToken = false;
-        $wrappedStreamCallback = function (string|array $chunk, array $metadata = []) use ($streamCallback, &$fullResponseText, &$sawFirstToken, $perfTimer): void {
+        $streamFinishReason = null;
+        $wrappedStreamCallback = function (string|array $chunk, array $metadata = []) use ($streamCallback, &$fullResponseText, &$sawFirstToken, &$streamFinishReason, $perfTimer): void {
+            if (is_array($chunk) && 'finish' === ($chunk['type'] ?? null) && is_string($chunk['finish_reason'] ?? null) && '' !== $chunk['finish_reason']) {
+                $streamFinishReason = $chunk['finish_reason'];
+            }
             // Mark TTFT on the very first chunk that carries any visible content.
             // This is the user-facing "first token" — what determines the perceived
             // wait between hitting send and seeing characters appear.
@@ -1818,14 +1887,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
-        if (!$sawFirstToken) {
-            $responseProvider = is_string($metadata['provider'] ?? null)
-                ? $metadata['provider']
-                : ($provider ?? 'unknown');
-            $responseModel = is_string($metadata['model'] ?? null)
-                ? $metadata['model']
-                : ($modelName ?? 'unknown');
+        $finishReason = $streamFinishReason;
+        if (is_string($metadata['finish_reason'] ?? null) && '' !== $metadata['finish_reason']) {
+            $finishReason = $metadata['finish_reason'];
+        }
+        $responseProvider = is_string($metadata['provider'] ?? null)
+            ? $metadata['provider']
+            : ($provider ?? 'unknown');
+        $responseModel = is_string($metadata['model'] ?? null)
+            ? $metadata['model']
+            : ($modelName ?? 'unknown');
+        $this->rejectCutOffAnswer($fullResponseText, $finishReason, $responseProvider, $responseModel);
 
+        if (!$sawFirstToken) {
             $this->logger->warning('ChatHandler: Provider returned no visible streaming content', [
                 'provider' => $responseProvider,
                 'model' => $responseModel,

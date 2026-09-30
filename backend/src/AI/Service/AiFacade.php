@@ -411,6 +411,7 @@ class AiFacade
             // call is NOT emitted to the stream callback — the client must
             // never see a routing hand-off as if it were answer text.
             'tool_calls' => $streamResult['tool_calls'] ?? [],
+            'finish_reason' => is_string($streamResult['finish_reason'] ?? null) ? $streamResult['finish_reason'] : null,
         ];
     }
 

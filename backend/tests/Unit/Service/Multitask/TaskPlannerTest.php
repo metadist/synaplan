@@ -9,6 +9,7 @@ use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Prompt;
+use App\Entity\User;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
@@ -21,6 +22,7 @@ use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Usage\RecordedUsage;
 use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -231,6 +233,108 @@ final class TaskPlannerTest extends TestCase
         $this->planner->plan($this->message(), [], 1);
 
         self::assertGreaterThanOrEqual(3000, $options['max_tokens'] ?? 0);
+    }
+
+    public function testCutOffPlannerJsonIsRetriedWithoutThinking(): void
+    {
+        $calls = [];
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$calls): array {
+                $calls[] = $opts;
+                if (1 === count($calls)) {
+                    return [
+                        'content' => '<think>planning'."\n".'{"version":1,"tasks":[{"id":"n1","capability":"mcp_fetch"',
+                        'finish_reason' => 'length',
+                    ];
+                }
+
+                return ['content' => json_encode([
+                    'version' => 1,
+                    'language' => 'en',
+                    'reply_node' => 'n1',
+                    'tasks' => [['id' => 'n1', 'capability' => 'chat']],
+                ])];
+            }
+        );
+
+        $result = $this->planner->plan($this->message('Look up the runbook'), [], 1);
+
+        self::assertFalse($result->fallback);
+        self::assertCount(2, $calls);
+        self::assertTrue($calls[1]['disable_thinking'] ?? false);
+        self::assertGreaterThan($calls[0]['max_tokens'] ?? 0, $calls[1]['max_tokens'] ?? 0);
+        self::assertSame(Capability::Chat, $result->plan->nodes[0]->capability);
+    }
+
+    public function testCutOffRetryAddsBothPlanningUsages(): void
+    {
+        $user = $this->createMock(User::class);
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn($user);
+
+        $attempt = 0;
+        $rateLimit = $this->createMock(RateLimitService::class);
+        $rateLimit->method('recordUsage')->willReturnCallback(function () use (&$attempt): RecordedUsage {
+            ++$attempt;
+
+            return 1 === $attempt
+                ? new RecordedUsage('0.010000', '0.010000', 10, 20, 30)
+                : new RecordedUsage('0.020000', '0.020000', 40, 50, 90);
+        });
+
+        $planner = new TaskPlanner(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->modelConfigService,
+            new TaskPlanValidator(),
+            $this->createMock(LoggerInterface::class),
+            $users,
+            new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
+            $rateLimit,
+            $this->alwaysOnStructuredOutputConfig(),
+        );
+
+        $calls = 0;
+        $this->aiFacade->method('chat')->willReturnCallback(function () use (&$calls): array {
+            ++$calls;
+            if (1 === $calls) {
+                return [
+                    'content' => '{"version":1,"tasks":[{"id":"n1"',
+                    'finish_reason' => 'length',
+                    'provider' => 'openaicompatible',
+                    'model' => 'qwen3.8:27b',
+                ];
+            }
+
+            return [
+                'content' => json_encode([
+                    'version' => 1,
+                    'language' => 'en',
+                    'reply_node' => 'n1',
+                    'tasks' => [['id' => 'n1', 'capability' => 'chat']],
+                ]),
+                'provider' => 'openaicompatible',
+                'model' => 'qwen3.8:27b',
+            ];
+        });
+
+        $result = $planner->plan($this->message('Look up the runbook'), [], 1);
+
+        self::assertFalse($result->fallback);
+        $usage = $result->planningUsage;
+        self::assertNotNull($usage);
+        self::assertSame(50, $usage['promptTokens']);
+        self::assertSame(70, $usage['completionTokens']);
+        self::assertSame(120, $usage['totalTokens']);
+        self::assertSame('0.030000', $usage['cost']);
+        self::assertSame('PLANNING', $usage['kind']);
     }
 
     public function testPlanForwardsTheTaskPlanSchemaToTheAiFacade(): void
