@@ -59,6 +59,15 @@ export const mcpServerTemplates: McpServerTemplate[] = [
     allowWrite: false,
   },
   {
+    key: 'atlassian',
+    icon: 'simple-icons:atlassian',
+    name: 'Jira & Confluence',
+    authHeader: '',
+    allowWrite: false,
+    authMode: 'oauth',
+    urlPrefill: 'https://mcp.atlassian.com/v2/mcp',
+  },
+  {
     key: 'notion',
     icon: 'simple-icons:notion',
     name: 'Notion',

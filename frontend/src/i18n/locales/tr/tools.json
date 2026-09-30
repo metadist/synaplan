@@ -382,6 +382,11 @@
         "name": "Higgsfield",
         "summary": "Görüntü ve video araçları",
         "hint": "Bağlantıyı kaydedin, ardından Higgsfield hesabınızla oturum açın. Geçmişe bakmak salt okunurdur; görüntü veya video oluşturmak yazma eylemleri ister ve Higgsfield kredilerinizi kullanır."
+      },
+      "atlassian": {
+        "name": "Jira ve Confluence",
+        "summary": "Atlassian Cloud ile oturum açma",
+        "hint": "Bağlantıyı kaydedin, ardından Atlassian hesabınızla oturum açın. Synaplan, görebildiğiniz Jira kayıtlarını ve Confluence sayfalarını, sohbete yapıştırdığınız sayfalar dahil, okuyabilir. API belirteci gerekmez. Erişimi istediğiniz zaman Atlassian hesabınızdan iptal edebilirsiniz."
       }
     },
     "oauthFormHint": "Bu sunucu hesap oturumunuzu kullanır. Kaydedin, ardından erişime izin vermek için sağlayıcıya yönlendirilirsiniz. Yapıştırılacak bir erişim token'ı yoktur.",

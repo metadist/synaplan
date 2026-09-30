@@ -456,6 +456,11 @@
         "name": "Higgsfield",
         "summary": "Outils d’image et de vidéo",
         "hint": "Enregistrez la connexion, puis connectez-vous avec votre compte Higgsfield. La consultation de votre historique est en lecture seule ; la création d’images ou de vidéos nécessite des actions d’écriture et utilise vos crédits Higgsfield."
+      },
+      "atlassian": {
+        "name": "Jira et Confluence",
+        "summary": "Connexion Atlassian Cloud",
+        "hint": "Enregistrez la connexion, puis connectez-vous avec votre compte Atlassian. Synaplan peut alors lire les tickets Jira et les pages Confluence auxquels vous avez accès, y compris les pages que vous collez dans le chat. Aucun jeton d’API n’est nécessaire. Vous pouvez révoquer l’accès à tout moment dans votre compte Atlassian."
       }
     },
     "oauthFormHint": "Ce serveur utilise la connexion de votre compte. Enregistrez-le, puis vous serez envoyé chez le fournisseur pour autoriser l’accès. Aucun jeton d’accès à coller.",
