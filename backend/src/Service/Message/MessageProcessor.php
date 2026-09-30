@@ -383,9 +383,7 @@ final readonly class MessageProcessor
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $profile = $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null;
-            if ($profile instanceof RuntimeProfile && array_key_exists('tool_internet', $profile->toolFlags)) {
-                $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
-            }
+            $promptMetadata = $this->applyRuntimeToolFlags($promptMetadata, $profile);
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
             $userRequestedSearch = $this->userRequestedSearch($options);
@@ -402,10 +400,7 @@ final readonly class MessageProcessor
             $perfTimer->start('url_read');
             $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
             $perfTimer->stop('url_read');
-            if ($shouldSearch && !$userRequestedSearch && true === ($classification['confluence_mcp_handled'] ?? false)) {
-                $shouldSearch = false;
-                $triggerReason = 'confluence_page_read_via_connection';
-            }
+            [$shouldSearch, $triggerReason] = $this->suppressSearchAfterConfluenceRead($shouldSearch, $userRequestedSearch, $classification, $triggerReason);
             if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
                 $shouldSearch = false;
                 $triggerReason = 'link_only_message_answered_from_page';
@@ -909,9 +904,7 @@ final readonly class MessageProcessor
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $profile = $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null;
-            if ($profile instanceof RuntimeProfile && array_key_exists('tool_internet', $profile->toolFlags)) {
-                $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
-            }
+            $promptMetadata = $this->applyRuntimeToolFlags($promptMetadata, $profile);
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
             $userRequestedSearch = $this->userRequestedSearch($options);
@@ -923,6 +916,7 @@ final readonly class MessageProcessor
 
             // Step 2.4: read pasted links first (see processStream()).
             $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
+            [$shouldSearch, $triggerReason] = $this->suppressSearchAfterConfluenceRead($shouldSearch, $userRequestedSearch, $classification, $triggerReason);
             if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
                 $shouldSearch = false;
                 $triggerReason = 'link_only_message_answered_from_page';
@@ -1263,7 +1257,7 @@ final readonly class MessageProcessor
             return $classification;
         }
 
-        $classification = $this->readConfluenceLinks($message, $urls, $classification, $statusCallback);
+        $classification = $this->readConfluenceLinks($message, $urls, $classification, $statusCallback, $promptMetadata);
         $handled = is_array($classification['confluence_mcp_urls'] ?? null) ? $classification['confluence_mcp_urls'] : [];
         $urls = array_values(array_filter(
             $urls,
@@ -1338,23 +1332,34 @@ final readonly class MessageProcessor
      * the answer is the page — or an honest connection error — rather than
      * the Atlassian sign-in screen.
      *
+     * The same gates as mcp_fetch apply first: the topic (or the pinned
+     * assistant) must have `tool_mcp` on, and an `mcp_servers` allowlist
+     * limits which connection may be called. No outbound call happens otherwise.
+     *
      * @param list<string>         $urls
      * @param array<string, mixed> $classification
+     * @param array<string, mixed> $promptMetadata
      *
      * @return array<string, mixed>
      */
-    private function readConfluenceLinks(Message $message, array $urls, array $classification, ?callable $statusCallback): array
+    private function readConfluenceLinks(Message $message, array $urls, array $classification, ?callable $statusCallback, array $promptMetadata): array
     {
-        if (null === $this->confluencePages) {
+        if (null === $this->confluencePages || true !== ($promptMetadata['tool_mcp'] ?? null)) {
             return $classification;
         }
 
-        $read = $this->confluencePages->read($urls, $message->getUserId());
+        $read = $this->confluencePages->read(
+            $urls,
+            $message->getUserId(),
+            $this->mcpServerAllowlist($promptMetadata),
+            function () use ($statusCallback): void {
+                $this->notify($statusCallback, 'fetching_urls', 'Reading the Confluence page from your connection...');
+            },
+        );
         if (!$read->attempted()) {
             return $classification;
         }
 
-        $this->notify($statusCallback, 'fetching_urls', 'Reading the Confluence page from your connection...');
         $prompt = $read->prompt();
         if ('' !== $prompt) {
             $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
@@ -1365,6 +1370,88 @@ final readonly class MessageProcessor
         $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
 
         return $classification;
+    }
+
+    /**
+     * An assistant pin replaces the topic's tool flags for this turn, the
+     * same way the internet-search flag already does.
+     *
+     * @param array<string, mixed> $promptMetadata
+     *
+     * @return array<string, mixed>
+     */
+    private function applyRuntimeToolFlags(array $promptMetadata, mixed $profile): array
+    {
+        if (!$profile instanceof RuntimeProfile) {
+            return $promptMetadata;
+        }
+        if (array_key_exists('tool_internet', $profile->toolFlags)) {
+            $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
+        }
+        if (array_key_exists('tool_mcp', $profile->toolFlags)) {
+            $promptMetadata['tool_mcp'] = (bool) $profile->toolFlags['tool_mcp'];
+        }
+        if (array_key_exists('mcp_servers', $profile->toolFlags)) {
+            $promptMetadata['mcp_servers'] = $profile->toolFlags['mcp_servers'];
+        }
+
+        return $promptMetadata;
+    }
+
+    /**
+     * A Confluence page already read through the user's connection is the
+     * answer. A public search would only find the Atlassian login screen.
+     * An explicit search request still runs.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array{0: bool, 1: string}
+     */
+    private function suppressSearchAfterConfluenceRead(bool $shouldSearch, bool $userRequestedSearch, array $classification, string $triggerReason): array
+    {
+        if ($shouldSearch && !$userRequestedSearch && true === ($classification['confluence_mcp_handled'] ?? false)) {
+            return [false, 'confluence_page_read_via_connection'];
+        }
+
+        return [$shouldSearch, $triggerReason];
+    }
+
+    /**
+     * Optional `mcp_servers` prompt metadata.
+     *
+     * A blank topic string means every enabled connection. A list (an
+     * assistant pin) is exact: an empty list allows none.
+     *
+     * @param array<string, mixed> $promptMetadata
+     *
+     * @return list<int>|null
+     */
+    private function mcpServerAllowlist(array $promptMetadata): ?array
+    {
+        $raw = $promptMetadata['mcp_servers'] ?? null;
+        if (is_array($raw)) {
+            $ids = [];
+            foreach ($raw as $part) {
+                if (is_numeric($part) && (int) $part > 0) {
+                    $ids[] = (int) $part;
+                }
+            }
+
+            return $ids;
+        }
+        if (!is_string($raw) || '' === trim($raw)) {
+            return null;
+        }
+
+        $ids = [];
+        foreach (explode(',', $raw) as $part) {
+            $part = trim($part);
+            if (is_numeric($part) && (int) $part > 0) {
+                $ids[] = (int) $part;
+            }
+        }
+
+        return [] === $ids ? null : $ids;
     }
 
     /**

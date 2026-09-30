@@ -31,18 +31,24 @@ final readonly class ConfluenceLinkedPageReader
     }
 
     /**
-     * @param list<string> $urls
+     * @param list<string>   $urls
+     * @param list<int>|null $serverAllowlist null = every enabled connection; a list limits which connection may be called
+     * @param callable|null  $onReady         fired once a page and an allowed connection are known, before the first remote call
      */
-    public function read(array $urls, int $userId): ConfluenceLinkedPageRead
+    public function read(array $urls, int $userId, ?array $serverAllowlist = null, ?callable $onReady = null): ConfluenceLinkedPageRead
     {
         $pages = $this->confluencePages($urls);
         if ([] === $pages || $userId <= 0 || !$this->clientConfig->isClientEnabled($userId)) {
             return new ConfluenceLinkedPageRead([]);
         }
 
-        $server = $this->atlassianServer($userId);
+        $server = $this->atlassianServer($userId, $serverAllowlist);
         if (null === $server) {
             return new ConfluenceLinkedPageRead([]);
+        }
+
+        if (null !== $onReady) {
+            $onReady();
         }
 
         try {
@@ -98,13 +104,18 @@ final readonly class ConfluenceLinkedPageReader
     /**
      * A signed-in connection wins over a pasted token: Atlassian refuses
      * API tokens unless an organization admin allows them.
+     *
+     * @param list<int>|null $serverAllowlist
      */
-    private function atlassianServer(int $userId): ?McpServerConfig
+    private function atlassianServer(int $userId, ?array $serverAllowlist): ?McpServerConfig
     {
         $signedIn = null;
         $token = null;
         $site = null;
         foreach ($this->servers->findEnabledByUser($userId) as $server) {
+            if (null !== $serverAllowlist && !in_array((int) $server->getId(), $serverAllowlist, true)) {
+                continue;
+            }
             $host = strtolower((string) parse_url($server->getUrl(), PHP_URL_HOST));
             if ('mcp.atlassian.com' === $host) {
                 if ($server->isOAuth()) {
@@ -214,8 +225,30 @@ final readonly class ConfluenceLinkedPageReader
         } elseif (isset($properties['contentFormat'])) {
             $args['contentFormat'] = 'markdown';
         }
+        // Atlassian MCP v2 defaults getConfluenceContent to a summary.
+        // Ask for the page body only when the live schema advertises it.
+        if (isset($properties['detail']) && $this->schemaOffers($properties['detail'], 'full')) {
+            $args['detail'] = 'full';
+        }
 
         return $args;
+    }
+
+    /**
+     * A property with no enum accepts the value. An enum must list it,
+     * otherwise the server would reject the call.
+     */
+    private function schemaOffers(mixed $property, string $value): bool
+    {
+        if (!is_array($property)) {
+            return true;
+        }
+        $enum = $property['enum'] ?? null;
+        if (!is_array($enum) || [] === $enum) {
+            return true;
+        }
+
+        return in_array($value, $enum, true);
     }
 
     /**

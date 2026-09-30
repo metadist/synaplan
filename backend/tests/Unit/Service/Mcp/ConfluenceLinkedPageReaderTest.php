@@ -123,6 +123,113 @@ final class ConfluenceLinkedPageReaderTest extends TestCase
         self::assertStringContainsString('Jira & Confluence', $read->prompt());
     }
 
+    public function testRequestsFullDetailWhenTheSchemaAdvertisesIt(): void
+    {
+        $server = $this->server();
+        $this->servers->method('findEnabledByUser')->willReturn([$server]);
+        $this->client->method('listTools')->willReturn([[
+            'name' => 'getConfluenceContent',
+            'description' => '',
+            'inputSchema' => [
+                'properties' => [
+                    'cloudId' => ['type' => 'string'],
+                    'content_id' => ['type' => 'string'],
+                    'detail' => ['type' => 'string', 'enum' => ['summary', 'full']],
+                ],
+            ],
+            'annotations' => [],
+        ]]);
+        $this->client->expects($this->once())->method('callTool')->with(
+            $server,
+            'getConfluenceContent',
+            [
+                'cloudId' => 'https://deskfiler.atlassian.net',
+                'content_id' => '3101163538',
+                'detail' => 'full',
+            ],
+        )->willReturn([
+            'content' => [['type' => 'text', 'text' => 'Full page']],
+            'isError' => false,
+        ]);
+
+        $read = $this->reader->read([self::PAGE], 1);
+
+        self::assertSame(1, $read->successCount());
+    }
+
+    public function testSkipsDetailWhenTheSchemaOnlyAllowsASummary(): void
+    {
+        $server = $this->server();
+        $this->servers->method('findEnabledByUser')->willReturn([$server]);
+        $this->client->method('listTools')->willReturn([[
+            'name' => 'getConfluenceContent',
+            'description' => '',
+            'inputSchema' => [
+                'properties' => [
+                    'content_url' => ['type' => 'string'],
+                    'detail' => ['type' => 'string', 'enum' => ['summary']],
+                ],
+            ],
+            'annotations' => [],
+        ]]);
+        $this->client->expects($this->once())->method('callTool')->with(
+            $server,
+            'getConfluenceContent',
+            ['content_url' => self::PAGE],
+        )->willReturn([
+            'content' => [['type' => 'text', 'text' => 'Summary only']],
+            'isError' => false,
+        ]);
+
+        $this->reader->read([self::PAGE], 1);
+    }
+
+    public function testDoesNotCallAServerTheTopicExcluded(): void
+    {
+        $server = $this->server();
+        (new \ReflectionProperty($server, 'id'))->setValue($server, 4);
+        $this->servers->method('findEnabledByUser')->willReturn([$server]);
+        $this->client->expects($this->never())->method('listTools');
+        $this->client->expects($this->never())->method('callTool');
+
+        $read = $this->reader->read([self::PAGE], 1, [9], function (): void {
+            self::fail('Progress must wait until an allowed connection is selected.');
+        });
+
+        self::assertFalse($read->attempted());
+    }
+
+    public function testSignalsReadyBeforeTheFirstRemoteCall(): void
+    {
+        $server = $this->server();
+        $this->servers->method('findEnabledByUser')->willReturn([$server]);
+        $events = [];
+        $this->client->method('listTools')->willReturnCallback(function () use (&$events): array {
+            $events[] = 'list';
+
+            return [[
+                'name' => 'getConfluencePage',
+                'description' => '',
+                'inputSchema' => ['properties' => ['pageId' => ['type' => 'string']]],
+                'annotations' => [],
+            ]];
+        });
+        $this->client->method('callTool')->willReturnCallback(function () use (&$events): array {
+            $events[] = 'call';
+
+            return [
+                'content' => [['type' => 'text', 'text' => 'Page']],
+                'isError' => false,
+            ];
+        });
+
+        $this->reader->read([self::PAGE], 1, null, function () use (&$events): void {
+            $events[] = 'ready';
+        });
+
+        self::assertSame(['ready', 'list', 'call'], $events);
+    }
+
     private function server(string $name = 'Deskfiler'): McpServerConfig
     {
         $server = new McpServerConfig();
