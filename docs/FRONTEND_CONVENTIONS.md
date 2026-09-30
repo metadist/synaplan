@@ -230,10 +230,10 @@ export async function createWidget(
 Hide a surface from everyone except admins while it is being tested on production. The gate is code, not a setting.
 
 1. Add the feature id to `AdminPreviewFeature` and `FEATURES` in `frontend/src/composables/useAdminPreview.ts`. Keep that list identical to `App\Service\Feature\AdminPreview::FEATURES`.
-2. Gate the surface with `isAdminPreview('telegram')` (for a `v-if` or a `computed`) or wrap it in `<AdminPreview feature="telegram">`.
-3. On the resource itself, add `<AdminPreview feature="telegram" badge />`. The badge is a static label, not a button. Its tooltip says that other people cannot see this yet. Copy lives in `common.adminPreview` in all five locales.
+2. Gate the surface with `isAdminPreview('my-feature')` (for a `v-if` or a `computed`) or wrap it in `<AdminPreview feature="my-feature">`.
+3. On the resource itself, add `<AdminPreview feature="my-feature" badge />`. The badge is a static label, not a button. Its tooltip says that other people cannot see this yet. Copy lives in `common.adminPreview` in all five locales.
 
-`isAdminPreview` reads `useAuthStore().isAdmin` and does not change the auth store.
+`isAdminPreview` reads `useAuthStore().isAdmin` and does not change the auth store. While no feature is listed, `AdminPreviewFeature` is `never`, so a call site left behind after a release fails `vue-tsc`.
 
 Release the feature by removing the id from both lists and every `isAdminPreview` / `<AdminPreview>` that names it, in the same change as the backend markers, then deploy.
 

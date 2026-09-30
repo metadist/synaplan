@@ -10,7 +10,9 @@ vi.mock('@/stores/auth', () => ({
   }),
 }))
 
-import { isAdminPreview } from '@/composables/useAdminPreview'
+import { isAdminPreview, type AdminPreviewFeature } from '@/composables/useAdminPreview'
+
+const TEST_FEATURE = 'test-preview' as AdminPreviewFeature
 
 describe('useAdminPreview', () => {
   beforeEach(() => {
@@ -18,14 +20,14 @@ describe('useAdminPreview', () => {
   })
 
   it('is true only for an admin on a listed feature', () => {
-    expect(isAdminPreview('telegram')).toBe(false)
+    expect(isAdminPreview(TEST_FEATURE, ['test-preview'])).toBe(false)
 
     admin = true
-    expect(isAdminPreview('telegram')).toBe(true)
+    expect(isAdminPreview(TEST_FEATURE, ['test-preview'])).toBe(true)
   })
 
   it('hides a feature id that is not in the preview list', () => {
     admin = true
-    expect(isAdminPreview('not-a-feature' as 'telegram')).toBe(false)
+    expect(isAdminPreview(TEST_FEATURE, ['other-preview'])).toBe(false)
   })
 })

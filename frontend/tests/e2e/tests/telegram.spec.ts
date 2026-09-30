@@ -32,20 +32,21 @@ test.describe('@ci @telegram Telegram channel', () => {
     await resetTelegramStub(request, testInfo.testId)
   })
 
-  test('a regular user does not see Telegram', async ({ page, request, credentials }) => {
+  test('a regular user can connect Telegram too', async ({ page, request, credentials }) => {
     await page.addInitScript(() => {
       localStorage.setItem('language', 'en')
     })
     await page.goto('/channels')
-    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+    await expect(page.locator(selectors.inboundConfig.telegramSection)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
-    await expect(page.locator(selectors.inboundConfig.telegramSection)).toHaveCount(0)
+    await expect(page.getByTestId('input-telegram-token')).toBeVisible()
+    await expect(page.getByTestId('badge-admin-preview')).toHaveCount(0)
 
     const auth = await getAuthHeaders(request, credentials)
-    const hidden = await request.get(`${getApiUrl()}/api/v1/channels/telegram`, { headers: auth })
-    expect(hidden.status()).toBe(404)
-    expect(await hidden.json()).toEqual({ error: 'not_found' })
+    const channel = await request.get(`${getApiUrl()}/api/v1/channels/telegram`, { headers: auth })
+    expect(channel.status()).toBe(200)
+    expect(await channel.json()).toMatchObject({ success: true })
   })
 
   test('invalid token stays on the form as one sentence', async ({ page }) => {
@@ -88,27 +89,30 @@ test.describe('@ci @telegram Telegram channel', () => {
 
     const { botKey, secret } = await readWebhook(request, testInfo.testId)
     const start = new URL(href ?? 'https://t.me/x').searchParams.get('start') ?? ''
+    // Handled updates are remembered per update id, so every run needs fresh ids.
+    const firstUpdateId = Date.now()
+    const id = (offset: number) => firstUpdateId + offset
 
-    await postUpdate(request, botKey, secret, messageUpdate(1001, 10, 555, `/start ${start}`))
+    await postUpdate(request, botKey, secret, messageUpdate(id(1), 10, 555, `/start ${start}`))
     await expect(page.getByTestId('text-telegram-connected')).toBeVisible({
       timeout: TIMEOUTS.LONG,
     })
     await expect(page.getByTestId('btn-telegram-open-chat')).toBeVisible()
 
-    await postUpdate(request, botKey, secret, messageUpdate(1002, 11, 555, 'What is 2 + 2?'))
+    await postUpdate(request, botKey, secret, messageUpdate(id(2), 11, 555, 'What is 2 + 2?'))
     const afterReply = await waitForTexts(
       request,
       testInfo.testId,
       (texts) => texts.length > 1 && (texts[texts.length - 1]?.length ?? 0) > 0
     )
 
-    await postUpdate(request, botKey, secret, messageUpdate(1002, 11, 555, 'What is 2 + 2?'))
+    await postUpdate(request, botKey, secret, messageUpdate(id(2), 11, 555, 'What is 2 + 2?'))
     expect(await sendTexts(request, testInfo.testId)).toHaveLength(afterReply.length)
 
-    await postUpdate(request, botKey, secret, unreadableUpdate(1003, 12, 555))
+    await postUpdate(request, botKey, secret, unreadableUpdate(id(3), 12, 555))
     await waitForTexts(request, testInfo.testId, (texts) => texts.includes(UNREADABLE))
 
-    await postUpdate(request, botKey, secret, messageUpdate(1004, 13, 777, 'hello'))
+    await postUpdate(request, botKey, secret, messageUpdate(id(4), 13, 777, 'hello'))
     await waitForTexts(request, testInfo.testId, (texts) =>
       texts.includes('This bot only answers its owner.')
     )
@@ -124,7 +128,7 @@ test.describe('@ci @telegram Telegram channel', () => {
     })
 
     const beforeSilent = await sendTexts(request, testInfo.testId)
-    await postUpdate(request, botKey, secret, messageUpdate(1005, 14, 555, 'Are you still there?'))
+    await postUpdate(request, botKey, secret, messageUpdate(id(5), 14, 555, 'Are you still there?'))
     expect(await sendTexts(request, testInfo.testId)).toEqual(beforeSilent)
 
     await expectTelegramThread(page)
@@ -143,13 +147,15 @@ test.describe('@ci @telegram Telegram channel', () => {
       'start'
     )
     const { botKey, secret } = await readWebhook(request, testInfo.testId)
-    await postUpdate(request, botKey, secret, messageUpdate(2001, 20, 555, `/start ${start}`))
+    const firstUpdateId = Date.now()
+    const id = (offset: number) => firstUpdateId + offset
+    await postUpdate(request, botKey, secret, messageUpdate(id(1), 20, 555, `/start ${start}`))
     await expect(page.getByTestId('text-telegram-connected')).toBeVisible({
       timeout: TIMEOUTS.LONG,
     })
 
     await setTelegramStubBlocked(request, true)
-    await postUpdate(request, botKey, secret, unreadableUpdate(2002, 21, 555))
+    await postUpdate(request, botKey, secret, unreadableUpdate(id(2), 21, 555))
     await page.reload()
     const blocked = page.getByTestId('text-telegram-state-error')
     await expect(blocked).toBeVisible({ timeout: TIMEOUTS.STANDARD })
@@ -158,7 +164,7 @@ test.describe('@ci @telegram Telegram channel', () => {
     await expect(blocked.getByTestId('btn-telegram-open-chat')).toBeVisible()
 
     await setTelegramStubBlocked(request, false)
-    await postUpdate(request, botKey, secret, unreadableUpdate(2003, 22, 555))
+    await postUpdate(request, botKey, secret, unreadableUpdate(id(3), 22, 555))
     await waitForTexts(request, testInfo.testId, (texts) => texts.includes(UNREADABLE))
     await page.reload()
     await expect(page.getByTestId('text-telegram-connected')).toBeVisible({
@@ -398,7 +404,6 @@ async function openChannels(page: import('@playwright/test').Page): Promise<void
   await expect(page.locator(selectors.inboundConfig.telegramSection)).toBeVisible({
     timeout: TIMEOUTS.STANDARD,
   })
-  await expect(page.getByTestId('badge-admin-preview')).toBeVisible()
 }
 
 async function readWebhook(

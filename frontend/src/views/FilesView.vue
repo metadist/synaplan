@@ -1592,7 +1592,7 @@ import {
   previewIconForName,
 } from '@/services/filePreview'
 import { isDocumentToolsEnabled } from '@/composables/useDocumentToolsFeature'
-import { isAdminPreview } from '@/composables/useAdminPreview'
+import { isModuleConfigured } from '@/composables/useModuleFeature'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { ApiError } from '@/services/api/httpClient'
@@ -1740,7 +1740,7 @@ const filterDateFrom = ref('')
 const filterDateTo = ref('')
 // Feature 2 (§4.4, §4.2, §4.5) — provenance / searchable / incoming filters.
 const filterSource = ref('')
-const telegramSourceVisible = computed(() => isAdminPreview('telegram'))
+const telegramSourceVisible = computed(() => isModuleConfigured('telegram'))
 const filterVectorized = ref('')
 const filterIncoming = ref(false)
 const filterSharedWithMe = ref(false)

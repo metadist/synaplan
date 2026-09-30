@@ -91,12 +91,12 @@ final class AdminPreviewListenerTest extends TestCase
         $tokens = $this->createStub(TokenStorageInterface::class);
         $tokens->method('getToken')->willReturn(null === $user ? null : $token);
 
-        return new AdminPreviewListener(new AdminPreview($this->createStub(UserRepository::class)), $tokens);
+        return new AdminPreviewListener(new AdminPreview($this->createStub(UserRepository::class), [PreviewController::FEATURE]), $tokens);
     }
 
     private function event(callable $controller, int $requestType): ControllerEvent
     {
-        $request = Request::create('/api/v1/channels/telegram');
+        $request = Request::create('/api/v1/preview');
 
         return new ControllerEvent(
             $this->createStub(HttpKernelInterface::class),
@@ -123,9 +123,11 @@ final class AdminPreviewListenerTest extends TestCase
     }
 }
 
-#[AdminPreviewAttribute(AdminPreview::TELEGRAM)]
+#[AdminPreviewAttribute(PreviewController::FEATURE)]
 final class PreviewController
 {
+    public const FEATURE = 'test-preview';
+
     public function __invoke(): Response
     {
         return new Response('controller');
@@ -134,7 +136,7 @@ final class PreviewController
 
 final class MethodPreviewController
 {
-    #[AdminPreviewAttribute(AdminPreview::TELEGRAM)]
+    #[AdminPreviewAttribute(PreviewController::FEATURE)]
     public function show(): Response
     {
         return new Response('controller');
