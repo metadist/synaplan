@@ -233,6 +233,37 @@ final class TaskPlannerTest extends TestCase
         self::assertGreaterThanOrEqual(3000, $options['max_tokens'] ?? 0);
     }
 
+    public function testCutOffPlannerJsonIsRetriedWithoutThinking(): void
+    {
+        $calls = [];
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$calls): array {
+                $calls[] = $opts;
+                if (1 === count($calls)) {
+                    return [
+                        'content' => '<think>planning'."\n".'{"version":1,"tasks":[{"id":"n1","capability":"mcp_fetch"',
+                        'finish_reason' => 'length',
+                    ];
+                }
+
+                return ['content' => json_encode([
+                    'version' => 1,
+                    'language' => 'en',
+                    'reply_node' => 'n1',
+                    'tasks' => [['id' => 'n1', 'capability' => 'chat']],
+                ])];
+            }
+        );
+
+        $result = $this->planner->plan($this->message('Look up the runbook'), [], 1);
+
+        self::assertFalse($result->fallback);
+        self::assertCount(2, $calls);
+        self::assertTrue($calls[1]['disable_thinking'] ?? false);
+        self::assertGreaterThan($calls[0]['max_tokens'] ?? 0, $calls[1]['max_tokens'] ?? 0);
+        self::assertSame(Capability::Chat, $result->plan->nodes[0]->capability);
+    }
+
     public function testPlanForwardsTheTaskPlanSchemaToTheAiFacade(): void
     {
         $options = null;

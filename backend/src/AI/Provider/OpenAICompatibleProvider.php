@@ -159,16 +159,17 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
                     $finishReason = $chunkFinish;
                 }
 
-                // Some gateways surface structured reasoning like the o-series.
-                if (isset($response->choices[0]->delta->reasoning_content)) {
-                    $reasoning = (string) $response->choices[0]->delta->reasoning_content;
-                    if ('' !== $reasoning) {
-                        $callback(['type' => 'reasoning', 'content' => $reasoning]);
-                    }
+                // o-series uses reasoning_content. Ollama's OpenAI-compatible API
+                // puts Qwen3 thinking in delta.reasoning. Read the raw payload:
+                // the SDK object drops fields it does not know.
+                $delta = is_array($arr['choices'][0]['delta'] ?? null) ? $arr['choices'][0]['delta'] : [];
+                $reasoning = $delta['reasoning_content'] ?? $delta['reasoning'] ?? null;
+                if (is_string($reasoning) && '' !== $reasoning) {
+                    $callback(['type' => 'reasoning', 'content' => self::toUtf8($reasoning)]);
                 }
 
                 if (isset($response->choices[0]->delta->content)) {
-                    $content = (string) $response->choices[0]->delta->content;
+                    $content = self::toUtf8((string) $response->choices[0]->delta->content);
                     if ('' !== $content) {
                         $callback($content);
                     }
@@ -181,7 +182,12 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
                 $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
 
-            return ['usage' => $usage];
+            $result = ['usage' => $usage];
+            if (is_string($finishReason) && '' !== $finishReason) {
+                $result['finish_reason'] = $finishReason;
+            }
+
+            return $result;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Throwable $e) {
@@ -415,6 +421,14 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
             $request['temperature'] = $options['temperature'];
         }
 
+        // Ollama's OpenAI-compatible API. Qwen3 otherwise spends max_tokens on
+        // thinking and the JSON answer is cut off (#2264). Only sent when a
+        // caller asked — a strict gateway that rejects unknown fields must not
+        // see this on ordinary calls.
+        if (!empty($options['disable_thinking'])) {
+            $request['think'] = false;
+        }
+
         $schema = $options['structured_output'] ?? null;
         if ($schema instanceof StructuredOutputSchema) {
             $request = array_merge($request, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
@@ -426,6 +440,19 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
     /**
      * @param array<string, mixed> $options
      */
+    /**
+     * A token limit can cut a multi-byte character in half. Invalid UTF-8
+     * later fails the message insert and the reply is never saved (#2264).
+     */
+    private static function toUtf8(string $text): string
+    {
+        if ('' === $text || mb_check_encoding($text, 'UTF-8')) {
+            return $text;
+        }
+
+        return mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+    }
+
     private function requireModel(array $options): string
     {
         $model = $options['model'] ?? null;

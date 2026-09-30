@@ -3222,6 +3222,9 @@ const streamAIResponse = async (
               if (typeof data.metadata?.error === 'string' && data.metadata.error) {
                 card.error = data.metadata.error
               }
+              if (typeof data.metadata?.text === 'string' && data.metadata.text) {
+                card.text = data.metadata.text
+              }
               if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
                 card.prompt = data.metadata.prompt
               }
@@ -3818,6 +3821,9 @@ const streamAIResponse = async (
               // resolved prompt powering the per-task retry button.
               if (typeof data.metadata?.error === 'string' && data.metadata.error) {
                 card.error = data.metadata.error
+              }
+              if (typeof data.metadata?.text === 'string' && data.metadata.text) {
+                card.text = data.metadata.text
               }
               if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
                 card.prompt = data.metadata.prompt

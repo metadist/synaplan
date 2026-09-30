@@ -262,7 +262,7 @@ final readonly class TaskPlanStore
         return [
             'BRESULTREF' => [] === $ref
                 ? null
-                : (json_encode($ref, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE) ?: null),
+                : (json_encode($ref, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE) ?: null),
             'BERROR' => $errorValue,
         ];
     }

@@ -176,6 +176,27 @@ final class TaskPlanStoreTest extends TestCase
         self::assertSame('/uploads/a.mp3', $ref['url']);
     }
 
+    public function testUpdateNodeStatusKeepsTextWhenUtf8WasCutMidCharacter(): void
+    {
+        $captured = [];
+        $this->connection->expects(self::once())
+            ->method('update')
+            ->willReturnCallback(function (string $table, array $data, array $criteria) use (&$captured): int {
+                $captured = $data;
+
+                return 1;
+            });
+
+        $this->store->updateNodeStatus(42, 'n2', 'done', [
+            'text' => "cut off\xC3",
+        ]);
+
+        self::assertIsString($captured['BRESULTREF']);
+        $ref = json_decode($captured['BRESULTREF'], true);
+        self::assertIsArray($ref);
+        self::assertArrayHasKey('text', $ref);
+    }
+
     public function testUpdateNodeStatusIgnoresEmptyNodeId(): void
     {
         $this->connection->expects(self::never())->method('update');

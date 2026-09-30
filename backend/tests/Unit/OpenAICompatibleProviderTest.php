@@ -88,6 +88,20 @@ final class OpenAICompatibleProviderTest extends TestCase
         $this->assertSame(['type' => 'object'], $request['response_format']['json_schema']['schema']);
     }
 
+    public function testBuildChatRequestDisablesThinkingWhenAsked(): void
+    {
+        $request = $this->buildChatRequest([], ['disable_thinking' => true], 'qwen3.8:27b', false);
+
+        $this->assertFalse($request['think']);
+    }
+
+    public function testBuildChatRequestLeavesThinkingAloneByDefault(): void
+    {
+        $request = $this->buildChatRequest([], [], 'qwen3.8:27b', false);
+
+        $this->assertArrayNotHasKey('think', $request);
+    }
+
     public function testBuildChatRequestWithoutStructuredOutputOmitsResponseFormat(): void
     {
         $request = $this->buildChatRequest([], [], 'some-model', false);

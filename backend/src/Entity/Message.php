@@ -174,6 +174,12 @@ class Message
 
     public function setText(string $text): self
     {
+        // A completion cut off mid-character is not valid UTF-8. MariaDB then
+        // rejects the INSERT, the entity manager closes, and the chat is left
+        // on "the reply was never saved" (#2264).
+        if ('' !== $text && !mb_check_encoding($text, 'UTF-8')) {
+            $text = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+        }
         $this->text = $text;
 
         return $this;
