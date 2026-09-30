@@ -235,6 +235,7 @@
               :document-changes="message.documentChanges"
               :document-fidelity-lossy="message.documentFidelityLossy"
               :voice-reply-failed="message.voiceReplyFailed"
+              :read-aloud-failed="message.readAloudFailed"
               :search-results="message.searchResults"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
@@ -619,10 +620,12 @@ import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
 import {
+  applyReadAloudFailed,
   applyVoiceReplyFailed,
   attachVoiceReplyAudio,
   isTaskPlanSuppressedMediaStatus,
   isVoiceReplyFailedReason,
+  shouldAutoplayVoiceReply,
 } from '@/utils/voiceReply'
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
@@ -3582,7 +3585,7 @@ const streamAIResponse = async (
         currentAudioStreamer.setOnFailure(() => {
           const message = historyStore.messages.find((m) => m.id === messageId)
           if (message) {
-            applyVoiceReplyFailed(message, 'provider_error')
+            applyReadAloudFailed(message)
           }
           isAudioStreaming.value = false
           currentAudioStreamer = null
@@ -4013,10 +4016,13 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.url) {
               const absoluteUrl = normalizeMediaUrl(data.url)
-              // Play a spoken reply unless sentence streaming is already audible.
-              // Other audio files stay silent until the person presses play.
-              const shouldAutoplay =
-                message.parts.some((part) => part.type === 'tts_loading') && !currentAudioStreamer
+              // Play the stored spoken reply unless sentence streaming already
+              // has answer text. A streamer object alone is not enough: a task
+              // plan never feeds it, and a finished stream is no longer active.
+              const shouldAutoplay = shouldAutoplayVoiceReply(
+                message.parts.some((part) => part.type === 'tts_loading'),
+                audioText
+              )
               attachVoiceReplyAudio(message, absoluteUrl, { autoplay: shouldAutoplay })
             }
           } else if (data.status === 'voice_reply_failed') {

@@ -151,6 +151,11 @@ export interface Message {
    * Reason code maps to a localized sentence on the message.
    */
   voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited'
+  /**
+   * Live sentence-by-sentence reading stopped. Not stored on the server:
+   * the full spoken file can still arrive and play.
+   */
+  readAloudFailed?: boolean
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorReason?: string | null

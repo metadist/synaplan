@@ -2308,8 +2308,8 @@ class StreamController extends AbstractController
                 // === Voice Reply: TTS Generation (Phase 3) ===
                 // Generate MP3 audio BEFORE sending complete event
                 // (frontend closes EventSource on 'complete', so audio must arrive first)
-                if ($voiceReply && !empty($responseText)) {
-                    // GUARD 1: Skip voice reply for media generation (image/video/audio).
+                if ($voiceReply) {
+                    // Skip voice reply for media generation (image/video/audio).
                     // Intentional and silent — the generated file is the answer (#2282).
                     $handlerIntent = $classification['intent'] ?? $classification['topic'] ?? 'chat';
                     if (in_array($handlerIntent, ['image_generation', 'video_generation', 'audio_generation', 'mediamaker'], true)) {
@@ -2320,7 +2320,9 @@ class StreamController extends AbstractController
                     }
                 }
 
-                if ($voiceReply && !empty($responseText)) {
+                // An empty or "0" answer still goes through processVoiceReply so the
+                // sanitizer can emit empty_text. Skipping on !empty() left that case silent.
+                if ($voiceReply) {
                     $this->processVoiceReply(
                         $outgoingMessage,
                         $user,
@@ -3417,7 +3419,19 @@ class StreamController extends AbstractController
                 $audioEvent['file_id'] = $ttsEphemeralFile->getId();
             }
             $this->sendSSE('audio', $audioEvent);
+        } catch (\Throwable $e) {
+            $this->logger->warning('StreamController: Voice reply TTS failed', [
+                'error' => $e->getMessage(),
+            ]);
+            $this->emitVoiceReplyFailed($outgoingMessage, 'provider_error', $incognito);
 
+            return;
+        }
+
+        // Audio is already stored and sent. A usage-accounting failure must not
+        // also report voice_reply_failed, or the client shows a player and a
+        // failure sentence for the same turn.
+        try {
             $recordedTtsUsage = $this->rateLimitService->recordUsage($user, 'AUDIOS', [
                 'provider' => $ttsProvider ?? 'unknown',
                 'model' => $ttsModelName ?? 'unknown',
@@ -3443,10 +3457,9 @@ class StreamController extends AbstractController
                 'model' => $ttsModelName ?? 'unknown',
             ]);
         } catch (\Throwable $e) {
-            $this->logger->warning('StreamController: Voice reply TTS failed', [
+            $this->logger->warning('StreamController: Voice reply usage recording failed', [
                 'error' => $e->getMessage(),
             ]);
-            $this->emitVoiceReplyFailed($outgoingMessage, 'provider_error', $incognito);
         }
     }
 

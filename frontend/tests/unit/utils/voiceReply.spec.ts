@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Message } from '@/stores/history'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import {
+  applyReadAloudFailed,
   applyVoiceReplyFailed,
   attachVoiceReplyAudio,
   isTaskPlanSuppressedMediaStatus,
+  shouldAutoplayVoiceReply,
 } from '@/utils/voiceReply'
 
 function makeMessage(overrides: Partial<Message> = {}): Message {
@@ -20,10 +22,7 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
 describe('voiceReply utils (#2282)', () => {
   it('applyVoiceReplyFailed clears tts_loading and stores the reason', () => {
     const message = makeMessage({
-      parts: [
-        { type: 'text', content: 'Hello' },
-        { type: 'tts_loading' },
-      ],
+      parts: [{ type: 'text', content: 'Hello' }, { type: 'tts_loading' }],
     })
 
     applyVoiceReplyFailed(message, 'provider_error')
@@ -43,10 +42,7 @@ describe('voiceReply utils (#2282)', () => {
 
   it('attachVoiceReplyAudio during an active task plan attaches audio and clears loading', () => {
     const message = makeMessage({
-      parts: [
-        { type: 'text', content: 'Summary' },
-        { type: 'tts_loading' },
-      ],
+      parts: [{ type: 'text', content: 'Summary' }, { type: 'tts_loading' }],
       taskPlan: {
         active: true,
         replyNode: 'n2',
@@ -77,6 +73,41 @@ describe('voiceReply utils (#2282)', () => {
     const audio = message.parts.find((p) => p.type === 'audio')
     expect(audio?.url).toContain('tts.mp3')
     expect(audio?.autoplay).toBe(true)
+  })
+
+  it('keeps a read-aloud stop when the full spoken file arrives', () => {
+    const message = makeMessage({
+      parts: [{ type: 'text', content: 'Hello' }, { type: 'tts_loading' }],
+      voiceReplyFailed: 'provider_error',
+      readAloudFailed: true,
+    })
+
+    attachVoiceReplyAudio(message, 'http://localhost:8000/api/v1/files/uploads/tts.mp3', {
+      autoplay: false,
+    })
+
+    expect(message.voiceReplyFailed).toBeUndefined()
+    expect(message.readAloudFailed).toBe(true)
+    expect(message.parts.some((p) => p.type === 'audio')).toBe(true)
+  })
+
+  it('applyReadAloudFailed leaves the spoken-file loading indicator in place', () => {
+    const message = makeMessage({
+      parts: [{ type: 'text', content: 'Hello' }, { type: 'tts_loading' }],
+    })
+
+    applyReadAloudFailed(message)
+
+    expect(message.readAloudFailed).toBe(true)
+    expect(message.voiceReplyFailed).toBeUndefined()
+    expect(message.parts.some((p) => p.type === 'tts_loading')).toBe(true)
+  })
+
+  it('autoplays the stored reply only when sentence streaming has no answer text', () => {
+    expect(shouldAutoplayVoiceReply(true, '')).toBe(true)
+    expect(shouldAutoplayVoiceReply(true, '   ')).toBe(true)
+    expect(shouldAutoplayVoiceReply(true, 'Hello there.')).toBe(false)
+    expect(shouldAutoplayVoiceReply(false, '')).toBe(false)
   })
 })
 

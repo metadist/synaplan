@@ -143,6 +143,57 @@ final class StreamControllerVoiceReplyTest extends TestCase
         self::assertFalse($this->sseHasStatus($events, 'audio'));
     }
 
+    public function testBlankResponseEmitsEmptyText(): void
+    {
+        $user = $this->createUser(7);
+        $message = $this->createPersistedMessage();
+
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->aiFacade->expects(self::never())->method('synthesize');
+
+        $events = $this->invokeProcessVoiceReply($message, $user, '');
+
+        self::assertTrue($this->sseHas($events, 'voice_reply_failed', 'empty_text'));
+        self::assertSame('empty_text', $message->getMeta('voice_reply_failed'));
+    }
+
+    public function testZeroTextStillReachesSynthesis(): void
+    {
+        $user = $this->createUser(7);
+        $message = $this->createPersistedMessage();
+
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->aiFacade->expects(self::once())->method('synthesize')->willThrowException(new \RuntimeException('no audio'));
+
+        $events = $this->invokeProcessVoiceReply($message, $user, '0');
+
+        self::assertTrue($this->sseHas($events, 'voice_reply_failed', 'provider_error'));
+        self::assertFalse($this->sseHasStatus($events, 'audio'));
+    }
+
+    public function testUsageRecordingFailureAfterDeliveryDoesNotReportVoiceFailure(): void
+    {
+        $user = $this->createUser(7);
+        $message = $this->createPersistedMessage();
+
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->aiFacade->method('synthesize')->willReturn([
+            'relativePath' => 'tts.mp3',
+            'provider' => 'piper',
+            'model' => 'piper-multi',
+            'model_id' => 9,
+            'text_length' => 12,
+        ]);
+        $this->rateLimitService->method('recordUsage')->willThrowException(new \RuntimeException('usage store down'));
+
+        $events = $this->invokeProcessVoiceReply($message, $user, 'Hello world.');
+
+        self::assertTrue($this->sseHasStatus($events, 'audio'));
+        self::assertFalse($this->sseHasStatus($events, 'voice_reply_failed'));
+        self::assertNull($message->getMeta('voice_reply_failed'));
+        self::assertSame(1, $message->getFile());
+    }
+
     /**
      * @return list<array<string, mixed>>
      */

@@ -95,6 +95,7 @@
       "empty_text": "The spoken version could not be created. Your text answer is complete.",
       "rate_limited": "The spoken version could not be created because your audio limit is used up. Your text answer is complete."
     },
+    "readAloudStopped": "Reading the answer aloud stopped before it finished.",
     "audioUnavailable": "Audio could not be loaded",
     "audioUnavailableDescription": "The file is currently unavailable on the server. Please try again later or download it.",
     "imageUnavailable": "Image could not be loaded",

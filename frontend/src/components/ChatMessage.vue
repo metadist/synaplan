@@ -370,6 +370,13 @@
           >
             {{ $t(`chat.voiceReplyFailed.${voiceReplyFailed}`) }}
           </p>
+          <p
+            v-if="role === 'assistant' && readAloudFailed"
+            class="px-4 pb-2 text-sm txt-secondary"
+            data-testid="read-aloud-failed"
+          >
+            {{ $t('chat.readAloudStopped') }}
+          </p>
 
           <ChatErrorNotice
             v-if="role === 'assistant' && errorReason"
@@ -1119,6 +1126,8 @@ interface Props {
   documentFidelityLossy?: boolean
   /** Voice-reply failure reason when TTS was requested but no audio was stored (#2282). */
   voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited'
+  /** Live reading stopped. Stays visible when the full spoken file arrives. */
+  readAloudFailed?: boolean
   searchResults?: Array<{
     title: string
     url: string

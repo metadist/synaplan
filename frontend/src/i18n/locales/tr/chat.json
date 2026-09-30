@@ -91,6 +91,7 @@
       "empty_text": "Sesli sürüm oluşturulamadı. Metin yanıtınız tamamlandı.",
       "rate_limited": "Ses kotanız dolduğu için sesli sürüm oluşturulamadı. Metin yanıtınız tamamlandı."
     },
+    "readAloudStopped": "Sesli okuma bitmeden durdu.",
     "audioUnavailable": "Ses yüklenemedi",
     "audioUnavailableDescription": "Dosya şu anda sunucuda mevcut değil. Lütfen daha sonra tekrar deneyin veya indirin.",
     "imageUnavailable": "Görsel yüklenemedi",
