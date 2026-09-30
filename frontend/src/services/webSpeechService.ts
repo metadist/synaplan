@@ -228,7 +228,7 @@ export class WebSpeechService {
       // then expected to *assign* (not append) the snapshot into the textbox,
       // which makes duplicate emissions a no-op.
       const finals: string[] = []
-      let interim = ''
+      const interims: string[] = []
       for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i]
         if (!result || result.length === 0) continue
@@ -236,26 +236,26 @@ export class WebSpeechService {
         if (result.isFinal) {
           finals.push(transcript)
         } else {
-          // Per spec only one trailing interim is meaningful at a time, but
-          // some engines briefly report multiple in-progress entries. Keep
-          // the latest one — concatenation would inflate the visible text.
-          interim = transcript
+          interims.push(transcript)
         }
       }
 
-      // Android Chrome (some versions) reports cumulative finals: each
+      // Android Chrome (some versions) reports cumulative segments: each
       // results[i].transcript contains ALL text from results[0..i], not just
       // the new segment. Real Android sessions also mix patterns within a
       // single recognition (e.g. ["hi", "hi wie wird", "neue session"]) where
       // an all-or-nothing detection still leaks duplicates. Walk the list
-      // once and only keep the *new tail* whenever a final is a strict
+      // once and only keep the *new tail* whenever a segment is a strict
       // prefix-extension of the previous one — this collapses cumulative
-      // bursts while preserving genuinely independent segments.
-      const finalText = this.dedupeProgressiveFinals(finals)
+      // bursts while preserving genuinely independent segments. The same
+      // walk applies to in-progress entries, which some engines report as
+      // several pieces of the current phrase rather than one trailing interim.
+      const finalText = this.dedupeProgressiveSegments(finals)
+      const interimText = this.dedupeProgressiveSegments(interims)
 
       this.options.onResult?.({
         final: finalText.replace(/\s+/g, ' ').trim(),
-        interim: interim.replace(/\s+/g, ' ').trim(),
+        interim: interimText.replace(/\s+/g, ' ').trim(),
       })
     }
 
@@ -328,9 +328,10 @@ export class WebSpeechService {
   }
 
   /**
-   * Walk the list of final transcripts and emit a deduplicated, joined
-   * string that handles three intermixed patterns Android Chrome has been
-   * observed to produce in a single recognition session:
+   * Walk a list of transcripts (finalized phrases, or the in-progress pieces
+   * of the current phrase) and emit a deduplicated, joined string that
+   * handles three intermixed patterns Android Chrome has been observed to
+   * produce in a single recognition session:
    *
    *  1. **Identical re-emit:** the same final shows up multiple times in a
    *     row (`["hi wie", "hi wie"]`). Skip the duplicate.
@@ -349,11 +350,11 @@ export class WebSpeechService {
    * The cumulative check requires an actual space (` `) between prev and
    * the rest to avoid false positives like ["hi", "higher"].
    */
-  private dedupeProgressiveFinals(finals: string[]): string {
+  private dedupeProgressiveSegments(segments: string[]): string {
     const parts: string[] = []
     let previousCumulative = ''
 
-    for (const raw of finals) {
+    for (const raw of segments) {
       const curr = raw.trim()
       if ('' === curr) continue
 

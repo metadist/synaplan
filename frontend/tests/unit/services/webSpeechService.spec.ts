@@ -266,19 +266,45 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     expect(calls.at(-1)).toEqual({ final: 'hello world', interim: '' })
   })
 
-  it('keeps the latest interim only when the engine briefly reports multiple', async () => {
+  it('joins independent interim fragments of the current phrase', async () => {
     const calls: WebSpeechSnapshot[] = []
     const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
     await service.start()
 
-    // Some engines report multiple in-progress entries between finals; we
-    // must not concatenate them into the visible interim.
+    recognition.fireResults(0, [
+      { transcript: 'guten', isFinal: false },
+      { transcript: 'Morgen wie', isFinal: false },
+    ])
+
+    expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: '', interim: 'guten Morgen wie' }])
+  })
+
+  it('collapses cumulative interim fragments to the longest phrase', async () => {
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
     recognition.fireResults(0, [
       { transcript: 'good', isFinal: false },
       { transcript: 'good morning', isFinal: false },
     ])
 
     expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: '', interim: 'good morning' }])
+  })
+
+  it('keeps finalized phrases and joins the in-progress phrase after them', async () => {
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(2, [
+      { transcript: 'hello', isFinal: true },
+      { transcript: 'world', isFinal: true },
+      { transcript: 'how', isFinal: false },
+      { transcript: 'are you', isFinal: false },
+    ])
+
+    expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: 'hello world', interim: 'how are you' }])
   })
 
   it('collapses repeated whitespace inside the joined final string', async () => {
