@@ -2186,7 +2186,7 @@ const loadConversationHistory = async (force = false) => {
 }
 
 // Use the shared markdown renderer (singleton for widget performance)
-const markdownRenderer = getMarkdownRenderer()
+const markdownRenderer = getMarkdownRenderer((key, params) => String(t(key, params ?? {})))
 
 interface CodeBlock {
   language: string

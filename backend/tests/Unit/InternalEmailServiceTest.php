@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\Service\InternalEmailService;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportException;
@@ -27,7 +28,7 @@ class InternalEmailServiceTest extends TestCase
         $mailer->expects($this->once())
             ->method('send');
 
-        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger, new GeneratedMediaTextRenderer($translator));
         $service->sendVerificationEmail('test@example.com', 'test_token_123');
 
         $this->assertTrue(true, 'Verification email method called successfully');
@@ -43,7 +44,7 @@ class InternalEmailServiceTest extends TestCase
         $mailer->expects($this->once())
             ->method('send');
 
-        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger, new GeneratedMediaTextRenderer($translator));
         $service->sendPasswordResetEmail('test@example.com', 'reset_token_456');
 
         $this->assertTrue(true, 'Password reset email method called successfully');
@@ -59,7 +60,7 @@ class InternalEmailServiceTest extends TestCase
         $mailer->expects($this->once())
             ->method('send');
 
-        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger, new GeneratedMediaTextRenderer($translator));
         $service->sendAiResponseEmail(
             'user@example.com',
             'Test Subject',
@@ -79,7 +80,7 @@ class InternalEmailServiceTest extends TestCase
         $mailer->expects($this->once())
             ->method('send');
 
-        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger, new GeneratedMediaTextRenderer($translator));
         $service->sendAiResponseEmail(
             'user@example.com',
             'Test Subject',
@@ -111,7 +112,7 @@ class InternalEmailServiceTest extends TestCase
                 $captured = $email;
             });
 
-        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger, new GeneratedMediaTextRenderer($translator));
         $service->sendAiResponseEmail(
             'user@example.com',
             'Test Subject',
@@ -143,7 +144,7 @@ class InternalEmailServiceTest extends TestCase
                 $captured = $email;
             });
 
-        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger, new GeneratedMediaTextRenderer($translator));
         $service->sendAiResponseEmail(
             'user@example.com',
             'Test Subject',
@@ -169,11 +170,15 @@ class InternalEmailServiceTest extends TestCase
                 $captured = $email;
             });
 
+        $translator = $this->createMock(TranslatorInterface::class);
+        $translator->method('trans')->willReturnCallback(static fn (string $id): string => $id);
+
         return new InternalEmailService(
             $mailer,
             $this->createMock(Environment::class),
-            $this->createMock(TranslatorInterface::class),
+            $translator,
             $this->createMock(LoggerInterface::class),
+            new GeneratedMediaTextRenderer($translator),
         );
     }
 
@@ -245,11 +250,15 @@ class InternalEmailServiceTest extends TestCase
 
     private function serviceWithMailer(MailerInterface $mailer): InternalEmailService
     {
+        $translator = $this->createMock(TranslatorInterface::class);
+        $translator->method('trans')->willReturnCallback(static fn (string $id): string => $id);
+
         return new InternalEmailService(
             $mailer,
             $this->createMock(Environment::class),
-            $this->createMock(TranslatorInterface::class),
+            $translator,
             $this->createMock(LoggerInterface::class),
+            new GeneratedMediaTextRenderer($translator),
         );
     }
 

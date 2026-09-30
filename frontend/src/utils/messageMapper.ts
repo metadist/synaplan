@@ -21,6 +21,7 @@ import {
   isImageFileType,
   isVideoFileType,
 } from '@/utils/mediaTypes'
+import { i18n } from '@/i18n'
 
 /**
  * Issue #1070: single authoritative mapping from the persisted API row
@@ -109,7 +110,7 @@ function appendGeneratedMediaPart(message: Message, url: string, type: string): 
       partId: generatePartId(),
       type: 'image',
       url: normalized,
-      alt: 'Generated image',
+      alt: i18n.global.t('message.imageGenerated'),
     })
   } else if ('audio' === type && !message.parts.some((p) => 'audio' === p.type)) {
     message.parts.push({ partId: generatePartId(), type: 'audio', url: normalized })
@@ -400,7 +401,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         partId: generatePartId(),
         type: 'image',
         url: absoluteUrl,
-        alt: m.text || 'Generated image',
+        alt: i18n.global.t('message.imageGenerated'),
       })
     } else if (isVideoFileType(m.file.type)) {
       parts.push({

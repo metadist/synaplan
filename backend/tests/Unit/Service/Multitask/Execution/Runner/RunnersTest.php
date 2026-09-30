@@ -605,7 +605,7 @@ final class RunnersTest extends TestCase
             $captured = $classification;
 
             return [
-                'content' => 'Generated image: a dog',
+                'content' => '__IMAGE_GENERATED__',
                 'metadata' => [
                     'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
                     'local_path' => '1/000/dog.png',
@@ -689,7 +689,7 @@ final class RunnersTest extends TestCase
                 $capturedOptions = $options;
 
                 return [
-                    'content' => 'Generated image',
+                    'content' => '__IMAGE_GENERATED__',
                     'metadata' => [
                         'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
                         'local_path' => '1/000/dog.png',

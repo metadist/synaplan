@@ -9,6 +9,7 @@ use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -49,6 +50,7 @@ final readonly class WidgetExportService
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -578,7 +580,11 @@ final readonly class WidgetExportService
 
             return [
                 'direction' => $message->getDirection(),
-                'text' => $this->sanitizeCellValue($message->getText()),
+                'text' => $this->sanitizeCellValue(
+                    null !== $this->mediaTextRenderer
+                        ? $this->mediaTextRenderer->forUser($message->getText(), $message->getLanguage())
+                        : GeneratedMediaTextRenderer::renderModel((string) $message->getText())
+                ),
                 'timestamp' => $message->getUnixTimestamp(),
                 'sender' => $sender,
                 'language' => strtoupper($message->getLanguage()),

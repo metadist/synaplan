@@ -376,7 +376,9 @@ final class TelegramInboundServiceTest extends TestCase
         $upload = $this->call('sendFile');
         $this->assertSame(TelegramFileMethod::Document, $upload[2]);
         $this->assertSame('Report.docx', $upload[4]);
-        $this->assertSame('Your report is ready.', $upload[5]);
+        $this->assertStringContainsString('Your report is ready.', $upload[5]);
+        $this->assertStringNotContainsString('__FILE_GENERATED__', $upload[5]);
+        $this->assertStringContainsString('report.docx', $upload[5]);
         $this->assertSame("Your report is ready.\n__FILE_GENERATED__:report.docx", $this->messages[1]->getText());
     }
 
@@ -424,7 +426,8 @@ final class TelegramInboundServiceTest extends TestCase
         $upload = $this->call('sendFile');
         $this->assertSame(TelegramFileMethod::Document, $upload[2]);
         $this->assertSame('Report.docx', $upload[4]);
-        $this->assertSame('', $upload[5]);
+        $this->assertStringNotContainsString('__', $upload[5]);
+        $this->assertStringContainsString('report.docx', $upload[5]);
         $this->assertSame([], $this->texts());
     }
 

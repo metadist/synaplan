@@ -11,6 +11,7 @@ use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -30,6 +31,7 @@ final readonly class MemoryExtractionService
         private LoggerInterface $logger,
         private StructuredOutputConfig $structuredOutputConfig,
         private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -82,7 +84,9 @@ final readonly class MemoryExtractionService
                 if ('IN' !== $msg->getDirection()) {
                     continue;
                 }
-                $userOnlyHistory[] = ['role' => 'user', 'content' => (string) $msg->getText()];
+                $userOnlyHistory[] = ['role' => 'user', 'content' => null !== $this->mediaTextRenderer
+                    ? $this->mediaTextRenderer->forModel($msg->getText())
+                    : GeneratedMediaTextRenderer::renderModel((string) $msg->getText())];
                 continue;
             }
 

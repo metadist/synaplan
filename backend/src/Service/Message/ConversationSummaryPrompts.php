@@ -106,7 +106,7 @@ final class ConversationSummaryPrompts
     public static function renderMessage(Message $msg): string
     {
         $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-        $text = (string) $msg->getText();
+        $text = GeneratedMediaTextRenderer::renderModel((string) $msg->getText());
 
         $fileText = (string) $msg->getFileText();
         if ('' !== $fileText) {
