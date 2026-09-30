@@ -29,6 +29,8 @@ final class OpenAiReasoningEffort
         // prefixes must precede the bare `gpt-6` fallback.
         'gpt-6-sol' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
         'gpt-6-luna' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+        // 6.1 Sol dropped the `none` tier that 6 Sol still accepts.
+        'gpt-6.1-sol' => ['low', 'medium', 'high', 'xhigh', 'max'],
         'gpt-6' => ['low', 'medium', 'high', 'xhigh', 'max'],
         'gpt-5.6' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
         // Pro reasons hard by design: no skip tier, default 'high'.
