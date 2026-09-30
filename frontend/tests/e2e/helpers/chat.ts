@@ -221,6 +221,35 @@ export class ChatHelper {
     )
   }
 
+  /**
+   * Full reload, then wait until the open chat's transcript is actually back.
+   *
+   * `page.reload()` resolves on the document load event, a few hundred
+   * milliseconds in. The bubbles only exist after the cold boot's
+   * GET /chats/:id/messages, and on a shared CI runner that request regularly
+   * lands just past STANDARD (10s). Waiting on the bubble from document load
+   * therefore times out as the player is mounting.
+   */
+  async reload(): Promise<void> {
+    const messagesReady = this.page.waitForResponse(
+      (res) => {
+        try {
+          const url = new URL(res.url())
+          return (
+            /\/api\/v1\/chats\/\d+\/messages$/.test(url.pathname) &&
+            res.request().method() === 'GET' &&
+            res.ok()
+          )
+        } catch {
+          return false
+        }
+      },
+      { timeout: TIMEOUTS.VERY_LONG }
+    )
+    await this.page.reload()
+    await messagesReady
+  }
+
   async attachFile(file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
     const panel = this.page.locator(selectors.chat.plusPanel)
     if (!(await panel.isVisible())) {
