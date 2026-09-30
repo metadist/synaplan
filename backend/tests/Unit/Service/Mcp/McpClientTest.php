@@ -82,6 +82,30 @@ final class McpClientTest extends TestCase
         self::assertStringContainsString('Mcp-Session-Id: sess-1', $toolsListHeaders);
     }
 
+    public function testListToolsFollowsTheNextCursor(): void
+    {
+        $captured = [];
+        $client = $this->client([
+            self::rpc(['protocolVersion' => McpClient::PROTOCOL_VERSION], ['mcp-session-id' => 'sess-1']),
+            new MockResponse('', ['http_code' => 202]),
+            self::rpc([
+                'tools' => [['name' => 'createConfluenceContent', 'description' => '', 'inputSchema' => []]],
+                'nextCursor' => 'page-2',
+            ]),
+            self::rpc([
+                'tools' => [['name' => 'getConfluenceContent', 'description' => 'Open a page', 'inputSchema' => ['type' => 'object']]],
+            ]),
+            new MockResponse('', ['http_code' => 200]),
+        ], $captured);
+
+        $tools = $client->listTools($this->server());
+
+        self::assertSame(['createConfluenceContent', 'getConfluenceContent'], array_column($tools, 'name'));
+        $secondList = json_decode((string) ($captured[3]['options']['body'] ?? ''), true);
+        self::assertSame('tools/list', $secondList['method']);
+        self::assertSame('page-2', $secondList['params']['cursor']);
+    }
+
     public function testCallToolSendsArgumentsAndReturnsContentBlocks(): void
     {
         $captured = [];

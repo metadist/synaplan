@@ -147,10 +147,17 @@ Reconnect*) to grant the new permissions.
 
 ## Jira & Confluence (via MCP)
 
-Jira and Confluence connect through the **MCP servers** page (*Channels → MCP
-servers*), not through this registry: add an Atlassian-capable MCP server
-(for example a self-hosted Atlassian MCP service) with its endpoint URL and
-access token — the Jira/Confluence quick-start presets prefill the form.
+Jira and Confluence connect through **Manage → Connections → MCP Servers**.
+Choose the **Jira & Confluence** card, save the
+connection, then sign in with your Atlassian account. Synaplan uses Atlassian's
+hosted server (`https://mcp.atlassian.com/v2/mcp`). No API token is needed —
+Atlassian refuses API tokens unless an organization admin allows them. You can
+revoke access in your Atlassian account at any time.
+
+A Confluence page pasted into chat is read through that signed-in connection
+when the task has **MCP data sources** turned on. For normal chat questions
+that is General Chat. A task that turns it off, or that limits which
+connections it may use, does not call Atlassian.
 
 - **Read** (`mcp_fetch`): "search Confluence for the onboarding page and
   summarize it", "list my open Jira tickets" — read-only tools feed the
