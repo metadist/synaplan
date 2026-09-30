@@ -209,7 +209,7 @@ final readonly class ModelDiscoveryDigest
         }
 
         return [sprintf(
-            'Baseline recorded for %s: %d ids; new models will be reported from tomorrow',
+            'Baseline recorded for %s: %d ids; newer models are reported from now on',
             implode(', ', $parts),
             $total,
         )];

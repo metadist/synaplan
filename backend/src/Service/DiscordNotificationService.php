@@ -939,7 +939,7 @@ final readonly class DiscordNotificationService
                     'inline' => false,
                 ],
             ],
-            footer: 'Synaplan model discovery · daily · at most one post per day',
+            footer: 'Synaplan model discovery · hourly · at most one failure post per day',
         );
     }
 

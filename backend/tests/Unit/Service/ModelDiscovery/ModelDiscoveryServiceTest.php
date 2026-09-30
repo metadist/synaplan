@@ -35,6 +35,10 @@ final class ModelDiscoveryServiceTest extends TestCase
 
     private int $releaseCalls = 0;
 
+    private ?string $claimedSlot = null;
+
+    private ?string $reminderSentOn = null;
+
     public function testDisabledThrowsOnRun(): void
     {
         $service = $this->service(enabled: false);
@@ -141,6 +145,46 @@ final class ModelDiscoveryServiceTest extends TestCase
         $this->assertTrue($this->storedProviders['openai']['baselineRecorded']);
         $this->assertFalse($this->storedProviders['openai']['baselineAnnounced']);
         $this->assertSame(['gpt-4o', 'gpt-5.4'], $this->storedProviders['openai']['baselineIds']);
+    }
+
+    public function testFirstListingReportsModelsReleasedInsideTheFreshWindow(): void
+    {
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok(
+            ['gpt-4o', 'gpt-6-sol', 'gpt-6.1-sol'],
+            [
+                'gpt-4o' => (new \DateTimeImmutable('2024-05-13 00:00:00 UTC'))->getTimestamp(),
+                'gpt-6-sol' => (new \DateTimeImmutable('2026-09-15 00:00:00 UTC'))->getTimestamp(),
+                'gpt-6.1-sol' => (new \DateTimeImmutable('2026-09-23 18:00:00 UTC'))->getTimestamp(),
+            ],
+        );
+
+        $report = $this->service(
+            listings: $listings,
+            models: [$this->model('openai', 'gpt-6-sol')],
+        )->run();
+
+        $this->assertSame(['gpt-4o'], $this->storedProviders['openai']['baselineIds']);
+        $this->assertCount(1, $report->newPending);
+        $this->assertSame('gpt-6.1-sol', $report->newPending[0]['id']);
+        $this->assertSame('2026-09-24', $report->newPending[0]['firstSeen']);
+        $this->assertSame(1, $report->baselinesRecorded[0]['idCount']);
+        $this->assertTrue($report->shouldNotify);
+    }
+
+    public function testFirstListingWithoutUsableDatesBaselinesEverything(): void
+    {
+        $sameStamp = (new \DateTimeImmutable('2026-09-24 11:59:00 UTC'))->getTimestamp();
+        $listings = $this->allNotConfigured();
+        $listings['mistral'] = ProviderModelListing::ok(
+            ['mistral-large', 'mistral-small'],
+            ['mistral-large' => $sameStamp, 'mistral-small' => $sameStamp],
+        );
+
+        $report = $this->service(listings: $listings)->run();
+
+        $this->assertSame([], $report->pending);
+        $this->assertSame(['mistral-large', 'mistral-small'], $this->storedProviders['mistral']['baselineIds']);
     }
 
     public function testUnannouncedOlderBaselineIsReportedAgain(): void
@@ -288,6 +332,34 @@ final class ModelDiscoveryServiceTest extends TestCase
         $this->assertTrue($report->isMondayReminder);
         $this->assertSame([], $report->newPending);
         $this->assertCount(1, $report->openPending);
+    }
+
+    public function testMondayReminderIsSentOncePerMonday(): void
+    {
+        $this->storedProviders = [
+            'openai' => $this->providerState(
+                baselineRecorded: true,
+                baselineAnnounced: true,
+                baselineIds: ['gpt-4o'],
+                seen: ['gpt-4o' => '2026-09-01', 'gpt-brand-new' => '2026-09-10'],
+                announced: ['gpt-brand-new' => '2026-09-10'],
+            ),
+        ];
+        $listings = $this->allNotConfigured();
+        $listings['openai'] = ProviderModelListing::ok(['gpt-4o', 'gpt-brand-new']);
+
+        $firstRun = $this->service(listings: $listings, clock: new MockClock('2026-09-21 06:00:00'));
+        $report = $firstRun->run();
+        $this->assertTrue($report->isMondayReminder);
+        $firstRun->markDiscoveriesAnnounced($report);
+        $this->assertSame('2026-09-21', $this->reminderSentOn);
+
+        $laterRun = $this->service(listings: $listings, clock: new MockClock('2026-09-21 07:00:00'))->run();
+        $this->assertFalse($laterRun->isMondayReminder);
+        $this->assertFalse($laterRun->shouldNotify);
+
+        $nextMonday = $this->service(listings: $listings, clock: new MockClock('2026-09-28 06:00:00'))->run();
+        $this->assertTrue($nextMonday->isMondayReminder);
     }
 
     public function testPendingPersistsAcrossRunsUntilKnown(): void
@@ -628,17 +700,18 @@ final class ModelDiscoveryServiceTest extends TestCase
         $this->assertArrayNotHasKey('openai:still-listed', $whys);
     }
 
-    public function testClaimNotifyDayDelegatesToStore(): void
+    public function testClaimNotifySlotClaimsTheCurrentHour(): void
     {
         $this->claimResult = false;
-        $service = $this->service();
-        $this->assertFalse($service->claimNotifyDay());
+        $service = $this->service(clock: new MockClock('2026-09-24 09:05:00'));
+        $this->assertFalse($service->claimNotifySlot());
         $this->assertSame(1, $this->claimCalls);
+        $this->assertSame('2026-09-24 09', $this->claimedSlot);
     }
 
-    public function testReleaseNotifyDayDelegatesToStore(): void
+    public function testReleaseNotifySlotDelegatesToStore(): void
     {
-        $this->service()->releaseNotifyDay();
+        $this->service()->releaseNotifySlot();
         $this->assertSame(1, $this->releaseCalls);
     }
 
@@ -702,13 +775,18 @@ final class ModelDiscoveryServiceTest extends TestCase
         $store->method('saveProviders')->willReturnCallback(function (array $providers): void {
             $this->storedProviders = $providers;
         });
-        $store->method('claimNotifyDay')->willReturnCallback(function () {
+        $store->method('claimNotifySlot')->willReturnCallback(function (string $slot): bool {
             ++$this->claimCalls;
+            $this->claimedSlot = $slot;
 
             return $this->claimResult;
         });
-        $store->method('releaseNotifyDay')->willReturnCallback(function (): void {
+        $store->method('releaseNotifySlot')->willReturnCallback(function (): void {
             ++$this->releaseCalls;
+        });
+        $store->method('loadReminderSentOn')->willReturnCallback(fn (): ?string => $this->reminderSentOn);
+        $store->method('saveReminderSentOn')->willReturnCallback(function (string $day): void {
+            $this->reminderSentOn = $day;
         });
 
         return new ModelDiscoveryService(

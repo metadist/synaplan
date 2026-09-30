@@ -7,7 +7,7 @@ namespace App\Service\ModelDiscovery;
 use Doctrine\DBAL\Connection;
 
 /**
- * Persists per-provider discovery state and the daily Discord claim in BCONFIG.
+ * Persists per-provider discovery state and the Discord claims in BCONFIG.
  *
  * State shape (setting {@see SETTING_PROVIDERS}, owner 0, group
  * {@see CONFIG_GROUP}): JSON object keyed by inventory provider name:
@@ -30,21 +30,28 @@ use Doctrine\DBAL\Connection;
  *
  * No migration and no Schema API — rows appear on first write via INSERT.
  *
- * Daily Discord claim (setting {@see SETTING_NOTIFY_CLAIM}): BVALUE holds the
- * Y-m-d of the day that already posted. {@see claimNotifyDay()} wins with a
- * conditional UPDATE (value must differ) or an INSERT IGNORE when the row is
- * absent; losers see 0 affected rows and skip the post. {@see releaseNotifyDay()}
- * clears the claim only when BVALUE still equals our day (failed post retry).
- * Galera: every web node shares one BCONFIG; the UNIQUE(BOWNERID, BGROUP,
- * BSETTING) index makes the INSERT IGNORE race-safe across nodes, and the
- * WHERE BVALUE <> :day UPDATE is certified the same way any other single-row
- * write is — exactly one certification winner per day.
+ * Discord claims: BVALUE holds the slot that already posted — the hour
+ * (`Y-m-d H`) for discovery posts ({@see SETTING_NOTIFY_CLAIM}), the day for
+ * "the command itself crashed" posts ({@see SETTING_FAILURE_CLAIM}).
+ * {@see claimNotifySlot()} wins with a conditional UPDATE (value must differ)
+ * or an INSERT IGNORE when the row is absent; losers see 0 affected rows and
+ * skip the post. {@see releaseNotifySlot()} clears the claim only when BVALUE
+ * still equals our slot (failed post retry). Galera: every web node shares
+ * one BCONFIG; the UNIQUE(BOWNERID, BGROUP, BSETTING) index makes the INSERT
+ * IGNORE race-safe across nodes, and the WHERE BVALUE <> :slot UPDATE is
+ * certified the same way any other single-row write is — exactly one
+ * certification winner per slot.
+ *
+ * {@see SETTING_REMINDER_SENT} holds the Y-m-d of the last Monday reminder,
+ * so hourly runs send it once per Monday rather than once per slot.
  */
 final readonly class ModelDiscoveryStateStore
 {
     public const CONFIG_GROUP = 'MODEL_DISCOVERY';
     public const SETTING_PROVIDERS = 'PROVIDERS';
     public const SETTING_NOTIFY_CLAIM = 'NOTIFY_CLAIM';
+    public const SETTING_FAILURE_CLAIM = 'FAILURE_CLAIM';
+    public const SETTING_REMINDER_SENT = 'REMINDER_SENT';
 
     public function __construct(
         private Connection $connection,
@@ -107,21 +114,62 @@ final readonly class ModelDiscoveryStateStore
     }
 
     /**
-     * Atomically claim the right to post Discord for $day (Y-m-d).
+     * Atomically claim the right to post a discovery result for $slot (`Y-m-d H`).
      *
      * Returns true only for the winning node/process. Losers must still update
      * provider state idempotently but must not post.
      */
-    public function claimNotifyDay(string $day): bool
+    public function claimNotifySlot(string $slot): bool
+    {
+        return $this->claim(self::SETTING_NOTIFY_CLAIM, $slot);
+    }
+
+    /**
+     * Clear the discovery claim only if we still own it (failed post retry).
+     */
+    public function releaseNotifySlot(string $slot): void
+    {
+        $this->release(self::SETTING_NOTIFY_CLAIM, $slot);
+    }
+
+    /**
+     * Atomically claim the right to post "the check could not run" for $day (Y-m-d).
+     */
+    public function claimFailureDay(string $day): bool
+    {
+        return $this->claim(self::SETTING_FAILURE_CLAIM, $day);
+    }
+
+    public function releaseFailureDay(string $day): void
+    {
+        $this->release(self::SETTING_FAILURE_CLAIM, $day);
+    }
+
+    /**
+     * Y-m-d of the last Monday reminder that was posted (or marked as sent).
+     */
+    public function loadReminderSentOn(): ?string
+    {
+        $value = $this->readValue(self::SETTING_REMINDER_SENT);
+
+        return null === $value || '' === $value ? null : $value;
+    }
+
+    public function saveReminderSentOn(string $day): void
+    {
+        $this->writeValue(self::SETTING_REMINDER_SENT, $day);
+    }
+
+    private function claim(string $setting, string $slot): bool
     {
         $updated = (int) $this->connection->executeStatement(
-            'UPDATE BCONFIG SET BVALUE = :day
+            'UPDATE BCONFIG SET BVALUE = :slot
              WHERE BOWNERID = 0 AND BGROUP = :group AND BSETTING = :setting
-               AND BVALUE <> :day',
+               AND BVALUE <> :slot',
             [
-                'day' => $day,
+                'slot' => $slot,
                 'group' => self::CONFIG_GROUP,
-                'setting' => self::SETTING_NOTIFY_CLAIM,
+                'setting' => $setting,
             ],
         );
 
@@ -131,30 +179,27 @@ final readonly class ModelDiscoveryStateStore
 
         $inserted = (int) $this->connection->executeStatement(
             'INSERT IGNORE INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
-             VALUES (0, :group, :setting, :day)',
+             VALUES (0, :group, :setting, :slot)',
             [
                 'group' => self::CONFIG_GROUP,
-                'setting' => self::SETTING_NOTIFY_CLAIM,
-                'day' => $day,
+                'setting' => $setting,
+                'slot' => $slot,
             ],
         );
 
         return $inserted > 0;
     }
 
-    /**
-     * Clear today's Discord claim only if we still own it (failed post retry).
-     */
-    public function releaseNotifyDay(string $day): void
+    private function release(string $setting, string $slot): void
     {
         $this->connection->executeStatement(
             'UPDATE BCONFIG SET BVALUE = \'\'
              WHERE BOWNERID = 0 AND BGROUP = :group AND BSETTING = :setting
-               AND BVALUE = :day',
+               AND BVALUE = :slot',
             [
-                'day' => $day,
+                'slot' => $slot,
                 'group' => self::CONFIG_GROUP,
-                'setting' => self::SETTING_NOTIFY_CLAIM,
+                'setting' => $setting,
             ],
         );
     }
