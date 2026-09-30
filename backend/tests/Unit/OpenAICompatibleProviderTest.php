@@ -8,6 +8,9 @@ use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\OpenAICompatibleProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use OpenAI\Contracts\ClientContract;
+use OpenAI\Contracts\Resources\ChatContract;
+use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -93,6 +96,44 @@ final class OpenAICompatibleProviderTest extends TestCase
         $request = $this->buildChatRequest([], ['disable_thinking' => true], 'qwen3.8:27b', false);
 
         $this->assertFalse($request['think']);
+    }
+
+    public function testChatDropsThinkWhenTheEndpointRejectsTheField(): void
+    {
+        $seen = [];
+        $chat = $this->createMock(ChatContract::class);
+        $chat->method('create')->willReturnCallback(function (array $parameters) use (&$seen): CreateResponse {
+            $seen[] = $parameters;
+            if (array_key_exists('think', $parameters)) {
+                throw new \RuntimeException("Additional properties are not allowed ('think' was unexpected)");
+            }
+
+            return CreateResponse::fake();
+        });
+
+        $result = $this->providerWithChat($chat)->chat(
+            [['role' => 'user', 'content' => 'hi']],
+            ['model' => 'qwen3.8:27b', 'disable_thinking' => true],
+        );
+
+        $this->assertCount(2, $seen);
+        $this->assertFalse($seen[0]['think']);
+        $this->assertArrayNotHasKey('think', $seen[1]);
+        $this->assertIsString($result['content']);
+        $this->assertNotSame('', $result['content']);
+    }
+
+    public function testChatDoesNotRetryAnUnrelatedFailure(): void
+    {
+        $chat = $this->createMock(ChatContract::class);
+        $chat->expects($this->once())->method('create')->willThrowException(new \RuntimeException('invalid api key'));
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('invalid api key');
+        $this->providerWithChat($chat)->chat(
+            [['role' => 'user', 'content' => 'hi']],
+            ['model' => 'qwen3.8:27b', 'disable_thinking' => true],
+        );
     }
 
     public function testBuildChatRequestLeavesThinkingAloneByDefault(): void
@@ -239,6 +280,25 @@ final class OpenAICompatibleProviderTest extends TestCase
     private function buildChatRequest(array $messages, array $options, string $model, bool $stream): array
     {
         return (new \ReflectionClass($this->provider))->getMethod('buildChatRequest')->invoke($this->provider, $messages, $options, $model, $stream);
+    }
+
+    private function providerWithChat(ChatContract $chat): OpenAICompatibleProvider
+    {
+        $registry = $this->createStub(OpenAiCompatibleEndpointRegistry::class);
+        $registry->method('resolveForModel')->willReturn([
+            'name' => 'gateway',
+            'label' => 'Gateway',
+            'base_url' => 'http://gateway.example/v1',
+            'api_key' => 'sk-test',
+            'headers' => [],
+            'capabilities' => ['chat'],
+        ]);
+        $client = $this->createMock(ClientContract::class);
+        $client->method('chat')->willReturn($chat);
+        $provider = new OpenAICompatibleProvider($registry, new NullLogger(), new MockHttpClient(), '/tmp');
+        (new \ReflectionClass($provider))->getProperty('clients')->setValue($provider, ['gateway' => $client]);
+
+        return $provider;
     }
 
     private function imageProvider(MockHttpClient $client): OpenAICompatibleProvider

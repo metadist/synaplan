@@ -51,6 +51,21 @@ final class VisibleAnswerTest extends TestCase
         self::assertFalse(VisibleAnswer::failedBecauseOutputWasCut($raw, 'stop'));
     }
 
+    public function testBraceInsideAStringDoesNotCloseTheObject(): void
+    {
+        self::assertTrue(VisibleAnswer::isCutJson('{"text":"}"'));
+        self::assertTrue(VisibleAnswer::isCutJson('{"text":"a\\"'));
+        self::assertFalse(VisibleAnswer::isCutJson('{"text":"say } please"}'));
+    }
+
+    public function testBlankVisibleTextIsUnusableForEveryFinishReason(): void
+    {
+        self::assertTrue(VisibleAnswer::isUnusable('', 'stop'));
+        self::assertTrue(VisibleAnswer::isUnusable('   ', null));
+        self::assertFalse(VisibleAnswer::failedBecauseOutputWasCut('', 'stop'));
+        self::assertTrue(VisibleAnswer::failedBecauseOutputWasCut('', 'length'));
+    }
+
     public function testRecognisesLocalThinkingModels(): void
     {
         self::assertTrue(VisibleAnswer::modelHidesAnswerBehindThinking('qwen3.8:27b'));

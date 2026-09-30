@@ -294,11 +294,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'finish_reason' => $finishReason,
             ]);
 
-            throw new ProviderException(
-                'The model ran out of room before it finished the answer.',
-                $provider,
-                ['error_code' => 'max_tokens', 'model' => $model],
-            );
+            throw new ProviderException('The model ran out of room before it finished the answer.', $provider, ['error_code' => 'max_tokens', 'model' => $model]);
         }
 
         $this->logger->warning('ChatHandler: Provider returned no visible streaming content', [
@@ -306,11 +302,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'model' => $model,
         ]);
 
-        throw new ProviderException(
-            'The AI model returned an empty response. Please try again or select a different model.',
-            $provider,
-            ['model' => $model],
-        );
+        throw new ProviderException('The AI model returned an empty response. Please try again or select a different model.', $provider, ['model' => $model]);
     }
 
     /**

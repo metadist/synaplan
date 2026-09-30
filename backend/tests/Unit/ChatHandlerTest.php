@@ -866,6 +866,42 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * A stream of structured reasoning with no answer text must not finish as
+     * a successful empty reply. Reasoning sets the first-token flag while the
+     * visible buffer stays blank.
+     */
+    public function testHandleStreamRejectsReasoningOnlyOutput(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('What is in Confluence?');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(static function ($messages, $cb): array {
+                $cb(['type' => 'reasoning', 'content' => 'still thinking']);
+                $cb(['type' => 'finish', 'finish_reason' => 'stop']);
+
+                return ['provider' => 'openaicompatible', 'model' => 'qwen3.8:27b', 'finish_reason' => 'stop'];
+            });
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('The AI model returned an empty response');
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+        );
+    }
+
+    /**
      * Rolling conversation summary: when MessageProcessor condenses older turns
      * and passes them via options['conversation_summary'], ChatHandler must fold
      * that text into the SYSTEM prompt so long threads keep their context.

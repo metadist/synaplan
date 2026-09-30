@@ -66,25 +66,25 @@ final class VisibleAnswer
             json_decode($trim, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             // Balanced-but-invalid JSON (a trailing comma) is a bad answer, not
-            // evidence the token budget ran out. Only an unclosed object is.
-            $open = substr_count($trim, '{') + substr_count($trim, '[');
-            $close = substr_count($trim, '}') + substr_count($trim, ']');
-
-            return $open > $close;
+            // evidence the token budget ran out. Only an unclosed structure is.
+            // Braces inside quoted strings do not count.
+            return self::jsonStructureIsUnclosed($trim);
         }
 
         return false;
     }
 
     /**
-     * Nothing a person can read: reasoning only, or a JSON blob the token
-     * limit cut in half.
+     * Nothing a person can read: blank text, reasoning only, or a JSON blob
+     * the token limit cut in half. A clean stop with an empty body is still
+     * unusable; {@see failedBecauseOutputWasCut()} separates a token limit
+     * from a model that simply said nothing.
      */
     public static function isUnusable(string $raw, ?string $finishReason): bool
     {
         $visible = self::withoutReasoning($raw);
         if ('' === $visible) {
-            return self::outputWasCut($finishReason) || self::containsReasoning($raw);
+            return true;
         }
 
         return self::isCutJson($visible);
@@ -112,5 +112,47 @@ final class VisibleAnswer
     public static function modelHidesAnswerBehindThinking(string $model): bool
     {
         return 1 === preg_match('/qwen3|qwq|deepseek-r1/i', $model);
+    }
+
+    /**
+     * True when a `{` / `[` payload still has an open object, array, or string.
+     * Structural delimiters inside quotes, including `\}` escapes, are ignored.
+     */
+    private static function jsonStructureIsUnclosed(string $text): bool
+    {
+        $depth = 0;
+        $inString = false;
+        $escape = false;
+        $length = strlen($text);
+        for ($i = 0; $i < $length; ++$i) {
+            $char = $text[$i];
+            if ($inString) {
+                if ($escape) {
+                    $escape = false;
+                    continue;
+                }
+                if ('\\' === $char) {
+                    $escape = true;
+                    continue;
+                }
+                if ('"' === $char) {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ('"' === $char) {
+                $inString = true;
+                continue;
+            }
+            if ('{' === $char || '[' === $char) {
+                ++$depth;
+                continue;
+            }
+            if (('}' === $char || ']' === $char) && $depth > 0) {
+                --$depth;
+            }
+        }
+
+        return $depth > 0 || $inString;
     }
 }

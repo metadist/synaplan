@@ -146,7 +146,7 @@ final readonly class TaskPlanner
                 $decoded = $retried['decoded'];
                 $raw = $retried['raw'];
                 if (null !== $retried['planningUsage']) {
-                    $planningUsage = $retried['planningUsage'];
+                    $planningUsage = $this->combinePlanningUsage($planningUsage, $retried['planningUsage']);
                 }
             }
         }
@@ -573,6 +573,32 @@ final readonly class TaskPlanner
             'decoded' => $decoded,
             'raw' => $raw,
             'planningUsage' => $this->recordPlanningUsage($userId, $modelId, $response),
+        ];
+    }
+
+    /**
+     * The retry is a second billed call. The message badge stores one planning
+     * entry, so both attempts have to be added together or the first call's
+     * tokens and cost disappear from history.
+     *
+     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $first
+     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}      $second
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     */
+    private function combinePlanningUsage(?array $first, array $second): array
+    {
+        if (null === $first) {
+            return $second;
+        }
+
+        return [
+            'promptTokens' => $first['promptTokens'] + $second['promptTokens'],
+            'completionTokens' => $first['completionTokens'] + $second['completionTokens'],
+            'totalTokens' => $first['totalTokens'] + $second['totalTokens'],
+            'cost' => bcadd($first['cost'], $second['cost'], 6),
+            'modelKey' => '' !== $second['modelKey'] ? $second['modelKey'] : $first['modelKey'],
+            'kind' => $first['kind'],
         ];
     }
 }
