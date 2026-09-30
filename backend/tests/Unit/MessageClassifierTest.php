@@ -22,6 +22,7 @@ use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -846,7 +847,7 @@ class MessageClassifierTest extends TestCase
         yield 'tankstellen (no old trigger)' => ['günstigsten tankstellen in 10km umgebung von 48161'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('germanCostQueryFastPathProvider')]
+    #[DataProvider('germanCostQueryFastPathProvider')]
     public function testFastPathReturnsNullWebSearchHintForGermanCostQueries(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -925,7 +926,7 @@ class MessageClassifierTest extends TestCase
         yield 'tr: resim' => ['bana bir kedi resmi verir misin', 'tr'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('declarativeImageRequestProvider')]
+    #[DataProvider('declarativeImageRequestProvider')]
     public function testFastPathYieldsToAiSorterOnDeclarativeImageRequests(string $text, string $lang): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -997,7 +998,7 @@ class MessageClassifierTest extends TestCase
         yield 'tr: bilgi taban' => ['bilgi tabanımda platform hakkında ara', 'tr'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('dataSourceRequestProvider')]
+    #[DataProvider('dataSourceRequestProvider')]
     public function testFastPathYieldsToAiSorterOnDataSourceRequests(string $text, string $lang): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -1051,7 +1052,7 @@ class MessageClassifierTest extends TestCase
         $this->assertFalse($result['skip_sorting']);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
+    #[DataProvider('germanMediaImperativeProvider')]
     public function testFastPathYieldsToAiSorterOnGermanGenerateImperatives(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -1121,7 +1122,7 @@ class MessageClassifierTest extends TestCase
         yield 'csv' => ['exportiere das als csv'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('documentFormatProvider')]
+    #[DataProvider('documentFormatProvider')]
     public function testFastPathYieldsToAiSorterOnDocumentFormats(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -1824,7 +1825,7 @@ class MessageClassifierTest extends TestCase
      * capabilities and nothing else. Deferring such a question would answer it
      * from a plain chat turn that knows nothing about the product.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    #[DataProvider('selfAwareGuardUtterances')]
     public function testTheDeferralStepsAsideForSelfAwareMetaQuestions(string $text): void
     {
         $sorter = $this->createMock(MessageSorter::class);
@@ -1845,7 +1846,7 @@ class MessageClassifierTest extends TestCase
      * Same rule for the Phase 8 layer: a confident anchor match can only ever
      * be one of the four system topics, so `synaplan` would be unreachable.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    #[DataProvider('selfAwareGuardUtterances')]
     public function testTheEmbeddingRouterStepsAsideForSelfAwareMetaQuestions(string $text): void
     {
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -2010,7 +2011,7 @@ class MessageClassifierTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    #[DataProvider('selfAwareGuardUtterances')]
     public function testFastPathDefersSelfAwareMetaQuestions(string $text): void
     {
         $sorter = $this->createMock(MessageSorter::class);
@@ -2263,6 +2264,69 @@ class MessageClassifierTest extends TestCase
         $result = $this->service->classify($message);
 
         $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    /**
+     * The production sorter filed both requests as plain chat, so the chat
+     * model answered that it cannot create audio.
+     */
+    #[DataProvider('spokenOutputRequests')]
+    public function testSpokenOutputRequestForcesPlanner(string $text): void
+    {
+        $result = $this->classifyText($text, ['topic' => 'general', 'multi_step' => false]);
+
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertTrue($result['multi_step']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function spokenOutputRequests(): iterable
+    {
+        yield 'de explain as audio' => ['Und nun erstelle eine Audio wo du kurz sagst, wie der 2. Weltkrieg entstanden ist'];
+        yield 'de quoted words' => ['Erstelle eine Audio wo du sagst: "Guten Abend meine lieben Freunde."'];
+        yield 'de read aloud' => ['Lies mir das bitte vor.'];
+        yield 'en voice message' => ['Make a voice message that explains photosynthesis.'];
+        yield 'en read aloud' => ['Write a poem and read it out loud.'];
+        yield 'fr' => ['Crée un audio qui explique la photosynthèse.'];
+        yield 'tr' => ['Bunu sesli oku.'];
+    }
+
+    public function testQuestionAboutAudioKeepsSorterVote(): void
+    {
+        $result = $this->classifyText('What is the difference between MP3 and WAV audio?', ['topic' => 'general', 'multi_step' => false]);
+
+        $this->assertFalse($result['multi_step']);
+    }
+
+    public function testSorterChoosingTheSpeechGeneratorIsKept(): void
+    {
+        $result = $this->classifyText('Lies mir vor: Guten Morgen zusammen', [
+            'topic' => 'mediamaker',
+            'media_type' => 'audio',
+            'multi_step' => false,
+        ]);
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertFalse($result['multi_step']);
+    }
+
+    public function testSpokenOutputRequestSkipsTheEmbeddingRouter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'de']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(420, 'Erstelle eine Audio, in der du den Mond erklärst.'));
+
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertTrue($result['multi_step']);
     }
 
     /**
@@ -2570,6 +2634,24 @@ class MessageClassifierTest extends TestCase
         ]);
 
         return $this->service->classify($message);
+    }
+
+    /**
+     * @param array<string, mixed> $sorterResult
+     *
+     * @return array<string, mixed>
+     */
+    private function classifyText(string $text, array $sorterResult): array
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn($sorterResult + [
+            'language' => 'de',
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'groq',
+            'sorting_model_name' => 'gpt-oss-120b',
+        ]);
+
+        return $this->service->classify($this->plainMessage(3, $text));
     }
 
     private function plainMessage(int $id, string $text): Message&MockObject

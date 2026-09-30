@@ -366,9 +366,15 @@ final readonly class MessageClassifier
         // the planner, whose rule 3a arbitrates code_run.
         $produceFileWork = $this->messageRequestsFileProduction($message, $text);
 
+        // "Make an audio where you explain X" needs the text written first and
+        // spoken second. Only the AI sorter plus the planner deliver both, so
+        // these turns skip the embedding match and the chat deferral too.
+        $spokenOutput = 1 === preg_match(self::SPOKEN_OUTPUT_PATTERN, $text);
+
         if (null === $overrideModelId
             && !empty($text)
             && !$produceFileWork
+            && !$spokenOutput
             && $this->embeddingRouterConfig->isEnabled($userId)
             && !$this->isSelfAwareQuestion($text, $userId)
         ) {
@@ -446,6 +452,7 @@ final readonly class MessageClassifier
             && null === $overrideModelId
             && !empty($text)
             && !$produceFileWork
+            && !$spokenOutput
             && !$embeddingDeclinedForLanguage
             && $this->nativeToolRoutingConfig->isEnabled($userId)
             && !$this->isSelfAwareQuestion($text, $userId)
@@ -606,6 +613,21 @@ final readonly class MessageClassifier
         if ($this->messageRequestsCodeExecution($message, $text)) {
             $this->logger->info('MessageClassifier: forcing planner for file-work execution demand', [
                 'message_id' => $messageId,
+            ]);
+
+            $classification['multi_step'] = true;
+        }
+
+        // A sorter that files an audio request as plain chat leaves the chat
+        // model to answer "I cannot create audio". The planner writes the
+        // text and speaks it, so hand it the turn whenever the sorter did
+        // not already pick the speech generator itself.
+        if ($spokenOutput
+            && true !== ($classification['multi_step'] ?? null)
+            && !('mediamaker' === $classification['topic'] && 'audio' === ($classification['media_type'] ?? null))) {
+            $this->logger->info('MessageClassifier: forcing planner for a spoken-output request', [
+                'message_id' => $messageId,
+                'sorter_topic' => $classification['topic'],
             ]);
 
             $classification['multi_step'] = true;
@@ -985,6 +1007,21 @@ final readonly class MessageClassifier
         .'|\b(?:translate|translation|übersetz\w*|traduc\w*|traduir\w*|çevir\w*)\b'
         .'|\b(?:summarize|summary|summarise|zusammenfassung|resum\w*|résum\w*|özetle\w*)\b'
         .'|\bfasse?\b.{0,40}\bzusammen\b'
+        .')/iu';
+
+    /**
+     * The person asks to HEAR the result: a produce verb paired with an audio
+     * object, or a read-aloud phrase. Talking ABOUT audio ("what is an MP3
+     * codec?") has no produce verb and does not match.
+     */
+    private const SPOKEN_OUTPUT_PATTERN = '/(*UCP)(?:'
+        .'\b(?:erstell\w*|erzeug\w*|mach\w*|generier\w*|schick\w*|sende|nimm\w*|create|make|generate|send|record|produce|crea|genera|haz|crée|génère|fais|envoie)\b[^.!?]{0,40}\b(?:audio|audiodatei|mp3|sprachnachricht|sprachmemo|hörbuch|podcast|voice\s+(?:message|note|memo)|nota\s+de\s+voz|message\s+vocal)\b'
+        .'|\b(?:vorlesen|vorlies\w*|vorgelesen|vertone\w*|vertonen|vertont)\b'
+        .'|\b(?:lies|liest)\b[^.!?]{0,30}\bvor\b'
+        .'|\bread\b[^.!?]{0,30}\b(?:aloud|out\s+loud)\b'
+        .'|\b(?:als|as|into|en|comme)\s+(?:an?\s+|eine[nmr]?\s+)?(?:audio|mp3|sprachnachricht|voice\s+message|speech)\b'
+        .'|\btext[\s-]to[\s-]speech\b|\ben\s+voz\s+alta\b|\bà\s+voix\s+haute\b'
+        .'|\bsesli\s+oku\w*|\b(?:ses\s+dosyası|mp3)\b[^.!?]{0,40}\b(?:oluştur\w*|yap\w*)\b'
         .')/iu';
 
     /**
