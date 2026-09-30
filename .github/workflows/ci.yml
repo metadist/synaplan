@@ -1415,6 +1415,77 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
 
+  deploy-smoke:
+    name: Deploy Smoke Test (self-host)
+    # E2E runs the image with APP_ENV=test, a synchronous in-memory messenger
+    # and no worker, scheduler, Redis or Centrifugo. This job installs it the
+    # way deploy/README.md tells an operator to, from the production template
+    # deploy/compose.yaml and its pinned third-party images, and runs the same
+    # smoke test the AMI release build runs.
+    #
+    # Pull requests only. Any failed job fails the CI run: on main that stops
+    # the release tag from promoting the tested images, and on a tag it stops
+    # release-publish.yml and the AMI build.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [docker-build]
+    if: github.event_name == 'pull_request'
+    env:
+      # Compose merges the host environment over deploy/.env, so the operator
+      # file stays the unmodified example. The tag exists only locally, hence
+      # pull policy never.
+      SYNAPLAN_IMAGE: synaplan-ci
+      SYNAPLAN_VERSION: ${{ needs.docker-build.outputs.app-version }}
+      SYNAPLAN_PULL_POLICY: never
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load the tested image
+        env:
+          TESTED_IMAGE_TAGS: ${{ needs.docker-build.outputs.image-tags }}
+        run: |
+          set -euo pipefail
+          docker load -i /tmp/docker-image.tar
+          source_tag="$(printf '%s\n' "$TESTED_IMAGE_TAGS" | sed -n '/./{p;q;}')"
+          [ -n "$source_tag" ] || {
+            echo "::error::docker-build did not provide a tested image tag"
+            exit 1
+          }
+          docker tag "$source_tag" "${SYNAPLAN_IMAGE}:${SYNAPLAN_VERSION}"
+
+      - name: Prepare the deployment
+        run: |
+          set -euo pipefail
+          cp deploy/selfhost.env.example deploy/.env
+          deploy/scripts/prepare.sh
+
+      - name: Pull the third-party images
+        run: |
+          n=0; until docker compose --env-file deploy/.env -f deploy/compose.yaml pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
+
+      - name: Validate the release
+        run: deploy/scripts/validate-release.sh
+
+      - name: Start the stack
+        run: docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+
+      - name: Smoke test
+        run: deploy/scripts/smoke-test.sh
+
+      - name: Show the stack on failure
+        if: failure()
+        run: |
+          docker compose --env-file deploy/.env -f deploy/compose.yaml ps -a
+          docker compose --env-file deploy/.env -f deploy/compose.yaml logs --no-color --tail=200
+
   docker-push-amd64:
     name: Publish amd64 Image
     runs-on: ubuntu-latest
@@ -2286,7 +2357,7 @@ jobs:
     name: All Checks Passed
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Check for failures
@@ -2309,6 +2380,7 @@ jobs:
           DOCKER_BUILD: ${{ needs.docker-build.result }}
           E2E: ${{ needs.e2e.result }}
           E2E_VISUAL: ${{ needs.e2e-visual.result }}
+          DEPLOY_SMOKE: ${{ needs.deploy-smoke.result }}
           PUSH_AMD64: ${{ needs.docker-push-amd64.result }}
           PUSH_ARM64: ${{ needs.docker-push-arm64.result }}
           MANIFEST: ${{ needs.docker-manifest.result }}
@@ -2338,6 +2410,7 @@ jobs:
           allow_skip "Build Docker Image" "$DOCKER_BUILD"
           allow_skip "E2E Tests" "$E2E"
           allow_skip "E2E Visual Snapshots" "$E2E_VISUAL"
+          allow_skip "Deploy Smoke Test (self-host)" "$DEPLOY_SMOKE"
           allow_skip "Publish amd64 Image" "$PUSH_AMD64"
           allow_skip "Publish arm64 Image" "$PUSH_ARM64"
           allow_skip "Publish Multi-Arch Manifest" "$MANIFEST"
@@ -2365,6 +2438,7 @@ jobs:
               fi
               if [ "$EVENT" = pull_request ]; then
                 require "Cloudflare Worker Check" "$CF_CHECK"
+                require "Deploy Smoke Test (self-host)" "$DEPLOY_SMOKE"
               fi
               ;;
             thin)
