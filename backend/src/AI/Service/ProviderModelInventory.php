@@ -68,6 +68,7 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
 
         try {
             $modelIds = [];
+            $releasedAt = [];
             $baseUrl = $listing['url'];
             $url = $baseUrl;
             $pagesLeft = self::MAX_PAGES;
@@ -84,6 +85,7 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
 
                 $body = $response->toArray(false);
                 $modelIds = array_merge($modelIds, $this->extractModelIds($body));
+                $releasedAt += $this->extractReleaseDates($body);
                 $url = ModelListPageCursor::nextUrl($baseUrl, $body);
             } while (null !== $url && --$pagesLeft > 0);
 
@@ -105,7 +107,7 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
             return ProviderModelListing::unreachable('The provider returned no recognisable model list.');
         }
 
-        return ProviderModelListing::ok($modelIds);
+        return ProviderModelListing::ok($modelIds, $releasedAt);
     }
 
     /**
@@ -191,6 +193,38 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
         }
 
         return $ids;
+    }
+
+    /**
+     * Release dates from `data[].created` (unix seconds: OpenAI, xAI, Groq)
+     * or `data[].created_at` (RFC 3339: Anthropic). Google lists none.
+     *
+     * @param array<mixed> $payload
+     *
+     * @return array<string, int>
+     */
+    private function extractReleaseDates(array $payload): array
+    {
+        $dates = [];
+
+        foreach ($this->entries($payload, 'data') as $entry) {
+            $id = $entry['id'] ?? null;
+            if (!is_string($id) || '' === $id) {
+                continue;
+            }
+
+            $raw = $entry['created'] ?? $entry['created_at'] ?? null;
+            $timestamp = match (true) {
+                is_int($raw) => $raw,
+                is_string($raw) && '' !== $raw => strtotime($raw),
+                default => false,
+            };
+            if (false !== $timestamp && $timestamp > 0) {
+                $dates[$id] = $timestamp;
+            }
+        }
+
+        return $dates;
     }
 
     /**

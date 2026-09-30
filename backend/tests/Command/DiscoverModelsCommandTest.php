@@ -70,7 +70,7 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willReturn($report);
-        $discovery->method('claimNotifyDay')->willReturn(true);
+        $discovery->method('claimNotifySlot')->willReturn(true);
         $discovery->expects($this->once())->method('markDiscoveriesAnnounced')->with($report);
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
@@ -97,8 +97,8 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willReturn($report);
-        $discovery->method('claimNotifyDay')->willReturn(true);
-        $discovery->expects($this->once())->method('releaseNotifyDay');
+        $discovery->method('claimNotifySlot')->willReturn(true);
+        $discovery->expects($this->once())->method('releaseNotifySlot');
         $discovery->expects($this->never())->method('markDiscoveriesAnnounced');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook', webhookStatus: 404);
@@ -124,9 +124,9 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willReturn($report);
-        $discovery->method('claimNotifyDay')->willReturn(true);
+        $discovery->method('claimNotifySlot')->willReturn(true);
         $discovery->expects($this->once())->method('markDiscoveriesAnnounced')->with($report);
-        $discovery->expects($this->never())->method('releaseNotifyDay');
+        $discovery->expects($this->never())->method('releaseNotifySlot');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook', webhookStatus: 204);
         $tester->execute(['--notify' => true]);
@@ -145,7 +145,7 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willReturn($report);
-        $discovery->expects($this->never())->method('claimNotifyDay');
+        $discovery->expects($this->never())->method('claimNotifySlot');
         $discovery->expects($this->once())->method('markDiscoveriesAnnounced')->with($report);
 
         $tester = $this->tester($discovery, webhookUrl: null);
@@ -180,7 +180,7 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willReturn($report);
         $discovery->expects($this->never())->method('markDiscoveriesAnnounced');
-        $discovery->expects($this->never())->method('claimNotifyDay');
+        $discovery->expects($this->never())->method('claimNotifySlot');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
         $tester->execute([]);
@@ -189,7 +189,7 @@ final class DiscoverModelsCommandTest extends TestCase
         $this->assertSame([], $this->webhookBodies);
     }
 
-    public function testSecondNotifySameDayDoesNotPost(): void
+    public function testSecondNotifySameHourDoesNotPost(): void
     {
         $report = $this->report(
             pending: [[
@@ -212,7 +212,7 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willReturn($report);
-        $discovery->method('claimNotifyDay')->willReturn(false);
+        $discovery->method('claimNotifySlot')->willReturn(false);
         $discovery->expects($this->never())->method('markDiscoveriesAnnounced');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
@@ -228,7 +228,8 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willThrowException(new \RuntimeException('boom'));
-        $discovery->method('claimNotifyDay')->willReturn(true);
+        $discovery->method('claimFailureNoticeDay')->willReturn(true);
+        $discovery->expects($this->never())->method('claimNotifySlot');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
         $tester->execute(['--notify' => true]);
@@ -254,7 +255,7 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willReturn($report);
-        $discovery->method('claimNotifyDay')->willReturn(true);
+        $discovery->method('claimNotifySlot')->willReturn(true);
         $discovery->expects($this->once())->method('markDiscoveriesAnnounced')->with($report);
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');
@@ -265,7 +266,7 @@ final class DiscoverModelsCommandTest extends TestCase
         $encoded = json_encode($body, \JSON_THROW_ON_ERROR);
         $this->assertSame('✅ New-model check is active', $body['embeds'][0]['title']);
         $this->assertStringContainsString('Baseline recorded for openai, anthropic: 20 ids', $encoded);
-        $this->assertStringContainsString('from tomorrow', $encoded);
+        $this->assertStringContainsString('from now on', $encoded);
         $this->assertStringNotContainsString('Action required', $encoded);
     }
 
@@ -293,7 +294,7 @@ final class DiscoverModelsCommandTest extends TestCase
         $discovery = $this->createMock(ModelDiscoveryService::class);
         $discovery->method('isEnabled')->willReturn(true);
         $discovery->method('run')->willReturn($report);
-        $discovery->method('claimNotifyDay')->willReturn(true);
+        $discovery->method('claimNotifySlot')->willReturn(true);
         $discovery->expects($this->once())->method('markDiscoveriesAnnounced');
 
         $tester = $this->tester($discovery, webhookUrl: 'https://discord.example/hook');

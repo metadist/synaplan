@@ -132,7 +132,7 @@ final class DiscoverModelsCommand extends Command
         $lines = [];
         foreach ($report->baselinesRecorded as $event) {
             $lines[] = sprintf(
-                '%s — %d ids baseline; new models will be reported from tomorrow',
+                '%s — %d ids baseline; newer models are reported from now on',
                 $event['provider'],
                 $event['idCount'],
             );
@@ -210,8 +210,8 @@ final class DiscoverModelsCommand extends Command
             return;
         }
 
-        if (!$this->discovery->claimNotifyDay()) {
-            $io->note('Discord already claimed for today by another node; skipped post.');
+        if (!$this->discovery->claimNotifySlot()) {
+            $io->note('Discord already claimed for this hour by another node; skipped post.');
 
             return;
         }
@@ -219,8 +219,8 @@ final class DiscoverModelsCommand extends Command
         $digest = ModelDiscoveryDigest::fromReport($report);
         $posted = $this->discord->notifyNewModelDiscovery($digest);
         if (!$posted) {
-            $this->discovery->releaseNotifyDay();
-            $io->warning('Discord post failed; today stays unclaimed so the next run retries.');
+            $this->discovery->releaseNotifySlot();
+            $io->warning('Discord post failed; this hour stays unclaimed so the next run retries.');
 
             return;
         }
@@ -235,15 +235,15 @@ final class DiscoverModelsCommand extends Command
             return;
         }
 
-        if (!$this->discovery->claimNotifyDay()) {
-            $io->note('Discord already claimed for today by another node; skipped failure post.');
+        if (!$this->discovery->claimFailureNoticeDay()) {
+            $io->note('Failure alert already sent today; skipped failure post.');
 
             return;
         }
 
         $posted = $this->discord->notifyNewModelDiscoveryFailure($reason);
         if (!$posted) {
-            $this->discovery->releaseNotifyDay();
+            $this->discovery->releaseFailureNoticeDay();
             $io->warning('Discord post failed; today stays unclaimed so the next run retries.');
 
             return;

@@ -108,7 +108,7 @@ assert_contains "app:desktop:reap-jobs --no-interaction" "$COMMAND_LOG" "schedul
 assert_contains "app:files:reap-ephemeral --no-interaction" "$COMMAND_LOG" "scheduler runs ephemeral-file reaper"
 assert_contains "app:updates:check --no-interaction" "$COMMAND_LOG" "scheduler runs the daily update check"
 assert_contains "app:models:check-availability --notify --no-interaction" "$COMMAND_LOG" "scheduler runs the daily model availability check"
-assert_contains "app:models:discover --notify --no-interaction" "$COMMAND_LOG" "scheduler runs the daily model discovery check"
+assert_contains "app:models:discover --notify --no-interaction" "$COMMAND_LOG" "scheduler runs the model discovery check"
 assert_contains "app:selfaware:sync-docs --no-interaction" "$COMMAND_LOG" "scheduler runs the daily platform docs sync"
 assert_contains "app:model:health-check --jitter=" "$COMMAND_LOG" "scheduler runs the model health check with request jitter"
 if [ -s "$TMP_DIR/runtime/scheduler.heartbeat" ]; then
@@ -116,6 +116,30 @@ if [ -s "$TMP_DIR/runtime/scheduler.heartbeat" ]; then
 else
     assert_eq 1 0 "scheduler writes liveness heartbeat"
 fi
+
+echo "Case 2b: model discovery runs on the hourly slot, not the daily one"
+: > "$COMMAND_LOG"
+(
+    cd "$TMP_DIR/app" || exit
+    export PATH="$TMP_DIR/bin:$PATH"
+    export COMMAND_LOG
+    export SYNAPLAN_ROLE=scheduler
+    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+    export SYNAPLAN_SCHEDULER_MAX_CYCLES=2
+    export SYNAPLAN_SCHEDULER_TICK_SECONDS=0
+    export SYNAPLAN_SCHEDULER_HOURLY_SECONDS=0
+    export SYNAPLAN_SCHEDULER_DAILY_SECONDS=86400
+    # shellcheck disable=SC1090
+    . "$RUNTIME_LIB"
+    prepare_role_cache() { :; }
+    wait_for_web_initialization() { :; }
+    php() {
+        printf '%s\n' "$*" >> "$COMMAND_LOG"
+    }
+    run_scheduler_role
+)
+assert_eq 2 "$(grep -c 'app:models:discover --notify' "$COMMAND_LOG")" "model discovery runs on every hourly slot"
+assert_eq 1 "$(grep -c 'app:updates:check' "$COMMAND_LOG")" "daily update check still runs once per day"
 
 echo "Case 3: initialization wait retries pending migrations"
 DB_CALLS=0

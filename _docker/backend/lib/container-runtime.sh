@@ -355,7 +355,7 @@ run_scheduler_role() {
     mkdir -p "$SYNAPLAN_RUNTIME_DIR"
     trap stop_scheduler TERM INT
 
-    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper every ${hourly_seconds}s, model health check every ${health_seconds}s, update + model-availability check every ${daily_seconds}s)."
+    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper + new-model check every ${hourly_seconds}s, model health check every ${health_seconds}s, update + model-availability check every ${daily_seconds}s)."
     while [ "$_scheduler_stopping" -eq 0 ]; do
         now="$(date +%s)"
         printf '%s\n' "$now" > "${SYNAPLAN_RUNTIME_DIR}/scheduler.heartbeat"
@@ -387,6 +387,14 @@ run_scheduler_role() {
             if ! run_scheduler_command bin/console --env="$env" app:approvals:expire --no-interaction; then
                 runtime_log "Approval expiry sweep failed; it will be retried next hour." >&2
             fi
+
+            # New-model detection. Opt-in via MODEL_DISCOVERY_ENABLED (command
+            # is a no-op when false). Read-only: reports pending upstream ids
+            # to Discord, never writes BMODELS. Hourly so a release is posted
+            # within the hour; BCONFIG state keeps each id to one post.
+            if ! run_scheduler_command bin/console --env="$env" app:models:discover --notify --no-interaction; then
+                runtime_log "Model discovery check failed; it will be retried next hour." >&2
+            fi
             next_hourly=$((now + hourly_seconds))
         fi
 
@@ -405,13 +413,6 @@ run_scheduler_role() {
             # cloud keys make no outbound request at all.
             if ! run_scheduler_command bin/console --env="$env" app:models:check-availability --notify --no-interaction; then
                 runtime_log "Model availability check failed; it will be retried on the next daily interval." >&2
-            fi
-
-            # New-model detection. Opt-in via MODEL_DISCOVERY_ENABLED (command
-            # is a no-op when false). Read-only: reports pending upstream ids
-            # to Discord, never writes BMODELS.
-            if ! run_scheduler_command bin/console --env="$env" app:models:discover --notify --no-interaction; then
-                runtime_log "Model discovery check failed; it will be retried on the next daily interval." >&2
             fi
 
             # Message digest: out-of-band deep-memory indexing of new user
