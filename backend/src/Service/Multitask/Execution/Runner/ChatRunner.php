@@ -10,6 +10,7 @@ use App\AI\Stream\VisibleAnswer;
 use App\Entity\Prompt;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Knowledge\KnowledgeContextFormatter;
+use App\Service\Message\SlashCommandCopy;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -59,6 +60,7 @@ final readonly class ChatRunner implements TaskRunner
         private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
         #[Autowire(lazy: true)]
         private ?PlatformDocsRetriever $platformDocsRetriever = null,
+        private ?SlashCommandCopy $slashCommandCopy = null,
     ) {
     }
 
@@ -101,6 +103,13 @@ final readonly class ChatRunner implements TaskRunner
         $ragChunks = 0;
         if (Capability::RagQuery === $node->capability) {
             $ragContext = $this->ragContext($text, $context, $ragChunks);
+            if ('' === $ragContext && !empty($context->classification['slash_docs'])) {
+                $empty = $this->slashCommandCopy?->docsNotFound($language)
+                    ?? 'No matching file was found in your knowledge base.';
+                $context->streamChunk($empty);
+
+                return NodeResult::ok($empty, [], ['rag_chunks' => 0, 'rag_empty' => true]);
+            }
             $systemPrompt .= $ragContext;
         }
         $systemPrompt .= $this->linkedPagesContext($context);

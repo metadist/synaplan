@@ -1327,4 +1327,63 @@ class MessageProcessorTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertSame(42, $result['classification']['saved_task_id'] ?? null);
     }
+
+    public function testSlashHintSkipsShadowPlanning(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(55);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getText')->willReturn('/pic');
+        $message->method('hasFiles')->willReturn(false);
+
+        $multitaskConfig = $this->createMock(MultitaskRoutingConfig::class);
+        $multitaskConfig->method('isShadowMode')->willReturn(true);
+        $multitaskConfig->method('isRoutingEnabled')->willReturn(false);
+
+        $taskPlanner = $this->createMock(TaskPlanner::class);
+        $taskPlanner->expects($this->never())->method('plan');
+
+        $processor = new MessageProcessor(
+            $this->messageRepository,
+            $this->searchResultRepository,
+            $this->preProcessor,
+            $this->classifier,
+            $this->router,
+            $this->modelConfigService,
+            $this->promptService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
+            $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
+            $this->createMock(UrlContentService::class),
+            $this->logger,
+            $multitaskConfig,
+            $taskPlanner,
+            $this->createMock(TaskPlanStore::class),
+            $this->createMock(TaskPlanExecutor::class),
+            $this->conversationSummaryService,
+            $this->createMock(AgentConfig::class),
+        );
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'tool_command',
+            'skip_sorting' => true,
+            'slash_hint' => true,
+            'slash_command' => 'pic',
+        ]);
+        $this->router->method('route')->willReturn([
+            'content' => 'Write what to create after the command, for example: /pic a dog on the beach',
+            'metadata' => ['slash_hint' => true, 'provider' => 'none', 'model' => 'none'],
+        ]);
+
+        $result = $processor->process($message);
+
+        $this->assertTrue($result['success']);
+    }
 }

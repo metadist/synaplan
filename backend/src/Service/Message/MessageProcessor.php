@@ -329,7 +329,7 @@ final readonly class MessageProcessor
                 // answers the user. Inert unless MULTITASK_SHADOW_MODE is on, and
                 // wrapped so it can never affect the turn. Runs only on the
                 // normal-classification branch (never widget/fixed-prompt/again).
-                $this->maybeShadowPlan($message, $conversationHistory, $perfTimer);
+                $this->maybeShadowPlan($message, $conversationHistory, $perfTimer, $classification);
             }
 
             // User-selected knowledge-base folder (RAG group key) from the chat
@@ -386,7 +386,7 @@ final readonly class MessageProcessor
             }
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options);
+            $userRequestedSearch = $this->userRequestedSearch($options, $classification);
             $messageText = $message->getText();
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
@@ -879,7 +879,7 @@ final readonly class MessageProcessor
 
                 // Shadow mode (Sprint 1): see processStream() for rationale.
                 // Inert unless MULTITASK_SHADOW_MODE is on; never affects the turn.
-                $this->maybeShadowPlan($message, $conversationHistory);
+                $this->maybeShadowPlan($message, $conversationHistory, null, $classification);
             }
             $classification = $this->tagSavedTaskRun($classification, $options);
 
@@ -908,7 +908,7 @@ final readonly class MessageProcessor
             }
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options);
+            $userRequestedSearch = $this->userRequestedSearch($options, $classification);
             $messageText = $message->getText();
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
@@ -1450,17 +1450,21 @@ final readonly class MessageProcessor
 
     /**
      * Resolve the explicit per-message web-search request from the processing
-     * options. The streaming pipeline carries it as `web_search` (the chat
-     * toggle / `/search` command, set by StreamController) while the legacy
-     * non-streaming path uses `force_web_search`; accept either so an explicit
+     * options or classification. The streaming pipeline carries it as
+     * `web_search` (the chat toggle / `/search` command, set by StreamController)
+     * while the legacy non-streaming path uses `force_web_search`; the shared
+     * slash parser also sets `force_web_search` on the classification when a
+     * non-web channel types `/search <text>`. Accept any of these so an explicit
      * user request reliably forces a search.
      *
      * @param array<string, mixed> $options
+     * @param array<string, mixed> $classification
      */
-    private function userRequestedSearch(array $options): bool
+    private function userRequestedSearch(array $options, array $classification = []): bool
     {
         return (bool) ($options['web_search'] ?? false)
-            || (bool) ($options['force_web_search'] ?? false);
+            || (bool) ($options['force_web_search'] ?? false)
+            || (bool) ($classification['force_web_search'] ?? false);
     }
 
     /**
@@ -1495,10 +1499,24 @@ final readonly class MessageProcessor
         }
     }
 
-    private function maybeShadowPlan(Message $message, array $conversationHistory, ?PerfTimer $perfTimer = null): void
-    {
+    /**
+     * @param array<int, Message|array{role: string, content: string}> $conversationHistory
+     * @param array<string, mixed>                                     $classification
+     */
+    private function maybeShadowPlan(
+        Message $message,
+        array $conversationHistory,
+        ?PerfTimer $perfTimer = null,
+        array $classification = [],
+    ): void {
         try {
             if (!$this->multitaskConfig->isShadowMode()) {
+                return;
+            }
+
+            // Bare slash commands already short-circuit in ChatHandler with a
+            // localized hint — never spend a billable PLANNING call on them.
+            if (!empty($classification['slash_hint'])) {
                 return;
             }
 

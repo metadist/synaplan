@@ -181,14 +181,27 @@
         "web_search": false
     },
     "cmd_docs": {
+        "intent": "rag_query",
+        "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "slash_docs": true,
+        "source": "tool_command",
+        "topic": "general"
+    },
+    "cmd_docs_bare": {
         "intent": "chat",
         "language": "en",
         "routing_confidence": 1,
         "routing_discarded_alternatives": [],
         "routing_fallback_reason": null,
         "skip_sorting": true,
+        "slash_command": "docs",
+        "slash_hint": true,
         "source": "tool_command",
-        "topic": "tools:filesort"
+        "topic": "general"
     },
     "cmd_help": {
         "intent": "chat",
@@ -230,15 +243,71 @@
         "source": "tool_command",
         "topic": "tools:pic"
     },
-    "cmd_search": {
+    "cmd_pic_bare": {
         "intent": "chat",
         "language": "en",
         "routing_confidence": 1,
         "routing_discarded_alternatives": [],
         "routing_fallback_reason": null,
         "skip_sorting": true,
+        "slash_command": "pic",
+        "slash_hint": true,
         "source": "tool_command",
-        "topic": "tools:search"
+        "topic": "general"
+    },
+    "cmd_pic_bare_at": {
+        "intent": "chat",
+        "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "slash_command": "pic",
+        "slash_hint": true,
+        "source": "tool_command",
+        "topic": "general"
+    },
+    "cmd_pic_bare_ws": {
+        "intent": "chat",
+        "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "slash_command": "pic",
+        "slash_hint": true,
+        "source": "tool_command",
+        "topic": "general"
+    },
+    "cmd_search": {
+        "force_web_search": true,
+        "intent": "chat",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "multi_step": null,
+        "provider": null,
+        "read_pages": null,
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": false,
+        "sorting_usage": null,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": false
+    },
+    "cmd_search_bare": {
+        "intent": "chat",
+        "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "slash_command": "search",
+        "slash_hint": true,
+        "source": "tool_command",
+        "topic": "general"
     },
     "cmd_tts": {
         "intent": "image_generation",
@@ -250,6 +319,18 @@
         "source": "tool_command",
         "topic": "tools:tts"
     },
+    "cmd_tts_bare": {
+        "intent": "chat",
+        "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "slash_command": "tts",
+        "slash_hint": true,
+        "source": "tool_command",
+        "topic": "general"
+    },
     "cmd_vid": {
         "intent": "image_generation",
         "language": "en",
@@ -259,6 +340,18 @@
         "skip_sorting": true,
         "source": "tool_command",
         "topic": "tools:vid"
+    },
+    "cmd_vid_bare": {
+        "intent": "chat",
+        "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "slash_command": "vid",
+        "slash_hint": true,
+        "source": "tool_command",
+        "topic": "general"
     },
     "cmd_web": {
         "intent": "chat",
