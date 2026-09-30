@@ -172,6 +172,46 @@ describe('Chats Store', () => {
       expect(httpClientMock).toHaveBeenCalledTimes(2)
       expect(store.activeChatId).toBe(9)
     })
+
+    it('waits for an in-flight chat list and reuses an empty chat instead of creating one', async () => {
+      const store = useChatsStore()
+      let resolveList: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveList = resolve
+        })
+      )
+      const loading = store.loadChats()
+
+      const clicked = store.findOrCreateEmptyChat()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
+
+      resolveList({
+        chats: [
+          {
+            id: 3,
+            title: 'Regular chat',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-02T00:00:00.000Z',
+            messageCount: 2,
+          },
+          {
+            id: 4,
+            title: 'New Chat',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            messageCount: 0,
+            firstMessagePreview: null,
+          },
+        ],
+      })
+      await loading
+
+      expect((await clicked)?.id).toBe(4)
+      expect(store.activeChatId).toBe(4)
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('loadChats / ensureValidActiveChat', () => {

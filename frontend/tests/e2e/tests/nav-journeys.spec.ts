@@ -320,7 +320,7 @@ test.describe('@ci Navigation journeys', () => {
       await expect(
         page.locator(`[data-memory-id="${memoryId}"][data-memory-highlighted="true"]`).first()
       ).toBeVisible()
-      await page.goBack()
+      await chat.goBack()
       await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
 

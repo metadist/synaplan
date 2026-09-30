@@ -154,7 +154,7 @@ test.describe('@ci Memories', () => {
       page.locator(`[data-memory-id="${memoryId}"][data-memory-highlighted="true"]`).first()
     ).toBeVisible()
 
-    await page.goBack()
+    await chat.goBack()
     await expect(page.locator(selectors.chat.textInput)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
