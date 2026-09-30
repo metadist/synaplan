@@ -234,6 +234,8 @@
               :files="message.files"
               :document-changes="message.documentChanges"
               :document-fidelity-lossy="message.documentFidelityLossy"
+              :voice-reply-failed="message.voiceReplyFailed"
+              :read-aloud-failed="message.readAloudFailed"
               :search-results="message.searchResults"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
@@ -617,6 +619,14 @@ import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
+import {
+  applyReadAloudFailed,
+  applyVoiceReplyFailed,
+  attachVoiceReplyAudio,
+  isTaskPlanSuppressedMediaStatus,
+  isVoiceReplyFailedReason,
+  shouldAutoplayVoiceReply,
+} from '@/utils/voiceReply'
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
@@ -3277,15 +3287,11 @@ const streamAIResponse = async (
               fullContent += data.chunk
             }
           } else if (
-            (data.status === 'file' ||
-              data.status === 'audio' ||
-              data.status === 'tts_generating' ||
-              data.status === 'links') &&
+            isTaskPlanSuppressedMediaStatus(data.status) &&
             historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
           ) {
-            // Multitask: task cards are the live media surface, so suppress the
-            // normal single-bubble media events (they still persist on the OUT
-            // message and re-render from history on reload).
+            // Multitask: task cards are the live media surface for file/links.
+            // Voice-reply audio and TTS status must still attach live (#2282).
           } else if (data.status === 'data' && data.chunk) {
             // First visible answer token: the live thinking panel folds away.
             // A buffered `<think>` block, including one split across chunks,
@@ -3336,11 +3342,12 @@ const streamAIResponse = async (
           } else if (data.status === 'audio') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.url) {
-              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
-              if (loadingIdx !== -1) {
-                message.parts.splice(loadingIdx, 1)
-              }
-              pushMediaPart(message, 'audio', normalizeMediaUrl(data.url))
+              attachVoiceReplyAudio(message, normalizeMediaUrl(data.url))
+            }
+          } else if (data.status === 'voice_reply_failed') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && isVoiceReplyFailedReason(data.reason)) {
+              applyVoiceReplyFailed(message, data.reason)
             }
           } else if (data.status === 'links') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -3571,6 +3578,14 @@ const streamAIResponse = async (
         currentAudioStreamer = new AudioStreamer()
         isAudioStreaming.value = true
         currentAudioStreamer.setOnFinished(() => {
+          isAudioStreaming.value = false
+          currentAudioStreamer = null
+        })
+        currentAudioStreamer.setOnFailure(() => {
+          const message = historyStore.messages.find((m) => m.id === messageId)
+          if (message) {
+            applyReadAloudFailed(message)
+          }
           isAudioStreaming.value = false
           currentAudioStreamer = null
         })
@@ -3882,16 +3897,11 @@ const streamAIResponse = async (
               fullContent += data.chunk
             }
           } else if (
-            (data.status === 'file' ||
-              data.status === 'audio' ||
-              data.status === 'tts_generating' ||
-              data.status === 'links') &&
+            isTaskPlanSuppressedMediaStatus(data.status) &&
             historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
           ) {
-            // Multitask mode: the task cards are the live surface, so suppress
-            // the normal single-bubble media events. They still flow so the
-            // OUT message files persist; history renders the flattened bubble
-            // on reload.
+            // Multitask: task cards are the live media surface for file/links.
+            // Voice-reply audio and TTS status must still attach live (#2282).
           } else if (data.status === 'data' && data.chunk) {
             // First visible answer token: the live thinking panel folds away.
             // A buffered `<think>` block, including one split across chunks,
@@ -4004,16 +4014,25 @@ const streamAIResponse = async (
             }
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.url) {
-              // Remove tts_loading part and replace with audio player
-              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
-              const isVoiceReply = loadingIdx !== -1
-              if (isVoiceReply) {
-                message.parts.splice(loadingIdx, 1)
-              }
               const absoluteUrl = normalizeMediaUrl(data.url)
-              // If we are already streaming audio (currentAudioStreamer exists), don't autoplay the file
-              const shouldAutoplay = isVoiceReply && !currentAudioStreamer
-              pushMediaPart(message, 'audio', absoluteUrl, { autoplay: shouldAutoplay })
+              // Play the stored spoken reply unless sentence streaming already
+              // has answer text. A streamer object alone is not enough: a task
+              // plan never feeds it, and a finished stream is no longer active.
+              const shouldAutoplay = shouldAutoplayVoiceReply(
+                message.parts.some((part) => part.type === 'tts_loading'),
+                audioText
+              )
+              attachVoiceReplyAudio(message, absoluteUrl, { autoplay: shouldAutoplay })
+            }
+          } else if (data.status === 'voice_reply_failed') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && isVoiceReplyFailedReason(data.reason)) {
+              applyVoiceReplyFailed(message, data.reason)
+            }
+            if (currentAudioStreamer) {
+              currentAudioStreamer.stop()
+              currentAudioStreamer = null
+              isAudioStreaming.value = false
             }
           } else if (data.status === 'links') {
             // Handle web search results

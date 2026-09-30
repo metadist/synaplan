@@ -6,6 +6,7 @@ namespace App\Service\Media;
 
 use App\Repository\MessageRepository;
 use App\Service\File\ThumbnailService;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -121,7 +122,11 @@ final readonly class MediaJobMessageSync
                     $message->setText($errorText);
                 }
             } elseif (MediaJob::STATUS_COMPLETED === $job->getStatus()) {
-                $message->setText('');
+                $message->setText(GeneratedMediaTextRenderer::storageMarker($job->getType()));
+                $prompt = trim((string) $job->getPrompt());
+                if ('' !== $prompt) {
+                    $message->setMeta('media_prompt', $prompt);
+                }
                 $this->attachGeneratedFile($job, $message);
             }
         }

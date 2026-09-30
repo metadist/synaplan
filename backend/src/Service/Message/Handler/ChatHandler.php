@@ -45,9 +45,12 @@ use App\Service\File\UnreadSourceGuard;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\Routing\RoutingDirective;
 use App\Service\Message\Routing\RoutingToolset;
+use App\Service\Message\SlashCommandCopy;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\Plan\Capability;
 use App\Service\PerfPipelineFlag;
 use App\Service\PerfTimer;
 use App\Service\Plugin\PluginContextProviderInterface;
@@ -149,6 +152,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private ?ContextCondenser $contextCondenser = null,
         private ?ModelContextWindow $modelContextWindow = null,
         private ?UnreadSourceGuard $unreadSourceGuard = null,
+        private ?SlashCommandCopy $slashCommandCopy = null,
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
     }
@@ -584,6 +588,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
+        $hint = $this->slashHintReply($classification);
+        if (null !== $hint) {
+            return [
+                'content' => $hint,
+                'metadata' => ['slash_hint' => true, 'provider' => 'none', 'model' => 'none'],
+            ];
+        }
+
         $this->notify($progressCallback, 'generating', 'Generating response...');
 
         // Local PerfTimer keeps the shared helpers (memory + feedback
@@ -605,6 +617,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
+        $isRagQuery = Capability::RagQuery->value === ($classification['intent'] ?? '');
         $ragContext = $this->loadRagContext(
             $message,
             $topic,
@@ -612,7 +625,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $ragLimit,
             $ragMinScore,
             $this->agentRagScopes($profile, $message->getUserId()),
+            $isRagQuery,
         );
+
+        if ($isRagQuery && '' === $ragContext) {
+            $empty = $this->docsNotFoundReply($classification);
+
+            return [
+                'content' => $empty,
+                'metadata' => ['rag_query' => true, 'rag_chunks' => 0, 'provider' => 'none', 'model' => 'none'],
+            ];
+        }
 
         // Issue #615: the non-streaming path (email / generic webhook)
         // used to skip memory loading entirely, so memories never
@@ -790,6 +813,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         if (!empty($ragContext)) {
             $systemPrompt .= $ragContext;
+            if (!empty($classification['slash_docs'])) {
+                $systemPrompt .= $this->slashDocsCitationInstruction();
+            }
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
                 'topic' => $topic,
                 'rag_context_length' => strlen($ragContext),
@@ -1219,6 +1245,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
+        $hint = $this->slashHintReply($classification);
+        if (null !== $hint) {
+            $streamCallback($hint);
+
+            return [
+                'metadata' => ['slash_hint' => true, 'provider' => 'none', 'model' => 'none'],
+            ];
+        }
+
         $this->notify($progressCallback, 'analyzing_prompt', 'Analyzing the prompt...');
 
         $perfTimer = $options['perf_timer'] ?? null;
@@ -1264,14 +1299,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
         $agentScopes = $this->agentRagScopes($profile, $message->getUserId());
+        $isRagQuery = Capability::RagQuery->value === ($classification['intent'] ?? '');
 
-        if (!$ragGroupKey && 'general' !== $topic) {
+        if (!$ragGroupKey && 'general' !== $topic && !$isRagQuery) {
             $ragGroupKey = "TASKPROMPT:{$topic}";
         }
 
         $ragResults = [];
 
-        if (!empty($message->getText()) && $ragGroupKey) {
+        if (!empty($message->getText()) && (null !== $ragGroupKey || $isRagQuery)) {
             try {
                 error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.$ragGroupKey.')');
 
@@ -1305,7 +1341,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
                 error_log('🔍 ChatHandler: RAG search returned '.count($ragResults).' results');
 
-                if (empty($ragResults) && 'general' !== $topic) {
+                if (empty($ragResults) && !$isRagQuery && 'general' !== $topic) {
                     $fallbackGroupKey = "TASKPROMPT:{$topic}";
                     if ($fallbackGroupKey !== $ragGroupKey) {
                         error_log('🔄 ChatHandler: RAG fallback search with groupKey: '.$fallbackGroupKey);
@@ -1371,6 +1407,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $topic,
                 empty($message->getText()) ? 'yes' : 'no'
             ));
+        }
+
+        if ($isRagQuery && '' === $ragContext) {
+            $empty = $this->docsNotFoundReply($classification);
+            $streamCallback($empty);
+
+            return [
+                'metadata' => ['rag_query' => true, 'rag_chunks' => 0, 'provider' => 'none', 'model' => 'none'],
+            ];
         }
 
         // Memory + feedback context now live in shared helpers so the
@@ -1532,6 +1577,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Append RAG context to system prompt if available
         if (!empty($ragContext)) {
             $systemPrompt .= $ragContext;
+            if (!empty($classification['slash_docs'])) {
+                $systemPrompt .= $this->slashDocsCitationInstruction();
+            }
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
                 'topic' => $topic,
                 'rag_context_length' => strlen($ragContext),
@@ -2388,6 +2436,53 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
+     * @param array<string, mixed> $classification
+     */
+    private function slashHintReply(array $classification): ?string
+    {
+        if (empty($classification['slash_hint'])) {
+            return null;
+        }
+
+        $command = is_string($classification['slash_command'] ?? null)
+            ? (string) $classification['slash_command']
+            : 'pic';
+        $locale = is_string($classification['language'] ?? null) ? (string) $classification['language'] : 'en';
+
+        if (null === $this->slashCommandCopy) {
+            return sprintf(
+                'Write what to create after the command, for example: /%s a dog on the beach',
+                $command,
+            );
+        }
+
+        return $this->slashCommandCopy->needsArgument($command, $locale);
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     */
+    private function docsNotFoundReply(array $classification): string
+    {
+        $locale = is_string($classification['language'] ?? null) ? (string) $classification['language'] : 'en';
+
+        if (null === $this->slashCommandCopy) {
+            return 'No matching file was found in your knowledge base.';
+        }
+
+        return $this->slashCommandCopy->docsNotFound($locale);
+    }
+
+    /**
+     * Slash `/docs` only: tell the model to name the matching source file.
+     * Regular RAG turns keep the softer KnowledgeContextFormatter wording.
+     */
+    private function slashDocsCitationInstruction(): string
+    {
+        return "\nWhen you answer, name the source file you used from the knowledge context above.\n";
+    }
+
+    /**
      * Build messages for non-streaming (JSON format)
      * Like old system: topicPrompt with $stream = false.
      */
@@ -2398,6 +2493,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         int $limit = 5,
         float $minScore = 0.3,
         ?array $explicitScopes = null,
+        bool $forceUserKnowledge = false,
     ): string {
         if (empty($message->getText())) {
             $this->logger->debug('ChatHandler: Skipping RAG context (empty text)', [
@@ -2409,7 +2505,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         if (!$groupKey) {
-            if ('general' === $topic) {
+            if (!$forceUserKnowledge && 'general' === $topic) {
                 $this->logger->debug('ChatHandler: Skipping RAG context (general topic, no group key)', [
                     'topic' => $topic,
                 ]);
@@ -2417,12 +2513,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 return '';
             }
 
-            $groupKey = "TASKPROMPT:{$topic}";
+            if (!$forceUserKnowledge) {
+                $groupKey = "TASKPROMPT:{$topic}";
+            }
         }
 
         try {
-            error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.$groupKey.')');
-            error_log('🔍 ChatHandler: Searching RAG with groupKey: '.$groupKey.', query: '.substr($message->getText(), 0, 100));
+            error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.($groupKey ?? 'user-kb').')');
+            error_log('🔍 ChatHandler: Searching RAG with groupKey: '.($groupKey ?? 'user-kb').', query: '.substr($message->getText(), 0, 100));
 
             $ragResults = $this->vectorSearchService->semanticSearch(
                 $message->getText(),
@@ -2435,7 +2533,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
             error_log('🔍 ChatHandler: RAG search returned '.count($ragResults).' results');
 
-            if (empty($ragResults) && 'general' !== $topic) {
+            if (empty($ragResults) && !$forceUserKnowledge && 'general' !== $topic) {
                 $fallbackGroupKey = "TASKPROMPT:{$topic}";
                 if ($fallbackGroupKey !== $groupKey) {
                     error_log('🔄 ChatHandler: RAG fallback search with groupKey: '.$fallbackGroupKey);
@@ -3369,30 +3467,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * @return array|null ['filename' => string, 'content' => string, 'extension' => string] or null
      */
     /**
-     * Replace internal file-generation markers with human-readable text before a
-     * prior assistant turn is sent back to the model as conversation history.
+     * Replace internal generated-media markers with plain prose before a prior
+     * assistant turn is sent back to the model as conversation history.
      *
-     * The stored assistant content for a generated file is the internal marker
-     * "__FILE_GENERATED__:filename". If that raw marker is fed back into the
-     * model context, the model starts imitating it and leaks strings such as
-     * "FILE_GENERATED:report.docx" into its replies. Converting it to plain
-     * prose keeps the context (a file was generated) without the marker syntax.
+     * @see GeneratedMediaTextRenderer::forModel()
      */
     public function humanizeFileMarkersForModel(?string $content): string
     {
-        $content = (string) $content;
-
-        if (str_starts_with($content, '__FILE_GENERATED__:')) {
-            $filename = trim(substr($content, strlen('__FILE_GENERATED__:')));
-
-            return sprintf('(I generated the file "%s" and provided it to the user as a download.)', $filename);
-        }
-
-        if ('__FILE_GENERATION_FAILED__' === $content) {
-            return '(The requested file could not be generated.)';
-        }
-
-        return $content;
+        return GeneratedMediaTextRenderer::renderModel((string) $content);
     }
 
     private function extractFileGenerationData(string $content): ?array

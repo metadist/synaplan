@@ -21,6 +21,7 @@ import {
   isImageFileType,
   isVideoFileType,
 } from '@/utils/mediaTypes'
+import { i18n } from '@/i18n'
 
 /**
  * Issue #1070: single authoritative mapping from the persisted API row
@@ -109,7 +110,7 @@ function appendGeneratedMediaPart(message: Message, url: string, type: string): 
       partId: generatePartId(),
       type: 'image',
       url: normalized,
-      alt: 'Generated image',
+      alt: i18n.global.t('message.imageGenerated'),
     })
   } else if ('audio' === type && !message.parts.some((p) => 'audio' === p.type)) {
     message.parts.push({ partId: generatePartId(), type: 'audio', url: normalized })
@@ -302,6 +303,8 @@ export interface ApiLoadedMessageRow {
   errorReason?: string | null
   canRetryModel?: boolean | null
   errorDebug?: string | null
+  /** Voice-reply failure reason when TTS was requested but no audio was stored (#2282). */
+  voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited' | null
   provider?: string
   aiModels?: Message['aiModels']
   webSearch?: Message['webSearch']
@@ -398,7 +401,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         partId: generatePartId(),
         type: 'image',
         url: absoluteUrl,
-        alt: m.text || 'Generated image',
+        alt: i18n.global.t('message.imageGenerated'),
       })
     } else if (isVideoFileType(m.file.type)) {
       parts.push({
@@ -557,6 +560,13 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     errorReason: role === 'assistant' ? (m.errorReason ?? null) : null,
     canRetryModel: role === 'assistant' ? (m.canRetryModel ?? undefined) : undefined,
     errorDebug: role === 'assistant' ? (m.errorDebug ?? null) : null,
+    voiceReplyFailed:
+      role === 'assistant' &&
+      (m.voiceReplyFailed === 'provider_error' ||
+        m.voiceReplyFailed === 'empty_text' ||
+        m.voiceReplyFailed === 'rate_limited')
+        ? m.voiceReplyFailed
+        : undefined,
     backendMessageId: m.id,
     quotedText: m.quotedText ?? null,
     quotedMessageId: m.quotedMessageId ?? null,
@@ -777,6 +787,9 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
     local.errorReason = persisted.errorReason
     local.canRetryModel = persisted.canRetryModel
     local.errorDebug = persisted.errorDebug ?? null
+  }
+  if (persisted.voiceReplyFailed) {
+    local.voiceReplyFailed = persisted.voiceReplyFailed
   }
   if (persisted.wasMultitask) {
     local.wasMultitask = true

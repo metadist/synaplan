@@ -84,7 +84,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
     await test.step('Assert: task cards are still visible after a page reload (#1070)', async () => {
       // Before the fix, the persisted row had no card data, so a reload lost the
       // task-plan bubble entirely — only the compose_reply text remained.
-      await page.reload()
+      await chat.reload()
       const reloadedBubble = chat.conversationBubbles().nth(previousCount)
       await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
@@ -160,7 +160,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
     })
 
     await test.step('Assert: Sources dropdown still visible after reload', async () => {
-      await page.reload()
+      await chat.reload()
       const reloadedBubble = chat.conversationBubbles().nth(previousCount)
       await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await expect(reloadedBubble.locator(selectors.chat.sourcesToggle)).toBeVisible({
@@ -243,7 +243,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
     })
 
     await test.step('Assert: the audio player is still visible after a reload', async () => {
-      await page.reload()
+      await chat.reload()
       const reloadedBubble = chat.conversationBubbles().nth(previousCount)
       await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await reloadedBubble

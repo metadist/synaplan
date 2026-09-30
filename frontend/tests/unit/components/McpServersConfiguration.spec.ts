@@ -312,25 +312,25 @@ describe('McpServersConfiguration — add-server templates', () => {
 
     expect(wrapper.find('[data-testid="mcp-empty"]').exists()).toBe(true)
     const custom = wrapper.find('[data-testid="btn-mcp-template-custom"]')
-    const jira = wrapper.find('[data-testid="btn-mcp-template-jira"]')
+    const github = wrapper.find('[data-testid="btn-mcp-template-github"]')
     expect(custom.exists()).toBe(true)
-    expect(jira.exists()).toBe(true)
+    expect(github.exists()).toBe(true)
     expect(custom.attributes('aria-checked')).toBe('true')
-    expect(jira.attributes('aria-checked')).toBe('false')
+    expect(github.attributes('aria-checked')).toBe('false')
   })
 
   it('opens the form from a template and prefills only that template', async () => {
     const wrapper = mount(McpServersConfiguration, mountOptions)
     await flushPromises()
 
-    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await wrapper.find('[data-testid="btn-mcp-template-github"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[data-testid="section-mcp-editor"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="mcp-empty"]').exists()).toBe(false)
     const name = wrapper.find('[data-testid="input-mcp-name"]').element as HTMLInputElement
-    expect(name.value).toBe('Jira')
-    expect(wrapper.find('[data-testid="btn-mcp-template-jira"]').attributes('aria-checked')).toBe(
+    expect(name.value).toBe('GitHub')
+    expect(wrapper.find('[data-testid="btn-mcp-template-github"]').attributes('aria-checked')).toBe(
       'true'
     )
   })
@@ -340,20 +340,20 @@ describe('McpServersConfiguration — add-server templates', () => {
     await flushPromises()
 
     await wrapper.find('[data-testid="btn-mcp-add"]').trigger('click')
-    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await wrapper.find('[data-testid="btn-mcp-template-github"]').trigger('click')
     await flushPromises()
 
     const name = () => wrapper.find('[data-testid="input-mcp-name"]').element as HTMLInputElement
-    expect(name().value).toBe('Jira')
+    expect(name().value).toBe('GitHub')
 
-    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await wrapper.find('[data-testid="btn-mcp-template-github"]').trigger('click')
     await flushPromises()
 
     expect(name().value).toBe('')
     expect(wrapper.find('[data-testid="btn-mcp-template-custom"]').attributes('aria-checked')).toBe(
       'true'
     )
-    expect(wrapper.find('[data-testid="btn-mcp-template-jira"]').attributes('aria-checked')).toBe(
+    expect(wrapper.find('[data-testid="btn-mcp-template-github"]').attributes('aria-checked')).toBe(
       'false'
     )
   })

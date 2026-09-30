@@ -17,6 +17,7 @@ use App\Service\InternalEmailService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ExternalReplyReferences;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -56,6 +57,7 @@ class WebhookController extends AbstractController
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatErrorPresenter $chatErrorPresenter,
         private ExternalReplyReferences $externalReplyReferences,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -482,11 +484,19 @@ class WebhookController extends AbstractController
                         ? (string) $result['classification']['language']
                         : ($message->getLanguage() ?: 'en');
 
-                    if (!empty(trim($responseText))) {
+                    $speakable = null !== $this->mediaTextRenderer
+                        ? $this->mediaTextRenderer->forUser(
+                            $responseText,
+                            $message->getLanguage(),
+                            $user->getLocale(),
+                        )
+                        : GeneratedMediaTextRenderer::renderModel($responseText);
+                    if (!empty(trim($speakable))) {
                         $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
                         $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
 
-                        $ttsResult = $this->aiFacade->synthesize($responseText, $ttsLanguage, $user->getId(), [
+                        // The facade sanitizes; markers are already a readable sentence here.
+                        $ttsResult = $this->aiFacade->synthesize($speakable, $ttsLanguage, $user->getId(), [
                             'format' => 'mp3',
                             'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
                         ]);
@@ -499,7 +509,7 @@ class WebhookController extends AbstractController
                             'model_id' => $ttsResult['model_id'] ?? null,
                             'source' => 'EMAIL',
                             'media_usage' => [
-                                'characters' => $ttsResult['text_length'] ?? mb_strlen($responseText),
+                                'characters' => $ttsResult['text_length'] ?? mb_strlen($speakable),
                             ],
                         ]);
                     }
@@ -611,7 +621,16 @@ class WebhookController extends AbstractController
                 $this->internalEmailService->sendAiResponseEmail(
                     $fromEmail,
                     $subject,
-                    $this->externalReplyReferences->resolve($responseText, $user),
+                    $this->externalReplyReferences->resolve(
+                        null !== $this->mediaTextRenderer
+                            ? $this->mediaTextRenderer->forUser(
+                                $responseText,
+                                $message->getLanguage(),
+                                $user->getLocale(),
+                            )
+                            : GeneratedMediaTextRenderer::renderModel($responseText),
+                        $user,
+                    ),
                     $messageId,
                     $provider,
                     $model,
@@ -619,7 +638,8 @@ class WebhookController extends AbstractController
                     $attachmentPath,
                     $toEmail,
                     $responseMediaType,
-                    $this->resolveAdditionalAttachmentPathsFromAiMetadata($metadata)
+                    $this->resolveAdditionalAttachmentPathsFromAiMetadata($metadata),
+                    $message->getLanguage() ?: $user->getLocale(),
                 );
 
                 $this->logger->info('Email response sent', [

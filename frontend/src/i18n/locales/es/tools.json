@@ -353,16 +353,6 @@
         "summary": "Cualquier endpoint MCP",
         "hint": "Pega la URL HTTPS de cualquier servidor MCP Streamable HTTP y, si hace falta, un token de acceso. CRM, wiki, tickets, automatización: si habla MCP, funciona aquí."
       },
-      "jira": {
-        "name": "Jira",
-        "summary": "Tickets e incidencias",
-        "hint": "Conecta un servidor MCP compatible con Jira (por ejemplo, un servicio MCP de Atlassian autoalojado) e introduce su URL de endpoint y token de acceso. Con las acciones de escritura activadas puedes listar tickets y crear otros nuevos con un prompt."
-      },
-      "confluence": {
-        "name": "Confluence",
-        "summary": "Páginas wiki",
-        "hint": "Conecta un servidor MCP compatible con Confluence (por ejemplo, un servicio MCP de Atlassian autoalojado) e introduce su URL de endpoint y token de acceso. Con las acciones de escritura activadas puedes buscar páginas, obtener resúmenes y crear páginas nuevas con un prompt."
-      },
       "github": {
         "name": "GitHub",
         "summary": "Repos, issues, pull requests",
@@ -382,6 +372,11 @@
         "name": "Higgsfield",
         "summary": "Herramientas de imagen y vídeo",
         "hint": "Guarda la conexión y, a continuación, inicia sesión con tu cuenta de Higgsfield. Consultar el historial es de solo lectura; crear imágenes o vídeos requiere acciones de escritura y consume tus créditos de Higgsfield."
+      },
+      "atlassian": {
+        "name": "Jira y Confluence",
+        "summary": "Inicio de sesión con Atlassian Cloud",
+        "hint": "Guarda la conexión y, a continuación, inicia sesión con tu cuenta de Atlassian. Synaplan podrá leer las incidencias de Jira y las páginas de Confluence que puedes ver, incluidas las páginas que pegues en el chat. No hace falta un token de API. Puedes revocar el acceso en tu cuenta de Atlassian en cualquier momento."
       }
     },
     "oauthFormHint": "Este servidor usa el inicio de sesión de tu cuenta. Guárdalo y se te enviará al proveedor para permitir el acceso. No hay token que pegar.",

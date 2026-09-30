@@ -26,6 +26,7 @@ use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\File\FileHelper;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
@@ -93,6 +94,7 @@ final class McpServerFactory
         private readonly LoggerInterface $logger,
         private readonly EventRingStore $eventRing,
         private readonly ?AssistantAliasResolver $assistantAliases = null,
+        private readonly ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -662,10 +664,12 @@ final class McpServerFactory
                 'success' => true,
                 'chat_id' => $chat->getId(),
                 'title' => $chat->getTitle() ?? 'New Chat',
-                'messages' => array_map(static fn (Message $m): array => [
+                'messages' => array_map(fn (Message $m): array => [
                     'id' => $m->getId(),
                     'role' => 'IN' === $m->getDirection() ? 'user' : 'assistant',
-                    'text' => $m->getText(),
+                    'text' => null !== $this->mediaTextRenderer
+                        ? $this->mediaTextRenderer->forUser($m->getText(), $m->getLanguage(), $user->getLocale())
+                        : GeneratedMediaTextRenderer::renderModel((string) $m->getText()),
                     'topic' => $m->getTopic(),
                     'timestamp' => $m->getUnixTimestamp(),
                 ], $messages),
@@ -855,7 +859,13 @@ final class McpServerFactory
 
             return [
                 'success' => true,
-                'answer' => $answer,
+                'answer' => null !== $this->mediaTextRenderer
+                    ? $this->mediaTextRenderer->forUser(
+                        $answer,
+                        (string) ($classification['language'] ?? 'en'),
+                        $user->getLocale(),
+                    )
+                    : GeneratedMediaTextRenderer::renderModel($answer),
                 'chat_id' => $chat->getId(),
                 'topic' => $classification['topic'] ?? null,
                 'intent' => $classification['intent'] ?? null,

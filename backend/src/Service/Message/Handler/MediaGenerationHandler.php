@@ -22,6 +22,7 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\TtsScriptGuard;
 use App\Service\ModelConfigService;
@@ -992,9 +993,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
             }
 
-            // Stream response with revised prompt
-            $revisedPrompt = $media[0]['revised_prompt'] ?? $prompt;
-            $responseText = "Generated {$mediaType}: {$revisedPrompt}";
+            // Store a marker only — the prompt lives in media_prompt meta
+            // (see GeneratedMediaTextRenderer). Channels and the web UI localize it.
+            $responseText = GeneratedMediaTextRenderer::storageMarker($mediaType);
             $folderNote = $this->maybeDeliverToFolder($message, $localPath, $options);
             if (null !== $folderNote) {
                 $responseText .= "\n\n".$folderNote;

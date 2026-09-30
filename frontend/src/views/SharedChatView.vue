@@ -229,7 +229,7 @@
                 <MessageImage
                   v-if="message.file.type === 'image'"
                   :url="message.file.path"
-                  :alt="message.text || 'Generated image'"
+                  :alt="t('message.imageGenerated')"
                 />
                 <MessageVideo v-if="message.file.type === 'video'" :url="message.file.path" />
               </div>

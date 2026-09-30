@@ -346,6 +346,7 @@
             <input
               v-model="form.authHeader"
               type="text"
+              autocomplete="off"
               placeholder="Authorization"
               class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
               data-testid="input-mcp-auth-header"
@@ -358,7 +359,7 @@
             <input
               v-model="form.authToken"
               type="password"
-              autocomplete="off"
+              autocomplete="new-password"
               :placeholder="editingHasToken ? '••••••••' : $t('mcpServers.authTokenPlaceholder')"
               class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
               data-testid="input-mcp-auth-token"

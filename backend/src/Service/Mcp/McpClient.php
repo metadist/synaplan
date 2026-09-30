@@ -33,6 +33,9 @@ final readonly class McpClient
     /** Cap on a single JSON-RPC response body (tool results can be huge). */
     private const MAX_RESPONSE_BYTES = 524288; // 512 KiB
 
+    /** Atlassian returns tools in pages of 50; the page reader is not on page one. */
+    private const MAX_TOOL_LIST_PAGES = 20;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private SsrfGuard $ssrfGuard,
@@ -50,23 +53,37 @@ final readonly class McpClient
      */
     public function listTools(McpServerConfig $server): array
     {
-        $result = $this->withSession($server, fn (string $url, array $headers): array => $this->request($url, $headers, 'tools/list', []));
-
         $tools = [];
-        foreach ((array) ($result['tools'] ?? []) as $tool) {
-            if (!is_array($tool) || !is_string($tool['name'] ?? null)) {
-                continue;
+        $this->withSession($server, function (string $url, array $headers) use (&$tools): array {
+            $seen = [];
+            $cursor = null;
+            for ($page = 0; $page < self::MAX_TOOL_LIST_PAGES; ++$page) {
+                $params = null !== $cursor ? ['cursor' => $cursor] : [];
+                $listed = $this->request($url, $headers, 'tools/list', $params);
+                foreach ((array) ($listed['tools'] ?? []) as $tool) {
+                    if (!is_array($tool) || !is_string($tool['name'] ?? null) || isset($seen[$tool['name']])) {
+                        continue;
+                    }
+                    $seen[$tool['name']] = true;
+                    $tools[] = [
+                        'name' => $tool['name'],
+                        'description' => is_string($tool['description'] ?? null) ? $tool['description'] : '',
+                        'inputSchema' => is_array($tool['inputSchema'] ?? null) ? $tool['inputSchema'] : [],
+                        // Spec tool annotations (readOnlyHint/destructiveHint/…) — the
+                        // pull-only guard in McpFetchRunner refuses tools that declare
+                        // themselves mutating (plan 09 §2.4).
+                        'annotations' => is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [],
+                    ];
+                }
+                $next = $listed['nextCursor'] ?? null;
+                if (!is_string($next) || '' === $next || $next === $cursor) {
+                    break;
+                }
+                $cursor = $next;
             }
-            $tools[] = [
-                'name' => $tool['name'],
-                'description' => is_string($tool['description'] ?? null) ? $tool['description'] : '',
-                'inputSchema' => is_array($tool['inputSchema'] ?? null) ? $tool['inputSchema'] : [],
-                // Spec tool annotations (readOnlyHint/destructiveHint/…) — the
-                // pull-only guard in McpFetchRunner refuses tools that declare
-                // themselves mutating (plan 09 §2.4).
-                'annotations' => is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [],
-            ];
-        }
+
+            return ['tools' => $tools];
+        });
 
         return $tools;
     }

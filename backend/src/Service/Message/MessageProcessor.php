@@ -10,6 +10,7 @@ use App\Repository\SearchResultRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
+use App\Service\Mcp\ConfluenceLinkedPageReader;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -69,6 +70,7 @@ final readonly class MessageProcessor
         private ConversationSummaryService $conversationSummaryService,
         private AgentConfig $agentConfig,
         private ?WebResearchService $webResearch = null,
+        private ?ConfluenceLinkedPageReader $confluencePages = null,
     ) {
     }
 
@@ -329,7 +331,7 @@ final readonly class MessageProcessor
                 // answers the user. Inert unless MULTITASK_SHADOW_MODE is on, and
                 // wrapped so it can never affect the turn. Runs only on the
                 // normal-classification branch (never widget/fixed-prompt/again).
-                $this->maybeShadowPlan($message, $conversationHistory, $perfTimer);
+                $this->maybeShadowPlan($message, $conversationHistory, $perfTimer, $classification);
             }
 
             // User-selected knowledge-base folder (RAG group key) from the chat
@@ -381,12 +383,10 @@ final readonly class MessageProcessor
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $profile = $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null;
-            if ($profile instanceof RuntimeProfile && array_key_exists('tool_internet', $profile->toolFlags)) {
-                $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
-            }
+            $promptMetadata = $this->applyRuntimeToolFlags($promptMetadata, $profile);
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options);
+            $userRequestedSearch = $this->userRequestedSearch($options, $classification);
             $messageText = $message->getText();
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
@@ -400,6 +400,7 @@ final readonly class MessageProcessor
             $perfTimer->start('url_read');
             $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
             $perfTimer->stop('url_read');
+            [$shouldSearch, $triggerReason] = $this->suppressSearchAfterConfluenceRead($shouldSearch, $userRequestedSearch, $classification, $triggerReason);
             if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
                 $shouldSearch = false;
                 $triggerReason = 'link_only_message_answered_from_page';
@@ -879,7 +880,7 @@ final readonly class MessageProcessor
 
                 // Shadow mode (Sprint 1): see processStream() for rationale.
                 // Inert unless MULTITASK_SHADOW_MODE is on; never affects the turn.
-                $this->maybeShadowPlan($message, $conversationHistory);
+                $this->maybeShadowPlan($message, $conversationHistory, null, $classification);
             }
             $classification = $this->tagSavedTaskRun($classification, $options);
 
@@ -903,12 +904,10 @@ final readonly class MessageProcessor
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $profile = $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null;
-            if ($profile instanceof RuntimeProfile && array_key_exists('tool_internet', $profile->toolFlags)) {
-                $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
-            }
+            $promptMetadata = $this->applyRuntimeToolFlags($promptMetadata, $profile);
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options);
+            $userRequestedSearch = $this->userRequestedSearch($options, $classification);
             $messageText = $message->getText();
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
@@ -917,6 +916,7 @@ final readonly class MessageProcessor
 
             // Step 2.4: read pasted links first (see processStream()).
             $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
+            [$shouldSearch, $triggerReason] = $this->suppressSearchAfterConfluenceRead($shouldSearch, $userRequestedSearch, $classification, $triggerReason);
             if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
                 $shouldSearch = false;
                 $triggerReason = 'link_only_message_answered_from_page';
@@ -1252,15 +1252,25 @@ final readonly class MessageProcessor
      */
     private function maybeFetchUrlContent(Message $message, array $promptMetadata, array $classification, ?callable $statusCallback): array
     {
+        $urls = $this->urlContentService->extractUrls((string) $message->getText());
+        if ([] === $urls) {
+            return $classification;
+        }
+
+        $classification = $this->readConfluenceLinks($message, $urls, $classification, $statusCallback, $promptMetadata);
+        $handled = is_array($classification['confluence_mcp_urls'] ?? null) ? $classification['confluence_mcp_urls'] : [];
+        $urls = array_values(array_filter(
+            $urls,
+            static fn (string $url): bool => !in_array($url, $handled, true),
+        ));
+        if ([] === $urls) {
+            return $classification;
+        }
+
         $savedTask = 'saved_task' === ($classification['source'] ?? null) || !empty($classification['saved_task_id']);
         $promptOptIn = !empty($promptMetadata['tool_url_screenshot']);
         $autoRead = null !== $this->webResearch && $this->webResearch->isUrlReadEnabled();
         if (!$savedTask && !$promptOptIn && !$autoRead) {
-            return $classification;
-        }
-
-        $urls = $this->urlContentService->extractUrls((string) $message->getText());
-        if ([] === $urls) {
             return $classification;
         }
 
@@ -1272,10 +1282,12 @@ final readonly class MessageProcessor
             // Always record the outcome, including total failure: generator
             // nodes treat "named URL, zero pages read" as a terminal honest
             // failure instead of inventing content (#2050).
-            $classification['url_pages_read'] = $successCount;
+            $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $successCount;
 
             if ($successCount > 0) {
-                $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
+                $public = $this->urlContentService->formatForPrompt($urlContentResults);
+                $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
+                $classification['url_content'] = '' !== $existing ? $existing."\n\n".$public : $public;
                 $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
             }
 
@@ -1297,20 +1309,149 @@ final readonly class MessageProcessor
 
             // A failed read is still a read outcome: record the explicit zero
             // so generator guards cannot mistake it for "no read ran" (#2050).
-            $classification['url_pages_read'] = 0;
+            $classification['url_pages_read'] ??= 0;
 
             return $classification;
         }
 
         $prompt = $this->webResearch->formatMentionedUrlsForPrompt($read);
         if ('' !== $prompt) {
-            $classification['url_content'] = $prompt;
+            $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
+            $classification['url_content'] = '' !== $existing ? $existing."\n\n".$prompt : $prompt;
         }
         $classification['url_pages'] = $read->toClientList();
-        $classification['url_pages_read'] = $read->successCount();
+        $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
         $classification['url_page_context'] = $read->contextForQuery();
 
         return $classification;
+    }
+
+    /**
+     * A pasted Confluence link is behind a login. Read it through the user's
+     * Atlassian MCP connection and keep the public reader away from it, so
+     * the answer is the page — or an honest connection error — rather than
+     * the Atlassian sign-in screen.
+     *
+     * The same gates as mcp_fetch apply first: the topic (or the pinned
+     * assistant) must have `tool_mcp` on, and an `mcp_servers` allowlist
+     * limits which connection may be called. No outbound call happens otherwise.
+     *
+     * @param list<string>         $urls
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $promptMetadata
+     *
+     * @return array<string, mixed>
+     */
+    private function readConfluenceLinks(Message $message, array $urls, array $classification, ?callable $statusCallback, array $promptMetadata): array
+    {
+        if (null === $this->confluencePages || true !== ($promptMetadata['tool_mcp'] ?? null)) {
+            return $classification;
+        }
+
+        $read = $this->confluencePages->read(
+            $urls,
+            $message->getUserId(),
+            $this->mcpServerAllowlist($promptMetadata),
+            function () use ($statusCallback): void {
+                $this->notify($statusCallback, 'fetching_urls', 'Reading the Confluence page from your connection...');
+            },
+        );
+        if (!$read->attempted()) {
+            return $classification;
+        }
+
+        $prompt = $read->prompt();
+        if ('' !== $prompt) {
+            $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
+            $classification['url_content'] = '' !== $existing ? $existing."\n\n".$prompt : $prompt;
+        }
+        $classification['confluence_mcp_urls'] = $read->handledUrls();
+        $classification['confluence_mcp_handled'] = $read->coversAll($urls);
+        $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
+
+        return $classification;
+    }
+
+    /**
+     * An assistant pin replaces the topic's tool flags for this turn, the
+     * same way the internet-search flag already does.
+     *
+     * @param array<string, mixed> $promptMetadata
+     *
+     * @return array<string, mixed>
+     */
+    private function applyRuntimeToolFlags(array $promptMetadata, mixed $profile): array
+    {
+        if (!$profile instanceof RuntimeProfile) {
+            return $promptMetadata;
+        }
+        if (array_key_exists('tool_internet', $profile->toolFlags)) {
+            $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
+        }
+        if (array_key_exists('tool_mcp', $profile->toolFlags)) {
+            $promptMetadata['tool_mcp'] = (bool) $profile->toolFlags['tool_mcp'];
+        }
+        if (array_key_exists('mcp_servers', $profile->toolFlags)) {
+            $promptMetadata['mcp_servers'] = $profile->toolFlags['mcp_servers'];
+        }
+
+        return $promptMetadata;
+    }
+
+    /**
+     * A Confluence page already read through the user's connection is the
+     * answer. A public search would only find the Atlassian login screen.
+     * An explicit search request still runs.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array{0: bool, 1: string}
+     */
+    private function suppressSearchAfterConfluenceRead(bool $shouldSearch, bool $userRequestedSearch, array $classification, string $triggerReason): array
+    {
+        if ($shouldSearch && !$userRequestedSearch && true === ($classification['confluence_mcp_handled'] ?? false)) {
+            return [false, 'confluence_page_read_via_connection'];
+        }
+
+        return [$shouldSearch, $triggerReason];
+    }
+
+    /**
+     * Optional `mcp_servers` prompt metadata.
+     *
+     * A blank topic string means every enabled connection. A list (an
+     * assistant pin) is exact: an empty list allows none.
+     *
+     * @param array<string, mixed> $promptMetadata
+     *
+     * @return list<int>|null
+     */
+    private function mcpServerAllowlist(array $promptMetadata): ?array
+    {
+        $raw = $promptMetadata['mcp_servers'] ?? null;
+        if (is_array($raw)) {
+            $ids = [];
+            foreach ($raw as $part) {
+                if (is_numeric($part) && (int) $part > 0) {
+                    $ids[] = (int) $part;
+                }
+            }
+
+            return $ids;
+        }
+        if (!is_string($raw) || '' === trim($raw)) {
+            return null;
+        }
+
+        $ids = [];
+        foreach (explode(',', $raw) as $part) {
+            $part = trim($part);
+            if (is_numeric($part) && (int) $part > 0) {
+                $ids[] = (int) $part;
+            }
+        }
+
+        return [] === $ids ? null : $ids;
     }
 
     /**
@@ -1450,17 +1591,21 @@ final readonly class MessageProcessor
 
     /**
      * Resolve the explicit per-message web-search request from the processing
-     * options. The streaming pipeline carries it as `web_search` (the chat
-     * toggle / `/search` command, set by StreamController) while the legacy
-     * non-streaming path uses `force_web_search`; accept either so an explicit
+     * options or classification. The streaming pipeline carries it as
+     * `web_search` (the chat toggle / `/search` command, set by StreamController)
+     * while the legacy non-streaming path uses `force_web_search`; the shared
+     * slash parser also sets `force_web_search` on the classification when a
+     * non-web channel types `/search <text>`. Accept any of these so an explicit
      * user request reliably forces a search.
      *
      * @param array<string, mixed> $options
+     * @param array<string, mixed> $classification
      */
-    private function userRequestedSearch(array $options): bool
+    private function userRequestedSearch(array $options, array $classification = []): bool
     {
         return (bool) ($options['web_search'] ?? false)
-            || (bool) ($options['force_web_search'] ?? false);
+            || (bool) ($options['force_web_search'] ?? false)
+            || (bool) ($classification['force_web_search'] ?? false);
     }
 
     /**
@@ -1495,10 +1640,24 @@ final readonly class MessageProcessor
         }
     }
 
-    private function maybeShadowPlan(Message $message, array $conversationHistory, ?PerfTimer $perfTimer = null): void
-    {
+    /**
+     * @param array<int, Message|array{role: string, content: string}> $conversationHistory
+     * @param array<string, mixed>                                     $classification
+     */
+    private function maybeShadowPlan(
+        Message $message,
+        array $conversationHistory,
+        ?PerfTimer $perfTimer = null,
+        array $classification = [],
+    ): void {
         try {
             if (!$this->multitaskConfig->isShadowMode()) {
+                return;
+            }
+
+            // Bare slash commands already short-circuit in ChatHandler with a
+            // localized hint — never spend a billable PLANNING call on them.
+            if (!empty($classification['slash_hint'])) {
                 return;
             }
 

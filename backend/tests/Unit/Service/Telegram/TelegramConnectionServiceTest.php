@@ -329,6 +329,92 @@ final class TelegramConnectionServiceTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function testRegisterCommandsOnlyRegistersHelpForEveryLocale(): void
+    {
+        $locales = [];
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->expects($this->exactly(5))->method('setMyCommands')
+            ->willReturnCallback(function (string $token, array $commands, ?string $locale) use (&$locales): void {
+                $this->assertSame(self::TOKEN, $token);
+                $this->assertCount(1, $commands);
+                $this->assertSame('help', $commands[0]['command']);
+                $locales[] = $locale;
+            });
+
+        $ok = $this->service($api, $this->createMock(TelegramBotRepository::class), $this->vault(), 'https://chat.example.com')
+            ->registerCommands(self::TOKEN);
+
+        $this->assertTrue($ok);
+        $this->assertSame([null, 'de', 'es', 'fr', 'tr'], $locales);
+    }
+
+    public function testRegisterCommandsContinuesAfterALocaleFails(): void
+    {
+        $seen = [];
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->expects($this->exactly(5))->method('setMyCommands')
+            ->willReturnCallback(function (string $token, array $commands, ?string $locale) use (&$seen): void {
+                $seen[] = $locale;
+                if ('de' === $locale) {
+                    throw new TelegramChannelException(TelegramChannelException::TOKEN_REVOKED);
+                }
+            });
+
+        $ok = $this->service($api, $this->createMock(TelegramBotRepository::class), $this->vault(), 'https://chat.example.com')
+            ->registerCommands(self::TOKEN);
+
+        $this->assertFalse($ok);
+        $this->assertSame([null, 'de', 'es', 'fr', 'tr'], $seen);
+    }
+
+    public function testEnsureCommandMenuReRegistersWhenVersionIsStale(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setCredentialId(3);
+        $bot->setCommandsMenuVersion(0);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->expects($this->once())->method('save')->with($bot);
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->expects($this->exactly(5))->method('setMyCommands');
+
+        $this->service($api, $bots, $this->vault(), 'https://chat.example.com')->ensureCommandMenu($bot);
+
+        $this->assertSame(TelegramConnectionService::COMMAND_MENU_VERSION, $bot->getCommandsMenuVersion());
+    }
+
+    public function testEnsureCommandMenuDoesNotAdvanceVersionWhenALocaleFails(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setCredentialId(3);
+        $bot->setCommandsMenuVersion(0);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->expects($this->never())->method('save');
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->expects($this->exactly(5))->method('setMyCommands')
+            ->willReturnCallback(function (string $token, array $commands, ?string $locale): void {
+                if ('fr' === $locale) {
+                    throw new TelegramChannelException(TelegramChannelException::TOKEN_REVOKED);
+                }
+            });
+
+        $this->service($api, $bots, $this->vault(), 'https://chat.example.com')->ensureCommandMenu($bot);
+
+        $this->assertSame(0, $bot->getCommandsMenuVersion());
+    }
+
+    public function testEnsureCommandMenuSkipsWhenVersionIsCurrent(): void
+    {
+        $bot = new TelegramBot(7, 'key', 1, 'synaplan_test_bot');
+        $bot->setCredentialId(3);
+        $bot->setCommandsMenuVersion(TelegramConnectionService::COMMAND_MENU_VERSION);
+        $bots = $this->createMock(TelegramBotRepository::class);
+        $bots->expects($this->never())->method('save');
+        $api = $this->createMock(TelegramBotApi::class);
+        $api->expects($this->never())->method('setMyCommands');
+
+        $this->service($api, $bots, $this->vault(), 'https://chat.example.com')->ensureCommandMenu($bot);
+    }
+
     private function service(
         TelegramBotApi $api,
         TelegramBotRepository $bots,

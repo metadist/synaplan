@@ -683,6 +683,8 @@ const speechFinalTranscript = ref('') // Accumulated final transcripts during re
 const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
+/** Set on unmount so a late recognition or recorder callback cannot write state or upload audio. */
+let dictationUnmounted = false
 const selectedModelId = ref<number | null>(null)
 // Knowledge-base folder ("group key") to scope this chat's RAG retrieval to.
 const knowledgeGroups = ref<Array<{ name: string; count: number }>>([])
@@ -1258,18 +1260,15 @@ watch(
   { immediate: false }
 )
 
-const sendMessage = () => {
-  if (isStreaming.value) {
-    warning(t('chatInput.waitForStreaming'))
-    return
-  }
-
-  // If dictation is active, stop it FIRST and absorb any pending speech
-  // (final + interim) into message.value before we evaluate canSend / send.
-  // We use abort() (not stop()) on the Web Speech service so that any
-  // late native onresult event cannot write transcribed text back into
-  // message.value after we've cleared it below.
-  if (isRecording.value) {
+/**
+ * Stop Web Speech and the audio recorder.
+ *
+ * `keepText` absorbs the live transcript into the composer (send). Leaving
+ * it false discards the recording so nothing is uploaded (unmount).
+ */
+const stopDictation = (options: { keepText: boolean }) => {
+  const recording = isRecording.value
+  if (options.keepText && recording) {
     const base = speechBaseMessage.value
     const finals = speechFinalTranscript.value
     const interim = interimTranscript.value
@@ -1279,25 +1278,36 @@ const sendMessage = () => {
     if (absorbed) {
       message.value = absorbed
     }
+  }
 
-    if (webSpeechService.value) {
-      webSpeechService.value.abort()
-      webSpeechService.value = null
-    }
-    if (audioRecorder.value) {
-      discardNextRecording.value = true
-      audioRecorder.value.stopRecording()
-    }
+  if (webSpeechService.value) {
+    webSpeechService.value.abort()
+    webSpeechService.value = null
+  }
+  if (audioRecorder.value && (recording || !options.keepText)) {
+    discardNextRecording.value = true
+    audioRecorder.value.stopRecording()
+  }
+  if (recording || !options.keepText) {
     isRecording.value = false
   }
 
-  // Always clear speech tracking to prevent any late onEnd / onResult from
-  // restoring text (handles race conditions around stop/abort).
   speechBaseMessage.value = ''
   speechFinalTranscript.value = ''
   interimTranscript.value = ''
   clearSilenceTimer()
   autoSendPending.value = false
+}
+
+const sendMessage = () => {
+  if (isStreaming.value) {
+    warning(t('chatInput.waitForStreaming'))
+    return
+  }
+
+  // Absorb any pending speech, then abort recognition so a late onresult
+  // cannot write text back after the composer is cleared for the next turn.
+  stopDictation({ keepText: true })
 
   if (!canSend.value) {
     return
@@ -1766,7 +1776,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  clearSilenceTimer()
+  dictationUnmounted = true
+  stopDictation({ keepText: false })
   document.removeEventListener('click', handlePlusClickOutside)
   if (uploadAbortController.value) {
     uploadAbortController.value.abort()
@@ -1895,6 +1906,7 @@ const startWebSpeechRecording = async () => {
         success(t('chatInput.listeningStarted'))
       },
       onEnd: () => {
+        if (dictationUnmounted) return
         isRecording.value = false
         clearSilenceTimer()
 
@@ -1916,6 +1928,7 @@ const startWebSpeechRecording = async () => {
         }
       },
       onResult: ({ final, interim }) => {
+        if (dictationUnmounted) return
         // Snapshot semantics: the service hands us the *whole* recognition
         // session so far. Assigning (never appending) the snapshot is what
         // makes the consumer immune to Android Chrome re-emitting the same
@@ -1942,6 +1955,7 @@ const startWebSpeechRecording = async () => {
         }
       },
       onError: (error) => {
+        if (dictationUnmounted) return
         console.error('Web Speech error:', error)
         if (error.type !== 'no_speech') {
           showError(error.userMessage)
@@ -1950,7 +1964,12 @@ const startWebSpeechRecording = async () => {
       },
     })
 
-    await webSpeechService.value.start()
+    const service = webSpeechService.value
+    await service.start()
+    if (dictationUnmounted) {
+      service.abort()
+      webSpeechService.value = null
+    }
   } catch (err: unknown) {
     console.error('Failed to start Web Speech:', err)
     const errMessage = err instanceof Error ? err.message : 'Unknown error'
@@ -1965,27 +1984,38 @@ const startWebSpeechRecording = async () => {
  */
 const startWhisperRecording = async () => {
   try {
-    audioRecorder.value = new AudioRecorder({
+    const recorder = new AudioRecorder({
       onStart: () => {
+        if (dictationUnmounted) return
         isRecording.value = true
         success(t('chatInput.recordingStarted'))
       },
       onStop: () => {
+        if (dictationUnmounted) return
         isRecording.value = false
       },
       onDataAvailable: async (audioBlob: Blob) => {
+        if (dictationUnmounted) return
         console.log('🎵 Audio recorded:', audioBlob.size, 'bytes')
         await transcribeAudio(audioBlob)
       },
       onError: (error) => {
+        if (dictationUnmounted) return
         console.error('❌ Recording error:', error)
         showError(t(error.messageKey))
         isRecording.value = false
       },
     })
+    audioRecorder.value = recorder
 
-    // Check support first (with detailed diagnostics)
-    const support = await audioRecorder.value.checkSupport()
+    // Check support first (with detailed diagnostics). Unmount can happen
+    // while permission is pending; stop again after each await so a stream
+    // created when getUserMedia later resolves is not left open.
+    const support = await recorder.checkSupport()
+    if (dictationUnmounted) {
+      recorder.stopRecording()
+      return
+    }
     if (!support.supported || !support.hasDevices) {
       if (support.error) {
         showError(t(support.error.messageKey))
@@ -1993,8 +2023,10 @@ const startWhisperRecording = async () => {
       return
     }
 
-    // Start recording
-    await audioRecorder.value.startRecording()
+    await recorder.startRecording()
+    if (dictationUnmounted) {
+      recorder.stopRecording()
+    }
   } catch (err: unknown) {
     console.error('❌ Failed to start recording:', err)
     const error = err as { messageKey?: string; message?: string }
@@ -2012,7 +2044,7 @@ const startWhisperRecording = async () => {
  * Called after AudioRecorder stops and provides recorded audio.
  */
 const transcribeAudio = async (audioBlob: Blob) => {
-  if (discardNextRecording.value) {
+  if (dictationUnmounted || discardNextRecording.value) {
     discardNextRecording.value = false
     return
   }

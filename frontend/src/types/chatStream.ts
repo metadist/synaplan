@@ -155,6 +155,8 @@ export interface StreamUpdatePayload {
   }>
   documentVersion?: number
   documentFidelityLossy?: boolean
+  /** Voice-reply failure reason when TTS was requested but no audio was stored (#2282). */
+  voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited' | null
   searchResults?: StreamSearchResult[]
   memoryIds?: number[]
   feedbackIds?: number[]
@@ -187,5 +189,7 @@ export interface StreamUpdatePayload {
   phases?: Record<string, number>
   marks?: Record<string, number>
   total_ms?: number
+  /** Voice-reply failure reason on `status === 'voice_reply_failed'` (#2282). */
+  reason?: string
   [key: string]: unknown
 }

@@ -59,6 +59,8 @@ final readonly class TelegramInboundService
             return;
         }
 
+        $this->connections->ensureCommandMenu($bot);
+
         $updateKey = $bot->getBotId().':'.$updateId;
         $lock = $this->lockFactory->createLock('telegram_turn_'.$botRowId.'_'.$updateId, self::LOCK_SECONDS);
         if (!$lock->acquire()) {
