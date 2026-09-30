@@ -86,6 +86,11 @@
     "showAll": "Tümünü Göster",
     "recent": "Son Konuşmalar",
     "ttsGenerating": "Sesli yanıt ekleniyor…",
+    "voiceReplyFailed": {
+      "provider_error": "Sesli sürüm oluşturulamadı. Metin yanıtınız tamamlandı.",
+      "empty_text": "Sesli sürüm oluşturulamadı. Metin yanıtınız tamamlandı.",
+      "rate_limited": "Ses kotanız dolduğu için sesli sürüm oluşturulamadı. Metin yanıtınız tamamlandı."
+    },
     "audioUnavailable": "Ses yüklenemedi",
     "audioUnavailableDescription": "Dosya şu anda sunucuda mevcut değil. Lütfen daha sonra tekrar deneyin veya indirin.",
     "imageUnavailable": "Görsel yüklenemedi",

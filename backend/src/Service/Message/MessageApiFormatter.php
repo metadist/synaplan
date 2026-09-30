@@ -215,6 +215,7 @@ final readonly class MessageApiFormatter
             'errorReason' => $errorFields['errorReason'],
             'canRetryModel' => $errorFields['canRetryModel'],
             'errorDebug' => $errorFields['errorDebug'],
+            'voiceReplyFailed' => $this->voiceReplyFailedReason($m),
             'agentId' => $this->agentIdFromMeta($m),
             'agentVersionId' => $this->intMeta($m, 'AGENTVERSIONID'),
             // Generated content (images, videos, audio from AI)
@@ -228,6 +229,25 @@ final readonly class MessageApiFormatter
     private function agentIdFromMeta(Message $m): ?int
     {
         return $this->intMeta($m, 'AGENTID');
+    }
+
+    /**
+     * Voice-reply failure reason stored when TTS was requested but no audio was
+     * produced (#2282). Null when voice reply succeeded or was never requested.
+     *
+     * @return 'provider_error'|'empty_text'|'rate_limited'|null
+     */
+    private function voiceReplyFailedReason(Message $m): ?string
+    {
+        $raw = $m->getMeta('voice_reply_failed');
+        if (!\is_string($raw) || '' === $raw) {
+            return null;
+        }
+
+        return match ($raw) {
+            'provider_error', 'empty_text', 'rate_limited' => $raw,
+            default => null,
+        };
     }
 
     private function intMeta(Message $m, string $key): ?int
