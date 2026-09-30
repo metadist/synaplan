@@ -53,16 +53,12 @@ final readonly class GeneratedMediaTextRenderer
             return '';
         }
 
-        $parsed = $this->parseMarker($text);
-        if (null === $parsed) {
-            return $text;
-        }
-
-        [$kind, $filename, $suffix] = $parsed;
         $locale = $this->resolveLocale($messageLang, $fallbackLocale);
-        $sentence = $this->userSentence($kind, $filename, $locale);
 
-        return '' === $suffix ? $sentence : $sentence.$suffix;
+        return self::rewriteLines(
+            $text,
+            fn (string $kind, ?string $filename): string => $this->userSentence($kind, $filename, $locale),
+        );
     }
 
     /**
@@ -84,22 +80,80 @@ final readonly class GeneratedMediaTextRenderer
             return '';
         }
 
-        $parsed = self::parseMarkerStatic($text);
-        if (null === $parsed) {
-            return $text;
-        }
+        return self::rewriteLines($text, [self::class, 'modelSentence']);
+    }
 
-        [$kind, $filename, $suffix] = $parsed;
-        $sentence = match ($kind) {
+    private static function modelSentence(string $kind, ?string $filename): string
+    {
+        return match ($kind) {
             'image' => '(I generated an image and provided it to the user.)',
             'video' => '(I generated a video and provided it to the user.)',
             'audio' => '(I generated audio and provided it to the user.)',
             'file' => sprintf('(I generated the file "%s" and provided it to the user as a download.)', $filename ?? 'file'),
             'file_failed' => '(The requested file could not be generated.)',
-            default => $text,
+            default => '',
         };
+    }
 
-        return '' === $suffix ? $sentence : $sentence.$suffix;
+    /**
+     * Replace every marker line. Prose around it stays, including a folder
+     * note on the following lines. Text with no marker is returned unchanged.
+     *
+     * @param callable(string, ?string): string $sentence
+     */
+    private static function rewriteLines(string $text, callable $sentence): string
+    {
+        $lines = explode("\n", $text);
+        $changed = false;
+        foreach ($lines as $index => $line) {
+            $parsed = self::parseMarkerLine($line);
+            if (null === $parsed) {
+                continue;
+            }
+            $lines[$index] = $sentence($parsed[0], $parsed[1]);
+            $changed = true;
+        }
+
+        return $changed ? implode("\n", $lines) : $text;
+    }
+
+    /**
+     * @return array{0: string, 1: ?string}|null
+     */
+    private static function parseMarkerLine(string $line): ?array
+    {
+        $trimmed = trim($line);
+        if ('' === $trimmed) {
+            return null;
+        }
+        if (self::MARKER_IMAGE === $trimmed) {
+            return ['image', null];
+        }
+        if (self::MARKER_VIDEO === $trimmed) {
+            return ['video', null];
+        }
+        if (self::MARKER_AUDIO === $trimmed) {
+            return ['audio', null];
+        }
+        if (self::MARKER_FILE_FAILED === $trimmed) {
+            return ['file_failed', null];
+        }
+        if (str_starts_with($trimmed, self::MARKER_FILE_PREFIX)) {
+            $filename = trim(substr($trimmed, strlen(self::MARKER_FILE_PREFIX)));
+
+            return ['file', '' !== $filename ? $filename : 'file'];
+        }
+        if (preg_match('/^Generated image:\s*/i', $trimmed)) {
+            return ['image', null];
+        }
+        if (preg_match('/^Generated video:\s*/i', $trimmed)) {
+            return ['video', null];
+        }
+        if (preg_match('/^Generated audio:\s*/i', $trimmed)) {
+            return ['audio', null];
+        }
+
+        return null;
     }
 
     /**
@@ -128,50 +182,16 @@ final readonly class GeneratedMediaTextRenderer
      */
     private static function parseMarkerStatic(string $text): ?array
     {
-        $trimmed = trim($text);
-        if ('' === $trimmed) {
-            return null;
+        $line = self::parseMarkerLine($text);
+        if (null === $line) {
+            $first = trim(explode("\n", $text, 2)[0]);
+            $line = self::parseMarkerLine($first);
+            if (null === $line) {
+                return null;
+            }
         }
 
-        // Exact marker, or marker as the first line (folder-delivery note after).
-        $firstLine = $trimmed;
-        $suffix = '';
-        if (str_contains($trimmed, "\n")) {
-            $parts = explode("\n", $trimmed, 2);
-            $firstLine = trim($parts[0]);
-            $suffix = "\n".$parts[1];
-        }
-
-        if (self::MARKER_IMAGE === $firstLine) {
-            return ['image', null, $suffix];
-        }
-        if (self::MARKER_VIDEO === $firstLine) {
-            return ['video', null, $suffix];
-        }
-        if (self::MARKER_AUDIO === $firstLine) {
-            return ['audio', null, $suffix];
-        }
-        if (self::MARKER_FILE_FAILED === $firstLine) {
-            return ['file_failed', null, $suffix];
-        }
-        if (str_starts_with($firstLine, self::MARKER_FILE_PREFIX)) {
-            $filename = trim(substr($firstLine, strlen(self::MARKER_FILE_PREFIX)));
-
-            return ['file', '' !== $filename ? $filename : 'file', $suffix];
-        }
-
-        // Legacy stored prose (pre-migration). Never echo the rewritten prompt.
-        if (preg_match('/^Generated image:\s*/i', $firstLine)) {
-            return ['image', null, $suffix];
-        }
-        if (preg_match('/^Generated video:\s*/i', $firstLine)) {
-            return ['video', null, $suffix];
-        }
-        if (preg_match('/^Generated audio:\s*/i', $firstLine)) {
-            return ['audio', null, $suffix];
-        }
-
-        return null;
+        return [$line[0], $line[1], ''];
     }
 
     private function userSentence(string $kind, ?string $filename, string $locale): string

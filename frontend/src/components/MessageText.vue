@@ -757,34 +757,32 @@ function normalizeInlineReferences(text: string): string {
 // Normalize special file markers + reference markers + apply badge / table
 // post-processing. Shared between the sync and async render paths so the
 // post-render HTML shape is identical regardless of which path produced it.
-function normalizeContentForRender(input: string): string {
-  if (input.startsWith('__FILE_GENERATED__:')) {
-    const filename = input.replace('__FILE_GENERATED__:', '').trim()
-    return t('message.fileGenerated', { filename })
+function localizedMediaMarker(firstLine: string): string | null {
+  const line = firstLine.trim()
+  if (line.startsWith('__FILE_GENERATED__:')) {
+    return t('message.fileGenerated', {
+      filename: line.replace('__FILE_GENERATED__:', '').trim(),
+    })
   }
-  if (input === '__FILE_GENERATION_FAILED__') {
-    return t('message.fileGenerationFailed')
+  if (line === '__FILE_GENERATION_FAILED__') return t('message.fileGenerationFailed')
+  if (line === '__AUDIO_GENERATED__') return t('message.audioGenerated')
+  if (line === '__IMAGE_GENERATED__') return t('message.imageGenerated')
+  if (line === '__VIDEO_GENERATED__') return t('message.videoGenerated')
+  if (line === '__VIDEO_GENERATING__') return t('message.mediaJob.title.video')
+  if (line === '__IMAGE_GENERATING__') return t('message.mediaJob.title.image')
+  if (line === '__AUDIO_GENERATING__') return t('message.mediaJob.title.audio')
+  return null
+}
+
+function normalizeContentForRender(input: string): string {
+  const newline = input.indexOf('\n')
+  const firstLine = newline === -1 ? input : input.slice(0, newline)
+  const localized = localizedMediaMarker(firstLine)
+  if (localized !== null) {
+    return newline === -1 ? localized : localized + input.slice(newline)
   }
   if (input === TOOL_RESULT_MARKER) {
     return t('message.toolStepHidden')
-  }
-  if (input === '__AUDIO_GENERATED__') {
-    return t('message.audioGenerated')
-  }
-  if (input === '__IMAGE_GENERATED__') {
-    return t('message.imageGenerated')
-  }
-  if (input === '__VIDEO_GENERATED__') {
-    return t('message.videoGenerated')
-  }
-  if (input === '__VIDEO_GENERATING__') {
-    return t('message.mediaJob.title.video')
-  }
-  if (input === '__IMAGE_GENERATING__') {
-    return t('message.mediaJob.title.image')
-  }
-  if (input === '__AUDIO_GENERATING__') {
-    return t('message.mediaJob.title.audio')
   }
   return input
 }

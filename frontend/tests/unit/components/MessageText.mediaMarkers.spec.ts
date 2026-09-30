@@ -54,4 +54,12 @@ describe('MessageText media markers', () => {
     await flushPromises()
     expect(video.text()).toContain(de.message.videoGenerated)
   })
+
+  it('keeps a folder note that follows an image marker', async () => {
+    const image = mountWithLocale('en', '__IMAGE_GENERATED__\n\nSaved to Projects/Art.')
+    await flushPromises()
+    expect(image.text()).toContain(en.message.imageGenerated)
+    expect(image.text()).toContain('Saved to Projects/Art.')
+    expect(image.text()).not.toContain('__IMAGE_GENERATED__')
+  })
 })

@@ -12,6 +12,33 @@ import DOMPurify from 'dompurify'
 import { escapeHtml, highlightCode, preloadHighlighter, ensureHighlighter } from './useHighlight'
 import { i18n } from '@/i18n'
 
+type MarkerTranslator = (key: string, params?: Record<string, unknown>) => string
+
+function appMarkerTranslator(): MarkerTranslator {
+  return (key, params) => String(i18n.global.t(key, params ?? {}))
+}
+
+function localizeLeadingMediaMarker(content: string, translate: MarkerTranslator): string {
+  const newline = content.indexOf('\n')
+  const firstLine = (newline === -1 ? content : content.slice(0, newline)).trim()
+  const rest = newline === -1 ? '' : content.slice(newline)
+  let sentence: string | null = null
+  if (firstLine.startsWith('__FILE_GENERATED__:')) {
+    sentence = translate('message.fileGenerated', {
+      filename: firstLine.replace('__FILE_GENERATED__:', '').trim(),
+    })
+  } else if (firstLine === '__FILE_GENERATION_FAILED__') {
+    sentence = translate('message.fileGenerationFailed')
+  } else if (firstLine === '__IMAGE_GENERATED__') {
+    sentence = translate('message.imageGenerated')
+  } else if (firstLine === '__VIDEO_GENERATED__') {
+    sentence = translate('message.videoGenerated')
+  } else if (firstLine === '__AUDIO_GENERATED__') {
+    sentence = translate('message.audioGenerated')
+  }
+  return sentence === null ? content : sentence + rest
+}
+
 /**
  * URI schemes that must never be rendered as clickable links.
  *
@@ -487,7 +514,7 @@ export interface UseMarkdownReturn {
  * const htmlWithMath = await renderAsync('$E = mc^2$', { katex: true })
  * ```
  */
-export function useMarkdown(): UseMarkdownReturn {
+export function useMarkdown(translate: MarkerTranslator = appMarkerTranslator()): UseMarkdownReturn {
   configureMarked()
 
   function render(markdown: string, options: MarkdownOptions = {}): string {
@@ -504,18 +531,7 @@ export function useMarkdown(): UseMarkdownReturn {
 
     // Handle special file generation markers from backend
     if (processFileMarkers) {
-      if (content.startsWith('__FILE_GENERATED__:')) {
-        const filename = content.replace('__FILE_GENERATED__:', '').trim()
-        content = i18n.global.t('message.fileGenerated', { filename })
-      } else if (content === '__FILE_GENERATION_FAILED__') {
-        content = i18n.global.t('message.fileGenerationFailed')
-      } else if (content === '__IMAGE_GENERATED__') {
-        content = i18n.global.t('message.imageGenerated')
-      } else if (content === '__VIDEO_GENERATED__') {
-        content = i18n.global.t('message.videoGenerated')
-      } else if (content === '__AUDIO_GENERATED__') {
-        content = i18n.global.t('message.audioGenerated')
-      }
+      content = localizeLeadingMediaMarker(content, translate)
     }
 
     // Parse markdown to HTML
@@ -553,18 +569,7 @@ export function useMarkdown(): UseMarkdownReturn {
 
     // Handle special file generation markers from backend
     if (processFileMarkers) {
-      if (content.startsWith('__FILE_GENERATED__:')) {
-        const filename = content.replace('__FILE_GENERATED__:', '').trim()
-        content = i18n.global.t('message.fileGenerated', { filename })
-      } else if (content === '__FILE_GENERATION_FAILED__') {
-        content = i18n.global.t('message.fileGenerationFailed')
-      } else if (content === '__IMAGE_GENERATED__') {
-        content = i18n.global.t('message.imageGenerated')
-      } else if (content === '__VIDEO_GENERATED__') {
-        content = i18n.global.t('message.videoGenerated')
-      } else if (content === '__AUDIO_GENERATED__') {
-        content = i18n.global.t('message.audioGenerated')
-      }
+      content = localizeLeadingMediaMarker(content, translate)
     }
 
     // Process KaTeX if enabled
@@ -602,7 +607,10 @@ export function useMarkdown(): UseMarkdownReturn {
 // Export singleton for widget usage (avoids re-initialization)
 let singletonInstance: UseMarkdownReturn | null = null
 
-export function getMarkdownRenderer(): UseMarkdownReturn {
+export function getMarkdownRenderer(translate?: MarkerTranslator): UseMarkdownReturn {
+  if (translate) {
+    return useMarkdown(translate)
+  }
   if (!singletonInstance) {
     singletonInstance = useMarkdown()
   }

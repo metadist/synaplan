@@ -70,6 +70,15 @@ final class GeneratedMediaTextRendererTest extends TestCase
         $this->assertStringNotContainsString('__', $text);
     }
 
+    public function testForUserReplacesAMarkerBuriedUnderProse(): void
+    {
+        $text = $this->renderer->forUser("Your report is ready.\n__FILE_GENERATED__:report.docx", 'en');
+
+        $this->assertStringContainsString('Your report is ready.', $text);
+        $this->assertStringContainsString('report.docx', $text);
+        $this->assertStringNotContainsString('__', $text);
+    }
+
     public function testIsMediaMarker(): void
     {
         $this->assertTrue($this->renderer->isMediaMarker('__IMAGE_GENERATED__'));

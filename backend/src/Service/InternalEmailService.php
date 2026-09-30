@@ -163,6 +163,15 @@ final readonly class InternalEmailService
         }
     }
 
+    private function imageAlt(?string $locale): string
+    {
+        if (null !== $this->mediaTextRenderer) {
+            return $this->mediaTextRenderer->forUser(GeneratedMediaTextRenderer::MARKER_IMAGE, $locale, $locale);
+        }
+
+        return GeneratedMediaTextRenderer::renderModel(GeneratedMediaTextRenderer::MARKER_IMAGE);
+    }
+
     /**
      * Send AI response email (for smart@synaplan.net chat).
      *
@@ -176,6 +185,7 @@ final readonly class InternalEmailService
      * @param string|null $attachmentPath    Path to attachment file
      * @param string|null $originalRecipient The address the user originally wrote to (used as From/Reply-To)
      * @param string|null $mediaType         Type of media attachment ('image', 'video', 'audio') for inline embedding
+     * @param string|null $locale            Recipient language for the image alternative text
      */
     public function sendAiResponseEmail(
         string $to,
@@ -189,6 +199,7 @@ final readonly class InternalEmailService
         ?string $originalRecipient = null,
         ?string $mediaType = null,
         ?array $additionalAttachmentPaths = null,
+        ?string $locale = null,
     ): void {
         $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
         $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
@@ -206,9 +217,7 @@ final readonly class InternalEmailService
         // Embed images inline via CID for broad email client compatibility (Outlook, Gmail, etc.)
         if ('image' === $mediaType && $attachmentPath && file_exists($attachmentPath)) {
             $imageAlt = htmlspecialchars(
-                null !== $this->mediaTextRenderer
-                    ? $this->mediaTextRenderer->forUser(GeneratedMediaTextRenderer::MARKER_IMAGE)
-                    : GeneratedMediaTextRenderer::renderModel(GeneratedMediaTextRenderer::MARKER_IMAGE),
+                $this->imageAlt($locale),
                 ENT_QUOTES | ENT_SUBSTITUTE,
                 'UTF-8',
             );
@@ -318,7 +327,7 @@ final readonly class InternalEmailService
      * @param string                                        $markdown    Result text in markdown
      * @param list<array{path: string, type?: string|null}> $attachments Absolute file paths (+ optional media kind)
      */
-    public function sendTaskResultEmail(string $to, string $subject, string $markdown, array $attachments = []): void
+    public function sendTaskResultEmail(string $to, string $subject, string $markdown, array $attachments = [], ?string $locale = null): void
     {
         $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
@@ -343,9 +352,7 @@ final readonly class InternalEmailService
 
         if (null !== $inlineImagePath) {
             $imageAlt = htmlspecialchars(
-                null !== $this->mediaTextRenderer
-                    ? $this->mediaTextRenderer->forUser(GeneratedMediaTextRenderer::MARKER_IMAGE)
-                    : GeneratedMediaTextRenderer::renderModel(GeneratedMediaTextRenderer::MARKER_IMAGE),
+                $this->imageAlt($locale),
                 ENT_QUOTES | ENT_SUBSTITUTE,
                 'UTF-8',
             );

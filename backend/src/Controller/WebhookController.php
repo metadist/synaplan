@@ -630,7 +630,8 @@ class WebhookController extends AbstractController
                     $attachmentPath,
                     $toEmail,
                     $responseMediaType,
-                    $this->resolveAdditionalAttachmentPathsFromAiMetadata($metadata)
+                    $this->resolveAdditionalAttachmentPathsFromAiMetadata($metadata),
+                    $message->getLanguage() ?: $user->getLocale(),
                 );
 
                 $this->logger->info('Email response sent', [
