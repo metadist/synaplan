@@ -3339,7 +3339,7 @@ const streamAIResponse = async (
           } else if (data.status === 'audio') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.url) {
-              attachVoiceReplyAudio(message, normalizeMediaUrl(data.url), { autoplay: false })
+              attachVoiceReplyAudio(message, normalizeMediaUrl(data.url))
             }
           } else if (data.status === 'voice_reply_failed') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -4013,8 +4013,10 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.url) {
               const absoluteUrl = normalizeMediaUrl(data.url)
-              // If we are already streaming audio (currentAudioStreamer exists), don't autoplay the file
-              const shouldAutoplay = !currentAudioStreamer
+              // Play a spoken reply unless sentence streaming is already audible.
+              // Other audio files stay silent until the person presses play.
+              const shouldAutoplay =
+                message.parts.some((part) => part.type === 'tts_loading') && !currentAudioStreamer
               attachVoiceReplyAudio(message, absoluteUrl, { autoplay: shouldAutoplay })
             }
           } else if (data.status === 'voice_reply_failed') {
