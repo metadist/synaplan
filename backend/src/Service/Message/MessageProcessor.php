@@ -10,6 +10,7 @@ use App\Repository\SearchResultRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
+use App\Service\Mcp\ConfluenceLinkedPageReader;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -69,6 +70,7 @@ final readonly class MessageProcessor
         private ConversationSummaryService $conversationSummaryService,
         private AgentConfig $agentConfig,
         private ?WebResearchService $webResearch = null,
+        private ?ConfluenceLinkedPageReader $confluencePages = null,
     ) {
     }
 
@@ -400,6 +402,10 @@ final readonly class MessageProcessor
             $perfTimer->start('url_read');
             $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
             $perfTimer->stop('url_read');
+            if ($shouldSearch && !$userRequestedSearch && true === ($classification['confluence_mcp_handled'] ?? false)) {
+                $shouldSearch = false;
+                $triggerReason = 'confluence_page_read_via_connection';
+            }
             if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
                 $shouldSearch = false;
                 $triggerReason = 'link_only_message_answered_from_page';
@@ -1252,15 +1258,25 @@ final readonly class MessageProcessor
      */
     private function maybeFetchUrlContent(Message $message, array $promptMetadata, array $classification, ?callable $statusCallback): array
     {
+        $urls = $this->urlContentService->extractUrls((string) $message->getText());
+        if ([] === $urls) {
+            return $classification;
+        }
+
+        $classification = $this->readConfluenceLinks($message, $urls, $classification, $statusCallback);
+        $handled = is_array($classification['confluence_mcp_urls'] ?? null) ? $classification['confluence_mcp_urls'] : [];
+        $urls = array_values(array_filter(
+            $urls,
+            static fn (string $url): bool => !in_array($url, $handled, true),
+        ));
+        if ([] === $urls) {
+            return $classification;
+        }
+
         $savedTask = 'saved_task' === ($classification['source'] ?? null) || !empty($classification['saved_task_id']);
         $promptOptIn = !empty($promptMetadata['tool_url_screenshot']);
         $autoRead = null !== $this->webResearch && $this->webResearch->isUrlReadEnabled();
         if (!$savedTask && !$promptOptIn && !$autoRead) {
-            return $classification;
-        }
-
-        $urls = $this->urlContentService->extractUrls((string) $message->getText());
-        if ([] === $urls) {
             return $classification;
         }
 
@@ -1272,10 +1288,12 @@ final readonly class MessageProcessor
             // Always record the outcome, including total failure: generator
             // nodes treat "named URL, zero pages read" as a terminal honest
             // failure instead of inventing content (#2050).
-            $classification['url_pages_read'] = $successCount;
+            $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $successCount;
 
             if ($successCount > 0) {
-                $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
+                $public = $this->urlContentService->formatForPrompt($urlContentResults);
+                $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
+                $classification['url_content'] = '' !== $existing ? $existing."\n\n".$public : $public;
                 $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
             }
 
@@ -1297,18 +1315,54 @@ final readonly class MessageProcessor
 
             // A failed read is still a read outcome: record the explicit zero
             // so generator guards cannot mistake it for "no read ran" (#2050).
-            $classification['url_pages_read'] = 0;
+            $classification['url_pages_read'] ??= 0;
 
             return $classification;
         }
 
         $prompt = $this->webResearch->formatMentionedUrlsForPrompt($read);
         if ('' !== $prompt) {
-            $classification['url_content'] = $prompt;
+            $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
+            $classification['url_content'] = '' !== $existing ? $existing."\n\n".$prompt : $prompt;
         }
         $classification['url_pages'] = $read->toClientList();
-        $classification['url_pages_read'] = $read->successCount();
+        $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
         $classification['url_page_context'] = $read->contextForQuery();
+
+        return $classification;
+    }
+
+    /**
+     * A pasted Confluence link is behind a login. Read it through the user's
+     * Atlassian MCP connection and keep the public reader away from it, so
+     * the answer is the page — or an honest connection error — rather than
+     * the Atlassian sign-in screen.
+     *
+     * @param list<string>         $urls
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function readConfluenceLinks(Message $message, array $urls, array $classification, ?callable $statusCallback): array
+    {
+        if (null === $this->confluencePages) {
+            return $classification;
+        }
+
+        $read = $this->confluencePages->read($urls, $message->getUserId());
+        if (!$read->attempted()) {
+            return $classification;
+        }
+
+        $this->notify($statusCallback, 'fetching_urls', 'Reading the Confluence page from your connection...');
+        $prompt = $read->prompt();
+        if ('' !== $prompt) {
+            $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
+            $classification['url_content'] = '' !== $existing ? $existing."\n\n".$prompt : $prompt;
+        }
+        $classification['confluence_mcp_urls'] = $read->handledUrls();
+        $classification['confluence_mcp_handled'] = $read->coversAll($urls);
+        $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
 
         return $classification;
     }
