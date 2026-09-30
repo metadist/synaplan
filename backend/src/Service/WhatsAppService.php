@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\DTO\WhatsApp\IncomingMessageDto;
@@ -1352,6 +1353,12 @@ final class WhatsAppService
             ]);
 
             return $result;
+        } catch (NoSpeakableTextException) {
+            $this->logger->info('WhatsApp: TTS skipped, no speakable text', [
+                'user_id' => $userId,
+            ]);
+
+            return null;
         } catch (\Throwable $e) {
             $this->logger->error('WhatsApp: TTS generation failed', [
                 'user_id' => $userId,

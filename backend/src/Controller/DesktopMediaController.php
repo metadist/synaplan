@@ -119,7 +119,7 @@ final class DesktopMediaController extends AbstractController
         )
     )]
     #[OA\Response(response: 200, description: 'Generated audio file URL')]
-    #[OA\Response(response: 400, description: 'Invalid text or model')]
+    #[OA\Response(response: 400, description: 'Invalid text, model, or language, or the text has nothing to speak')]
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 422, description: 'Model not available')]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]

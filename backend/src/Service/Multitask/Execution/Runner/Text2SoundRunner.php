@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -64,6 +65,8 @@ final readonly class Text2SoundRunner implements TaskRunner
             $result = $this->aiFacade->synthesize($text, $language, $context->userId, [
                 'format' => is_string($node->params['format'] ?? null) ? $node->params['format'] : 'mp3',
             ]);
+        } catch (NoSpeakableTextException) {
+            return NodeResult::failed('no text to synthesize');
         } catch (\Throwable $e) {
             $this->logger->warning('Text2SoundRunner: synthesize failed', ['error' => $e->getMessage()]);
 

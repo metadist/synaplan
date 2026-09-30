@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Provider\PiperProvider;
 use App\AI\Service\AiFacade;
 use App\Controller\WebhookController;
@@ -32,6 +33,7 @@ use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -65,12 +67,6 @@ final class EmailVoiceReplyLanguageTest extends TestCase
 
     public function testEmailVoiceReplyPassesClassificationLanguageToSynthesize(): void
     {
-        $user = $this->createMock(User::class);
-        $user->method('getId')->willReturn(4);
-
-        $chat = $this->createMock(Chat::class);
-        $chat->method('getId')->willReturn(9);
-
         $aiFacade = $this->createMock(AiFacade::class);
         $aiFacade->expects($this->once())
             ->method('synthesize')
@@ -89,6 +85,49 @@ final class EmailVoiceReplyLanguageTest extends TestCase
                 'model_id' => 7,
                 'text_length' => 30,
             ]);
+
+        $response = $this->sendVoiceEmail(
+            $aiFacade,
+            $this->createStub(DiscordNotificationService::class),
+            'Guten Tag, hier ist die Antwort.',
+            'person@example.com',
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testNothingToSpeakSendsTheTextEmailWithoutAFailureAlert(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->expects($this->once())
+            ->method('synthesize')
+            ->willThrowException(new NoSpeakableTextException());
+
+        // The debug sender gets a Discord alert for every real email failure.
+        $discord = $this->createMock(DiscordNotificationService::class);
+        $discord->expects($this->never())->method('notifyEmailError');
+
+        $response = $this->sendVoiceEmail(
+            $aiFacade,
+            $discord,
+            "```\nprint('hi')\n```",
+            'tester@metadist.onmicrosoft.com',
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    private function sendVoiceEmail(
+        AiFacade $aiFacade,
+        DiscordNotificationService $discord,
+        string $answer,
+        string $from,
+    ): Response {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(4);
+
+        $chat = $this->createMock(Chat::class);
+        $chat->method('getId')->willReturn(9);
 
         $modelConfig = $this->createMock(ModelConfigService::class);
         $modelConfig->method('getDefaultModel')->with('TEXT2SOUND', 4)->willReturn(7);
@@ -127,7 +166,7 @@ final class EmailVoiceReplyLanguageTest extends TestCase
             'success' => true,
             'classification' => ['topic' => 'CHAT', 'language' => 'de'],
             'response' => [
-                'content' => 'Guten Tag, hier ist die Antwort.',
+                'content' => $answer,
                 'metadata' => [
                     'provider' => 'test',
                     'model' => 'test-model',
@@ -154,7 +193,7 @@ final class EmailVoiceReplyLanguageTest extends TestCase
             $this->createStub(WhatsAppService::class),
             $emailChats,
             $mailer,
-            $this->createStub(DiscordNotificationService::class),
+            $discord,
             new NullLogger(),
             'verify-token',
             $aiFacade,
@@ -177,7 +216,7 @@ final class EmailVoiceReplyLanguageTest extends TestCase
         $controller->setContainer($container);
 
         $request = Request::create('/api/v1/webhooks/email', 'POST', content: json_encode([
-            'from' => 'person@example.com',
+            'from' => $from,
             'to' => 'smart@synaplan.net',
             'subject' => 'Frage',
             'body' => 'Bitte antworte per Sprache.',
@@ -188,7 +227,6 @@ final class EmailVoiceReplyLanguageTest extends TestCase
             ]],
         ], JSON_THROW_ON_ERROR));
 
-        $response = $controller->email($request);
-        self::assertSame(200, $response->getStatusCode());
+        return $controller->email($request);
     }
 }

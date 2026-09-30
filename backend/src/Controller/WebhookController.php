@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
@@ -502,6 +503,9 @@ class WebhookController extends AbstractController
                             ],
                         ]);
                     }
+                } catch (NoSpeakableTextException) {
+                    // Code-only or think-only answer: send the text email without audio.
+                    $this->logger->info('Email voice reply skipped: no speakable text');
                 } catch (\Exception $e) {
                     $this->logger->error('Failed to generate TTS for email', ['error' => $e->getMessage()]);
                     if ($debugDiscord) {

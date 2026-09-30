@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\AI\Exception\ChatFailureReason;
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\Entity\Connection;
 use App\Entity\File;
@@ -565,6 +566,20 @@ final class RunnersTest extends TestCase
         $result = $runner->run($node, $this->context($this->message()));
 
         self::assertFalse($result->isSuccessful());
+    }
+
+    public function testText2SoundReportsNoTextWhenNothingIsSpeakable(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('synthesize')->willThrowException(new NoSpeakableTextException());
+
+        $runner = new Text2SoundRunner($aiFacade, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n3', Capability::Text2Sound, [], ['text' => '<think>plan</think>']);
+
+        $result = $runner->run($node, $this->context($this->message()));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame('no text to synthesize', $result->error);
     }
 
     public function testText2SoundTruncatesLongTextBeforeSynthesize(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\AI\Exception\ChatFailureClassifier;
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Chat;
@@ -828,6 +829,18 @@ class WhatsAppServiceTest extends TestCase
         $result = $method->invoke($this->service, 'Test text', 2);
 
         $this->assertNull($result, 'TTS failure should return null, not throw exception');
+    }
+
+    public function testTtsWithNothingSpeakableReturnsNull(): void
+    {
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('synthesize')
+            ->willThrowException(new NoSpeakableTextException());
+
+        $method = new \ReflectionMethod($this->service, 'generateTtsResponse');
+
+        $this->assertNull($method->invoke($this->service, "```\ncode\n```", 2, 'de'));
     }
 
     /**

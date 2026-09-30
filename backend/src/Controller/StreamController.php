@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderDisplayNames;
 use App\Entity\Chat;
@@ -2421,6 +2422,8 @@ class StreamController extends AbstractController
                                 'model' => $ttsModelName ?? 'unknown',
                             ]);
                         }
+                    } catch (NoSpeakableTextException) {
+                        $this->logger->info('StreamController: Voice reply skipped, no speakable text');
                     } catch (\Throwable $e) {
                         $this->logger->warning('StreamController: Voice reply TTS failed', [
                             'error' => $e->getMessage(),

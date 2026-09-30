@@ -8,7 +8,7 @@ describe('AudioStreamer', () => {
       vi.fn().mockResolvedValue({
         ok: true,
         blob: async () => new Blob(['audio'], { type: 'audio/webm' }),
-      }),
+      })
     )
     vi.stubGlobal('URL', {
       createObjectURL: vi.fn(() => 'blob:mock'),
@@ -22,7 +22,7 @@ describe('AudioStreamer', () => {
           return Promise.resolve()
         }
         pause() {}
-      },
+      }
     )
   })
 
