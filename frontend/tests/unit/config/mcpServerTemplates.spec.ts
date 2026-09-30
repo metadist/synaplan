@@ -45,12 +45,4 @@ describe('mcpServerTemplates', () => {
     expect(isOAuthTemplate(higgsfield)).toBe(true)
     expect(higgsfield.urlPrefill).toBe('https://mcp.higgsfield.ai/mcp')
   })
-
-  it('connects Jira and Confluence with an Atlassian sign-in, not a pasted token', () => {
-    const atlassian = findMcpServerTemplate('atlassian')
-    expect(isOAuthTemplate(atlassian)).toBe(true)
-    expect(atlassian.urlPrefill).toBe('https://mcp.atlassian.com/v2/mcp')
-    expect(atlassian.authHeader).toBe('')
-    expect(visibleMcpServerTemplates(false).map((t) => t.key)).not.toContain('atlassian')
-  })
 })

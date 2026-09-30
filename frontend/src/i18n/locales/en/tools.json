@@ -456,11 +456,6 @@
         "name": "Higgsfield",
         "summary": "Image and video tools",
         "hint": "Save the connection, then sign in with your Higgsfield account. Browsing your history is read-only; creating images or videos needs write actions and uses your Higgsfield credits."
-      },
-      "atlassian": {
-        "name": "Jira & Confluence",
-        "summary": "Atlassian Cloud sign-in",
-        "hint": "Save the connection, then sign in with your Atlassian account. Synaplan can then read the Jira issues and Confluence pages you can see, including pages you paste into the chat. No API token is needed. You can revoke access in your Atlassian account at any time."
       }
     },
     "oauthFormHint": "This server uses your account sign-in. Save it, then you will be sent to the provider to allow access. No access token to paste.",
