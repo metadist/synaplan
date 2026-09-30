@@ -78,16 +78,36 @@
             >
               {{ remoteNote }}
             </p>
+            <p
+              v-if="aiNote"
+              class="px-3 py-2 text-xs txt-secondary"
+              role="status"
+              data-testid="text-smart-search-ai-note"
+            >
+              {{ aiNote }}
+            </p>
             <div
               v-for="group in groups"
               :key="group.key"
               role="group"
               :aria-label="group.label"
+              :class="
+                group.key === 'best'
+                  ? 'mb-2 rounded-xl border border-[var(--brand)]/40 bg-[var(--brand)]/5 pb-1'
+                  : ''
+              "
               :data-testid="`group-smart-search-${group.key}`"
             >
               <div class="px-3 pt-3 pb-1 text-xs font-semibold txt-secondary">
                 {{ group.label }}
               </div>
+              <p
+                v-if="group.note"
+                class="px-3 pb-2 text-sm txt-primary"
+                data-testid="text-smart-search-best-note"
+              >
+                {{ group.note }}
+              </p>
               <SearchResultRow
                 v-for="item in group.items"
                 :key="item.id"
@@ -120,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useSmartSearchStore } from '@/stores/smartSearch'
@@ -131,6 +151,7 @@ import type { SearchResult } from '@/composables/search/types'
 import { useInlineSetting } from '@/composables/search/useInlineSetting'
 import { usePaletteStatus } from '@/composables/search/usePaletteStatus'
 import { usePaletteFocus } from '@/composables/search/usePaletteFocus'
+import { usePaletteKeys } from '@/composables/search/usePaletteKeys'
 import SearchResultRow from './SearchResultRow.vue'
 import SearchSettingControl from './SearchSettingControl.vue'
 import SearchPaletteFooter from './SearchPaletteFooter.vue'
@@ -152,6 +173,8 @@ const {
   remoteStatus,
   semanticAvailable,
   indexing,
+  aiStatus,
+  aiOutcome,
 } = useSmartSearch(isOpen, () => store.close())
 
 const inline = useInlineSetting()
@@ -173,12 +196,14 @@ const activeOptionId = computed(() =>
   flatResults.value.length > 0 ? optionId(activeIndex.value) : undefined
 )
 
-const { statusText, remoteNote } = usePaletteStatus({
+const { statusText, remoteNote, aiNote } = usePaletteStatus({
   parsed,
   hasMatches,
   remoteStatus,
   semanticAvailable,
   indexing,
+  aiStatus,
+  aiOutcome,
 })
 
 // Late server results must not move the keyboard selection off the item
@@ -212,68 +237,18 @@ const select = (result: SearchResult, newTab = false) => {
   void execute(result, newTab)
 }
 
-const move = (delta: number) => {
-  const total = flatResults.value.length
-  if (total === 0) return
-  activeIndex.value = (activeIndex.value + delta + total) % total
-}
-
-const onKeydown = (event: KeyboardEvent) => {
-  switch (event.key) {
-    case 'ArrowDown':
-      event.preventDefault()
-      move(1)
-      break
-    case 'ArrowUp':
-      event.preventDefault()
-      move(-1)
-      break
-    case 'Home':
-      if (flatResults.value.length > 0 && query.value === '') {
-        event.preventDefault()
-        activeIndex.value = 0
-      }
-      break
-    case 'End':
-      if (flatResults.value.length > 0 && query.value === '') {
-        event.preventDefault()
-        activeIndex.value = flatResults.value.length - 1
-      }
-      break
-    case 'Enter': {
-      event.preventDefault()
-      if (event.shiftKey) {
-        if (activeSetting.value) void inline.cycle(activeSetting.value)
-        break
-      }
-      const result = flatResults.value[activeIndex.value]
-      if (result) select(result, event.ctrlKey || event.metaKey)
-      break
-    }
-    case 'Escape':
-      event.preventDefault()
-      store.close()
-      break
-    case 'Tab':
-      event.preventDefault()
-      break
-  }
-}
-
-const canOpen = () => authStore.isAuthenticated && route.meta.public !== true
-
-const onGlobalKeydown = (event: KeyboardEvent) => {
-  if (event.key.toLowerCase() !== 'k' || event.altKey || event.shiftKey) return
-  if (!(event.metaKey || event.ctrlKey)) return
-  if (!store.isOpen && !canOpen()) return
-  event.preventDefault()
-  store.toggle()
-}
-
-// Capture phase: inputs that stop propagation (composer palettes, editors)
-// must not swallow the global shortcut.
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown, { capture: true }))
-onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown, { capture: true }))
+const { onKeydown } = usePaletteKeys({
+  query,
+  results: flatResults,
+  activeIndex,
+  activeSetting,
+  select,
+  switchSetting: (control) => void inline.cycle(control),
+  close: () => store.close(),
+  toggle: () => store.toggle(),
+  isOpen: () => store.isOpen,
+  canOpen: () => authStore.isAuthenticated && route.meta.public !== true,
+})
 </script>
 
 <style scoped>

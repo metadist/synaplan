@@ -1,6 +1,7 @@
 import { computed, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { RemoteStatus } from './useRemoteSearch'
+import type { AiStatus } from './useSearchInterpret'
 import type { SearchScope } from './useSmartSearch'
 
 /**
@@ -13,6 +14,8 @@ export function usePaletteStatus(state: {
   remoteStatus: Ref<RemoteStatus>
   semanticAvailable: Ref<boolean>
   indexing: Ref<boolean>
+  aiStatus: Ref<AiStatus>
+  aiOutcome: Ref<string | null>
 }) {
   const { t } = useI18n()
 
@@ -41,5 +44,20 @@ export function usePaletteStatus(state: {
     }
   })
 
-  return { statusText, remoteNote }
+  const aiNote = computed(() => {
+    switch (state.aiStatus.value) {
+      case 'loading':
+        return t('search.palette.ai.thinking')
+      case 'failed':
+        return t('search.palette.ai.failed')
+      case 'rateLimited':
+        return t('search.palette.ai.rateLimited')
+      case 'ready':
+        return state.aiOutcome.value === 'no_match' ? t('search.palette.ai.noMatch') : ''
+      default:
+        return ''
+    }
+  })
+
+  return { statusText, remoteNote, aiNote }
 }

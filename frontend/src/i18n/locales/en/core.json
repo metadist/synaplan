@@ -237,6 +237,13 @@
       "emptyHint": "Type what you are looking for: a page, a setting, a chat, or something inside your files.",
       "noResults": "Nothing matches “{query}”. Ask the AI in a new chat instead.",
       "askInChat": "Ask in chat: “{query}”",
+      "ai": {
+        "ask": "Ask the AI which result fits",
+        "thinking": "The AI is looking at the results…",
+        "failed": "The AI could not help this time. The results below still work.",
+        "rateLimited": "AI help is paused for a minute. The results below still work.",
+        "noMatch": "The AI found no better match. Ask in chat to get an answer."
+      },
       "foundByMeaning": "Found by meaning",
       "footer": {
         "navigate": "move",

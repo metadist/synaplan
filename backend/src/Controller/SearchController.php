@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\SmartSearch\Interpret\InterpretCandidate;
+use App\Service\SmartSearch\Interpret\InterpretResult;
+use App\Service\SmartSearch\Interpret\SearchInterpreter;
 use App\Service\SmartSearch\SmartSearchService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,9 +21,13 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Smart Search')]
 final class SearchController extends AbstractController
 {
+    private const LANGUAGES = ['de', 'en', 'es', 'fr', 'tr'];
+
     public function __construct(
         private readonly SmartSearchService $smartSearch,
+        private readonly SearchInterpreter $interpreter,
         private readonly RateLimiterFactoryInterface $smartSearchLimiter,
+        private readonly RateLimiterFactoryInterface $smartSearchInterpretLimiter,
     ) {
     }
 
@@ -120,5 +127,86 @@ final class SearchController extends AbstractController
         $limit = is_int($data['limit'] ?? null) ? $data['limit'] : SmartSearchService::DEFAULT_LIMIT;
 
         return $this->json($this->smartSearch->search($user, $query, $kinds, $limit)->toArray());
+    }
+
+    #[Route('/api/v1/search/interpret', name: 'smart_search_interpret', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/search/interpret',
+        operationId: 'smartSearchInterpret',
+        summary: 'Let the AI pick the best search result for a question',
+        description: 'One tools-model call. It reads the question and the results the palette already shows and points at the best of them. It never changes anything. Answers 404 when FEATURE_SEARCH_AI_ENABLED is off or no tools model can answer.',
+        security: [['Bearer' => []]],
+        tags: ['Smart Search'],
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['q', 'candidates'],
+            properties: [
+                new OA\Property(property: 'q', type: 'string', maxLength: 200, minLength: 1, example: 'how do I turn on groups'),
+                new OA\Property(property: 'language', type: 'string', enum: self::LANGUAGES, example: 'en', description: 'Language of the answer sentence; defaults to en'),
+                new OA\Property(
+                    property: 'candidates',
+                    type: 'array',
+                    maxItems: InterpretCandidate::MAX_CANDIDATES,
+                    minItems: 1,
+                    items: new OA\Items(
+                        required: ['id', 'kind', 'title'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', example: 'setting:FEATURE_IAM_GROUPS_ENABLED'),
+                            new OA\Property(property: 'kind', type: 'string', enum: InterpretCandidate::KINDS, example: 'setting'),
+                            new OA\Property(property: 'title', type: 'string', example: 'People & groups'),
+                            new OA\Property(property: 'subtitle', type: 'string', nullable: true, example: 'Features › People & sharing'),
+                            new OA\Property(property: 'value', type: 'string', nullable: true, description: 'Current value of a setting', example: 'false'),
+                        ],
+                    ),
+                ),
+            ],
+        ),
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'The pick. outcome "failed" means the model gave no usable answer; the palette keeps its list.',
+        content: new OA\JsonContent(
+            required: ['outcome', 'intent', 'targetIds', 'answer'],
+            properties: [
+                new OA\Property(property: 'outcome', type: 'string', enum: InterpretResult::OUTCOMES, example: 'ok'),
+                new OA\Property(property: 'intent', type: 'string', enum: InterpretResult::INTENTS, nullable: true, example: 'change_setting'),
+                new OA\Property(property: 'targetIds', type: 'array', description: 'Candidate ids, best first; never an id that was not sent', items: new OA\Items(type: 'string'), example: ['setting:FEATURE_IAM_GROUPS_ENABLED']),
+                new OA\Property(property: 'answer', type: 'string', nullable: true, description: 'One sentence for the user', example: 'Turns on groups for everyone — you confirm it first.'),
+            ],
+        ),
+    )]
+    #[OA\Response(response: 400, description: 'Missing query or unusable candidates')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 404, description: 'AI search is off or no tools model can answer')]
+    #[OA\Response(response: 429, description: 'Too many AI searches')]
+    public function interpret(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        if (!$this->interpreter->isAvailable($user)) {
+            return $this->json(['error' => 'AI search is not available on this instance.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $query = is_array($data) && is_string($data['q'] ?? null) ? trim($data['q']) : '';
+        if ('' === $query || mb_strlen($query) > SmartSearchService::MAX_QUERY_LENGTH) {
+            return $this->json(['error' => sprintf('Send a question of 1 to %d characters in "q".', SmartSearchService::MAX_QUERY_LENGTH)], Response::HTTP_BAD_REQUEST);
+        }
+        try {
+            $candidates = InterpretCandidate::listFromPayload($data['candidates'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!$this->smartSearchInterpretLimiter->create('user:'.$user->getId())->consume()->isAccepted()) {
+            return $this->json(['error' => 'Too many AI searches. Try again in a minute.'], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
+        $language = in_array($data['language'] ?? null, self::LANGUAGES, true) ? $data['language'] : 'en';
+
+        return $this->json($this->interpreter->interpret($user, $query, $candidates, $language)->toArray());
     }
 }

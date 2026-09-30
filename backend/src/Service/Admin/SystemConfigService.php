@@ -38,6 +38,7 @@ use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\WorkflowsConfig;
+use App\Service\SmartSearch\SmartSearchConfig;
 use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
@@ -138,6 +139,9 @@ final readonly class SystemConfigService
             'platforms' => ['label' => 'Desktop & partner platforms', 'fields' => [
                 'FEATURE_DESKTOP_AGENT_ENABLED',
                 'FEATURE_PLATFORM_LINKS_ENABLED',
+            ]],
+            'search' => ['label' => 'Search', 'fields' => [
+                'FEATURE_SEARCH_AI_ENABLED',
             ]],
         ];
 
@@ -1534,6 +1538,15 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => PlatformLinksConfig::CONFIG_GROUP,
                 'dbKey' => PlatformLinksConfig::KEY_ENABLED,
+            ],
+            'FEATURE_SEARCH_AI_ENABLED' => [
+                'tab' => 'features', 'section' => 'search', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why. Each use is one short AI call. Off keeps keyword and meaning search.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => SmartSearchConfig::CONFIG_GROUP,
+                'dbKey' => SmartSearchConfig::KEY_AI_ENABLED,
             ],
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',

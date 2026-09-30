@@ -66,6 +66,13 @@ framework:
             limit: 120
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
+        # AI tier of the palette (POST /api/v1/search/interpret). Each call is
+        # one tools-model request, so the cap is far below plain search.
+        smart_search_interpret:
+            policy: 'sliding_window'
+            limit: 20
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
         # Public Saved Task webhook (`POST /api/v1/webhooks/saved-tasks/{token}`,
         # PUBLIC_ACCESS), keyed per task in SavedTaskWebhookIngress. One start
         # per second is far beyond any real integration and keeps a leaked

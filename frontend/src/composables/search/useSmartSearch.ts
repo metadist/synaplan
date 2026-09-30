@@ -1,6 +1,6 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChatBubbleLeftEllipsisIcon, ClockIcon } from '@heroicons/vue/24/outline'
+import { ChatBubbleLeftEllipsisIcon, ClockIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 import { i18n } from '@/i18n/instance'
 import { LocalSearchIndex } from './localIndex'
 import { ensureAllLocales } from './localeTexts'
@@ -8,6 +8,8 @@ import { usePageSources, type LocalEntry } from './pageSources'
 import { useCommandSources } from './commandSources'
 import { useSearchRecents } from './useSearchRecents'
 import { useRemoteSearch } from './useRemoteSearch'
+import { useSearchInterpret } from './useSearchInterpret'
+import { buildBestAction } from './bestAction'
 import type { SearchGroup, SearchKind, SearchResult } from './types'
 
 export const GROUP_ORDER: SearchKind[] = [
@@ -112,6 +114,41 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
     }
   })
 
+  /** Everything the list found, once per id — what the AI may point at. */
+  const candidates = computed<SearchResult[]>(() => {
+    const seen = new Set<string>()
+    return [...localResults.value, ...remote.results.value].filter((result) => {
+      if (seen.has(result.id)) return false
+      seen.add(result.id)
+      return true
+    })
+  })
+
+  const ai = useSearchInterpret({
+    text: computed(() => (parsed.value.scope === 'all' ? parsed.value.text : '')),
+    candidates,
+    remoteStatus: remote.status,
+    isOpen,
+  })
+
+  const askAiResult = computed<SearchResult | null>(() => {
+    const { scope, text } = parsed.value
+    if (!ai.enabled.value || scope !== 'all' || text === '') return null
+    if (ai.status.value !== 'idle' && ai.status.value !== 'failed') return null
+    if (candidates.value.length === 0) return null
+    return {
+      id: 'ask:ai',
+      kind: 'ask',
+      title: String(t('search.palette.ai.ask')),
+      icon: SparklesIcon,
+      matchedBy: 'local',
+      keepOpen: true,
+      run: () => ai.ask(),
+    }
+  })
+
+  const best = computed(() => buildBestAction(ai.result.value, candidates.value, askResult.value))
+
   const recentResults = computed<SearchResult[]>(() =>
     recents.value
       .map((recent) => {
@@ -147,23 +184,35 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
     }
 
     const byKind = new Map<SearchKind, SearchResult[]>()
+    const picked = new Set(best.value?.items.map((item) => item.id) ?? [])
     const all = [
-      ...localResults.value,
-      ...remote.results.value,
+      ...candidates.value,
+      ...(askAiResult.value ? [askAiResult.value] : []),
       ...(askResult.value ? [askResult.value] : []),
-    ]
+    ].filter((result) => !picked.has(result.id))
     for (const result of all) {
       const list = byKind.get(result.kind) ?? []
-      if (!list.some((existing) => existing.id === result.id)) list.push(result)
+      list.push(result)
       byKind.set(result.kind, list)
     }
     const limit = parsed.value.scope === 'all' ? MAX_PER_GROUP : MAX_SCOPED
     const recentIds = recents.value.map((recent) => recent.id)
-    return GROUP_ORDER.filter((kind) => byKind.has(kind)).map((kind) => ({
+    const ranked: SearchGroup[] = GROUP_ORDER.filter((kind) => byKind.has(kind)).map((kind) => ({
       key: kind,
       label: groupLabel(kind),
       items: boostRecent(byKind.get(kind) ?? [], recentIds).slice(0, limit),
     }))
+    return best.value
+      ? [
+          {
+            key: 'best',
+            label: groupLabel('best'),
+            note: best.value.note,
+            items: best.value.items,
+          },
+          ...ranked,
+        ]
+      : ranked
   })
 
   const flatResults = computed(() => groups.value.flatMap((group) => group.items))
@@ -171,6 +220,10 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
   const hasMatches = computed(() => flatResults.value.some((result) => result.kind !== 'ask'))
 
   const execute = async (result: SearchResult, newTab = false) => {
+    if (result.keepOpen) {
+      await result.run?.()
+      return
+    }
     if (newTab && result.route) {
       window.open(router.resolve(result.route).href, '_blank', 'noopener')
       remember(result)
@@ -195,5 +248,7 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
     remoteStatus: remote.status,
     semanticAvailable: remote.semanticAvailable,
     indexing: remote.indexing,
+    aiStatus: ai.status,
+    aiOutcome: computed(() => ai.result.value?.outcome ?? null),
   }
 }

@@ -485,7 +485,8 @@
         "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Verwalten → Kanäle. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut."
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Verwalten → Kanäle. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut.",
+        "FEATURE_SEARCH_AI_ENABLED": "KI-Hilfe in der Suchpalette (Strg/Cmd+K): Bei einer Frage in normalen Worten wählt das Tools-Modell den passendsten Treffer und begründet ihn in einem Satz. Es ändert selbst nichts. Jede Nutzung ist ein kurzer KI-Aufruf. Aus: Stichwort- und Bedeutungssuche bleiben."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -949,6 +950,7 @@
         "SAVEDTASKS_ENABLED": "Gespeicherte Aufgaben",
         "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Dokumentwerkzeuge",
+        "SEARCH_AI_ENABLED": "KI-Hilfe in der Suche",
         "MULTITASK_ROUTING_ENABLED": "Mehrschritt-Routing",
         "MULTITASK_PARALLEL_ENABLED": "Parallele Schritte",
         "MULTITASK_URL_FETCH_ENABLED": "Webseiten abrufen",

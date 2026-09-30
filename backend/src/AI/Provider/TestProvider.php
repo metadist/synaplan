@@ -223,6 +223,12 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
             return $this->mockTaskPlan($userContent, $schema);
         }
 
+        // Search palette AI tier (tools:smart_search). Checked before the
+        // generic search-query branch below, whose markers it also contains.
+        if (str_contains($systemContent, 'Smart Search Interpreter')) {
+            return $this->mockSmartSearchInterpret($userContent);
+        }
+
         // Memory extraction (tools:memory_extraction): the user prompt built by
         // MemoryExtractionService carries these two stable markers.
         if (str_contains($userContent, 'Current Message (from the user):')
@@ -755,6 +761,39 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
             '4k', 'uhd' => '4K',
             default => '1080p',
         };
+    }
+
+    /**
+     * Mock palette interpretation: points at the first setting candidate,
+     * else the first candidate, so E2E can walk the Best action card
+     * without a real provider. No candidate line yields the chat hand-off.
+     */
+    private function mockSmartSearchInterpret(string $userContent): string
+    {
+        preg_match_all('/^- id=([^|]+?) \| kind=(\w+) \| title=([^|\n]+)/m', $userContent, $matches, PREG_SET_ORDER);
+        if ([] === $matches) {
+            return (string) json_encode(['intent' => 'answer', 'targetIds' => [], 'answer' => 'A chat can help with this.']);
+        }
+
+        $pick = $matches[0];
+        foreach ($matches as $match) {
+            if ('setting' === $match[2]) {
+                $pick = $match;
+                break;
+            }
+        }
+        $intent = match ($pick[2]) {
+            'setting' => 'change_setting',
+            'command' => 'run_command',
+            'page' => 'navigate',
+            default => 'find',
+        };
+
+        return (string) json_encode([
+            'intent' => $intent,
+            'targetIds' => [trim($pick[1])],
+            'answer' => 'Test pick: '.trim($pick[3]).'.',
+        ]);
     }
 
     /**

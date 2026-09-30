@@ -481,7 +481,8 @@
         "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Cuántos días puede permanecer sin uso una carpeta de trabajo con archivos antes de que la limpieza la elimine. Predeterminado: 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Gestionar → Canales. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código."
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Gestionar → Canales. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
+        "FEATURE_SEARCH_AI_ENABLED": "Ayuda de IA en la paleta de búsqueda (Ctrl/Cmd+K): ante una pregunta en lenguaje normal, el modelo de herramientas elige el resultado que mejor encaja y lo explica en una frase. Nunca cambia nada por sí mismo. Cada uso es una llamada breve a la IA. Desactivado: se mantienen la búsqueda por palabras clave y por significado."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -945,6 +946,7 @@
         "SAVEDTASKS_ENABLED": "Tareas guardadas",
         "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Herramientas de documentos",
+        "SEARCH_AI_ENABLED": "Ayuda de IA en la búsqueda",
         "MULTITASK_ROUTING_ENABLED": "Enrutado de varios pasos",
         "MULTITASK_PARALLEL_ENABLED": "Pasos en paralelo",
         "MULTITASK_URL_FETCH_ENABLED": "Obtener páginas web",

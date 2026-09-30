@@ -290,6 +290,13 @@
       "emptyHint": "Tippe, was du suchst: eine Seite, eine Einstellung, einen Chat oder etwas in deinen Dateien.",
       "noResults": "Nichts passt zu „{query}“. Frag stattdessen die KI in einem neuen Chat.",
       "askInChat": "Im Chat fragen: „{query}“",
+      "ai": {
+        "ask": "Die KI fragen, welcher Treffer passt",
+        "thinking": "Die KI sieht sich die Treffer an …",
+        "failed": "Die KI konnte diesmal nicht helfen. Die Treffer unten funktionieren weiter.",
+        "rateLimited": "Die KI-Hilfe pausiert für eine Minute. Die Treffer unten funktionieren weiter.",
+        "noMatch": "Die KI hat keinen besseren Treffer gefunden. Frag im Chat, um eine Antwort zu bekommen."
+      },
       "foundByMeaning": "Nach Bedeutung gefunden",
       "footer": {
         "navigate": "bewegen",

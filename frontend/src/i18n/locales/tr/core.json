@@ -226,6 +226,13 @@
       "emptyHint": "Ne aradığını yaz: bir sayfa, bir ayar, bir sohbet ya da dosyalarındaki bir içerik.",
       "noResults": "“{query}” ile eşleşen bir şey yok. Bunun yerine yeni bir sohbette yapay zekâya sor.",
       "askInChat": "Sohbette sor: “{query}”",
+      "ai": {
+        "ask": "Hangi sonucun uyduğunu AI'ya sor",
+        "thinking": "AI sonuçlara bakıyor…",
+        "failed": "AI bu sefer yardımcı olamadı. Aşağıdaki sonuçlar yine çalışıyor.",
+        "rateLimited": "AI yardımı bir dakikalığına duraklatıldı. Aşağıdaki sonuçlar yine çalışıyor.",
+        "noMatch": "AI daha iyi bir sonuç bulamadı. Yanıt almak için sohbette sor."
+      },
       "foundByMeaning": "Anlamına göre bulundu",
       "footer": {
         "navigate": "gezin",

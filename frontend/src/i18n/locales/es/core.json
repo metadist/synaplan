@@ -226,6 +226,13 @@
       "emptyHint": "Escribe lo que buscas: una página, un ajuste, un chat o algo dentro de tus archivos.",
       "noResults": "Nada coincide con «{query}». Pregunta a la IA en un chat nuevo.",
       "askInChat": "Preguntar en el chat: «{query}»",
+      "ai": {
+        "ask": "Preguntar a la IA qué resultado encaja",
+        "thinking": "La IA está revisando los resultados…",
+        "failed": "La IA no pudo ayudar esta vez. Los resultados de abajo siguen funcionando.",
+        "rateLimited": "La ayuda de la IA está en pausa durante un minuto. Los resultados de abajo siguen funcionando.",
+        "noMatch": "La IA no encontró un resultado mejor. Pregunta en el chat para obtener una respuesta."
+      },
       "foundByMeaning": "Encontrado por significado",
       "footer": {
         "navigate": "mover",

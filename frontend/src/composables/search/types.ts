@@ -35,6 +35,8 @@ export interface SearchResult {
   /** Navigation target; used when `run` is absent. */
   route?: string
   run?: () => unknown
+  /** `run` works inside the palette (e.g. asking the AI), so it stays open. */
+  keepOpen?: boolean
   setting?: SettingControl
   score?: number
 }
@@ -43,6 +45,8 @@ export interface SearchGroup {
   /** A result kind, or `recent` / `suggested` for the empty-query view. */
   key: string
   label: string
+  /** One sentence under the label, e.g. why the AI picked these. */
+  note?: string
   items: SearchResult[]
 }
 

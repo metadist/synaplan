@@ -237,6 +237,13 @@
       "emptyHint": "Tapez ce que vous cherchez : une page, un réglage, un chat ou un contenu de vos fichiers.",
       "noResults": "Aucun résultat pour « {query} ». Posez plutôt la question à l’IA dans un nouveau chat.",
       "askInChat": "Demander dans le chat : « {query} »",
+      "ai": {
+        "ask": "Demander à l’IA quel résultat convient",
+        "thinking": "L’IA examine les résultats…",
+        "failed": "L’IA n’a pas pu aider cette fois. Les résultats ci-dessous restent utilisables.",
+        "rateLimited": "L’aide de l’IA est en pause pendant une minute. Les résultats ci-dessous restent utilisables.",
+        "noMatch": "L’IA n’a pas trouvé de meilleur résultat. Posez la question dans le chat pour obtenir une réponse."
+      },
       "foundByMeaning": "Trouvé par le sens",
       "footer": {
         "navigate": "déplacer",
