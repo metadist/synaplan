@@ -326,6 +326,16 @@ class ChatHandlerTest extends TestCase
         $this->assertStringContainsString('could not be generated', $result);
     }
 
+    public function testHumanizeFileMarkersReplacesImageVideoAndAudioMarkers(): void
+    {
+        foreach (['__IMAGE_GENERATED__', '__VIDEO_GENERATED__', '__AUDIO_GENERATED__'] as $marker) {
+            $result = $this->handler->humanizeFileMarkersForModel($marker);
+            $this->assertStringNotContainsString('__', $result, $marker);
+            $this->assertStringNotContainsString('Generated ', $result, $marker);
+            $this->assertNotSame('', trim($result), $marker);
+        }
+    }
+
     public function testHumanizeFileMarkersLeavesRegularContentUntouched(): void
     {
         $text = 'Here is a normal assistant reply with no markers.';

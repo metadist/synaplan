@@ -179,12 +179,21 @@ describe('useMarkdown', () => {
       it('should process file generated marker', () => {
         const html = markdown.render('__FILE_GENERATED__:report.pdf')
         expect(html).toContain('report.pdf')
-        expect(html).toContain('File generated')
+        expect(html).not.toContain('__FILE_GENERATED__')
       })
 
       it('should process file generation failed marker', () => {
         const html = markdown.render('__FILE_GENERATION_FAILED__')
-        expect(html).toContain('File generation failed')
+        expect(html).not.toContain('__FILE_GENERATION_FAILED__')
+        expect(html.length).toBeGreaterThan(0)
+      })
+
+      it('should process image and video markers', () => {
+        const image = markdown.render('__IMAGE_GENERATED__')
+        expect(image).not.toContain('__IMAGE_GENERATED__')
+        expect(image).not.toContain('Generated ')
+        const video = markdown.render('__VIDEO_GENERATED__')
+        expect(video).not.toContain('__VIDEO_GENERATED__')
       })
 
       it('should skip file markers when disabled', () => {

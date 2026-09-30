@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Service\Message\GeneratedMediaTextRenderer;
+
 /**
  * TTS Text Sanitizer.
  *
@@ -24,6 +26,9 @@ final readonly class TtsTextSanitizer
      */
     public static function sanitize(string $text): string
     {
+        // 0. Speak localized / model prose instead of internal media markers
+        $text = GeneratedMediaTextRenderer::renderModel($text);
+
         // 1. Remove <think>...</think> reasoning blocks
         $text = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $text);
 

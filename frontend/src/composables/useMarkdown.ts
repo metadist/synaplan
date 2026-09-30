@@ -10,6 +10,7 @@
 import { marked, type MarkedExtension, type Tokens } from 'marked'
 import DOMPurify from 'dompurify'
 import { escapeHtml, highlightCode, preloadHighlighter, ensureHighlighter } from './useHighlight'
+import { i18n } from '@/i18n'
 
 /**
  * URI schemes that must never be rendered as clickable links.
@@ -505,9 +506,15 @@ export function useMarkdown(): UseMarkdownReturn {
     if (processFileMarkers) {
       if (content.startsWith('__FILE_GENERATED__:')) {
         const filename = content.replace('__FILE_GENERATED__:', '').trim()
-        content = `📄 File generated: **${filename}**`
+        content = i18n.global.t('message.fileGenerated', { filename })
       } else if (content === '__FILE_GENERATION_FAILED__') {
-        content = '❌ File generation failed'
+        content = i18n.global.t('message.fileGenerationFailed')
+      } else if (content === '__IMAGE_GENERATED__') {
+        content = i18n.global.t('message.imageGenerated')
+      } else if (content === '__VIDEO_GENERATED__') {
+        content = i18n.global.t('message.videoGenerated')
+      } else if (content === '__AUDIO_GENERATED__') {
+        content = i18n.global.t('message.audioGenerated')
       }
     }
 
@@ -548,9 +555,15 @@ export function useMarkdown(): UseMarkdownReturn {
     if (processFileMarkers) {
       if (content.startsWith('__FILE_GENERATED__:')) {
         const filename = content.replace('__FILE_GENERATED__:', '').trim()
-        content = `📄 File generated: **${filename}**`
+        content = i18n.global.t('message.fileGenerated', { filename })
       } else if (content === '__FILE_GENERATION_FAILED__') {
-        content = '❌ File generation failed'
+        content = i18n.global.t('message.fileGenerationFailed')
+      } else if (content === '__IMAGE_GENERATED__') {
+        content = i18n.global.t('message.imageGenerated')
+      } else if (content === '__VIDEO_GENERATED__') {
+        content = i18n.global.t('message.videoGenerated')
+      } else if (content === '__AUDIO_GENERATED__') {
+        content = i18n.global.t('message.audioGenerated')
       }
     }
 

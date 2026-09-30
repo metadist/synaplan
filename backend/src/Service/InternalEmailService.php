@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\AI\Health\ModelHealthAlert;
 use App\Service\Email\MarkdownEmailFormatter;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
@@ -26,6 +27,7 @@ final readonly class InternalEmailService
         private Environment $twig,
         private TranslatorInterface $translator,
         private LoggerInterface $logger,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -203,7 +205,14 @@ final readonly class InternalEmailService
 
         // Embed images inline via CID for broad email client compatibility (Outlook, Gmail, etc.)
         if ('image' === $mediaType && $attachmentPath && file_exists($attachmentPath)) {
-            $htmlBody .= '<br><br><img src="cid:generated-image" alt="Generated image" style="max-width: 100%; border-radius: 8px;">';
+            $imageAlt = htmlspecialchars(
+                null !== $this->mediaTextRenderer
+                    ? $this->mediaTextRenderer->forUser(GeneratedMediaTextRenderer::MARKER_IMAGE)
+                    : GeneratedMediaTextRenderer::renderModel(GeneratedMediaTextRenderer::MARKER_IMAGE),
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8',
+            );
+            $htmlBody .= '<br><br><img src="cid:generated-image" alt="'.$imageAlt.'" style="max-width: 100%; border-radius: 8px;">';
             $hasInlineImage = true;
         }
 
@@ -333,7 +342,14 @@ final readonly class InternalEmailService
         }
 
         if (null !== $inlineImagePath) {
-            $htmlBody .= '<br><br><img src="cid:generated-image" alt="Generated image" style="max-width: 100%; border-radius: 8px;">';
+            $imageAlt = htmlspecialchars(
+                null !== $this->mediaTextRenderer
+                    ? $this->mediaTextRenderer->forUser(GeneratedMediaTextRenderer::MARKER_IMAGE)
+                    : GeneratedMediaTextRenderer::renderModel(GeneratedMediaTextRenderer::MARKER_IMAGE),
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8',
+            );
+            $htmlBody .= '<br><br><img src="cid:generated-image" alt="'.$imageAlt.'" style="max-width: 100%; border-radius: 8px;">';
         }
 
         $htmlBody .= '<br><br><div style="font-size: 11px; color: #888888; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">'

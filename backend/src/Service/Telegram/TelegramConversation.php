@@ -13,6 +13,7 @@ use App\Service\Digest\MessageReferenceResolver;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
@@ -33,7 +34,6 @@ final readonly class TelegramConversation
     private const EDIT_WINDOW_SECONDS = 47 * 3600;
     private const MAX_SOURCES = 5;
     private const ACTIVE_JOB_STATES = ['queued', 'submitting', 'running', 'finalizing'];
-    private const FILE_MARKER = '/^__FILE_GENERATED__:.*$/m';
 
     public function __construct(
         private TelegramMessageStore $store,
@@ -55,6 +55,7 @@ final readonly class TelegramConversation
         private PlatformDocReferenceResolver $docs,
         private ClockInterface $clock,
         private string $frontendUrl,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -290,7 +291,11 @@ final readonly class TelegramConversation
             $stored = $this->memories->resolveMemoryTags($stored, $owner);
             $stored = $this->references->resolveMessageTags($stored, $owner);
         }
-        $channelReply = trim((string) (preg_replace(self::FILE_MARKER, '', $stored) ?? ''));
+        $channelReply = trim(
+            null !== $this->mediaTextRenderer
+                ? $this->mediaTextRenderer->forUser($stored, $inbound->getLanguage(), $owner->getLocale())
+                : GeneratedMediaTextRenderer::renderModel($stored)
+        );
 
         $recorded = $this->recordUsage($turn, $inbound, $metadata, $channelReply);
         $this->store->applyClassification($inbound, $classification);

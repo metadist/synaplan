@@ -16,6 +16,7 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ExternalReplyReferences;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
@@ -114,6 +115,7 @@ final class WhatsAppService
         private ?ChatActivityNotifier $chatActivityNotifier = null,
         private ?WhatsAppAgentBinding $agentBinding = null,
         private ?AgentConfig $agentConfig = null,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -907,7 +909,14 @@ final class WhatsAppService
         // The stored reply keeps [Doc:slug] so the web chat can render the pill.
         // The phone gets the same text with those tags turned into links.
         $responseText = $this->externalReplyReferences->resolveStored($responseText, $user);
-        $channelText = $this->externalReplyReferences->resolveDocTags($responseText);
+        $userFacing = null !== $this->mediaTextRenderer
+            ? $this->mediaTextRenderer->forUser(
+                $responseText,
+                $message->getLanguage(),
+                $user->getLocale(),
+            )
+            : GeneratedMediaTextRenderer::renderModel($responseText);
+        $channelText = $this->externalReplyReferences->resolveDocTags($userFacing);
         $metadata = $result['response']['metadata'] ?? [];
         $classification = is_array($result['classification'] ?? null) ? $result['classification'] : null;
         $fileData = $metadata['file'] ?? null;

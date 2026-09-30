@@ -16,6 +16,7 @@ use App\Service\InternalEmailService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ExternalReplyReferences;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -56,6 +57,7 @@ class WebhookController extends AbstractController
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatErrorPresenter $chatErrorPresenter,
         private ExternalReplyReferences $externalReplyReferences,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -477,7 +479,14 @@ class WebhookController extends AbstractController
             // Generate TTS if voice_reply is set and no media attachment already exists.
             if (null === $attachmentPath && '1' === $message->getMeta('voice_reply')) {
                 try {
-                    $ttsText = TtsTextSanitizer::sanitize($responseText);
+                    $speakable = null !== $this->mediaTextRenderer
+                        ? $this->mediaTextRenderer->forUser(
+                            $responseText,
+                            $message->getLanguage(),
+                            $user->getLocale(),
+                        )
+                        : GeneratedMediaTextRenderer::renderModel($responseText);
+                    $ttsText = TtsTextSanitizer::sanitize($speakable);
                     if (!empty(trim($ttsText))) {
                         $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
                         $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
@@ -604,7 +613,16 @@ class WebhookController extends AbstractController
                 $this->internalEmailService->sendAiResponseEmail(
                     $fromEmail,
                     $subject,
-                    $this->externalReplyReferences->resolve($responseText, $user),
+                    $this->externalReplyReferences->resolve(
+                        null !== $this->mediaTextRenderer
+                            ? $this->mediaTextRenderer->forUser(
+                                $responseText,
+                                $message->getLanguage(),
+                                $user->getLocale(),
+                            )
+                            : GeneratedMediaTextRenderer::renderModel($responseText),
+                        $user,
+                    ),
                     $messageId,
                     $provider,
                     $model,

@@ -714,6 +714,8 @@
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
     "toolStepHidden": "Un paso en este ordenador ha terminado.",
     "audioGenerated": "Aquí está el audio que solicitaste. Puedes reproducirlo o descargarlo abajo.",
+    "imageGenerated": "Aquí tienes la imagen que pediste.",
+    "videoGenerated": "Aquí tienes el vídeo que pediste.",
     "mediaJob": {
       "title": {
         "video": "Generando tu vídeo…",

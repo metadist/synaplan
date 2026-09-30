@@ -45,6 +45,7 @@ use App\Service\File\UnreadSourceGuard;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\Routing\RoutingDirective;
 use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
@@ -3369,30 +3370,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * @return array|null ['filename' => string, 'content' => string, 'extension' => string] or null
      */
     /**
-     * Replace internal file-generation markers with human-readable text before a
-     * prior assistant turn is sent back to the model as conversation history.
+     * Replace internal generated-media markers with plain prose before a prior
+     * assistant turn is sent back to the model as conversation history.
      *
-     * The stored assistant content for a generated file is the internal marker
-     * "__FILE_GENERATED__:filename". If that raw marker is fed back into the
-     * model context, the model starts imitating it and leaks strings such as
-     * "FILE_GENERATED:report.docx" into its replies. Converting it to plain
-     * prose keeps the context (a file was generated) without the marker syntax.
+     * @see GeneratedMediaTextRenderer::forModel()
      */
     public function humanizeFileMarkersForModel(?string $content): string
     {
-        $content = (string) $content;
-
-        if (str_starts_with($content, '__FILE_GENERATED__:')) {
-            $filename = trim(substr($content, strlen('__FILE_GENERATED__:')));
-
-            return sprintf('(I generated the file "%s" and provided it to the user as a download.)', $filename);
-        }
-
-        if ('__FILE_GENERATION_FAILED__' === $content) {
-            return '(The requested file could not be generated.)';
-        }
-
-        return $content;
+        return GeneratedMediaTextRenderer::renderModel((string) $content);
     }
 
     private function extractFileGenerationData(string $content): ?array

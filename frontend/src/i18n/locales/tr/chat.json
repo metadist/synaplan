@@ -714,6 +714,8 @@
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
     "toolStepHidden": "Bu bilgisayardaki bir adım tamamlandı.",
     "audioGenerated": "İstediğiniz ses burada. Aşağıdan oynatabilir veya indirebilirsiniz.",
+    "imageGenerated": "İstediğiniz görsel burada.",
+    "videoGenerated": "İstediğiniz video burada.",
     "mediaJob": {
       "title": {
         "video": "Videonuz oluşturuluyor…",
