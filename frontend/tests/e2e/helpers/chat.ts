@@ -250,6 +250,28 @@ export class ChatHelper {
     await messagesReady
   }
 
+  /**
+   * `page.goBack()` into the chat, then wait until the cold boot got as far as
+   * openApp() waits for.
+   *
+   * Coming back from a page that was opened with `page.goto()` is a full page
+   * load. The chat list request only starts after the runtime config and the
+   * session check, and on a shared CI runner that chain alone took more than
+   * STANDARD (10s). The composer then needs the list or the access probe that
+   * runs beside it.
+   */
+  async goBack(): Promise<void> {
+    const chatsLoaded = this.page.waitForResponse(
+      (res) =>
+        new URL(res.url()).pathname.endsWith('/api/v1/chats') &&
+        res.request().method() === 'GET' &&
+        res.ok(),
+      { timeout: TIMEOUTS.VERY_LONG }
+    )
+    await this.page.goBack()
+    await chatsLoaded
+  }
+
   async attachFile(file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
     const panel = this.page.locator(selectors.chat.plusPanel)
     if (!(await panel.isVisible())) {
