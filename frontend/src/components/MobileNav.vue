@@ -1090,8 +1090,13 @@ onBeforeUnmount(() => {
     opacity 0.2s ease;
   opacity: 1;
 }
+/* clip, not hidden: a hidden box is a scroll container. scrollIntoView or
+   focus() on a still-clipped item scrolls it up during the expand, then the
+   growing row clamps scrollTop and slides the items back down under the
+   pointer. `hidden` stays as the fallback for engines without `clip`. */
 .more-accordion-inner {
   overflow: hidden;
+  overflow: clip;
   min-height: 0;
 }
 .more-accordion-enter-from,
