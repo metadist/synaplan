@@ -22,6 +22,7 @@
     </ErrorBoundary>
     <NotificationContainer />
     <Dialog />
+    <SmartSearchPalette v-if="authStore.isAuthenticated" />
     <AnnouncementModal />
     <CookieConsent @consent="handleCookieConsent" />
     <BiometricLockScreen />
@@ -39,6 +40,7 @@ import { useConfigStore } from '@/stores/config'
 import { brandName } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
+import SmartSearchPalette from '@/components/search/SmartSearchPalette.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AnnouncementModal from '@/components/AnnouncementModal.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'

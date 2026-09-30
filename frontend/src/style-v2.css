@@ -1081,6 +1081,17 @@
   box-shadow: none !important;
 }
 
+/* Smart Search: the palette panel is the visible field; its input stays bare. */
+.design-v2 input[data-testid='input-smart-search'],
+.design-v2.dark input[data-testid='input-smart-search'],
+.design-v2 input[data-testid='input-smart-search']:focus,
+.design-v2.dark input[data-testid='input-smart-search']:focus {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0;
+}
+
 /* ----------------------------------------------------------
    Accessibility — honor "Reduce Transparency" / "Reduce Motion"
    (Apple HIG requirement for glass / translucent materials).

@@ -1235,6 +1235,22 @@ watch(
   { flush: 'post' }
 )
 
+// Smart Search hands a query to the composer via `?prefill=`. The text is
+// only placed in the input; the user still decides to send it.
+watch(
+  [chatInputRef, () => route.query.prefill],
+  ([input, prefill]) => {
+    if (!input || typeof prefill !== 'string' || prefill === '') {
+      return
+    }
+    input.setInputText(prefill)
+    const nextQuery = { ...route.query }
+    delete nextQuery.prefill
+    void router.replace({ path: route.path, query: nextQuery })
+  },
+  { flush: 'post' }
+)
+
 function initChatShortcuts(): void {
   if (!isNativeApp()) {
     return

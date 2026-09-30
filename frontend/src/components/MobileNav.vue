@@ -36,6 +36,17 @@
         </button>
 
         <button
+          v-if="!isGuestMode"
+          type="button"
+          class="v2-drawer-item"
+          data-testid="btn-mobile-nav-search"
+          @click="handleSearchClick"
+        >
+          <MagnifyingGlassIcon class="w-5 h-5" aria-hidden="true" />
+          <span class="flex-1 text-left">{{ $t('search.palette.openButton') }}</span>
+        </button>
+
+        <button
           class="v2-drawer-item"
           :class="historyActive && 'v2-drawer-item--active'"
           data-testid="btn-mobile-nav-history"
@@ -590,8 +601,10 @@ import {
   UserCircleIcon,
   UserGroupIcon,
   InboxArrowDownIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
+import { useSmartSearchStore } from '../stores/smartSearch'
 import {
   isNativeServerControlAvailable,
   isPurchaseAllowed,
@@ -693,6 +706,12 @@ const accountActive = computed(() =>
 const visibleChats = computed(() => chatsStore.historyChats.filter((c) => !c.widgetSession))
 
 const closeDrawer = () => sidebarStore.closeMobileDrawer()
+
+const smartSearchStore = useSmartSearchStore()
+const handleSearchClick = () => {
+  closeDrawer()
+  smartSearchStore.open()
+}
 
 // Navigation handlers close the drawer FIRST, then navigate: the close
 // transition starts synchronously on tap (main thread still free) and the

@@ -40,6 +40,24 @@
       </button>
     </div>
 
+    <!-- Smart Search -->
+    <div v-if="!isGuestMode" class="flex items-center justify-center pb-2 flex-shrink-0">
+      <button
+        type="button"
+        class="v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5"
+        :title="$t('search.palette.openHint', { shortcut: searchShortcut })"
+        :aria-label="$t('search.palette.openHint', { shortcut: searchShortcut })"
+        aria-keyshortcuts="Control+K Meta+K"
+        data-testid="btn-sidebar-v2-search"
+        @click="smartSearchStore.open()"
+      >
+        <MagnifyingGlassIcon class="w-6 h-6" aria-hidden="true" />
+        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+          {{ $t('search.palette.openButton') }}
+        </span>
+      </button>
+    </div>
+
     <!-- Nav Icons -->
     <nav class="flex-1 flex flex-col items-center gap-1 py-1 overflow-y-auto sidebar-scroll">
       <button
@@ -711,9 +729,12 @@ import {
   UserGroupIcon,
   InboxArrowDownIcon,
   ArrowRightOnRectangleIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
+import { useSmartSearchStore } from '../stores/smartSearch'
+import { paletteShortcutLabel } from '@/composables/search/shortcut'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
@@ -753,6 +774,8 @@ import GuestHintPopover from './guest/GuestHintPopover.vue'
 const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const sidebarStore = useSidebarStore()
+const smartSearchStore = useSmartSearchStore()
+const searchShortcut = paletteShortcutLabel()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 
