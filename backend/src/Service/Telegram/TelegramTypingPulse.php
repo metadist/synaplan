@@ -45,9 +45,12 @@ final class TelegramTypingPulse
             return;
         }
 
+        // Count the attempt before the request. A short outage must not
+        // turn the next token into another send.
+        $this->lastBeatAt = $now;
+
         try {
             ($this->send)();
-            $this->lastBeatAt = $now;
         } catch (TelegramChannelException $e) {
             ($this->onFailure)($e);
             if (in_array($e->errorCode, [

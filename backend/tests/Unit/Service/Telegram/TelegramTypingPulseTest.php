@@ -80,6 +80,9 @@ final class TelegramTypingPulseTest extends TestCase
         );
 
         $pulse->beat();
+        $pulse->beat();
+        $this->assertSame(1, $sent);
+
         $clock->sleep(4);
         $pulse->beat();
 

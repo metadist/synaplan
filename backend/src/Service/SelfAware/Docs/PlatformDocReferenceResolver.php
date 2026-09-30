@@ -14,7 +14,11 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class PlatformDocReferenceResolver
 {
-    private const TAG_PATTERN = '/\[Doc\s*:\s*([a-z0-9-]+(?:\s*,\s*[a-z0-9-]+)*)\.{0,3}\]/i';
+    /**
+     * The tag plus the spaces touching it. Cleanup stays inside this match,
+     * so a removed citation cannot restyle a code block elsewhere.
+     */
+    private const TAG_PATTERN = '/[ \t]*\[Doc\s*:\s*([a-z0-9-]+(?:\s*,\s*[a-z0-9-]+)*)\.{0,3}\][ \t]*/i';
 
     public function __construct(
         private PlatformDocsSyncState $state,
@@ -46,12 +50,28 @@ final readonly class PlatformDocReferenceResolver
                     ]);
                 }
 
-                return [] === $links ? '' : implode(' ', $links);
+                if ([] === $links) {
+                    // Between two words, keep one space. Before punctuation or
+                    // at the edge, the spaces around the tag go away with it.
+                    $betweenWords = 1 === preg_match('/^[ \t]/', $matches[0])
+                        && 1 === preg_match('/[ \t]$/', $matches[0]);
+
+                    return $betweenWords ? ' ' : '';
+                }
+
+                preg_match('/^[ \t]*/', $matches[0], $lead);
+                preg_match('/[ \t]*$/', $matches[0], $trail);
+
+                return $lead[0].implode(' ', $links).$trail[0];
             },
             $text,
         );
 
-        return $stripped ? $this->tidy($resolved) : $resolved;
+        if ($stripped) {
+            $resolved = (string) preg_replace('/\A[ \t]+|[ \t]+\z/', '', $resolved);
+        }
+
+        return $resolved;
     }
 
     /**
@@ -122,18 +142,5 @@ final readonly class PlatformDocReferenceResolver
         $title = trim((string) preg_replace('/\s+/', ' ', str_replace(['[', ']', '(', ')'], ' ', $title)));
 
         return '' !== $title ? $title : $slug;
-    }
-
-    /**
-     * A removed tag must not leave a double space or a space before punctuation.
-     */
-    private function tidy(string $text): string
-    {
-        $text = (string) preg_replace('/[ \t]{2,}/', ' ', $text);
-        $text = (string) preg_replace('/[ \t]+([.,;:!?])/', '$1', $text);
-        $text = (string) preg_replace('/[ \t]+\n/', "\n", $text);
-        $text = (string) preg_replace('/\A[ \t]+|[ \t]+\z/', '', $text);
-
-        return $text;
     }
 }

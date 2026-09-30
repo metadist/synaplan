@@ -33,6 +33,17 @@ final class PlatformDocReferenceResolverTest extends TestCase
         $this->assertSame('Hello world', $this->resolver([])->resolveDocTags('Hello [Doc:missing] world'));
     }
 
+    public function testRemovedTagLeavesSpacingInsideACodeBlockAlone(): void
+    {
+        $text = "```\nkeep  two\n```\nHello [Doc:missing] world";
+
+        $resolved = $this->resolver([])->resolveDocTags($text);
+
+        $this->assertStringContainsString('keep  two', $resolved);
+        $this->assertStringContainsString('Hello world', $resolved);
+        $this->assertStringNotContainsString('[Doc:', $resolved);
+    }
+
     public function testMultiSlugKeepsKnownPagesAndDropsTheRest(): void
     {
         $resolver = $this->resolver([
