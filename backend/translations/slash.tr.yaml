@@ -1,0 +1,2 @@
+needs_argument: 'Komuttan sonra ne oluşturulacağını yazın, örneğin: /%command% %example%'
+docs_not_found: 'Bilgi tabanınızda eşleşen bir dosya bulunamadı.'

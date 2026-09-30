@@ -1,0 +1,2 @@
+needs_argument: 'Write what to create after the command, for example: /%command% %example%'
+docs_not_found: 'No matching file was found in your knowledge base.'

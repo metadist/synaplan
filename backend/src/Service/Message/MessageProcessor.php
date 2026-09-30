@@ -386,7 +386,7 @@ final readonly class MessageProcessor
             }
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options);
+            $userRequestedSearch = $this->userRequestedSearch($options, $classification);
             $messageText = $message->getText();
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
@@ -908,7 +908,7 @@ final readonly class MessageProcessor
             }
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options);
+            $userRequestedSearch = $this->userRequestedSearch($options, $classification);
             $messageText = $message->getText();
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
@@ -1450,17 +1450,21 @@ final readonly class MessageProcessor
 
     /**
      * Resolve the explicit per-message web-search request from the processing
-     * options. The streaming pipeline carries it as `web_search` (the chat
-     * toggle / `/search` command, set by StreamController) while the legacy
-     * non-streaming path uses `force_web_search`; accept either so an explicit
+     * options or classification. The streaming pipeline carries it as
+     * `web_search` (the chat toggle / `/search` command, set by StreamController)
+     * while the legacy non-streaming path uses `force_web_search`; the shared
+     * slash parser also sets `force_web_search` on the classification when a
+     * non-web channel types `/search <text>`. Accept any of these so an explicit
      * user request reliably forces a search.
      *
      * @param array<string, mixed> $options
+     * @param array<string, mixed> $classification
      */
-    private function userRequestedSearch(array $options): bool
+    private function userRequestedSearch(array $options, array $classification = []): bool
     {
         return (bool) ($options['web_search'] ?? false)
-            || (bool) ($options['force_web_search'] ?? false);
+            || (bool) ($options['force_web_search'] ?? false)
+            || (bool) ($classification['force_web_search'] ?? false);
     }
 
     /**

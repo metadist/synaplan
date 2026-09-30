@@ -1,0 +1,2 @@
+needs_argument: 'Schreibe nach dem Befehl, was erstellt werden soll, zum Beispiel: /%command% %example%'
+docs_not_found: 'In deiner Wissensbasis wurde keine passende Datei gefunden.'

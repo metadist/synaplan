@@ -123,12 +123,23 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'cmd_pic', 'text' => '/pic a watercolor cat', 'language' => 'en'],
             ['id' => 'cmd_vid', 'text' => '/vid a drone shot of the alps', 'language' => 'en'],
             ['id' => 'cmd_tts', 'text' => '/tts read this aloud', 'language' => 'en'],
-            ['id' => 'cmd_search', 'text' => '/search latest php release', 'language' => 'en'],
+            // /search strips the command and continues through normal classification
+            // with force_web_search (issue #2280).
+            ['id' => 'cmd_search', 'text' => '/search latest php release', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en']],
             ['id' => 'cmd_lang', 'text' => '/lang de', 'language' => 'en'],
             ['id' => 'cmd_web', 'text' => '/web example.com', 'language' => 'en'],
             ['id' => 'cmd_list', 'text' => '/list', 'language' => 'en'],
+            // /docs strips and routes to rag_query (no tools:filesort).
             ['id' => 'cmd_docs', 'text' => '/docs sort my files', 'language' => 'en'],
             ['id' => 'cmd_help', 'text' => '/help', 'language' => 'en'],
+            // Bare arg-required commands → usage hint, no model (#2280).
+            ['id' => 'cmd_pic_bare', 'text' => '/pic', 'language' => 'en'],
+            ['id' => 'cmd_pic_bare_ws', 'text' => '/pic   ', 'language' => 'en'],
+            ['id' => 'cmd_pic_bare_at', 'text' => '/pic@TestBot', 'language' => 'en'],
+            ['id' => 'cmd_vid_bare', 'text' => '/vid', 'language' => 'en'],
+            ['id' => 'cmd_tts_bare', 'text' => '/tts', 'language' => 'en'],
+            ['id' => 'cmd_search_bare', 'text' => '/search', 'language' => 'en'],
+            ['id' => 'cmd_docs_bare', 'text' => '/docs', 'language' => 'en'],
 
             // ---- Again overrides (fast-path off, like the existing override tests) ----
             ['id' => 'again_prompt_override', 'text' => 'redo that', 'language' => 'en', 'fastPath' => false, 'meta' => ['PROMPTID' => 'tools:pic']],
@@ -334,10 +345,18 @@ final class RoutingCharacterizationTest extends TestCase
      */
     private function buildMessage(array $case): Message
     {
+        $text = $case['text'];
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(1);
         $message->method('getUserId')->willReturn(10);
-        $message->method('getText')->willReturn($case['text']);
+        $message->method('getText')->willReturnCallback(static function () use (&$text): string {
+            return $text;
+        });
+        $message->method('setText')->willReturnCallback(static function (string $value) use (&$text, $message): Message {
+            $text = $value;
+
+            return $message;
+        });
         $message->method('getLanguage')->willReturn($case['language'] ?? 'en');
         $message->method('getDateTime')->willReturn('20260607120000');
         $message->method('getFilePath')->willReturn('');

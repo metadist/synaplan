@@ -72,6 +72,10 @@ class TelegramBot
     #[ORM\Column(name: 'BLASTMESSAGEAT', type: 'bigint', nullable: true)]
     private ?int $lastMessageAt = null;
 
+    /** Version of the Telegram "/" menu last registered for this bot. */
+    #[ORM\Column(name: 'BCOMMANDSMENUVERSION', type: 'integer', options: ['default' => 0])]
+    private int $commandsMenuVersion = 0;
+
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
     private int $created;
 
@@ -238,6 +242,17 @@ class TelegramBot
     public function setLastMessageAt(?int $lastMessageAt): void
     {
         $this->lastMessageAt = $lastMessageAt;
+        $this->touch();
+    }
+
+    public function getCommandsMenuVersion(): int
+    {
+        return $this->commandsMenuVersion;
+    }
+
+    public function setCommandsMenuVersion(int $commandsMenuVersion): void
+    {
+        $this->commandsMenuVersion = $commandsMenuVersion;
         $this->touch();
     }
 
