@@ -189,6 +189,7 @@
             <button
               type="button"
               class="text-sm text-[var(--brand)] hover:underline"
+              :data-testid="`btn-mcp-edit-${server.id}`"
               @click="startEdit(server)"
             >
               {{ $t('common.edit') }}
@@ -294,7 +295,12 @@
     </div>
 
     <!-- Editor -->
-    <div v-if="editorOpen" class="surface-card p-6" data-testid="section-mcp-editor">
+    <div
+      v-if="editorOpen"
+      ref="editorSection"
+      class="surface-card p-6 scroll-mt-4"
+      data-testid="section-mcp-editor"
+    >
       <h3 class="text-lg font-semibold txt-primary mb-1">
         {{ editingId ? $t('mcpServers.editTitle') : $t('mcpServers.addTitle') }}
       </h3>
@@ -402,7 +408,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -454,6 +460,7 @@ const showNotUsedWarning = computed(
 )
 
 const editorOpen = ref(false)
+const editorSection = ref<HTMLElement | null>(null)
 const editingId = ref<number | null>(null)
 const editingHasToken = ref(false)
 const form = reactive({
@@ -596,7 +603,7 @@ const startCreate = () => {
   editingId.value = null
   editingHasToken.value = false
   resetForm()
-  editorOpen.value = true
+  void revealEditor()
 }
 
 const startCreateFromTemplate = (key: string) => {
@@ -617,7 +624,15 @@ const startEdit = (server: McpServer) => {
     allowWrite: server.allow_write ?? false,
     authMode: (server.auth_mode as McpAuthMode | undefined) ?? 'bearer',
   })
+  void revealEditor()
+}
+
+/** The form sits below the server list and the task switches, so opening it
+ *  without scrolling leaves it off-screen. */
+const revealEditor = async () => {
   editorOpen.value = true
+  await nextTick()
+  editorSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 const closeEditor = () => {

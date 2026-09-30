@@ -137,6 +137,22 @@ describe('McpServersConfiguration — task usage panel', () => {
     expect((toggle.element as HTMLInputElement).checked).toBe(true)
   })
 
+  it('scrolls the edit form into view when Edit is pressed', async () => {
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {})
+
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="btn-mcp-edit-3"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="section-mcp-editor"]').exists()).toBe(true)
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    scrollIntoView.mockRestore()
+  })
+
   it('hides the whole panel when no servers are connected', async () => {
     mockList.mockResolvedValue({
       clientEnabled: true,
