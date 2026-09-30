@@ -514,7 +514,9 @@ export interface UseMarkdownReturn {
  * const htmlWithMath = await renderAsync('$E = mc^2$', { katex: true })
  * ```
  */
-export function useMarkdown(translate: MarkerTranslator = appMarkerTranslator()): UseMarkdownReturn {
+export function useMarkdown(
+  translate: MarkerTranslator = appMarkerTranslator()
+): UseMarkdownReturn {
   configureMarked()
 
   function render(markdown: string, options: MarkdownOptions = {}): string {
