@@ -16,6 +16,8 @@ let recorderOptions: {
 } = {}
 const abortRecognition = vi.fn()
 const stopRecording = vi.fn()
+let holdStart = false
+let releaseStart: (() => void) | null = null
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {}, fullPath: '/chat' }),
@@ -71,9 +73,20 @@ vi.mock('@/services/audioRecorder', () => ({
     constructor(options: typeof recorderOptions) {
       recorderOptions = options
       this.stopRecording = stopRecording
-      this.startRecording = vi.fn(async () => {
-        recorderOptions.onStart?.()
-      })
+      this.startRecording = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            const begin = () => {
+              recorderOptions.onStart?.()
+              resolve()
+            }
+            if (!holdStart) {
+              begin()
+              return
+            }
+            releaseStart = begin
+          })
+      )
     }
   },
 }))
@@ -117,6 +130,8 @@ describe('ChatInput dictation unmount', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     browserSpeech = false
+    holdStart = false
+    releaseStart = null
     speechOptions = {}
     recorderOptions = {}
     abortRecognition.mockClear()
@@ -147,6 +162,25 @@ describe('ChatInput dictation unmount', () => {
 
     expect(stopRecording).toHaveBeenCalledTimes(1)
     await recorderOptions.onDataAvailable?.(new Blob(['audio']))
+    expect(chatApi.transcribeAudio).not.toHaveBeenCalled()
+  })
+
+  it('stops the microphone when recording starts after the composer unmounts', async () => {
+    holdStart = true
+    const wrapper = mountInput()
+    const pending = dictationOf(wrapper).startDictation()
+    await vi.waitFor(() => {
+      expect(releaseStart).toBeTypeOf('function')
+    })
+
+    wrapper.unmount()
+    const stopsAtUnmount = stopRecording.mock.calls.length
+    expect(stopsAtUnmount).toBeGreaterThan(0)
+
+    releaseStart?.()
+    await pending
+
+    expect(stopRecording.mock.calls.length).toBeGreaterThan(stopsAtUnmount)
     expect(chatApi.transcribeAudio).not.toHaveBeenCalled()
   })
 })

@@ -1964,7 +1964,12 @@ const startWebSpeechRecording = async () => {
       },
     })
 
-    await webSpeechService.value.start()
+    const service = webSpeechService.value
+    await service.start()
+    if (dictationUnmounted) {
+      service.abort()
+      webSpeechService.value = null
+    }
   } catch (err: unknown) {
     console.error('Failed to start Web Speech:', err)
     const errMessage = err instanceof Error ? err.message : 'Unknown error'
@@ -1979,7 +1984,7 @@ const startWebSpeechRecording = async () => {
  */
 const startWhisperRecording = async () => {
   try {
-    audioRecorder.value = new AudioRecorder({
+    const recorder = new AudioRecorder({
       onStart: () => {
         if (dictationUnmounted) return
         isRecording.value = true
@@ -2001,9 +2006,16 @@ const startWhisperRecording = async () => {
         isRecording.value = false
       },
     })
+    audioRecorder.value = recorder
 
-    // Check support first (with detailed diagnostics)
-    const support = await audioRecorder.value.checkSupport()
+    // Check support first (with detailed diagnostics). Unmount can happen
+    // while permission is pending; stop again after each await so a stream
+    // created when getUserMedia later resolves is not left open.
+    const support = await recorder.checkSupport()
+    if (dictationUnmounted) {
+      recorder.stopRecording()
+      return
+    }
     if (!support.supported || !support.hasDevices) {
       if (support.error) {
         showError(t(support.error.messageKey))
@@ -2011,8 +2023,10 @@ const startWhisperRecording = async () => {
       return
     }
 
-    // Start recording
-    await audioRecorder.value.startRecording()
+    await recorder.startRecording()
+    if (dictationUnmounted) {
+      recorder.stopRecording()
+    }
   } catch (err: unknown) {
     console.error('❌ Failed to start recording:', err)
     const error = err as { messageKey?: string; message?: string }
