@@ -240,18 +240,12 @@ export class WebSpeechService {
         }
       }
 
-      // Android Chrome (some versions) reports cumulative segments: each
-      // results[i].transcript contains ALL text from results[0..i], not just
-      // the new segment. Real Android sessions also mix patterns within a
-      // single recognition (e.g. ["hi", "hi wie wird", "neue session"]) where
-      // an all-or-nothing detection still leaks duplicates. Walk the list
-      // once and only keep the *new tail* whenever a segment is a strict
-      // prefix-extension of the previous one — this collapses cumulative
-      // bursts while preserving genuinely independent segments. The same
-      // walk applies to in-progress entries, which some engines report as
-      // several pieces of the current phrase rather than one trailing interim.
+      // Finals collapse Android's cumulative re-emits. In-progress pieces are
+      // joined separately: a later fragment may extend the phrase so far, but
+      // a repeated word in its own slot is kept, and a fragment that already
+      // includes the finalized words does not repeat them.
       const finalText = this.dedupeProgressiveSegments(finals)
-      const interimText = this.dedupeProgressiveSegments(interims)
+      const interimText = this.joinInterimSegments(interims, finalText)
 
       this.options.onResult?.({
         final: finalText.replace(/\s+/g, ' ').trim(),
@@ -328,8 +322,7 @@ export class WebSpeechService {
   }
 
   /**
-   * Walk a list of transcripts (finalized phrases, or the in-progress pieces
-   * of the current phrase) and emit a deduplicated, joined string that
+   * Walk a list of finalized transcripts and emit a deduplicated, joined string that
    * handles three intermixed patterns Android Chrome has been observed to
    * produce in a single recognition session:
    *
@@ -369,6 +362,42 @@ export class WebSpeechService {
 
       parts.push(curr)
       previousCumulative = curr
+    }
+
+    return parts.join(' ')
+  }
+
+  /**
+   * Join the in-progress slots of the current phrase.
+   *
+   * Independent slots are kept, including a repeated word (`no`, `no`).
+   * A slot that continues the phrase assembled so far replaces that phrase
+   * (`good`, `morning`, `good morning everyone`). Whitespace is collapsed
+   * before the comparison so uneven spacing does not look like a new phrase.
+   * A slot that already starts with the finalized text contributes only the
+   * new tail; an exact repeat of the finalized words is left in place.
+   */
+  private joinInterimSegments(interims: string[], finalText: string): string {
+    const finalNorm = finalText.replace(/\s+/g, ' ').trim()
+    const parts: string[] = []
+
+    for (const raw of interims) {
+      let curr = raw.replace(/\s+/g, ' ').trim()
+      if ('' === curr) continue
+
+      if ('' !== finalNorm && curr.startsWith(finalNorm + ' ')) {
+        curr = curr.slice(finalNorm.length + 1).trim()
+        if ('' === curr) continue
+      }
+
+      const assembled = parts.join(' ')
+      if ('' !== assembled && curr.startsWith(assembled + ' ')) {
+        parts.length = 0
+        parts.push(curr)
+        continue
+      }
+
+      parts.push(curr)
     }
 
     return parts.join(' ')

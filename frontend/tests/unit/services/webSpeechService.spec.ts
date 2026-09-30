@@ -307,6 +307,60 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: 'hello world', interim: 'how are you' }])
   })
 
+  it('does not repeat finalized words that a later interim already includes', async () => {
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(1, [
+      { transcript: 'hello', isFinal: true },
+      { transcript: 'hello world', isFinal: false },
+      { transcript: 'again', isFinal: false },
+    ])
+
+    expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: 'hello', interim: 'world again' }])
+  })
+
+  it('keeps a repeated word that occupies its own interim slot', async () => {
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(0, [
+      { transcript: 'no', isFinal: false },
+      { transcript: 'no', isFinal: false },
+    ])
+
+    expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: '', interim: 'no no' }])
+  })
+
+  it('replaces earlier interim pieces when a later slot contains the whole phrase', async () => {
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(0, [
+      { transcript: 'good', isFinal: false },
+      { transcript: 'morning', isFinal: false },
+      { transcript: 'good morning everyone', isFinal: false },
+    ])
+
+    expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: '', interim: 'good morning everyone' }])
+  })
+
+  it('treats uneven interim spacing as the same phrase', async () => {
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(0, [
+      { transcript: 'good  morning', isFinal: false },
+      { transcript: 'good morning everyone', isFinal: false },
+    ])
+
+    expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: '', interim: 'good morning everyone' }])
+  })
+
   it('collapses repeated whitespace inside the joined final string', async () => {
     const calls: WebSpeechSnapshot[] = []
     const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
