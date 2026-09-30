@@ -21,15 +21,15 @@ use Symfony\Component\Security\Core\User\UserInterface;
  */
 final readonly class AdminPreview
 {
-    public const TELEGRAM = 'telegram';
-
     /** @var list<string> */
-    public const FEATURES = [
-        self::TELEGRAM,
-    ];
+    public const FEATURES = [];
 
+    /**
+     * @param list<string> $features tests pass their own ids; production uses {@see FEATURES}
+     */
     public function __construct(
         private UserRepository $users,
+        private array $features = self::FEATURES,
     ) {
     }
 
@@ -55,7 +55,7 @@ final readonly class AdminPreview
 
     private function assertKnown(string $feature): void
     {
-        if (!\in_array($feature, self::FEATURES, true)) {
+        if (!\in_array($feature, $this->features, true)) {
             throw new \LogicException(sprintf('Unknown admin-preview feature "%s". Add it to %s::FEATURES or remove the call site.', $feature, self::class));
         }
     }

@@ -10,24 +10,21 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * The Telegram channel is an admin preview: a signed-in non-admin gets the
- * same 404 as a missing route, and an admin can read their (empty) bot.
+ * Every signed-in user can reach their own Telegram bot; anonymous callers
+ * still need to sign in.
  */
-final class TelegramChannelAdminPreviewTest extends WebTestCase
+final class TelegramChannelAccessTest extends WebTestCase
 {
-    public function testChannelIsHiddenFromARegularUserAndOpenForAnAdmin(): void
+    public function testChannelIsOpenForARegularUser(): void
     {
         self::ensureKernelShutdown();
         $client = static::createClient();
         $em = $client->getContainer()->get('doctrine')->getManager();
 
-        $member = $this->user('preview-member', 'NEW');
-        $admin = $this->user('preview-admin', 'ADMIN');
+        $member = $this->user('telegram-member', 'NEW');
         $em->persist($member);
-        $em->persist($admin);
         $em->flush();
         $memberId = (int) $member->getId();
-        $adminId = (int) $admin->getId();
 
         try {
             $client->request('GET', '/api/v1/channels/telegram');
@@ -35,19 +32,12 @@ final class TelegramChannelAdminPreviewTest extends WebTestCase
 
             $this->login($client, (string) $member->getMail());
             $client->request('GET', '/api/v1/channels/telegram');
-            $this->assertResponseStatusCodeSame(404);
-            $body = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
-            $this->assertSame(['error' => 'not_found'], $body);
-
-            $this->login($client, (string) $admin->getMail());
-            $client->request('GET', '/api/v1/channels/telegram');
             $this->assertResponseIsSuccessful();
             $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
             $this->assertTrue($payload['success'] ?? false);
             $this->assertSame('none', $payload['status'] ?? null);
         } finally {
             $this->removeUser($memberId);
-            $this->removeUser($adminId);
         }
     }
 
@@ -55,7 +45,7 @@ final class TelegramChannelAdminPreviewTest extends WebTestCase
     {
         $user = new User();
         $user->setMail($name.'-'.bin2hex(random_bytes(4)).'@example.com');
-        $user->setPw(password_hash('PreviewPass123!', \PASSWORD_BCRYPT));
+        $user->setPw(password_hash('AccessPass123!', \PASSWORD_BCRYPT));
         $user->setUserLevel($level);
         $user->setProviderId('local');
         $user->setCreated(date('YmdHis'));
@@ -75,7 +65,7 @@ final class TelegramChannelAdminPreviewTest extends WebTestCase
             ['CONTENT_TYPE' => 'application/json'],
             json_encode([
                 'email' => $email,
-                'password' => 'PreviewPass123!',
+                'password' => 'AccessPass123!',
             ], \JSON_THROW_ON_ERROR),
         );
         $this->assertResponseIsSuccessful();

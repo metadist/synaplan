@@ -1,16 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AdminPreview from '@/components/common/AdminPreview.vue'
+import type { AdminPreviewFeature } from '@/composables/useAdminPreview'
 
 let admin = false
 
-vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({
-    get isAdmin() {
-      return admin
-    },
-  }),
+vi.mock('@/composables/useAdminPreview', () => ({
+  isAdminPreview: () => admin,
 }))
+
+const TEST_FEATURE = 'test-preview' as AdminPreviewFeature
 
 describe('AdminPreview', () => {
   beforeEach(() => {
@@ -19,8 +18,8 @@ describe('AdminPreview', () => {
 
   it('renders nothing for a regular user', () => {
     const wrapper = mount(AdminPreview, {
-      props: { feature: 'telegram' },
-      slots: { default: '<p data-testid="preview-body">Connect Telegram</p>' },
+      props: { feature: TEST_FEATURE },
+      slots: { default: '<p data-testid="preview-body">Preview body</p>' },
     })
 
     expect(wrapper.text()).toBe('')
@@ -30,18 +29,18 @@ describe('AdminPreview', () => {
   it('renders the slot for an admin', () => {
     admin = true
     const wrapper = mount(AdminPreview, {
-      props: { feature: 'telegram' },
-      slots: { default: '<p>Connect Telegram</p>' },
+      props: { feature: TEST_FEATURE },
+      slots: { default: '<p>Preview body</p>' },
     })
 
-    expect(wrapper.text()).toContain('Connect Telegram')
+    expect(wrapper.text()).toContain('Preview body')
     expect(wrapper.find('[data-testid="badge-admin-preview"]').exists()).toBe(false)
   })
 
   it('shows a static badge that says other people cannot see this yet', () => {
     admin = true
     const wrapper = mount(AdminPreview, {
-      props: { feature: 'telegram', badge: true },
+      props: { feature: TEST_FEATURE, badge: true },
     })
 
     const badge = wrapper.get('[data-testid="badge-admin-preview"]')

@@ -3,7 +3,6 @@
     <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
       <Icon icon="mdi:telegram" class="w-5 h-5 text-[var(--channel-telegram)]" />
       {{ t('channels.telegram.title') }}
-      <AdminPreview feature="telegram" badge />
     </h3>
 
     <TelegramPairingPanel
@@ -95,7 +94,6 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import AdminPreview from '@/components/common/AdminPreview.vue'
 import TelegramChannelFacts from '@/components/config/TelegramChannelFacts.vue'
 import TelegramConnectForm from '@/components/config/TelegramConnectForm.vue'
 import TelegramPairingPanel from '@/components/config/TelegramPairingPanel.vue'

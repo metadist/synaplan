@@ -11,11 +11,13 @@ use PHPUnit\Framework\TestCase;
 
 final class AdminPreviewTest extends TestCase
 {
+    private const FEATURE = 'test-preview';
+
     public function testAnAdminIsAllowed(): void
     {
         $preview = $this->preview(null);
 
-        $this->assertTrue($preview->allows(AdminPreview::TELEGRAM, $this->user('ADMIN')));
+        $this->assertTrue($preview->allows(self::FEATURE, $this->user('ADMIN')));
     }
 
     public function testAnOidcAdminIsAllowedWithoutTheInternalAdminLevel(): void
@@ -23,15 +25,15 @@ final class AdminPreviewTest extends TestCase
         $user = $this->user('NEW');
         $user->setUserDetails(['oidc_roles' => ['admin']]);
 
-        $this->assertTrue($this->preview(null)->allows(AdminPreview::TELEGRAM, $user));
+        $this->assertTrue($this->preview(null)->allows(self::FEATURE, $user));
     }
 
     public function testARegularUserAndAnAnonymousCallerAreRefused(): void
     {
         $preview = $this->preview(null);
 
-        $this->assertFalse($preview->allows(AdminPreview::TELEGRAM, $this->user('NEW')));
-        $this->assertFalse($preview->allows(AdminPreview::TELEGRAM, null));
+        $this->assertFalse($preview->allows(self::FEATURE, $this->user('NEW')));
+        $this->assertFalse($preview->allows(self::FEATURE, null));
     }
 
     public function testAllowsUserIdLoadsTheOwner(): void
@@ -44,11 +46,11 @@ final class AdminPreviewTest extends TestCase
             8 => $member,
             default => null,
         });
-        $preview = new AdminPreview($users);
+        $preview = new AdminPreview($users, [self::FEATURE]);
 
-        $this->assertTrue($preview->allowsUserId(AdminPreview::TELEGRAM, 7));
-        $this->assertFalse($preview->allowsUserId(AdminPreview::TELEGRAM, 8));
-        $this->assertFalse($preview->allowsUserId(AdminPreview::TELEGRAM, 9));
+        $this->assertTrue($preview->allowsUserId(self::FEATURE, 7));
+        $this->assertFalse($preview->allowsUserId(self::FEATURE, 8));
+        $this->assertFalse($preview->allowsUserId(self::FEATURE, 9));
     }
 
     public function testAnUnknownFeatureFailsLoudly(): void
@@ -64,7 +66,7 @@ final class AdminPreviewTest extends TestCase
         $users = $this->createStub(UserRepository::class);
         $users->method('find')->willReturn($loaded);
 
-        return new AdminPreview($users);
+        return new AdminPreview($users, [self::FEATURE]);
     }
 
     private function user(string $level): User

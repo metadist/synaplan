@@ -162,7 +162,6 @@ import PhoneVerification from '@/components/config/PhoneVerification.vue'
 import TelegramChannelCard from '@/components/config/TelegramChannelCard.vue'
 import FeatureNotConfiguredNotice from '@/components/common/FeatureNotConfiguredNotice.vue'
 import { isModuleConfigured } from '@/composables/useModuleFeature'
-import { isAdminPreview } from '@/composables/useAdminPreview'
 import {
   featureNotConfigured,
   type FeatureNotConfigured,
@@ -206,9 +205,7 @@ const whatsappGate = ref<FeatureNotConfigured | null>(null)
 const whatsappAvailable = computed(
   () => isModuleConfigured('whatsapp') && whatsappGate.value === null
 )
-const telegramAvailable = computed(
-  () => isModuleConfigured('telegram') && isAdminPreview('telegram')
-)
+const telegramAvailable = computed(() => isModuleConfigured('telegram'))
 const whatsappAgentId = ref<number | null>(null)
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed<EmailChannel[]>(() => {

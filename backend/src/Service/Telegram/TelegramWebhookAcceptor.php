@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Service\Telegram;
 
 use App\Repository\TelegramBotRepository;
-use App\Service\Feature\AdminPreview;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -25,7 +24,6 @@ final readonly class TelegramWebhookAcceptor
         private CacheItemPoolInterface $cache,
         private LockFactory $lockFactory,
         private LoggerInterface $logger,
-        private AdminPreview $preview,
     ) {
     }
 
@@ -40,15 +38,6 @@ final readonly class TelegramWebhookAcceptor
         }
         if (!$this->secretMatches($bot->getSecretHash(), $secretHeader)) {
             $this->logger->info('Telegram webhook secret rejected', ['bot_id' => $bot->getId()]);
-
-            return TelegramWebhookDecision::drop();
-        }
-        // Checked before the update id is reserved, so a later delivery is not
-        // treated as a duplicate once the owner is allowed again.
-        if (!$this->preview->allowsUserId(AdminPreview::TELEGRAM, $bot->getOwnerId())) {
-            $this->logger->info('Telegram webhook dropped because the bot owner is not an admin', [
-                'bot_id' => $bot->getId(),
-            ]);
 
             return TelegramWebhookDecision::drop();
         }
