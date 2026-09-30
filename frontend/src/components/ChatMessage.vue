@@ -415,8 +415,10 @@
             <!-- Header with Expand/Collapse Button -->
             <div class="flex items-center justify-between gap-2">
               <button
+                type="button"
                 class="flex items-center gap-2 text-sm font-medium txt-tertiary hover:txt-primary transition-colors"
                 data-testid="btn-message-sources-toggle"
+                :aria-expanded="sourcesExpanded"
                 @click="sourcesExpanded = !sourcesExpanded"
               >
                 <Icon icon="mdi:web" class="w-4 h-4" />
@@ -467,7 +469,7 @@
             </div>
 
             <!-- Carousel Container (collapsible) -->
-            <div v-show="sourcesExpanded" class="py-2 px-3">
+            <div v-show="sourcesExpanded" class="py-2 px-3" data-testid="message-sources-list">
               <div
                 class="relative overflow-x-auto sm:overflow-x-hidden scroll-thin snap-x snap-mandatory sm:snap-none"
               >
@@ -1267,11 +1269,11 @@ const copyMessageText = async () => {
 const showAllBadges = ref(false)
 
 // Sources expand/collapse state.
-// Default OPEN: when the assistant ran a web search, the sources are part of
-// the answer's citation context, so they should be visible without an extra
-// click. Users can still collapse the section via the chevron toggle if they
-// want a denser thread view.
-const sourcesExpanded = ref(true)
+// Default FOLDED: a web search drops its result cards under the answer. The
+// standard view keeps that section closed so the thread stays readable. The
+// Sources control unfolds and folds it again. A citation click still opens
+// the matching card.
+const sourcesExpanded = ref(false)
 
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)
