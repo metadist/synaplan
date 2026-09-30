@@ -86,6 +86,12 @@
     "showAll": "Mostrar Todo",
     "recent": "Conversaciones Recientes",
     "ttsGenerating": "Añadiendo respuesta hablada…",
+    "voiceReplyFailed": {
+      "provider_error": "No se pudo crear la versión hablada. Tu respuesta de texto está completa.",
+      "empty_text": "No se pudo crear la versión hablada. Tu respuesta de texto está completa.",
+      "rate_limited": "No se pudo crear la versión hablada porque se agotó tu límite de audio. Tu respuesta de texto está completa."
+    },
+    "readAloudStopped": "La lectura en voz alta se detuvo antes de terminar.",
     "audioUnavailable": "El audio no se pudo cargar",
     "audioUnavailableDescription": "El archivo no está disponible en el servidor por el momento. Inténtalo de nuevo más tarde o descárgalo.",
     "imageUnavailable": "No se pudo cargar la imagen",

@@ -161,6 +161,12 @@ class StreamController extends AbstractController
      */
     private bool $abortLogged = false;
 
+    /**
+     * When true, {@see sendSSE()} skips ob_flush/flush so unit tests can capture
+     * the echoed frames with output buffering (#2282).
+     */
+    private bool $sseCaptureMode = false;
+
     private function suppressUnparseableOfficemakerEnvelope(
         string $text,
         ?string $topic,
@@ -2302,8 +2308,9 @@ class StreamController extends AbstractController
                 // === Voice Reply: TTS Generation (Phase 3) ===
                 // Generate MP3 audio BEFORE sending complete event
                 // (frontend closes EventSource on 'complete', so audio must arrive first)
-                if ($voiceReply && !empty($responseText)) {
-                    // GUARD 1: Skip voice reply for media generation (image/video/audio)
+                if ($voiceReply) {
+                    // Skip voice reply for media generation (image/video/audio).
+                    // Intentional and silent — the generated file is the answer (#2282).
                     $handlerIntent = $classification['intent'] ?? $classification['topic'] ?? 'chat';
                     if (in_array($handlerIntent, ['image_generation', 'video_generation', 'audio_generation', 'mediamaker'], true)) {
                         $this->logger->info('StreamController: Skipping voice reply for media generation', [
@@ -2311,124 +2318,20 @@ class StreamController extends AbstractController
                         ]);
                         $voiceReply = false;
                     }
-
-                    if ($voiceReply) {
-                        $limitCheck = $this->rateLimitService->checkLimit($user, 'AUDIOS');
-                        if (!$limitCheck['allowed']) {
-                            $this->logger->warning('StreamController: Voice reply skipped - rate limit exceeded', [
-                                'user_id' => $user->getId(),
-                            ]);
-                            $voiceReply = false;
-                        }
-                    }
                 }
 
-                if ($voiceReply && !empty($responseText)) {
-                    try {
-                        $language = $classification['language'] ?? 'en';
-
-                        $this->sendSSE('tts_generating', ['language' => $language]);
-
-                        $ttsText = TtsTextSanitizer::prepareForSynthesis($responseText);
-
-                        if (!empty(trim($ttsText))) {
-                            $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
-                                'format' => 'mp3',
-                                'language' => $language,
-                            ]);
-
-                            $audioUrl = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
-
-                            $outgoingMessage->setFile(1);
-                            $outgoingMessage->setFilePath($audioUrl);
-                            $outgoingMessage->setFileType('audio');
-
-                            // Persist the TTS provider/model on the
-                            // outgoing message so the history endpoint
-                            // (and any later page reload) surfaces the
-                            // *audio* model — not the chat LLM — under
-                            // the "Audio Model" badge. Fixes #583 and
-                            // its post-refresh sibling reports.
-                            $ttsProvider = $ttsResult['provider'] ?? null;
-                            $ttsModelName = $ttsResult['model'] ?? null;
-                            $ttsModelId = $ttsResult['model_id'] ?? null;
-                            if (null !== $ttsProvider) {
-                                $outgoingMessage->setMeta('ai_audio_provider', (string) $ttsProvider);
-                            }
-                            if (null !== $ttsModelName) {
-                                $outgoingMessage->setMeta('ai_audio_model', (string) $ttsModelName);
-                            }
-                            if (null !== $ttsModelId && '' !== (string) $ttsModelId) {
-                                $outgoingMessage->setMeta('ai_audio_model_id', (string) $ttsModelId);
-                            }
-                            $ttsEphemeralFile = null;
-                            if (!$incognito) {
-                                $this->em->flush();
-                            } else {
-                                // Incognito: register the TTS audio as an
-                                // EPHEMERAL File row so the session-end cleanup
-                                // and the reaper can delete it — synthesize()
-                                // wrote it to disk without any DB row.
-                                $ttsEphemeralFile = $this->generatedFileRegistrar->register(
-                                    $user->getId(),
-                                    $ttsResult['relativePath'],
-                                    'audio',
-                                    null,
-                                    $ttsProvider,
-                                    ephemeral: true,
-                                );
-                            }
-
-                            // Refresh the `aiModels` payload that was
-                            // pre-built before TTS ran, so the live SSE
-                            // `complete` event already carries the
-                            // audio badge — no page reload required.
-                            $completeData['aiModels'] = $this->buildAiModelsPayload($outgoingMessage);
-
-                            $audioEvent = [
-                                'url' => $audioUrl,
-                                'provider' => $ttsProvider,
-                                'model' => $ttsModelName,
-                                'model_id' => $this->normalizeModelId($ttsModelId, 'sse_audio_event'),
-                            ];
-                            // Incognito: ship the ephemeral file id so the
-                            // frontend can delete the audio on session end.
-                            if (null !== $ttsEphemeralFile?->getId()) {
-                                $audioEvent['file_id'] = $ttsEphemeralFile->getId();
-                            }
-                            $this->sendSSE('audio', $audioEvent);
-
-                            $recordedTtsUsage = $this->rateLimitService->recordUsage($user, 'AUDIOS', [
-                                'provider' => $ttsProvider ?? 'unknown',
-                                'model' => $ttsModelName ?? 'unknown',
-                                'model_id' => $ttsModelId,
-                                'media_usage' => [
-                                    'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
-                                ],
-                            ]);
-
-                            // Usage taximeter: list the TTS model for this turn.
-                            $usageExtra[] = $this->buildExtraUsageEntry(
-                                'TTS',
-                                null !== $ttsProvider ? (string) $ttsProvider : null,
-                                null !== $ttsModelName ? (string) $ttsModelName : null,
-                                $recordedTtsUsage,
-                            );
-                            $completeData['usage_extra'] = $usageExtra;
-                            $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
-                            $this->em->flush();
-
-                            $this->logger->info('StreamController: Voice reply generated', [
-                                'url' => $audioUrl,
-                                'provider' => $ttsProvider ?? 'unknown',
-                                'model' => $ttsModelName ?? 'unknown',
-                            ]);
-                        }
-                    } catch (\Throwable $e) {
-                        $this->logger->warning('StreamController: Voice reply TTS failed', [
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
+                // An empty or "0" answer still goes through processVoiceReply so the
+                // sanitizer can emit empty_text. Skipping on !empty() left that case silent.
+                if ($voiceReply) {
+                    $this->processVoiceReply(
+                        $outgoingMessage,
+                        $user,
+                        $responseText,
+                        $classification['language'] ?? 'en',
+                        $incognito,
+                        $completeData,
+                        $usageExtra,
+                    );
                 }
 
                 // Widget Mode: Increment session message count
@@ -3418,6 +3321,165 @@ class StreamController extends AbstractController
     }
 
     /**
+     * Synthesize a voice-reply MP3 for the outgoing message, or emit a terminal
+     * `voice_reply_failed` SSE event when no audio can be stored (#2282).
+     *
+     * Caller is responsible for the intentional silent skip on media-generation
+     * turns. Rate-limit, empty speakable text, and provider errors all surface
+     * a reason code on the OUT message meta so a reload shows the same state.
+     *
+     * @param array<string, mixed>       $completeData
+     * @param list<array<string, mixed>> $usageExtra
+     */
+    private function processVoiceReply(
+        Message $outgoingMessage,
+        User $user,
+        string $responseText,
+        string $language,
+        bool $incognito,
+        array &$completeData,
+        array &$usageExtra,
+    ): void {
+        $limitCheck = $this->rateLimitService->checkLimit($user, 'AUDIOS');
+        if (!$limitCheck['allowed']) {
+            $this->logger->warning('StreamController: Voice reply skipped - rate limit exceeded', [
+                'user_id' => $user->getId(),
+            ]);
+            $this->emitVoiceReplyFailed($outgoingMessage, 'rate_limited', $incognito);
+
+            return;
+        }
+
+        try {
+            $this->sendSSE('tts_generating', ['language' => $language]);
+
+            $ttsText = TtsTextSanitizer::prepareForSynthesis($responseText);
+
+            if ('' === trim($ttsText)) {
+                $this->emitVoiceReplyFailed($outgoingMessage, 'empty_text', $incognito);
+
+                return;
+            }
+
+            $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
+                'format' => 'mp3',
+                'language' => $language,
+            ]);
+
+            $audioUrl = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
+
+            $outgoingMessage->setFile(1);
+            $outgoingMessage->setFilePath($audioUrl);
+            $outgoingMessage->setFileType('audio');
+
+            // Persist the TTS provider/model on the outgoing message so the
+            // history endpoint (and any later page reload) surfaces the *audio*
+            // model — not the chat LLM — under the "Audio Model" badge.
+            // Fixes #583 and its post-refresh sibling reports.
+            $ttsProvider = $ttsResult['provider'] ?? null;
+            $ttsModelName = $ttsResult['model'] ?? null;
+            $ttsModelId = $ttsResult['model_id'] ?? null;
+            if (null !== $ttsProvider) {
+                $outgoingMessage->setMeta('ai_audio_provider', (string) $ttsProvider);
+            }
+            if (null !== $ttsModelName) {
+                $outgoingMessage->setMeta('ai_audio_model', (string) $ttsModelName);
+            }
+            if (null !== $ttsModelId && '' !== (string) $ttsModelId) {
+                $outgoingMessage->setMeta('ai_audio_model_id', (string) $ttsModelId);
+            }
+            $ttsEphemeralFile = null;
+            if (!$incognito) {
+                $this->em->flush();
+            } else {
+                // Incognito: register the TTS audio as an EPHEMERAL File row so
+                // the session-end cleanup and the reaper can delete it —
+                // synthesize() wrote it to disk without any DB row.
+                $ttsEphemeralFile = $this->generatedFileRegistrar->register(
+                    $user->getId(),
+                    $ttsResult['relativePath'],
+                    'audio',
+                    null,
+                    $ttsProvider,
+                    ephemeral: true,
+                );
+            }
+
+            // Refresh the `aiModels` payload that was pre-built before TTS ran,
+            // so the live SSE `complete` event already carries the audio badge.
+            $completeData['aiModels'] = $this->buildAiModelsPayload($outgoingMessage);
+
+            $audioEvent = [
+                'url' => $audioUrl,
+                'provider' => $ttsProvider,
+                'model' => $ttsModelName,
+                'model_id' => $this->normalizeModelId($ttsModelId, 'sse_audio_event'),
+            ];
+            if (null !== $ttsEphemeralFile?->getId()) {
+                $audioEvent['file_id'] = $ttsEphemeralFile->getId();
+            }
+            $this->sendSSE('audio', $audioEvent);
+        } catch (\Throwable $e) {
+            $this->logger->warning('StreamController: Voice reply TTS failed', [
+                'error' => $e->getMessage(),
+            ]);
+            $this->emitVoiceReplyFailed($outgoingMessage, 'provider_error', $incognito);
+
+            return;
+        }
+
+        // Audio is already stored and sent. A usage-accounting failure must not
+        // also report voice_reply_failed, or the client shows a player and a
+        // failure sentence for the same turn.
+        try {
+            $recordedTtsUsage = $this->rateLimitService->recordUsage($user, 'AUDIOS', [
+                'provider' => $ttsProvider ?? 'unknown',
+                'model' => $ttsModelName ?? 'unknown',
+                'model_id' => $ttsModelId,
+                'media_usage' => [
+                    'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
+                ],
+            ]);
+
+            $usageExtra[] = $this->buildExtraUsageEntry(
+                'TTS',
+                null !== $ttsProvider ? (string) $ttsProvider : null,
+                null !== $ttsModelName ? (string) $ttsModelName : null,
+                $recordedTtsUsage,
+            );
+            $completeData['usage_extra'] = $usageExtra;
+            $outgoingMessage->setMeta('ai_usage_extra', (string) json_encode($usageExtra));
+            $this->em->flush();
+
+            $this->logger->info('StreamController: Voice reply generated', [
+                'url' => $audioUrl,
+                'provider' => $ttsProvider ?? 'unknown',
+                'model' => $ttsModelName ?? 'unknown',
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('StreamController: Voice reply usage recording failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Persist a voice-reply failure reason on the OUT message and notify the
+     * client with one terminal SSE event (#2282).
+     *
+     * @param 'provider_error'|'empty_text'|'rate_limited' $reason
+     */
+    private function emitVoiceReplyFailed(Message $outgoingMessage, string $reason, bool $incognito): void
+    {
+        $outgoingMessage->setMeta('voice_reply_failed', $reason);
+        if (!$incognito) {
+            $this->em->flush();
+        }
+
+        $this->sendSSE('voice_reply_failed', ['reason' => $reason]);
+    }
+
+    /**
      * Build the nested aiModels payload mirroring the ChatController
      * /api/v1/chats/{id}/messages response shape.
      *
@@ -3610,6 +3672,10 @@ class StreamController extends AbstractController
         }
 
         echo 'data: '.json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
+
+        if ($this->sseCaptureMode) {
+            return;
+        }
 
         if (ob_get_level() > 0) {
             ob_flush();

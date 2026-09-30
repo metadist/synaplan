@@ -11,11 +11,13 @@ export class AudioStreamer {
   private queue: Array<{ text: string; language?: string }> = []
   private isPlaying = false
   private stopped = false
+  private failed = false
   private currentAudio: HTMLAudioElement | null = null
   private prefetchedBlobs: Map<number, string> = new Map() // index → blob URL
   private playIndex = 0
   private _allQueued = false
   private onFinished?: () => void
+  private onFailure?: (reason: 'provider_error') => void
 
   /**
    * Register a callback invoked once when all queued audio has finished playing
@@ -23,6 +25,14 @@ export class AudioStreamer {
    */
   public setOnFinished(cb: () => void): void {
     this.onFinished = cb
+  }
+
+  /**
+   * Register a callback invoked once when a chunk fetch fails. Ends playback
+   * for this message and prevents further chunk fetches (#2282).
+   */
+  public setOnFailure(cb: (reason: 'provider_error') => void): void {
+    this.onFailure = cb
   }
 
   /**
@@ -35,7 +45,7 @@ export class AudioStreamer {
   }
 
   public get active(): boolean {
-    return !this.stopped && (this.isPlaying || this.queue.length > this.playIndex)
+    return !this.stopped && !this.failed && (this.isPlaying || this.queue.length > this.playIndex)
   }
 
   /**
@@ -43,7 +53,7 @@ export class AudioStreamer {
    * Starts prefetching immediately; playback begins as soon as first blob is ready.
    */
   public streamText(text: string, _voice?: string, language?: string): void {
-    if (this.stopped) return
+    if (this.stopped || this.failed) return
     const trimmed = text.trim()
     if (!trimmed) return
 
@@ -56,7 +66,7 @@ export class AudioStreamer {
 
   private async prefetch(idx: number): Promise<void> {
     const item = this.queue[idx]
-    if (!item || this.stopped) return
+    if (!item || this.stopped || this.failed) return
 
     const params = new URLSearchParams({ text: item.text })
     if (item.language) params.append('language', item.language)
@@ -66,15 +76,16 @@ export class AudioStreamer {
         credentials: 'include', // Cookie-based auth
       })
 
+      if (this.stopped || this.failed) return
+
       if (!response.ok) {
-        console.warn(`AudioStreamer: TTS fetch failed (${response.status}) for idx ${idx}`)
-        // Skip this segment, try to play next
-        this.prefetchedBlobs.set(idx, '')
-        this.tryPlayNext()
+        this.failChunk()
         return
       }
 
       const blob = await response.blob()
+      if (this.stopped || this.failed) return
+
       const blobUrl = URL.createObjectURL(blob)
       this.prefetchedBlobs.set(idx, blobUrl)
 
@@ -83,21 +94,43 @@ export class AudioStreamer {
         this.tryPlayNext()
       }
     } catch (e) {
-      if (!this.stopped) {
+      if (!this.stopped && !this.failed) {
         console.warn('AudioStreamer: Prefetch error', e)
+        this.failChunk()
       }
-      this.prefetchedBlobs.set(idx, '')
-      this.tryPlayNext()
     }
   }
 
+  /**
+   * Terminal failure for a chunk: stop further fetches, end playback, notify.
+   */
+  private failChunk(): void {
+    if (this.failed || this.stopped) return
+    this.failed = true
+    this.stopped = true
+    if (this.currentAudio) {
+      this.currentAudio.pause()
+      this.currentAudio = null
+    }
+    for (const [, url] of this.prefetchedBlobs) {
+      if (url) URL.revokeObjectURL(url)
+    }
+    this.prefetchedBlobs.clear()
+    this.queue = []
+    this.isPlaying = false
+    const cb = this.onFailure
+    this.onFailure = undefined
+    cb?.('provider_error')
+    this.fireFinished()
+  }
+
   private tryPlayNext(): void {
-    if (this.stopped || this.isPlaying) return
+    if (this.stopped || this.failed || this.isPlaying) return
 
     const blobUrl = this.prefetchedBlobs.get(this.playIndex)
     if (blobUrl === undefined) return // Not yet fetched
 
-    // Empty string means fetch failed — skip
+    // Empty string should not occur after failChunk — treat as skip just in case
     if (!blobUrl) {
       this.playIndex++
       this.tryPlayNext()
@@ -123,9 +156,7 @@ export class AudioStreamer {
       this.prefetchedBlobs.delete(this.playIndex)
       this.isPlaying = false
       this.currentAudio = null
-      this.playIndex++
-      this.tryPlayNext()
-      this.checkFinished()
+      this.failChunk()
     })
 
     audio.play().catch((e) => {

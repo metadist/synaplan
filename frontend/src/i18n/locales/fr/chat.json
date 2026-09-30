@@ -90,6 +90,12 @@
     "showAll": "Tout afficher",
     "recent": "Conversations récentes",
     "ttsGenerating": "Ajout de la réponse parlée…",
+    "voiceReplyFailed": {
+      "provider_error": "La version parlée n’a pas pu être créée. Votre réponse textuelle est complète.",
+      "empty_text": "La version parlée n’a pas pu être créée. Votre réponse textuelle est complète.",
+      "rate_limited": "La version parlée n’a pas pu être créée car votre limite audio est épuisée. Votre réponse textuelle est complète."
+    },
+    "readAloudStopped": "La lecture à voix haute s’est arrêtée avant la fin.",
     "audioUnavailable": "L’audio n’a pas pu être chargé",
     "audioUnavailableDescription": "Le fichier est actuellement indisponible sur le serveur. Réessayez plus tard ou téléchargez-le.",
     "imageUnavailable": "L’image n’a pas pu être chargée",
