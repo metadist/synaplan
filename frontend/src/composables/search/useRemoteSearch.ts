@@ -14,6 +14,7 @@ import {
   type SmartSearchHit,
   type SmartSearchKind,
 } from '@/services/api/searchApi'
+import { localizedSettingName } from './settingNames'
 import type { SearchScope } from './useSmartSearch'
 import type { SearchResult } from './types'
 
@@ -41,10 +42,12 @@ const SCOPE_KINDS: Partial<Record<SearchScope, SmartSearchKind[]>> = {
 }
 
 export function toSearchResult(hit: SmartSearchHit): SearchResult {
+  const settingName =
+    hit.kind === 'setting' ? localizedSettingName(hit.id.slice(`${hit.kind}:`.length)) : null
   return {
     id: hit.id,
     kind: hit.kind,
-    title: hit.title,
+    title: settingName ?? hit.title,
     subtitle: hit.subtitle ?? undefined,
     snippet: hit.snippet ?? undefined,
     route: hit.route,

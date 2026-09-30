@@ -20,6 +20,7 @@ function setup(options: { open?: boolean; canOpen?: boolean } = {}) {
     toggle: vi.fn(),
     isOpen: () => options.open ?? true,
     canOpen: () => options.canOpen ?? true,
+    actions: { open: vi.fn(), handle: vi.fn(() => false) },
   }
   let onKeydown: (event: KeyboardEvent) => void = () => {}
   const wrapper = mount(
@@ -32,7 +33,7 @@ function setup(options: { open?: boolean; canOpen?: boolean } = {}) {
   )
   const press = (key: string, init: KeyboardEventInit = {}) =>
     onKeydown(new KeyboardEvent('keydown', { key, cancelable: true, ...init }))
-  return { state, press, wrapper }
+  return { state, press, wrapper, keydown: (event: KeyboardEvent) => onKeydown(event) }
 }
 
 describe('usePaletteKeys', () => {
@@ -70,6 +71,41 @@ describe('usePaletteKeys', () => {
     press('Enter', { shiftKey: true })
     expect(state.switchSetting).toHaveBeenCalledWith(control)
     expect(state.select).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('opens the action pane on Tab and lets the open pane take the keys first', () => {
+    const { state, press, wrapper } = setup()
+    press('Tab')
+    expect(state.actions.open).toHaveBeenCalledTimes(1)
+    press('Tab', { shiftKey: true })
+    expect(state.actions.open).toHaveBeenCalledTimes(1)
+
+    state.actions.handle.mockReturnValue(true)
+    press('Escape')
+    press('Enter')
+    expect(state.close).not.toHaveBeenCalled()
+    expect(state.select).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('keeps Enter from reaching a confirmation it just opened on document', () => {
+    const { state, wrapper, keydown } = setup()
+    const confirmOnDocument = vi.fn()
+    document.addEventListener('keydown', confirmOnDocument)
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.addEventListener('keydown', keydown)
+
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true })
+    )
+    state.actions.handle.mockReturnValue(true)
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+
+    expect(confirmOnDocument).not.toHaveBeenCalled()
+    document.removeEventListener('keydown', confirmOnDocument)
+    input.remove()
     wrapper.unmount()
   })
 

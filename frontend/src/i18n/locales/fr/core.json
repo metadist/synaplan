@@ -250,7 +250,8 @@
         "open": "ouvrir",
         "close": "fermer",
         "prefixes": "> actions · # réglages · {'@'} fichiers",
-        "switch": "basculer"
+        "switch": "basculer",
+        "actions": "actions"
       },
       "groups": {
         "recent": "Ouverts récemment",
@@ -380,6 +381,25 @@
         "failed": "{name} n’a pas pu être modifié. Il reste « {value} ».",
         "undoFailed": "La modification n’a pas pu être annulée. {name} reste « {value} ».",
         "notRefreshed": "Enregistré. Rechargez la page pour voir le changement partout."
+      },
+      "actions": {
+        "title": "Actions pour {title}",
+        "open": "Ouvrir",
+        "run": "Exécuter",
+        "newTab": "Ouvrir dans un nouvel onglet",
+        "copyLink": "Copier le lien",
+        "linkCopied": "Lien copié.",
+        "copyFailed": "Le lien n’a pas pu être copié, car le navigateur a bloqué le presse-papiers.",
+        "turnOn": "Activer",
+        "turnOff": "Désactiver",
+        "change": "Modifier la valeur"
+      },
+      "preview": {
+        "label": "Aperçu",
+        "where": "Où cela se trouve",
+        "current": "Valeur actuelle",
+        "byMeaning": "Trouvé par le sens : d’autres mots, le même sujet.",
+        "tabHint": "Appuyez sur Tab pour atteindre ces actions au clavier."
       }
     }
   },

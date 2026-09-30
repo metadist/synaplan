@@ -8,6 +8,7 @@ use App\Repository\SearchIndexRepository;
 use App\Service\Admin\SystemConfigService;
 use App\Service\SmartSearch\Index\CatalogSync;
 use App\Service\SmartSearch\Index\SettingsCatalog;
+use App\Service\SmartSearch\Index\SettingSearchTerms;
 use App\Service\SmartSearch\SearchHit;
 use App\Service\SmartSearch\SearchProviderInterface;
 use App\Service\SmartSearch\SearchRequest;
@@ -31,11 +32,12 @@ final readonly class SettingsSearchProvider implements SearchProviderInterface
     private const SNIPPET_LENGTH = 160;
 
     /**
-     * The weakest word match scores 0.5 (SettingMatcher), so a meaning-only
-     * hit (similarity ≤ 1) always ranks below it and just fills the list;
-     * on a word match the similarity breaks ties between equal matches.
+     * A close meaning (similarity ~0.7 → 2.8) outranks a match on common
+     * description words only (1 per word), but never a key word (6) or the
+     * key itself. Tuned with app:search:eval: 0.49 → nDCG@10 0.88, 4 → 0.91,
+     * higher gained nothing.
      */
-    private const SEMANTIC_WEIGHT = 0.49;
+    private const SEMANTIC_WEIGHT = 4.0;
 
     public function __construct(
         private SettingsCatalog $catalog,
@@ -60,7 +62,8 @@ final readonly class SettingsSearchProvider implements SearchProviderInterface
         $entries = $this->catalog->entries();
         $scores = [];
         foreach ($entries as $key => $entry) {
-            $score = SettingMatcher::score($request->query, $key, $entry['tabLabel'].' '.$entry['sectionLabel'], $entry['description']);
+            $labels = $entry['tabLabel'].' '.$entry['sectionLabel'].' '.SettingSearchTerms::of($entry['key']);
+            $score = SettingMatcher::score($request->query, $key, $labels, $entry['description']);
             if ($score > 0) {
                 $scores[$key] = [$score, SearchHit::MATCHED_LEXICAL];
             }
@@ -150,10 +153,10 @@ final readonly class SettingsSearchProvider implements SearchProviderInterface
         return new SearchHit(
             kind: self::KIND,
             refId: $entry['key'],
-            title: $entry['key'],
+            title: SettingLabel::of($entry['key'], $entry['description']),
             route: '/admin/config?'.http_build_query(['tab' => $entry['tab'], 'section' => $entry['section'], 'highlight' => $entry['key']]),
             matchedBy: $matchedBy,
-            subtitle: $entry['tabLabel'].' › '.$entry['sectionLabel'],
+            subtitle: $entry['tabLabel'].' › '.$entry['sectionLabel'].' · '.$entry['key'],
             snippet: '' === $entry['description'] ? null : mb_strimwidth($entry['description'], 0, self::SNIPPET_LENGTH, '…'),
             score: $score,
             action: $action,

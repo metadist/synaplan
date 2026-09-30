@@ -239,7 +239,8 @@
         "open": "abrir",
         "close": "cerrar",
         "prefixes": "> acciones · # ajustes · {'@'} archivos",
-        "switch": "cambiar"
+        "switch": "cambiar",
+        "actions": "acciones"
       },
       "groups": {
         "recent": "Abiertos recientemente",
@@ -369,6 +370,25 @@
         "failed": "No se pudo cambiar {name}. Sigue en «{value}».",
         "undoFailed": "No se pudo deshacer el cambio. {name} sigue en «{value}».",
         "notRefreshed": "Guardado. Recarga la página para ver el cambio en todas partes."
+      },
+      "actions": {
+        "title": "Acciones para {title}",
+        "open": "Abrir",
+        "run": "Ejecutar",
+        "newTab": "Abrir en una pestaña nueva",
+        "copyLink": "Copiar enlace",
+        "linkCopied": "Enlace copiado.",
+        "copyFailed": "No se pudo copiar el enlace porque el navegador bloqueó el portapapeles.",
+        "turnOn": "Activar",
+        "turnOff": "Desactivar",
+        "change": "Cambiar valor"
+      },
+      "preview": {
+        "label": "Vista previa",
+        "where": "Dónde está",
+        "current": "Valor actual",
+        "byMeaning": "Encontrado por el significado: otras palabras, el mismo tema.",
+        "tabHint": "Pulse Tab para llegar a estas acciones con el teclado."
       }
     }
   },

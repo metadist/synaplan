@@ -67,7 +67,7 @@ final readonly class SettingsCatalog
                 kind: self::KIND,
                 refId: $entry['key'],
                 title: $entry['key'],
-                body: $entry['tabLabel'].' – '.$entry['sectionLabel'].'. '.$entry['description'],
+                body: trim($entry['tabLabel'].' – '.$entry['sectionLabel'].'. '.$entry['description'].' '.SettingSearchTerms::of($entry['key'])),
                 updated: 0,
                 lang: 'en',
             );

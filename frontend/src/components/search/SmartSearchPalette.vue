@@ -15,7 +15,7 @@
           role="dialog"
           aria-modal="true"
           :aria-label="$t('search.palette.label')"
-          class="relative surface-card w-full h-full sm:h-auto sm:max-h-[72vh] sm:max-w-2xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden"
+          class="relative surface-card w-full h-full sm:h-auto sm:max-h-[72vh] sm:max-w-2xl lg:max-w-4xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden"
           data-testid="panel-smart-search"
         >
           <div
@@ -29,8 +29,10 @@
               role="combobox"
               aria-autocomplete="list"
               aria-expanded="true"
-              :aria-controls="LIST_ID"
-              :aria-activedescendant="activeOptionId"
+              :aria-controls="paneActions.isOpen.value ? ACTIONS_ID : LIST_ID"
+              :aria-activedescendant="
+                paneActions.isOpen.value ? actionOptionId(paneActions.index.value) : activeOptionId
+              "
               :aria-label="$t('search.palette.label')"
               :placeholder="$t('search.palette.placeholder')"
               autocomplete="off"
@@ -54,85 +56,92 @@
             >
           </div>
 
-          <div
-            :id="LIST_ID"
-            ref="listRef"
-            role="listbox"
-            :aria-label="$t('search.palette.label')"
-            class="flex-1 min-h-0 overflow-y-auto p-2"
-            data-testid="list-smart-search"
-          >
-            <p
-              v-if="statusText"
-              class="px-3 py-2 text-xs txt-secondary"
-              role="status"
-              data-testid="text-smart-search-status"
-            >
-              {{ statusText }}
-            </p>
-            <p
-              v-if="remoteNote"
-              class="px-3 py-2 text-xs txt-secondary"
-              role="status"
-              data-testid="text-smart-search-remote-note"
-            >
-              {{ remoteNote }}
-            </p>
-            <p
-              v-if="aiNote"
-              class="px-3 py-2 text-xs txt-secondary"
-              role="status"
-              data-testid="text-smart-search-ai-note"
-            >
-              {{ aiNote }}
-            </p>
+          <div class="flex-1 min-h-0 flex">
             <div
-              v-for="group in groups"
-              :key="group.key"
-              role="group"
-              :aria-label="group.label"
-              :class="
-                group.key === 'best'
-                  ? 'mb-2 rounded-xl border border-[var(--brand)]/40 bg-[var(--brand)]/5 pb-1'
-                  : ''
-              "
-              :data-testid="`group-smart-search-${group.key}`"
+              :id="LIST_ID"
+              ref="listRef"
+              role="listbox"
+              :aria-label="$t('search.palette.label')"
+              class="flex-1 min-w-0 overflow-y-auto p-2"
+              data-testid="list-smart-search"
             >
-              <div class="px-3 pt-3 pb-1 text-xs font-semibold txt-secondary">
-                {{ group.label }}
+              <SearchStatusNotes
+                :status-text="statusText"
+                :remote-note="remoteNote"
+                :ai-note="aiNote"
+              />
+              <div
+                v-for="group in groups"
+                :key="group.key"
+                role="group"
+                :aria-label="group.label"
+                :class="
+                  group.key === 'best'
+                    ? 'mb-2 rounded-xl border border-[var(--brand)]/40 bg-[var(--brand)]/5 pb-1'
+                    : ''
+                "
+                :data-testid="`group-smart-search-${group.key}`"
+              >
+                <div class="px-3 pt-3 pb-1 text-xs font-semibold txt-secondary">
+                  {{ group.label }}
+                </div>
+                <p
+                  v-if="group.note"
+                  class="px-3 pb-2 text-sm txt-primary"
+                  data-testid="text-smart-search-best-note"
+                >
+                  {{ group.note }}
+                </p>
+                <SearchResultRow
+                  v-for="item in group.items"
+                  :key="item.id"
+                  :result="item"
+                  :active="flatIndex(item) === activeIndex"
+                  :option-id="optionId(flatIndex(item))"
+                  @select="(event) => select(item, event.ctrlKey || event.metaKey)"
+                  @hover="activeIndex = flatIndex(item)"
+                >
+                  <template v-if="item.setting" #trailing>
+                    <SearchSettingControl
+                      :control="item.setting"
+                      :value="inline.valueOf(item.setting)"
+                      :value-label="inline.valueLabel(item.setting, inline.valueOf(item.setting))"
+                      :name="inline.nameOf(item.setting.key)"
+                      :saving="inline.savingKey.value === item.setting.key"
+                      :option-label="inline.optionLabel"
+                      @change="(value) => item.setting && inline.apply(item.setting, value)"
+                    />
+                  </template>
+                </SearchResultRow>
               </div>
-              <p
-                v-if="group.note"
-                class="px-3 pb-2 text-sm txt-primary"
-                data-testid="text-smart-search-best-note"
-              >
-                {{ group.note }}
-              </p>
-              <SearchResultRow
-                v-for="item in group.items"
-                :key="item.id"
-                :result="item"
-                :active="flatIndex(item) === activeIndex"
-                :option-id="optionId(flatIndex(item))"
-                @select="(event) => select(item, event.ctrlKey || event.metaKey)"
-                @hover="activeIndex = flatIndex(item)"
-              >
-                <template v-if="item.setting" #trailing>
-                  <SearchSettingControl
-                    :control="item.setting"
-                    :value="inline.valueOf(item.setting)"
-                    :value-label="inline.valueLabel(item.setting, inline.valueOf(item.setting))"
-                    :name="inline.nameOf(item.setting.key)"
-                    :saving="inline.savingKey.value === item.setting.key"
-                    :option-label="inline.optionLabel"
-                    @change="(value) => item.setting && inline.apply(item.setting, value)"
-                  />
-                </template>
-              </SearchResultRow>
             </div>
+            <SearchPreview
+              v-if="activeResult"
+              :result="activeResult"
+              :actions="paneActions.actions.value"
+              :setting-value="
+                activeResult.setting
+                  ? inline.valueLabel(activeResult.setting, inline.valueOf(activeResult.setting))
+                  : null
+              "
+              @run="paneActions.runAt"
+            />
           </div>
 
-          <SearchPaletteFooter :can-switch="activeSetting !== null" />
+          <SearchActionPane
+            v-if="paneActions.isOpen.value && activeResult"
+            :actions="paneActions.actions.value"
+            :index="paneActions.index.value"
+            :title="activeResult.title"
+            :list-id="ACTIONS_ID"
+            :option-id="actionOptionId"
+            @run="paneActions.runAt"
+            @hover="(position) => (paneActions.index.value = position)"
+          />
+          <SearchPaletteFooter
+            :can-switch="activeSetting !== null"
+            :has-actions="paneActions.actions.value.length > 1"
+          />
         </div>
       </div>
     </Transition>
@@ -152,11 +161,17 @@ import { useInlineSetting } from '@/composables/search/useInlineSetting'
 import { usePaletteStatus } from '@/composables/search/usePaletteStatus'
 import { usePaletteFocus } from '@/composables/search/usePaletteFocus'
 import { usePaletteKeys } from '@/composables/search/usePaletteKeys'
+import { usePaletteActions } from '@/composables/search/usePaletteActions'
 import SearchResultRow from './SearchResultRow.vue'
 import SearchSettingControl from './SearchSettingControl.vue'
 import SearchPaletteFooter from './SearchPaletteFooter.vue'
+import SearchStatusNotes from './SearchStatusNotes.vue'
+import SearchPreview from './SearchPreview.vue'
+import SearchActionPane from './SearchActionPane.vue'
 
 const LIST_ID = 'smart-search-listbox'
+const ACTIONS_ID = 'smart-search-actions'
+const actionOptionId = (position: number) => `smart-search-action-${position}`
 
 const store = useSmartSearchStore()
 const authStore = useAuthStore()
@@ -182,8 +197,9 @@ const inline = useInlineSetting()
 const inputRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
+const activeResult = computed<SearchResult | undefined>(() => flatResults.value[activeIndex.value])
 const activeSetting = computed(() => {
-  const setting = flatResults.value[activeIndex.value]?.setting
+  const setting = activeResult.value?.setting
   return setting && !setting.envPinned ? setting : null
 })
 
@@ -237,6 +253,14 @@ const select = (result: SearchResult, newTab = false) => {
   void execute(result, newTab)
 }
 
+const paneActions = usePaletteActions({
+  active: activeResult,
+  query,
+  select,
+  switchSetting: (control) => void inline.cycle(control),
+  settingValue: inline.valueOf,
+})
+
 const { onKeydown } = usePaletteKeys({
   query,
   results: flatResults,
@@ -248,6 +272,7 @@ const { onKeydown } = usePaletteKeys({
   toggle: () => store.toggle(),
   isOpen: () => store.isOpen,
   canOpen: () => authStore.isAuthenticated && route.meta.public !== true,
+  actions: paneActions,
 })
 </script>
 

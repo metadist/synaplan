@@ -46,8 +46,9 @@ final readonly class SmartSearchService
 
     /**
      * @param list<string>|null $kinds null = every kind
+     * @param int               $rrfK  fusion constant; only `app:search:eval` changes it
      */
-    public function search(User $user, string $query, ?array $kinds = null, int $limit = self::DEFAULT_LIMIT): SearchResponse
+    public function search(User $user, string $query, ?array $kinds = null, int $limit = self::DEFAULT_LIMIT, int $rrfK = RankFusion::DEFAULT_K): SearchResponse
     {
         $query = mb_substr(trim($query), 0, self::MAX_QUERY_LENGTH);
         $kinds = null === $kinds ? self::KINDS : array_values(array_intersect(self::KINDS, $kinds));
@@ -78,7 +79,7 @@ final readonly class SmartSearchService
 
         return new SearchResponse(
             query: $query,
-            hits: array_slice(RankFusion::fuse($lists), 0, $limit),
+            hits: array_slice(RankFusion::fuse($lists, $rrfK), 0, $limit),
             semanticAvailable: $request->vectors->indexAvailable() && !in_array('semantic', $degraded, true),
             degraded: $degraded,
             indexing: $indexing,

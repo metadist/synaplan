@@ -4,6 +4,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { updateConfigValue } from '@/services/api/adminConfigApi'
 import { useConfigStore } from '@/stores/config'
+import { localizedSettingName } from './settingNames'
 import type { SettingControl } from './types'
 
 /** Long enough to reach the Undo button after reading the sentence. */
@@ -26,10 +27,7 @@ export function useInlineSetting() {
 
   const valueOf = (control: SettingControl): string => written.value[control.key] ?? control.current
 
-  const nameOf = (key: string): string => {
-    const feature = `people.policies.feature.${key.slice('FEATURE_'.length)}`
-    return key.startsWith('FEATURE_') && te(feature) ? t(feature) : key
-  }
+  const nameOf = (key: string): string => localizedSettingName(key) ?? key
 
   const optionLabel = (key: string, option: string): string => {
     const label = `admin.config.fieldOptions.${key}.${option}`

@@ -303,7 +303,8 @@
         "open": "öffnen",
         "close": "schließen",
         "prefixes": "> Aktionen · # Einstellungen · {'@'} Dateien",
-        "switch": "umschalten"
+        "switch": "umschalten",
+        "actions": "Aktionen"
       },
       "groups": {
         "recent": "Zuletzt geöffnet",
@@ -433,6 +434,25 @@
         "failed": "{name} konnte nicht geändert werden. Es bleibt „{value}“.",
         "undoFailed": "Die Änderung konnte nicht rückgängig gemacht werden. {name} bleibt „{value}“.",
         "notRefreshed": "Gespeichert. Lade die Seite neu, um die Änderung überall zu sehen."
+      },
+      "actions": {
+        "title": "Aktionen für {title}",
+        "open": "Öffnen",
+        "run": "Ausführen",
+        "newTab": "In neuem Tab öffnen",
+        "copyLink": "Link kopieren",
+        "linkCopied": "Link kopiert.",
+        "copyFailed": "Der Link konnte nicht kopiert werden, weil der Browser die Zwischenablage blockiert.",
+        "turnOn": "Einschalten",
+        "turnOff": "Ausschalten",
+        "change": "Wert ändern"
+      },
+      "preview": {
+        "label": "Vorschau",
+        "where": "Wo es liegt",
+        "current": "Aktueller Wert",
+        "byMeaning": "Über die Bedeutung gefunden: andere Wörter, gleiches Thema.",
+        "tabHint": "Mit Tab erreichen Sie diese Aktionen per Tastatur."
       }
     }
   },

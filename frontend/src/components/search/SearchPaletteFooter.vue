@@ -7,6 +7,9 @@
     <span v-if="canSwitch" data-testid="text-smart-search-switch-hint"
       >⇧↵ {{ $t('search.palette.footer.switch') }}</span
     >
+    <span v-if="hasActions" data-testid="text-smart-search-actions-hint"
+      >Tab {{ $t('search.palette.footer.actions') }}</span
+    >
     <span>Esc {{ $t('search.palette.footer.close') }}</span>
     <span class="ml-auto truncate">{{ $t('search.palette.footer.prefixes') }}</span>
   </footer>
@@ -16,5 +19,7 @@
 defineProps<{
   /** The active row is a setting that Shift+Enter switches in place. */
   canSwitch: boolean
+  /** The active row has more than "open", so Tab shows its action pane. */
+  hasActions: boolean
 }>()
 </script>

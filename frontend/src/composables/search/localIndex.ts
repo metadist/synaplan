@@ -48,13 +48,21 @@ export class LocalSearchIndex {
     this.index.addAll(unique)
   }
 
-  /** Returns doc ids ordered by relevance. Falls back to OR when AND finds nothing. */
+  /**
+   * Returns doc ids ordered by relevance. Falls back to OR when AND finds
+   * nothing, but then at least half of the words must match: otherwise a
+   * sentence lists every command that shares one fuzzy word with it.
+   */
   search(query: string): Array<{ id: string; score: number }> {
     const trimmed = query.trim()
     if (trimmed === '') return []
     let hits = this.index.search(trimmed)
     if (hits.length === 0) {
-      hits = this.index.search(trimmed, { combineWith: 'OR' })
+      const words = new Set(MiniSearch.getDefault('tokenize')(trimmed).filter(Boolean)).size
+      const needed = Math.ceil(words / 2)
+      hits = this.index
+        .search(trimmed, { combineWith: 'OR' })
+        .filter((hit) => hit.queryTerms.length >= needed)
     }
     return hits.slice(0, MAX_LOCAL_RESULTS).map((hit) => ({ id: String(hit.id), score: hit.score }))
   }

@@ -250,7 +250,8 @@
         "open": "open",
         "close": "close",
         "prefixes": "> commands · # settings · {'@'} files",
-        "switch": "switch"
+        "switch": "switch",
+        "actions": "actions"
       },
       "groups": {
         "recent": "Recently opened",
@@ -380,6 +381,25 @@
         "failed": "{name} could not be changed. It is still “{value}”.",
         "undoFailed": "The change could not be undone. {name} is still “{value}”.",
         "notRefreshed": "Saved. Reload the page to see the change everywhere."
+      },
+      "actions": {
+        "title": "Actions for {title}",
+        "open": "Open",
+        "run": "Run",
+        "newTab": "Open in new tab",
+        "copyLink": "Copy link",
+        "linkCopied": "Link copied.",
+        "copyFailed": "The link could not be copied because the browser blocked the clipboard.",
+        "turnOn": "Turn on",
+        "turnOff": "Turn off",
+        "change": "Change value"
+      },
+      "preview": {
+        "label": "Preview",
+        "where": "Where it is",
+        "current": "Current value",
+        "byMeaning": "Found by meaning: different words, same topic.",
+        "tabHint": "Press Tab to reach these actions from the keyboard."
       }
     }
   },

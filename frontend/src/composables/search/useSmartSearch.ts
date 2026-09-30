@@ -10,21 +10,8 @@ import { useSearchRecents } from './useSearchRecents'
 import { useRemoteSearch } from './useRemoteSearch'
 import { useSearchInterpret } from './useSearchInterpret'
 import { buildBestAction } from './bestAction'
+import { isExactMatch, orderKinds } from './groupOrder'
 import type { SearchGroup, SearchKind, SearchResult } from './types'
-
-export const GROUP_ORDER: SearchKind[] = [
-  'best',
-  'command',
-  'page',
-  'setting',
-  'chat',
-  'file',
-  'memory',
-  'widget',
-  'assistant',
-  'task',
-  'ask',
-]
 
 const MAX_PER_GROUP = 6
 /** A prefix (`>`, `#`, `@`) narrows to one kind, so show more of it. */
@@ -45,13 +32,15 @@ export function parseScope(raw: string): { scope: SearchScope; text: string } {
 
 /**
  * Stable re-order that lifts recently opened items to the top of their
- * group, most recent first; everything else keeps its ranked order.
+ * group, most recent first; everything else keeps its ranked order. An
+ * exact match of the query stays above them all.
  */
-export function boostRecent(items: SearchResult[], recentIds: string[]): SearchResult[] {
+export function boostRecent(items: SearchResult[], recentIds: string[], text = ''): SearchResult[] {
   const rank = new Map(recentIds.map((id, index) => [id, index]))
+  const exact = (item: SearchResult) => (isExactMatch(item, text) ? 0 : 1)
   return items
     .map((item, index) => ({ item, index, recent: rank.get(item.id) ?? Number.MAX_SAFE_INTEGER }))
-    .sort((a, b) => a.recent - b.recent || a.index - b.index)
+    .sort((a, b) => exact(a.item) - exact(b.item) || a.recent - b.recent || a.index - b.index)
     .map((entry) => entry.item)
 }
 
@@ -197,10 +186,10 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
     }
     const limit = parsed.value.scope === 'all' ? MAX_PER_GROUP : MAX_SCOPED
     const recentIds = recents.value.map((recent) => recent.id)
-    const ranked: SearchGroup[] = GROUP_ORDER.filter((kind) => byKind.has(kind)).map((kind) => ({
+    const ranked: SearchGroup[] = orderKinds(byKind, parsed.value.text).map((kind) => ({
       key: kind,
       label: groupLabel(kind),
-      items: boostRecent(byKind.get(kind) ?? [], recentIds).slice(0, limit),
+      items: boostRecent(byKind.get(kind) ?? [], recentIds, parsed.value.text).slice(0, limit),
     }))
     return best.value
       ? [

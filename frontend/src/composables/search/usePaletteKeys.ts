@@ -3,8 +3,8 @@ import type { SearchResult, SettingControl } from './types'
 
 /**
  * Keyboard model of the palette: arrows, Home/End, Enter (Ctrl/Cmd for a
- * new tab, Shift to switch the active setting), Esc, plus the global
- * Ctrl/Cmd+K shortcut.
+ * new tab, Shift to switch the active setting), Tab for the action pane,
+ * Esc, plus the global Ctrl/Cmd+K shortcut.
  */
 export function usePaletteKeys(state: {
   query: Ref<string>
@@ -17,6 +17,8 @@ export function usePaletteKeys(state: {
   toggle: () => void
   isOpen: () => boolean
   canOpen: () => boolean
+  /** The Tab action pane; it gets the keys first while it is open. */
+  actions: { open: () => void; handle: (event: KeyboardEvent) => boolean }
 }) {
   const move = (delta: number) => {
     const total = state.results.value.length
@@ -31,6 +33,13 @@ export function usePaletteKeys(state: {
   }
 
   const onKeydown = (event: KeyboardEvent) => {
+    // A confirmation opened by this key listens for Enter on document; the
+    // same keystroke must not reach it, or it confirms itself unseen.
+    if (state.actions.handle(event)) {
+      event.stopPropagation()
+      return
+    }
+    if (event.key === 'Enter') event.stopPropagation()
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault()
@@ -62,6 +71,7 @@ export function usePaletteKeys(state: {
         break
       case 'Tab':
         event.preventDefault()
+        if (!event.shiftKey && state.results.value[state.activeIndex.value]) state.actions.open()
         break
     }
   }

@@ -34,6 +34,11 @@ describe('LocalSearchIndex', () => {
     expect(index.search('dunk')[0]?.id).toBe('command:theme-dark')
   })
 
+  it('keeps an OR match only when half of the words match', () => {
+    expect(index.search('groups documents')[0]?.id).toBeDefined()
+    expect(index.search('let colleagues see each other in teams')).toEqual([])
+  })
+
   it('returns nothing for an empty query', () => {
     expect(index.search('   ')).toEqual([])
   })

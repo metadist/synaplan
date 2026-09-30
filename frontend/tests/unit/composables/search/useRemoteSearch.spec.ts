@@ -210,4 +210,10 @@ describe('boostRecent', () => {
 
     expect(ordered).toEqual(['d', 'b', 'a', 'c'])
   })
+
+  it('keeps an exact match of the query above recent items', () => {
+    const ordered = boostRecent([item('a'), item('b'), item('c')], ['b'], 'C').map((r) => r.id)
+
+    expect(ordered).toEqual(['c', 'b', 'a'])
+  })
 })

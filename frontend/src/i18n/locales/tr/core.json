@@ -239,7 +239,8 @@
         "open": "aç",
         "close": "kapat",
         "prefixes": "> eylemler · # ayarlar · {'@'} dosyalar",
-        "switch": "değiştir"
+        "switch": "değiştir",
+        "actions": "eylemler"
       },
       "groups": {
         "recent": "Son açılanlar",
@@ -369,6 +370,25 @@
         "failed": "{name} değiştirilemedi. Hâlâ “{value}”.",
         "undoFailed": "Değişiklik geri alınamadı. {name} hâlâ “{value}”.",
         "notRefreshed": "Kaydedildi. Değişikliği her yerde görmek için sayfayı yenile."
+      },
+      "actions": {
+        "title": "{title} için eylemler",
+        "open": "Aç",
+        "run": "Çalıştır",
+        "newTab": "Yeni sekmede aç",
+        "copyLink": "Bağlantıyı kopyala",
+        "linkCopied": "Bağlantı kopyalandı.",
+        "copyFailed": "Tarayıcı panoyu engellediği için bağlantı kopyalanamadı.",
+        "turnOn": "Aç",
+        "turnOff": "Kapat",
+        "change": "Değeri değiştir"
+      },
+      "preview": {
+        "label": "Önizleme",
+        "where": "Nerede",
+        "current": "Geçerli değer",
+        "byMeaning": "Anlamına göre bulundu: farklı kelimeler, aynı konu.",
+        "tabHint": "Bu eylemlere klavyeden ulaşmak için Tab tuşuna basın."
       }
     }
   },
