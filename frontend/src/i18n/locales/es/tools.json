@@ -382,6 +382,11 @@
         "name": "Higgsfield",
         "summary": "Herramientas de imagen y vídeo",
         "hint": "Guarda la conexión y, a continuación, inicia sesión con tu cuenta de Higgsfield. Consultar el historial es de solo lectura; crear imágenes o vídeos requiere acciones de escritura y consume tus créditos de Higgsfield."
+      },
+      "atlassian": {
+        "name": "Jira y Confluence",
+        "summary": "Inicio de sesión con Atlassian Cloud",
+        "hint": "Guarda la conexión y, a continuación, inicia sesión con tu cuenta de Atlassian. Synaplan podrá leer las incidencias de Jira y las páginas de Confluence que puedes ver, incluidas las páginas que pegues en el chat. No hace falta un token de API. Puedes revocar el acceso en tu cuenta de Atlassian en cualquier momento."
       }
     },
     "oauthFormHint": "Este servidor usa el inicio de sesión de tu cuenta. Guárdalo y se te enviará al proveedor para permitir el acceso. No hay token que pegar.",

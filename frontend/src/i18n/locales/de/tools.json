@@ -379,6 +379,11 @@
         "name": "Higgsfield",
         "summary": "Bild- und Videowerkzeuge",
         "hint": "Speichere die Verbindung und melde dich danach mit deinem Higgsfield-Konto an. Der Verlauf ist nur lesend; Bilder oder Videos erzeugen braucht Schreibaktionen und verbraucht deine Higgsfield-Credits."
+      },
+      "atlassian": {
+        "name": "Jira & Confluence",
+        "summary": "Anmeldung mit Atlassian Cloud",
+        "hint": "Speichere die Verbindung und melde dich danach mit deinem Atlassian-Konto an. Synaplan kann dann die Jira-Vorgänge und Confluence-Seiten lesen, die du sehen darfst – auch Seiten, die du in den Chat einfügst. Ein API-Token ist nicht nötig. Den Zugriff kannst du jederzeit in deinem Atlassian-Konto widerrufen."
       }
     },
     "oauthFormHint": "Dieser Server nutzt deine Kontoanmeldung. Speichere ihn, danach wirst du zum Anbieter weitergeleitet. Es gibt kein Zugriffstoken zum Einfügen.",

@@ -110,10 +110,23 @@ final class ConfluenceLinkedPageReaderTest extends TestCase
         self::assertStringContainsString('Do not ask them to paste', $read->prompt());
     }
 
-    private function server(): McpServerConfig
+    public function testPrefersTheSignedInAtlassianConnectionOverAPastedToken(): void
+    {
+        $token = $this->server();
+        $signedIn = $this->server('Jira & Confluence');
+        $signedIn->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+        $this->servers->method('findEnabledByUser')->willReturn([$token, $signedIn]);
+        $this->client->expects($this->once())->method('listTools')->with($signedIn)->willReturn([]);
+
+        $read = $this->reader->read([self::PAGE], 1);
+
+        self::assertStringContainsString('Jira & Confluence', $read->prompt());
+    }
+
+    private function server(string $name = 'Deskfiler'): McpServerConfig
     {
         $server = new McpServerConfig();
-        $server->setUserId(1)->setName('Deskfiler')->setUrl('https://mcp.atlassian.com/v2/mcp?tools=all')->setEnabled(true);
+        $server->setUserId(1)->setName($name)->setUrl('https://mcp.atlassian.com/v2/mcp?tools=all')->setEnabled(true);
 
         return $server;
     }

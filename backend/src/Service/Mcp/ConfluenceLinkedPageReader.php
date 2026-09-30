@@ -95,20 +95,29 @@ final readonly class ConfluenceLinkedPageReader
         return $pages;
     }
 
+    /**
+     * A signed-in connection wins over a pasted token: Atlassian refuses
+     * API tokens unless an organization admin allows them.
+     */
     private function atlassianServer(int $userId): ?McpServerConfig
     {
-        $match = null;
+        $signedIn = null;
+        $token = null;
+        $site = null;
         foreach ($this->servers->findEnabledByUser($userId) as $server) {
             $host = strtolower((string) parse_url($server->getUrl(), PHP_URL_HOST));
             if ('mcp.atlassian.com' === $host) {
-                return $server;
-            }
-            if (str_ends_with($host, '.atlassian.net')) {
-                $match ??= $server;
+                if ($server->isOAuth()) {
+                    $signedIn ??= $server;
+                } else {
+                    $token ??= $server;
+                }
+            } elseif (str_ends_with($host, '.atlassian.net')) {
+                $site ??= $server;
             }
         }
 
-        return $match;
+        return $signedIn ?? $token ?? $site;
     }
 
     /**
