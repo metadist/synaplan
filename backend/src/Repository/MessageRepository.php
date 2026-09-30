@@ -870,4 +870,27 @@ class MessageRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * The first user-written texts of a chat, oldest first (Smart Search
+     * indexes them so an untitled chat is still findable by what was asked).
+     *
+     * @return list<string>
+     */
+    public function findFirstInboundTexts(int $chatId, int $limit): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.text')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('direction', 'IN')
+            ->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_values(array_map(static fn (array $row): string => (string) $row['text'], $rows));
+    }
 }

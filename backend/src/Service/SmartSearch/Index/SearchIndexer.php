@@ -1,0 +1,84 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service\SmartSearch\Index;
+
+use App\Repository\SearchIndexRepository;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
+
+/**
+ * Keeps BSEARCHINDEX in step with the sources of truth.
+ */
+final readonly class SearchIndexer
+{
+    /** @var array<string, SearchDocumentSourceInterface> */
+    private array $sources;
+
+    /**
+     * @param iterable<SearchDocumentSourceInterface> $sources
+     */
+    public function __construct(
+        private SearchIndexRepository $repository,
+        #[AutowireIterator('app.smart_search.source')]
+        iterable $sources,
+    ) {
+        $byKind = [];
+        foreach ($sources as $source) {
+            $byKind[$source->kind()] = $source;
+        }
+        $this->sources = $byKind;
+    }
+
+    /** @return array<string, SearchDocumentSourceInterface> */
+    public function sources(): array
+    {
+        return $this->sources;
+    }
+
+    public function source(string $kind): ?SearchDocumentSourceInterface
+    {
+        return $this->sources[$kind] ?? null;
+    }
+
+    /**
+     * Refreshes one item: upserts the current document, or removes the row
+     * when the item is gone or no longer searchable.
+     */
+    public function refresh(string $kind, int $userId, string $refId): void
+    {
+        $source = $this->source($kind);
+        if (null === $source) {
+            throw new \InvalidArgumentException(sprintf('Unknown Smart Search kind "%s" (known: %s)', $kind, implode(', ', array_keys($this->sources))));
+        }
+
+        $document = $source->build($userId, $refId);
+        if (null === $document) {
+            $this->repository->delete($userId, $kind, $refId);
+
+            return;
+        }
+        $this->repository->upsert($document);
+    }
+
+    /**
+     * Rebuilds every kind of one user and drops rows whose item is gone.
+     *
+     * @return int number of documents written
+     */
+    public function reindexUser(int $userId): int
+    {
+        $written = 0;
+        foreach ($this->sources as $kind => $source) {
+            $kept = [];
+            foreach ($source->allForUser($userId) as $document) {
+                $this->repository->upsert($document);
+                $kept[] = $document->refId;
+                ++$written;
+            }
+            $this->repository->deleteMissing($userId, $kind, $kept);
+        }
+
+        return $written;
+    }
+}

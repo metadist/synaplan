@@ -58,6 +58,14 @@ framework:
             limit: 60
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
+
+        # Smart Search palette (POST /api/v1/search). The palette debounces
+        # typing, so 120/minute covers fast real use while capping a script.
+        smart_search:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
         # Public Saved Task webhook (`POST /api/v1/webhooks/saved-tasks/{token}`,
         # PUBLIC_ACCESS), keyed per task in SavedTaskWebhookIngress. One start
         # per second is far beyond any real integration and keeps a leaked
