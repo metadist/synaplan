@@ -7,8 +7,10 @@
  *
  * This avoids MSE complexity and works reliably in all browsers.
  */
+export type ReadAloudFailureReason = 'missing_language' | 'provider_error'
+
 export class AudioStreamer {
-  private queue: Array<{ text: string; language?: string }> = []
+  private queue: Array<{ text: string; language: string }> = []
   private isPlaying = false
   private stopped = false
   private failed = false
@@ -17,7 +19,7 @@ export class AudioStreamer {
   private playIndex = 0
   private _allQueued = false
   private onFinished?: () => void
-  private onFailure?: (reason: 'provider_error') => void
+  private onFailure?: (reason: ReadAloudFailureReason) => void
 
   /**
    * Register a callback invoked once when all queued audio has finished playing
@@ -28,10 +30,11 @@ export class AudioStreamer {
   }
 
   /**
-   * Register a callback invoked once when a chunk fetch fails. Ends playback
-   * for this message and prevents further chunk fetches (#2282).
+   * Register a callback invoked once when reading aloud has to stop: a chunk
+   * fetch failed (#2282) or no language was given (#2283). Playback for this
+   * message ends and no further chunks are fetched.
    */
-  public setOnFailure(cb: (reason: 'provider_error') => void): void {
+  public setOnFailure(cb: (reason: ReadAloudFailureReason) => void): void {
     this.onFailure = cb
   }
 
@@ -51,13 +54,21 @@ export class AudioStreamer {
   /**
    * Queue a sentence for TTS playback.
    * Starts prefetching immediately; playback begins as soon as first blob is ready.
+   * Language is required — never invent English (#2283).
    */
   public streamText(text: string, _voice?: string, language?: string): void {
     if (this.stopped || this.failed) return
     const trimmed = text.trim()
     if (!trimmed) return
 
-    this.queue.push({ text: trimmed, language })
+    const lang = (language ?? '').trim()
+    if (!lang) {
+      console.warn('AudioStreamer: language is required; stopping playback')
+      this.failChunk('missing_language')
+      return
+    }
+
+    this.queue.push({ text: trimmed, language: lang })
     const idx = this.queue.length - 1
 
     // Prefetch audio blob in background
@@ -68,8 +79,7 @@ export class AudioStreamer {
     const item = this.queue[idx]
     if (!item || this.stopped || this.failed) return
 
-    const params = new URLSearchParams({ text: item.text })
-    if (item.language) params.append('language', item.language)
+    const params = new URLSearchParams({ text: item.text, language: item.language })
 
     try {
       const response = await fetch(`/api/v1/tts/stream?${params.toString()}`, {
@@ -79,7 +89,8 @@ export class AudioStreamer {
       if (this.stopped || this.failed) return
 
       if (!response.ok) {
-        this.failChunk()
+        console.warn(`AudioStreamer: TTS fetch failed (${response.status}) for idx ${idx}`)
+        this.failChunk('provider_error')
         return
       }
 
@@ -96,15 +107,15 @@ export class AudioStreamer {
     } catch (e) {
       if (!this.stopped && !this.failed) {
         console.warn('AudioStreamer: Prefetch error', e)
-        this.failChunk()
+        this.failChunk('provider_error')
       }
     }
   }
 
   /**
-   * Terminal failure for a chunk: stop further fetches, end playback, notify.
+   * Terminal failure: stop further fetches, end playback, notify.
    */
-  private failChunk(): void {
+  private failChunk(reason: ReadAloudFailureReason): void {
     if (this.failed || this.stopped) return
     this.failed = true
     this.stopped = true
@@ -120,7 +131,7 @@ export class AudioStreamer {
     this.isPlaying = false
     const cb = this.onFailure
     this.onFailure = undefined
-    cb?.('provider_error')
+    cb?.(reason)
     this.fireFinished()
   }
 
@@ -156,7 +167,7 @@ export class AudioStreamer {
       this.prefetchedBlobs.delete(this.playIndex)
       this.isPlaying = false
       this.currentAudio = null
-      this.failChunk()
+      this.failChunk('provider_error')
     })
 
     audio.play().catch((e) => {

@@ -91,6 +91,103 @@ final class DesktopGeneratedMediaServiceTest extends TestCase
         self::assertSame('/api/v1/files/uploads/01/000/x.png', $out['file']['url']);
     }
 
+    public function testSpeakPassesExplicitLanguageToFacade(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+        $user->method('getLocale')->willReturn('en');
+
+        $model = $this->createMock(\App\Entity\Model::class);
+        $model->method('getService')->willReturn('Piper');
+        $model->method('getProviderId')->willReturn('piper-multi');
+        $model->method('getName')->willReturn('Piper Multi-Language');
+
+        $modelRepo = $this->createMock(EntityRepository::class);
+        $modelRepo->expects($this->any())->method('find')->with(140)->willReturn($model);
+
+        $fileRepo = $this->createMock(EntityRepository::class);
+        $fileRepo->method('findOneBy')->willReturn(null);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getRepository')->willReturnCallback(static function (string $class) use ($modelRepo, $fileRepo) {
+            return \App\Entity\Model::class === $class ? $modelRepo : $fileRepo;
+        });
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->expects($this->once())
+            ->method('synthesize')
+            ->with('Guten Morgen', 'de', 5, self::anything())
+            ->willReturn([
+                'relativePath' => '5/000/tts.mp3',
+                'provider' => 'piper',
+                'model' => 'de_DE-kerstin-low',
+            ]);
+
+        $rateLimit = $this->createMock(RateLimitService::class);
+        $rateLimit->method('checkLimit')->willReturn(['allowed' => true, 'used' => 0, 'limit' => 100]);
+
+        $svc = new DesktopGeneratedMediaService(
+            $this->createMock(MediaGenerationServiceInterface::class),
+            $aiFacade,
+            $rateLimit,
+            $em,
+            '/tmp/uploads',
+        );
+
+        $out = $svc->speak($user, 'Guten Morgen', 'piper:piper-multi:text2sound', 'de');
+        self::assertSame('/api/v1/files/uploads/5/000/tts.mp3', $out['file']['url']);
+    }
+
+    public function testSpeakFallsBackToUserLocaleWhenLanguageOmitted(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+        $user->method('getLocale')->willReturn('fr');
+
+        $model = $this->createMock(\App\Entity\Model::class);
+        $model->method('getService')->willReturn('Piper');
+        $model->method('getProviderId')->willReturn('piper-multi');
+        $model->method('getName')->willReturn('Piper Multi-Language');
+
+        $modelRepo = $this->createMock(EntityRepository::class);
+        $modelRepo->expects($this->any())->method('find')->with(140)->willReturn($model);
+        $fileRepo = $this->createMock(EntityRepository::class);
+        $fileRepo->method('findOneBy')->willReturn(null);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getRepository')->willReturnCallback(static function (string $class) use ($modelRepo, $fileRepo) {
+            return \App\Entity\Model::class === $class ? $modelRepo : $fileRepo;
+        });
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->expects($this->once())
+            ->method('synthesize')
+            ->with('Bonjour', 'fr', 5, self::anything())
+            ->willReturn([
+                'relativePath' => '5/000/tts.mp3',
+                'provider' => 'piper',
+                'model' => 'fr_FR-siwis-medium',
+            ]);
+
+        $rateLimit = $this->createMock(RateLimitService::class);
+        $rateLimit->method('checkLimit')->willReturn(['allowed' => true, 'used' => 0, 'limit' => 100]);
+
+        $svc = new DesktopGeneratedMediaService(
+            $this->createMock(MediaGenerationServiceInterface::class),
+            $aiFacade,
+            $rateLimit,
+            $em,
+            '/tmp/uploads',
+        );
+
+        $out = $svc->speak($user, 'Bonjour', 'piper:piper-multi:text2sound');
+        self::assertSame('piper', $out['provider']);
+    }
+
     private function service(
         ?MediaGenerationServiceInterface $media = null,
         ?EntityManagerInterface $em = null,

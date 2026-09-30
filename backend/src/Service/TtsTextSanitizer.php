@@ -12,9 +12,9 @@ use App\Service\Message\GeneratedMediaTextRenderer;
  * Strips non-speakable artifacts from AI response text before TTS synthesis.
  * Removes: <think> tags, [Memory:ID] badges, code blocks, markdown formatting, HTML tags.
  *
- * Call TtsTextSanitizer::prepareForSynthesis($text) BEFORE passing text to
- * AiFacade::synthesize() so every caller stays inside provider input limits
- * (OpenAI TTS rejects more than 4096 characters — #1665).
+ * AiFacade::synthesize() / synthesizeStream() call prepareForSynthesis() so
+ * every spoken reply stays inside provider input limits (OpenAI TTS rejects
+ * more than 4096 characters — #1665, #2283). Callers should pass raw text.
  */
 final readonly class TtsTextSanitizer
 {

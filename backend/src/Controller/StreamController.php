@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderDisplayNames;
 use App\Entity\Chat;
@@ -3361,9 +3362,9 @@ class StreamController extends AbstractController
                 return;
             }
 
-            $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
+            // The facade sanitizes and truncates again and needs the answer language (#2283).
+            $ttsResult = $this->aiFacade->synthesize($responseText, $language, $user->getId(), [
                 'format' => 'mp3',
-                'language' => $language,
             ]);
 
             $audioUrl = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
@@ -3419,6 +3420,10 @@ class StreamController extends AbstractController
                 $audioEvent['file_id'] = $ttsEphemeralFile->getId();
             }
             $this->sendSSE('audio', $audioEvent);
+        } catch (NoSpeakableTextException) {
+            $this->emitVoiceReplyFailed($outgoingMessage, 'empty_text', $incognito);
+
+            return;
         } catch (\Throwable $e) {
             $this->logger->warning('StreamController: Voice reply TTS failed', [
                 'error' => $e->getMessage(),

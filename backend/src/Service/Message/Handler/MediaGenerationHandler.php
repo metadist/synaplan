@@ -760,14 +760,19 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     );
                 }
 
+                $ttsLanguage = is_string($classification['language'] ?? null)
+                    ? (string) $classification['language']
+                    : ($message->getLanguage() ?: 'en');
+
+                // Facade sanitizes; pass the answer language explicitly (#2283).
                 $result = $this->aiFacade->synthesize(
                     $prompt,
+                    $ttsLanguage,
                     $message->getUserId(),
                     [
                         'provider' => $provider,
                         'model' => $modelName,
                         'format' => 'mp3',
-                        'language' => $classification['language'] ?? $message->getLanguage(),
                     ]
                 );
 

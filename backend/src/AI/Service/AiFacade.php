@@ -3,6 +3,7 @@
 namespace App\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Health\ModelHealthRecorder;
@@ -1496,14 +1497,26 @@ class AiFacade
     /**
      * Synthesize Speech (TTS).
      *
-     * @param string   $text    Text to synthesize
-     * @param int|null $userId  User ID for config lookup
-     * @param array    $options Additional options (provider, model, voice, speed, format, etc.)
+     * Language is a required argument so PHPStan flags every caller that omits
+     * the answer language (issue #2283). Do not default to "en" here — callers
+     * must pass the language of the text being spoken. Text is always sanitized
+     * and truncated in the facade so callers cannot skip TtsTextSanitizer.
+     *
+     * @param string   $text     Text to synthesize
+     * @param string   $language Language of the spoken text (e.g. "de", "en")
+     * @param int|null $userId   User ID for config lookup
+     * @param array    $options  Additional options (provider, model, voice, speed, format, etc.)
      *
      * @return array Result with relativePath (user-based path) and metadata
      */
-    public function synthesize(string $text, ?int $userId = null, array $options = []): array
+    public function synthesize(string $text, string $language, ?int $userId = null, array $options = []): array
     {
+        $language = trim($language);
+        if ('' === $language) {
+            throw new \InvalidArgumentException('TTS language is required');
+        }
+        $options['language'] = $language;
+
         $providerName = $options['provider'] ?? null;
         $ttsModelId = null;
 
@@ -1525,12 +1538,16 @@ class AiFacade
 
         $provider = $this->registry->getTextToSpeechProvider($providerName);
 
-        // Last-line defence for callers that skip TtsTextSanitizer (#1665).
-        $text = TtsTextSanitizer::truncateForSynthesis($text);
+        // Always sanitize + truncate here so callers cannot skip it (#2283, #1665).
+        $text = TtsTextSanitizer::prepareForSynthesis($text);
+        if ('' === $text) {
+            throw new NoSpeakableTextException();
+        }
 
         $this->logger->info('AI TTS request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
+            'language' => $language,
             'text_length' => strlen($text),
         ]);
 
@@ -1572,14 +1589,24 @@ class AiFacade
      * (same source the UI "Sprachsynthese" dropdown writes to) so streaming
      * and MP3 generation always use the same voice.
      *
-     * @param string   $text    Text to synthesize
-     * @param int|null $userId  User ID for config lookup
-     * @param array    $options Additional options (provider, model, voice, speed, format, language, etc.)
+     * Language is required — see {@see synthesize()}. Text is always sanitized
+     * and truncated in the facade.
+     *
+     * @param string   $text     Text to synthesize
+     * @param string   $language Language of the spoken text (e.g. "de", "en")
+     * @param int|null $userId   User ID for config lookup
+     * @param array    $options  Additional options (provider, model, voice, speed, format, etc.)
      *
      * @return array{generator: \Generator, contentType: string, provider: string, supportsStreaming: bool}
      */
-    public function synthesizeStream(string $text, ?int $userId = null, array $options = []): array
+    public function synthesizeStream(string $text, string $language, ?int $userId = null, array $options = []): array
     {
+        $language = trim($language);
+        if ('' === $language) {
+            throw new \InvalidArgumentException('TTS language is required');
+        }
+        $options['language'] = $language;
+
         $providerName = $options['provider'] ?? null;
 
         if (!$providerName && $userId > 0) {
@@ -1598,11 +1625,15 @@ class AiFacade
 
         $provider = $this->registry->getTextToSpeechProvider($providerName);
 
-        $text = TtsTextSanitizer::truncateForSynthesis($text);
+        $text = TtsTextSanitizer::prepareForSynthesis($text);
+        if ('' === $text) {
+            throw new NoSpeakableTextException();
+        }
 
         $this->logger->info('AI TTS stream request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
+            'language' => $language,
             'text_length' => strlen($text),
             'supports_streaming' => $provider->supportsStreaming(),
         ]);

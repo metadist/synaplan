@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
@@ -21,7 +22,6 @@ use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
-use App\Service\TtsTextSanitizer;
 use App\Service\Usage\RecordedUsage;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -479,6 +479,11 @@ class WebhookController extends AbstractController
             // Generate TTS if voice_reply is set and no media attachment already exists.
             if (null === $attachmentPath && '1' === $message->getMeta('voice_reply')) {
                 try {
+                    // Classification language is available after process() (#2283).
+                    $ttsLanguage = is_string($result['classification']['language'] ?? null)
+                        ? (string) $result['classification']['language']
+                        : ($message->getLanguage() ?: 'en');
+
                     $speakable = null !== $this->mediaTextRenderer
                         ? $this->mediaTextRenderer->forUser(
                             $responseText,
@@ -486,12 +491,12 @@ class WebhookController extends AbstractController
                             $user->getLocale(),
                         )
                         : GeneratedMediaTextRenderer::renderModel($responseText);
-                    $ttsText = TtsTextSanitizer::sanitize($speakable);
-                    if (!empty(trim($ttsText))) {
+                    if (!empty(trim($speakable))) {
                         $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
                         $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
 
-                        $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
+                        // The facade sanitizes; markers are already a readable sentence here.
+                        $ttsResult = $this->aiFacade->synthesize($speakable, $ttsLanguage, $user->getId(), [
                             'format' => 'mp3',
                             'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
                         ]);
@@ -504,10 +509,13 @@ class WebhookController extends AbstractController
                             'model_id' => $ttsResult['model_id'] ?? null,
                             'source' => 'EMAIL',
                             'media_usage' => [
-                                'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
+                                'characters' => $ttsResult['text_length'] ?? mb_strlen($speakable),
                             ],
                         ]);
                     }
+                } catch (NoSpeakableTextException) {
+                    // Code-only or think-only answer: send the text email without audio.
+                    $this->logger->info('Email voice reply skipped: no speakable text');
                 } catch (\Exception $e) {
                     $this->logger->error('Failed to generate TTS for email', ['error' => $e->getMessage()]);
                     if ($debugDiscord) {

@@ -157,7 +157,7 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
         $this->chatHandler->expects(self::never())->method('handleStream');
         $this->aiFacade->expects(self::once())
             ->method('synthesize')
-            ->with('Guten Morgen zusammen.', 7, self::anything())
+            ->with('Guten Morgen zusammen.', 'de', 7, self::anything())
             ->willReturn(['relativePath' => '7/tts.mp3', 'provider' => 'openai', 'model' => 'tts-1', 'text_length' => 22]);
         // The media path still extracts memories from the user turn — exactly once.
         $this->messageBus->expects(self::once())->method('dispatch')->willReturn(new Envelope(new \stdClass()));
@@ -183,6 +183,7 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
         $this->chatHandler->expects(self::never())->method('handleStream');
         $this->aiFacade->expects(self::once())
             ->method('synthesize')
+            ->with(self::KINDERLIED_REQUEST, 'de', 7, self::anything())
             ->willReturn(['relativePath' => '7/tts.mp3', 'provider' => 'openai', 'model' => 'tts-1', 'text_length' => 66]);
 
         $result = $handler->handle($message, [], ['topic' => 'tools:tts', 'language' => 'de']);
