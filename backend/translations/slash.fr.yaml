@@ -1,2 +1,7 @@
 needs_argument: 'Écrivez ce qu''il faut créer après la commande, par exemple : /%command% %example%'
 docs_not_found: 'Aucun fichier correspondant n''a été trouvé dans votre base de connaissances.'
+example_pic: 'un chien sur la plage'
+example_vid: 'une prise de vue par drone des montagnes'
+example_tts: 'bonjour, comment allez-vous'
+example_search: 'météo à Berlin aujourd''hui'
+example_docs: 'facture mars'

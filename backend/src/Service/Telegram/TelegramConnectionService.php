@@ -123,9 +123,10 @@ final readonly class TelegramConnectionService
         $bot->setStatus(TelegramBot::STATUS_PENDING);
         $bot->setErrorCode(null);
         $this->bots->save($bot);
-        $this->registerCommands($token);
-        $bot->setCommandsMenuVersion(self::COMMAND_MENU_VERSION);
-        $this->bots->save($bot);
+        if ($this->registerCommands($token)) {
+            $bot->setCommandsMenuVersion(self::COMMAND_MENU_VERSION);
+            $this->bots->save($bot);
+        }
 
         return $this->present($bot);
     }
@@ -155,9 +156,10 @@ final readonly class TelegramConnectionService
         }
         $bot->setSecretHash(hash('sha256', $secret));
         $this->bots->save($bot);
-        $this->registerCommands($token);
-        $bot->setCommandsMenuVersion(self::COMMAND_MENU_VERSION);
-        $this->bots->save($bot);
+        if ($this->registerCommands($token)) {
+            $bot->setCommandsMenuVersion(self::COMMAND_MENU_VERSION);
+            $this->bots->save($bot);
+        }
 
         return true;
     }
@@ -165,6 +167,8 @@ final readonly class TelegramConnectionService
     /**
      * Re-register the "/" menu when the stored version is behind
      * {@see COMMAND_MENU_VERSION}. Best effort — never blocks the inbound turn.
+     * The version advances only when every locale menu update succeeds, so a
+     * failed locale is retried on a later inbound update.
      */
     public function ensureCommandMenu(TelegramBot $bot): void
     {
@@ -175,7 +179,9 @@ final readonly class TelegramConnectionService
         if (null === $token) {
             return;
         }
-        $this->registerCommands($token);
+        if (!$this->registerCommands($token)) {
+            return;
+        }
         $bot->setCommandsMenuVersion(self::COMMAND_MENU_VERSION);
         $this->bots->save($bot);
     }
@@ -184,9 +190,12 @@ final readonly class TelegramConnectionService
      * The "/" menu in Telegram, in every language we support. Best effort:
      * the bot answers commands without the menu too. A failing locale is
      * logged and the remaining locales are still attempted.
+     *
+     * @return bool true only when every required locale menu update succeeded
      */
-    public function registerCommands(string $token): void
+    public function registerCommands(string $token): bool
     {
+        $ok = true;
         foreach (self::COMMAND_LOCALES as $locale) {
             $commands = [];
             foreach (self::COMMANDS as $command) {
@@ -195,12 +204,15 @@ final readonly class TelegramConnectionService
             try {
                 $this->api->setMyCommands($token, $commands, self::DEFAULT_COMMAND_LOCALE === $locale ? null : $locale);
             } catch (TelegramChannelException $e) {
+                $ok = false;
                 $this->logger->info('Telegram setMyCommands skipped', [
                     'locale' => $locale,
                     'error' => $e->errorCode,
                 ]);
             }
         }
+
+        return $ok;
     }
 
     public function pair(TelegramBot $bot, string $code, string $tgUserId, string $tgChatId): TelegramPairResult

@@ -812,6 +812,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         if (!empty($ragContext)) {
             $systemPrompt .= $ragContext;
+            if (!empty($classification['slash_docs'])) {
+                $systemPrompt .= $this->slashDocsCitationInstruction();
+            }
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
                 'topic' => $topic,
                 'rag_context_length' => strlen($ragContext),
@@ -1573,6 +1576,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Append RAG context to system prompt if available
         if (!empty($ragContext)) {
             $systemPrompt .= $ragContext;
+            if (!empty($classification['slash_docs'])) {
+                $systemPrompt .= $this->slashDocsCitationInstruction();
+            }
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
                 'topic' => $topic,
                 'rag_context_length' => strlen($ragContext),
@@ -2464,6 +2470,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         return $this->slashCommandCopy->docsNotFound($locale);
+    }
+
+    /**
+     * Slash `/docs` only: tell the model to name the matching source file.
+     * Regular RAG turns keep the softer KnowledgeContextFormatter wording.
+     */
+    private function slashDocsCitationInstruction(): string
+    {
+        return "\nWhen you answer, name the source file you used from the knowledge context above.\n";
     }
 
     /**

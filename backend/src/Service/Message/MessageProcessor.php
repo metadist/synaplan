@@ -329,7 +329,7 @@ final readonly class MessageProcessor
                 // answers the user. Inert unless MULTITASK_SHADOW_MODE is on, and
                 // wrapped so it can never affect the turn. Runs only on the
                 // normal-classification branch (never widget/fixed-prompt/again).
-                $this->maybeShadowPlan($message, $conversationHistory, $perfTimer);
+                $this->maybeShadowPlan($message, $conversationHistory, $perfTimer, $classification);
             }
 
             // User-selected knowledge-base folder (RAG group key) from the chat
@@ -879,7 +879,7 @@ final readonly class MessageProcessor
 
                 // Shadow mode (Sprint 1): see processStream() for rationale.
                 // Inert unless MULTITASK_SHADOW_MODE is on; never affects the turn.
-                $this->maybeShadowPlan($message, $conversationHistory);
+                $this->maybeShadowPlan($message, $conversationHistory, null, $classification);
             }
             $classification = $this->tagSavedTaskRun($classification, $options);
 
@@ -1499,10 +1499,24 @@ final readonly class MessageProcessor
         }
     }
 
-    private function maybeShadowPlan(Message $message, array $conversationHistory, ?PerfTimer $perfTimer = null): void
-    {
+    /**
+     * @param array<int, Message|array{role: string, content: string}> $conversationHistory
+     * @param array<string, mixed>                                     $classification
+     */
+    private function maybeShadowPlan(
+        Message $message,
+        array $conversationHistory,
+        ?PerfTimer $perfTimer = null,
+        array $classification = [],
+    ): void {
         try {
             if (!$this->multitaskConfig->isShadowMode()) {
+                return;
+            }
+
+            // Bare slash commands already short-circuit in ChatHandler with a
+            // localized hint — never spend a billable PLANNING call on them.
+            if (!empty($classification['slash_hint'])) {
                 return;
             }
 

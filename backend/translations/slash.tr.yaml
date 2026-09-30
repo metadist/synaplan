@@ -1,2 +1,7 @@
 needs_argument: 'Komuttan sonra ne oluşturulacağını yazın, örneğin: /%command% %example%'
 docs_not_found: 'Bilgi tabanınızda eşleşen bir dosya bulunamadı.'
+example_pic: 'plajda bir köpek'
+example_vid: 'dağların drone çekimi'
+example_tts: 'merhaba, nasılsın'
+example_search: 'bugün Berlin hava durumu'
+example_docs: 'Mart faturası'

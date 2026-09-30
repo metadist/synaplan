@@ -21,6 +21,28 @@ final class SlashCommandCopyTest extends TestCase
         self::assertStringContainsString('a dog on the beach', $text);
     }
 
+    public function testNeedsArgumentUsesLocalizedExamples(): void
+    {
+        $copy = new SlashCommandCopy($this->translator());
+
+        $de = $copy->needsArgument('pic', 'de');
+        self::assertStringContainsString('/pic', $de);
+        self::assertStringContainsString('ein Hund am Strand', $de);
+        self::assertStringNotContainsString('a dog on the beach', $de);
+
+        $es = $copy->needsArgument('search', 'es');
+        self::assertStringContainsString('/search', $es);
+        self::assertStringContainsString('el tiempo en Berlín hoy', $es);
+
+        $fr = $copy->needsArgument('docs', 'fr');
+        self::assertStringContainsString('/docs', $fr);
+        self::assertStringContainsString('facture mars', $fr);
+
+        $tr = $copy->needsArgument('tts', 'tr');
+        self::assertStringContainsString('/tts', $tr);
+        self::assertStringContainsString('merhaba, nasılsın', $tr);
+    }
+
     public function testDocsNotFoundIsLocalized(): void
     {
         $copy = new SlashCommandCopy($this->translator());

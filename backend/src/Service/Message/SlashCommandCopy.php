@@ -13,14 +13,8 @@ final readonly class SlashCommandCopy
 {
     private const DOMAIN = 'slash';
 
-    /** @var array<string, string> */
-    private const EXAMPLES = [
-        'pic' => 'a dog on the beach',
-        'vid' => 'a drone shot of mountains',
-        'tts' => 'hello, how are you',
-        'search' => 'weather in Berlin today',
-        'docs' => 'invoice March',
-    ];
+    /** @var list<string> */
+    private const EXAMPLE_COMMANDS = ['pic', 'vid', 'tts', 'search', 'docs'];
 
     public function __construct(private TranslatorInterface $translator)
     {
@@ -29,7 +23,8 @@ final readonly class SlashCommandCopy
     public function needsArgument(string $command, string $locale): string
     {
         $command = strtolower($command);
-        $example = self::EXAMPLES[$command] ?? '…';
+        $locale = $this->normalizeLocale($locale);
+        $example = $this->exampleFor($command, $locale);
 
         return $this->translator->trans(
             'needs_argument',
@@ -38,7 +33,7 @@ final readonly class SlashCommandCopy
                 '%example%' => $example,
             ],
             self::DOMAIN,
-            $this->normalizeLocale($locale),
+            $locale,
         );
     }
 
@@ -49,6 +44,20 @@ final readonly class SlashCommandCopy
             [],
             self::DOMAIN,
             $this->normalizeLocale($locale),
+        );
+    }
+
+    private function exampleFor(string $command, string $locale): string
+    {
+        if (!in_array($command, self::EXAMPLE_COMMANDS, true)) {
+            return '…';
+        }
+
+        return $this->translator->trans(
+            'example_'.$command,
+            [],
+            self::DOMAIN,
+            $locale,
         );
     }
 

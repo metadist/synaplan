@@ -111,9 +111,49 @@ final readonly class MessageClassifier
         $messageId = $message->getId();
         $text = $message->getText();
 
+        // Slash commands first (shared parser, every channel — issue #2280).
+        // Must run BEFORE the agent-pin fast-return: WhatsApp/MCP often supply
+        // agentId, and a bare /pic|/search|/docs must still return a usage hint
+        // instead of reaching the chat model. /search and /docs with an argument
+        // keep any pinned runtime profile and only overlay force_web_search /
+        // rag_query.
+        $forceWebSearchFromSlash = false;
+        $slashDocsFromSlash = false;
+        if (!empty($text) && str_starts_with(ltrim($text), '/')) {
+            $slashResult = $this->resolveSlashCommand($message, $text);
+            if (null !== $slashResult['return']) {
+                return $slashResult['return'];
+            }
+            $forceWebSearchFromSlash = $slashResult['force_web_search'];
+            $slashDocsFromSlash = $slashResult['slash_docs'];
+            $text = $message->getText();
+        }
+
         $pinned = $this->tryPinAgent($message, $options);
         if (null !== $pinned) {
-            return $pinned;
+            return $this->applySlashOverlaysToClassification(
+                $pinned,
+                $forceWebSearchFromSlash,
+                $slashDocsFromSlash,
+            );
+        }
+
+        // /docs <query> with no pin: route to rag_query without the AI sorter.
+        if ($slashDocsFromSlash) {
+            $language = $message->getLanguage() ?: 'en';
+            if ('NN' === $language) {
+                $language = 'en';
+            }
+            $docsDecision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, 'general');
+
+            return array_merge([
+                'topic' => 'general',
+                'language' => $language,
+                'intent' => Capability::RagQuery->value,
+                'source' => $docsDecision->toClassificationSource(),
+                'skip_sorting' => true,
+                'slash_docs' => true,
+            ], $docsDecision->toClassificationFields());
         }
 
         $this->logger->info('MessageClassifier: Starting classification', [
@@ -122,19 +162,6 @@ final readonly class MessageClassifier
             'has_text' => !empty($text),
             'override_model_id' => $overrideModelId,
         ]);
-
-        // Slash commands first (shared parser, every channel — issue #2280).
-        // Bare /pic|/vid|/tts|/search|/docs → usage hint. /search <text> strips
-        // and continues with force_web_search. /docs <text> → rag_query.
-        $forceWebSearchFromSlash = false;
-        if (!empty($text) && str_starts_with(ltrim($text), '/')) {
-            $slashResult = $this->resolveSlashCommand($message, $text);
-            if (null !== $slashResult['return']) {
-                return $slashResult['return'];
-            }
-            $forceWebSearchFromSlash = $slashResult['force_web_search'];
-            $text = $message->getText();
-        }
 
         // Phase 1c: fast-path. The full AI sorter call costs 200-800 ms TTFT
         // and is unnecessary for plain chat messages. If the message looks
@@ -812,13 +839,17 @@ final readonly class MessageClassifier
     /**
      * Resolve a leading slash command via {@see SlashCommandParser}.
      *
-     * @return array{return: array<string, mixed>|null, force_web_search: bool}
+     * Bare argument-required commands and media tool topics return immediately.
+     * `/search` and `/docs` with an argument strip the prefix and continue so a
+     * pinned assistant profile can still be applied on top.
+     *
+     * @return array{return: array<string, mixed>|null, force_web_search: bool, slash_docs: bool}
      */
     private function resolveSlashCommand(Message $message, string $text): array
     {
         $parsed = (new SlashCommandParser())->parse($text);
         if (null === $parsed) {
-            return ['return' => null, 'force_web_search' => false];
+            return ['return' => null, 'force_web_search' => false, 'slash_docs' => false];
         }
 
         $language = $message->getLanguage() ?: 'en';
@@ -845,6 +876,7 @@ final readonly class MessageClassifier
                     'slash_command' => $parsed->name,
                 ], $decision->toClassificationFields()),
                 'force_web_search' => false,
+                'slash_docs' => false,
             ];
         }
 
@@ -855,7 +887,7 @@ final readonly class MessageClassifier
                 'query_length' => strlen($parsed->argument),
             ]);
 
-            return ['return' => null, 'force_web_search' => true];
+            return ['return' => null, 'force_web_search' => true, 'slash_docs' => false];
         }
 
         if ('docs' === $parsed->name) {
@@ -865,19 +897,7 @@ final readonly class MessageClassifier
                 'query_length' => strlen($parsed->argument),
             ]);
 
-            $decision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, 'general');
-
-            return [
-                'return' => array_merge([
-                    'topic' => 'general',
-                    'language' => $language,
-                    'intent' => Capability::RagQuery->value,
-                    'source' => $decision->toClassificationSource(),
-                    'skip_sorting' => true,
-                    'slash_docs' => true,
-                ], $decision->toClassificationFields()),
-                'force_web_search' => false,
-            ];
+            return ['return' => null, 'force_web_search' => false, 'slash_docs' => true];
         }
 
         $toolTopic = $parsed->toolTopic();
@@ -898,10 +918,32 @@ final readonly class MessageClassifier
                     'skip_sorting' => true,
                 ], $decision->toClassificationFields()),
                 'force_web_search' => false,
+                'slash_docs' => false,
             ];
         }
 
-        return ['return' => null, 'force_web_search' => false];
+        return ['return' => null, 'force_web_search' => false, 'slash_docs' => false];
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function applySlashOverlaysToClassification(
+        array $classification,
+        bool $forceWebSearch,
+        bool $slashDocs,
+    ): array {
+        if ($forceWebSearch) {
+            $classification['force_web_search'] = true;
+        }
+        if ($slashDocs) {
+            $classification['intent'] = Capability::RagQuery->value;
+            $classification['slash_docs'] = true;
+        }
+
+        return $classification;
     }
 
     /**

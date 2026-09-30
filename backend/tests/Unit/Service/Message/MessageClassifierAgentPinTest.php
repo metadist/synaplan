@@ -111,6 +111,78 @@ final class MessageClassifierAgentPinTest extends TestCase
         self::assertArrayNotHasKey('runtime_profile', $result);
     }
 
+    public function testBareSlashCommandReturnsHintEvenWhenAnAssistantIsPinned(): void
+    {
+        $message = $this->mutableMessage(4, '/pic');
+        $this->agentPin->expects(self::never())->method('resolve');
+        $this->sorter->expects(self::never())->method('classify');
+
+        $result = $this->classifier->classify($message, [], null, true, ['agentId' => 7]);
+
+        self::assertTrue($result['slash_hint'] ?? false);
+        self::assertSame('pic', $result['slash_command'] ?? null);
+        self::assertArrayNotHasKey('runtime_profile', $result);
+        self::assertSame('tool_command', $result['source']);
+    }
+
+    public function testSearchWithArgumentKeepsPinnedProfileAndForcesWebSearch(): void
+    {
+        $profile = $this->sampleProfile();
+        $message = $this->mutableMessage(4, '/search weather in Berlin');
+        $this->agentPin->expects(self::once())->method('resolve')
+            ->with($message, ['agentId' => 7])
+            ->willReturn($profile);
+        $this->sorter->expects(self::never())->method('classify');
+
+        $result = $this->classifier->classify($message, [], null, true, ['agentId' => 7]);
+
+        self::assertSame('weather in Berlin', $message->getText());
+        self::assertTrue($result['force_web_search'] ?? false);
+        self::assertSame($profile, $result['runtime_profile']);
+        self::assertSame('agent', $result['source']);
+        self::assertSame(7, $result['agent_id']);
+        self::assertArrayNotHasKey('slash_hint', $result);
+    }
+
+    public function testDocsWithArgumentKeepsPinnedProfileAndSetsRagQuery(): void
+    {
+        $profile = $this->sampleProfile();
+        $message = $this->mutableMessage(4, '/docs invoice March');
+        $this->agentPin->expects(self::once())->method('resolve')
+            ->with($message, ['agentId' => 7])
+            ->willReturn($profile);
+        $this->sorter->expects(self::never())->method('classify');
+
+        $result = $this->classifier->classify($message, [], null, true, ['agentId' => 7]);
+
+        self::assertSame('invoice March', $message->getText());
+        self::assertSame('rag_query', $result['intent']);
+        self::assertTrue($result['slash_docs'] ?? false);
+        self::assertSame($profile, $result['runtime_profile']);
+        self::assertSame('agent', $result['source']);
+        self::assertSame(7, $result['agent_id']);
+    }
+
+    private function sampleProfile(): RuntimeProfile
+    {
+        return new RuntimeProfile(
+            promptId: 20,
+            promptTopic: 'agent:contract-review',
+            systemPrompt: 'Review contracts.',
+            modelIds: ['chat' => 11],
+            ragScopes: [['ownerId' => 4, 'groupKey' => 'TASKPROMPT:agent:contract-review']],
+            toolFlags: [],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 7,
+            agentVersionId: null,
+            notes: [],
+            ragLimit: 8,
+            ragMinScore: 0.6,
+        );
+    }
+
     private function message(int $userId, string $text): Message
     {
         $message = $this->createMock(Message::class);
@@ -122,6 +194,28 @@ final class MessageClassifierAgentPinTest extends TestCase
         $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
         $message->method('getTopic')->willReturn('CHAT');
         $message->method('getChatId')->willReturn(null);
+
+        return $message;
+    }
+
+    private function mutableMessage(int $userId, string $text): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(1);
+        $message->method('getUserId')->willReturn($userId);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getChatId')->willReturn(null);
+        $message->method('getText')->willReturnCallback(static function () use (&$text): string {
+            return $text;
+        });
+        $message->method('setText')->willReturnCallback(static function (string $value) use (&$text, $message): Message {
+            $text = $value;
+
+            return $message;
+        });
 
         return $message;
     }
