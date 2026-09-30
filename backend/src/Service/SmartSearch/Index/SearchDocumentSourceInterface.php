@@ -39,11 +39,12 @@ interface SearchDocumentSourceInterface
 
     /**
      * Live view of the hits the user may still open, keyed by ref id. Ids the
-     * user cannot access (or that no longer exist) are absent.
+     * user cannot access (or that no longer exist) are absent. Numeric ref
+     * ids become integer keys, as PHP stores them.
      *
      * @param list<string> $refIds
      *
-     * @return array<string, ResolvedItem>
+     * @return array<array-key, ResolvedItem>
      */
     public function resolve(int $userId, array $refIds): array;
 }

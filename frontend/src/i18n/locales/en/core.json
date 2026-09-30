@@ -242,7 +242,8 @@
         "navigate": "move",
         "open": "open",
         "close": "close",
-        "prefixes": "> commands · # settings · {'@'} files"
+        "prefixes": "> commands · # settings · {'@'} files",
+        "switch": "switch"
       },
       "groups": {
         "recent": "Recently opened",
@@ -341,6 +342,36 @@
         "chats": "all chats history conversations",
         "chats_incoming": "incoming shared with me chats",
         "my_groups": "groups teams members"
+      },
+      "remote": {
+        "searching": "Searching your chats, files and memories…",
+        "unavailable": "Your chats and files cannot be searched right now. Pages and actions still work — try again in a moment.",
+        "rateLimited": "That was a lot of searches in a short time. Wait a few seconds, then type again.",
+        "keywordOnly": "Matching by exact words only — search by meaning is not available right now.",
+        "indexing": "Your search is still being prepared. Some chats and files may be missing for a minute."
+      },
+      "setting": {
+        "pinned": "Set by the server",
+        "pinnedHint": "An environment variable pins this setting. Change it on the server and restart it.",
+        "switchLabel": "Switch {name}",
+        "selectLabel": "Choose {name}",
+        "confirmTitle": "Change {name} for everyone?",
+        "confirm": "Change it",
+        "consequence": {
+          "on": "This turns {name} on for every user of this Synaplan instance, right away. You can undo it from the notification.",
+          "off": "This turns {name} off for every user of this Synaplan instance, right away. You can undo it from the notification.",
+          "select": "This sets {name} to “{value}” for every user of this Synaplan instance, right away. You can undo it from the notification.",
+          "FEATURE_IAM_GROUPS_ENABLED": {
+            "true": "Administrators see People under Manage and can create groups; members see their groups under Account. You can undo it from the notification.",
+            "false": "People disappears from Manage and nobody can create or use groups. Sharing and group policies stop working. You can undo it from the notification."
+          }
+        },
+        "saved": "{name} is now “{value}” for everyone.",
+        "restored": "{name} is back to “{value}”.",
+        "undo": "Undo",
+        "failed": "{name} could not be changed. It is still “{value}”.",
+        "undoFailed": "The change could not be undone. {name} is still “{value}”.",
+        "notRefreshed": "Saved. Reload the page to see the change everywhere."
       }
     }
   },

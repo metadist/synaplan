@@ -51,9 +51,18 @@ async function reveal(sectionId: string): Promise<void> {
   open(sectionId)
   highlighted.value = sectionId
   await nextTick()
-  document
-    .getElementById(`config-section-${sectionId}`)
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const panel = document.getElementById(`config-section-${sectionId}`)
+  const field =
+    typeof route.query.highlight === 'string'
+      ? panel?.querySelector<HTMLElement>(
+          `[data-config-field="${CSS.escape(route.query.highlight)}"]`
+        )
+      : null
+  if (field) {
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return
+  }
+  panel?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function jumpTo(sectionId: string): void {

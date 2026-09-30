@@ -36,6 +36,16 @@ final class SettingMatcherTest extends TestCase
         self::assertGreaterThan(0, SettingMatcher::score('grou', self::KEY, self::LABELS, self::DESCRIPTION));
     }
 
+    public function testSwitchingVerbsDoNotMatchEveryToggle(): void
+    {
+        self::assertSame(0.0, SettingMatcher::score('enable', 'REGISTRATION_ENABLED', 'Users Sign-up', 'Allow new accounts.'));
+        self::assertSame(
+            SettingMatcher::score('groups', self::KEY, self::LABELS, self::DESCRIPTION),
+            SettingMatcher::score('turn on groups', self::KEY, self::LABELS, self::DESCRIPTION),
+        );
+        self::assertGreaterThan(0, SettingMatcher::score('Gruppen einschalten groups', self::KEY, self::LABELS, self::DESCRIPTION));
+    }
+
     public function testMostQueryWordsMustMatch(): void
     {
         self::assertSame(0.0, SettingMatcher::score('turn on the weather forecast', self::KEY, self::LABELS, self::DESCRIPTION));

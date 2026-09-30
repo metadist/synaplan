@@ -1,4 +1,5 @@
 import type { Component } from 'vue'
+import type { SmartSearchSettingAction } from '@/services/api/searchApi'
 
 export type SearchKind =
   | 'best'
@@ -19,15 +20,7 @@ export type MatchSource = 'local' | 'lexical' | 'semantic' | 'both'
  * Inline control for a setting result. Writes always go through the
  * existing settings endpoints; the descriptor only says what to render.
  */
-export interface SettingControl {
-  key: string
-  type: 'toggle' | 'select' | 'navigate'
-  scope: 'user' | 'system'
-  current: string | boolean | null
-  options: Array<{ value: string; label: string }>
-  envPinned: boolean
-  consequence: string | null
-}
+export type SettingControl = SmartSearchSettingAction
 
 export interface SearchResult {
   /** Stable, unique across all sources (`page:/files`, `chat:12`, …). */

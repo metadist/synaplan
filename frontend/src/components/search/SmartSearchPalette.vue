@@ -70,6 +70,14 @@
             >
               {{ statusText }}
             </p>
+            <p
+              v-if="remoteNote"
+              class="px-3 py-2 text-xs txt-secondary"
+              role="status"
+              data-testid="text-smart-search-remote-note"
+            >
+              {{ remoteNote }}
+            </p>
             <div
               v-for="group in groups"
               :key="group.key"
@@ -88,18 +96,23 @@
                 :option-id="optionId(flatIndex(item))"
                 @select="(event) => select(item, event.ctrlKey || event.metaKey)"
                 @hover="activeIndex = flatIndex(item)"
-              />
+              >
+                <template v-if="item.setting" #trailing>
+                  <SearchSettingControl
+                    :control="item.setting"
+                    :value="inline.valueOf(item.setting)"
+                    :value-label="inline.valueLabel(item.setting, inline.valueOf(item.setting))"
+                    :name="inline.nameOf(item.setting.key)"
+                    :saving="inline.savingKey.value === item.setting.key"
+                    :option-label="inline.optionLabel"
+                    @change="(value) => item.setting && inline.apply(item.setting, value)"
+                  />
+                </template>
+              </SearchResultRow>
             </div>
           </div>
 
-          <footer
-            class="hidden sm:flex items-center gap-4 px-4 py-2 border-t border-light-border/30 dark:border-dark-border/20 text-[11px] txt-secondary"
-          >
-            <span>↑↓ {{ $t('search.palette.footer.navigate') }}</span>
-            <span>↵ {{ $t('search.palette.footer.open') }}</span>
-            <span>Esc {{ $t('search.palette.footer.close') }}</span>
-            <span class="ml-auto truncate">{{ $t('search.palette.footer.prefixes') }}</span>
-          </footer>
+          <SearchPaletteFooter :can-switch="activeSetting !== null" />
         </div>
       </div>
     </Transition>
@@ -109,31 +122,47 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useSmartSearchStore } from '@/stores/smartSearch'
 import { useAuthStore } from '@/stores/auth'
 import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
 import { useSmartSearch } from '@/composables/search/useSmartSearch'
 import type { SearchResult } from '@/composables/search/types'
+import { useInlineSetting } from '@/composables/search/useInlineSetting'
+import { usePaletteStatus } from '@/composables/search/usePaletteStatus'
+import { usePaletteFocus } from '@/composables/search/usePaletteFocus'
 import SearchResultRow from './SearchResultRow.vue'
+import SearchSettingControl from './SearchSettingControl.vue'
+import SearchPaletteFooter from './SearchPaletteFooter.vue'
 
 const LIST_ID = 'smart-search-listbox'
 
-const { t } = useI18n()
 const store = useSmartSearchStore()
 const authStore = useAuthStore()
 const route = useRoute()
 const { teleportTarget } = useFullscreenTeleportTarget()
 const isOpen = computed(() => store.isOpen)
-const { query, parsed, groups, flatResults, hasMatches, execute } = useSmartSearch(isOpen, () =>
-  store.close()
-)
+const {
+  query,
+  parsed,
+  groups,
+  flatResults,
+  hasMatches,
+  execute,
+  remoteStatus,
+  semanticAvailable,
+  indexing,
+} = useSmartSearch(isOpen, () => store.close())
+
+const inline = useInlineSetting()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)
 const activeIndex = ref(0)
-let previouslyFocused: HTMLElement | null = null
+const activeSetting = computed(() => {
+  const setting = flatResults.value[activeIndex.value]?.setting
+  return setting && !setting.envPinned ? setting : null
+})
 
 const indexById = computed(
   () => new Map(flatResults.value.map((result, index) => [result.id, index]))
@@ -144,17 +173,23 @@ const activeOptionId = computed(() =>
   flatResults.value.length > 0 ? optionId(activeIndex.value) : undefined
 )
 
-const statusText = computed(() => {
-  if (parsed.value.text === '' && parsed.value.scope === 'all') {
-    return t('search.palette.emptyHint')
-  }
-  if (parsed.value.text !== '' && !hasMatches.value) {
-    return t('search.palette.noResults', { query: parsed.value.text })
-  }
-  return ''
+const { statusText, remoteNote } = usePaletteStatus({
+  parsed,
+  hasMatches,
+  remoteStatus,
+  semanticAvailable,
+  indexing,
 })
 
-watch(flatResults, () => {
+// Late server results must not move the keyboard selection off the item
+// the user already arrowed to; a new query starts at the top again.
+watch(flatResults, (next, previous) => {
+  const activeId = previous?.[activeIndex.value]?.id
+  const kept = activeIndex.value > 0 && activeId ? next.findIndex((r) => r.id === activeId) : -1
+  activeIndex.value = kept >= 0 ? kept : 0
+})
+
+watch(query, () => {
   activeIndex.value = 0
 })
 
@@ -163,21 +198,9 @@ watch(activeIndex, async (index) => {
   listRef.value?.querySelector(`#${optionId(index)}`)?.scrollIntoView({ block: 'nearest' })
 })
 
-watch(isOpen, async (open) => {
-  if (open) {
-    previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
-    query.value = store.initialQuery
-    activeIndex.value = 0
-    await nextTick()
-    inputRef.value?.focus()
-    inputRef.value?.select()
-    return
-  }
-  const restore = previouslyFocused
-  previouslyFocused = null
-  await nextTick()
-  restore?.focus()
+usePaletteFocus(isOpen, inputRef, () => {
+  query.value = store.initialQuery
+  activeIndex.value = 0
 })
 
 watch(
@@ -219,6 +242,10 @@ const onKeydown = (event: KeyboardEvent) => {
       break
     case 'Enter': {
       event.preventDefault()
+      if (event.shiftKey) {
+        if (activeSetting.value) void inline.cycle(activeSetting.value)
+        break
+      }
       const result = flatResults.value[activeIndex.value]
       if (result) select(result, event.ctrlKey || event.metaKey)
       break

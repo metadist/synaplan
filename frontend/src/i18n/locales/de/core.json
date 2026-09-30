@@ -295,7 +295,8 @@
         "navigate": "bewegen",
         "open": "öffnen",
         "close": "schließen",
-        "prefixes": "> Aktionen · # Einstellungen · {'@'} Dateien"
+        "prefixes": "> Aktionen · # Einstellungen · {'@'} Dateien",
+        "switch": "umschalten"
       },
       "groups": {
         "recent": "Zuletzt geöffnet",
@@ -394,6 +395,36 @@
         "chats": "alle chats verlauf unterhaltungen",
         "chats_incoming": "eingehend mit mir geteilt chats",
         "my_groups": "gruppen teams mitglieder"
+      },
+      "remote": {
+        "searching": "Durchsuche deine Chats, Dateien und Erinnerungen…",
+        "unavailable": "Deine Chats und Dateien lassen sich gerade nicht durchsuchen. Seiten und Aktionen funktionieren weiter — versuche es gleich noch einmal.",
+        "rateLimited": "Das waren viele Suchen in kurzer Zeit. Warte ein paar Sekunden und tippe dann weiter.",
+        "keywordOnly": "Es wird nur nach genauen Wörtern gesucht — die Suche nach Bedeutung ist gerade nicht verfügbar.",
+        "indexing": "Deine Suche wird noch vorbereitet. Einige Chats und Dateien fehlen eventuell für eine Minute."
+      },
+      "setting": {
+        "pinned": "Vom Server festgelegt",
+        "pinnedHint": "Eine Umgebungsvariable legt diese Einstellung fest. Ändere sie auf dem Server und starte ihn neu.",
+        "switchLabel": "{name} umschalten",
+        "selectLabel": "{name} auswählen",
+        "confirmTitle": "{name} für alle ändern?",
+        "confirm": "Ändern",
+        "consequence": {
+          "on": "Damit wird {name} sofort für alle Nutzer dieser Synaplan-Instanz eingeschaltet. Du kannst es in der Benachrichtigung rückgängig machen.",
+          "off": "Damit wird {name} sofort für alle Nutzer dieser Synaplan-Instanz ausgeschaltet. Du kannst es in der Benachrichtigung rückgängig machen.",
+          "select": "Damit wird {name} sofort für alle Nutzer dieser Synaplan-Instanz auf „{value}“ gesetzt. Du kannst es in der Benachrichtigung rückgängig machen.",
+          "FEATURE_IAM_GROUPS_ENABLED": {
+            "true": "Administratoren sehen „Personen“ unter Verwalten und können Gruppen anlegen; Mitglieder sehen ihre Gruppen unter Konto. Du kannst es in der Benachrichtigung rückgängig machen.",
+            "false": "„Personen“ verschwindet aus Verwalten, und niemand kann Gruppen anlegen oder nutzen. Freigaben und Gruppenrichtlinien funktionieren nicht mehr. Du kannst es in der Benachrichtigung rückgängig machen."
+          }
+        },
+        "saved": "{name} ist jetzt für alle „{value}“.",
+        "restored": "{name} ist wieder „{value}“.",
+        "undo": "Rückgängig",
+        "failed": "{name} konnte nicht geändert werden. Es bleibt „{value}“.",
+        "undoFailed": "Die Änderung konnte nicht rückgängig gemacht werden. {name} bleibt „{value}“.",
+        "notRefreshed": "Gespeichert. Lade die Seite neu, um die Änderung überall zu sehen."
       }
     }
   },

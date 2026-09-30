@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\SmartSearch\Provider;
 
+use App\Service\SmartSearch\Index\StopWords;
+
 /**
  * Keyword score of one admin setting against a query.
  *
@@ -37,7 +39,7 @@ final class SettingMatcher
 
     public static function score(string $query, string $key, string $labels, string $description): float
     {
-        $queryWords = self::words($query);
+        $queryWords = array_values(array_filter(self::words($query), static fn (string $word): bool => !StopWords::contains($word)));
         if ([] === $queryWords) {
             return 0.0;
         }

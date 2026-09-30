@@ -375,13 +375,19 @@ final readonly class SystemConfigService
     /**
      * Get current configuration values with sensitive fields masked.
      *
+     * @param list<string>|null $onlyKeys limit the lookup to these keys (null = every field)
+     *
      * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool, envOverride?: bool, effectiveValue?: string, locked?: bool, keySource?: string}>
      */
-    public function getValues(?int $actingUserId = null): array
+    public function getValues(?int $actingUserId = null, ?array $onlyKeys = null): array
     {
         $values = [];
+        $wanted = null === $onlyKeys ? null : array_flip($onlyKeys);
 
         foreach ($this->schema as $key => $field) {
+            if (null !== $wanted && !isset($wanted[$key])) {
+                continue;
+            }
             $source = $field['source'] ?? 'env';
 
             // Instance provider keys live in the encrypted ProviderKeyStore

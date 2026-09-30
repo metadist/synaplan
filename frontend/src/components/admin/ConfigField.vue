@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -8,6 +9,7 @@ import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigA
 import { providerHelpByEnvVar } from '@/utils/providerHelp'
 
 const { t, te } = useI18n()
+const route = useRoute()
 
 interface Props {
   fieldKey: string
@@ -182,6 +184,9 @@ const effectiveValueLabel = computed(() =>
 )
 
 const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
+
+/** `?highlight=KEY` from a search result rings the field it points at. */
+const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
 </script>
 
 <template>
@@ -191,7 +196,16 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
     the parent shows ManagedKeysStatusCard instead. This guard keeps that
     true for any caller.
   -->
-  <div v-if="!schema.managedBy" class="config-field">
+  <div
+    v-if="!schema.managedBy"
+    :data-config-field="fieldKey"
+    :class="[
+      'config-field',
+      isHighlighted &&
+        'rounded-lg ring-2 ring-[var(--brand)] ring-offset-4 ring-offset-transparent',
+    ]"
+    :data-testid="isHighlighted ? 'config-field-highlighted' : undefined"
+  >
     <div class="flex items-center justify-between mb-1.5">
       <div class="flex items-center gap-1.5 min-w-0">
         <label

@@ -19,6 +19,7 @@ final readonly class SearchRequest
         public string $query,
         public array $kinds,
         public int $limit,
+        public QueryVectors $vectors,
     ) {
         $this->fulltext = new FulltextQuery($query);
     }

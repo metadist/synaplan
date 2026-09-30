@@ -7,6 +7,7 @@ import { ensureAllLocales } from './localeTexts'
 import { usePageSources, type LocalEntry } from './pageSources'
 import { useCommandSources } from './commandSources'
 import { useSearchRecents } from './useSearchRecents'
+import { useRemoteSearch } from './useRemoteSearch'
 import type { SearchGroup, SearchKind, SearchResult } from './types'
 
 export const GROUP_ORDER: SearchKind[] = [
@@ -40,6 +41,18 @@ export function parseScope(raw: string): { scope: SearchScope; text: string } {
   return { scope: 'all', text: raw.trim() }
 }
 
+/**
+ * Stable re-order that lifts recently opened items to the top of their
+ * group, most recent first; everything else keeps its ranked order.
+ */
+export function boostRecent(items: SearchResult[], recentIds: string[]): SearchResult[] {
+  const rank = new Map(recentIds.map((id, index) => [id, index]))
+  return items
+    .map((item, index) => ({ item, index, recent: rank.get(item.id) ?? Number.MAX_SAFE_INTEGER }))
+    .sort((a, b) => a.recent - b.recent || a.index - b.index)
+    .map((entry) => entry.item)
+}
+
 export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
   const router = useRouter()
   const t = i18n.global.t
@@ -66,6 +79,7 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
   })
 
   const parsed = computed(() => parseScope(query.value))
+  const remote = useRemoteSearch(parsed, isOpen)
 
   const localResults = computed<SearchResult[]>(() => {
     const { scope, text } = parsed.value
@@ -133,16 +147,22 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
     }
 
     const byKind = new Map<SearchKind, SearchResult[]>()
-    for (const result of [...localResults.value, ...(askResult.value ? [askResult.value] : [])]) {
+    const all = [
+      ...localResults.value,
+      ...remote.results.value,
+      ...(askResult.value ? [askResult.value] : []),
+    ]
+    for (const result of all) {
       const list = byKind.get(result.kind) ?? []
       if (!list.some((existing) => existing.id === result.id)) list.push(result)
       byKind.set(result.kind, list)
     }
     const limit = parsed.value.scope === 'all' ? MAX_PER_GROUP : MAX_SCOPED
+    const recentIds = recents.value.map((recent) => recent.id)
     return GROUP_ORDER.filter((kind) => byKind.has(kind)).map((kind) => ({
       key: kind,
       label: groupLabel(kind),
-      items: (byKind.get(kind) ?? []).slice(0, limit),
+      items: boostRecent(byKind.get(kind) ?? [], recentIds).slice(0, limit),
     }))
   })
 
@@ -165,5 +185,15 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
     }
   }
 
-  return { query, parsed, groups, flatResults, hasMatches, execute }
+  return {
+    query,
+    parsed,
+    groups,
+    flatResults,
+    hasMatches,
+    execute,
+    remoteStatus: remote.status,
+    semanticAvailable: remote.semanticAvailable,
+    indexing: remote.indexing,
+  }
 }

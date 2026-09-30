@@ -231,7 +231,8 @@
         "navigate": "gezin",
         "open": "aç",
         "close": "kapat",
-        "prefixes": "> eylemler · # ayarlar · {'@'} dosyalar"
+        "prefixes": "> eylemler · # ayarlar · {'@'} dosyalar",
+        "switch": "değiştir"
       },
       "groups": {
         "recent": "Son açılanlar",
@@ -330,6 +331,36 @@
         "chats": "tüm sohbetler geçmiş konuşmalar",
         "chats_incoming": "gelen benimle paylaşılan sohbetler",
         "my_groups": "gruplar takımlar üyeler"
+      },
+      "remote": {
+        "searching": "Sohbetlerin, dosyaların ve anıların aranıyor…",
+        "unavailable": "Sohbetlerin ve dosyaların şu anda aranamıyor. Sayfalar ve eylemler çalışmaya devam ediyor — birazdan tekrar dene.",
+        "rateLimited": "Kısa sürede çok fazla arama yaptın. Birkaç saniye bekle, sonra tekrar yaz.",
+        "keywordOnly": "Yalnızca tam kelimelerle aranıyor — anlama göre arama şu anda kullanılamıyor.",
+        "indexing": "Araman hâlâ hazırlanıyor. Bazı sohbetler ve dosyalar bir dakika kadar eksik olabilir."
+      },
+      "setting": {
+        "pinned": "Sunucu tarafından belirlendi",
+        "pinnedHint": "Bu ayarı bir ortam değişkeni sabitliyor. Sunucuda değiştir ve yeniden başlat.",
+        "switchLabel": "{name} değiştir",
+        "selectLabel": "{name} seç",
+        "confirmTitle": "{name} herkes için değiştirilsin mi?",
+        "confirm": "Değiştir",
+        "consequence": {
+          "on": "Bu, {name} ayarını bu Synaplan örneğindeki tüm kullanıcılar için hemen açar. Bildirimden geri alabilirsin.",
+          "off": "Bu, {name} ayarını bu Synaplan örneğindeki tüm kullanıcılar için hemen kapatır. Bildirimden geri alabilirsin.",
+          "select": "Bu, {name} ayarını bu Synaplan örneğindeki tüm kullanıcılar için hemen “{value}” yapar. Bildirimden geri alabilirsin.",
+          "FEATURE_IAM_GROUPS_ENABLED": {
+            "true": "Yöneticiler Yönet altında Kişiler’i görür ve grup oluşturabilir; üyeler gruplarını Hesap altında görür. Bildirimden geri alabilirsin.",
+            "false": "Kişiler Yönet menüsünden kaybolur ve kimse grup oluşturamaz ya da kullanamaz. Paylaşımlar ve grup politikaları çalışmayı durdurur. Bildirimden geri alabilirsin."
+          }
+        },
+        "saved": "{name} artık herkes için “{value}”.",
+        "restored": "{name} yeniden “{value}”.",
+        "undo": "Geri al",
+        "failed": "{name} değiştirilemedi. Hâlâ “{value}”.",
+        "undoFailed": "Değişiklik geri alınamadı. {name} hâlâ “{value}”.",
+        "notRefreshed": "Kaydedildi. Değişikliği her yerde görmek için sayfayı yenile."
       }
     }
   },

@@ -231,7 +231,8 @@
         "navigate": "mover",
         "open": "abrir",
         "close": "cerrar",
-        "prefixes": "> acciones · # ajustes · {'@'} archivos"
+        "prefixes": "> acciones · # ajustes · {'@'} archivos",
+        "switch": "cambiar"
       },
       "groups": {
         "recent": "Abiertos recientemente",
@@ -330,6 +331,36 @@
         "chats": "todos los chats historial conversaciones",
         "chats_incoming": "entrantes compartidos conmigo chats",
         "my_groups": "grupos equipos miembros"
+      },
+      "remote": {
+        "searching": "Buscando en tus chats, archivos y recuerdos…",
+        "unavailable": "Ahora mismo no se pueden buscar tus chats y archivos. Las páginas y acciones siguen funcionando: inténtalo de nuevo en un momento.",
+        "rateLimited": "Has hecho muchas búsquedas en poco tiempo. Espera unos segundos y vuelve a escribir.",
+        "keywordOnly": "Solo se buscan palabras exactas: la búsqueda por significado no está disponible ahora.",
+        "indexing": "Tu búsqueda aún se está preparando. Puede que falten algunos chats y archivos durante un minuto."
+      },
+      "setting": {
+        "pinned": "Definido por el servidor",
+        "pinnedHint": "Una variable de entorno fija este ajuste. Cámbiala en el servidor y reinícialo.",
+        "switchLabel": "Cambiar {name}",
+        "selectLabel": "Elegir {name}",
+        "confirmTitle": "¿Cambiar {name} para todos?",
+        "confirm": "Cambiar",
+        "consequence": {
+          "on": "Esto activa {name} para todos los usuarios de esta instancia de Synaplan, al instante. Puedes deshacerlo desde la notificación.",
+          "off": "Esto desactiva {name} para todos los usuarios de esta instancia de Synaplan, al instante. Puedes deshacerlo desde la notificación.",
+          "select": "Esto pone {name} en «{value}» para todos los usuarios de esta instancia de Synaplan, al instante. Puedes deshacerlo desde la notificación.",
+          "FEATURE_IAM_GROUPS_ENABLED": {
+            "true": "Los administradores ven Personas en Gestionar y pueden crear grupos; los miembros ven sus grupos en Cuenta. Puedes deshacerlo desde la notificación.",
+            "false": "Personas desaparece de Gestionar y nadie puede crear ni usar grupos. Las comparticiones y las políticas de grupo dejan de funcionar. Puedes deshacerlo desde la notificación."
+          }
+        },
+        "saved": "{name} ahora es «{value}» para todos.",
+        "restored": "{name} vuelve a ser «{value}».",
+        "undo": "Deshacer",
+        "failed": "No se pudo cambiar {name}. Sigue en «{value}».",
+        "undoFailed": "No se pudo deshacer el cambio. {name} sigue en «{value}».",
+        "notRefreshed": "Guardado. Recarga la página para ver el cambio en todas partes."
       }
     }
   },

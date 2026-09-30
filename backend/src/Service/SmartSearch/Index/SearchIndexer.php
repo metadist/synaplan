@@ -81,4 +81,21 @@ final readonly class SearchIndexer
 
         return $written;
     }
+
+    /**
+     * Rewrites the shared catalog rows of one kind (BUSERID = 0).
+     *
+     * @param list<SearchDocument> $documents
+     */
+    public function replaceCatalog(string $kind, array $documents): int
+    {
+        $kept = [];
+        foreach ($documents as $document) {
+            $this->repository->upsert($document);
+            $kept[] = $document->refId;
+        }
+        $this->repository->deleteMissing(SettingsCatalog::CATALOG_USER_ID, $kind, $kept);
+
+        return count($kept);
+    }
 }

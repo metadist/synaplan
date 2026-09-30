@@ -62,7 +62,7 @@ final class SearchControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $owner);
         $body = $this->postSearch(['q' => 'Q3']);
         self::assertResponseIsSuccessful();
-        self::assertFalse($body['semanticAvailable']);
+        self::assertIsBool($body['semanticAvailable']);
         self::assertSame('chat:'.$chat->getId(), $body['results'][0]['id']);
         self::assertSame('/?chat='.$chat->getId(), $body['results'][0]['route']);
         self::assertSame('lexical', $body['results'][0]['matchedBy']);
@@ -99,6 +99,29 @@ final class SearchControllerTest extends WebTestCase
         $body = $this->postSearch(['q' => 'FEATURE_IAM_GROUPS_ENABLED']);
         self::assertSame('setting:FEATURE_IAM_GROUPS_ENABLED', $body['results'][0]['id']);
         self::assertStringContainsString('highlight=FEATURE_IAM_GROUPS_ENABLED', $body['results'][0]['route']);
+        self::assertStringContainsString('section=people', $body['results'][0]['route']);
+    }
+
+    /**
+     * A database-backed toggle is switched in place; a setting that lives in
+     * .env needs a restart and a secret must never be echoed, so both only
+     * link to the page.
+     */
+    public function testOnlyDatabaseTogglesCarryAnInlineAction(): void
+    {
+        $this->authenticateClient($this->client, $this->createUser('search-admin@synaplan.internal', 'ADMIN'));
+
+        $toggle = $this->postSearch(['q' => 'FEATURE_IAM_GROUPS_ENABLED'])['results'][0];
+        self::assertSame('toggle', $toggle['action']['type']);
+        self::assertSame('FEATURE_IAM_GROUPS_ENABLED', $toggle['action']['key']);
+        self::assertSame('system', $toggle['action']['scope']);
+        self::assertContains($toggle['action']['current'], ['true', 'false']);
+        self::assertSame([], $toggle['action']['options']);
+        self::assertIsBool($toggle['action']['envPinned']);
+
+        $envSetting = $this->postSearch(['q' => 'MAILER_DSN'])['results'][0];
+        self::assertSame('setting:MAILER_DSN', $envSetting['id']);
+        self::assertNull($envSetting['action']);
     }
 
     public function testKindsNarrowTheResults(): void
@@ -145,22 +168,37 @@ final class SearchControllerTest extends WebTestCase
             ->setFileType('txt')
             ->setFileMime('text/plain')
             ->setFileText('The quarterly revenue forecast for the Lisbon office grew again.');
+        $invoice = (new File())
+            ->setUserId($userId)
+            ->setFileName('invoice_march_plumber.pdf')
+            ->setFileType('pdf')
+            ->setFileMime('application/pdf');
         $this->em->persist($file);
+        $this->em->persist($invoice);
         $this->em->flush();
 
         try {
             static::getContainer()->get(SearchIndexer::class)->reindexUser($userId);
-
             $this->authenticateClient($this->client, $owner);
-            $body = $this->postSearch(['q' => 'lisbon revenue']);
 
+            $body = $this->postSearch(['q' => 'lisbon revenue', 'kinds' => ['file']]);
             self::assertResponseIsSuccessful();
             self::assertSame('file:'.$file->getId(), $body['results'][0]['id']);
             self::assertSame('forecast.txt', $body['results'][0]['title']);
             self::assertStringContainsString('Lisbon', (string) $body['results'][0]['snippet']);
+
+            // Words inside an underscore file name are separate words.
+            $body = $this->postSearch(['q' => 'plumber invoice', 'kinds' => ['file']]);
+            self::assertSame(['file:'.$invoice->getId()], array_column($body['results'], 'id'));
+            self::assertNull($body['results'][0]['snippet']);
+
+            // All words first; when that finds nothing, the rows matching some of them.
+            $body = $this->postSearch(['q' => 'lisbon unicorn', 'kinds' => ['file']]);
+            self::assertSame(['file:'.$file->getId()], array_column($body['results'], 'id'));
         } finally {
             static::getContainer()->get(SearchIndexRepository::class)->deleteMissing($userId, 'file', []);
             $this->em->remove($this->em->find(File::class, $file->getId()));
+            $this->em->remove($this->em->find(File::class, $invoice->getId()));
             $this->em->remove($this->em->find(User::class, $userId));
             $this->em->flush();
         }

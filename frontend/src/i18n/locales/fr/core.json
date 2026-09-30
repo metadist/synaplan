@@ -242,7 +242,8 @@
         "navigate": "déplacer",
         "open": "ouvrir",
         "close": "fermer",
-        "prefixes": "> actions · # réglages · {'@'} fichiers"
+        "prefixes": "> actions · # réglages · {'@'} fichiers",
+        "switch": "basculer"
       },
       "groups": {
         "recent": "Ouverts récemment",
@@ -341,6 +342,36 @@
         "chats": "tous les chats historique conversations",
         "chats_incoming": "entrants partagés avec moi chats",
         "my_groups": "groupes équipes membres"
+      },
+      "remote": {
+        "searching": "Recherche dans vos chats, fichiers et souvenirs…",
+        "unavailable": "Vos chats et fichiers ne peuvent pas être recherchés pour le moment. Les pages et actions fonctionnent toujours — réessayez dans un instant.",
+        "rateLimited": "Beaucoup de recherches en peu de temps. Attendez quelques secondes, puis tapez à nouveau.",
+        "keywordOnly": "Recherche par mots exacts uniquement — la recherche par sens n’est pas disponible pour le moment.",
+        "indexing": "Votre recherche est encore en préparation. Certains chats et fichiers peuvent manquer pendant une minute."
+      },
+      "setting": {
+        "pinned": "Défini par le serveur",
+        "pinnedHint": "Une variable d’environnement fixe ce réglage. Modifiez-la sur le serveur, puis redémarrez-le.",
+        "switchLabel": "Basculer {name}",
+        "selectLabel": "Choisir {name}",
+        "confirmTitle": "Modifier {name} pour tout le monde ?",
+        "confirm": "Modifier",
+        "consequence": {
+          "on": "Cela active {name} pour tous les utilisateurs de cette instance Synaplan, immédiatement. Vous pouvez l’annuler depuis la notification.",
+          "off": "Cela désactive {name} pour tous les utilisateurs de cette instance Synaplan, immédiatement. Vous pouvez l’annuler depuis la notification.",
+          "select": "Cela règle {name} sur « {value} » pour tous les utilisateurs de cette instance Synaplan, immédiatement. Vous pouvez l’annuler depuis la notification.",
+          "FEATURE_IAM_GROUPS_ENABLED": {
+            "true": "Les administrateurs voient Personnes sous Gérer et peuvent créer des groupes ; les membres voient leurs groupes sous Compte. Vous pouvez l’annuler depuis la notification.",
+            "false": "Personnes disparaît de Gérer et personne ne peut créer ni utiliser de groupes. Les partages et les règles de groupe ne fonctionnent plus. Vous pouvez l’annuler depuis la notification."
+          }
+        },
+        "saved": "{name} est désormais « {value} » pour tout le monde.",
+        "restored": "{name} est revenu à « {value} ».",
+        "undo": "Annuler",
+        "failed": "{name} n’a pas pu être modifié. Il reste « {value} ».",
+        "undoFailed": "La modification n’a pas pu être annulée. {name} reste « {value} ».",
+        "notRefreshed": "Enregistré. Rechargez la page pour voir le changement partout."
       }
     }
   },
