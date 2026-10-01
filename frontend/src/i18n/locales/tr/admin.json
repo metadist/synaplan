@@ -355,6 +355,18 @@
         "light": "AÇIK mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler açık modda geçerlidir. Koyu mod renklerini düzenlemek için uygulamayı koyu moda geçirin.",
         "dark": "KOYU mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler koyu modda geçerlidir. Açık mod renklerini düzenlemek için uygulamayı açık moda geçirin."
       },
+      "brandingReset": {
+        "title": "Varsayılan stile sıfırla",
+        "description": "Açık ve koyu mod için varsayılan Synaplan renklerini ve yazı tiplerini geri yükler. Ad, logolar, yasal bağlantılar, açılış sayfaları ve atıf değişmeden kalır.",
+        "button": "Stili sıfırla",
+        "resetting": "Sıfırlanıyor…",
+        "confirmTitle": "Stil varsayılanlara sıfırlansın mı?",
+        "confirmMessage": "Özel renkleriniz ve yazı tipleriniz (açık ve koyu mod) Synaplan varsayılanlarıyla değiştirilecek. Ad, logolar, bağlantılar ve atıf değişmeyecek. Bu işlem geri alınamaz.",
+        "success": "Stil sıfırlandı — varsayılanlar yeniden kullanılıyor.",
+        "partial": "{reset} ayar sıfırlandı, {failed} başarısız oldu — başarısız olanlar değerlerinizi korudu.",
+        "failed": "Stil sıfırlanamadı. Değerleriniz değişmedi.",
+        "unconfirmed": "Stilin sıfırlanıp sıfırlanmadığı doğrulanamadı. Geçerli stili görmek için sayfayı yenileyin."
+      },
       "restartBanner": {
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",

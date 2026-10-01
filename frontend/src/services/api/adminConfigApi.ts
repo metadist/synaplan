@@ -4,6 +4,7 @@
  * SECURITY: All endpoints require admin access. Sensitive values are always masked.
  */
 import { z } from 'zod'
+import { PostAdminConfigBrandingResetResponseSchema } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
 // === Zod Schemas for Runtime Validation ===
@@ -104,6 +105,7 @@ export type ConfigSchema = z.infer<typeof ConfigSchemaZ>
 export type ConfigValue = z.infer<typeof ConfigValueZ>
 export type ConfigBackup = z.infer<typeof ConfigBackupZ>
 export type TestConnectionResult = z.infer<typeof TestConnectionResultZ>
+export type ResetBrandingStyleResult = z.infer<typeof PostAdminConfigBrandingResetResponseSchema>
 
 // === API Functions ===
 
@@ -138,6 +140,17 @@ export async function updateConfigValue(
     method: 'PUT',
     body: JSON.stringify({ key, value }),
     schema: UpdateValueResponseZ,
+  })
+}
+
+/**
+ * Reset the branding style (colors + fonts) to the defaults.
+ * Name, logos, legal links, navigation and attribution are kept.
+ */
+export async function resetBrandingStyle(): Promise<ResetBrandingStyleResult> {
+  return httpClient('/api/v1/admin/config/branding/reset', {
+    method: 'POST',
+    schema: PostAdminConfigBrandingResetResponseSchema,
   })
 }
 

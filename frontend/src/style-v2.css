@@ -14,36 +14,39 @@
  * 55% white that blended into the page), darker secondary text, and stronger
  * borders/glow so cards, the rail and dividers keep their "power". */
 .design-v2 {
-  --bg-app: #e4e9f1;
-  --bg-sidebar: rgba(219, 227, 240, 0.92);
-  --bg-chat: #eef2f7;
+  /* Contrast pass: the page deepens a step so white cards lift off it
+     (1.22:1 -> 1.36:1 vs white, +12%); borders gain ~30% alpha so glass
+     edges stop blending tone-in-tone. */
+  --bg-app: #d5dee9;
+  --bg-sidebar: rgba(208, 218, 234, 0.94);
+  --bg-chat: #e8edf4;
   --bg-card: rgba(255, 255, 255, 0.96);
-  --bg-chip: rgba(0, 0, 0, 0.05);
+  --bg-chip: rgba(0, 0, 0, 0.07);
   /* Contrast overhaul: darker secondary ink so hints, labels, timestamps
      and placeholders read clearly on the light blue-grey surfaces
      (was #4b515c). */
   --txt-secondary: #3a3f48;
   /* Same placeholder ink as the base theme: #6b6b6b is 4.9:1 on the glass
-     dropdown (#f5f5f8). Do not point this at --txt-secondary (#3a3f48, ~10:1);
+     dropdown (#f3f4f7). Do not point this at --txt-secondary (#3a3f48, ~10:1);
      that is why the empty row shouted as loud as a real model. */
   --txt-model-placeholder: #6b6b6b;
-  /* Same hover ink as the base theme: 5.1:1 on the glass hover wash. */
+  /* Same hover ink as the base theme: 5.0:1 on the glass hover wash. */
   --txt-model-placeholder-hover: #5e5e5e;
-  --border-light: rgba(0, 45, 140, 0.22);
-  --brand-alpha-light: rgba(0, 63, 199, 0.09);
+  --border-light: rgba(0, 45, 140, 0.28);
+  --brand-alpha-light: rgba(0, 63, 199, 0.12);
 
-  --v2-glow: rgba(0, 63, 199, 0.16);
-  --v2-glow-strong: rgba(0, 63, 199, 0.3);
+  --v2-glow: rgba(0, 63, 199, 0.2);
+  --v2-glow-strong: rgba(0, 63, 199, 0.36);
   --v2-blur-sm: 8px;
   --v2-blur-md: 16px;
   --v2-blur-lg: 24px;
   --v2-radius: 1rem;
-  --v2-border: rgba(0, 63, 199, 0.22);
-  --v2-border-hover: rgba(0, 63, 199, 0.36);
+  --v2-border: rgba(0, 63, 199, 0.3);
+  --v2-border-hover: rgba(0, 63, 199, 0.44);
 
   /* Usage taximeter — V2 keeps the base blues; slightly stronger track alpha
      so the bar/ring stay visible on the frosted light surfaces. */
-  --usage-track: rgba(0, 63, 199, 0.14);
+  --usage-track: rgba(0, 63, 199, 0.18);
   --usage-epoch-a: #003fc7;
   --usage-epoch-b: #4f9cf9;
 }
@@ -52,26 +55,28 @@
  * Secondary text is a calm mid-grey — readable on near-black surfaces
  * without the glare of near-white ink. */
 .design-v2.dark {
-  --bg-app: #050a16;
-  --bg-sidebar: rgba(10, 16, 30, 0.7);
-  --bg-chat: #050a16;
-  --bg-card: rgba(16, 24, 42, 0.9);
-  --bg-chip: rgba(255, 255, 255, 0.04);
+  /* Contrast pass: the page deepens while cards lift and gain opacity, so
+     glass stops blending tone-in-tone (card vs app 1.12:1 -> 1.25:1, +12%). */
+  --bg-app: #02050c;
+  --bg-sidebar: rgba(8, 13, 24, 0.78);
+  --bg-chat: #02050c;
+  --bg-card: rgba(20, 31, 56, 0.94);
+  --bg-chip: rgba(255, 255, 255, 0.07);
   --txt-secondary: #bdc2cc;
-  /* #8b95a7 is 6.0:1 on the dark glass dropdown (#0e1628), quieter than #bdc2cc. */
+  /* #8b95a7 is 6.0:1 on the dark glass dropdown (#0d1526), quieter than #bdc2cc. */
   --txt-model-placeholder: #8b95a7;
-  /* Hover wash here is rgba(107, 143, 214, 0.08). #959fb1 stays above 6:1. */
+  /* Hover wash here is rgba(107, 143, 214, 0.12). #959fb1 stays above 6:1. */
   --txt-model-placeholder-hover: #959fb1;
-  --border-light: rgba(107, 143, 214, 0.16);
-  --brand-alpha-light: rgba(107, 143, 214, 0.1);
+  --border-light: rgba(107, 143, 214, 0.24);
+  --brand-alpha-light: rgba(107, 143, 214, 0.14);
 
-  --v2-glow: rgba(107, 143, 214, 0.1);
-  --v2-glow-strong: rgba(107, 143, 214, 0.22);
-  --v2-border: rgba(107, 143, 214, 0.1);
-  --v2-border-hover: rgba(107, 143, 214, 0.2);
+  --v2-glow: rgba(107, 143, 214, 0.14);
+  --v2-glow-strong: rgba(107, 143, 214, 0.28);
+  --v2-border: rgba(107, 143, 214, 0.18);
+  --v2-border-hover: rgba(107, 143, 214, 0.3);
 
   /* Usage taximeter — V2 dark. */
-  --usage-track: rgba(147, 197, 253, 0.2);
+  --usage-track: rgba(147, 197, 253, 0.26);
   --usage-epoch-a: #6d9ae0;
   --usage-epoch-b: #93c5fd;
 }
@@ -157,45 +162,45 @@
    ---------------------------------------------------------- */
 
 .design-v2 .nav-item {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.05);
   border-radius: 0.875rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.16);
   color: #2c2c2c;
   box-shadow: none;
   transition: all 0.2s ease;
 }
 .design-v2 .nav-item:hover {
-  background: rgba(0, 63, 199, 0.06);
+  background: rgba(0, 63, 199, 0.09);
   border-color: var(--v2-border);
   box-shadow: 0 0 12px var(--v2-glow);
 }
 .design-v2 .nav-item--active {
-  background: rgba(0, 63, 199, 0.1) !important;
+  background: rgba(0, 63, 199, 0.13) !important;
   border-color: var(--v2-border-hover);
   color: var(--brand);
   box-shadow:
     0 0 16px var(--v2-glow),
-    inset 0 0 0 1px rgba(0, 63, 199, 0.18);
+    inset 0 0 0 1px rgba(0, 63, 199, 0.22);
 }
 
 .design-v2.dark .nav-item {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(107, 143, 214, 0.06);
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(107, 143, 214, 0.12);
   color: #d7dae0;
   box-shadow: none;
 }
 .design-v2.dark .nav-item:hover {
-  background: rgba(107, 143, 214, 0.05) !important;
+  background: rgba(107, 143, 214, 0.08) !important;
   border-color: var(--v2-border);
   box-shadow: 0 0 12px var(--v2-glow);
 }
 .design-v2.dark .nav-item--active {
-  background: rgba(107, 143, 214, 0.08) !important;
+  background: rgba(107, 143, 214, 0.12) !important;
   border-color: var(--v2-border-hover);
   color: var(--brand-light);
   box-shadow:
     0 0 16px var(--v2-glow),
-    inset 0 0 0 1px rgba(107, 143, 214, 0.15) !important;
+    inset 0 0 0 1px rgba(107, 143, 214, 0.2) !important;
 }
 
 /* ----------------------------------------------------------
@@ -222,13 +227,13 @@
 }
 
 .design-v2 .btn-secondary {
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.16);
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.26);
   transition: all 0.2s ease;
 }
 .design-v2.dark .btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 .design-v2 .btn-secondary:hover {
   border-color: var(--v2-border-hover);
@@ -298,45 +303,45 @@
 .design-v2 .pill {
   backdrop-filter: blur(var(--v2-blur-sm));
   -webkit-backdrop-filter: blur(var(--v2-blur-sm));
-  background: rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(0, 0, 0, 0.16);
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.22);
   border-radius: 0.75rem;
   color: #2f3743;
   box-shadow: none;
   transition: all 0.2s ease;
 }
 .design-v2.dark .pill {
-  background: rgba(255, 255, 255, 0.09);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   color: #e4e5e9;
 }
 .design-v2 .pill:hover {
-  background: rgba(0, 63, 199, 0.1);
-  border-color: rgba(0, 63, 199, 0.3);
+  background: rgba(0, 63, 199, 0.13);
+  border-color: rgba(0, 63, 199, 0.38);
   color: var(--brand);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .pill:hover {
-  background: rgba(107, 143, 214, 0.12);
-  border-color: rgba(107, 143, 214, 0.3);
+  background: rgba(107, 143, 214, 0.16);
+  border-color: rgba(107, 143, 214, 0.38);
   color: var(--brand-light);
 }
 
 .design-v2 .pill--active {
-  background: rgba(0, 63, 199, 0.12) !important;
-  border-color: rgba(0, 63, 199, 0.3) !important;
+  background: rgba(0, 63, 199, 0.16) !important;
+  border-color: rgba(0, 63, 199, 0.38) !important;
   color: var(--brand);
   box-shadow:
     0 0 14px var(--v2-glow),
-    inset 0 0 0 1px rgba(0, 63, 199, 0.15) !important;
+    inset 0 0 0 1px rgba(0, 63, 199, 0.2) !important;
 }
 .design-v2.dark .pill--active {
-  background: rgba(107, 143, 214, 0.1) !important;
-  border-color: rgba(107, 143, 214, 0.3) !important;
+  background: rgba(107, 143, 214, 0.14) !important;
+  border-color: rgba(107, 143, 214, 0.38) !important;
   color: var(--brand-light);
   box-shadow:
     0 0 14px var(--v2-glow),
-    inset 0 0 0 1px rgba(107, 143, 214, 0.12) !important;
+    inset 0 0 0 1px rgba(107, 143, 214, 0.18) !important;
 }
 
 /* ----------------------------------------------------------
@@ -465,15 +470,15 @@
 }
 
 .design-v2 .dropdown-item:hover {
-  background: rgba(0, 63, 199, 0.06);
+  background: rgba(0, 63, 199, 0.09);
 }
 .design-v2.dark .dropdown-item:hover {
-  background: rgba(107, 143, 214, 0.08);
+  background: rgba(107, 143, 214, 0.12);
 }
 
 .design-v2 .dropdown-item--active {
-  background: rgba(0, 63, 199, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(0, 63, 199, 0.12);
+  background: rgba(0, 63, 199, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(0, 63, 199, 0.18);
 }
 
 .design-v2 .dropdown-up {
@@ -499,12 +504,12 @@
 
 .design-v2 .icon-ghost:hover,
 .design-v2 .icon-ghost:focus-visible {
-  background: rgba(0, 63, 199, 0.08);
+  background: rgba(0, 63, 199, 0.11);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .icon-ghost:hover,
 .design-v2.dark .icon-ghost:focus-visible {
-  background: rgba(107, 143, 214, 0.1);
+  background: rgba(107, 143, 214, 0.14);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 
@@ -534,12 +539,12 @@
 .design-v2 .sidebar-scroll::-webkit-scrollbar-thumb,
 .design-v2 .chat-input-scroll::-webkit-scrollbar-thumb,
 .design-v2 .scroll-thin::-webkit-scrollbar-thumb {
-  background: rgba(0, 63, 199, 0.12);
+  background: rgba(0, 63, 199, 0.18);
 }
 .design-v2.dark .sidebar-scroll::-webkit-scrollbar-thumb,
 .design-v2.dark .chat-input-scroll::-webkit-scrollbar-thumb,
 .design-v2.dark .scroll-thin::-webkit-scrollbar-thumb {
-  background: rgba(107, 143, 214, 0.1);
+  background: rgba(107, 143, 214, 0.16);
 }
 
 /* ----------------------------------------------------------
@@ -590,14 +595,14 @@
 
 /* New Chat Button — branded glow, always prominent */
 .design-v2 .v2-new-chat-btn {
-  background: rgba(0, 63, 199, 0.1);
+  background: rgba(0, 63, 199, 0.14);
   color: var(--brand);
-  border: 1px solid rgba(0, 63, 199, 0.2);
+  border: 1px solid rgba(0, 63, 199, 0.28);
   box-shadow: 0 0 10px rgba(0, 63, 199, 0.08);
 }
 .design-v2 .v2-new-chat-btn:hover {
-  background: rgba(0, 63, 199, 0.18);
-  border-color: rgba(0, 63, 199, 0.35);
+  background: rgba(0, 63, 199, 0.22);
+  border-color: rgba(0, 63, 199, 0.42);
   box-shadow: 0 0 20px rgba(0, 63, 199, 0.2);
   transform: scale(1.05);
 }
@@ -609,14 +614,14 @@
   pointer-events: none;
 }
 .design-v2.dark .v2-new-chat-btn {
-  background: rgba(107, 143, 214, 0.08);
+  background: rgba(107, 143, 214, 0.12);
   color: var(--brand-light);
-  border: 1px solid rgba(107, 143, 214, 0.15);
+  border: 1px solid rgba(107, 143, 214, 0.22);
   box-shadow: 0 0 10px rgba(107, 143, 214, 0.06);
 }
 .design-v2.dark .v2-new-chat-btn:hover {
-  background: rgba(107, 143, 214, 0.15);
-  border-color: rgba(107, 143, 214, 0.3);
+  background: rgba(107, 143, 214, 0.2);
+  border-color: rgba(107, 143, 214, 0.38);
   box-shadow: 0 0 20px rgba(107, 143, 214, 0.15);
 }
 
@@ -669,22 +674,22 @@
   transition: all 0.2s ease;
 }
 .design-v2 .v2-rail-icon:hover {
-  background: rgba(0, 63, 199, 0.08);
+  background: rgba(0, 63, 199, 0.12);
   color: var(--brand);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2 .v2-rail-icon--active {
-  background: rgba(0, 63, 199, 0.1);
+  background: rgba(0, 63, 199, 0.14);
   color: var(--brand);
   box-shadow: 0 0 14px var(--v2-glow);
 }
 .design-v2.dark .v2-rail-icon:hover {
-  background: rgba(107, 143, 214, 0.08);
+  background: rgba(107, 143, 214, 0.12);
   color: var(--brand-light);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .v2-rail-icon--active {
-  background: rgba(107, 143, 214, 0.08);
+  background: rgba(107, 143, 214, 0.12);
   color: var(--brand-light);
   box-shadow: 0 0 14px var(--v2-glow);
 }
@@ -704,7 +709,7 @@
   padding-right: env(safe-area-inset-right);
 }
 .design-v2.dark .v2-mobile-tabbar {
-  background: rgba(10, 16, 30, 0.97);
+  background: rgba(7, 11, 21, 0.97);
   box-shadow: 0 -2px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -747,10 +752,10 @@
    ---------------------------------------------------------- */
 
 .design-v2 .hover-surface:hover {
-  background: rgba(0, 63, 199, 0.06) !important;
+  background: rgba(0, 63, 199, 0.09) !important;
 }
 .design-v2.dark .hover-surface:hover {
-  background: rgba(107, 143, 214, 0.08) !important;
+  background: rgba(107, 143, 214, 0.12) !important;
 }
 
 /* ----------------------------------------------------------
@@ -813,7 +818,7 @@
   background: rgba(0, 0, 0, 0.03) !important;
   border-width: 1px !important;
   border-style: solid !important;
-  border-color: rgba(0, 0, 0, 0.22) !important;
+  border-color: rgba(0, 0, 0, 0.28) !important;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -842,7 +847,7 @@
 .design-v2.dark select,
 .design-v2.dark textarea {
   background: rgba(255, 255, 255, 0.05) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
 }
 .design-v2.dark input[type='text']:focus,
 .design-v2.dark input[type='email']:focus,
@@ -1103,12 +1108,12 @@
 @media (prefers-reduced-transparency: reduce) {
   /* Opaque the two translucent glass surfaces (others are already solid). */
   .design-v2 {
-    --bg-sidebar: #dbe3f0;
+    --bg-sidebar: #d0daea;
     --bg-card: #ffffff;
   }
   .design-v2.dark {
-    --bg-sidebar: #0a101e;
-    --bg-card: #10182a;
+    --bg-sidebar: #070b15;
+    --bg-card: #131d35;
   }
   /* Remove the frosted-glass blur the translucency relied on. */
   .design-v2 *,
@@ -1122,7 +1127,7 @@
     background: #ffffff;
   }
   .design-v2.dark .v2-mobile-tabbar {
-    background: #0a101e;
+    background: #070b15;
   }
 }
 
@@ -1153,12 +1158,12 @@
 }
 .design-v2.dark .v2-rail-icon:hover {
   color: #d8dce6;
-  background: rgba(107, 143, 214, 0.12);
+  background: rgba(107, 143, 214, 0.16);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .v2-rail-icon--active {
   color: var(--brand-light);
-  background: rgba(107, 143, 214, 0.1);
+  background: rgba(107, 143, 214, 0.14);
   box-shadow: 0 0 14px var(--v2-glow);
 }
 
@@ -1196,18 +1201,18 @@
   opacity: 1;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] .surface-chip {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
 }
 
 .design-v2.dark [data-testid='comp-chat-input-shell'] .pill {
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
   color: #d0d3db !important;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] .pill--active {
-  background: rgba(107, 143, 214, 0.12) !important;
-  border-color: rgba(107, 143, 214, 0.28) !important;
+  background: rgba(107, 143, 214, 0.16) !important;
+  border-color: rgba(107, 143, 214, 0.36) !important;
   color: var(--brand-light) !important;
 }
 
@@ -1233,12 +1238,12 @@
 }
 .design-v2:not(.dark) .v2-rail-icon:hover {
   color: var(--brand);
-  background: rgba(0, 63, 199, 0.1);
+  background: rgba(0, 63, 199, 0.13);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2:not(.dark) .v2-rail-icon--active {
   color: var(--brand);
-  background: rgba(0, 63, 199, 0.12);
+  background: rgba(0, 63, 199, 0.16);
   box-shadow: 0 0 14px var(--v2-glow);
 }
 

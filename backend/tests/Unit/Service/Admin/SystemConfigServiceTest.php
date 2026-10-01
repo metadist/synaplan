@@ -810,4 +810,55 @@ final class SystemConfigServiceTest extends TestCase
 
         $this->assertFalse($result['success']);
     }
+
+    public function testResetBrandingStyleClearsColorsAndFontsButKeepsIdentity(): void
+    {
+        $deleted = [];
+        $this->configRepository->expects($this->exactly(9))
+            ->method('deleteValue')
+            ->willReturnCallback(function (int $ownerId, string $group, string $setting) use (&$deleted): bool {
+                $this->assertSame(0, $ownerId);
+                $this->assertSame('BRANDING', $group);
+                $deleted[] = $setting;
+
+                return true;
+            });
+
+        $result = $this->service->resetBrandingStyle();
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['failed']);
+        $this->assertFalse($result['requiresRestart']);
+        $this->assertSame([
+            'BRAND_PRIMARY_COLOR',
+            'BRAND_SECONDARY_COLOR',
+            'BRAND_ACCENT_COLOR',
+            'BRAND_PRIMARY_COLOR_DARK',
+            'BRAND_SECONDARY_COLOR_DARK',
+            'BRAND_ACCENT_COLOR_DARK',
+            'BRAND_FONT_FAMILY',
+            'BRAND_HEADING_FONT_FAMILY',
+            'BRAND_FONT_URL',
+        ], $result['reset']);
+        $this->assertSame($result['reset'], $deleted);
+    }
+
+    public function testResetBrandingStyleReportsWhatDidAndDidNotReset(): void
+    {
+        $this->configRepository->method('deleteValue')
+            ->willReturnCallback(function (int $ownerId, string $group, string $setting): bool {
+                if ('BRAND_FONT_URL' === $setting) {
+                    throw new \RuntimeException('db down');
+                }
+
+                return true;
+            });
+
+        $result = $this->service->resetBrandingStyle();
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(['BRAND_FONT_URL'], $result['failed']);
+        $this->assertCount(8, $result['reset']);
+        $this->assertNotContains('BRAND_FONT_URL', $result['reset']);
+    }
 }
