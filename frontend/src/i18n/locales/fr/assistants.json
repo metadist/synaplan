@@ -111,7 +111,7 @@
     "toolsSkills": "Outils et compétences",
     "toolsSkillsHint": "Ce que cet assistant peut faire quand quelqu’un lui parle.",
     "toolInternet": "Chercher sur internet",
-    "toolInternetHint": "L’IA peut chercher sur le web pour cet assistant.",
+    "toolInternetHint": "L’IA ne cherche sur le web que lorsqu’une question a besoin d’informations actuelles, comme la météo, les prix ou l’actualité.",
     "toolFiles": "Utiliser des fichiers",
     "toolFilesHint": "L’IA peut chercher dans les dossiers choisis ci-dessus.",
     "mcpServers": "Applications connectées",

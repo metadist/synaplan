@@ -29,7 +29,7 @@ final class ReadPagesPolicy
     /**
      * @param int|null $classifierVote         Sorter `BREADPAGES` (0, 2, 3) or null when omitted
      * @param bool     $pastedLinksAlreadyRead The message already had URLs the system fetched
-     * @param bool     $searchForced           User toggle / `/search` / prompt `tool_internet=true`
+     * @param bool     $searchForced           User toggle / `/search` / "search the web …" in the message
      */
     public static function pagesToRead(?int $classifierVote, bool $pastedLinksAlreadyRead, bool $searchForced): int
     {
@@ -47,7 +47,7 @@ final class ReadPagesPolicy
         // Fast-path / old prompt / rule-based topic: no BREADPAGES vote.
         // This method is only called when a search is already running, so
         // default to two page dumps — a research question must not regress
-        // to snippet-only hedging. Forced search (`/search`, tool_internet)
+        // to snippet-only hedging. Forced search (toggle, `/search`)
         // and a search vote that omitted the field share the same default.
         return $searchForced ? self::SHORT : self::FALLBACK_WHEN_SEARCH_WITHOUT_VOTE;
     }

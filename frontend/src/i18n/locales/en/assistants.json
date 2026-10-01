@@ -111,7 +111,7 @@
     "toolsSkills": "Tools and skills",
     "toolsSkillsHint": "What this assistant may do when someone talks to it.",
     "toolInternet": "Look things up on the internet",
-    "toolInternetHint": "The AI may search the web for this assistant.",
+    "toolInternetHint": "The AI searches the web only when a question needs current information, such as weather, prices or news.",
     "toolFiles": "Use files",
     "toolFilesHint": "The AI may search the folders you picked above.",
     "mcpServers": "Connected apps",

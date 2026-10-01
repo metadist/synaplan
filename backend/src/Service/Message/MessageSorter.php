@@ -184,8 +184,8 @@ final readonly class MessageSorter
                     'language' => $messageData['BLANG'] ?? 'en',
                     // No LLM ran on the rule-based path, so there is no
                     // BWEBSEARCH vote. The final web-search decision is made by
-                    // WebSearchTopicPolicy in MessageProcessor (a custom topic
-                    // that needs live data can set tool_internet=true).
+                    // WebSearchTopicPolicy in MessageProcessor (the user can
+                    // still ask for a search explicitly).
                     'web_search' => false,
                     // No LLM ran, so there is no BREADPAGES vote either.
                     'read_pages' => null,
@@ -722,11 +722,10 @@ final readonly class MessageSorter
 
         $data = $decoded->data;
 
-        // Parse BWEBSEARCH (can be 0, 1, true, false)
-        $webSearch = false;
-        if (isset($data['BWEBSEARCH'])) {
-            $webSearch = (bool) $data['BWEBSEARCH'];
-        }
+        // BWEBSEARCH counts as a vote for search only as 1, true, "1" or
+        // "true". Anything else — "false", "yes", "on", garbage — is no vote,
+        // so malformed sorter output can never trigger a search.
+        $webSearch = in_array($data['BWEBSEARCH'] ?? null, [1, true, '1', 'true'], true);
 
         // Parse BREADPAGES (0 = snippets only, 2 or 3 = dump that many
         // result pages into the answer prompt). Null when the model omitted
