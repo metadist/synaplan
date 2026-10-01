@@ -722,12 +722,10 @@ final readonly class MessageSorter
 
         $data = $decoded->data;
 
-        // Parse BWEBSEARCH (0, 1, true, false, "0", "1", "true", "false").
-        // A plain (bool) cast would turn the string "false" into true.
-        $webSearch = false;
-        if (isset($data['BWEBSEARCH'])) {
-            $webSearch = filter_var($data['BWEBSEARCH'], \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
-        }
+        // BWEBSEARCH counts as a vote for search only as 1, true, "1" or
+        // "true". Anything else — "false", "yes", "on", garbage — is no vote,
+        // so malformed sorter output can never trigger a search.
+        $webSearch = in_array($data['BWEBSEARCH'] ?? null, [1, true, '1', 'true'], true);
 
         // Parse BREADPAGES (0 = snippets only, 2 or 3 = dump that many
         // result pages into the answer prompt). Null when the model omitted

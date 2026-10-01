@@ -576,6 +576,10 @@ class MessageSorterTest extends TestCase
         yield 'string_one' => ['"1"', true];
         yield 'string_zero' => ['"0"', false];
         yield 'garbage' => ['"maybe"', false];
+        yield 'string_yes' => ['"yes"', false];
+        yield 'string_on' => ['"on"', false];
+        yield 'int_two' => ['2', false];
+        yield 'null' => ['null', false];
     }
 
     #[DataProvider('webSearchVoteProvider')]

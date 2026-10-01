@@ -23,22 +23,24 @@ final class LegacyFlagToolPolicy implements ToolPolicySourceInterface
 
     public function flagsFromDefinition(array $tools): array
     {
+        $allow = $this->stringList($tools['allow'] ?? []);
+        $deny = $this->stringList($tools['deny'] ?? []);
+        $webSearchListed = !in_array('web_search', $deny, true)
+            && ([] === $allow || in_array('web_search', $allow, true));
+
         $flags = [
             'tool_files' => (bool) ($tools['files'] ?? true),
+            // `true` only ALLOWS web search — the classifier decides per
+            // message. It is kept explicit so the assistant's setting beats a
+            // `tool_internet=false` on its linked prompt. A denied
+            // `web_search` tool turns it into the hard disable.
+            'tool_internet' => (bool) ($tools['internet'] ?? true) && $webSearchListed,
         ];
-        // `internet: true` only ALLOWS web search — the classifier decides per
-        // message. Only an explicit `false` reaches the routing layer, where
-        // `tool_internet=false` is the hard disable.
-        if (false === (bool) ($tools['internet'] ?? true)) {
-            $flags['tool_internet'] = false;
-        }
         $servers = $tools['mcpServers'] ?? [];
         if (is_array($servers) && [] !== $servers) {
             $flags['tool_mcp'] = true;
             $flags['mcp_servers'] = array_values(array_map('intval', $servers));
         }
-        $allow = $this->stringList($tools['allow'] ?? []);
-        $deny = $this->stringList($tools['deny'] ?? []);
         if ([] !== $allow) {
             $flags['allow'] = $allow;
         }

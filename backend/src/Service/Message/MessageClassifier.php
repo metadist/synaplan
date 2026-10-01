@@ -130,7 +130,12 @@ final readonly class MessageClassifier
             $text = $message->getText();
         }
 
-        $pinned = $this->tryPinAgent($message, $options, $conversationHistory, (bool) $forceWebSearchFromSlash);
+        $pinned = $this->tryPinAgent(
+            $message,
+            $options,
+            $conversationHistory,
+            (bool) $forceWebSearchFromSlash || !empty($options['web_search_requested']),
+        );
         if (null !== $pinned) {
             return $this->applySlashOverlaysToClassification(
                 $pinned,

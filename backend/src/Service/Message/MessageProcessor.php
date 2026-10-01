@@ -1832,6 +1832,9 @@ final readonly class MessageProcessor
         if (array_key_exists('agentDraft', $options)) {
             $out['agentDraft'] = (bool) $options['agentDraft'];
         }
+        if (!empty($options['web_search']) || !empty($options['force_web_search'])) {
+            $out['web_search_requested'] = true;
+        }
 
         return $out;
     }

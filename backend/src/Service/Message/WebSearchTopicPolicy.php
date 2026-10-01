@@ -76,39 +76,50 @@ final class WebSearchTopicPolicy
      * Plain-language requests to search the web for THIS message ("search
      * the web for …", "such im Internet nach …", "google mal …"). They count
      * as an explicit per-message request, exactly like the chat toggle or
-     * `/search`. Matched against the lowercased raw message. Bare "google"
-     * is NOT listed — "how does Google search work?" is not a search request.
+     * `/search`. Matched against the lowercased raw message.
+     *
+     * Every pattern is anchored to the start of a sentence or clause plus an
+     * optional politeness lead-in ("please", "can you", "kannst du mal"), so
+     * only a request matches — talking ABOUT searching ("why do people search
+     * the web for medical advice?", "how does Google search work?") does not.
      *
      * @var list<string>
      */
     private const EXPLICIT_SEARCH_PATTERNS = [
         // English
-        '/\b(search|browse|check|look)\s+(on\s+)?(the\s+)?(web|internet|net)\b/u',
-        '/\bsearch\s+online\b/u',
-        '/\bweb\s*search\b/u',
-        '/\blook\s+(it|this|that|them)?\s*up\s+online\b/u',
-        '/\b(look|check)\s+online\b/u',
-        '/\bgoogle\s+(it|this|that|for)\b/u',
-        '/\b(on|from)\s+the\s+(web|internet)\b.*\b(find|search|look)\b/u',
-        '/\b(find|search)\b.*\b(on|from)\s+the\s+(web|internet)\b/u',
+        '/'.self::REQUEST_START_EN.'(?:search|browse|check|look)\s+(?:on\s+)?(?:the\s+)?(?:web|internet|net|online)\b/u',
+        '/'.self::REQUEST_START_EN.'look\s+(?:it|this|that|them)\s+up\s+online\b/u',
+        '/'.self::REQUEST_START_EN.'(?:do|run)\s+an?\s+(?:web|internet|online)\s+search\b/u',
+        '/'.self::REQUEST_START_EN.'google\s+(?:it|this|that|for)\b/u',
+        '/'.self::REQUEST_START_EN.'(?:find|search)\b[^.?!]*\b(?:on|from)\s+the\s+(?:web|internet)\b/u',
         // German
-        '/\b(such|suche|suchen|durchsuche|recherchier|recherchiere|recherchieren|schau|schaue|guck|gucke)\b[^.?!]*\b(im|ins|das|dem)\s+(internet|netz|web)\b/u',
-        '/\b(im|ins)\s+(internet|netz|web)\b[^.?!]*\b(such|suche|suchen|nachsuchen|nachschauen|nachsehen|nachgucken|recherchier|recherchiere|recherchieren)\b/u',
-        '/\bonline\s+(such|suche|suchen|nachschauen|nachsehen|nachgucken|recherchieren)\b/u',
-        '/\b(such|suche|schau|schaue|recherchiere)\b[^.?!]*\bonline\b/u',
-        '/\bwebsuche\b/u',
-        '/\bgoogle\s+(mal|bitte|das|nach)\b/u',
-        '/\bgoogel\b|\bgoogeln\b|\bgoogle\b[^.?!]*\bnach\b/u',
+        '/'.self::REQUEST_START_DE.'(?:such|suche|durchsuche|recherchier|recherchiere|schau|schaue|guck|gucke)\b[^.?!]*(?:\b(?:im|ins|das|dem)\s+(?:internet|netz|web)\b|\bonline\b)/u',
+        '/'.self::REQUEST_START_DE.'(?:kannst|könntest|koenntest|würdest|wuerdest)\s+du\b[^.?!]*(?:\b(?:im|ins)\s+(?:internet|netz|web)\b|\bonline\b)[^.?!]*\b(?:suchen|nachsuchen|nachschauen|nachsehen|nachgucken|recherchieren|schauen|gucken)\b/u',
+        '/'.self::REQUEST_START_DE.'(?:kannst|könntest|koenntest|würdest|wuerdest)\s+du\b[^.?!]*\bgoogeln\b/u',
+        '/'.self::REQUEST_START_DE.'(?:mach|mache|starte|führ|führe|fuehr|fuehre)\s+(?:mal\s+)?(?:eine\s+)?(?:websuche|internetsuche|online-suche|onlinesuche)\b/u',
+        '/'.self::REQUEST_START_DE.'(?:websuche|internetsuche)\s*:/u',
+        '/'.self::REQUEST_START_DE.'(?:google|googel)\s+(?:mal|bitte|das|nach)\b/u',
         // Spanish
-        '/\b(busca|buscar|búscalo|buscalo|investiga|investigar)\b[^.?!]*\b(en|por)\s+(internet|la\s+web|google|línea|linea)\b/u',
+        '/'.self::REQUEST_START_ES.'(?:busca|buscar|búscalo|buscalo|investiga|investigar)\b[^.?!]*\b(?:en|por)\s+(?:internet|la\s+web|google|línea|linea)\b/u',
         // French
-        '/\b(cherche|chercher|recherche|rechercher)\b[^.?!]*\bsur\s+(internet|le\s+web|google)\b/u',
-        '/\ben\s+ligne\b[^.?!]*\b(cherche|recherche)\b|\b(cherche|recherche)\b[^.?!]*\ben\s+ligne\b/u',
+        '/'.self::REQUEST_START_FR.'(?:cherche|chercher|recherche|rechercher)\b[^.?!]*\b(?:sur\s+(?:internet|le\s+web|google)|en\s+ligne)\b/u',
         // Italian
-        '/\b(cerca|cercare)\b[^.?!]*\b(su|in)\s+(internet|web|google)\b/u',
-        // Turkish
-        '/\b(internette|internetten|webde|google\'da|googleda)\s+(ara|araştır|arastir|bak)\b/u',
+        '/'.self::REQUEST_START_IT.'(?:cerca|cercare)\b[^.?!]*\b(?:su|in)\s+(?:internet|web|google)\b/u',
+        // Turkish (the verb comes last: "internette ara", "internetten bakar mısın")
+        '/\b(?:internette|internetten|webde|google\'da|googleda)\s+(?:ara|araştır|arastir|bak)(?:\s*$|\s*[:.!?,]|\s+(?:mısın|misin|bakar|lütfen|lutfen)\b)/u',
     ];
+
+    private const CLAUSE_START = '(?:^|[.!?;:,]\s*)[¿¡]?\s*';
+
+    private const REQUEST_START_EN = self::CLAUSE_START.'(?:(?:please|pls|just|hey|ok|okay|now|then)\s+)*(?:(?:can|could|would|will)\s+you\s+(?:please\s+|just\s+)*)?';
+
+    private const REQUEST_START_DE = self::CLAUSE_START.'(?:(?:bitte|hey|ok|okay|jetzt|dann)\s+)*';
+
+    private const REQUEST_START_ES = self::CLAUSE_START.'(?:(?:por\s+favor|oye|vale)\s*,?\s*)*(?:(?:puedes|podrías|podrias)\s+)?';
+
+    private const REQUEST_START_FR = self::CLAUSE_START.'(?:(?:s\'il\s+te\s+plaît|s\'il\s+te\s+plait|stp)\s*,?\s*)*(?:(?:peux|pourrais)[-\s]tu\s+)?';
+
+    private const REQUEST_START_IT = self::CLAUSE_START.'(?:(?:per\s+favore)\s*,?\s*)*(?:puoi\s+)?';
 
     /**
      * Matches an explicit four-digit 20xx year token (e.g. "2026", "olympics
@@ -304,13 +315,22 @@ final class WebSearchTopicPolicy
 
         $remainingWords = self::wordCount($remaining);
         if ($matchedPhrase) {
-            return $remainingWords <= self::TRIVIAL_MAX_WORDS;
+            // A fully consumed greeting is small talk. A short remainder is
+            // too — unless it is phrased as a question ("Hi, Öffnungszeiten
+            // Städel?"), which the model vote must still see.
+            return 0 === $remainingWords
+                || ($remainingWords <= self::TRIVIAL_MAX_WORDS && !self::asksAQuestion($trimmed));
         }
 
         // Ultra-short, question-less one-liners ("lol") carry no information
         // need. A question mark means the user is asking something, so those
         // are left to the model vote.
-        return $remainingWords <= self::TRIVIAL_MAX_WORDS && !str_contains($trimmed, '?');
+        return $remainingWords <= self::TRIVIAL_MAX_WORDS && !self::asksAQuestion($trimmed);
+    }
+
+    private static function asksAQuestion(string $text): bool
+    {
+        return str_contains($text, '?') || str_contains($text, '¿');
     }
 
     /**

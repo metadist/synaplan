@@ -216,6 +216,8 @@ final class WebSearchTopicPolicyTest extends TestCase
         // Not trivial: a greeting followed by a real question.
         yield 'greeting_then_fx_question' => ['Hi, wie steht der Dollar zum Euro?', false];
         yield 'thanks_then_question' => ['Danke! Und was ist die Hauptstadt von Kanada?', false];
+        yield 'greeting_then_short_question' => ['Hi, Öffnungszeiten Städel?', false];
+        yield 'greeting_then_short_remark' => ['Hallo, alles super', true];
         // Whole-word matching: "know" is not "now", "actually" is not "actual".
         yield 'know_is_not_now' => ['ok i know', true];
         yield 'actually_is_not_actual' => ['thanks actually', true];
@@ -255,9 +257,22 @@ final class WebSearchTopicPolicyTest extends TestCase
         yield 'es_busca_en_internet' => ['Busca en internet el horario del museo', true];
         yield 'fr_cherche_sur_internet' => ['Cherche sur internet les horaires', true];
         yield 'tr_internette_ara' => ['internette ara: hava durumu', true];
+        yield 'en_greeting_then_request' => ['Hi, can you please search the web for train strikes?', true];
+        yield 'en_do_a_web_search' => ['Do a web search on solar panel prices', true];
+        yield 'de_bitte_suche_online' => ['Bitte suche online nach einem Rezept', true];
+        yield 'de_kannst_du_googeln' => ['Kannst du das mal googeln?', true];
+        yield 'de_websuche_colon' => ['Websuche: Öffnungszeiten Zoo Frankfurt', true];
+        yield 'es_puedes_buscar' => ['¿Puedes buscar en internet el precio?', true];
+        yield 'es_por_favor_busca' => ['Por favor, busca en internet el precio', true];
+        yield 'fr_peux_tu_chercher' => ['Peux-tu chercher sur internet la météo ?', true];
 
         // Mentioning the web or Google is not a request to search.
         yield 'how_does_google_work' => ['How does Google search work?', false];
+        yield 'en_why_people_search_the_web' => ['Why do people search the web for medical advice?', false];
+        yield 'en_i_searched_the_web' => ['I tried to search the web but found nothing', false];
+        yield 'de_wie_funktioniert_websuche' => ['Wie funktioniert eine Websuche?', false];
+        yield 'de_ich_habe_im_internet_gesucht' => ['Ich habe im Internet gesucht, aber nichts gefunden', false];
+        yield 'fr_pourquoi_chercher' => ['Pourquoi les gens cherchent sur internet ?', false];
         yield 'what_is_the_internet' => ['Was ist das Internet?', false];
         yield 'great_wall' => ['Wie lang ist die Chinesische Mauer?', false];
         yield 'greeting' => ['Hi, wie gehts?', false];

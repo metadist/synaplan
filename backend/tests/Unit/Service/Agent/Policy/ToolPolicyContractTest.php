@@ -52,7 +52,7 @@ final class ToolPolicyContractTest extends TestCase
             'deny' => [],
         ]);
 
-        self::assertArrayNotHasKey('tool_internet', $flags, '"internet: true" must not force a search on every message');
+        self::assertTrue($flags['tool_internet'], 'the assistant setting must beat a prompt-level opt-out');
         self::assertTrue($policy->isAllowed($this->profile($flags), 'web_search'));
     }
 
@@ -62,6 +62,29 @@ final class ToolPolicyContractTest extends TestCase
         $flags = $policy->flagsFromDefinition(['internet' => false]);
 
         self::assertFalse($flags['tool_internet']);
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: ToolPolicySourceInterface, 2: array<string, mixed>}>
+     */
+    public static function deniedWebSearchDefinitions(): iterable
+    {
+        foreach (self::adapters() as [$adapterName, $policy]) {
+            yield $adapterName.' deny' => [$adapterName, $policy, ['internet' => true, 'deny' => ['web_search']]];
+            yield $adapterName.' allow without web_search' => [$adapterName, $policy, ['internet' => true, 'allow' => ['rag_search']]];
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $tools
+     */
+    #[DataProvider('deniedWebSearchDefinitions')]
+    public function testADeniedWebSearchToolIsAHardDisableFlag(string $_name, ToolPolicySourceInterface $policy, array $tools): void
+    {
+        $flags = $policy->flagsFromDefinition($tools);
+
+        self::assertFalse($flags['tool_internet']);
+        self::assertFalse($policy->isAllowed($this->profile($flags), 'web_search'));
     }
 
     #[DataProvider('adapters')]

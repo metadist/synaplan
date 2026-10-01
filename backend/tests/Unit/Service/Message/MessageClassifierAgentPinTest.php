@@ -153,6 +153,23 @@ final class MessageClassifierAgentPinTest extends TestCase
         self::assertNull($result['web_search']);
     }
 
+    public function testThePinnedChatToggleSkipsTheSorterVote(): void
+    {
+        $this->agentPin->method('resolve')->willReturn($this->sampleProfile());
+        $this->sorter->expects(self::never())->method('classify');
+
+        $result = $this->classifier->classify(
+            $this->message(4, 'How long is the Great Wall of China?'),
+            [],
+            null,
+            true,
+            ['agentId' => 7, 'web_search_requested' => true],
+        );
+
+        self::assertSame('agent:contract-review', $result['topic']);
+        self::assertNull($result['web_search']);
+    }
+
     public function testSorterIsCalledWhenNothingIsPinned(): void
     {
         $this->agentPin->method('resolve')->willReturn(null);
