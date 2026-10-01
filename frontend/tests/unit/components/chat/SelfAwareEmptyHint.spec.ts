@@ -22,7 +22,7 @@ describe('SelfAwareEmptyHint', () => {
     const wrapper = mount(SelfAwareEmptyHint)
 
     expect(wrapper.find('[data-testid="self-aware-empty-hint"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('What can you do?')
+    expect(wrapper.text()).toContain('Give me a rough overview of the features')
     expect(wrapper.get('[data-testid="btn-self-aware-empty-hint"]').classes()).toEqual(
       expect.arrayContaining(['btn-secondary', 'px-4', 'py-2.5', 'rounded-lg', 'text-sm'])
     )
@@ -48,6 +48,6 @@ describe('SelfAwareEmptyHint', () => {
 
     await wrapper.get('[data-testid="btn-self-aware-empty-hint"]').trigger('click')
 
-    expect(wrapper.emitted('ask')).toEqual([['What can you do?']])
+    expect(wrapper.emitted('ask')).toEqual([['Give me a rough overview of the features']])
   })
 })

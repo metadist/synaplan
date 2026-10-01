@@ -31,7 +31,7 @@
   "selfAware": {
     "emptyHint": "Nicht sicher, was hier möglich ist? Frag mich, was ich tun kann.",
     "emptyHintQuestion": "Was kannst du hier tun?",
-    "examplePrompt": "Was kannst du?",
+    "examplePrompt": "Erkläre mal grob die Features",
     "helpCommand": {
       "label": "Hilfe",
       "description": "Fragen, was dieser KI-Assistent hier tun kann"

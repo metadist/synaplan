@@ -31,7 +31,7 @@
   "selfAware": {
     "emptyHint": "¿No sabes qué es posible aquí? Pregúntame qué puedo hacer.",
     "emptyHintQuestion": "¿Qué puedes hacer aquí?",
-    "examplePrompt": "¿Qué puedes hacer?",
+    "examplePrompt": "Explícame a grandes rasgos las funciones",
     "helpCommand": {
       "label": "Ayuda",
       "description": "Preguntar qué puede hacer este asistente de IA aquí"

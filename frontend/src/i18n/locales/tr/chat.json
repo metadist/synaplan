@@ -31,7 +31,7 @@
   "selfAware": {
     "emptyHint": "Burada neler mümkün olduğundan emin değil misiniz? Bana neler yapabileceğimi sorun.",
     "emptyHintQuestion": "Burada neler yapabilirsin?",
-    "examplePrompt": "Ne yapabilirsin?",
+    "examplePrompt": "Özellikleri kabaca anlat",
     "helpCommand": {
       "label": "Yardım",
       "description": "Bu AI asistanının burada neler yapabileceğini sor"
