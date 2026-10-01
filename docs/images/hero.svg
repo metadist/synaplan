@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-label="Synaplan - We open-source artificial intelligence">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-label="Synaplan - We produce AI freedom">
   <defs>
     <linearGradient id="accent" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1200" y2="0">
       <stop offset="0" stop-color="#0003C7"/>
@@ -20,14 +20,20 @@
     .d2 { animation-delay: 0.4s; }
     .d3 { animation-delay: 0.65s; }
     .d4 { animation-delay: 0.9s; }
-    .float { animation: float 6s ease-in-out infinite; }
+    .float {
+      transform-box: view-box;
+      transform-origin: 600px 130px;
+      animation: fly 4s ease-in-out infinite;
+    }
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(14px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50%      { transform: translateY(-7px); }
+    @keyframes fly {
+      0%, 100% { transform: translate(0px, 0px) rotate(0deg); }
+      25%      { transform: translate(18px, -20px) rotate(-5deg); }
+      50%      { transform: translate(0px, -28px) rotate(0deg); }
+      75%      { transform: translate(-18px, -10px) rotate(5deg); }
     }
     @media (prefers-reduced-motion: reduce) {
       .fade, .float, #accent * { animation: none !important; }
@@ -51,7 +57,7 @@
   <rect class="fade d3" x="500" y="278" width="200" height="5" rx="2.5" fill="url(#accent)"/>
 
   <!-- Tagline -->
-  <text class="fade d3" x="600" y="324" text-anchor="middle" font-size="26" font-weight="600" fill="#1E293B">We open-source artificial intelligence.</text>
+  <text class="fade d3" x="600" y="324" text-anchor="middle" font-size="26" font-weight="600" fill="#1E293B">We produce AI freedom.</text>
 
   <!-- Sub-line -->
   <text class="fade d4" x="600" y="362" text-anchor="middle" font-size="17.5" fill="#55637A">Hundreds of models &#183; DAG task routing &#183; RAG knowledge &#183; sovereign &amp; air-gap ready &#183; Apache-2.0</text>
