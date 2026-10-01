@@ -20,6 +20,8 @@ final readonly class ScheduledJobStatusReader
     public const STATE_STALE = 'stale';
     public const STATE_NEVER = 'never';
 
+    public const DEFAULT_MAX_AGE_SECONDS = 600;
+
     public function __construct(
         private ScheduledJobStatusStore $status,
         private ClockInterface $clock = new Clock(),

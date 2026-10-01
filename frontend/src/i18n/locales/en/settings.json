@@ -418,6 +418,48 @@
         "failed24": "{count} failed (24h)",
         "openConfig": "File work settings",
         "stateTierBlocked": "On, but below the required isolation. File work stays hidden."
+      },
+      "scheduler": {
+        "title": "Background jobs",
+        "loading": "Checking background jobs…",
+        "error": "We could not load the background job status. Reload the page.",
+        "never": "Background jobs have never run on this server.",
+        "running": "Background jobs are running. Last run: {time}.",
+        "stale": "Background jobs have stopped. Last run: {time}. Scheduled tasks, reminders and clean-ups are not running. Restart the scheduler service.",
+        "howToStart": "How to start the scheduler",
+        "refresh": "Refresh",
+        "notRunYet": "Not run yet",
+        "statusRunning": "Running",
+        "statusStopped": "Stopped",
+        "statusNever": "Not started",
+        "failures": "1 job failed: {names}. The scheduler log has the details. | {count} jobs failed: {names}. The scheduler log has the details.",
+        "unfinished": "Started but not finished yet: {names} (still running, or stopped by its time limit).",
+        "owner": "These jobs run in this server's scheduler service, started by its Docker Compose file. Restart it with {command}.",
+        "lanes": {
+          "tick": "Every minute",
+          "tasks": "Saved Tasks",
+          "hourly": "Hourly",
+          "daily": "Daily",
+          "health": "Model health"
+        },
+        "jobs": {
+          "mediaReap": "image/video job clean-up",
+          "chatReap": "stuck chat clean-up",
+          "desktopReap": "desktop job clean-up",
+          "mailHandlers": "inbound mail handlers",
+          "processEmails": "smart mailbox",
+          "savedTasks": "Saved Tasks",
+          "ephemeralFiles": "temporary file clean-up",
+          "approvalsExpire": "expired approvals",
+          "modelsDiscover": "new-model check",
+          "updatesCheck": "update check",
+          "modelsAvailability": "model availability check",
+          "digest": "message digest",
+          "syncDocs": "documentation sync",
+          "approvalsDigest": "approval digest email",
+          "syncPrices": "model price sync",
+          "modelHealth": "model health check"
+        }
       }
     },
     "notLoggedIn": "Not logged in"

@@ -103,8 +103,8 @@
       operator does, so this is a pointer to documentation and nothing else.
     -->
     <div
-      v-if="versionLabel"
-      class="flex items-center justify-center pt-2 flex-shrink-0"
+      v-if="versionLabel || schedulerStore.isStale"
+      class="flex flex-col items-center justify-center gap-1 pt-2 flex-shrink-0"
       data-testid="section-sidebar-v2-version"
     >
       <a
@@ -126,13 +126,14 @@
         <span class="truncate">{{ versionLabel }}</span>
       </a>
       <span
-        v-else
+        v-else-if="versionLabel"
         class="text-[10px] txt-secondary"
         :title="$t('updates.runningVersion', { version: versionLabel })"
         data-testid="text-sidebar-v2-version"
       >
         {{ versionLabel }}
       </span>
+      <SchedulerStaleHint compact />
     </div>
 
     <!-- User Avatar -->
@@ -697,7 +698,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowUpCircleIcon,
@@ -730,6 +731,8 @@ import { useTheme } from '../composables/useTheme'
 import { useBrandLogo } from '../composables/useBrandLogo'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useUpdatesStore } from '../stores/updates'
+import { useSchedulerStore } from '../stores/scheduler'
+import SchedulerStaleHint from './SchedulerStaleHint.vue'
 import { formatRunningVersion } from '@/utils/formatRunningVersion'
 import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { useDialog } from '../composables/useDialog'
@@ -760,6 +763,7 @@ const configStore = useConfigStore()
 const purchaseAllowed = isPurchaseAllowed()
 const chatsStore = useChatsStore()
 const updatesStore = useUpdatesStore()
+const schedulerStore = useSchedulerStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
 const { navItems, isItemActive, isGuestMode, loadFeatureStatus } = useNavItems()
@@ -903,6 +907,32 @@ watch(
   },
   { immediate: true }
 )
+
+/** Five minutes. Polling while the admin is signed in, not a race workaround. */
+const SCHEDULER_POLL_MS = 5 * 60 * 1000
+let schedulerPoll: ReturnType<typeof setInterval> | null = null
+
+function stopSchedulerPoll(): void {
+  if (schedulerPoll !== null) {
+    clearInterval(schedulerPoll)
+    schedulerPoll = null
+  }
+}
+
+watch(
+  () => schedulerStore.canRead,
+  (canRead) => {
+    stopSchedulerPoll()
+    if (!canRead) return
+    void schedulerStore.ensureLoaded()
+    schedulerPoll = setInterval(() => {
+      void schedulerStore.load()
+    }, SCHEDULER_POLL_MS)
+  },
+  { immediate: true }
+)
+
+onUnmounted(stopSchedulerPoll)
 
 const handleQuickNewChat = async () => {
   if (isCreatingChat.value) return

@@ -165,9 +165,9 @@ without a scheduler, so this is a local-only difference.
 
 | State | Copy (en draft; all five locales in the same PR) |
 | ----- | ---- |
-| running | "Background jobs ran {time} ago." |
-| failures | "Daily jobs ran {time} ago. 1 job failed: update check. The scheduler log has the details." |
-| stale | "Background jobs stopped {time} ago. Scheduled tasks, reminders and clean-ups are not running. Restart the scheduler service." + docs link |
+| running | "Background jobs are running. Last run: {time}." |
+| failures | "1 job failed: update check. The scheduler log has the details." |
+| stale | "Background jobs have stopped. Last run: {time}. Scheduled tasks, reminders and clean-ups are not running. Restart the scheduler service." + docs link |
 | never (U5) | "Background jobs have never run on this server." + primary action "How to start the scheduler" |
 | error (U8) | "We could not load the background job status. Reload the page." |
 
@@ -190,10 +190,10 @@ install's compose file. Read-only surface, no undo control (U3 n/a).
 
 | Step | Scope | Tests | State |
 | ---- | ----- | ----- | ----- |
-| **P1** | Dev fix (§2.4) | `make test-e2e` with the scheduler running | open |
-| **P2** | §2.1–2.3; lock on `app:process-emails`; flags in `backend/.env.example` + `docs/ADMIN.md`; docs claims re-checked (`docs/PRICING_MAINTENANCE.md:139`, `docs/DEVELOPMENT.md:168`, `docs/ADMIN.md:695`, `docs/CONVERSATION_CONTINUITY.md:59`) | shell tests: every job present, lanes skip while alive, `TERM` stops lanes, claim exit codes; PHPUnit: claim atomicity, fixed-time due logic, status | open |
-| **P3** | `scheduler` service on every node (image entrypoint kept, `SYNAPLAN_ROLE=scheduler`, env/volumes/extra_hosts like `worker`, `container-healthcheck`, `restart: unless-stopped`); the two flags; delete the 8 app cron wrappers + logrotate entries; watchdog calls `app:scheduler:status`; `DIGEST/ENABLED` per §0 #8; cluster doc: scheduler section, crontab cleanup, checks, rollback | `docker compose config -q`; first deploy watched | open |
-| **P4** | Status API block (additive, admin-only, OpenAPI → `generate-schemas`) + card + sidebar hint (§3) | Vitest per state; one E2E on `/admin/features` | open |
+| **P1** | Dev fix (§2.4) | `make test-e2e` with the scheduler running | done ([#2302](https://github.com/metadist/synaplan/pull/2302)) |
+| **P2** | §2.1–2.3; lock on `app:process-emails`; flags in `backend/.env.example` + `docs/ADMIN.md`; docs claims re-checked (`docs/PRICING_MAINTENANCE.md:139`, `docs/DEVELOPMENT.md:168`, `docs/ADMIN.md:695`, `docs/CONVERSATION_CONTINUITY.md:59`) | shell tests: every job present, lanes skip while alive, `TERM` stops lanes, claim exit codes; PHPUnit: claim atomicity, fixed-time due logic, status | done ([#2302](https://github.com/metadist/synaplan/pull/2302)) |
+| **P3** | `scheduler` service on every node (image entrypoint kept, `SYNAPLAN_ROLE=scheduler`, env/volumes/extra_hosts like `worker`, `container-healthcheck`, `restart: unless-stopped`); the two flags; delete the 8 app cron wrappers + logrotate entries; watchdog calls `app:scheduler:status`; `DIGEST/ENABLED` per §0 #8; cluster doc: scheduler section, crontab cleanup, checks, rollback | `docker compose config -q`; first deploy watched | draft PR in `synaplan-platform`, deploy after a release with P2 |
+| **P4** | Status API block (additive, admin-only, OpenAPI → `generate-schemas`) + card + sidebar hint (§3) | Vitest per state; one E2E on `/admin/features` | done (stacked on #2302) |
 
 ---
 
@@ -240,6 +240,10 @@ cluster doc.
 preserves it (`ModelSeeder.php:168-170`), so later catalog price fixes for
 synced rows never land, and a deliberate catalog override is overwritten by
 LiteLLM the next day. The production cron runs this sync daily.
+Draft: `issue-price-sync-fingerprint.md`. A second pre-existing finding from
+the overlap audit (synchronous media renders longer than 90 s are reaped as
+"Render worker stopped responding") is drafted in
+`issue-media-sync-heartbeat.md`.
 
 ## 9. Review log (2026-10-01)
 
