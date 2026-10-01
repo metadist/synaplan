@@ -31,7 +31,7 @@
   "selfAware": {
     "emptyHint": "Not sure what's possible here? Ask me what I can do.",
     "emptyHintQuestion": "What can you do here?",
-    "examplePrompt": "What can you do?",
+    "examplePrompt": "Give me a rough overview of the features",
     "helpCommand": {
       "label": "Help",
       "description": "Ask what this AI assistant can do here"
