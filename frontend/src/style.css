@@ -123,24 +123,28 @@
        ink flips to near-black there (see .dark). Both pass WCAG AA. */
     --on-brand: #fff;
 
-    --bg-app: #f2f2f2;
-    --bg-sidebar: #ebebeb;
+    /* Contrast pass: the page deepens while cards lighten, so surfaces stop
+       blending tone-in-tone (card vs app 1.03:1 -> 1.16:1, +13%). */
+    --bg-app: #e9e9e9;
+    --bg-sidebar: #e1e1e1;
     --bg-chat: #f0f0f0;
-    --bg-card: #f5f5f5;
-    --bg-chip: #f0f0f0;
+    --bg-card: #fafafa;
+    --bg-chip: #ededed;
 
     --txt-primary: #000;
-    --txt-secondary: #6b6b6b;
+    /* #5e5e5e on #fafafa is 6.2:1 (+27% over the old #6b6b6b on #f5f5f5),
+       giving secondary copy real headroom above AA. */
+    --txt-secondary: #5e5e5e;
     /* Empty "-- Select Model --" row only. Quieter than a real model name
-       (#000, ~19:1) and quieter than design-v2 secondary ink (#3a3f48, ~10:1),
-       still 4.7:1 on the light dropdown panel (#f0f0f0 / #f5f5f8). */
+       (#000, ~19:1) and quieter than secondary ink (#5e5e5e, ~6.2:1),
+       still 4.6:1 on the light dropdown panel (#ededed / #f5f5f8). */
     --txt-model-placeholder: #6b6b6b;
-    /* Hover wash is rgba(0, 63, 199, 0.06). #6b6b6b falls to ~4.2:1 on
-       #f0f0f0 under that wash; #5e5e5e stays 5.2:1. Rest state stays quiet. */
+    /* Hover wash is rgba(0, 63, 199, 0.09). #6b6b6b falls to ~4.1:1 on
+       #ededed under that wash; #5e5e5e stays 5.0:1. Rest state stays quiet. */
     --txt-model-placeholder-hover: #5e5e5e;
 
-    --border-light: rgba(0, 0, 0, 0.06);
-    --brand-alpha-light: rgba(0, 63, 199, 0.08);
+    --border-light: rgba(0, 0, 0, 0.1);
+    --brand-alpha-light: rgba(0, 63, 199, 0.1);
 
     --status-success: #16a34a;
     --status-success-muted: #dcfce7;
@@ -192,26 +196,29 @@
        glows and white text on it is only ~2.9:1. The fill is a deeper brand
        blue; white on #1a4db8 is ~7.5:1. */
     --brand-fill: #1a4db8;
-    /* Dark brand is a light blue, so on-brand ink is near-black (6.5:1). */
+    /* Dark brand is a light blue, so on-brand ink is near-black (6.7:1). */
     --on-brand: #0a0e1a;
 
-    --bg-app: #0a0e1a;
-    --bg-sidebar: #0d1525;
-    --bg-chat: #0f1726;
-    --bg-card: #121b2e;
-    --bg-chip: #1a2438;
+    /* Contrast pass: the page deepens while cards lift, so surfaces stop
+       blending tone-in-tone (card vs app 1.12:1 -> 1.25:1, +12%). */
+    --bg-app: #04070e;
+    --bg-sidebar: #080d18;
+    --bg-chat: #0e1526;
+    --bg-card: #172133;
+    --bg-chip: #202c46;
 
     --txt-primary: #fff;
-    --txt-secondary: #a1a1a3;
-    /* 5.1:1 on the dark dropdown panel (#1a2438) and 6.0:1 on the glass panel
+    /* #aaafb9 on #172133 is 7.3:1 (+10% over the old #a1a1a3 on #121b2e). */
+    --txt-secondary: #aaafb9;
+    /* 4.6:1 on the dark dropdown panel (#202c46) and 6.0:1 on the glass panel
        (#0e1628). Quieter than near-white model names and than #bdc2cc. */
     --txt-model-placeholder: #8b95a7;
-    /* Hover wash is rgba(107, 143, 214, 0.12). #8b95a7 falls to ~4.3:1 on
-       #1a2438; #959fb1 stays 4.9:1. */
+    /* Hover wash is rgba(107, 143, 214, 0.16). #8b95a7 falls to ~4.3:1 on
+       #202c46; #959fb1 stays 5.2:1. */
     --txt-model-placeholder-hover: #959fb1;
 
-    --border-light: rgba(109, 154, 224, 0.15);
-    --brand-alpha-light: rgba(109, 154, 224, 0.18);
+    --border-light: rgba(109, 154, 224, 0.22);
+    --brand-alpha-light: rgba(109, 154, 224, 0.24);
 
     --status-success: #4ade80;
     --status-success-muted: rgba(34, 197, 94, 0.15);
@@ -382,50 +389,50 @@
 
   /* Sidebar Nav-Items (dezent, mit Brand-Rand) */
   .nav-item {
-    background: rgba(0, 0, 0, 0.02);
+    background: rgba(0, 0, 0, 0.04);
     border-radius: 0.75rem;
     color: #2d2d2d;
     box-shadow:
-      inset 0 0 0 1px rgba(0, 63, 199, 0.08),
-      inset 0 0 0 1px rgba(0, 0, 0, 0.06),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.12),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.1),
       0 1px 2px rgba(0, 0, 0, 0.04);
     transition:
       background 0.15s,
       box-shadow 0.15s;
   }
   .nav-item:hover {
-    background: rgba(0, 63, 199, 0.03);
+    background: rgba(0, 63, 199, 0.06);
     box-shadow:
-      inset 0 0 0 1px rgba(0, 63, 199, 0.12),
-      inset 0 0 0 1px rgba(0, 0, 0, 0.06),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.18),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.1),
       0 4px 12px rgba(0, 0, 0, 0.06);
   }
   .nav-item--active {
     background: var(--brand-alpha-light);
     color: var(--brand);
     box-shadow:
-      inset 0 0 0 2px rgba(0, 63, 199, 0.28),
-      inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+      inset 0 0 0 2px rgba(0, 63, 199, 0.32),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.1);
   }
   .dark .nav-item {
-    background: transparent !important;
+    background: rgba(255, 255, 255, 0.03) !important;
     color: #d7dae0;
     box-shadow:
-      inset 0 0 0 1px rgba(0, 63, 199, 0.15),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      inset 0 0 0 1px rgba(0, 63, 199, 0.22),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
   .dark .nav-item:hover {
-    background: rgba(107, 143, 214, 0.05) !important;
+    background: rgba(107, 143, 214, 0.08) !important;
     box-shadow:
-      inset 0 0 0 1px rgba(107, 143, 214, 0.25),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+      inset 0 0 0 1px rgba(107, 143, 214, 0.32),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   }
   .dark .nav-item--active {
-    background: rgba(107, 143, 214, 0.08) !important;
+    background: rgba(107, 143, 214, 0.12) !important;
     color: var(--brand-light);
     box-shadow:
-      inset 0 0 0 2px rgba(107, 143, 214, 0.4),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+      inset 0 0 0 2px rgba(107, 143, 214, 0.48),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
   }
 
   /* Chat-Bubbles */
@@ -545,19 +552,21 @@
 
   /* Selection inside the user bubble: the forced white text becomes invisible
      against the browser's pale default highlight. Flip it to a white highlight
-     with brand-colored text so the user can actually read what they select to
-     copy. Covers the bubble itself and all descendants; resets the light-mode
-     text-shadow so selected text stays crisp. */
+     with fill-colored text so the user can actually read what they select to
+     copy. The fill (not --brand: the dark-mode brand is a light blue whose
+     white-on-tint is only ~2.9:1) keeps this above 7:1 in both themes. Covers
+     the bubble itself and all descendants; resets the light-mode text-shadow
+     so selected text stays crisp. */
   .bubble-user::selection,
   .bubble-user *::selection {
     background-color: #ffffff !important;
-    color: var(--brand) !important;
+    color: var(--brand-fill) !important;
     text-shadow: none !important;
   }
   .bubble-user::-moz-selection,
   .bubble-user *::-moz-selection {
     background-color: #ffffff !important;
-    color: var(--brand) !important;
+    color: var(--brand-fill) !important;
     text-shadow: none !important;
   }
 
@@ -628,16 +637,16 @@
   }
 
   .border-light-border {
-    border-color: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.12);
   }
   .dark .border-light-border {
-    border-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.09);
   }
   .border-dark-border {
-    border-color: rgba(0, 0, 0, 0.15);
+    border-color: rgba(0, 0, 0, 0.2);
   }
   .dark .border-dark-border {
-    border-color: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   /* Primärbutton */
@@ -670,36 +679,40 @@
     opacity: 0.5;
     pointer-events: none;
   }
+  /* Same deep red as light mode: white on #ef4444 is only 3.8:1 (fails AA),
+     white on #dc2626 is 4.8:1. The button still lifts off dark cards (3.6:1). */
   .dark .btn-danger {
-    background: #ef4444;
-  }
-  .dark .btn-danger:hover {
     background: #dc2626;
   }
+  .dark .btn-danger:hover {
+    background: #b91c1c;
+  }
 
-  /* Secondary/Outline Button */
+  /* Secondary/Outline Button. Always a visible surface: the old transparent
+     fill with a 0.06–0.10 hairline read as plain text, not a button. */
   .btn-secondary {
-    background: transparent;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.22);
     color: var(--txt-primary);
     transition:
       background-color 0.15s,
       border-color 0.15s;
   }
   .btn-secondary:hover {
-    background: rgba(0, 0, 0, 0.05);
-    border-color: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.09);
+    border-color: rgba(0, 0, 0, 0.3);
   }
   .btn-secondary:disabled {
     opacity: 0.5;
     pointer-events: none;
   }
   .dark .btn-secondary {
-    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.16);
   }
   .dark .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.11);
+    border-color: rgba(255, 255, 255, 0.24);
   }
 
   /* Dropdowns */
@@ -707,7 +720,7 @@
     background: var(--bg-chip);
     border-radius: 0.75rem;
     box-shadow:
-      inset 0 0 0 1px rgb(212 212 212 / 0.4),
+      inset 0 0 0 1px rgb(212 212 212 / 0.55),
       0 1px 2px rgb(0 0 0 / 0.05);
     isolation: isolate;
     mix-blend-mode: normal;
@@ -716,7 +729,7 @@
   }
   .dark .dropdown-panel {
     box-shadow:
-      inset 0 0 0 1px rgba(0, 63, 199, 0.2),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.28),
       0 1px 2px rgb(0 0 0 / 0.05);
   }
 
@@ -728,17 +741,17 @@
     min-height: 44px;
     border-radius: 0.5rem;
     outline: none;
-    color: #6b6b6b;
+    color: var(--txt-secondary);
     transition: background-color 0.15s;
   }
   .dark .dropdown-trigger {
-    color: #a1a1a3;
+    color: var(--txt-secondary);
   }
   .dropdown-trigger:hover {
-    background: rgba(0, 63, 199, 0.06);
+    background: rgba(0, 63, 199, 0.09);
   }
   .dark .dropdown-trigger:hover {
-    background: rgba(107, 143, 214, 0.12);
+    background: rgba(107, 143, 214, 0.16);
   }
   .dropdown-trigger:focus-visible {
     outline: 2px solid var(--brand);
@@ -762,10 +775,10 @@
     color: #fff;
   }
   .dropdown-item:hover {
-    background: rgba(0, 63, 199, 0.06);
+    background: rgba(0, 63, 199, 0.09);
   }
   .dark .dropdown-item:hover {
-    background: rgba(107, 143, 214, 0.12);
+    background: rgba(107, 143, 214, 0.16);
   }
   .dropdown-item:focus-visible {
     outline: 2px solid var(--brand);
@@ -773,11 +786,11 @@
   }
 
   .dropdown-item--active {
-    background: rgba(0, 63, 199, 0.1);
+    background: rgba(0, 63, 199, 0.14);
     color: var(--brand);
   }
   .dropdown-item--active:hover {
-    background: rgba(0, 63, 199, 0.15);
+    background: rgba(0, 63, 199, 0.18);
   }
 
   .dropdown-item--danger {
@@ -795,10 +808,10 @@
 
   /* Globaler Hover (optional als Utility) */
   .hover-surface:hover {
-    background: rgba(0, 63, 199, 0.06) !important;
+    background: rgba(0, 63, 199, 0.09) !important;
   }
   .dark .hover-surface:hover {
-    background: rgba(107, 143, 214, 0.12) !important;
+    background: rgba(107, 143, 214, 0.16) !important;
   }
 
   /*
@@ -852,10 +865,10 @@
   }
   .tab-nav-item:hover {
     color: var(--txt-primary);
-    background: rgba(0, 63, 199, 0.06);
+    background: rgba(0, 63, 199, 0.09);
   }
   .dark .tab-nav-item:hover {
-    background: rgba(107, 143, 214, 0.12);
+    background: rgba(107, 143, 214, 0.16);
   }
   .tab-nav-item:focus-visible {
     outline: 2px solid var(--brand);
@@ -863,35 +876,35 @@
   }
 
   .tab-nav-item--active {
-    background: rgba(0, 63, 199, 0.1);
+    background: rgba(0, 63, 199, 0.14);
     color: var(--brand);
   }
   .tab-nav-item--active:hover {
-    background: rgba(0, 63, 199, 0.1);
+    background: rgba(0, 63, 199, 0.14);
     color: var(--brand);
   }
   .dark .tab-nav-item--active {
-    background: rgba(107, 143, 214, 0.15);
+    background: rgba(107, 143, 214, 0.2);
     color: var(--brand-light);
   }
   .dark .tab-nav-item--active:hover {
-    background: rgba(107, 143, 214, 0.15);
+    background: rgba(107, 143, 214, 0.2);
     color: var(--brand-light);
   }
 
   /* Light overlay backgrounds */
   .bg-overlay-light {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.07);
   }
   .dark .bg-overlay-light {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .hover-overlay-light:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: rgba(0, 0, 0, 0.07);
   }
   .dark .hover-overlay-light:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   select option {
@@ -1045,16 +1058,17 @@
     );
   }
 
-  /* Icon ghost */
+  /* Icon ghost. The old #8a8a8e at 0.65 opacity was ~2.3:1 on white —
+     invisible for low-vision users. #5e5e5e at 0.9 is ~5.9:1. */
   .icon-ghost {
-    color: #8a8a8e;
+    color: #5e5e5e;
     border-radius: 0.5rem;
     padding: 0.25rem 0.375rem;
     transition:
       background 0.15s,
       color 0.15s,
       opacity 0.15s;
-    opacity: 0.65;
+    opacity: 0.9;
   }
   .icon-ghost:hover,
   .icon-ghost:focus-visible {
@@ -1065,9 +1079,9 @@
   }
   .dark .icon-ghost {
     /* Soft mid-grey: readable on dark surfaces without the glare of
-       near-white icons at high opacity. */
+       near-white icons at full opacity. */
     color: #c8c8cc;
-    opacity: 0.74;
+    opacity: 0.88;
   }
   .dark .icon-ghost:hover,
   .dark .icon-ghost:focus-visible {
@@ -1095,7 +1109,9 @@
   .icon-contrast:hover,
   .icon-contrast:focus-visible {
     background: var(--brand);
-    color: #fff;
+    /* --on-brand, not white: the dark-mode brand is a light blue and white
+       on it is only ~2.9:1. */
+    color: var(--on-brand);
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
     outline: none;
   }
@@ -1180,35 +1196,35 @@
     min-height: 34px;
     border-radius: 0.6rem;
     color: #374151;
-    background: rgba(0, 0, 0, 0.04);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
     transition: all 0.15s;
   }
   .dark .pill {
     color: #d4d4d8;
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.09);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
   }
   .pill:hover {
-    background: rgba(0, 63, 199, 0.08);
+    background: rgba(0, 63, 199, 0.11);
     color: var(--brand);
-    box-shadow: inset 0 0 0 1px rgba(0, 63, 199, 0.25);
+    box-shadow: inset 0 0 0 1px rgba(0, 63, 199, 0.32);
   }
   .dark .pill:hover {
-    background: rgba(107, 143, 214, 0.14);
+    background: rgba(107, 143, 214, 0.18);
     color: var(--brand-light);
-    box-shadow: inset 0 0 0 1px rgba(107, 143, 214, 0.3);
+    box-shadow: inset 0 0 0 1px rgba(107, 143, 214, 0.38);
   }
 
   .pill--active {
-    background: rgba(0, 63, 199, 0.12);
+    background: rgba(0, 63, 199, 0.16);
     color: var(--brand);
-    box-shadow: inset 0 0 0 2px rgba(0, 63, 199, 0.25);
+    box-shadow: inset 0 0 0 2px rgba(0, 63, 199, 0.32);
   }
   .dark .pill--active {
-    background: rgba(107, 143, 214, 0.12);
+    background: rgba(107, 143, 214, 0.16);
     color: var(--brand-light);
-    box-shadow: inset 0 0 0 2px rgba(107, 143, 214, 0.35);
+    box-shadow: inset 0 0 0 2px rgba(107, 143, 214, 0.42);
   }
 
   /* Static sovereignty badges (not clickable — do not use .pill) */
@@ -1282,7 +1298,7 @@
     background: var(--bg-chip);
     border-radius: 0.75rem;
     box-shadow:
-      inset 0 0 0 1px rgb(212 212 212 / 0.4),
+      inset 0 0 0 1px rgb(212 212 212 / 0.55),
       0 8px 24px rgb(0 0 0 / 0.18);
     padding: 0.5rem;
     transform-origin: bottom left;
@@ -1290,7 +1306,7 @@
   }
   .dark .dropdown-up {
     box-shadow:
-      inset 0 0 0 1px rgba(0, 63, 199, 0.2),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.28),
       0 8px 24px rgb(0 0 0 / 0.6);
   }
   @keyframes dropup {
@@ -1559,36 +1575,36 @@
   }
 
   .tool-badge--search {
-    background: rgba(59, 130, 246, 0.1);
+    background: rgba(59, 130, 246, 0.14);
     color: #2563eb;
-    border-color: rgba(59, 130, 246, 0.22);
+    border-color: rgba(59, 130, 246, 0.3);
   }
   .dark .tool-badge--search {
-    background: rgba(96, 165, 250, 0.16);
+    background: rgba(96, 165, 250, 0.2);
     color: #93c5fd;
-    border-color: rgba(96, 165, 250, 0.3);
+    border-color: rgba(96, 165, 250, 0.38);
   }
 
   .tool-badge--image {
-    background: rgba(139, 92, 246, 0.1);
+    background: rgba(139, 92, 246, 0.14);
     color: #7c3aed;
-    border-color: rgba(139, 92, 246, 0.22);
+    border-color: rgba(139, 92, 246, 0.3);
   }
   .dark .tool-badge--image {
-    background: rgba(167, 139, 250, 0.16);
+    background: rgba(167, 139, 250, 0.2);
     color: #c4b5fd;
-    border-color: rgba(167, 139, 250, 0.3);
+    border-color: rgba(167, 139, 250, 0.38);
   }
 
   .tool-badge--video {
-    background: rgba(245, 158, 11, 0.12);
+    background: rgba(245, 158, 11, 0.16);
     color: #b45309;
-    border-color: rgba(245, 158, 11, 0.25);
+    border-color: rgba(245, 158, 11, 0.32);
   }
   .dark .tool-badge--video {
-    background: rgba(251, 191, 36, 0.16);
+    background: rgba(251, 191, 36, 0.2);
     color: #fcd34d;
-    border-color: rgba(251, 191, 36, 0.3);
+    border-color: rgba(251, 191, 36, 0.38);
   }
 
   /* Large pasted-text cards in the composer and sent user bubble. */
@@ -1871,7 +1887,7 @@
     top: 2px;
     width: 5px;
     height: 9px;
-    border: solid white;
+    border: solid var(--on-brand);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }

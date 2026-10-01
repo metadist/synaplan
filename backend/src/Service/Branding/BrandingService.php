@@ -76,6 +76,26 @@ final readonly class BrandingService
     public const DEFAULT_POWERED_BY_LABEL = 'Synaplan';
     public const DEFAULT_POWERED_BY_URL = 'https://www.synaplan.com';
 
+    /**
+     * Style settings the Operate "reset to default style" action restores: the
+     * light + dark brand colors and the font settings. Name, logos, legal
+     * links, navigation and attribution are brand identity, not style, and are
+     * deliberately kept.
+     *
+     * @var list<string>
+     */
+    public const STYLE_RESET_KEYS = [
+        self::KEY_PRIMARY_COLOR,
+        self::KEY_SECONDARY_COLOR,
+        self::KEY_ACCENT_COLOR,
+        self::KEY_PRIMARY_COLOR_DARK,
+        self::KEY_SECONDARY_COLOR_DARK,
+        self::KEY_ACCENT_COLOR_DARK,
+        self::KEY_FONT_FAMILY,
+        self::KEY_HEADING_FONT_FAMILY,
+        self::KEY_FONT_URL,
+    ];
+
     public function __construct(
         private ConfigRepository $configRepository,
     ) {

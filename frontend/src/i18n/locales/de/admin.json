@@ -359,6 +359,17 @@
         "light": "Sie bearbeiten die Einstellungen für den HELLEN Modus — hier gespeicherte Farben gelten im hellen Modus. Wechseln Sie in den dunklen Modus, um die Farben für den dunklen Modus zu bearbeiten.",
         "dark": "Sie bearbeiten die Einstellungen für den DUNKLEN Modus — hier gespeicherte Farben gelten im dunklen Modus. Wechseln Sie in den hellen Modus, um die Farben für den hellen Modus zu bearbeiten."
       },
+      "brandingReset": {
+        "title": "Auf den Standardstil zurücksetzen",
+        "description": "Stellt die Standardfarben und -schriften von Synaplan für den hellen und dunklen Modus wieder her. Name, Logos, rechtliche Links, Landingpages und die Attribution bleiben unverändert.",
+        "button": "Stil zurücksetzen",
+        "resetting": "Wird zurückgesetzt…",
+        "confirmTitle": "Stil auf die Standards zurücksetzen?",
+        "confirmMessage": "Ihre benutzerdefinierten Farben und Schriften (heller und dunkler Modus) werden durch die Synaplan-Standards ersetzt. Name, Logos, Links und Attribution bleiben unberührt. Dies kann nicht rückgängig gemacht werden.",
+        "success": "Stil zurückgesetzt — die Standards werden wieder verwendet.",
+        "partial": "{reset} Einstellung(en) zurückgesetzt, {failed} fehlgeschlagen — die fehlgeschlagenen haben Ihre Werte behalten.",
+        "failed": "Der Stil konnte nicht zurückgesetzt werden. Ihre Werte sind unverändert."
+      },
       "restartBanner": {
         "title": "Konfiguration aktualisiert — Neustart erforderlich",
         "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",

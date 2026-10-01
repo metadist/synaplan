@@ -359,6 +359,17 @@
         "light": "Vous modifiez les réglages du mode CLAIR — les couleurs enregistrées ici s’appliquent lorsque l’application est en mode clair. Passez l’application en mode sombre pour modifier les couleurs du mode sombre.",
         "dark": "Vous modifiez les réglages du mode SOMBRE — les couleurs enregistrées ici s’appliquent lorsque l’application est en mode sombre. Passez l’application en mode clair pour modifier les couleurs du mode clair."
       },
+      "brandingReset": {
+        "title": "Revenir au style par défaut",
+        "description": "Restaure les couleurs et polices Synaplan par défaut pour le mode clair et sombre. Le nom, les logos, les liens juridiques, les pages d’accueil et l’attribution restent inchangés.",
+        "button": "Réinitialiser le style",
+        "resetting": "Réinitialisation…",
+        "confirmTitle": "Réinitialiser le style aux valeurs par défaut ?",
+        "confirmMessage": "Vos couleurs et polices personnalisées (mode clair et sombre) seront remplacées par les valeurs Synaplan par défaut. Le nom, les logos, les liens et l’attribution restent inchangés. Cette action est irréversible.",
+        "success": "Style réinitialisé — les valeurs par défaut sont de nouveau utilisées.",
+        "partial": "{reset} réglage(s) réinitialisé(s), {failed} échoué(s) — les réglages échoués ont conservé vos valeurs.",
+        "failed": "Le style n’a pas pu être réinitialisé. Vos valeurs sont inchangées."
+      },
       "restartBanner": {
         "title": "Configuration mise à jour — redémarrage requis",
         "message": "Vos modifications ont été enregistrées dans le fichier .env. Pour qu’elles prennent effet, vous devez redémarrer vos conteneurs Docker.",

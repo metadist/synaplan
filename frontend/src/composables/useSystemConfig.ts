@@ -5,6 +5,7 @@ import { useConfigStore } from '@/stores/config'
 import {
   getConfigSchema,
   getConfigValues,
+  resetBrandingStyle as resetBrandingStyleApi,
   testConnection,
   updateConfigValue,
   type ConfigFieldSchema,
@@ -178,6 +179,51 @@ export function useSystemConfig() {
     }
   }
 
+  /**
+   * Restore the default style (brand colors + fonts, both modes). One request,
+   * one outcome sentence: the backend reports per key what did and did not
+   * reset, and the runtime config + live theme follow in the same step so the
+   * new defaults are visible at once.
+   */
+  async function resetBrandingStyle(): Promise<boolean> {
+    try {
+      const result = await resetBrandingStyleApi()
+      const next = { ...values.value }
+      for (const key of result.reset) {
+        const field = schema.value?.fields[key]
+        next[key] = {
+          value: field?.default ?? '',
+          isSet: false,
+          isMasked: false,
+        }
+      }
+      values.value = next
+      try {
+        await configStore.reload()
+        applyBrandingTheme()
+      } catch (err) {
+        console.error('Style reset, but the runtime config could not be reloaded:', err)
+        showError(t('admin.config.savedButNotRefreshed'))
+        return result.success
+      }
+      if (result.success) {
+        success(t('admin.config.brandingReset.success'))
+      } else {
+        showError(
+          t('admin.config.brandingReset.partial', {
+            reset: result.reset.length,
+            failed: result.failed.length,
+          })
+        )
+      }
+      return result.success
+    } catch (err) {
+      console.error('Failed to reset branding style:', err)
+      showError(t('admin.config.brandingReset.failed'))
+      return false
+    }
+  }
+
   async function testService(service: string): Promise<void> {
     testingService.value = service
     try {
@@ -211,6 +257,7 @@ export function useSystemConfig() {
     ensureLoaded,
     resolveSection,
     update,
+    resetBrandingStyle,
     testService,
     dismissRestart,
   }

@@ -20,10 +20,76 @@ const FONT_LINK_ID = 'brand-font-link'
 const HEADING_STYLE_ID = 'brand-heading-font'
 const BRAND_COLOR_STYLE_ID = 'brand-color-vars'
 
+/** Ink candidates for text placed ON a brand fill (the stylesheet tokens). */
+const ON_BRAND_LIGHT = '#ffffff'
+const ON_BRAND_DARK = '#0a0e1a'
+
 export function applyBrandingTheme(): void {
   applyColors()
   applyFonts()
   applyIcon()
+}
+
+/**
+ * WCAG contrast helpers for brand fills. A custom brand can be any hex, so the
+ * ink on top of it cannot be a fixed per-theme token: a dark explicit
+ * dark-mode color with the fixed near-black ink reads as black-on-dark, and a
+ * light primary with fixed white ink as white-on-light. Both pick the ink with
+ * the higher ratio instead; the bubble fill is darkened until white passes, so
+ * bubbles (whose internals assume white ink) stay readable whatever the brand.
+ */
+function hexToRgb(hex: string): [number, number, number] {
+  const full = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex
+  return [
+    parseInt(full.slice(1, 3), 16) / 255,
+    parseInt(full.slice(3, 5), 16) / 255,
+    parseInt(full.slice(5, 7), 16) / 255,
+  ]
+}
+
+function relativeLuminance(hex: string): number {
+  const channel = (c: number): number =>
+    c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  const [r, g, b] = hexToRgb(hex).map(channel)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/** White or near-black, whichever reads better on the given fill. */
+export function pickOnBrandColor(fillHex: string): string {
+  return contrastRatio(fillHex, ON_BRAND_LIGHT) >= contrastRatio(fillHex, ON_BRAND_DARK)
+    ? ON_BRAND_LIGHT
+    : ON_BRAND_DARK
+}
+
+function mixHex(a: string, b: string, keepA: number): string {
+  const [ar, ag, ab] = hexToRgb(a)
+  const [br, bg, bc] = hexToRgb(b)
+  const mix = (x: number, y: number): string =>
+    Math.round((x * keepA + y * (1 - keepA)) * 255)
+      .toString(16)
+      .padStart(2, '0')
+  return `#${mix(ar, br)}${mix(ag, bg)}${mix(ab, bc)}`
+}
+
+/**
+ * The fill bubbles use: the brand when white already passes on it, otherwise a
+ * progressively darkened mix until white reaches AA (at most 10 steps; pure
+ * white still lands at ~3:1, but no brand is pure white).
+ */
+export function ensureFillForWhiteText(fillHex: string): string {
+  let fill =
+    fillHex.length === 4
+      ? `#${fillHex[1]}${fillHex[1]}${fillHex[2]}${fillHex[2]}${fillHex[3]}${fillHex[3]}`
+      : fillHex
+  for (let i = 0; i < 10 && contrastRatio(fill, ON_BRAND_LIGHT) < 4.5; i++) {
+    fill = mixHex(fill, '#000000', 0.82)
+  }
+  return fill
 }
 
 /**
@@ -65,31 +131,41 @@ function applyColors(): void {
       `--brand-hover:color-mix(in srgb, ${primaryColor} 88%, black)`,
       `--brand-light:color-mix(in srgb, ${primaryColor} 55%, white)`,
       `--brand-alpha-light:color-mix(in srgb, ${primaryColor} 10%, transparent)`,
-      // User bubbles use the saturated brand, not the lightened dark accent.
-      `--brand-fill:${primaryColor}`
+      // Buttons, checkboxes and icon-contrast read the ink that wins on this
+      // brand — never a fixed white that vanishes on a light custom color.
+      `--on-brand:${pickOnBrandColor(primaryColor)}`,
+      // User bubbles use the saturated brand, darkened until white passes, so
+      // they never turn into a bright wash with unreadable white text.
+      `--brand-fill:${ensureFillForWhiteText(primaryColor)}`
     )
   }
 
   if (hasDarkPrimary) {
     // Operator picked the dark color explicitly — use it as-is and derive only
-    // the auxiliary tints from it. The bubble fill follows that choice.
+    // the auxiliary tints from it. The ink wins on that choice (a dark custom
+    // color with the fixed near-black ink would read as black-on-dark); the
+    // bubble fill darkens until white passes.
     darkVars.push(
       `--brand:${primaryColorDark}`,
       `--brand-hover:color-mix(in srgb, ${primaryColorDark} 82%, white)`,
       `--brand-light:color-mix(in srgb, ${primaryColorDark} 70%, white)`,
       `--brand-alpha-light:color-mix(in srgb, ${primaryColorDark} 20%, transparent)`,
-      `--brand-fill:${primaryColorDark}`
+      `--on-brand:${pickOnBrandColor(primaryColorDark)}`,
+      `--brand-fill:${ensureFillForWhiteText(primaryColorDark)}`
     )
   } else if (hasLightPrimary) {
     // No explicit dark color: derive a dark-friendly tint from the light one
-    // for icons and buttons. The message bubble keeps the saturated primary
-    // so it does not turn into a bright wash.
+    // for icons and buttons. The tint is always light, so near-black ink wins;
+    // the message bubble keeps the saturated primary (darkened until white
+    // passes) so it does not turn into a bright wash.
+    const darkTint = mixHex(primaryColor, '#ffffff', 0.58)
     darkVars.push(
       `--brand:color-mix(in srgb, ${primaryColor} 58%, white)`,
       `--brand-hover:color-mix(in srgb, ${primaryColor} 46%, white)`,
       `--brand-light:color-mix(in srgb, ${primaryColor} 40%, white)`,
       `--brand-alpha-light:color-mix(in srgb, ${primaryColor} 20%, transparent)`,
-      `--brand-fill:${primaryColor}`
+      `--on-brand:${pickOnBrandColor(darkTint)}`,
+      `--brand-fill:${ensureFillForWhiteText(primaryColor)}`
     )
   }
 

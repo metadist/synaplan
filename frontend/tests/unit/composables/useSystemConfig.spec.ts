@@ -13,13 +13,16 @@ import type { ConfigSchema } from '@/services/api/adminConfigApi'
 const getConfigSchema = vi.hoisted(() => vi.fn())
 const getConfigValues = vi.hoisted(() => vi.fn())
 const updateConfigValue = vi.hoisted(() => vi.fn())
+const resetBrandingStyleApi = vi.hoisted(() => vi.fn())
 const success = vi.hoisted(() => vi.fn())
 const showError = vi.hoisted(() => vi.fn())
 const reload = vi.hoisted(() => vi.fn())
+const applyBrandingTheme = vi.hoisted(() => vi.fn())
 
 vi.mock('@/services/api/adminConfigApi', () => ({
   getConfigSchema,
   getConfigValues,
+  resetBrandingStyle: resetBrandingStyleApi,
   updateConfigValue,
   testConnection: vi.fn(),
 }))
@@ -30,6 +33,10 @@ vi.mock('@/composables/useNotification', () => ({
 
 vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({ reload }),
+}))
+
+vi.mock('@/utils/brandingTheme', () => ({
+  applyBrandingTheme,
 }))
 
 import { useSystemConfig } from '@/composables/useSystemConfig'
@@ -84,6 +91,11 @@ function mountConfig() {
             savedLive: 'Saved live',
             saveError: 'Failed to save configuration',
             savedButNotRefreshed: 'Saved, but the menus could not be refreshed.',
+            brandingReset: {
+              success: 'Style reset',
+              partial: '{reset} reset, {failed} failed',
+              failed: 'Reset failed',
+            },
           },
         },
       },
@@ -138,5 +150,43 @@ describe('useSystemConfig', () => {
     expect(showError).not.toHaveBeenCalledWith('Failed to save configuration')
     // Nested inside the harness return, so the ref is not auto-unwrapped.
     expect(wrapper.vm.config.values.value.FEATURE_X.isSet).toBe(true)
+  })
+
+  it('resets the style with one outcome and applies the defaults live', async () => {
+    resetBrandingStyleApi.mockResolvedValue({
+      success: true,
+      reset: ['BRAND_PRIMARY_COLOR'],
+      failed: [],
+      requiresRestart: false,
+    })
+    const wrapper = mountConfig()
+    await wrapper.vm.config.load()
+
+    const ok = await wrapper.vm.config.resetBrandingStyle()
+    await flushPromises()
+
+    expect(ok).toBe(true)
+    expect(success).toHaveBeenCalledWith('Style reset')
+    expect(reload).toHaveBeenCalledTimes(1)
+    expect(applyBrandingTheme).toHaveBeenCalledTimes(1)
+  })
+
+  it('says what did and did not reset on a partial failure', async () => {
+    resetBrandingStyleApi.mockResolvedValue({
+      success: false,
+      reset: ['BRAND_PRIMARY_COLOR'],
+      failed: ['BRAND_FONT_FAMILY'],
+      requiresRestart: false,
+    })
+    const wrapper = mountConfig()
+    await wrapper.vm.config.load()
+
+    const ok = await wrapper.vm.config.resetBrandingStyle()
+    await flushPromises()
+
+    expect(ok).toBe(false)
+    expect(showError).toHaveBeenCalledWith('1 reset, 1 failed')
+    expect(reload).toHaveBeenCalledTimes(1)
+    expect(applyBrandingTheme).toHaveBeenCalledTimes(1)
   })
 })

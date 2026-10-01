@@ -634,6 +634,42 @@ final readonly class SystemConfigService
     }
 
     /**
+     * Restore the default style: clears every brand color and font override so
+     * readers fall back to the field defaults. Name, logos, legal links,
+     * navigation and attribution are brand identity, not style, and are kept.
+     *
+     * Each key clears independently through setValue(), so one failing write
+     * cannot block the rest; callers report what did and did not reset.
+     *
+     * @return array{success: bool, reset: list<string>, failed: list<string>, requiresRestart: bool}
+     */
+    public function resetBrandingStyle(?int $actingUserId = null): array
+    {
+        $reset = [];
+        $failed = [];
+
+        foreach (BrandingService::STYLE_RESET_KEYS as $key) {
+            $result = $this->setValue($key, '', $actingUserId);
+            if ($result['success']) {
+                $reset[] = $key;
+            } else {
+                $failed[] = $key;
+                $this->logger->error('Failed to reset branding style key', [
+                    'key' => $key,
+                    'error' => $result['message'],
+                ]);
+            }
+        }
+
+        return [
+            'success' => [] === $failed,
+            'reset' => $reset,
+            'failed' => $failed,
+            'requiresRestart' => false,
+        ];
+    }
+
+    /**
      * Drop a stored override so readers fall back to the field default.
      *
      * @param array{type: string, default: string, dbGroup?: string, dbKey?: string} $field

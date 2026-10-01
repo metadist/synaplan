@@ -18,7 +18,7 @@ vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({ branding }),
 }))
 
-import { applyBrandingTheme } from '@/utils/brandingTheme'
+import { applyBrandingTheme, ensureFillForWhiteText, pickOnBrandColor } from '@/utils/brandingTheme'
 
 function iconLinks(): HTMLLinkElement[] {
   return Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'))
@@ -62,6 +62,38 @@ describe('applyBrandingTheme — colors', () => {
     applyBrandingTheme()
 
     expect(document.getElementById('brand-color-vars')).toBeNull()
+  })
+
+  it('picks white ink for a dark custom brand and dark ink for a light one', () => {
+    expect(pickOnBrandColor('#0b3d91')).toBe('#ffffff')
+    expect(pickOnBrandColor('#93c5fd')).toBe('#0a0e1a')
+    expect(pickOnBrandColor('#003fc7')).toBe('#ffffff')
+    expect(pickOnBrandColor('#6d9ae0')).toBe('#0a0e1a')
+  })
+
+  it('keeps a dark fill but darkens a light fill until white passes', () => {
+    expect(ensureFillForWhiteText('#0b3d91')).toBe('#0b3d91')
+    const lightened = ensureFillForWhiteText('#93c5fd')
+    expect(lightened).not.toBe('#93c5fd')
+    // White must reach AA on the darkened fill; verified via the picker.
+    expect(pickOnBrandColor(lightened)).toBe('#ffffff')
+  })
+
+  it('writes the winning ink next to a custom light brand', () => {
+    branding.primaryColor = '#93c5fd'
+    applyBrandingTheme()
+
+    const css = document.getElementById('brand-color-vars')?.textContent ?? ''
+    expect(css).toContain('--on-brand:#0a0e1a')
+    expect(css).not.toContain('--brand-fill:#93c5fd')
+  })
+
+  it('writes white ink next to a dark explicit dark-mode brand', () => {
+    branding.primaryColorDark = '#003fc7'
+    applyBrandingTheme()
+
+    const css = document.getElementById('brand-color-vars')?.textContent ?? ''
+    expect(css).toContain('--on-brand:#ffffff')
   })
 })
 

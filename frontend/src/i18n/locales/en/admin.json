@@ -359,6 +359,17 @@
         "light": "You are editing the LIGHT mode settings — colors saved here apply when the app is in light mode. Switch the app to dark mode to edit the dark mode colors.",
         "dark": "You are editing the DARK mode settings — colors saved here apply when the app is in dark mode. Switch the app to light mode to edit the light mode colors."
       },
+      "brandingReset": {
+        "title": "Reset to the default style",
+        "description": "Restores the default Synaplan colors and fonts for light and dark mode. The name, logos, legal links, landing pages and attribution stay as they are.",
+        "button": "Reset style",
+        "resetting": "Resetting…",
+        "confirmTitle": "Reset the style to the defaults?",
+        "confirmMessage": "Your custom colors and fonts (light and dark mode) will be replaced with the Synaplan defaults. The name, logos, links and attribution stay untouched. This cannot be undone.",
+        "success": "Style reset — the defaults are in use again.",
+        "partial": "{reset} setting(s) reset, {failed} failed — the failed ones kept your values.",
+        "failed": "The style could not be reset. Your values are unchanged."
+      },
       "restartBanner": {
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
