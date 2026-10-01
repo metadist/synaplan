@@ -592,6 +592,11 @@ export const selectors = {
     computeStatusPill: '[data-testid="compute-status-pill"]',
     computeRetry: '[data-testid="btn-compute-retry"]',
     computeConfigLink: '[data-testid="link-compute-config"]',
+    schedulerSection: '[data-testid="section-scheduler-status"]',
+    schedulerStateLine: '[data-testid="scheduler-state-line"]',
+    schedulerDocsLink: '[data-testid="link-scheduler-docs"]',
+    /** Admin rail/drawer hint while background jobs are stale */
+    schedulerSidebarHint: '[data-testid="link-sidebar-v2-scheduler"]',
   },
   people: {
     backToOperate: '[data-testid="link-people-back-operate"]',

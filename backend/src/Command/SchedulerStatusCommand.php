@@ -28,7 +28,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class SchedulerStatusCommand extends Command
 {
-    public const DEFAULT_MAX_AGE_SECONDS = 600;
+    public const DEFAULT_MAX_AGE_SECONDS = ScheduledJobStatusReader::DEFAULT_MAX_AGE_SECONDS;
     public const EXIT_RUNNING = 0;
     public const EXIT_ERROR = 1;
     public const EXIT_NOT_RUNNING = 2;
