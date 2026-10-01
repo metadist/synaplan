@@ -184,6 +184,43 @@ The same feed is available to the in-chat AI through the admin-only `recent_erro
 | Interval | 5 min |
 | Alert threshold | 2 consecutive failures |
 
+### Background jobs (scheduler)
+
+The `scheduler` service (`SYNAPLAN_ROLE=scheduler`) runs every periodic job.
+Jobs run in five lanes, so a slow job never holds up the others:
+
+| Lane | When | Jobs |
+|------|------|------|
+| Every minute | each tick | media reaper, stuck chats, desktop jobs, inbound mail handlers |
+| Saved Tasks | each tick | `app:saved-tasks:tick` |
+| Hourly | once an hour | expired temporary files, expired approvals, new-model discovery |
+| Daily | once a day at `SYNAPLAN_SCHEDULER_DAILY_AT` (UTC, default `03:30`) | update check, model availability, message digest, documentation sync, approval digest |
+| Model health | every 15 minutes | `app:model:health-check` |
+
+Every job has a time limit except Saved Tasks, whose runs must not be cut off
+halfway. The hourly, daily and model-health lanes claim their slot in the
+database before they run: a restart does not repeat them, and a slot that
+never ran (a fresh install) runs at once. Every-minute jobs hold a cross-node
+lock, so one scheduler per web node is safe when the nodes share the database
+and Redis.
+
+Check that jobs run:
+
+```bash
+docker compose exec -T backend php bin/console app:scheduler:status
+```
+
+Exit code `0` means jobs are running, `2` that no every-minute job finished
+in the last 10 minutes (`--max-age=<seconds>` to change), `1` that the check
+itself failed. Point an external monitor at it.
+
+Optional jobs, off by default. Set them on the scheduler service:
+
+| Variable | Adds |
+|----------|------|
+| `SYNAPLAN_SCHEDULER_SMART_MAILBOX=1` | `app:process-emails` every minute: the operator smart mailbox (`GMAIL_USERNAME` / `GMAIL_PASSWORD`) |
+| `SYNAPLAN_SCHEDULER_PRICE_SYNC=1` | `app:sync-model-prices` daily: writes LiteLLM prices into the model table; read [Pricing maintenance](PRICING_MAINTENANCE.md) first |
+
 ---
 
 ## Backups

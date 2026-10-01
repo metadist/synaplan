@@ -10,6 +10,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Lock\LockFactory;
 
 #[AsCommand(
     name: 'app:process-emails',
@@ -21,6 +22,7 @@ class ProcessEmailsCommand extends Command
         private InboundEmailService $inboundEmailService,
         private LoggerInterface $logger,
         private string $appUrl,
+        private LockFactory $lockFactory,
     ) {
         parent::__construct();
     }
@@ -36,6 +38,17 @@ class ProcessEmailsCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+
+        // One node fetches the mailbox. 300s releases the lock if this process dies.
+        $lock = $this->lockFactory->createLock('inbound-smart-mailbox', 300);
+        if (!$lock->acquire()) {
+            $message = 'Previous inbound smart mailbox process is still running. Skipping this run to prevent overlap.';
+            $io->warning($message);
+            $this->logger->info($message);
+
+            return Command::SUCCESS;
+        }
+
         $watch = $input->getOption('watch');
         $interval = (int) $input->getOption('interval');
         $deleteAfter = !$input->getOption('keep');
@@ -48,19 +61,23 @@ class ProcessEmailsCommand extends Command
             $webhookUrl = 'http://backend'.substr($webhookUrl, strlen('http://localhost:8000'));
         }
 
-        $io->title('Email Processing Service');
-        $io->info("Webhook URL: {$webhookUrl}");
-        $io->info('Delete after processing: '.($deleteAfter ? 'Yes' : 'No'));
+        try {
+            $io->title('Email Processing Service');
+            $io->info("Webhook URL: {$webhookUrl}");
+            $io->info('Delete after processing: '.($deleteAfter ? 'Yes' : 'No'));
 
-        if ($watch) {
-            $io->note("Watch mode enabled. Checking every {$interval} seconds. Press CTRL+C to stop.");
+            if ($watch) {
+                $io->note("Watch mode enabled. Checking every {$interval} seconds. Press CTRL+C to stop.");
 
-            while (true) {
-                $this->processEmails($io, $webhookUrl, $deleteAfter);
-                sleep($interval);
+                while (true) {
+                    $this->processEmails($io, $webhookUrl, $deleteAfter);
+                    sleep($interval);
+                }
             }
-        } else {
+
             $this->processEmails($io, $webhookUrl, $deleteAfter);
+        } finally {
+            $lock->release();
         }
 
         return Command::SUCCESS;
