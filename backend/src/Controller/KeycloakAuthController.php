@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Service\AccountLanguage;
 use App\Service\ImpersonationService;
 use App\Service\OAuthLoginResponder;
 use App\Service\OAuthStateService;
@@ -96,6 +97,7 @@ class KeycloakAuthController extends AbstractController
             if ($request->query->getBoolean('native')) {
                 $stateData['native'] = true;
             }
+            $stateData = AccountLanguage::withSignupLanguage($stateData, $request->query->get('language'));
 
             // Generate signed state token with PKCE verifier embedded (no session required)
             $state = $this->oauthStateService->generateState('keycloak', $stateData);
@@ -245,7 +247,11 @@ class KeycloakAuthController extends AbstractController
             ]);
 
             // Find or create user + sync roles via shared OIDC user service
-            $user = $this->oidcUserService->findOrCreateFromClaims($userInfo, $refreshToken);
+            $user = $this->oidcUserService->findOrCreateFromClaims(
+                $userInfo,
+                $refreshToken,
+                AccountLanguage::normalize($statePayload['language'] ?? null),
+            );
 
             // Native (mobile) cannot use cross-origin OIDC cookies — hand the app
             // its own Bearer tokens via the deep-link handoff. The Keycloak

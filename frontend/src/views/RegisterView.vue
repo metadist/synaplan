@@ -534,7 +534,7 @@ const handleRegister = async () => {
   if (password.value !== confirmPassword.value) return
 
   const recaptchaToken = await getReCaptchaToken('register')
-  const success = await register(email.value, password.value, recaptchaToken)
+  const success = await register(email.value, password.value, recaptchaToken, String(locale.value))
   if (success) registrationSuccess.value = true
 }
 

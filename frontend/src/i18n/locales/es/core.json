@@ -173,6 +173,7 @@
     "cancel": "Cancelar",
     "delete": "Eliminar",
     "save": "Guardar",
+    "accountLanguageSaveFailed": "El idioma de este dispositivo cambió, pero no se pudo guardar en su cuenta. Los correos y los mensajes de canales siguen usando el idioma anterior.",
     "saving": "Guardando...",
     "edit": "Editar",
     "close": "Cerrar",

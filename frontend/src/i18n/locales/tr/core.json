@@ -173,6 +173,7 @@
     "cancel": "İptal",
     "delete": "Sil",
     "save": "Kaydet",
+    "accountLanguageSaveFailed": "Bu cihazdaki dil değişti, ancak hesabınıza kaydedilemedi. E-postalar ve kanal mesajları önceki dili kullanmaya devam eder.",
     "saving": "Kaydediliyor...",
     "edit": "Düzenle",
     "close": "Kapat",

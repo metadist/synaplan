@@ -23,11 +23,6 @@ export interface Country {
   name: string
 }
 
-export interface Language {
-  code: string
-  name: string
-}
-
 export const mockProfile: UserProfile = {
   firstName: 'Yusuf',
   lastName: 'Senel',
@@ -54,14 +49,4 @@ export const countries: Country[] = [
   { code: 'BE', name: 'Belgium' },
   { code: 'US', name: 'United States' },
   { code: 'GB', name: 'United Kingdom' },
-]
-
-export const languages: Language[] = [
-  { code: 'en', name: 'English' },
-  { code: 'de', name: 'Deutsch' },
-  { code: 'fr', name: 'Français' },
-  { code: 'es', name: 'Español' },
-  { code: 'it', name: 'Italiano' },
-  { code: 'pt', name: 'Português' },
-  { code: 'nl', name: 'Nederlands' },
 ]

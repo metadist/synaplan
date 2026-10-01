@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\AccountLanguage;
 use App\Service\ModelConfigService;
 use App\Service\OAuthLoginResponder;
 use App\Service\OAuthStateService;
@@ -57,7 +58,10 @@ class GitHubAuthController extends AbstractController
         $native = $request->query->getBoolean('native');
 
         // Generate signed state token (no session required)
-        $state = $this->oauthStateService->generateState('github', $native ? ['native' => true] : []);
+        $state = $this->oauthStateService->generateState('github', AccountLanguage::withSignupLanguage(
+            $native ? ['native' => true] : [],
+            $request->query->get('language'),
+        ));
 
         $params = [
             'client_id' => $this->githubClientId,
@@ -169,7 +173,12 @@ class GitHubAuthController extends AbstractController
             ]);
 
             // Find or create user
-            $user = $this->findOrCreateUser($userInfo, $email, $githubAccessToken);
+            $user = $this->findOrCreateUser(
+                $userInfo,
+                $email,
+                $githubAccessToken,
+                AccountLanguage::normalize($statePayload['language'] ?? null),
+            );
 
             $this->logger->info('GitHub OAuth successful', [
                 'user_id' => $user->getId(),
@@ -189,7 +198,7 @@ class GitHubAuthController extends AbstractController
         }
     }
 
-    private function findOrCreateUser(array $userInfo, ?string $email, string $accessToken): User
+    private function findOrCreateUser(array $userInfo, ?string $email, string $accessToken, ?string $signupLanguage = null): User
     {
         $githubId = $userInfo['id'] ?? null;
         $githubLogin = $userInfo['login'] ?? null;
@@ -281,6 +290,9 @@ class GitHubAuthController extends AbstractController
         }
 
         $user->setUserDetails($userDetails);
+        if ($isNewUser) {
+            $user->applySignupLanguage($signupLanguage);
+        }
 
         if (!$user->isEmailVerified() && $email) {
             $user->setEmailVerified(true);
