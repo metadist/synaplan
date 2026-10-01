@@ -63,6 +63,14 @@ describe('account language sync', () => {
     expect(user.value?.language).toBe('fr')
   })
 
+  it('does not save a page-scoped locale change onto the account', async () => {
+    const saved = await setLocale('fr', { persistAccount: false })
+
+    expect(saved).toBe(true)
+    expect(i18n.global.locale.value).toBe('fr')
+    expect(updateProfile).not.toHaveBeenCalled()
+  })
+
   it('does not call the profile API while logged out', async () => {
     user.value = null
 
