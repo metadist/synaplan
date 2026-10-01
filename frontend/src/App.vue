@@ -8,6 +8,7 @@
       floating pill), so it does not push the navbar or any other content
       down — the page stays scroll-free.
     -->
+    <AmbientBackground />
     <ImpersonationBanner />
     <OfflineBanner />
     <ErrorBoundary>
@@ -38,6 +39,7 @@ import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { brandName } from '@/router'
+import AmbientBackground from '@/components/AmbientBackground.vue'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import SmartSearchPalette from '@/components/search/SmartSearchPalette.vue'
