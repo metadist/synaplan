@@ -202,8 +202,14 @@ halfway. The hourly, daily and model-health lanes claim their slot in the
 database before they run: a restart does not repeat them, and a slot that
 never ran (a fresh install) runs at once. Two daily runs are at least 12 hours
 apart, so a first start shortly before the daily time does not run them twice.
-Every-minute jobs hold a cross-node lock, so one scheduler per web node is safe
-when the nodes share the database and Redis.
+Every-minute jobs hold a cross-node lock that outlasts their time limit, so
+one scheduler per web node is safe when the nodes share the database and
+Redis.
+
+A Saved Task does not start again while its previous run is still going; that
+occurrence is skipped. A run cut off by a restart is marked failed after 30
+minutes with a message telling the owner to use **Run now**, instead of
+showing "running" forever.
 
 Check that jobs run:
 
