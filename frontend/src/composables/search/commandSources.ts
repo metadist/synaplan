@@ -53,9 +53,18 @@ export function useCommandSources() {
   const commandsStore = useCommandsStore()
   const t = i18n.global.t
 
-  const prefillChat = async (text: string) => {
+  const prefillChat = async (text: string, options?: { send?: boolean }) => {
+    const query: Record<string, string> = { prefill: text }
+    // Ask-in-chat sends once the empty thread is on screen. ChatView owns
+    // that hand-off so a history reload cannot wipe the outgoing message.
+    // Slash commands stay a draft: the person still completes the command.
+    if (options?.send) {
+      query.send = '1'
+      await router.push({ path: '/', query })
+      return
+    }
     await chatsStore.findOrCreateEmptyChat()
-    await router.push({ path: '/', query: { prefill: text } })
+    await router.push({ path: '/', query })
   }
 
   const definitions = computed<CommandDef[]>(() => {

@@ -1235,18 +1235,51 @@ watch(
   { flush: 'post' }
 )
 
-// Smart Search hands a query to the composer via `?prefill=`. The text is
-// only placed in the input; the user still decides to send it.
+// Smart Search hands a query to the composer via `?prefill=`.
+// `?send=1` (Ask in chat) submits it. Anything else, including slash
+// commands, only fills the box.
+let deliveringSearchPrefill = false
+
+async function deliverSearchPrefill(text: string, send: boolean): Promise<void> {
+  if (!send) {
+    chatInputRef.value?.setInputText(text)
+    return
+  }
+
+  const previousChatId = chatsStore.activeChatId
+  // The chat-id watcher reloads history and would replace an optimistic
+  // user message. Skip that reload, load the empty thread ourselves, then send.
+  suppressNextChatHistoryLoad = true
+  const chat = await chatsStore.findOrCreateEmptyChat()
+  const chatId = chat?.id ?? chatsStore.activeChatId
+  await nextTick()
+  if (chatId === previousChatId) {
+    suppressNextChatHistoryLoad = false
+  }
+  if (chatId) {
+    await historyStore.loadMessages(chatId)
+  }
+  chatInputRef.value?.submitText(text)
+}
+
 watch(
-  [chatInputRef, () => route.query.prefill],
-  ([input, prefill]) => {
-    if (!input || typeof prefill !== 'string' || prefill === '') {
+  [chatInputRef, () => route.query.prefill, () => route.query.send],
+  async ([input, prefill, send]) => {
+    if (deliveringSearchPrefill || !input || typeof prefill !== 'string' || prefill === '') {
       return
     }
-    input.setInputText(prefill)
-    const nextQuery = { ...route.query }
-    delete nextQuery.prefill
-    void router.replace({ path: route.path, query: nextQuery })
+    deliveringSearchPrefill = true
+    const text = prefill
+    const shouldSend = send === '1'
+    try {
+      const nextQuery = { ...route.query }
+      delete nextQuery.prefill
+      delete nextQuery.send
+      await router.replace({ path: route.path, query: nextQuery })
+      await deliverSearchPrefill(text, shouldSend)
+    } finally {
+      deliveringSearchPrefill = false
+    }
   },
   { flush: 'post' }
 )

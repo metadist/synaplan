@@ -39,6 +39,29 @@ describe('SearchResultRow', () => {
     expect(semantic.find('[data-testid="badge-smart-search-semantic"]').exists()).toBe(true)
   })
 
+  it('marks admin-only results with a dot and leaves ordinary results plain', () => {
+    const file = mount(SearchResultRow, {
+      props: { result: base, active: false, optionId: 'opt-file' },
+    })
+    expect(file.find('[data-testid="dot-smart-search-admin"]').exists()).toBe(false)
+
+    const setting = mount(SearchResultRow, {
+      props: {
+        result: {
+          ...base,
+          id: 'setting:FEATURE_IAM_GROUPS_ENABLED',
+          kind: 'setting',
+          title: 'People & groups',
+          route: '/admin/config?tab=features&section=iam&highlight=FEATURE_IAM_GROUPS_ENABLED',
+        },
+        active: false,
+        optionId: 'opt-setting',
+      },
+    })
+    expect(setting.find('[data-testid="dot-smart-search-admin"]').exists()).toBe(true)
+    expect(setting.text()).toContain('Admin')
+  })
+
   it('emits select on click', async () => {
     const wrapper = mount(SearchResultRow, {
       props: { result: base, active: false, optionId: 'opt-3' },

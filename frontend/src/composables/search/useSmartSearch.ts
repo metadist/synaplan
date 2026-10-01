@@ -99,7 +99,7 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
       title: String(t('search.palette.askInChat', { query: text })),
       icon: ChatBubbleLeftEllipsisIcon,
       matchedBy: 'local',
-      run: () => prefillChat(text),
+      run: () => prefillChat(text, { send: true }),
     }
   })
 

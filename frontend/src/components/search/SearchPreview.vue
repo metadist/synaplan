@@ -18,7 +18,17 @@
         >
           {{ result.title }}
         </p>
-        <p class="text-xs txt-secondary">{{ $t(`search.palette.kind.${result.kind}`) }}</p>
+        <p class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs txt-secondary">
+          <span>{{ $t(`search.palette.kind.${result.kind}`) }}</span>
+          <span
+            v-if="adminOnly"
+            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium leading-none bg-[var(--status-error-muted)] text-[var(--status-error-text)]"
+            :title="$t('search.palette.adminOnlyHint')"
+            data-testid="badge-smart-search-admin"
+          >
+            {{ $t('search.palette.adminOnly') }}
+          </span>
+        </p>
       </div>
     </div>
 
@@ -69,16 +79,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import type { SearchResult } from '@/composables/search/types'
 import type { PaletteAction } from '@/composables/search/usePaletteActions'
+import { isAdminOnlyResult } from '@/composables/search/adminOnly'
 
-defineProps<{
+const props = defineProps<{
   result: SearchResult
   actions: PaletteAction[]
   /** Value in force for a setting result, already as a label; null otherwise. */
   settingValue: string | null
 }>()
+
+const adminOnly = computed(() => isAdminOnlyResult(props.result))
 
 const emit = defineEmits<{
   run: [position: number]

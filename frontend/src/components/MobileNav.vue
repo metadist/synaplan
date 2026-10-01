@@ -36,17 +36,6 @@
         </button>
 
         <button
-          v-if="!isGuestMode"
-          type="button"
-          class="v2-drawer-item"
-          data-testid="btn-mobile-nav-search"
-          @click="handleSearchClick"
-        >
-          <MagnifyingGlassIcon class="w-5 h-5" aria-hidden="true" />
-          <span class="flex-1 text-left">{{ $t('search.palette.openButton') }}</span>
-        </button>
-
-        <button
           class="v2-drawer-item"
           :class="historyActive && 'v2-drawer-item--active'"
           data-testid="btn-mobile-nav-history"
@@ -64,6 +53,17 @@
         >
           <FolderIcon class="w-5 h-5" aria-hidden="true" />
           <span class="flex-1 text-left">{{ $t('nav.files') }}</span>
+        </button>
+
+        <button
+          v-if="!isGuestMode"
+          type="button"
+          class="v2-drawer-item"
+          data-testid="btn-mobile-nav-search"
+          @click="handleSearchClick"
+        >
+          <MagnifyingGlassIcon class="w-5 h-5" aria-hidden="true" />
+          <span class="flex-1 text-left">{{ $t('search.palette.openButton') }}</span>
         </button>
 
         <button

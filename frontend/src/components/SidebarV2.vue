@@ -40,24 +40,6 @@
       </button>
     </div>
 
-    <!-- Smart Search -->
-    <div v-if="!isGuestMode" class="flex items-center justify-center pb-2 flex-shrink-0">
-      <button
-        type="button"
-        class="v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5"
-        :title="$t('search.palette.openHint', { shortcut: searchShortcut })"
-        :aria-label="$t('search.palette.openHint', { shortcut: searchShortcut })"
-        aria-keyshortcuts="Control+K Meta+K"
-        data-testid="btn-sidebar-v2-search"
-        @click="smartSearchStore.open()"
-      >
-        <MagnifyingGlassIcon class="w-6 h-6" aria-hidden="true" />
-        <span class="v2-rail-label text-[10px] font-medium leading-tight">
-          {{ $t('search.palette.openButton') }}
-        </span>
-      </button>
-    </div>
-
     <!-- Nav Icons -->
     <nav class="flex-1 flex flex-col items-center gap-1 py-1 overflow-y-auto sidebar-scroll">
       <button
@@ -151,6 +133,21 @@
       >
         {{ versionLabel }}
       </span>
+    </div>
+
+    <!-- Search hint: the keys that open the palette, not a second nav item. -->
+    <div v-if="!isGuestMode" class="flex items-center justify-center pt-1 flex-shrink-0">
+      <button
+        type="button"
+        class="txt-secondary hover:txt-primary px-2 py-1.5 rounded-lg text-[11px] font-medium tracking-wide transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        :title="searchHint"
+        :aria-label="searchHint"
+        aria-keyshortcuts="Control+K Meta+K"
+        data-testid="btn-sidebar-v2-search"
+        @click="smartSearchStore.open()"
+      >
+        <kbd class="font-sans">{{ searchShortcut }}</kbd>
+      </button>
     </div>
 
     <!-- User Avatar -->
@@ -729,7 +726,6 @@ import {
   UserGroupIcon,
   InboxArrowDownIcon,
   ArrowRightOnRectangleIcon,
-  MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
@@ -775,7 +771,8 @@ const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const sidebarStore = useSidebarStore()
 const smartSearchStore = useSmartSearchStore()
-const searchShortcut = paletteShortcutLabel()
+const searchShortcut = computed(() => paletteShortcutLabel(t('search.palette.modifier')))
+const searchHint = computed(() => t('search.palette.openHint', { shortcut: searchShortcut.value }))
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 

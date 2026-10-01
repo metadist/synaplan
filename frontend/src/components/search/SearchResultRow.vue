@@ -11,14 +11,21 @@
     @mousemove="emit('hover')"
   >
     <span
-      class="flex-shrink-0 w-8 h-8 rounded-lg surface-chip flex items-center justify-center"
+      class="relative flex-shrink-0 w-8 h-8 rounded-lg surface-chip flex items-center justify-center"
+      :title="adminOnly ? $t('search.palette.adminOnlyHint') : undefined"
       aria-hidden="true"
     >
       <component :is="result.icon" class="w-4 h-4" />
+      <span
+        v-if="adminOnly"
+        class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-card)]"
+        data-testid="dot-smart-search-admin"
+      />
     </span>
     <span class="flex-1 min-w-0">
       <span class="flex items-center gap-2 min-w-0">
         <span class="truncate font-medium">{{ result.title }}</span>
+        <span v-if="adminOnly" class="sr-only">{{ $t('search.palette.adminOnly') }}</span>
         <span
           v-if="result.matchedBy === 'semantic'"
           class="flex-shrink-0 inline-flex items-center gap-1 text-[10px] txt-secondary"
@@ -46,14 +53,18 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import type { SearchResult } from '@/composables/search/types'
+import { isAdminOnlyResult } from '@/composables/search/adminOnly'
 
-defineProps<{
+const props = defineProps<{
   result: SearchResult
   active: boolean
   optionId: string
 }>()
+
+const adminOnly = computed(() => isAdminOnlyResult(props.result))
 
 const emit = defineEmits<{
   select: [event: MouseEvent]
