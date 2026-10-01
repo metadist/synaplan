@@ -30,7 +30,7 @@ final class ProcessEmailsCommandTest extends TestCase
 
         $locks = $this->createMock(LockFactory::class);
         $locks->expects(self::once())->method('createLock')
-            ->with('inbound-smart-mailbox', 300)
+            ->with('inbound-smart-mailbox', 600)
             ->willReturn($lock);
 
         $tester = new CommandTester(new ProcessEmailsCommand(
@@ -57,7 +57,7 @@ final class ProcessEmailsCommandTest extends TestCase
         $lock->expects(self::once())->method('release');
 
         $locks = $this->createMock(LockFactory::class);
-        $locks->expects(self::once())->method('createLock')->with('inbound-smart-mailbox', 300)->willReturn($lock);
+        $locks->expects(self::once())->method('createLock')->with('inbound-smart-mailbox', 600)->willReturn($lock);
 
         $tester = new CommandTester(new ProcessEmailsCommand(
             $emails,

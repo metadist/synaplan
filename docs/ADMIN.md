@@ -200,9 +200,10 @@ Jobs run in five lanes, so a slow job never holds up the others:
 Every job has a time limit except Saved Tasks, whose runs must not be cut off
 halfway. The hourly, daily and model-health lanes claim their slot in the
 database before they run: a restart does not repeat them, and a slot that
-never ran (a fresh install) runs at once. Every-minute jobs hold a cross-node
-lock, so one scheduler per web node is safe when the nodes share the database
-and Redis.
+never ran (a fresh install) runs at once. Two daily runs are at least 12 hours
+apart, so a first start shortly before the daily time does not run them twice.
+Every-minute jobs hold a cross-node lock, so one scheduler per web node is safe
+when the nodes share the database and Redis.
 
 Check that jobs run:
 
@@ -214,7 +215,9 @@ Exit code `0` means jobs are running, `2` that no every-minute job finished
 in the last 10 minutes (`--max-age=<seconds>` to change), `1` that the check
 itself failed. Point an external monitor at it.
 
-Optional jobs, off by default. Set them on the scheduler service:
+Optional jobs, off by default. Set them, and `SYNAPLAN_SCHEDULER_DAILY_AT`, in
+the scheduler service's `environment` (the self-host `deploy/compose.yaml` does
+not pass them through from `deploy/.env`):
 
 | Variable | Adds |
 |----------|------|

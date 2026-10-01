@@ -28,6 +28,7 @@ final class SchedulerSlotPolicyTest extends TestCase
         yield 'one second short' => [1_000_000 - 3599, 1_000_000, 3600, false, 1];
         yield 'just claimed' => [1_000_000, 1_000_000, 3600, false, 3600];
         yield 'clock ahead of now' => [1_000_050, 1_000_000, 10, false, 60];
+        yield 'claim more than a day ahead is repaired' => [1_000_000 + 86_401, 1_000_000, 3600, true, 0];
     }
 
     #[DataProvider('intervalCases')]
@@ -47,7 +48,12 @@ final class SchedulerSlotPolicyTest extends TestCase
         yield 'never ran before today slot' => [null, '2026-10-01 01:00:00', 3, 30, true, null];
         yield 'never ran exactly on the slot' => [null, '2026-10-01 03:30:00', 3, 30, true, null];
         yield 'never ran after today slot' => [null, '2026-10-01 18:00:00', 3, 30, true, null];
-        yield 'claimed this morning still waits for today' => ['2026-10-01 01:00:00', '2026-10-01 01:05:00', 3, 30, false, '2026-10-01 03:30:00'];
+        yield 'first claim shortly before the slot skips that slot' => ['2026-10-01 01:00:00', '2026-10-01 01:05:00', 3, 30, false, '2026-10-02 03:30:00'];
+        yield 'first claim one minute before the slot does not run again at the slot' => ['2026-10-01 03:29:00', '2026-10-01 03:30:00', 3, 30, false, '2026-10-02 03:30:00'];
+        yield 'first claim in the evening skips the next morning' => ['2026-10-01 16:00:00', '2026-10-02 03:30:00', 3, 30, false, '2026-10-03 03:30:00'];
+        yield 'first claim twelve hours before the slot runs at the slot' => ['2026-10-01 15:30:00', '2026-10-02 03:30:00', 3, 30, true, null];
+        yield 'claim far in the future is repaired' => ['2026-10-05 03:30:00', '2026-10-01 18:00:00', 3, 30, true, null];
+        yield 'claim from a node two minutes ahead holds' => ['2026-10-01 03:32:00', '2026-10-01 03:30:00', 3, 30, false, '2026-10-02 03:30:00'];
         yield 'claimed exactly on the slot waits a day' => ['2026-10-01 03:30:00', '2026-10-01 03:30:00', 3, 30, false, '2026-10-02 03:30:00'];
         yield 'claimed on the slot one second later' => ['2026-10-01 03:30:00', '2026-10-01 03:30:01', 3, 30, false, '2026-10-02 03:30:00'];
         yield 'one second before slot previous claim holds' => ['2026-09-30 03:30:00', '2026-10-01 03:29:59', 3, 30, false, '2026-10-01 03:30:00'];

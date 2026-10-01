@@ -118,6 +118,11 @@ case "$*" in
             exit "$CHAT_REAP_EXIT"
         fi
         ;;
+    *app:desktop:reap-jobs*)
+        if [ -n "${DESKTOP_REAP_EXIT:-}" ]; then
+            exit "$DESKTOP_REAP_EXIT"
+        fi
+        ;;
 esac
 exit 0
 EOF
@@ -150,7 +155,7 @@ EOF
 chmod +x "$TMP_DIR/bin/php" "$TMP_DIR/bin/timeout"
 
 reset_scheduler_env() {
-    unset CLAIM_EXIT CLAIM_OUT CLAIM_SLEEP SAVED_TASKS_SLEEP MEDIA_REAP_EXIT CHAT_REAP_EXIT
+    unset CLAIM_EXIT CLAIM_OUT CLAIM_SLEEP SAVED_TASKS_SLEEP MEDIA_REAP_EXIT CHAT_REAP_EXIT DESKTOP_REAP_EXIT
     unset SYNAPLAN_SCHEDULER_SMART_MAILBOX SYNAPLAN_SCHEDULER_PRICE_SYNC
     unset SYNAPLAN_SCHEDULER_DAILY_AT SYNAPLAN_SCHEDULER_HOURLY_SECONDS
     unset SYNAPLAN_SCHEDULER_TICK_SECONDS SYNAPLAN_SCHEDULER_MAX_CYCLES
@@ -230,6 +235,7 @@ assert_not_contains "app:sync-model-prices" "$COMMAND_LOG" "price sync stays off
 assert_contains "app:scheduler:claim hourly --interval=3600 --no-interaction" "$COMMAND_LOG" "hourly claim uses the interval"
 assert_contains "app:scheduler:claim daily --at=03:30 --no-interaction" "$COMMAND_LOG" "daily claim defaults to 03:30 UTC"
 assert_contains "app:scheduler:claim health --interval=900 --no-interaction" "$COMMAND_LOG" "health claim uses its interval"
+assert_contains "TIMEOUT --signal=TERM --kill-after=5 30 php bin/console --env=prod app:scheduler:claim daily --at=03:30 --no-interaction" "$COMMAND_LOG" "slot claims are capped at 30s"
 assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:media:reap-jobs --no-interaction" "$COMMAND_LOG" "tick jobs are capped at 300s"
 assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:chat:reap-stuck --no-interaction" "$COMMAND_LOG" "stuck-chat reaper is capped at 300s"
 assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:desktop:reap-jobs --no-interaction" "$COMMAND_LOG" "desktop reaper is capped at 300s"
@@ -278,9 +284,9 @@ assert_not_contains "app:models:discover" "$COMMAND_LOG" "model discovery does n
 assert_not_contains "app:updates:check" "$COMMAND_LOG" "daily jobs do not run when the claim is not due"
 assert_not_contains "app:digest:run" "$COMMAND_LOG" "message digest does not run when the claim is not due"
 assert_not_contains "app:model:health-check" "$COMMAND_LOG" "health check does not run when the claim is not due"
-assert_eq 1 "$(count_in 'app:scheduler:claim hourly' "$COMMAND_LOG")" "hourly claim waits for the reported delay"
-assert_eq 1 "$(count_in 'app:scheduler:claim daily' "$COMMAND_LOG")" "daily claim waits for the reported delay"
-assert_eq 1 "$(count_in 'app:scheduler:claim health' "$COMMAND_LOG")" "health claim waits for the reported delay"
+assert_eq 1 "$(count_php_invocations 'app:scheduler:claim hourly')" "hourly claim waits for the reported delay"
+assert_eq 1 "$(count_php_invocations 'app:scheduler:claim daily')" "daily claim waits for the reported delay"
+assert_eq 1 "$(count_php_invocations 'app:scheduler:claim health')" "health claim waits for the reported delay"
 
 echo "Case 2d: a claim answer that is not a delay is asked again next tick"
 reset_scheduler_env
@@ -292,7 +298,7 @@ export CLAIM_OUT=soon
 CASE2D_STATUS=0
 run_scheduler_for_test "$TMP_DIR/scheduler-case2d.log" || CASE2D_STATUS=$?
 assert_eq 0 "$CASE2D_STATUS" "a non-numeric not-due claim does not abort the scheduler"
-assert_eq 2 "$(count_in 'app:scheduler:claim hourly' "$COMMAND_LOG")" "a non-numeric delay is asked again on the next tick"
+assert_eq 2 "$(count_php_invocations 'app:scheduler:claim hourly')" "a non-numeric delay is asked again on the next tick"
 assert_not_contains "app:files:reap-ephemeral" "$COMMAND_LOG" "a non-numeric not-due claim does not run hourly jobs"
 
 echo "Case 2e: a failed claim skips the slot and is asked again next tick"
@@ -361,13 +367,15 @@ reset_scheduler_env
 export SYNAPLAN_SCHEDULER_MAX_CYCLES=1
 export MEDIA_REAP_EXIT=1
 export CHAT_REAP_EXIT=124
+export DESKTOP_REAP_EXIT=137
 CASE2H_LOG="$TMP_DIR/scheduler-case2h.log"
 CASE2H_STATUS=0
 run_scheduler_for_test "$CASE2H_LOG" || CASE2H_STATUS=$?
 assert_eq 0 "$CASE2H_STATUS" "a failing job does not abort the scheduler under set -e"
 assert_contains "app:media:reap-jobs failed (exit 1); it will be retried on the next run." "$CASE2H_LOG" "a failed job is logged with its exit code"
 assert_contains "app:chat:reap-stuck was stopped after 300 seconds." "$CASE2H_LOG" "exit 124 is logged as stopped after the cap"
-assert_contains "app:desktop:reap-jobs" "$COMMAND_LOG" "later tick jobs still run after a failure"
+assert_contains "app:desktop:reap-jobs was killed (exit 137): it ignored the stop signal after its 300-second limit, or it ran out of memory." "$CASE2H_LOG" "exit 137 is logged as a forced kill, not a plain failure"
+assert_contains "app:process-mail-handlers" "$COMMAND_LOG" "later tick jobs still run after a failure"
 
 echo "Case 2i: TERM stops a running lane"
 reset_scheduler_env

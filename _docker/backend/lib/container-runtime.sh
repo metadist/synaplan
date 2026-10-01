@@ -555,6 +555,10 @@ run_scheduler_job() {
         runtime_log "${command_name} was stopped after ${cap} seconds." >&2
         return 0
     fi
+    if [ "$status" -eq 137 ] && [ "$cap" -gt 0 ]; then
+        runtime_log "${command_name} was killed (exit 137): it ignored the stop signal after its ${cap}-second limit, or it ran out of memory." >&2
+        return 0
+    fi
     runtime_log "${command_name} failed (exit ${status}); it will be retried on the next run." >&2
     return 0
 }
@@ -615,7 +619,8 @@ scheduler_claim_slot() {
         return 0
     fi
 
-    claim_output="$(php bin/console --env="$env" app:scheduler:claim "$slot" "--${mode}=${value}" --no-interaction)" || claim_status=$?
+    # Bounded so a hung database cannot hold the loop (and a pending TERM) forever.
+    claim_output="$(timeout --signal=TERM --kill-after=5 30 php bin/console --env="$env" app:scheduler:claim "$slot" "--${mode}=${value}" --no-interaction)" || claim_status=$?
 
     if [ "$claim_status" -eq 0 ]; then
         case "$slot" in

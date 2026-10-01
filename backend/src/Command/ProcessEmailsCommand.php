@@ -39,8 +39,9 @@ class ProcessEmailsCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        // One node fetches the mailbox. 300s releases the lock if this process dies.
-        $lock = $this->lockFactory->createLock('inbound-smart-mailbox', 300);
+        // One node fetches the mailbox. The TTL outlasts the scheduler's 300 s cap
+        // plus its 30 s kill grace, so a slow run never overlaps the next one.
+        $lock = $this->lockFactory->createLock('inbound-smart-mailbox', 600);
         if (!$lock->acquire()) {
             $message = 'Previous inbound smart mailbox process is still running. Skipping this run to prevent overlap.';
             $io->warning($message);

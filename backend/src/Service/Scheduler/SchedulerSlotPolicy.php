@@ -7,12 +7,25 @@ namespace App\Service\Scheduler;
 /**
  * Decides whether a scheduler slot is due. No I/O, so the rules can be tested
  * without a database.
+ *
+ * A stored claim more than a day in the future cannot come from clock skew
+ * between nodes; it is treated as unreadable so the slot repairs itself
+ * instead of staying silent until that date.
  */
 final readonly class SchedulerSlotPolicy
 {
     public const RETRY_DELAY_SECONDS = 60;
 
+    /**
+     * Two daily runs are never closer than this. Without it, an install whose
+     * first claim lands shortly before the daily time (a fresh install, or the
+     * first start after an upgrade) runs the daily jobs twice within minutes.
+     */
+    public const MIN_DAILY_GAP_SECONDS = 43200;
+
     private const SECONDS_PER_DAY = 86400;
+
+    private const MAX_FUTURE_SECONDS = 86400;
 
     /**
      * Due when the slot has never run, or at least $intervalSeconds have passed
@@ -24,7 +37,7 @@ final readonly class SchedulerSlotPolicy
             throw new \InvalidArgumentException('Scheduler slot interval must be an integer greater than or equal to 1.');
         }
 
-        if (null === $lastStart) {
+        if (null === $lastStart || $this->isImplausible($lastStart, $now)) {
             return SchedulerSlotDecision::due();
         }
 
@@ -38,8 +51,8 @@ final readonly class SchedulerSlotPolicy
 
     /**
      * $hour and $minute are UTC. Due when the slot has never run, or the last
-     * claim is before the latest HH:MM that is already in the past (or now).
-     * A fresh install therefore runs at once; after that, once per day.
+     * claim is before the latest HH:MM that is already in the past (or now)
+     * and at least {@see MIN_DAILY_GAP_SECONDS} ago.
      */
     public function evaluateAt(?int $lastStart, int $now, int $hour, int $minute): SchedulerSlotDecision
     {
@@ -47,12 +60,26 @@ final readonly class SchedulerSlotPolicy
             throw new \InvalidArgumentException('Scheduler slot time must be a UTC hour 0-23 and minute 0-59.');
         }
 
-        $slot = $this->mostRecentOccurrence($now, $hour, $minute);
-        if (null === $lastStart || $lastStart < $slot) {
+        if (null === $lastStart || $this->isImplausible($lastStart, $now)) {
             return SchedulerSlotDecision::due();
         }
 
-        return SchedulerSlotDecision::waiting(($slot + self::SECONDS_PER_DAY) - $now);
+        $slot = $this->mostRecentOccurrence($now, $hour, $minute);
+        if ($lastStart < $slot && ($now - $lastStart) >= self::MIN_DAILY_GAP_SECONDS) {
+            return SchedulerSlotDecision::due();
+        }
+
+        $next = $slot + self::SECONDS_PER_DAY;
+        while (($next - $lastStart) < self::MIN_DAILY_GAP_SECONDS) {
+            $next += self::SECONDS_PER_DAY;
+        }
+
+        return SchedulerSlotDecision::waiting($next - $now);
+    }
+
+    private function isImplausible(int $lastStart, int $now): bool
+    {
+        return $lastStart > $now + self::MAX_FUTURE_SECONDS;
     }
 
     private function mostRecentOccurrence(int $now, int $hour, int $minute): int
