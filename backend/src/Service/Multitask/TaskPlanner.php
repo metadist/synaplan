@@ -17,8 +17,10 @@ use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Context\AttachmentDigest;
 use App\Service\Context\TokenEstimator;
+use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
+use App\Service\Message\SpokenInput;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Plan\TaskPlanValidator;
@@ -317,9 +319,23 @@ final readonly class TaskPlanner
             return '';
         }
 
-        $block = $this->conversationFiles->renderInventoryBlock(
-            $this->conversationFiles->build($message, $conversationHistory),
-        );
+        $catalog = $this->conversationFiles->build($message, $conversationHistory);
+        if (SpokenInput::isMarked($message)) {
+            $spokenText = trim($message->getText());
+            $messageId = $message->getId();
+            $catalog = array_values(array_filter(
+                $catalog,
+                static function (ConversationFile $file) use ($spokenText, $messageId): bool {
+                    if (ConversationFile::CATEGORY_AUDIO !== $file->category || $file->messageId !== $messageId) {
+                        return true;
+                    }
+
+                    return trim($file->extractedText) !== $spokenText;
+                },
+            ));
+        }
+
+        $block = $this->conversationFiles->renderInventoryBlock($catalog);
         if ('' === $block) {
             return '';
         }
@@ -489,6 +505,14 @@ final readonly class TaskPlanner
     private function buildCurrentMessageJson(Message $message): string
     {
         $fileText = $message->getFileText() ?: '';
+        // The spoken transcript is already BTEXT. Leaving it in BFILETEXT
+        // makes the planner treat the voice note as an attachment.
+        if (
+            SpokenInput::isLegacySpokenAudio($message)
+            || (SpokenInput::isMarked($message) && trim($fileText) === trim($message->getText()))
+        ) {
+            $fileText = '';
+        }
         if ('' !== $fileText) {
             $digest = $this->attachmentDigest ?? new AttachmentDigest(new TokenEstimator());
             $fileText = $digest->forRoutingWithConfig($fileText, $message->getUserId(), $message->getFileType());
@@ -502,12 +526,17 @@ final readonly class TaskPlanner
 
         $attached = [];
         foreach ($message->getFiles() as $file) {
+            // The transcript is the user's message. Offering the audio file
+            // makes the planner treat the turn as a file task.
+            if (SpokenInput::isSpokenAudio($message, $file)) {
+                continue;
+            }
             $attached[] = $file->getFileType() ?: $file->getFileMime();
         }
         if ([] !== $attached) {
             $data['BATTACHED_FILES'] = implode(', ', $attached);
             $data['BATTACHED_COUNT'] = count($attached);
-        } elseif ($message->getFile() > 0) {
+        } elseif ($message->getFile() > 0 && !SpokenInput::isLegacySpokenAudio($message)) {
             $data['BATTACHED_FILES'] = (string) $message->getFileType();
             $data['BATTACHED_COUNT'] = 1;
         }

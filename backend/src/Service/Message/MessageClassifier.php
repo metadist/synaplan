@@ -1299,6 +1299,11 @@ final readonly class MessageClassifier
         $files = $message->getFiles();
         if ($files->count() > 0) {
             foreach ($files as $file) {
+                // A voice note whose transcript is the message text is the
+                // user's words. Documents and other audio on the turn still count.
+                if (SpokenInput::isSpokenAudio($message, $file)) {
+                    continue;
+                }
                 if ($this->attachedFileIsAnalyzableNonImage($file)) {
                     return true;
                 }
@@ -1308,6 +1313,10 @@ final readonly class MessageClassifier
         }
 
         if ($message->getFile() > 0 && '' !== (string) $message->getFilePath()) {
+            if (SpokenInput::isLegacySpokenAudio($message)) {
+                return false;
+            }
+
             $category = FileTypeResolver::resolveCategory(
                 $message->getFileType() ?: '',
                 '',

@@ -103,7 +103,8 @@ final class RoutingCharacterizationTest extends TestCase
      *     language?: string,
      *     topic?: string,
      *     fastPath?: bool,
-     *     files?: list<array{type?: string, name?: string, mime?: string}>,
+     *     files?: list<array{type?: string, name?: string, mime?: string, text?: string}>,
+     *     textSource?: string,
      *     meta?: array<string, string>,
      *     modelTag?: string,
      *     sorter?: array<string, mixed>
@@ -150,6 +151,9 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'attach_pdf', 'text' => 'Summarize this', 'language' => 'en', 'files' => [['type' => 'pdf', 'name' => 'report.pdf']]],
             ['id' => 'attach_docx', 'text' => 'What is in here?', 'language' => 'en', 'files' => [['type' => 'docx', 'name' => 'contract.docx']]],
             ['id' => 'attach_audio_mp3', 'text' => 'Transcribe', 'language' => 'de', 'files' => [['type' => 'mp3', 'name' => 'voice.mp3']]],
+            // A caption-less voice note is the user's words (#2287). Same route
+            // as the typed question: web search, not file analysis.
+            ['id' => 'voice_note_weather', 'text' => 'Wie wird das Wetter heute in Münster?', 'language' => 'de', 'fastPath' => false, 'textSource' => 'transcript', 'files' => [['type' => 'ogg', 'name' => 'voice.ogg', 'text' => 'Wie wird das Wetter heute in Münster?']], 'sorter' => ['topic' => 'general', 'language' => 'de', 'web_search' => true]],
             ['id' => 'attach_merge_pdf', 'text' => 'führe beide dateien in eine pdf zusammen', 'language' => 'de', 'files' => [
                 ['type' => 'xlsx', 'name' => 'Finanzmodell.xlsx'],
                 ['type' => 'pdf', 'name' => 'Finanzmodell.pdf'],
@@ -240,7 +244,7 @@ final class RoutingCharacterizationTest extends TestCase
     /**
      * @param array{
      *     id: string, text: string, language?: string, topic?: string,
-     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string}>,
+     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string, text?: string}>, textSource?: string,
      *     meta?: array<string, string>, modelTag?: string, sorter?: array<string, mixed>
      * } $case
      *
@@ -339,7 +343,7 @@ final class RoutingCharacterizationTest extends TestCase
     /**
      * @param array{
      *     id: string, text: string, language?: string, topic?: string,
-     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string}>,
+     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string, text?: string}>, textSource?: string,
      *     meta?: array<string, string>, modelTag?: string, sorter?: array<string, mixed>
      * } $case
      */
@@ -363,6 +367,16 @@ final class RoutingCharacterizationTest extends TestCase
         $message->method('getTopic')->willReturn($case['topic'] ?? '');
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
+        $textSource = $case['textSource'] ?? null;
+        $message->method('getMeta')->willReturnCallback(
+            static function (string $key, ?string $default = null) use ($textSource): ?string {
+                if ('text_source' === $key && is_string($textSource)) {
+                    return $textSource;
+                }
+
+                return $default;
+            }
+        );
 
         $files = [];
         foreach ($case['files'] ?? [] as $f) {
@@ -370,6 +384,7 @@ final class RoutingCharacterizationTest extends TestCase
             $file->method('getFileType')->willReturn($f['type'] ?? '');
             $file->method('getFileName')->willReturn($f['name'] ?? '');
             $file->method('getFileMime')->willReturn($f['mime'] ?? '');
+            $file->method('getFileText')->willReturn($f['text'] ?? '');
             $files[] = $file;
         }
         $message->method('getFiles')->willReturn(new ArrayCollection($files));

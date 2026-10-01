@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Multitask;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
@@ -444,5 +445,53 @@ final class TaskPlannerTest extends TestCase
         $planner->plan($this->message(), [], 1);
 
         self::assertArrayNotHasKey('structured_output', $options ?? []);
+    }
+
+    /**
+     * Issue #2287: a voice note is not offered to the planner as an audio
+     * attachment, so the plan has no file_analysis or extract_text node for it.
+     */
+    public function testSpokenVoiceNoteIsPlannedLikeTypedText(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $file = $this->createMock(File::class);
+        $file->method('getFileType')->willReturn('ogg');
+        $file->method('getFileName')->willReturn('voice.ogg');
+        $file->method('getFileText')->willReturn($text);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getFiles')->willReturn(new ArrayCollection([$file]));
+        $message->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages): array {
+            $current = json_decode((string) end($messages)['content'], true);
+            $offered = is_array($current) && isset($current['BATTACHED_FILES']);
+
+            return ['content' => json_encode([
+                'version' => 1,
+                'language' => 'de',
+                'reply_node' => 'n1',
+                'tasks' => [[
+                    'id' => 'n1',
+                    'capability' => $offered ? 'extract_text' : 'web_search',
+                ]],
+            ])];
+        });
+
+        $result = $this->planner->plan($message, [], 1);
+
+        self::assertFalse($result->fallback);
+        self::assertCount(1, $result->plan->nodes);
+        self::assertSame(Capability::WebSearch, $result->plan->nodes[0]->capability);
+        $capabilities = array_map(static fn ($node) => $node->capability, $result->plan->nodes);
+        self::assertNotContains(Capability::FileAnalysis, $capabilities);
+        self::assertNotContains(Capability::ExtractText, $capabilities);
     }
 }

@@ -132,6 +132,66 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame(['I could not understand the voice message. Speak a little longer or send text.'], $this->texts());
     }
 
+    /**
+     * Issue #2287: a killed worker resumes a voice note by transcribing it
+     * before the answer, same as a fresh voice note.
+     */
+    public function testResumeTranscribesAnUntranscribedVoiceNoteBeforeAnswering(): void
+    {
+        $bot = $this->connectedBot();
+        $inbound = $this->untranscribedVoiceNote($bot);
+        $preprocessor = $this->createMock(MessagePreProcessor::class);
+        $preprocessor->expects($this->once())->method('process')->willReturnCallback(static function (Message $message): Message {
+            $message->setText('Wie wird das Wetter heute in Münster?');
+            foreach ($message->getFiles() as $file) {
+                $file->setFileText('Wie wird das Wetter heute in Münster?');
+            }
+
+            return $message;
+        });
+
+        $service = $this->service(bot: $bot, reply: 'Sunny in Münster.', preprocessor: $preprocessor);
+        $service->handle(5, 1, $this->update(['voice' => ['file_id' => 'v', 'mime_type' => 'audio/ogg']]));
+
+        $this->assertSame('Wie wird das Wetter heute in Münster?', $inbound->getText());
+        $this->assertCount(1, $this->processed);
+        $this->assertSame(['Sunny in Münster.'], $this->texts());
+    }
+
+    public function testResumeOfAnEmptyTranscriptStillSaysSo(): void
+    {
+        $bot = $this->connectedBot();
+        $this->untranscribedVoiceNote($bot);
+        $preprocessor = $this->createMock(MessagePreProcessor::class);
+        $preprocessor->expects($this->once())->method('process')->willReturnArgument(0);
+
+        $service = $this->service(bot: $bot, reply: 'never', preprocessor: $preprocessor);
+        $service->handle(5, 1, $this->update(['voice' => ['file_id' => 'v', 'mime_type' => 'audio/ogg']]));
+
+        $this->assertSame([], $this->processed);
+        $this->assertSame(['I could not understand the voice message. Speak a little longer or send text.'], $this->texts());
+    }
+
+    private function untranscribedVoiceNote(TelegramBot $bot): Message
+    {
+        $inbound = new Message();
+        $inbound->setUserId(7);
+        $inbound->setTrackingId(1);
+        $inbound->setDirection('IN');
+        $inbound->setStatus('processing');
+        $inbound->setText('');
+        (new \ReflectionProperty(Message::class, 'id'))->setValue($inbound, 50);
+        $inbound->setMeta(TelegramMessageStore::META_UPDATE, $bot->getBotId().':1');
+        $audio = new File();
+        $audio->setUserId(7);
+        $audio->setFileType('ogg');
+        $audio->setFileName('voice.ogg');
+        $inbound->addFile($audio);
+        $this->messages[] = $inbound;
+
+        return $inbound;
+    }
+
     public function testALocationBecomesTextForTheAi(): void
     {
         $service = $this->service(reply: 'That is Berlin.');
@@ -833,6 +893,7 @@ final class TelegramInboundServiceTest extends TestCase
         ?MediaJobCanceller $canceller = null,
         ?PlatformDocReferenceResolver $docs = null,
         ?ClockInterface $clock = null,
+        ?MessagePreProcessor $preprocessor = null,
     ): TelegramInboundService {
         $bot ??= $this->connectedBot();
         /** @var list<object> $pending */
@@ -921,7 +982,7 @@ final class TelegramInboundServiceTest extends TestCase
             $sender,
             $downloader,
             $copy,
-            $this->createStub(MessagePreProcessor::class),
+            $preprocessor ?? $this->createStub(MessagePreProcessor::class),
             $processor,
             $errors,
             $limits,
