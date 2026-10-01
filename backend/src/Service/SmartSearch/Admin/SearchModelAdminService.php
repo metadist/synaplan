@@ -51,7 +51,7 @@ final readonly class SearchModelAdminService
         $latest = $this->runs->findLatestForScope(RevectorizeRun::SCOPE_SEARCH);
 
         return [
-            'ai' => $this->slot(SearchModelConfigService::SLOT_AI),
+            'ai' => $this->slot(SearchModelConfigService::SLOT_AI, $admin->getId()),
             'embed' => $this->slot(SearchModelConfigService::SLOT_EMBED),
             'aiEnabled' => $this->config->isAiEnabled(null),
             'aiAvailable' => $this->interpreter->isAvailable($admin),
@@ -137,10 +137,10 @@ final readonly class SearchModelAdminService
     /**
      * @return array<string, mixed>
      */
-    private function slot(string $slot): array
+    private function slot(string $slot, ?int $userId = null): array
     {
-        $inherited = $this->searchModels->inheritedModelId($slot);
-        $effective = $this->searchModels->effectiveModelId($slot);
+        $inherited = $this->searchModels->inheritedModelId($slot, $userId);
+        $effective = $this->searchModels->effectiveModelId($slot, $userId);
 
         return [
             'selectedModelId' => $this->searchModels->selectedModelId($slot),

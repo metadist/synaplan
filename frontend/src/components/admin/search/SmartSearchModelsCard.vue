@@ -15,9 +15,11 @@ const { config, loading, loadFailed, saving, run, refresh, changeAi, changeEmbed
   useSearchModels()
 
 const inheritLabel = (slot: 'ai' | 'embed') =>
-  t(`aiInfra.searchModels.${slot}.inherit`, {
-    model: modelName(slot, config.value?.[slot].inheritedModelId),
-  })
+  slot === 'ai'
+    ? t('aiInfra.searchModels.ai.inherit')
+    : t('aiInfra.searchModels.embed.inherit', {
+        model: modelName(slot, config.value?.[slot].inheritedModelId),
+      })
 
 const embedLocked = computed(
   () => config.value !== null && (config.value.activeRun !== null || config.value.otherRunActive)
@@ -26,10 +28,14 @@ const embedLocked = computed(
 const aiStatus = computed(() => {
   if (!config.value) return ''
   if (!config.value.aiEnabled) return t('aiInfra.searchModels.ai.off')
+  const model = modelName('ai', config.value.ai.effectiveModelId)
+  if (config.value.ai.selectedModelId === null) {
+    return config.value.aiAvailable
+      ? t('aiInfra.searchModels.ai.userChat', { model })
+      : t('aiInfra.searchModels.ai.userChatUnavailable', { model })
+  }
   if (!config.value.aiAvailable) return t('aiInfra.searchModels.ai.unavailable')
-  return t('aiInfra.searchModels.ai.ready', {
-    model: modelName('ai', config.value.ai.effectiveModelId),
-  })
+  return t('aiInfra.searchModels.ai.ready', { model })
 })
 
 const separateModels = computed(
@@ -120,6 +126,7 @@ onMounted(refresh)
           :label="$t('aiInfra.searchModels.ai.label')"
           :hint="$t('aiInfra.searchModels.ai.hint')"
           :inherit-label="inheritLabel('ai')"
+          :global-group-label="$t('aiInfra.searchModels.ai.globalGroup')"
           :slot-config="config.ai"
           :disabled="saving !== null"
           @change="changeAi"

@@ -669,21 +669,26 @@
     },
     "searchModels": {
       "title": "Smart Search",
-      "lead": "Les modèles derrière la palette de recherche (Ctrl/Cmd+K). Tant que vous n’en choisissez pas ici, les deux suivent vos autres réglages IA.",
+      "lead": "Les modèles derrière la palette de recherche (Ctrl/Cmd+K). Les questions de recherche utilisent le modèle de chat de chaque personne jusqu’à ce que vous choisissiez un modèle pour tout le monde. L’index de recherche suit le modèle d’embedding des documents jusqu’à ce que vous en choisissiez un autre.",
       "loading": "Chargement des modèles de recherche…",
       "loadFailed": "Les modèles de recherche n’ont pas pu être chargés.",
       "noModel": "aucun modèle",
       "undo": "Annuler",
       "ai": {
         "label": "Modèle IA pour les questions de recherche",
-        "hint": "Lit une question saisie dans la palette et désigne le meilleur résultat. Il ne modifie jamais rien de lui-même.",
-        "inherit": "Comme le modèle d’outils : {model}",
-        "ready": "{model} répond aux questions de recherche.",
+        "hint": "Le premier choix utilise le modèle de chat que chaque personne utilise déjà. Tout modèle sous « Le même modèle pour tout le monde » vaut pour tout le serveur. Il désigne seulement un résultat et ne modifie jamais rien de lui-même.",
+        "inherit": "Modèle de chat de chaque personne",
+        "globalGroup": "Le même modèle pour tout le monde",
+        "userChat": "Les questions de recherche utilisent le modèle de chat de chaque personne. Le vôtre est {model}.",
+        "userChatUnavailable": "Les questions de recherche utilisent le modèle de chat de chaque personne. Le vôtre ne peut pas répondre pour le moment, votre recherche n’affiche donc aucune aide IA.",
+        "ready": "{model} répond aux questions de recherche de tout le monde.",
         "off": "L’aide IA dans la recherche est désactivée, la palette n’affiche donc aucune ligne IA.",
         "openFlag": "L’activer dans Fonctionnalités",
         "unavailable": "Le modèle choisi ne peut pas répondre pour le moment, la palette n’affiche donc aucune ligne IA. Choisissez un autre modèle ou configurez son fournisseur.",
-        "saved": "Les questions de recherche utilisent désormais {model}.",
-        "restored": "Les questions de recherche utilisent de nouveau {model}."
+        "saved": "Les questions de recherche de tout le monde utilisent désormais {model}.",
+        "savedUserChat": "Les questions de recherche utilisent de nouveau le modèle de chat de chaque personne.",
+        "restored": "Les questions de recherche de tout le monde utilisent de nouveau {model}.",
+        "restoredUserChat": "Les questions de recherche utilisent de nouveau le modèle de chat de chaque personne."
       },
       "embed": {
         "label": "Modèle d’embedding pour l’index de recherche",

@@ -134,7 +134,7 @@ final class SearchController extends AbstractController
         path: '/api/v1/search/interpret',
         operationId: 'smartSearchInterpret',
         summary: 'Let the AI pick the best search result for a question',
-        description: 'One tools-model call. It reads the question and the results the palette already shows and points at the best of them. It never changes anything. Answers 404 when FEATURE_SEARCH_AI_ENABLED is off or no tools model can answer.',
+        description: 'One model call. By default that is the signed-in person\'s chat model; an admin can pin one model for everyone. It reads the question and the results the palette already shows and points at the best of them. It never changes anything. Answers 404 when FEATURE_SEARCH_AI_ENABLED is off or that model cannot answer.',
         security: [['Bearer' => []]],
         tags: ['Smart Search'],
     )]
@@ -179,7 +179,7 @@ final class SearchController extends AbstractController
     )]
     #[OA\Response(response: 400, description: 'Missing query or unusable candidates')]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    #[OA\Response(response: 404, description: 'AI search is off or no tools model can answer')]
+    #[OA\Response(response: 404, description: 'AI search is off or the search model cannot answer')]
     #[OA\Response(response: 429, description: 'Too many AI searches')]
     public function interpret(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {

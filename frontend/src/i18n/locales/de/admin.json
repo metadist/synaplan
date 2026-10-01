@@ -669,21 +669,26 @@
     },
     "searchModels": {
       "title": "Smart Search",
-      "lead": "Die Modelle hinter der Suchpalette (Strg/Cmd+K). Solange du hier nichts wählst, folgen beide deinen übrigen KI-Einstellungen.",
+      "lead": "Die Modelle hinter der Suchpalette (Strg/Cmd+K). Suchfragen nutzen das Chat-Modell der jeweiligen Person, bis du ein Modell für alle festlegst. Der Suchindex folgt dem Embedding-Modell der Dokumente, bis du ein anderes wählst.",
       "loading": "Suchmodelle werden geladen …",
       "loadFailed": "Die Suchmodelle konnten nicht geladen werden.",
       "noModel": "kein Modell",
       "undo": "Rückgängig",
       "ai": {
         "label": "KI-Modell für Suchfragen",
-        "hint": "Liest eine Frage in der Palette und zeigt auf den besten Treffer. Es ändert selbst nichts.",
-        "inherit": "Wie das Tools-Modell: {model}",
-        "ready": "Suchfragen beantwortet {model}.",
+        "hint": "Die erste Auswahl nutzt das Chat-Modell, das jede Person schon verwendet. Jedes Modell unter „Dasselbe Modell für alle“ gilt für den ganzen Server. Es zeigt nur auf einen Treffer und ändert selbst nichts.",
+        "inherit": "Chat-Modell der jeweiligen Person",
+        "globalGroup": "Dasselbe Modell für alle",
+        "userChat": "Suchfragen nutzen das Chat-Modell der jeweiligen Person. Deins ist {model}.",
+        "userChatUnavailable": "Suchfragen nutzen das Chat-Modell der jeweiligen Person. Deins kann gerade nicht antworten, deshalb zeigt deine Suche keine KI-Hilfe.",
+        "ready": "Suchfragen aller Personen beantwortet {model}.",
         "off": "Die KI-Hilfe in der Suche ist ausgeschaltet, deshalb zeigt die Palette keine KI-Zeile.",
         "openFlag": "In den Funktionen einschalten",
         "unavailable": "Das gewählte Modell kann gerade nicht antworten, deshalb zeigt die Palette keine KI-Zeile. Wähle ein anderes Modell oder richte seinen Anbieter ein.",
-        "saved": "Suchfragen nutzen jetzt {model}.",
-        "restored": "Suchfragen nutzen wieder {model}."
+        "saved": "Suchfragen aller Personen nutzen jetzt {model}.",
+        "savedUserChat": "Suchfragen nutzen wieder das Chat-Modell der jeweiligen Person.",
+        "restored": "Suchfragen aller Personen nutzen wieder {model}.",
+        "restoredUserChat": "Suchfragen nutzen wieder das Chat-Modell der jeweiligen Person."
       },
       "embed": {
         "label": "Embedding-Modell für den Suchindex",

@@ -101,19 +101,23 @@ export function useSearchModels() {
   const effectiveName = (slot: AdminSearchSlot) =>
     modelName(slot, config.value?.[slot].effectiveModelId)
 
+  const aiChoiceMessage = (modelId: number | null, kind: 'saved' | 'restored') =>
+    modelId === null
+      ? t(`aiInfra.searchModels.ai.${kind}UserChat`)
+      : t(`aiInfra.searchModels.ai.${kind}`, { model: effectiveName('ai') })
+
   const changeAi = async (modelId: number | null) => {
     const result = await write('ai', modelId)
     if (!result) return
     push({
       type: 'success',
-      message: t('aiInfra.searchModels.ai.saved', { model: effectiveName('ai') }),
+      message: aiChoiceMessage(modelId, 'saved'),
       duration: UNDO_TOAST_MS,
       action: {
         label: t('aiInfra.searchModels.undo'),
         onClick: () => {
           void write('ai', result.previousModelId).then((restored) => {
-            if (restored)
-              success(t('aiInfra.searchModels.ai.restored', { model: effectiveName('ai') }))
+            if (restored) success(aiChoiceMessage(result.previousModelId, 'restored'))
           })
         },
       },

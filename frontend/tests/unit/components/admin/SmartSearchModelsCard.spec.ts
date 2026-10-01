@@ -84,7 +84,11 @@ describe('SmartSearchModelsCard', () => {
   it('names the inherited models and disables a model without a key, with the reason', async () => {
     const wrapper = await mountCard()
     const ai = wrapper.get('[data-testid="select-smart-search-ai-model"]')
-    expect(ai.text()).toContain('Same as the tools model: Tools (Test)')
+    expect(ai.text()).toContain("Each person's chat model")
+    expect(ai.get('optgroup').attributes('label')).toBe('Same model for everyone')
+    expect(wrapper.get('[data-testid="text-smart-search-ai-status"]').text()).toContain(
+      "Search questions use each person's chat model. Yours is Tools (Test)."
+    )
     const keyless = ai.findAll('option').find((o) => o.text().startsWith('Keyless'))
     expect(keyless?.attributes('disabled')).toBeDefined()
     expect(keyless?.text()).toContain('no API key for Test')
@@ -133,7 +137,7 @@ describe('SmartSearchModelsCard', () => {
     expect(putAdminSearchConfig).toHaveBeenCalledWith('ai', 2)
     expect(confirm).not.toHaveBeenCalled()
     const toast = push.mock.calls[0]![0]
-    expect(toast.message).toBe('Search questions now use Fast (Test).')
+    expect(toast.message).toBe("Everyone's search questions now use Fast (Test).")
 
     putAdminSearchConfig.mockResolvedValue({
       success: true,
@@ -144,7 +148,7 @@ describe('SmartSearchModelsCard', () => {
     toast.action.onClick()
     await flushPromises()
     expect(putAdminSearchConfig).toHaveBeenLastCalledWith('ai', null)
-    expect(success).toHaveBeenCalledWith('Search questions use Tools (Test) again.')
+    expect(success).toHaveBeenCalledWith("Search questions use each person's chat model again.")
   })
 
   it('asks before an embedding change and keeps the model when cancelled', async () => {

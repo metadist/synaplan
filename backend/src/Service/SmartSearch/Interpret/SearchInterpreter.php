@@ -15,7 +15,7 @@ use App\Service\SmartSearch\SmartSearchConfig;
 use Psr\Log\LoggerInterface;
 
 /**
- * The AI tier of the search palette: one tools-model call that reads a
+ * The AI tier of the search palette: one model call that reads a
  * question plus the results the palette already found, and points at the
  * best of them. It never acts; the palette shows the pick and the user
  * decides.

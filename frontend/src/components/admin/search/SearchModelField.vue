@@ -9,6 +9,8 @@ const props = defineProps<{
   label: string
   hint: string
   inheritLabel: string
+  /** When set, every concrete model sits under this heading: one choice for everyone. */
+  globalGroupLabel?: string
   slotConfig: Slot
   disabled?: boolean
 }>()
@@ -49,14 +51,26 @@ const onChange = (event: Event) => {
       @change="onChange"
     >
       <option value="">{{ inheritLabel }}</option>
-      <option
-        v-for="option in slotConfig.options"
-        :key="option.id"
-        :value="String(option.id)"
-        :disabled="!option.available"
-      >
-        {{ optionLabel(option) }}
-      </option>
+      <optgroup v-if="globalGroupLabel" :label="globalGroupLabel">
+        <option
+          v-for="option in slotConfig.options"
+          :key="option.id"
+          :value="String(option.id)"
+          :disabled="!option.available"
+        >
+          {{ optionLabel(option) }}
+        </option>
+      </optgroup>
+      <template v-else>
+        <option
+          v-for="option in slotConfig.options"
+          :key="option.id"
+          :value="String(option.id)"
+          :disabled="!option.available"
+        >
+          {{ optionLabel(option) }}
+        </option>
+      </template>
     </select>
     <p class="text-xs txt-secondary mt-1">{{ hint }}</p>
   </div>

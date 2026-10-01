@@ -665,21 +665,26 @@
     },
     "searchModels": {
       "title": "Smart Search",
-      "lead": "Arama paletinin (Ctrl/Cmd+K) arkasındaki modeller. Burada bir model seçmediğin sürece ikisi de diğer AI ayarlarını izler.",
+      "lead": "Arama paletinin (Ctrl/Cmd+K) arkasındaki modeller. Herkes için bir model seçene kadar arama soruları her kişinin kendi sohbet modelini kullanır. Arama dizini, başka bir model seçene kadar belgelerin embedding modelini izler.",
       "loading": "Arama modelleri yükleniyor…",
       "loadFailed": "Arama modelleri yüklenemedi.",
       "noModel": "model yok",
       "undo": "Geri al",
       "ai": {
         "label": "Arama soruları için AI modeli",
-        "hint": "Palete yazılan bir soruyu okur ve en iyi sonucu gösterir. Kendi başına hiçbir şeyi değiştirmez.",
-        "inherit": "Araç modeliyle aynı: {model}",
-        "ready": "Arama sorularını {model} yanıtlıyor.",
+        "hint": "İlk seçenek, her kişinin zaten kullandığı sohbet modelini kullanır. «Herkes için aynı model» altındaki her model tüm sunucu için geçerlidir. Yalnızca bir sonucu gösterir ve kendi başına hiçbir şeyi değiştirmez.",
+        "inherit": "Her kişinin sohbet modeli",
+        "globalGroup": "Herkes için aynı model",
+        "userChat": "Arama soruları her kişinin sohbet modelini kullanır. Seninki {model}.",
+        "userChatUnavailable": "Arama soruları her kişinin sohbet modelini kullanır. Seninki şu anda yanıt veremiyor, bu yüzden araman AI yardımı göstermiyor.",
+        "ready": "Herkesin arama sorularını {model} yanıtlıyor.",
         "off": "Aramada AI yardımı kapalı, bu yüzden palet AI satırı göstermiyor.",
         "openFlag": "Özellikler bölümünden aç",
         "unavailable": "Seçilen model şu anda yanıt veremiyor, bu yüzden palet AI satırı göstermiyor. Başka bir model seç veya sağlayıcısını kur.",
-        "saved": "Arama soruları artık {model} kullanıyor.",
-        "restored": "Arama soruları yeniden {model} kullanıyor."
+        "saved": "Herkesin arama soruları artık {model} kullanıyor.",
+        "savedUserChat": "Arama soruları yeniden her kişinin sohbet modelini kullanıyor.",
+        "restored": "Herkesin arama soruları yeniden {model} kullanıyor.",
+        "restoredUserChat": "Arama soruları yeniden her kişinin sohbet modelini kullanıyor."
       },
       "embed": {
         "label": "Arama dizini için embedding modeli",

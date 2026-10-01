@@ -11,10 +11,10 @@ use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
 
 /**
- * The two system-wide search model slots. An empty slot inherits: the AI
- * tier from the tools model (which inherits the chat model), the index from
- * the instance embedding model. Search therefore works without any setup,
- * and an admin choice only ever narrows it.
+ * The two search model slots. An empty AI slot uses each person's own chat
+ * model. A picked AI model is one model for everyone. An empty embedding
+ * slot uses the instance embedding model. Search therefore works without
+ * any setup, and an admin choice only ever narrows it.
  */
 final readonly class SearchModelConfigService
 {
@@ -51,11 +51,14 @@ final readonly class SearchModelConfigService
         return null !== $model && $this->fitsSlot($model, $slot) ? (int) $model->getId() : null;
     }
 
-    /** The model a slot would use with no admin choice. */
+    /**
+     * The model a slot would use with no admin choice. For search questions
+     * that is this person's chat model, so two people can get two models.
+     */
     public function inheritedModelId(string $slot, ?int $userId = null): ?int
     {
         return self::SLOT_AI === self::assertSlot($slot)
-            ? $this->modelConfig->getToolsModelConfig($userId)['model_id']
+            ? $this->modelConfig->getDefaultModel('CHAT', $userId)
             : $this->modelConfig->getDefaultModel('VECTORIZE');
     }
 

@@ -665,21 +665,26 @@
     },
     "searchModels": {
       "title": "Smart Search",
-      "lead": "Los modelos detrás de la paleta de búsqueda (Ctrl/Cmd+K). Mientras no elijas uno aquí, ambos siguen tus demás ajustes de IA.",
+      "lead": "Los modelos detrás de la paleta de búsqueda (Ctrl/Cmd+K). Las preguntas de búsqueda usan el modelo de chat de cada persona hasta que elijas un modelo para todos. El índice de búsqueda sigue el modelo de embedding de los documentos hasta que elijas otro.",
       "loading": "Cargando los modelos de búsqueda…",
       "loadFailed": "No se pudieron cargar los modelos de búsqueda.",
       "noModel": "ningún modelo",
       "undo": "Deshacer",
       "ai": {
         "label": "Modelo de IA para preguntas de búsqueda",
-        "hint": "Lee una pregunta escrita en la paleta y señala el mejor resultado. Nunca cambia nada por sí mismo.",
-        "inherit": "Igual que el modelo de herramientas: {model}",
-        "ready": "{model} responde las preguntas de búsqueda.",
+        "hint": "La primera opción usa el modelo de chat que cada persona ya utiliza. Cualquier modelo bajo «El mismo modelo para todos» vale para todo el servidor. Solo señala un resultado y nunca cambia nada por sí mismo.",
+        "inherit": "Modelo de chat de cada persona",
+        "globalGroup": "El mismo modelo para todos",
+        "userChat": "Las preguntas de búsqueda usan el modelo de chat de cada persona. El tuyo es {model}.",
+        "userChatUnavailable": "Las preguntas de búsqueda usan el modelo de chat de cada persona. El tuyo no puede responder ahora, así que tu búsqueda no muestra ayuda de IA.",
+        "ready": "{model} responde las preguntas de búsqueda de todas las personas.",
         "off": "La ayuda de IA en la búsqueda está desactivada, por eso la paleta no muestra ninguna fila de IA.",
         "openFlag": "Activarla en Funciones",
         "unavailable": "El modelo elegido no puede responder ahora, por eso la paleta no muestra ninguna fila de IA. Elige otro modelo o configura su proveedor.",
-        "saved": "Las preguntas de búsqueda usan ahora {model}.",
-        "restored": "Las preguntas de búsqueda vuelven a usar {model}."
+        "saved": "Las preguntas de búsqueda de todas las personas usan ahora {model}.",
+        "savedUserChat": "Las preguntas de búsqueda vuelven a usar el modelo de chat de cada persona.",
+        "restored": "Las preguntas de búsqueda de todas las personas vuelven a usar {model}.",
+        "restoredUserChat": "Las preguntas de búsqueda vuelven a usar el modelo de chat de cada persona."
       },
       "embed": {
         "label": "Modelo de embedding para el índice de búsqueda",

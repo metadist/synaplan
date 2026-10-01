@@ -43,20 +43,21 @@ final class AdminSearchConfigControllerTest extends WebTestCase
 
     public function testBothSlotsInheritUntilAnAdminChooses(): void
     {
-        $tools = $this->createModel('chat', 'search-tools');
-        $this->setDefault('TOOLS', $tools);
-        $this->authenticateClient($this->client, $this->createUser('search-models-read@synaplan.internal', 'ADMIN'));
+        $chat = $this->createModel('chat', 'search-user-chat');
+        $admin = $this->createUser('search-models-read@synaplan.internal', 'ADMIN');
+        $this->setDefault('CHAT', $chat, $admin->getId() ?? 0);
+        $this->authenticateClient($this->client, $admin);
 
         $this->client->request('GET', '/api/v1/admin/search/config');
         self::assertResponseIsSuccessful();
         $body = $this->json();
 
         self::assertNull($body['ai']['selectedModelId']);
-        self::assertSame($tools->getId(), $body['ai']['inheritedModelId']);
-        self::assertSame($tools->getId(), $body['ai']['effectiveModelId']);
+        self::assertSame($chat->getId(), $body['ai']['inheritedModelId']);
+        self::assertSame($chat->getId(), $body['ai']['effectiveModelId']);
         self::assertNull($body['embed']['selectedModelId']);
         self::assertArrayHasKey('rows', $body['index']);
-        self::assertContains($tools->getId(), array_column($body['ai']['options'], 'id'));
+        self::assertContains($chat->getId(), array_column($body['ai']['options'], 'id'));
     }
 
     public function testAiModelChangeAppliesAtOnceAndCanBeUndone(): void
@@ -158,10 +159,10 @@ final class AdminSearchConfigControllerTest extends WebTestCase
         return $model;
     }
 
-    private function setDefault(string $capability, Model $model): void
+    private function setDefault(string $capability, Model $model, int $owner = 0): void
     {
         static::getContainer()->get(ConfigRepository::class)
-            ->setValue(0, 'DEFAULTMODEL', $capability, (string) $model->getId());
+            ->setValue($owner, 'DEFAULTMODEL', $capability, (string) $model->getId());
     }
 
     private function createUser(string $email, string $level): User

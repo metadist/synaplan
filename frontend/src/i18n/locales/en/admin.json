@@ -669,21 +669,26 @@
     },
     "searchModels": {
       "title": "Smart Search",
-      "lead": "The models behind the search palette (Ctrl/Cmd+K). Until you pick one here, both follow your other AI settings.",
+      "lead": "The models behind the search palette (Ctrl/Cmd+K). Search questions use each person's chat model until you pick one model for everyone. The search index follows the document embedding model until you pick another.",
       "loading": "Loading the search models…",
       "loadFailed": "The search models could not be loaded.",
       "noModel": "no model",
       "undo": "Undo",
       "ai": {
         "label": "AI model for search questions",
-        "hint": "Reads a question typed into the palette and points at the best result. It never changes anything by itself.",
-        "inherit": "Same as the tools model: {model}",
-        "ready": "Search questions are answered by {model}.",
+        "hint": "The first choice uses the chat model each person already uses. Any model under “Same model for everyone” is used for the whole server. It only points at a result and never changes anything by itself.",
+        "inherit": "Each person's chat model",
+        "globalGroup": "Same model for everyone",
+        "userChat": "Search questions use each person's chat model. Yours is {model}.",
+        "userChatUnavailable": "Search questions use each person's chat model. Yours cannot answer right now, so your search shows no AI help.",
+        "ready": "Everyone's search questions are answered by {model}.",
         "off": "AI help in search is switched off, so the palette shows no AI row.",
         "openFlag": "Turn it on in Features",
         "unavailable": "The chosen model cannot answer right now, so the palette shows no AI row. Pick another model or set up its provider.",
-        "saved": "Search questions now use {model}.",
-        "restored": "Search questions use {model} again."
+        "saved": "Everyone's search questions now use {model}.",
+        "savedUserChat": "Search questions use each person's chat model again.",
+        "restored": "Everyone's search questions use {model} again.",
+        "restoredUserChat": "Search questions use each person's chat model again."
       },
       "embed": {
         "label": "Embedding model for the search index",
