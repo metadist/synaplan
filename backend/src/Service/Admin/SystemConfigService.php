@@ -38,6 +38,7 @@ use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\WorkflowsConfig;
+use App\Service\SmartSearch\SmartSearchConfig;
 use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
@@ -138,6 +139,9 @@ final readonly class SystemConfigService
             'platforms' => ['label' => 'Desktop & partner platforms', 'fields' => [
                 'FEATURE_DESKTOP_AGENT_ENABLED',
                 'FEATURE_PLATFORM_LINKS_ENABLED',
+            ]],
+            'search' => ['label' => 'Search', 'fields' => [
+                'FEATURE_SEARCH_AI_ENABLED',
             ]],
         ];
 
@@ -375,13 +379,19 @@ final readonly class SystemConfigService
     /**
      * Get current configuration values with sensitive fields masked.
      *
+     * @param list<string>|null $onlyKeys limit the lookup to these keys (null = every field)
+     *
      * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool, envOverride?: bool, effectiveValue?: string, locked?: bool, keySource?: string}>
      */
-    public function getValues(?int $actingUserId = null): array
+    public function getValues(?int $actingUserId = null, ?array $onlyKeys = null): array
     {
         $values = [];
+        $wanted = null === $onlyKeys ? null : array_flip($onlyKeys);
 
         foreach ($this->schema as $key => $field) {
+            if (null !== $wanted && !isset($wanted[$key])) {
+                continue;
+            }
             $source = $field['source'] ?? 'env';
 
             // Instance provider keys live in the encrypted ProviderKeyStore
@@ -1528,6 +1538,15 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => PlatformLinksConfig::CONFIG_GROUP,
                 'dbKey' => PlatformLinksConfig::KEY_ENABLED,
+            ],
+            'FEATURE_SEARCH_AI_ENABLED' => [
+                'tab' => 'features', 'section' => 'search', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the search model (the chat model of each person unless an admin pins one) picks the best matching result and says why. Each use is one short AI call and counts as one message. Off keeps keyword and meaning search.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => SmartSearchConfig::CONFIG_GROUP,
+                'dbKey' => SmartSearchConfig::KEY_AI_ENABLED,
             ],
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',

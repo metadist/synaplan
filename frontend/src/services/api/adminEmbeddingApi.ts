@@ -15,7 +15,7 @@ export interface EmbeddingGuardStatus {
   cooldownSecondsRemaining: number
 }
 
-export type EmbeddingRunScope = 'documents' | 'memories' | 'all'
+export type EmbeddingRunScope = 'documents' | 'memories' | 'all' | 'search'
 
 export type EmbeddingRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 

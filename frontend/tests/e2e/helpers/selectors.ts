@@ -711,5 +711,22 @@ export const selectors = {
     serverRowAny: '[data-testid^="mcp-server-"]',
     deleteServer: (id: number) => `[data-testid="btn-mcp-delete-${id}"]`,
   },
-  toast: {},
+  smartSearch: {
+    openSidebar: '[data-testid="btn-sidebar-v2-search"]',
+    openMobile: '[data-testid="btn-mobile-nav-search"]',
+    modal: '[data-testid="modal-smart-search"]',
+    panel: '[data-testid="panel-smart-search"]',
+    input: '[data-testid="input-smart-search"]',
+    group: (kind: string) => `[data-testid="group-smart-search-${kind}"]`,
+    row: (kind: string) => `[data-testid="row-smart-search-${kind}"]`,
+    result: (id: string) => `[data-result-id="${id}"]`,
+    settingToggle: '[data-testid="btn-smart-search-setting-toggle"]',
+    actionPane: '[data-testid="pane-smart-search-actions"]',
+    action: (id: string) => `[data-testid="action-smart-search-${id}"]`,
+    preview: '[data-testid="preview-smart-search"]',
+  },
+  toast: {
+    item: '[data-testid="comp-notification-item"]',
+    action: '[data-testid="btn-notification-action"]',
+  },
 } as const

@@ -25,6 +25,24 @@ final readonly class SharedResourceIds
      */
     public function forUser(int $userId, string $kind, Permission $needed = Permission::Use): array
     {
+        $ids = [];
+        foreach ($this->rawForUser($userId, $kind, $needed) as $resourceId) {
+            if (ctype_digit($resourceId)) {
+                $ids[] = (int) $resourceId;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * Like {@see forUser()}, for kinds whose ids are not numeric
+     * (e.g. knowledge folders, "{ownerId}:{groupKey}").
+     *
+     * @return list<string>
+     */
+    public function rawForUser(int $userId, string $kind, Permission $needed = Permission::Use): array
+    {
         if (!$this->iamConfig->isSharingEnabled($userId)) {
             return [];
         }
@@ -40,10 +58,7 @@ final readonly class SharedResourceIds
             if (null === $permission || !$permission->implies($needed)) {
                 continue;
             }
-            if (!ctype_digit($share->getResourceId())) {
-                continue;
-            }
-            $ids[] = (int) $share->getResourceId();
+            $ids[] = $share->getResourceId();
         }
 
         return array_values(array_unique($ids));

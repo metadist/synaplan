@@ -863,6 +863,11 @@
       }
     },
     "setByAdmin": "Yöneticiniz tarafından ayarlandı",
-    "fromGroup": "Grubunuzun varsayılanı"
+    "fromGroup": "Grubunuzun varsayılanı",
+    "embeddingSwitch": {
+      "scopes": {
+        "search": "Smart Search dizini"
+      }
+    }
   }
 }

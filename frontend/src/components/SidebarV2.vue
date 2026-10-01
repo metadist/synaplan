@@ -135,6 +135,21 @@
       </span>
     </div>
 
+    <!-- Search hint: the keys that open the palette, not a second nav item. -->
+    <div v-if="!isGuestMode" class="flex items-center justify-center pt-1 flex-shrink-0">
+      <button
+        type="button"
+        class="txt-secondary hover:txt-primary px-2 py-1.5 rounded-lg text-[11px] font-medium tracking-wide transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        :title="searchHint"
+        :aria-label="searchHint"
+        aria-keyshortcuts="Control+K Meta+K"
+        data-testid="btn-sidebar-v2-search"
+        @click="smartSearchStore.open()"
+      >
+        <kbd class="font-sans">{{ searchShortcut }}</kbd>
+      </button>
+    </div>
+
     <!-- User Avatar -->
     <div class="flex items-center justify-center py-4 flex-shrink-0">
       <button
@@ -714,6 +729,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
+import { useSmartSearchStore } from '../stores/smartSearch'
+import { paletteShortcutLabel } from '@/composables/search/shortcut'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
@@ -753,6 +770,9 @@ import GuestHintPopover from './guest/GuestHintPopover.vue'
 const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const sidebarStore = useSidebarStore()
+const smartSearchStore = useSmartSearchStore()
+const searchShortcut = computed(() => paletteShortcutLabel(t('search.palette.modifier')))
+const searchHint = computed(() => t('search.palette.openHint', { shortcut: searchShortcut.value }))
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 

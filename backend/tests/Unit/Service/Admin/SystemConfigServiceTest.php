@@ -459,6 +459,7 @@ final class SystemConfigServiceTest extends TestCase
             'FEATURE_BUNDLE_ENABLED', 'FEATURE_WORKFLOWS_BUILDER_ENABLED', 'FEATURE_MULTITASK_URL_FETCH_ENABLED',
             'FEATURE_TOOLS_REGISTRY_ENABLED', 'FEATURE_TOOLS_APPROVALS_ENABLED', 'FEATURE_TOOLS_CUSTOM_HTTP_ENABLED',
             'FEATURE_DOCUMENT_TOOLS_ENABLED', 'FEATURE_DESKTOP_AGENT_ENABLED', 'FEATURE_PLATFORM_LINKS_ENABLED',
+            'FEATURE_SEARCH_AI_ENABLED',
         ] as $expected) {
             $this->assertContains($expected, $seen);
             $this->assertSame('true', $schema['fields'][$expected]['default'], $expected.' ships ON');

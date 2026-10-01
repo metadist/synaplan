@@ -485,7 +485,8 @@
         "COMPUTE_POLICY_INTERACTIVE": "When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An assistant cannot loosen this.",
         "COMPUTE_POLICY_UNATTENDED": "When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An assistant cannot loosen this.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "How many days a file-work folder may sit unused before cleanup can remove it. Default 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Manage → Channels. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository."
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Manage → Channels. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.",
+        "FEATURE_SEARCH_AI_ENABLED": "AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why in one sentence. It never changes anything by itself. Each use is one short AI call. Off keeps keyword and meaning search."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -664,6 +665,64 @@
       "lastEval": {
         "title": "Last measurement",
         "line": "On {date}: found the right snippet {recallOff} of the time without reranking, {recallOn} with it. Slowest answers took {p95Off} ms without and {p95On} ms with."
+      }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "The models behind the search palette (Ctrl/Cmd+K). Search questions use each person's chat model until you pick one model for everyone. The search index follows the document embedding model until you pick another.",
+      "loading": "Loading the search models…",
+      "loadFailed": "The search models could not be loaded.",
+      "noModel": "no model",
+      "undo": "Undo",
+      "ai": {
+        "label": "AI model for search questions",
+        "hint": "The first choice uses the chat model each person already uses. Any model under “Same model for everyone” is used for the whole server. It only points at a result and never changes anything by itself.",
+        "inherit": "Each person's chat model",
+        "globalGroup": "Same model for everyone",
+        "userChat": "Search questions use each person's chat model. Yours is {model}.",
+        "userChatUnavailable": "Search questions use each person's chat model. Yours cannot answer right now, so your search shows no AI help.",
+        "ready": "Everyone's search questions are answered by {model}.",
+        "off": "AI help in search is switched off, so the palette shows no AI row.",
+        "openFlag": "Turn it on in Features",
+        "unavailable": "The chosen model cannot answer right now, so the palette shows no AI row. Pick another model or set up its provider.",
+        "saved": "Everyone's search questions now use {model}.",
+        "savedUserChat": "Search questions use each person's chat model again.",
+        "restored": "Everyone's search questions use {model} again.",
+        "restoredUserChat": "Search questions use each person's chat model again."
+      },
+      "embed": {
+        "label": "Embedding model for the search index",
+        "hint": "Finds pages, settings, chats and files by meaning. Changing it re-reads the whole index in the background.",
+        "inherit": "Same as the document embedding model: {model}",
+        "separate": "Search and documents use different embedding models, so each search makes two short embedding calls.",
+        "otherRun": "Another embedding change is running. You can change this model when it has finished.",
+        "confirmTitle": "Change the search embedding model?",
+        "confirmMessage": "Search re-reads {count} entries with {model} in the background, one short embedding call each. Until an entry is done it is found by keywords only. If the change fails, search stays on {current}.",
+        "confirm": "Change and re-read",
+        "started": "Search is moving to {model}. You can follow the progress here.",
+        "savedNoRun": "Search uses {model}. The index already fits it, so nothing had to be re-read."
+      },
+      "reason": {
+        "notPulled": "not downloaded in Ollama",
+        "providerUnavailable": "no API key for {service}"
+      },
+      "index": {
+        "empty": "The search index is still empty. It fills as people use Synaplan.",
+        "keywordOnly": "Search finds by keywords only until the index has been read with the embedding model.",
+        "coverage": "{embedded} of {rows} index entries can be found by meaning."
+      },
+      "run": {
+        "running": "Re-reading the index with {model}: {done} of {total}. Search keeps working meanwhile.",
+        "completed": "The search index uses {model}.",
+        "partial": "The search index uses {model}. {count} entries could not be read and are found by keywords only until they change.",
+        "failed": "Moving the index to {model} failed, so search is back on {previous}. Entries that were already moved are found by keywords only until they are read again. Pick a model above to try again.",
+        "cancelled": "Moving the index to {model} was stopped. Search stays on {previous}."
+      },
+      "refused": {
+        "invalid_model": "{model} cannot be used for search right now. The previous model stays.",
+        "probe_failed": "{model} did not answer a test call, so nothing was changed.",
+        "run_in_progress": "Another embedding change is running. Nothing was changed; try again when it has finished.",
+        "unknown": "The model could not be changed. The previous one stays."
       }
     }
   },
@@ -949,6 +1008,7 @@
         "SAVEDTASKS_ENABLED": "Saved tasks",
         "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Document tools",
+        "SEARCH_AI_ENABLED": "AI help in search",
         "MULTITASK_ROUTING_ENABLED": "Multi-step routing",
         "MULTITASK_PARALLEL_ENABLED": "Parallel steps",
         "MULTITASK_URL_FETCH_ENABLED": "Fetch web pages",

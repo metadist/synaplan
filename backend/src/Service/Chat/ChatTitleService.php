@@ -235,6 +235,7 @@ final readonly class ChatTitleService
         $title = trim($title, " \t\"'`*");
         $title = preg_replace('/^(?:title|titel)\s*:\s*/i', '', $title) ?? $title;
         $title = trim($title, " \t\"'`*");
+        $title = str_replace(['**', '__', '`'], '', $title);
         $title = rtrim($title, '.!?,;:');
         $title = trim(preg_replace('/\s+/u', ' ', $title) ?? $title);
 

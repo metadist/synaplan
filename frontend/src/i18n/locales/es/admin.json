@@ -481,7 +481,8 @@
         "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Cuántos días puede permanecer sin uso una carpeta de trabajo con archivos antes de que la limpieza la elimine. Predeterminado: 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Gestionar → Canales. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código."
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Gestionar → Canales. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
+        "FEATURE_SEARCH_AI_ENABLED": "Ayuda de IA en la paleta de búsqueda (Ctrl/Cmd+K): ante una pregunta en lenguaje normal, el modelo de herramientas elige el resultado que mejor encaja y lo explica en una frase. Nunca cambia nada por sí mismo. Cada uso es una llamada breve a la IA. Desactivado: se mantienen la búsqueda por palabras clave y por significado."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -660,6 +661,64 @@
       "lastEval": {
         "title": "Última medición",
         "line": "El {date}: encontró el fragmento correcto {recallOff} de las veces sin reordenación, {recallOn} con ella. Las respuestas más lentas tardaron {p95Off} ms sin y {p95On} ms con."
+      }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "Los modelos detrás de la paleta de búsqueda (Ctrl/Cmd+K). Las preguntas de búsqueda usan el modelo de chat de cada persona hasta que elijas un modelo para todos. El índice de búsqueda sigue el modelo de embedding de los documentos hasta que elijas otro.",
+      "loading": "Cargando los modelos de búsqueda…",
+      "loadFailed": "No se pudieron cargar los modelos de búsqueda.",
+      "noModel": "ningún modelo",
+      "undo": "Deshacer",
+      "ai": {
+        "label": "Modelo de IA para preguntas de búsqueda",
+        "hint": "La primera opción usa el modelo de chat que cada persona ya utiliza. Cualquier modelo bajo «El mismo modelo para todos» vale para todo el servidor. Solo señala un resultado y nunca cambia nada por sí mismo.",
+        "inherit": "Modelo de chat de cada persona",
+        "globalGroup": "El mismo modelo para todos",
+        "userChat": "Las preguntas de búsqueda usan el modelo de chat de cada persona. El tuyo es {model}.",
+        "userChatUnavailable": "Las preguntas de búsqueda usan el modelo de chat de cada persona. El tuyo no puede responder ahora, así que tu búsqueda no muestra ayuda de IA.",
+        "ready": "{model} responde las preguntas de búsqueda de todas las personas.",
+        "off": "La ayuda de IA en la búsqueda está desactivada, por eso la paleta no muestra ninguna fila de IA.",
+        "openFlag": "Activarla en Funciones",
+        "unavailable": "El modelo elegido no puede responder ahora, por eso la paleta no muestra ninguna fila de IA. Elige otro modelo o configura su proveedor.",
+        "saved": "Las preguntas de búsqueda de todas las personas usan ahora {model}.",
+        "savedUserChat": "Las preguntas de búsqueda vuelven a usar el modelo de chat de cada persona.",
+        "restored": "Las preguntas de búsqueda de todas las personas vuelven a usar {model}.",
+        "restoredUserChat": "Las preguntas de búsqueda vuelven a usar el modelo de chat de cada persona."
+      },
+      "embed": {
+        "label": "Modelo de embedding para el índice de búsqueda",
+        "hint": "Encuentra páginas, ajustes, chats y archivos por su significado. Cambiarlo vuelve a leer todo el índice en segundo plano.",
+        "inherit": "Igual que el modelo de embedding de los documentos: {model}",
+        "separate": "La búsqueda y los documentos usan modelos de embedding distintos, por eso cada búsqueda hace dos llamadas cortas de embedding.",
+        "otherRun": "Hay otro cambio de embedding en curso. Podrás cambiar este modelo cuando termine.",
+        "confirmTitle": "¿Cambiar el modelo de embedding de la búsqueda?",
+        "confirmMessage": "La búsqueda vuelve a leer {count} entradas con {model} en segundo plano, una llamada corta de embedding por entrada. Hasta que una entrada esté lista, solo se encuentra por palabras clave. Si el cambio falla, la búsqueda sigue con {current}.",
+        "confirm": "Cambiar y volver a leer",
+        "started": "La búsqueda se está pasando a {model}. Puedes seguir el progreso aquí.",
+        "savedNoRun": "La búsqueda usa {model}. El índice ya encaja, así que no hubo que volver a leer nada."
+      },
+      "reason": {
+        "notPulled": "no descargado en Ollama",
+        "providerUnavailable": "sin clave de API para {service}"
+      },
+      "index": {
+        "empty": "El índice de búsqueda aún está vacío. Se llena a medida que se usa Synaplan.",
+        "keywordOnly": "La búsqueda solo encuentra por palabras clave hasta que el índice se haya leído con el modelo de embedding.",
+        "coverage": "{embedded} de {rows} entradas del índice se pueden encontrar por su significado."
+      },
+      "run": {
+        "running": "Volviendo a leer el índice con {model}: {done} de {total}. La búsqueda sigue funcionando mientras tanto.",
+        "completed": "El índice de búsqueda usa {model}.",
+        "partial": "El índice de búsqueda usa {model}. {count} entradas no se pudieron leer y solo se encuentran por palabras clave hasta que cambien.",
+        "failed": "No se pudo pasar el índice a {model}, así que la búsqueda vuelve a usar {previous}. Las entradas ya pasadas solo se encuentran por palabras clave hasta que se vuelvan a leer. Elige un modelo arriba para intentarlo de nuevo.",
+        "cancelled": "Se detuvo el paso del índice a {model}. La búsqueda sigue con {previous}."
+      },
+      "refused": {
+        "invalid_model": "{model} no se puede usar para la búsqueda ahora. Se mantiene el modelo anterior.",
+        "probe_failed": "{model} no respondió a una llamada de prueba, así que no se cambió nada.",
+        "run_in_progress": "Hay otro cambio de embedding en curso. No se cambió nada; inténtalo de nuevo cuando termine.",
+        "unknown": "No se pudo cambiar el modelo. Se mantiene el anterior."
       }
     }
   },
@@ -945,6 +1004,7 @@
         "SAVEDTASKS_ENABLED": "Tareas guardadas",
         "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Herramientas de documentos",
+        "SEARCH_AI_ENABLED": "Ayuda de IA en la búsqueda",
         "MULTITASK_ROUTING_ENABLED": "Enrutado de varios pasos",
         "MULTITASK_PARALLEL_ENABLED": "Pasos en paralelo",
         "MULTITASK_URL_FETCH_ENABLED": "Obtener páginas web",

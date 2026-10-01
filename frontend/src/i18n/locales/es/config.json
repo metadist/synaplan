@@ -863,6 +863,11 @@
       }
     },
     "setByAdmin": "Definido por su administrador",
-    "fromGroup": "Valor predeterminado de su grupo"
+    "fromGroup": "Valor predeterminado de su grupo",
+    "embeddingSwitch": {
+      "scopes": {
+        "search": "Índice de Smart Search"
+      }
+    }
   }
 }

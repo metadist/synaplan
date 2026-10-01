@@ -208,7 +208,8 @@
       "scopes": {
         "documents": "Documents (RAG)",
         "memories": "Mémoires utilisateur",
-        "all": "Tous les embeddings"
+        "all": "Tous les embeddings",
+        "search": "Index Smart Search"
       },
       "breakdown": {
         "title": "Détail par périmètre"

@@ -6,11 +6,14 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MessageRepository extends ServiceEntityRepository
 {
     private const DELETE_ID_BATCH = 500;
+    private const FIRST_TEXTS_CHUNK = 500;
 
     public function __construct(ManagerRegistry $registry)
     {
@@ -770,7 +773,7 @@ class MessageRepository extends ServiceEntityRepository
         $result = $conn->executeQuery(
             $sql,
             [$chatIds, $chatIds],
-            [\Doctrine\DBAL\ArrayParameterType::INTEGER, \Doctrine\DBAL\ArrayParameterType::INTEGER]
+            [ArrayParameterType::INTEGER, ArrayParameterType::INTEGER]
         );
 
         $messages = [];
@@ -863,11 +866,68 @@ class MessageRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('m')
             ->where('m.status IN (:statuses)')
             ->andWhere('m.unixTimestamp < :cutoff')
-            ->setParameter('statuses', $statuses, \Doctrine\DBAL\ArrayParameterType::STRING)
+            ->setParameter('statuses', $statuses, ArrayParameterType::STRING)
             ->setParameter('cutoff', $cutoffUnix)
             ->orderBy('m.unixTimestamp', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * The first user-written texts of a chat, oldest first (Smart Search
+     * indexes them so an untitled chat is still findable by what was asked).
+     *
+     * @return list<string>
+     */
+    public function findFirstInboundTexts(int $chatId, int $limit): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.text')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('direction', 'IN')
+            ->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_values(array_map(static fn (array $row): string => (string) $row['text'], $rows));
+    }
+
+    /**
+     * {@see findFirstInboundTexts()} for many chats in one query per chunk
+     * (a full Smart Search re-index would otherwise ask once per chat).
+     *
+     * @param list<int> $chatIds
+     *
+     * @return array<int, list<string>> chat id => texts, oldest first
+     */
+    public function findFirstInboundTextsForChats(array $chatIds, int $perChat): array
+    {
+        $texts = [];
+        foreach (array_chunk(array_values(array_unique($chatIds)), self::FIRST_TEXTS_CHUNK) as $chunk) {
+            $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+                <<<'SQL'
+                    SELECT BCHATID, BTEXT FROM (
+                      SELECT BCHATID, BTEXT,
+                        ROW_NUMBER() OVER (PARTITION BY BCHATID ORDER BY BUNIXTIMES ASC, BID ASC) AS RN
+                      FROM BMESSAGES
+                      WHERE BCHATID IN (:chatIds) AND BDIRECT = 'IN'
+                    ) ranked
+                    WHERE RN <= :perChat
+                    ORDER BY BCHATID, RN
+                SQL,
+                ['chatIds' => $chunk, 'perChat' => $perChat],
+                ['chatIds' => ArrayParameterType::INTEGER, 'perChat' => ParameterType::INTEGER],
+            );
+            foreach ($rows as $row) {
+                $texts[(int) $row['BCHATID']][] = (string) $row['BTEXT'];
+            }
+        }
+
+        return $texts;
     }
 }

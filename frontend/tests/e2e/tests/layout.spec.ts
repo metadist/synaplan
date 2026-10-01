@@ -189,7 +189,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
 
       const tabs = page.locator('[data-testid^="btn-mobile-nav-"]')
       const count = await tabs.count()
-      expect(count, 'drawer renders New/History/Files/More buttons').toBe(4)
+      expect(count, 'drawer renders New/History/Files/Search/More buttons').toBe(5)
 
       for (let i = 0; i < count; i++) {
         const tab = tabs.nth(i)

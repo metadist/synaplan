@@ -34,7 +34,7 @@ framework:
             cache_pool: 'cache.rate_limiter'
         realtime_subscribe_anon:
             policy: 'sliding_window'
-            limit: 120
+            limit: 60
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
         # First-run setup endpoints (PUBLIC_ACCESS, keyed per client IP in
@@ -56,6 +56,23 @@ framework:
         iam_subject_search:
             policy: 'sliding_window'
             limit: 60
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
+
+        # Smart Search palette (POST /api/v1/search). The palette debounces
+        # typing, so 60/minute covers fast real use while capping a script. Each
+        # search may also spend one metered query embedding.
+        smart_search:
+            policy: 'sliding_window'
+            limit: 60
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
+        # AI tier of the palette (POST /api/v1/search/interpret). Each call is
+        # one model request (the person's chat model unless an admin pins one),
+        # so the cap is far below plain search. It also spends MESSAGES quota.
+        smart_search_interpret:
+            policy: 'sliding_window'
+            limit: 20
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
         # Public Saved Task webhook (`POST /api/v1/webhooks/saved-tasks/{token}`,

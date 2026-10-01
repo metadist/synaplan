@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import PageHeader from '@/components/PageHeader.vue'
@@ -17,6 +17,13 @@ type OverviewTab = 'tasks' | 'watches'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
+const route = useRoute()
+
+/** `?task=ID` (Smart Search, links) points at one of the user's own tasks. */
+const highlightedTaskId = computed(() => {
+  const id = Number(route.query.task)
+  return Number.isInteger(id) && id > 0 ? id : null
+})
 
 const tasks = ref<SavedTask[]>([])
 const sharedItems = ref<IamSharedItem[]>([])
@@ -83,6 +90,18 @@ const load = async () => {
   } finally {
     loading.value = false
   }
+  await revealHighlightedTask()
+}
+
+const revealHighlightedTask = async () => {
+  const id = highlightedTaskId.value
+  if (id === null || !tasks.value.some((task) => task.id === id)) return
+  activeTab.value = 'tasks'
+  filterShared.value = false
+  await nextTick()
+  document
+    .querySelector(`[data-task-id="${id}"]`)
+    ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
 }
 
 const onUpdated = (task: SavedTask) => {
@@ -126,6 +145,10 @@ const sharedTasks = computed(() =>
 
 onMounted(() => {
   void load()
+})
+
+watch(highlightedTaskId, () => {
+  if (!loading.value) void revealHighlightedTask()
 })
 </script>
 
@@ -205,7 +228,13 @@ onMounted(() => {
         </ul>
 
         <ul v-else class="space-y-4">
-          <li v-for="task in tasks" :key="task.id">
+          <li
+            v-for="task in tasks"
+            :key="task.id"
+            :data-task-id="task.id"
+            :class="task.id === highlightedTaskId && 'rounded-xl ring-2 ring-[var(--brand)]'"
+            :data-testid="task.id === highlightedTaskId ? 'saved-task-highlighted' : undefined"
+          >
             <SavedTaskCard :task="task" @updated="onUpdated" @deleted="onDeleted" />
           </li>
         </ul>
