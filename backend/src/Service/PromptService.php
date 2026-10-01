@@ -94,11 +94,9 @@ final readonly class PromptService
 
         // IMPORTANT: do NOT pre-populate `tool_*` keys with a default
         // boolean. Downstream routing (`WebSearchTopicPolicy::shouldSearch`)
-        // discriminates between three states:
-        //
-        //   - true  → user explicitly opted in   → search
-        //   - false → user explicitly opted out  → never search
-        //   - null  (key absent) → no preference → search (project default)
+        // treats an explicit `false` as a hard opt-out, while an absent key
+        // (or `true`) means "automatic": the classifier decides per message
+        // whether the answer needs a web search.
         //
         // A pre-populated `tool_internet => false` would collapse the
         // "no preference" case onto "explicit opt-out" and silently

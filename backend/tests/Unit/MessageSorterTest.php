@@ -562,6 +562,31 @@ class MessageSorterTest extends TestCase
         $this->assertSame(0, $result['read_pages']);
     }
 
+    /**
+     * @return iterable<string, array{0: string, 1: bool}>
+     */
+    public static function webSearchVoteProvider(): iterable
+    {
+        yield 'int_one' => ['1', true];
+        yield 'int_zero' => ['0', false];
+        yield 'bool_true' => ['true', true];
+        yield 'bool_false' => ['false', false];
+        yield 'string_true' => ['"true"', true];
+        yield 'string_false' => ['"false"', false];
+        yield 'string_one' => ['"1"', true];
+        yield 'string_zero' => ['"0"', false];
+        yield 'garbage' => ['"maybe"', false];
+    }
+
+    #[DataProvider('webSearchVoteProvider')]
+    public function testParseResponseReadsTheWebSearchVoteStrictly(string $rawVote, bool $expected): void
+    {
+        $response = '{"BTOPIC":"general","BLANG":"en","BWEBSEARCH":'.$rawVote.'}';
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, ['BTOPIC' => 'general', 'BLANG' => 'en']);
+
+        $this->assertSame($expected, $result['web_search']);
+    }
+
     public function testParseResponseLeavesReadPagesNullWhenTheFieldIsOmitted(): void
     {
         $response = '{"BTOPIC":"general","BLANG":"en","BWEBSEARCH":1}';

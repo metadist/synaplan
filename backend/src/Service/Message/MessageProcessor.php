@@ -368,12 +368,11 @@ final readonly class MessageProcessor
             //   (1) Prompt opts out (`tool_internet=false`)      → never search
             //       (hard disable; beats the per-message toggle).
             //   (2) User requested search for THIS message       → always search
-            //       (chat toggle / `/search`).
-            //   (3) Prompt opts in (`tool_internet=true`)        → always search.
-            //   (4) Asset/document-generation topic              → never search.
-            //   (5) Otherwise → trust the classifier's BWEBSEARCH vote, vetoed
-            //       for trivial greetings. The fast-path carries no vote, so
-            //       those chats skip the search round-trip.
+            //       (chat toggle / `/search` / "search the web …" in the text).
+            //   (3) Asset/document-generation topic              → never search.
+            //   (4) Otherwise → trust the classifier's BWEBSEARCH vote, vetoed
+            //       for trivial greetings. `tool_internet=true` only allows
+            //       search; it never forces one.
             //
             // When the message refers to an attached/selected file ("what is
             // that?" + photo, "is this still valid?" + contract PDF), the
@@ -386,8 +385,9 @@ final readonly class MessageProcessor
             $promptMetadata = $this->applyRuntimeToolFlags($promptMetadata, $profile);
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options, $classification);
             $messageText = $message->getText();
+            $userRequestedSearch = $this->userRequestedSearch($options, $classification)
+                || WebSearchTopicPolicy::isExplicitSearchRequest($messageText);
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
             $needsAttachmentContext = $shouldSearch && $message->hasFiles()
@@ -401,7 +401,7 @@ final readonly class MessageProcessor
             $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
             $perfTimer->stop('url_read');
             [$shouldSearch, $triggerReason] = $this->suppressSearchAfterConfluenceRead($shouldSearch, $userRequestedSearch, $classification, $triggerReason);
-            if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
+            if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch)) {
                 $shouldSearch = false;
                 $triggerReason = 'link_only_message_answered_from_page';
             }
@@ -437,14 +437,14 @@ final readonly class MessageProcessor
                 $attachmentContext = $this->attachmentContextResolver->resolve($message, $message->getUserId());
                 $perfTimer->stop('search_attachment_context');
 
-                if (null === $attachmentContext && !$userRequestedSearch && true !== $promptToolInternet) {
+                if (null === $attachmentContext && !$userRequestedSearch) {
                     // The question is about the attachment but its content
                     // could not be resolved (no extracted text, vision
                     // unavailable/failed). A purely vote-triggered search
                     // would query the literal deictic words — guaranteed
                     // garbage — so drop it; the answer model still analyzes
-                    // the file. An explicit user request / prompt opt-in
-                    // keeps searching with the raw text (deliberate choice).
+                    // the file. An explicit user request keeps searching
+                    // with the raw text (deliberate choice).
                     $shouldSearch = false;
                     $this->logger->info('MessageProcessor: Skipping vote-triggered web search — attachment referent unresolvable', [
                         'message_id' => $message->getId(),
@@ -520,7 +520,7 @@ final readonly class MessageProcessor
                         // evidence it needs. Sources were already streamed above
                         // so the client renders them while pages load.
                         $perfTimer->start('search_read_pages');
-                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $promptToolInternet, $statusCallback);
+                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $statusCallback);
                         $perfTimer->stop('search_read_pages');
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
@@ -907,8 +907,9 @@ final readonly class MessageProcessor
             $promptMetadata = $this->applyRuntimeToolFlags($promptMetadata, $profile);
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options, $classification);
             $messageText = $message->getText();
+            $userRequestedSearch = $this->userRequestedSearch($options, $classification)
+                || WebSearchTopicPolicy::isExplicitSearchRequest($messageText);
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
             $needsAttachmentContext = $shouldSearch && $message->hasFiles()
@@ -917,7 +918,7 @@ final readonly class MessageProcessor
             // Step 2.4: read pasted links first (see processStream()).
             $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
             [$shouldSearch, $triggerReason] = $this->suppressSearchAfterConfluenceRead($shouldSearch, $userRequestedSearch, $classification, $triggerReason);
-            if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
+            if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch)) {
                 $shouldSearch = false;
                 $triggerReason = 'link_only_message_answered_from_page';
             }
@@ -951,7 +952,7 @@ final readonly class MessageProcessor
             if ($needsAttachmentContext && $braveEnabled) {
                 $attachmentContext = $this->attachmentContextResolver->resolve($message, $message->getUserId());
 
-                if (null === $attachmentContext && !$userRequestedSearch && true !== $promptToolInternet) {
+                if (null === $attachmentContext && !$userRequestedSearch) {
                     // See processStream(): a vote-only search whose referent
                     // lives in an unresolvable attachment would query the
                     // literal deictic words — drop it.
@@ -1011,7 +1012,7 @@ final readonly class MessageProcessor
                         ]);
 
                         // Step 2.6: read the top result pages (see processStream()).
-                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $promptToolInternet, $statusCallback);
+                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $statusCallback);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
                             'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
@@ -1470,7 +1471,6 @@ final readonly class MessageProcessor
         Message $message,
         array $classification,
         bool $userRequestedSearch,
-        ?bool $promptToolInternet,
         ?callable $statusCallback,
     ): array {
         if (null === $this->webResearch || !$this->webResearch->isDeepSearchEnabled()) {
@@ -1481,7 +1481,7 @@ final readonly class MessageProcessor
         $maxPages = ReadPagesPolicy::pagesToRead(
             is_int($vote) ? $vote : null,
             ($classification['url_pages_read'] ?? 0) >= 1,
-            $userRequestedSearch || true === $promptToolInternet,
+            $userRequestedSearch,
         );
         if ($maxPages <= 0) {
             $this->logger->info('MessageProcessor: skipping page dumps — router voted snippets only', [
@@ -1522,13 +1522,13 @@ final readonly class MessageProcessor
     /**
      * A message that is nothing but link(s) whose page the system just read
      * needs no vote-triggered web search: the answer comes from the page.
-     * Explicit requests (chat toggle, `/search`, prompt opt-in) still search.
+     * Explicit requests (chat toggle, `/search`, "search the web …") still search.
      *
      * @param array<string, mixed> $classification
      */
-    private function linkOnlyMessageWasRead(array $classification, ?string $messageText, bool $userRequestedSearch, ?bool $promptToolInternet): bool
+    private function linkOnlyMessageWasRead(array $classification, ?string $messageText, bool $userRequestedSearch): bool
     {
-        if ($userRequestedSearch || true === $promptToolInternet) {
+        if ($userRequestedSearch) {
             return false;
         }
         if (($classification['url_pages_read'] ?? 0) < 1) {
@@ -1580,10 +1580,6 @@ final readonly class MessageProcessor
 
         if ($userRequestedSearch) {
             return 'user_requested_search';
-        }
-
-        if (true === $promptToolInternet) {
-            return 'prompt_tool_internet_opt_in';
         }
 
         return 'classifier_vote_search';

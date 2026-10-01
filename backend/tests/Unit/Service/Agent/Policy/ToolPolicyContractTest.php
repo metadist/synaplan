@@ -42,6 +42,29 @@ final class ToolPolicyContractTest extends TestCase
     }
 
     #[DataProvider('adapters')]
+    public function testInternetOnOnlyAllowsWebSearch(string $_name, ToolPolicySourceInterface $policy): void
+    {
+        $flags = $policy->flagsFromDefinition([
+            'internet' => true,
+            'files' => true,
+            'mcpServers' => [],
+            'allow' => [],
+            'deny' => [],
+        ]);
+
+        self::assertArrayNotHasKey('tool_internet', $flags, '"internet: true" must not force a search on every message');
+        self::assertTrue($policy->isAllowed($this->profile($flags), 'web_search'));
+    }
+
+    #[DataProvider('adapters')]
+    public function testInternetOffIsAHardDisableFlag(string $_name, ToolPolicySourceInterface $policy): void
+    {
+        $flags = $policy->flagsFromDefinition(['internet' => false]);
+
+        self::assertFalse($flags['tool_internet']);
+    }
+
+    #[DataProvider('adapters')]
     public function testDenyWins(string $_name, ToolPolicySourceInterface $policy): void
     {
         $profile = $this->profile($policy->flagsFromDefinition([

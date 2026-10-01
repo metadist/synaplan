@@ -31,6 +31,7 @@ use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -129,7 +130,7 @@ final readonly class MessageClassifier
             $text = $message->getText();
         }
 
-        $pinned = $this->tryPinAgent($message, $options);
+        $pinned = $this->tryPinAgent($message, $options, $conversationHistory, (bool) $forceWebSearchFromSlash);
         if (null !== $pinned) {
             return $this->applySlashOverlaysToClassification(
                 $pinned,
@@ -200,8 +201,8 @@ final readonly class MessageClassifier
                 // calls the AI sorter, so there is no BWEBSEARCH vote. With the
                 // "trust the model" policy a missing vote means no search, so
                 // these trivial chats answer immediately without a web round-trip.
-                // An explicit prompt `tool_internet=true` still forces search
-                // later in `MessageProcessor` via `WebSearchTopicPolicy`.
+                // An explicit per-message request (toggle, `/search`, "search
+                // the web …") still searches via `WebSearchTopicPolicy`.
                 $fastPathDecision = RoutingDecision::deterministic(RoutingLayer::FastPathHeuristic, 'general');
 
                 $fastPath = array_merge([
@@ -489,8 +490,8 @@ final readonly class MessageClassifier
                 'language' => $deferredLanguage,
                 // `web_search` is null for the same reason as on every other
                 // sorter-skipping layer: no sorter, no BWEBSEARCH vote. An
-                // explicit prompt `tool_internet=true` still forces a search
-                // in MessageProcessor via WebSearchTopicPolicy.
+                // explicit per-message request still searches via
+                // WebSearchTopicPolicy.
                 'web_search' => null,
                 'source' => $deferredDecision->toClassificationSource(),
                 'skip_sorting' => true,
@@ -679,16 +680,21 @@ final readonly class MessageClassifier
     /**
      * Pin the turn to an assistant when `agentId` is present and the flag is on.
      * Runs before the fast-path and before PROMPTID so a pinned chat never
-     * becomes `general`. MessageSorter is never invoked on this path.
+     * becomes `general`. MessageSorter never picks the topic on this path.
      *
      * The RuntimeProfile travels as `runtime_profile`; RAG scope, limit and
      * score are read from it downstream and never copied into scalar keys.
      *
+     * The topic stays pinned, but an assistant that may use the internet still
+     * needs the sorter's BWEBSEARCH vote: without it a pinned chat could never
+     * search for live data (weather, prices, news) on its own.
+     *
      * @param array<string, mixed> $options
+     * @param array<int, mixed>    $conversationHistory
      *
      * @return array<string, mixed>|null
      */
-    private function tryPinAgent(Message $message, array $options): ?array
+    private function tryPinAgent(Message $message, array $options, array $conversationHistory = [], bool $searchAlreadyForced = false): ?array
     {
         $profile = $this->agentPin->resolve($message, $options);
         if (null === $profile) {
@@ -701,16 +707,20 @@ final readonly class MessageClassifier
             $language = 'en';
         }
 
-        $this->logger->info('MessageClassifier: Using agent pin (skipped AI sorter)', [
+        $searchVote = $this->pinnedWebSearchVote($message, $profile, $conversationHistory, $searchAlreadyForced);
+
+        $this->logger->info('MessageClassifier: Using agent pin (topic not sorted)', [
             'message_id' => $message->getId(),
             'agent_id' => $profile->agentId,
             'topic' => $profile->promptTopic,
+            'web_search_vote' => $searchVote['web_search'],
         ]);
 
         return array_merge([
             'topic' => $profile->promptTopic,
             'language' => $language,
-            'web_search' => null,
+            'web_search' => $searchVote['web_search'],
+            'read_pages' => $searchVote['read_pages'],
             'source' => $decision->toClassificationSource(),
             'skip_sorting' => true,
             'intent' => 'chat',
@@ -720,6 +730,38 @@ final readonly class MessageClassifier
             'model_id' => $profile->modelIds['chat'] ?? null,
             'runtime_profile' => $profile,
         ], $decision->toClassificationFields());
+    }
+
+    /**
+     * Ask the sorter only whether a pinned assistant turn needs the web.
+     *
+     * No vote (null) when the assistant may not use the internet, when the
+     * user already forced or asked for a search, or for small talk — the
+     * policy decides those without a model call.
+     *
+     * @param array<int, mixed> $conversationHistory
+     *
+     * @return array{web_search: ?bool, read_pages: ?int}
+     */
+    private function pinnedWebSearchVote(Message $message, RuntimeProfile $profile, array $conversationHistory, bool $searchAlreadyForced): array
+    {
+        $noVote = ['web_search' => null, 'read_pages' => null];
+        $text = $message->getText();
+
+        if (false === ($profile->toolFlags['tool_internet'] ?? null)
+            || $searchAlreadyForced
+            || WebSearchTopicPolicy::isExplicitSearchRequest($text)
+            || WebSearchTopicPolicy::isTrivialConversational($text)) {
+            return $noVote;
+        }
+
+        $result = $this->messageSorter->classify($this->buildMessageData($message), $conversationHistory, $message->getUserId());
+        $readPages = $result['read_pages'] ?? null;
+
+        return [
+            'web_search' => true === ($result['web_search'] ?? null),
+            'read_pages' => is_int($readPages) ? $readPages : null,
+        ];
     }
 
     /**

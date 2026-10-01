@@ -444,11 +444,14 @@ This is the list, use only this:
 
 5. If there is a file, but no BTEXT, use BFILETEXT as the primary signal to classify BTOPIC and BLANG. Do not put anything about the file content in your JSON answer — the answer only ever contains the classification fields.
 
-6. **Detect if web search is needed (BWEBSEARCH)**: Be conservative — default to 0. Most messages do NOT need a web search. Set BWEBSEARCH to 1 ONLY when answering correctly requires fresh, real-world information the model cannot know, such as:
-   - Current/recent information (news, prices, stock quotes, weather, sports scores, live events)
+6. **Detect if web search is needed (BWEBSEARCH)**: Be conservative — default to 0. Most messages do NOT need a web search. Ask yourself two questions:
+   (a) Would a well-trained AI model answer this correctly from its own knowledge?
+   (b) Could the correct answer have changed since the model was trained, or does it depend on live data?
+   Set BWEBSEARCH to 1 ONLY when (a) is "no" or (b) is "yes" — i.e. answering correctly requires fresh, real-world information the model cannot know, such as:
+   - Current/recent information (news, prices, exchange rates, stock quotes, crypto prices, weather, sports results, live events)
    - Real-time data or "today"/"now"/"latest"/"current" information
-   - Facts about events, releases, or people that changed after 2023
-   - Specific real-world locations/places (restaurants, stores, services, opening hours)
+   - Facts that change over time and may have changed after the model's training: who currently holds an office or job, latest versions/releases, schedules, ongoing events
+   - Specific local real-world places (restaurants, stores, services, opening hours, local events)
    - A request that explicitly asks to search the internet / look something up online
 
    Set BWEBSEARCH to 0 (no search) for everything else, including:
@@ -474,6 +477,16 @@ This is the list, use only this:
    reviews say about it?" — set BWEBSEARCH to 1. Do NOT worry that the text
    is deictic ("this/that/das"): the system analyzes the file first and
    builds the search phrase from its content, not from the literal words.
+
+   Examples:
+   - "Hi, wie gehts?" → BWEBSEARCH: 0 (smalltalk)
+   - "Wie lang ist die Chinesische Mauer?" → BWEBSEARCH: 0 (stable fact every model knows)
+   - "Wer war der erste Bundeskanzler?" → BWEBSEARCH: 0 (history does not change)
+   - "Explain photosynthesis" / "Write a Python function that sorts a list" → BWEBSEARCH: 0
+   - "Wie steht der Dollar zum Euro?" → BWEBSEARCH: 1 (live exchange rate)
+   - "Wie ist das Wetter aktuell in Frankfurt?" → BWEBSEARCH: 1 (live weather)
+   - "Wer ist aktuell Bundeskanzler?" → BWEBSEARCH: 1 (office holders change)
+   - "What happened in the news today?" → BWEBSEARCH: 1
 
    When in doubt and the message is conversational or answerable from general knowledge, set BWEBSEARCH to 0.
 

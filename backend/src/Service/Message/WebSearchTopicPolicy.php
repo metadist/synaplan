@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Service\Message;
 
 /**
- * Single source of truth for "is this topic compatible with web search?".
+ * Single source of truth for "does this message need a web search?".
+ *
+ * A web search runs only when the user explicitly asks for one for THIS
+ * message (chat toggle, `/search`, or a plain-language request such as
+ * "search the web for …"), or when the sorter judged that a correct answer
+ * needs fresh, changing information (weather, prices, news, …). A prompt or
+ * assistant setting can only ALLOW search (the classifier decides) or switch
+ * it off — it never forces a search on every message.
  *
  * Pure asset/document generation topics (image / video / audio / office
  * documents) never benefit from internet context — the downstream handler
- * does not consume search results. Routing them through Brave Search
- * costs quota and adds latency for zero benefit, so they are excluded
- * from the search default regardless of any other signal (including an
- * explicit `tool_internet=true` opt-in: there is nothing useful to do
- * with the results).
+ * does not consume search results, so a vote-triggered search is skipped.
  *
  * Used by `MessageProcessor` as the final web-search decision in both the
  * streaming and non-streaming pipelines.
@@ -40,26 +43,71 @@ final class WebSearchTopicPolicy
      * Live-data / actuality signals. When a message contains any of these it
      * may genuinely need fresh information, so it is NEVER treated as a
      * trivial chat (the model's BWEBSEARCH vote is honoured). Kept lowercase;
-     * matched as substrings against the lowercased raw message.
+     * matched as whole words against the normalized message, so "now" does
+     * not fire inside "know" and "actual" not inside "actually".
      *
      * @var list<string>
      */
     private const ACTUALITY_SIGNALS = [
         // English
-        'today', 'now', 'latest', 'current', 'recent', 'news', 'price', 'weather',
-        'score', 'stock', 'this week', 'this year', 'right now', 'up to date',
+        'today', 'tonight', 'tomorrow', 'yesterday', 'now', 'latest', 'current', 'currently',
+        'recent', 'recently', 'news', 'price', 'prices', 'weather', 'forecast', 'score',
+        'scores', 'stock', 'stocks', 'exchange rate', 'this week', 'this year', 'right now',
+        'up to date', 'dollar', 'euro', 'bitcoin',
         // German
-        'heute', 'jetzt', 'aktuell', 'aktuelle', 'neueste', 'neuste', 'wetter',
-        'preis', 'kurs', 'nachrichten', 'gerade', 'derzeit', 'momentan',
+        'heute', 'gestern', 'jetzt', 'aktuell', 'aktuelle', 'aktuellen', 'aktueller',
+        'aktuelles', 'neueste', 'neuesten', 'neuste', 'wetter', 'preis', 'preise', 'kurs',
+        'kurse', 'wechselkurs', 'aktie', 'aktien', 'börse', 'nachrichten', 'gerade', 'derzeit',
+        'momentan',
         // Spanish
-        'hoy', 'ahora', 'actual', 'últimas', 'ultimas', 'noticias', 'precio', 'tiempo',
+        'hoy', 'mañana', 'ayer', 'ahora', 'actual', 'actualmente', 'últimas', 'ultimas',
+        'noticias', 'precio', 'precios', 'tiempo', 'clima', 'bolsa',
         // French
-        "aujourd'hui", 'maintenant', 'actuel', 'actuelle', 'dernières', 'dernieres',
-        'nouvelles', 'prix', 'météo', 'meteo',
+        "aujourd'hui", 'demain', 'maintenant', 'actuel', 'actuelle', 'actuellement',
+        'dernières', 'dernieres', 'nouvelles', 'prix', 'météo', 'meteo', 'bourse', 'cours',
         // Italian
-        'oggi', 'adesso', 'attuale', 'ultime', 'notizie', 'prezzo', 'meteo',
+        'oggi', 'domani', 'ieri', 'adesso', 'attuale', 'ultime', 'notizie', 'prezzo', 'borsa',
         // Turkish
-        'bugün', 'bugun', 'şimdi', 'simdi', 'güncel', 'guncel', 'haber', 'fiyat',
+        'bugün', 'bugun', 'yarın', 'yarin', 'dün', 'dun', 'şimdi', 'simdi', 'güncel', 'guncel',
+        'haber', 'haberler', 'fiyat', 'fiyatı', 'hava durumu', 'kur', 'dolar',
+    ];
+
+    /**
+     * Plain-language requests to search the web for THIS message ("search
+     * the web for …", "such im Internet nach …", "google mal …"). They count
+     * as an explicit per-message request, exactly like the chat toggle or
+     * `/search`. Matched against the lowercased raw message. Bare "google"
+     * is NOT listed — "how does Google search work?" is not a search request.
+     *
+     * @var list<string>
+     */
+    private const EXPLICIT_SEARCH_PATTERNS = [
+        // English
+        '/\b(search|browse|check|look)\s+(on\s+)?(the\s+)?(web|internet|net)\b/u',
+        '/\bsearch\s+online\b/u',
+        '/\bweb\s*search\b/u',
+        '/\blook\s+(it|this|that|them)?\s*up\s+online\b/u',
+        '/\b(look|check)\s+online\b/u',
+        '/\bgoogle\s+(it|this|that|for)\b/u',
+        '/\b(on|from)\s+the\s+(web|internet)\b.*\b(find|search|look)\b/u',
+        '/\b(find|search)\b.*\b(on|from)\s+the\s+(web|internet)\b/u',
+        // German
+        '/\b(such|suche|suchen|durchsuche|recherchier|recherchiere|recherchieren|schau|schaue|guck|gucke)\b[^.?!]*\b(im|ins|das|dem)\s+(internet|netz|web)\b/u',
+        '/\b(im|ins)\s+(internet|netz|web)\b[^.?!]*\b(such|suche|suchen|nachsuchen|nachschauen|nachsehen|nachgucken|recherchier|recherchiere|recherchieren)\b/u',
+        '/\bonline\s+(such|suche|suchen|nachschauen|nachsehen|nachgucken|recherchieren)\b/u',
+        '/\b(such|suche|schau|schaue|recherchiere)\b[^.?!]*\bonline\b/u',
+        '/\bwebsuche\b/u',
+        '/\bgoogle\s+(mal|bitte|das|nach)\b/u',
+        '/\bgoogel\b|\bgoogeln\b|\bgoogle\b[^.?!]*\bnach\b/u',
+        // Spanish
+        '/\b(busca|buscar|búscalo|buscalo|investiga|investigar)\b[^.?!]*\b(en|por)\s+(internet|la\s+web|google|línea|linea)\b/u',
+        // French
+        '/\b(cherche|chercher|recherche|rechercher)\b[^.?!]*\bsur\s+(internet|le\s+web|google)\b/u',
+        '/\ben\s+ligne\b[^.?!]*\b(cherche|recherche)\b|\b(cherche|recherche)\b[^.?!]*\ben\s+ligne\b/u',
+        // Italian
+        '/\b(cerca|cercare)\b[^.?!]*\b(su|in)\s+(internet|web|google)\b/u',
+        // Turkish
+        '/\b(internette|internetten|webde|google\'da|googleda)\s+(ara|araştır|arastir|bak)\b/u',
     ];
 
     /**
@@ -112,10 +160,11 @@ final class WebSearchTopicPolicy
     ];
 
     /**
-     * Upper bound (in words) for the "ultra-short noise" trivial check.
-     * Deliberately conservative (2 instead of the plan's example of 3) so
-     * genuine short queries like "wann kommt gta" are not silently
-     * suppressed; greetings of any length are still caught by the phrase list.
+     * Upper bound (in words) for the "ultra-short noise" trivial check and
+     * for what may remain of a message once its greeting / smalltalk phrases
+     * are removed. Deliberately conservative so genuine short queries like
+     * "wann kommt gta" — or a greeting followed by a real question ("Hi, wie
+     * steht der Dollar zum Euro?") — are not silently suppressed.
      */
     private const TRIVIAL_MAX_WORDS = 2;
 
@@ -205,8 +254,9 @@ final class WebSearchTopicPolicy
      * "Hey, wie gehts?" never trigger a web search even when an over-eager
      * sorting model votes for one. Errs on the side of NOT suppressing: any
      * actuality signal (today / latest / price / weather / a year, …) makes a
-     * message non-trivial, and an explicit user opt-in bypasses this gate
-     * entirely (see {@see shouldSearch()}).
+     * message non-trivial, and so does a greeting followed by a real question
+     * ("Hi, wie steht der Dollar zum Euro?"). An explicit per-message request
+     * bypasses this gate entirely (see {@see shouldSearch()}).
      */
     public static function isTrivialConversational(?string $text): bool
     {
@@ -221,42 +271,95 @@ final class WebSearchTopicPolicy
 
         $lowerRaw = mb_strtolower($trimmed);
 
-        // A live-data signal means the message may genuinely need fresh
-        // information — never treat it as trivial.
-        foreach (self::ACTUALITY_SIGNALS as $signal) {
-            if (str_contains($lowerRaw, $signal)) {
-                return false;
-            }
-        }
-
         // Any explicit 20xx year is a (future-proof) actuality signal.
         if (1 === preg_match(self::YEAR_SIGNAL_PATTERN, $lowerRaw)) {
             return false;
         }
 
-        // Collapse every run of non-letters to a single space so the
-        // space-delimited phrase anchors below match regardless of
-        // punctuation ("wie gehts?" → " wie gehts ").
-        $normalized = preg_replace('/[^\p{L}]+/u', ' ', $lowerRaw) ?? '';
-        $normalized = trim($normalized);
-        $padded = ' '.$normalized.' ';
+        $padded = ' '.self::normalizeWords($lowerRaw).' ';
+        if ('' === trim($padded)) {
+            return false;
+        }
 
-        foreach (self::CONVERSATIONAL_PHRASES as $phrase) {
-            if (str_contains($padded, ' '.$phrase.' ')) {
+        // A live-data signal means the message may genuinely need fresh
+        // information — never treat it as trivial.
+        foreach (self::ACTUALITY_SIGNALS as $signal) {
+            if (str_contains($padded, ' '.self::normalizeWords($signal).' ')) {
+                return false;
+            }
+        }
+
+        // Strip every greeting / smalltalk phrase (longest first, so "wie
+        // geht es dir" goes before "wie geht"). What remains is the actual
+        // content of the message.
+        $remaining = $padded;
+        $matchedPhrase = false;
+        foreach (self::conversationalPhrasesLongestFirst() as $phrase) {
+            $needle = ' '.$phrase.' ';
+            while (str_contains($remaining, $needle)) {
+                $remaining = str_replace($needle, ' ', $remaining);
+                $matchedPhrase = true;
+            }
+        }
+
+        $remainingWords = self::wordCount($remaining);
+        if ($matchedPhrase) {
+            return $remainingWords <= self::TRIVIAL_MAX_WORDS;
+        }
+
+        // Ultra-short, question-less one-liners ("lol") carry no information
+        // need. A question mark means the user is asking something, so those
+        // are left to the model vote.
+        return $remainingWords <= self::TRIVIAL_MAX_WORDS && !str_contains($trimmed, '?');
+    }
+
+    /**
+     * True when the message itself asks to search the web ("search the web
+     * for …", "such im Internet nach …", "google mal …", "busca en internet
+     * …"). Treated like the chat toggle / `/search`: an explicit request for
+     * THIS message.
+     */
+    public static function isExplicitSearchRequest(?string $text): bool
+    {
+        if (null === $text || '' === trim($text)) {
+            return false;
+        }
+
+        $lower = mb_strtolower($text);
+        foreach (self::EXPLICIT_SEARCH_PATTERNS as $pattern) {
+            if (1 === preg_match($pattern, $lower)) {
                 return true;
             }
         }
 
-        // Ultra-short, question-less one-liners ("lol", "ok danke") carry no
-        // information need. A trailing question mark means the user is asking
-        // something, so those are left to the model vote.
-        if ('' === $normalized) {
-            return false;
-        }
-        $words = preg_split('/\s+/', $normalized) ?: [];
-        $wordCount = count($words);
+        return false;
+    }
 
-        return $wordCount <= self::TRIVIAL_MAX_WORDS && !str_contains($trimmed, '?');
+    /**
+     * Collapse every run of non-letters to a single space so space-delimited
+     * phrase anchors match regardless of punctuation ("wie gehts?" → "wie gehts").
+     */
+    private static function normalizeWords(string $lower): string
+    {
+        return trim(preg_replace('/[^\p{L}]+/u', ' ', $lower) ?? '');
+    }
+
+    private static function wordCount(string $text): int
+    {
+        $trimmed = trim($text);
+
+        return '' === $trimmed ? 0 : count(preg_split('/\s+/', $trimmed) ?: []);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function conversationalPhrasesLongestFirst(): array
+    {
+        $phrases = array_map(self::normalizeWords(...), self::CONVERSATIONAL_PHRASES);
+        usort($phrases, static fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
+
+        return $phrases;
     }
 
     /**
@@ -298,31 +401,31 @@ final class WebSearchTopicPolicy
     }
 
     /**
-     * Decide whether to run a web search, trusting the model's judgment but
-     * vetoing it for obviously trivial chats.
+     * Decide whether to run a web search: only on an explicit per-message
+     * request, or when the classifier judged that fresh information is
+     * needed — vetoed for obviously trivial chats.
      *
      * Decision rule (in order of precedence):
-     *   1. Prompt has explicit `tool_internet=false` → false
-     *      (a deliberate prompt-level opt-out is a HARD disable: it beats the
-     *      per-message user request, because the prompt author decided this
-     *      task must never consume web context, e.g. a translation prompt)
-     *   2. User explicitly requested search for THIS message (chat toggle /
-     *      `/search` command)                        → true
-     *      (an explicit per-message opt-in beats the topic gate and the
-     *      triviality veto, like `tool_internet=true`)
-     *   3. Prompt has explicit `tool_internet=true`  → true
-     *      (explicit opt-in beats the NON_WEB_SEARCH exclusion: power users
-     *      can wire search into a custom media-generation prompt that
-     *      consumes web context in its system message, e.g. "image of
-     *      today's headlines")
-     *   4. Topic is a NON_WEB_SEARCH topic           → false
+     *   1. Prompt/assistant has `tool_internet=false` → false
+     *      (a deliberate opt-out is a HARD disable: it beats the per-message
+     *      user request, because the prompt author decided this task must
+     *      never consume web context, e.g. a translation prompt)
+     *   2. User explicitly requested search for THIS message (chat toggle,
+     *      `/search` command, or a plain-language request in the text — see
+     *      {@see isExplicitSearchRequest()})          → true
+     *      (beats the topic gate and the triviality veto)
+     *   3. Topic is a NON_WEB_SEARCH topic           → false
      *      (the stock handler does not consume web context)
-     *   5. Otherwise (`tool_internet` is `null`)     → trust the classifier's
-     *      `BWEBSEARCH` vote, UNLESS the message is an obvious greeting /
-     *      smalltalk (see {@see isTrivialConversational()}). The veto stops an
-     *      over-eager sorting model from searching on every "Hey, wie gehts?".
-     *      No vote (e.g. the fast-path heuristic, which never calls the model)
-     *      means no search, so trivial chats stay fast.
+     *   4. Otherwise → trust the classifier's `BWEBSEARCH` vote, UNLESS the
+     *      message is an obvious greeting / smalltalk (see
+     *      {@see isTrivialConversational()}). No vote (e.g. a sorter-skipping
+     *      routing layer) means no search.
+     *
+     * `tool_internet=true` is NOT a force: like the "web search" switch in
+     * ChatGPT, Claude or Gemini it only allows the search, and the classifier
+     * decides per message whether the answer needs fresh information. Older
+     * installs stored `true` from a pre-selected checkbox, which turned every
+     * "Hi" into a search.
      *
      * Attachment-referring questions ("what is that?" + photo) are NOT vetoed
      * here: when the search runs, MessageProcessor resolves the attachment's
@@ -332,10 +435,10 @@ final class WebSearchTopicPolicy
      * purely vote-triggered search (a text-only query would be garbage).
      *
      * Pass `$userRequestedSearch` as the resolved per-message flag (frontend
-     * web-search toggle / `/search`). Pass `$promptToolInternet` as the raw
-     * value from `$promptMetadata['tool_internet'] ?? null` — the function
-     * distinguishes the three states (true / false / null) intentionally.
-     * Pass `$classifierVote` as the classifier's `web_search` hint
+     * web-search toggle / `/search`); a request written in `$messageText` is
+     * detected here. Pass `$promptToolInternet` as the raw value from
+     * `$promptMetadata['tool_internet'] ?? null` — only `false` changes the
+     * outcome. Pass `$classifierVote` as the classifier's `web_search` hint
      * (`$classification['web_search'] ?? null`) and `$messageText` as the raw
      * user message so the triviality veto can run.
      */
@@ -352,21 +455,16 @@ final class WebSearchTopicPolicy
         }
 
         // Rule 2: explicit per-message user request forces a search.
-        if ($userRequestedSearch) {
+        if ($userRequestedSearch || self::isExplicitSearchRequest($messageText)) {
             return true;
         }
 
-        // Rule 3: explicit prompt opt-in forces a search.
-        if (true === $promptToolInternet) {
-            return true;
-        }
-
-        // Rule 4: media-generation topics with no explicit opt-in stay off.
+        // Rule 3: media-generation topics never consume web context.
         if (self::isNonWebSearchTopic($topic)) {
             return false;
         }
 
-        // Rule 5: trust the model's BWEBSEARCH vote, but veto trivial chats.
+        // Rule 4: trust the model's BWEBSEARCH vote, but veto trivial chats.
         if (true !== $classifierVote) {
             return false;
         }

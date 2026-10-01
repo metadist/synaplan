@@ -24,9 +24,14 @@ final class LegacyFlagToolPolicy implements ToolPolicySourceInterface
     public function flagsFromDefinition(array $tools): array
     {
         $flags = [
-            'tool_internet' => (bool) ($tools['internet'] ?? true),
             'tool_files' => (bool) ($tools['files'] ?? true),
         ];
+        // `internet: true` only ALLOWS web search — the classifier decides per
+        // message. Only an explicit `false` reaches the routing layer, where
+        // `tool_internet=false` is the hard disable.
+        if (false === (bool) ($tools['internet'] ?? true)) {
+            $flags['tool_internet'] = false;
+        }
         $servers = $tools['mcpServers'] ?? [];
         if (is_array($servers) && [] !== $servers) {
             $flags['tool_mcp'] = true;

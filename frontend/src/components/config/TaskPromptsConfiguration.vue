@@ -564,12 +564,9 @@
                 </label>
 
                 <!--
-                  Internet search is tri-state (auto / always on / always off).
-                  A checkbox can only express two states, so saving silently
-                  collapsed the "let the classifier decide" default (null) into
-                  "always off" and disabled web search for the prompt (#1138).
-                  A dropdown keeps all three states distinguishable and lets an
-                  admin restore "auto" at any time.
+                  Internet search is "auto" (the AI decides per message) or
+                  "off". A prompt cannot force a search on every message; a
+                  single message is searched via Tools → Web Search.
                 -->
                 <div class="mb-3 p-3 rounded-lg surface-chip">
                   <div class="flex items-center gap-3 mb-2">
@@ -586,7 +583,6 @@
                     <option value="auto">
                       {{ $t('config.taskPrompts.internetSearch.auto') }}
                     </option>
-                    <option value="on">{{ $t('config.taskPrompts.internetSearch.on') }}</option>
                     <option value="off">{{ $t('config.taskPrompts.internetSearch.off') }}</option>
                   </select>
                   <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">

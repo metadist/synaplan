@@ -18,6 +18,7 @@ use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
 use App\Service\Runtime\RuntimeProfile;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -52,7 +53,7 @@ final class MessageClassifierAgentPinTest extends TestCase
         );
     }
 
-    public function testAPinnedTurnSkipsTheSorterAndCarriesOnlyTheProfile(): void
+    public function testAPinnedTurnWithoutInternetSkipsTheSorterAndCarriesOnlyTheProfile(): void
     {
         $profile = new RuntimeProfile(
             promptId: 20,
@@ -60,7 +61,7 @@ final class MessageClassifierAgentPinTest extends TestCase
             systemPrompt: 'Review contracts.',
             modelIds: ['chat' => 11],
             ragScopes: [['ownerId' => 4, 'groupKey' => 'TASKPROMPT:agent:contract-review']],
-            toolFlags: [],
+            toolFlags: ['tool_internet' => false],
             skillAllow: null,
             skillDeny: null,
             parameters: [],
@@ -86,12 +87,70 @@ final class MessageClassifierAgentPinTest extends TestCase
         self::assertNull($result['agent_version_id']);
         self::assertSame(11, $result['model_id']);
         self::assertSame($profile, $result['runtime_profile']);
+        self::assertNull($result['web_search']);
         self::assertArrayNotHasKey('sorting_usage', $result);
 
         // The profile is the one seam: RAG scope is never copied into scalars.
         self::assertArrayNotHasKey('rag_group_key', $result);
         self::assertArrayNotHasKey('rag_limit', $result);
         self::assertArrayNotHasKey('rag_min_score', $result);
+    }
+
+    public function testAPinnedTurnWithInternetTakesOnlyTheSorterWebSearchVote(): void
+    {
+        $profile = $this->sampleProfile();
+        $message = $this->message(4, 'What is the dollar to euro exchange rate?');
+        $this->agentPin->method('resolve')->willReturn($profile);
+        $this->sorter->expects(self::once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'web_search' => true,
+            'read_pages' => 2,
+        ]);
+
+        $result = $this->classifier->classify($message, [], null, true, ['agentId' => 7]);
+
+        self::assertSame('agent:contract-review', $result['topic']);
+        self::assertSame('agent', $result['source']);
+        self::assertSame(11, $result['model_id']);
+        self::assertTrue($result['web_search']);
+        self::assertSame(2, $result['read_pages']);
+    }
+
+    public function testAPinnedTurnKeepsANoVoteFromTheSorter(): void
+    {
+        $this->agentPin->method('resolve')->willReturn($this->sampleProfile());
+        $this->sorter->expects(self::once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'web_search' => false,
+        ]);
+
+        $result = $this->classifier->classify($this->message(4, 'How long is the Great Wall of China?'), [], null, true, ['agentId' => 7]);
+
+        self::assertFalse($result['web_search']);
+        self::assertNull($result['read_pages']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function pinnedTurnsWithoutSorterVoteProvider(): iterable
+    {
+        yield 'small talk' => ['Hi, how are you?'];
+        yield 'explicit request' => ['Search the web for the best laptops under 1000 euros'];
+    }
+
+    #[DataProvider('pinnedTurnsWithoutSorterVoteProvider')]
+    public function testAPinnedTurnSkipsTheSorterWhenThePolicyAlreadyDecides(string $text): void
+    {
+        $this->agentPin->method('resolve')->willReturn($this->sampleProfile());
+        $this->sorter->expects(self::never())->method('classify');
+
+        $result = $this->classifier->classify($this->message(4, $text), [], null, true, ['agentId' => 7]);
+
+        self::assertSame('agent:contract-review', $result['topic']);
+        self::assertNull($result['web_search']);
     }
 
     public function testSorterIsCalledWhenNothingIsPinned(): void
