@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { configApi } from '@/services/api/configApi'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
+import { useChatModelPickStore } from '@/stores/chatModelPick'
 import {
   isModelMixId,
   resolveModelMixes,
@@ -82,6 +83,9 @@ export const useModelMixStore = defineStore('modelMix', () => {
       } catch {
         // Non-persistent selection still works for this session.
       }
+      // A mix replaces the account default. An explicit composer pick would
+      // keep sending the old model, including when the same mix is re-applied.
+      useChatModelPickStore().clear()
       return true
     } finally {
       applying.value = false

@@ -165,17 +165,20 @@ export const useAuthStore = defineStore('auth', () => {
       { clearSseToken },
       { useMemoriesStore },
       { useFeedbackStore },
+      { useChatModelPickStore },
     ] = await Promise.all([
       import('./chats'),
       import('./history'),
       import('@/services/api/chatApi'),
       import('./userMemories'),
       import('./userFeedback'),
+      import('./chatModelPick'),
     ])
     useChatsStore().$reset()
     useHistoryStore().clear()
     useMemoriesStore().$reset()
     useFeedbackStore().$reset()
+    useChatModelPickStore().clear()
     clearSseToken()
   }
 

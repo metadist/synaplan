@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 import { useAuthStore } from '@/stores/auth'
+import { useChatModelPickStore } from '@/stores/chatModelPick'
 
 const loginApiMock = vi.fn()
 
@@ -128,6 +129,25 @@ describe('useAuthStore — login cookie race', () => {
     expect(loginApiMock).toHaveBeenCalledTimes(1)
     expect(httpClient.endAuthMutation).toHaveBeenCalledTimes(1)
     expect(store.user?.email).toBe('rs@example.com')
+  })
+
+  it('clears an explicit model pick when another account logs in', async () => {
+    const httpClient = await import('@/services/api/httpClient')
+    vi.mocked(httpClient.getInFlightRefresh).mockReturnValue(null)
+
+    const pick = useChatModelPickStore()
+    pick.selectedModelId = 240
+
+    loginApiMock.mockImplementation(async () => {
+      const { authService } = await import('@/services/authService')
+      authService.getUser().value = { id: 2, email: 'rs@example.com', level: 'ADMIN' }
+      return { success: true }
+    })
+
+    const ok = await useAuthStore().login('rs@example.com', 'secret')
+
+    expect(ok).toBe(true)
+    expect(pick.selectedModelId).toBeNull()
   })
 
   it('releases the lock when login is rejected', async () => {
