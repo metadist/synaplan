@@ -48,6 +48,32 @@ export interface ResolveOptions {
 const EMPTY_VALUE: ConfigValue = { value: '', isSet: false, isMasked: false }
 
 /**
+ * Must match BrandingService::STYLE_RESET_KEYS. Used only to re-read the
+ * outcome when the reset response itself is lost.
+ */
+const STYLE_RESET_KEYS = [
+  'BRAND_PRIMARY_COLOR',
+  'BRAND_SECONDARY_COLOR',
+  'BRAND_ACCENT_COLOR',
+  'BRAND_PRIMARY_COLOR_DARK',
+  'BRAND_SECONDARY_COLOR_DARK',
+  'BRAND_ACCENT_COLOR_DARK',
+  'BRAND_FONT_FAMILY',
+  'BRAND_HEADING_FONT_FAMILY',
+  'BRAND_FONT_URL',
+] as const
+
+function styleValueChanged(
+  before: ConfigValue | undefined,
+  after: ConfigValue | undefined
+): boolean {
+  return (
+    (before?.isSet ?? false) !== (after?.isSet ?? false) ||
+    (before?.value ?? '') !== (after?.value ?? '')
+  )
+}
+
+/**
  * Loads the admin config schema and values once per page and owns saving,
  * the restart notice and connection tests, so AI infrastructure and System
  * configuration render the same settings with the same behaviour.
@@ -218,10 +244,61 @@ export function useSystemConfig() {
       }
       return result.success
     } catch (err) {
+      // A dropped response or a schema mismatch can land here after the
+      // server already cleared the style keys. Re-read them before saying
+      // anything about what changed.
       console.error('Failed to reset branding style:', err)
+      return reconcileBrandingReset(values.value)
+    }
+  }
+
+  /**
+   * The reset call failed in the client. The stored values say what actually
+   * happened: nothing, a full reset, or a partial one. If they cannot be
+   * read, say so — do not claim the previous values are still in place.
+   */
+  async function reconcileBrandingReset(before: Record<string, ConfigValue>): Promise<boolean> {
+    let fresh: Record<string, ConfigValue>
+    try {
+      fresh = await getConfigValues()
+    } catch (err) {
+      console.error('Could not re-read branding after a reset error:', err)
+      showError(t('admin.config.brandingReset.unconfirmed'))
+      return false
+    }
+
+    values.value = fresh
+    const cleared = STYLE_RESET_KEYS.filter(
+      (key) => styleValueChanged(before[key], fresh[key]) && !fresh[key]?.isSet
+    )
+    const stillCustom = STYLE_RESET_KEYS.filter((key) => fresh[key]?.isSet)
+
+    try {
+      await configStore.reload()
+      applyBrandingTheme()
+    } catch (err) {
+      if (cleared.length > 0) {
+        console.error('Style reset, but the runtime config could not be reloaded:', err)
+        showError(t('admin.config.savedButNotRefreshed'))
+        return stillCustom.length === 0
+      }
+    }
+
+    if (cleared.length === 0) {
       showError(t('admin.config.brandingReset.failed'))
       return false
     }
+    if (stillCustom.length === 0) {
+      success(t('admin.config.brandingReset.success'))
+      return true
+    }
+    showError(
+      t('admin.config.brandingReset.partial', {
+        reset: cleared.length,
+        failed: stillCustom.length,
+      })
+    )
+    return false
   }
 
   async function testService(service: string): Promise<void> {

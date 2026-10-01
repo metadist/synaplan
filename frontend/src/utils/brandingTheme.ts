@@ -34,9 +34,10 @@ export function applyBrandingTheme(): void {
  * WCAG contrast helpers for brand fills. A custom brand can be any hex, so the
  * ink on top of it cannot be a fixed per-theme token: a dark explicit
  * dark-mode color with the fixed near-black ink reads as black-on-dark, and a
- * light primary with fixed white ink as white-on-light. Both pick the ink with
- * the higher ratio instead; the bubble fill is darkened until white passes, so
- * bubbles (whose internals assume white ink) stay readable whatever the brand.
+ * light primary with fixed white ink as white-on-light. The ink is the design
+ * token that already reaches AA, or pure black when near-black still falls
+ * short; the bubble fill is darkened until white passes, so bubbles (whose
+ * internals assume white ink) stay readable whatever the brand.
  */
 function hexToRgb(hex: string): [number, number, number] {
   const full = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex
@@ -54,16 +55,30 @@ function relativeLuminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-function contrastRatio(a: string, b: string): number {
+export function contrastRatio(a: string, b: string): number {
   const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x)
   return (hi + 0.05) / (lo + 0.05)
 }
 
-/** White or near-black, whichever reads better on the given fill. */
+/** WCAG AA for normal-size text. */
+const AA_NORMAL_TEXT = 4.5
+
+/**
+ * Ink for text on a brand fill. White or near-black when that token already
+ * reaches AA; otherwise pure black. Near-black (#0a0e1a) loses to white on
+ * mid-greys such as #787878, and that white is only 4.42:1 — under AA.
+ * Pure black against the same fill clears 4.5:1.
+ */
 export function pickOnBrandColor(fillHex: string): string {
-  return contrastRatio(fillHex, ON_BRAND_LIGHT) >= contrastRatio(fillHex, ON_BRAND_DARK)
-    ? ON_BRAND_LIGHT
-    : ON_BRAND_DARK
+  const onLight = contrastRatio(fillHex, ON_BRAND_LIGHT)
+  const onDark = contrastRatio(fillHex, ON_BRAND_DARK)
+  if (onLight >= AA_NORMAL_TEXT && onLight >= onDark) {
+    return ON_BRAND_LIGHT
+  }
+  if (onDark >= AA_NORMAL_TEXT && onDark >= onLight) {
+    return ON_BRAND_DARK
+  }
+  return contrastRatio(fillHex, '#000000') >= onLight ? '#000000' : ON_BRAND_LIGHT
 }
 
 function mixHex(a: string, b: string, keepA: number): string {
@@ -77,9 +92,9 @@ function mixHex(a: string, b: string, keepA: number): string {
 }
 
 /**
- * The fill bubbles use: the brand when white already passes on it, otherwise a
- * progressively darkened mix until white reaches AA (at most 10 steps; pure
- * white still lands at ~3:1, but no brand is pure white).
+ * Bubble fills assume white ink. Keep the brand when white already reaches
+ * AA on it; otherwise mix 18% toward black, up to 10 times. Pure white, a
+ * valid brand color, reaches 4.5:1 on the fourth step.
  */
 export function ensureFillForWhiteText(fillHex: string): string {
   let fill =

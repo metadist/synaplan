@@ -364,7 +364,8 @@
         "confirmMessage": "Sus colores y fuentes personalizados (modo claro y oscuro) se reemplazarán con los valores predeterminados de Synaplan. El nombre, los logotipos, los enlaces y la atribución no cambian. Esta acción no se puede deshacer.",
         "success": "Estilo restablecido — los valores predeterminados están en uso de nuevo.",
         "partial": "{reset} ajuste(s) restablecido(s), {failed} fallido(s) — los fallidos conservaron sus valores.",
-        "failed": "No se pudo restablecer el estilo. Sus valores no han cambiado."
+        "failed": "No se pudo restablecer el estilo. Sus valores no han cambiado.",
+        "unconfirmed": "No pudimos confirmar si el estilo se restableció. Recargue la página para ver el estilo actual."
       },
       "restartBanner": {
         "title": "Configuración Actualizada — Reinicio Requerido",

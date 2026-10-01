@@ -4,6 +4,7 @@
  * SECURITY: All endpoints require admin access. Sensitive values are always masked.
  */
 import { z } from 'zod'
+import { PostAdminConfigBrandingResetResponseSchema } from '@/generated/api-schemas'
 import { httpClient } from './httpClient'
 
 // === Zod Schemas for Runtime Validation ===
@@ -85,13 +86,6 @@ const UpdateValueResponseZ = z.object({
   error: z.string().optional(),
 })
 
-const ResetBrandingStyleResponseZ = z.object({
-  success: z.boolean(),
-  reset: z.array(z.string()),
-  failed: z.array(z.string()),
-  requiresRestart: z.boolean(),
-})
-
 const GetBackupsResponseZ = z.object({
   success: z.literal(true),
   backups: z.array(ConfigBackupZ),
@@ -111,7 +105,7 @@ export type ConfigSchema = z.infer<typeof ConfigSchemaZ>
 export type ConfigValue = z.infer<typeof ConfigValueZ>
 export type ConfigBackup = z.infer<typeof ConfigBackupZ>
 export type TestConnectionResult = z.infer<typeof TestConnectionResultZ>
-export type ResetBrandingStyleResult = z.infer<typeof ResetBrandingStyleResponseZ>
+export type ResetBrandingStyleResult = z.infer<typeof PostAdminConfigBrandingResetResponseSchema>
 
 // === API Functions ===
 
@@ -156,7 +150,7 @@ export async function updateConfigValue(
 export async function resetBrandingStyle(): Promise<ResetBrandingStyleResult> {
   return httpClient('/api/v1/admin/config/branding/reset', {
     method: 'POST',
-    schema: ResetBrandingStyleResponseZ,
+    schema: PostAdminConfigBrandingResetResponseSchema,
   })
 }
 

@@ -368,7 +368,8 @@
         "confirmMessage": "Vos couleurs et polices personnalisées (mode clair et sombre) seront remplacées par les valeurs Synaplan par défaut. Le nom, les logos, les liens et l’attribution restent inchangés. Cette action est irréversible.",
         "success": "Style réinitialisé — les valeurs par défaut sont de nouveau utilisées.",
         "partial": "{reset} réglage(s) réinitialisé(s), {failed} échoué(s) — les réglages échoués ont conservé vos valeurs.",
-        "failed": "Le style n’a pas pu être réinitialisé. Vos valeurs sont inchangées."
+        "failed": "Le style n’a pas pu être réinitialisé. Vos valeurs sont inchangées.",
+        "unconfirmed": "Impossible de confirmer si le style a été réinitialisé. Rechargez la page pour voir le style actuel."
       },
       "restartBanner": {
         "title": "Configuration mise à jour — redémarrage requis",

@@ -1058,8 +1058,9 @@
     );
   }
 
-  /* Icon ghost. The old #8a8a8e at 0.65 opacity was ~2.3:1 on white —
-     invisible for low-vision users. #5e5e5e at 0.9 is ~5.9:1. */
+  /* Icon ghost. Opacity stays at 1: 0.9 of #5e5e5e composites to #6a6b6c
+     (~3.9:1) on the #d5dee9 page, which fails AA for the language label.
+     #5e5e5e itself is 4.8:1 on that page and ~6.2:1 on a white card. */
   .icon-ghost {
     color: #5e5e5e;
     border-radius: 0.5rem;
@@ -1068,7 +1069,7 @@
       background 0.15s,
       color 0.15s,
       opacity 0.15s;
-    opacity: 0.9;
+    opacity: 1;
   }
   .icon-ghost:hover,
   .icon-ghost:focus-visible {

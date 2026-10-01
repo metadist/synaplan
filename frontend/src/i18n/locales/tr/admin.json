@@ -364,7 +364,8 @@
         "confirmMessage": "Özel renkleriniz ve yazı tipleriniz (açık ve koyu mod) Synaplan varsayılanlarıyla değiştirilecek. Ad, logolar, bağlantılar ve atıf değişmeyecek. Bu işlem geri alınamaz.",
         "success": "Stil sıfırlandı — varsayılanlar yeniden kullanılıyor.",
         "partial": "{reset} ayar sıfırlandı, {failed} başarısız oldu — başarısız olanlar değerlerinizi korudu.",
-        "failed": "Stil sıfırlanamadı. Değerleriniz değişmedi."
+        "failed": "Stil sıfırlanamadı. Değerleriniz değişmedi.",
+        "unconfirmed": "Stilin sıfırlanıp sıfırlanmadığı doğrulanamadı. Geçerli stili görmek için sayfayı yenileyin."
       },
       "restartBanner": {
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",

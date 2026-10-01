@@ -18,7 +18,12 @@ vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({ branding }),
 }))
 
-import { applyBrandingTheme, ensureFillForWhiteText, pickOnBrandColor } from '@/utils/brandingTheme'
+import {
+  applyBrandingTheme,
+  contrastRatio,
+  ensureFillForWhiteText,
+  pickOnBrandColor,
+} from '@/utils/brandingTheme'
 
 function iconLinks(): HTMLLinkElement[] {
   return Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'))
@@ -69,6 +74,14 @@ describe('applyBrandingTheme — colors', () => {
     expect(pickOnBrandColor('#93c5fd')).toBe('#0a0e1a')
     expect(pickOnBrandColor('#003fc7')).toBe('#ffffff')
     expect(pickOnBrandColor('#6d9ae0')).toBe('#0a0e1a')
+  })
+
+  it('uses pure black when neither design token reaches AA on a mid grey', () => {
+    const ink = pickOnBrandColor('#787878')
+
+    expect(ink).toBe('#000000')
+    expect(contrastRatio('#787878', ink)).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio('#ffffff', pickOnBrandColor('#ffffff'))).toBeGreaterThanOrEqual(4.5)
   })
 
   it('keeps a dark fill but darkens a light fill until white passes', () => {
