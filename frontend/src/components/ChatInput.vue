@@ -492,6 +492,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import {
   ArrowUpIcon,
   XMarkIcon,
@@ -541,6 +542,7 @@ import {
 } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
+import { useChatModelPickStore } from '@/stores/chatModelPick'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useDialog } from '@/composables/useDialog'
 import { desktopApi } from '@/services/api/desktopApi'
@@ -685,7 +687,6 @@ const voiceReply = ref(false)
 const discardNextRecording = ref(false)
 /** Set on unmount so a late recognition or recorder callback cannot write state or upload audio. */
 let dictationUnmounted = false
-const selectedModelId = ref<number | null>(null)
 // Knowledge-base folder ("group key") to scope this chat's RAG retrieval to.
 const knowledgeGroups = ref<Array<{ name: string; count: number }>>([])
 const selectedGroupKey = ref<string>('')
@@ -696,6 +697,8 @@ const autoSendPending = ref(false)
 
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
+const chatModelPick = useChatModelPickStore()
+const { selectedModelId } = storeToRefs(chatModelPick)
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 const commandsStore = useCommandsStore()
@@ -1199,11 +1202,12 @@ watch(
   { immediate: true }
 )
 
-// Reset model dropdown when switching chats
+// Reset model dropdown when switching chats. The same clear runs after a
+// successful model-mix apply, so both paths drop the explicit pick.
 watch(
   () => chatsStore.activeChatId,
   () => {
-    selectedModelId.value = null
+    chatModelPick.clear()
   }
 )
 

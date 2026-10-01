@@ -4,6 +4,9 @@ import { createPinia, setActivePinia } from 'pinia'
 import ChatInput from '@/components/ChatInput.vue'
 import { chatApi } from '@/services/api/chatApi'
 import { deleteFile } from '@/services/filesService'
+import { useAiConfigStore } from '@/stores/aiConfig'
+import { useModelMixStore } from '@/stores/modelMix'
+import type { AIModel } from '@/types/ai-models'
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {}, fullPath: '/chat' }),
@@ -73,6 +76,15 @@ vi.mock('@/composables/useNotification', () => ({
 vi.mock('@/services/filesService', () => ({
   getFileGroups: vi.fn().mockResolvedValue([]),
   deleteFile: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
+}))
+
+vi.mock('@/services/api/configApi', () => ({
+  configApi: {
+    getModels: vi.fn().mockResolvedValue({ success: true, models: {}, providers: [] }),
+    getDefaultModels: vi.fn().mockResolvedValue({ success: true, defaults: {} }),
+    saveDefaultModels: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
+    resetDefaultModels: vi.fn().mockResolvedValue({ success: true, message: 'ok', defaults: {} }),
+  },
 }))
 
 const TextareaStub = {
@@ -306,5 +318,81 @@ describe('ChatInput staged attachments', () => {
 
     expect(deleteFile).toHaveBeenCalledWith(9)
     expect(wrapper.find('[data-testid="btn-remove-chat-file"]').exists()).toBe(false)
+  })
+})
+
+const pickedChatModel = (): AIModel => ({
+  id: 55,
+  service: 'OpenAI',
+  name: 'GPT-5.4',
+  tag: 'CHAT',
+  providerId: 'gpt-5.4',
+  quality: 9,
+  rating: 1,
+  priceIn: 1,
+  priceOut: 1,
+  description: null,
+  isSystemModel: false,
+  features: [],
+})
+
+describe('ChatInput explicit model pick', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+  })
+
+  it('drops the caption and modelId after a model mix is applied', async () => {
+    const aiConfig = useAiConfigStore()
+    aiConfig.models.CHAT = [pickedChatModel()]
+
+    const wrapper = mount(ChatInput, {
+      attachTo: document.body,
+      global: {
+        mocks: { $t: (key: string) => key },
+        stubs: {
+          Icon: true,
+          Textarea: TextareaStub,
+          CommandPalette: true,
+          FileMentionPalette: true,
+          ToolsDropdown: true,
+          ToolBadge: true,
+          ModelDropdown: {
+            name: 'ModelDropdown',
+            props: ['modelValue'],
+            emits: ['update:modelValue'],
+            template:
+              '<button type="button" data-testid="stub-pick-model" @click="$emit(\'update:modelValue\', 55)">pick</button>',
+          },
+          KnowledgeFolderPicker: true,
+          FileSelectionModal: true,
+          PastedTextModal: true,
+          QuoteChip: true,
+        },
+      },
+    })
+
+    expect(wrapper.find('[data-testid="chat-model-caption"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="btn-chat-plus"]').trigger('click')
+    await wrapper.get('[data-testid="stub-pick-model"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="chat-model-caption"]').exists()).toBe(true)
+
+    expect(await useModelMixStore().applyMix('default')).toBe(true)
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="chat-model-caption"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="input-chat-message"]').setValue('Hello')
+    await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
+
+    const sent = wrapper.emitted('send')?.[0] as [string, { modelId?: number }]
+    expect(sent[0]).toBe('Hello')
+    expect(sent[1].modelId).toBeUndefined()
+
+    wrapper.unmount()
   })
 })
