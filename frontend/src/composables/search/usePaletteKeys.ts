@@ -85,7 +85,9 @@ export function usePaletteKeys(state: {
   }
 
   const onGlobalKeydown = (event: KeyboardEvent) => {
-    if (event.key.toLowerCase() !== 'k' || event.altKey || event.shiftKey) return
+    // Autofill, password managers and IMEs dispatch keydown events with no key.
+    // A throw here is a window error and replaces the whole signed-in app.
+    if (event.key?.toLowerCase() !== 'k' || event.altKey || event.shiftKey) return
     if (!(event.metaKey || event.ctrlKey)) return
     if (!state.isOpen() && !state.canOpen()) return
     event.preventDefault()
