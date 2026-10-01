@@ -2169,10 +2169,14 @@ const setInputText = (text: string) => {
   message.value = text
 }
 
-// Prefill + send in one step (e.g., landing example prompts).
-const submitText = (text: string) => {
+// Prefill + send in one step (e.g., landing example prompts). Resolves false
+// when the composer refused the send; the text then stays in the box.
+const submitText = async (text: string): Promise<boolean> => {
   message.value = text
-  nextTick(() => sendMessage())
+  await nextTick()
+  const sendable = !isStreaming.value && canSend.value
+  sendMessage()
+  return sendable
 }
 
 /**
@@ -2199,7 +2203,7 @@ defineExpose<{
   uploadFiles: (files: File[]) => Promise<void>
   attachExistingFile: (file: { file_id: number; filename: string; file_type: string }) => void
   setInputText: (text: string) => void
-  submitText: (text: string) => void
+  submitText: (text: string) => Promise<boolean>
   startDictation: () => Promise<boolean>
   armSummarize: () => void
 }>({

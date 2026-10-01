@@ -1542,7 +1542,7 @@ final readonly class SystemConfigService
             'FEATURE_SEARCH_AI_ENABLED' => [
                 'tab' => 'features', 'section' => 'search', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why. Each use is one short AI call. Off keeps keyword and meaning search.',
+                'description' => 'AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the search model (the chat model of each person unless an admin pins one) picks the best matching result and says why. Each use is one short AI call and counts as one message. Off keeps keyword and meaning search.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => SmartSearchConfig::CONFIG_GROUP,

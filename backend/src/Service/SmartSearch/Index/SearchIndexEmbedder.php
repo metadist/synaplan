@@ -14,6 +14,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class SearchIndexEmbedder
 {
+    /** No row cap: every pending row of the user, each read once. */
+    public const ALL = PHP_INT_MAX;
     private const BATCH_SIZE = 32;
 
     /** Title and the start of the body carry the meaning; the rest is noise. */
@@ -27,20 +29,23 @@ final readonly class SearchIndexEmbedder
     }
 
     /**
+     * @param int $maxRows {@see ALL} walks every pending row of the user once
+     *
      * @return int number of rows that got a vector
      */
-    public function embedPending(int $userId, int $maxRows = 500): int
+    public function embedPending(int $userId, int $maxRows = self::ALL): int
     {
         return $this->embedPendingCounted($userId, $maxRows)['embedded'];
     }
 
     /**
-     * Like {@see embedPending()}, and also reports the rows a failed batch
-     * left without a vector, so a reindex run can tell partial from none.
+     * Like {@see embedPending()}, and also reports the rows left without a
+     * vector (a failed batch counts every row it did not reach), so a
+     * reindex run can tell partial from none.
      *
      * @return array{embedded: int, failed: int}
      */
-    public function embedPendingCounted(int $userId, int $maxRows = 500): array
+    public function embedPendingCounted(int $userId, int $maxRows = self::ALL): array
     {
         $modelId = $this->embeddingModel->modelId();
         if (null === $modelId) {
@@ -50,8 +55,9 @@ final readonly class SearchIndexEmbedder
         $done = 0;
         $embedded = 0;
         $failed = 0;
+        $after = null;
         while ($done < $maxRows) {
-            $rows = $this->repository->findPendingEmbeddings($userId, $modelId, min(self::BATCH_SIZE, $maxRows - $done));
+            $rows = $this->repository->findPendingEmbeddings($userId, $modelId, min(self::BATCH_SIZE, $maxRows - $done), $after);
             if ([] === $rows) {
                 break;
             }
@@ -59,12 +65,13 @@ final readonly class SearchIndexEmbedder
             try {
                 $result = $this->embeddingModel->embed(array_map(self::text(...), $rows));
             } catch (\Throwable $e) {
+                $left = count($rows) + $this->repository->countPendingEmbeddings($userId, $modelId, self::cursorOf($rows));
+                $failed += min($maxRows - $done, $left);
                 $this->logger->warning('Smart Search index embedding failed, rows keep keyword search only', [
                     'user_id' => $userId,
-                    'rows' => count($rows),
+                    'rows_left' => $left,
                     'error' => $e->getMessage(),
                 ]);
-                $failed += count($rows);
 
                 break;
             }
@@ -82,9 +89,22 @@ final readonly class SearchIndexEmbedder
                 }
             }
             $done += count($rows);
+            $after = self::cursorOf($rows);
         }
 
         return ['embedded' => $embedded, 'failed' => $failed];
+    }
+
+    /**
+     * @param non-empty-list<array{id: int, updated: int}> $rows
+     *
+     * @return array{updated: int, id: int}
+     */
+    private static function cursorOf(array $rows): array
+    {
+        $last = $rows[array_key_last($rows)];
+
+        return ['updated' => $last['updated'], 'id' => $last['id']];
     }
 
     /**

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\SmartSearch;
 
+use App\Entity\User;
 use App\Repository\SearchIndexRepository;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use App\Service\SmartSearch\Index\SearchEmbeddingModel;
 use App\Service\SmartSearch\QueryVectors;
 use App\Service\UserMemoryService;
@@ -20,7 +22,7 @@ final class QueryVectorsTest extends TestCase
     {
         $searchModel = $this->createMock(SearchEmbeddingModel::class);
         $searchModel->expects(self::once())->method('embed')
-            ->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[0.6, 0.8]]]);
+            ->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[0.6, 0.8]], 'provider' => 'test', 'model' => 'm', 'usage' => []]);
         $memories = $this->createMock(UserMemoryService::class);
         $memories->method('getMemoryEmbeddingModelId')->willReturn(self::SEARCH_MODEL);
         $memories->expects(self::never())->method('embedUserQuery');
@@ -39,7 +41,7 @@ final class QueryVectorsTest extends TestCase
     public function testAnotherModelSpaceGetsItsOwnEmbed(): void
     {
         $searchModel = $this->createMock(SearchEmbeddingModel::class);
-        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[1.0]]]);
+        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[1.0]], 'provider' => 'test', 'model' => 'm', 'usage' => []]);
         $memories = $this->createMock(UserMemoryService::class);
         $memories->method('getMemoryEmbeddingModelId')->willReturn(99);
         $memories->expects(self::once())->method('embedQueryForMemorySearch')
@@ -55,7 +57,7 @@ final class QueryVectorsTest extends TestCase
     public function testCutoffSitsAboveTheQueryNoiseLevel(): void
     {
         $searchModel = $this->createMock(SearchEmbeddingModel::class);
-        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[1.0]]]);
+        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[1.0]], 'provider' => 'test', 'model' => 'm', 'usage' => []]);
         $repository = $this->createMock(SearchIndexRepository::class);
         $repository->expects(self::once())->method('averageSimilarity')->willReturn(0.2);
 
@@ -68,7 +70,7 @@ final class QueryVectorsTest extends TestCase
     public function testConstantVectorsOfATestModelFindNothing(): void
     {
         $searchModel = $this->createMock(SearchEmbeddingModel::class);
-        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[0.123]]]);
+        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[0.123]], 'provider' => 'test', 'model' => 'm', 'usage' => []]);
         $repository = $this->createMock(SearchIndexRepository::class);
         $repository->method('averageSimilarity')->willReturn(1.0);
 
@@ -78,7 +80,7 @@ final class QueryVectorsTest extends TestCase
     public function testWithoutACatalogTheConservativeCutoffApplies(): void
     {
         $searchModel = $this->createMock(SearchEmbeddingModel::class);
-        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[1.0]]]);
+        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[1.0]], 'provider' => 'test', 'model' => 'm', 'usage' => []]);
         $repository = $this->createMock(SearchIndexRepository::class);
         $repository->method('averageSimilarity')->willReturn(null);
 
@@ -98,22 +100,56 @@ final class QueryVectorsTest extends TestCase
         self::assertFalse($vectors->indexAvailable());
     }
 
+    public function testTheQueryEmbedIsMeteredAsEmbeddingUsage(): void
+    {
+        $searchModel = $this->createMock(SearchEmbeddingModel::class);
+        $searchModel->method('embed')->willReturn(['modelId' => self::SEARCH_MODEL, 'vectors' => [[1.0]], 'provider' => 'test', 'model' => 'm', 'usage' => ['prompt_tokens' => 3, 'total_tokens' => 3]]);
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
+        $rateLimits->expects(self::once())->method('recordUsage')
+            ->with(self::isInstanceOf(User::class), 'EMBEDDINGS', self::callback(static fn (array $meta): bool => 'smart_search' === $meta['source'] && self::SEARCH_MODEL === $meta['model_id']));
+
+        self::assertNotNull($this->vectors($searchModel, rateLimits: $rateLimits)->forIndex());
+    }
+
+    public function testASpentEmbeddingAllowanceMeansKeywordSearchOnly(): void
+    {
+        $searchModel = $this->createMock(SearchEmbeddingModel::class);
+        $searchModel->expects(self::never())->method('embed');
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => false]);
+        $rateLimits->expects(self::never())->method('recordUsage');
+
+        $vectors = $this->vectors($searchModel, rateLimits: $rateLimits);
+
+        self::assertNull($vectors->forIndex());
+        self::assertFalse($vectors->indexAvailable());
+    }
+
     private function vectors(
         SearchEmbeddingModel $searchModel,
         ?UserMemoryService $memories = null,
         ?SearchIndexRepository $repository = null,
         ?int $documentsModel = null,
+        ?RateLimitService $rateLimits = null,
     ): QueryVectors {
         $modelConfig = $this->createMock(ModelConfigService::class);
         $modelConfig->method('getDefaultModel')->willReturn($documentsModel);
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        if (null === $rateLimits) {
+            $rateLimits = $this->createMock(RateLimitService::class);
+            $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
+        }
 
         return new QueryVectors(
-            7,
+            $user,
             'turn on groups',
             $searchModel,
             $modelConfig,
             $memories ?? $this->createMock(UserMemoryService::class),
             $repository ?? $this->createMock(SearchIndexRepository::class),
+            $rateLimits,
             new NullLogger(),
         );
     }

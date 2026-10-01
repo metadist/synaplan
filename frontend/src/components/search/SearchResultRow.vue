@@ -36,11 +36,7 @@
           <span class="hidden sm:inline">{{ $t('search.palette.foundByMeaning') }}</span>
         </span>
       </span>
-      <span v-if="result.subtitle || result.snippet" class="block text-xs txt-secondary truncate">
-        <template v-if="result.subtitle">{{ result.subtitle }}</template>
-        <template v-if="result.subtitle && result.snippet"> · </template>
-        <template v-if="result.snippet">{{ result.snippet }}</template>
-      </span>
+      <span v-if="details" class="block text-xs txt-secondary truncate">{{ details }}</span>
     </span>
     <slot name="trailing">
       <span
@@ -54,6 +50,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import type { SearchResult } from '@/composables/search/types'
 import { isAdminOnlyResult } from '@/composables/search/adminOnly'
@@ -64,7 +61,19 @@ const props = defineProps<{
   optionId: string
 }>()
 
+const { t } = useI18n()
+
 const adminOnly = computed(() => isAdminOnlyResult(props.result))
+
+const details = computed(() =>
+  [
+    props.result.sharedBy ? t('search.palette.sharedBy', { name: props.result.sharedBy }) : '',
+    props.result.subtitle ?? '',
+    props.result.snippet ?? '',
+  ]
+    .filter((part) => part !== '')
+    .join(' · ')
+)
 
 const emit = defineEmits<{
   select: [event: MouseEvent]

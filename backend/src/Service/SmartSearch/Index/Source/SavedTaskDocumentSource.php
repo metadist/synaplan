@@ -67,6 +67,11 @@ final readonly class SavedTaskDocumentSource implements SearchDocumentSourceInte
         }
     }
 
+    public function sharedRefIds(int $userId): array
+    {
+        return [];
+    }
+
     public function resolve(int $userId, array $refIds): array
     {
         $ids = array_values(array_filter(array_map('intval', $refIds), static fn (int $id): bool => $id > 0));

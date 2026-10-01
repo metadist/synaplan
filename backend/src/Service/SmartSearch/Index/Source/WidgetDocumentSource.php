@@ -59,6 +59,11 @@ final readonly class WidgetDocumentSource implements SearchDocumentSourceInterfa
         }
     }
 
+    public function sharedRefIds(int $userId): array
+    {
+        return [];
+    }
+
     public function resolve(int $userId, array $refIds): array
     {
         if ([] === $refIds) {

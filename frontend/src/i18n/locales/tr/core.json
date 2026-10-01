@@ -237,7 +237,8 @@
         "thinking": "AI sonuçlara bakıyor…",
         "failed": "AI bu sefer yardımcı olamadı. Aşağıdaki sonuçlar yine çalışıyor.",
         "rateLimited": "AI yardımı bir dakikalığına duraklatıldı. Aşağıdaki sonuçlar yine çalışıyor.",
-        "noMatch": "AI daha iyi bir sonuç bulamadı. Yanıt almak için sohbette sor."
+        "noMatch": "AI daha iyi bir sonuç bulamadı. Yanıt almak için sohbette sor.",
+        "limitReached": "Şimdilik AI mesajlarınızı kullandınız, bu yüzden AI yardımı kapalı. Aşağıdaki sonuçlar yine çalışıyor."
       },
       "foundByMeaning": "Anlamına göre bulundu",
       "footer": {
@@ -395,7 +396,12 @@
         "current": "Geçerli değer",
         "byMeaning": "Anlamına göre bulundu: farklı kelimeler, aynı konu.",
         "tabHint": "Bu eylemlere klavyeden ulaşmak için Tab tuşuna basın."
-      }
+      },
+      "ask": {
+        "commandDraft": "Sorunuz \"/\" ile başladığı için mesaj kutusunda taslak olarak bekliyor. Kontrol edip göndermek için Enter tuşuna basın.",
+        "notSent": "Sorunuz mesaj kutusunda, ancak henüz gönderilmedi. Göndermek için Enter tuşuna basın."
+      },
+      "sharedBy": "{name} tarafından paylaşıldı"
     }
   },
   "unsavedChanges": {

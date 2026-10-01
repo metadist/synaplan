@@ -52,6 +52,8 @@ export function usePaletteStatus(state: {
         return t('search.palette.ai.failed')
       case 'rateLimited':
         return t('search.palette.ai.rateLimited')
+      case 'limitReached':
+        return t('search.palette.ai.limitReached')
       case 'ready':
         return state.aiOutcome.value === 'no_match' ? t('search.palette.ai.noMatch') : ''
       default:

@@ -595,4 +595,59 @@ class FileRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    /**
+     * Ids of the non-ephemeral files inside these knowledge folders, newest first.
+     *
+     * @param list<array{0: int, 1: string}> $folders (ownerId, groupKey) pairs
+     *
+     * @return list<int>
+     */
+    public function findIdsInFolders(array $folders, int $limit): array
+    {
+        if ([] === $folders) {
+            return [];
+        }
+
+        $qb = $this->createQueryBuilder('f')
+            ->select('f.id')
+            ->where('f.ephemeral = false')
+            ->orderBy('f.updatedAt', 'DESC')
+            ->setMaxResults($limit);
+        $match = $qb->expr()->orX();
+        foreach ($folders as $i => [$ownerId, $groupKey]) {
+            $match->add("(f.userId = :owner{$i} AND f.groupKey = :group{$i})");
+            $qb->setParameter("owner{$i}", $ownerId)->setParameter("group{$i}", $groupKey);
+        }
+        $qb->andWhere($match);
+
+        return array_map(static fn (array $row): int => (int) $row['id'], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Non-ephemeral files of one owner for the Smart Search index, with only
+     * the first `$textChars` characters of the extracted text, so a full
+     * re-index never hydrates whole documents.
+     *
+     * @return list<array{id: int, originalName: ?string, fileName: string, text: string, updatedAt: int}>
+     */
+    public function findSearchRowsForUser(int $userId, int $textChars): array
+    {
+        $rows = $this->createQueryBuilder('f')
+            ->select('f.id', 'f.originalName', 'f.fileName', 'SUBSTRING(f.fileText, 1, :chars) AS text', 'f.updatedAt')
+            ->where('f.userId = :userId')
+            ->andWhere('f.ephemeral = false')
+            ->setParameter('userId', $userId)
+            ->setParameter('chars', $textChars)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_values(array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'originalName' => null === $row['originalName'] ? null : (string) $row['originalName'],
+            'fileName' => (string) $row['fileName'],
+            'text' => (string) $row['text'],
+            'updatedAt' => (int) $row['updatedAt'],
+        ], $rows));
+    }
 }

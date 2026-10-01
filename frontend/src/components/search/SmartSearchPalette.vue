@@ -110,6 +110,7 @@
                       :saving="inline.savingKey.value === item.setting.key"
                       :option-label="inline.optionLabel"
                       @change="(value) => item.setting && inline.apply(item.setting, value)"
+                      @leave="inputRef?.focus()"
                     />
                   </template>
                 </SearchResultRow>
@@ -261,6 +262,15 @@ const paneActions = usePaletteActions({
   settingValue: inline.valueOf,
 })
 
+const focusActiveSetting = (): boolean => {
+  if (!activeSetting.value) return false
+  const control = listRef.value
+    ?.querySelector(`#${optionId(activeIndex.value)}`)
+    ?.querySelector<HTMLElement>('button:not([disabled]), select:not([disabled])')
+  control?.focus()
+  return !!control
+}
+
 const { onKeydown } = usePaletteKeys({
   query,
   results: flatResults,
@@ -272,6 +282,7 @@ const { onKeydown } = usePaletteKeys({
   toggle: () => store.toggle(),
   isOpen: () => store.isOpen,
   canOpen: () => authStore.isAuthenticated && route.meta.public !== true,
+  focusSetting: focusActiveSetting,
   actions: paneActions,
 })
 </script>

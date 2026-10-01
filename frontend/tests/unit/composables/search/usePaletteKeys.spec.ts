@@ -20,7 +20,8 @@ function setup(options: { open?: boolean; canOpen?: boolean } = {}) {
     toggle: vi.fn(),
     isOpen: () => options.open ?? true,
     canOpen: () => options.canOpen ?? true,
-    actions: { open: vi.fn(), handle: vi.fn(() => false) },
+    focusSetting: vi.fn(() => true),
+    actions: { isOpen: ref(false), open: vi.fn(() => true), handle: vi.fn(() => false) },
   }
   let onKeydown: (event: KeyboardEvent) => void = () => {}
   const wrapper = mount(
@@ -86,6 +87,23 @@ describe('usePaletteKeys', () => {
     press('Enter')
     expect(state.close).not.toHaveBeenCalled()
     expect(state.select).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('moves on from the open pane to the setting control with Tab', () => {
+    const { state, press, wrapper } = setup()
+    state.actions.isOpen.value = true
+    press('Tab')
+    expect(state.focusSetting).toHaveBeenCalledTimes(1)
+    expect(state.actions.open).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('focuses the setting control directly when there is no pane to open', () => {
+    const { state, press, wrapper } = setup()
+    state.actions.open.mockReturnValue(false)
+    press('Tab')
+    expect(state.focusSetting).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 

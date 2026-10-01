@@ -248,7 +248,8 @@
         "thinking": "The AI is looking at the results…",
         "failed": "The AI could not help this time. The results below still work.",
         "rateLimited": "AI help is paused for a minute. The results below still work.",
-        "noMatch": "The AI found no better match. Ask in chat to get an answer."
+        "noMatch": "The AI found no better match. Ask in chat to get an answer.",
+        "limitReached": "You have used up your AI messages for now, so AI help is off. The results below still work."
       },
       "foundByMeaning": "Found by meaning",
       "footer": {
@@ -406,7 +407,12 @@
         "current": "Current value",
         "byMeaning": "Found by meaning: different words, same topic.",
         "tabHint": "Press Tab to reach these actions from the keyboard."
-      }
+      },
+      "ask": {
+        "commandDraft": "Your question starts with \"/\", so it is waiting in the message box as a draft. Check it and press Enter to send.",
+        "notSent": "Your question is in the message box but was not sent yet. Press Enter to send it."
+      },
+      "sharedBy": "Shared by {name}"
     }
   },
   "unsavedChanges": {

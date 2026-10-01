@@ -105,11 +105,12 @@ export function usePaletteActions(state: {
     isOpen.value = false
   }
 
-  /** Only "open" would be pointless: Enter already does that. */
-  const open = () => {
-    if (actions.value.length < 2) return
+  /** Only "open" would be pointless: Enter already does that. False when it stays shut. */
+  const open = (): boolean => {
+    if (actions.value.length < 2) return false
     index.value = 0
     isOpen.value = true
+    return true
   }
 
   const runAt = (position: number) => {
@@ -119,7 +120,11 @@ export function usePaletteActions(state: {
     void action.run()
   }
 
-  /** Keys while the pane is open; true when the pane handled the key. */
+  /**
+   * Keys while the pane is open; true when the pane handled the key. Tab
+   * closes the pane and is left to the list, which moves on to the inline
+   * setting control.
+   */
   const handle = (event: KeyboardEvent): boolean => {
     if (!isOpen.value) return false
     const total = actions.value.length
@@ -133,8 +138,10 @@ export function usePaletteActions(state: {
         event.preventDefault()
         runAt(index.value)
         return true
-      case 'Escape':
       case 'Tab':
+        close()
+        return false
+      case 'Escape':
       case 'ArrowLeft':
         event.preventDefault()
         close()

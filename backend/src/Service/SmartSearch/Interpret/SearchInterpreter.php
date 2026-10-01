@@ -23,6 +23,7 @@ use Psr\Log\LoggerInterface;
 final readonly class SearchInterpreter
 {
     public const PROMPT_TOPIC = 'tools:smart_search';
+    private const USAGE_ACTION = 'MESSAGES';
 
     private const MAX_TARGETS = 3;
     private const MAX_ANSWER_LENGTH = 240;
@@ -58,6 +59,12 @@ final readonly class SearchInterpreter
      */
     public function interpret(User $user, string $query, array $candidates, string $language): InterpretResult
     {
+        // A search question is a model call like a chat turn, so it spends
+        // and respects the same message allowance.
+        if (!($this->rateLimitService->checkLimit($user, self::USAGE_ACTION)['allowed'] ?? false)) {
+            return InterpretResult::limitReached();
+        }
+
         $model = $this->searchModels->aiModel($user->getId());
         $options = ['temperature' => self::TEMPERATURE];
         if (null !== $model) {
@@ -85,7 +92,7 @@ final readonly class SearchInterpreter
         }
 
         $content = is_string($response['content'] ?? null) ? $response['content'] : '';
-        $this->rateLimitService->recordUsage($user, 'SMART_SEARCH', [
+        $this->rateLimitService->recordUsage($user, self::USAGE_ACTION, [
             'provider' => $response['provider'] ?? 'unknown',
             'model' => $response['model'] ?? 'unknown',
             'model_id' => $model?->getId(),
@@ -94,13 +101,14 @@ final readonly class SearchInterpreter
             'input_text' => $userPrompt,
         ]);
 
-        return self::parse($content, $candidates);
+        return self::parse($content, $candidates, $user->isAdmin());
     }
 
     /**
      * @param list<InterpretCandidate> $candidates
+     * @param bool                     $mayChangeSettings false turns a `change_setting` pick into `navigate`
      */
-    public static function parse(string $raw, array $candidates): InterpretResult
+    public static function parse(string $raw, array $candidates, bool $mayChangeSettings = true): InterpretResult
     {
         $trimmed = trim($raw);
         if (str_starts_with($trimmed, '```')) {
@@ -116,6 +124,9 @@ final readonly class SearchInterpreter
             return InterpretResult::failed();
         }
         $intent = $decoded['intent'];
+        if ('change_setting' === $intent && !$mayChangeSettings) {
+            $intent = 'navigate';
+        }
 
         $known = array_flip(array_map(static fn (InterpretCandidate $c): string => $c->id, $candidates));
         $targetIds = [];

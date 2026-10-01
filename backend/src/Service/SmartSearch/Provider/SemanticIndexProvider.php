@@ -11,8 +11,8 @@ use App\Service\SmartSearch\SearchRequest;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
- * Meaning tier over the user's own index rows: "invoice from the plumber"
- * finds the chat titled "Handwerker-Rechnung".
+ * Meaning tier over the user's own and shared index rows: "invoice from the
+ * plumber" finds the chat titled "Handwerker-Rechnung".
  */
 #[AsTaggedItem(priority: 80)]
 final readonly class SemanticIndexProvider implements SearchProviderInterface
@@ -48,6 +48,7 @@ final readonly class SemanticIndexProvider implements SearchProviderInterface
             $kinds,
             $request->limit * self::OVERFETCH,
             $request->vectors->indexMinScore(),
+            $this->resolver->sharedRefs($request, $kinds),
         );
 
         return [] === $rows ? [] : $this->resolver->toHits($request, $rows, SearchHit::MATCHED_SEMANTIC);

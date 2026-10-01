@@ -23,6 +23,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
 import { useChatsStore } from '@/stores/chats'
 import { useCommandsStore } from '@/stores/commands'
+import { useSmartSearchStore } from '@/stores/smartSearch'
 import { allLocaleTexts } from './localeTexts'
 import type { LocalEntry } from './pageSources'
 
@@ -51,20 +52,20 @@ export function useCommandSources() {
   const { logout, isImpersonating, isAuthenticated } = useAuth()
   const chatsStore = useChatsStore()
   const commandsStore = useCommandsStore()
+  const smartSearchStore = useSmartSearchStore()
   const t = i18n.global.t
 
   const prefillChat = async (text: string, options?: { send?: boolean }) => {
-    const query: Record<string, string> = { prefill: text }
-    // Ask-in-chat sends once the empty thread is on screen. ChatView owns
-    // that hand-off so a history reload cannot wipe the outgoing message.
-    // Slash commands stay a draft: the person still completes the command.
+    // Ask-in-chat goes through the in-memory store, never the URL, so only a
+    // click in the palette can send. ChatView picks it up once the composer
+    // is on screen. Slash commands stay a draft in `?prefill=`.
     if (options?.send) {
-      query.send = '1'
-      await router.push({ path: '/', query })
+      smartSearchStore.askInChat(text)
+      await router.push('/')
       return
     }
     await chatsStore.findOrCreateEmptyChat()
-    await router.push({ path: '/', query })
+    await router.push({ path: '/', query: { prefill: text } })
   }
 
   const definitions = computed<CommandDef[]>(() => {

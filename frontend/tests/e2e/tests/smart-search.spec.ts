@@ -124,6 +124,53 @@ test.describe('@ci Smart Search', () => {
       await page.locator(selectors.dialog.cancelBtn).click()
       await expect(row.locator(S.settingToggle)).toHaveAttribute('aria-checked', 'true')
     })
+
+    test('Tab reaches the inline switch and Esc goes back to the search field', async ({
+      page,
+    }) => {
+      await openPalette(page)
+      await search(page, SETTING_KEY)
+      const row = settingRow(page)
+      await expect(row).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await row.hover()
+
+      await page.keyboard.press('Tab')
+      await expect(page.locator(S.actionPane)).toBeVisible()
+      await page.keyboard.press('Tab')
+      await expect(page.locator(S.actionPane)).toHaveCount(0)
+      await expect(row.locator(S.settingToggle)).toBeFocused()
+
+      await page.keyboard.press('Escape')
+      await expect(page.locator(S.input)).toBeFocused()
+      await expect(page.locator(S.panel)).toBeVisible()
+    })
+  })
+
+  test('"Ask in chat" sends the question once; a link only fills the composer', async ({
+    page,
+  }) => {
+    const question = `palette question ${Date.now()}`
+    const userBubbles = page.locator(selectors.chat.userMessageBubble).filter({ hasText: question })
+
+    await test.step('a crafted link never sends', async () => {
+      await page.goto(`/?prefill=${encodeURIComponent(question)}&send=1`)
+      await expect(page.locator(selectors.chat.textInput)).toHaveValue(question, {
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page).not.toHaveURL(/prefill=|send=/)
+      await expect(userBubbles).toHaveCount(0)
+      await page.locator(selectors.chat.textInput).fill('')
+    })
+
+    await test.step('the palette action sends it', async () => {
+      await openPalette(page)
+      await search(page, question)
+      const ask = page.locator(S.result('ask:chat'))
+      await expect(ask).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await ask.click()
+      await expect(page.locator(S.modal)).toBeHidden()
+      await expect(userBubbles).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
+    })
   })
 
   test('opens from the mobile drawer at 320 px in dark theme', async ({ page }) => {

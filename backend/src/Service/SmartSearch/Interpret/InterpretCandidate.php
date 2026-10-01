@@ -16,6 +16,8 @@ final readonly class InterpretCandidate
     private const MAX_ID_LENGTH = 120;
     private const MAX_TEXT_LENGTH = 160;
     private const MAX_VALUE_LENGTH = 40;
+    /** `<kind>:<ref>` with URL-path characters only: no spaces or `|`, which the prompt line uses as separators. */
+    private const ID_PATTERN = '/^[a-z]+:[\p{L}\p{N}_\-.:\/@?=&#%+]+$/u';
 
     public function __construct(
         public string $id,
@@ -27,11 +29,14 @@ final readonly class InterpretCandidate
     }
 
     /**
+     * Setting candidates are dropped unless $allowSettings: only admins see
+     * settings, so a member's request never carries one legitimately.
+     *
      * @return list<self>
      *
      * @throws \InvalidArgumentException when the list is missing, too long or holds an unusable entry
      */
-    public static function listFromPayload(mixed $payload): array
+    public static function listFromPayload(mixed $payload, bool $allowSettings): array
     {
         if (!is_array($payload) || [] === $payload || count($payload) > self::MAX_CANDIDATES) {
             throw new \InvalidArgumentException(sprintf('Send 1 to %d candidates in "candidates".', self::MAX_CANDIDATES));
@@ -42,13 +47,16 @@ final readonly class InterpretCandidate
         foreach ($payload as $index => $item) {
             $candidate = is_array($item) ? self::fromArray($item) : null;
             if (null === $candidate) {
-                throw new \InvalidArgumentException(sprintf('Candidate %s needs an id, a known kind and a title.', (string) $index));
+                throw new \InvalidArgumentException(sprintf('Candidate %s needs an id of the form "<kind>:<ref>", a known kind and a title.', (string) $index));
             }
-            if (isset($seen[$candidate->id])) {
+            if (isset($seen[$candidate->id]) || (!$allowSettings && 'setting' === $candidate->kind)) {
                 continue;
             }
             $seen[$candidate->id] = true;
             $candidates[] = $candidate;
+        }
+        if ([] === $candidates) {
+            throw new \InvalidArgumentException('None of the candidates can be used for this account.');
         }
 
         return $candidates;
@@ -63,6 +71,9 @@ final readonly class InterpretCandidate
         $kind = $item['kind'] ?? null;
         $title = self::text($item['title'] ?? null, self::MAX_TEXT_LENGTH);
         if (null === $id || null === $title || !is_string($kind) || !in_array($kind, self::KINDS, true)) {
+            return null;
+        }
+        if (!str_starts_with($id, $kind.':') || 1 !== preg_match(self::ID_PATTERN, $id)) {
             return null;
         }
 

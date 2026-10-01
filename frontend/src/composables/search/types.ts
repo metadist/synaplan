@@ -30,6 +30,8 @@ export interface SearchResult {
   /** Where the thing lives, e.g. "Manage › Channels". */
   subtitle?: string
   snippet?: string
+  /** Owner's name when someone shared the item with the user. */
+  sharedBy?: string
   icon: Component
   matchedBy: MatchSource
   /** Navigation target; used when `run` is absent. */

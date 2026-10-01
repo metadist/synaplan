@@ -13,6 +13,8 @@ final readonly class ResolvedItem
         public string $title,
         public string $route,
         public ?string $subtitle = null,
+        /** Display name of the owner when the item reached the user through a share. */
+        public ?string $sharedBy = null,
     ) {
     }
 }

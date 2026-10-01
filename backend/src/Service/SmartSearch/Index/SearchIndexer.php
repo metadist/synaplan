@@ -42,23 +42,38 @@ final readonly class SearchIndexer
     }
 
     /**
-     * Refreshes one item: upserts the current document, or removes the row
-     * when the item is gone or no longer searchable.
+     * Refreshes one item: upserts the current document, or (when
+     * `$deleteWhenMissing`) removes the row when the item is gone or no
+     * longer searchable.
+     *
+     * @return bool true when a document was written
      */
-    public function refresh(string $kind, int $userId, string $refId): void
+    public function refresh(string $kind, int $userId, string $refId, bool $deleteWhenMissing = true): bool
     {
-        $source = $this->source($kind);
-        if (null === $source) {
-            throw new \InvalidArgumentException(sprintf('Unknown Smart Search kind "%s" (known: %s)', $kind, implode(', ', array_keys($this->sources))));
-        }
-
-        $document = $source->build($userId, $refId);
+        $document = $this->requireSource($kind)->build($userId, $refId);
         if (null === $document) {
-            $this->repository->delete($userId, $kind, $refId);
+            if ($deleteWhenMissing) {
+                $this->repository->delete($userId, $kind, $refId);
+            }
 
-            return;
+            return false;
         }
         $this->repository->upsert($document);
+
+        return true;
+    }
+
+    /** Drops one row without reading the source (the item was deleted). */
+    public function remove(string $kind, int $userId, string $refId): void
+    {
+        $this->requireSource($kind);
+        $this->repository->delete($userId, $kind, $refId);
+    }
+
+    private function requireSource(string $kind): SearchDocumentSourceInterface
+    {
+        return $this->source($kind)
+            ?? throw new \InvalidArgumentException(sprintf('Unknown Smart Search kind "%s" (known: %s)', $kind, implode(', ', array_keys($this->sources))));
     }
 
     /**

@@ -2,6 +2,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChatBubbleLeftEllipsisIcon, ClockIcon, SparklesIcon } from '@heroicons/vue/24/outline'
 import { i18n } from '@/i18n/instance'
+import { isSafeRedirectPath } from '@/utils/pendingAuthRedirect'
 import { LocalSearchIndex } from './localIndex'
 import { ensureAllLocales } from './localeTexts'
 import { usePageSources, type LocalEntry } from './pageSources'
@@ -143,7 +144,7 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
       .map((recent) => {
         const local = localById.value.get(recent.id)
         if (local) return local
-        if (!recent.route) return null
+        if (!isSafeRedirectPath(recent.route)) return null
         return {
           id: recent.id,
           kind: recent.kind,
@@ -213,8 +214,9 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
       await result.run?.()
       return
     }
-    if (newTab && result.route) {
-      window.open(router.resolve(result.route).href, '_blank', 'noopener')
+    const route = isSafeRedirectPath(result.route) ? result.route : null
+    if (newTab && route) {
+      window.open(router.resolve(route).href, '_blank', 'noopener')
       remember(result)
       return
     }
@@ -222,8 +224,8 @@ export function useSmartSearch(isOpen: Ref<boolean>, onClose: () => void) {
     onClose()
     if (result.run) {
       await result.run()
-    } else if (result.route) {
-      await router.push(result.route)
+    } else if (route) {
+      await router.push(route)
     }
   }
 

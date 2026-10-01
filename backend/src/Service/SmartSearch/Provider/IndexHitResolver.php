@@ -16,6 +16,7 @@ use App\Service\SmartSearch\SnippetBuilder;
  * both the permission check and the guard against stale rows.
  *
  * @phpstan-import-type IndexRow from SearchIndexRepository
+ * @phpstan-import-type SharedRefs from SearchIndexRepository
  */
 final readonly class IndexHitResolver
 {
@@ -39,6 +40,26 @@ final readonly class IndexHitResolver
         }
 
         return $kinds;
+    }
+
+    /**
+     * Ref ids of other people's rows the user may also search, per kind.
+     *
+     * @param list<string> $kinds
+     *
+     * @return SharedRefs
+     */
+    public function sharedRefs(SearchRequest $request, array $kinds): array
+    {
+        $shared = [];
+        foreach ($kinds as $kind) {
+            $refIds = $this->indexer->source($kind)?->sharedRefIds($request->userId()) ?? [];
+            if ([] !== $refIds) {
+                $shared[$kind] = $refIds;
+            }
+        }
+
+        return $shared;
     }
 
     /**
@@ -74,6 +95,7 @@ final readonly class IndexHitResolver
                 subtitle: $item->subtitle,
                 snippet: SnippetBuilder::build(SearchDocument::contentOf($row['title'], $row['body']), $request->fulltext->terms),
                 score: $row['score'],
+                sharedBy: $item->sharedBy,
             );
             if (count($hits) >= $request->limit) {
                 break;

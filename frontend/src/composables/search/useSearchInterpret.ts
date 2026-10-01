@@ -10,7 +10,7 @@ import {
 import type { RemoteStatus } from './useRemoteSearch'
 import type { SearchResult } from './types'
 
-export type AiStatus = 'idle' | 'loading' | 'ready' | 'failed' | 'rateLimited'
+export type AiStatus = 'idle' | 'loading' | 'ready' | 'failed' | 'rateLimited' | 'limitReached'
 
 /** Below this a query reads as keywords; the AI is only asked on request. */
 const QUESTION_MIN_WORDS = 4
@@ -96,7 +96,12 @@ export function useSearchInterpret(state: {
       )
       if (own.signal.aborted) return
       result.value = response
-      status.value = response.outcome === 'failed' ? 'failed' : 'ready'
+      status.value =
+        response.outcome === 'failed'
+          ? 'failed'
+          : response.outcome === 'limit_reached'
+            ? 'limitReached'
+            : 'ready'
     } catch (error) {
       if (own.signal.aborted) return
       status.value = error instanceof ApiError && error.status === 429 ? 'rateLimited' : 'failed'

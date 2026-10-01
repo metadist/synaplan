@@ -2,13 +2,16 @@
   <!--
     The row selects on click and keeps focus in the search field on
     mousedown; the control must receive both itself, or the switch would
-    navigate and the select would never open.
+    navigate and the select would never open. Tab from the search field
+    reaches it; Esc or Shift+Tab goes back to the field.
   -->
   <span
     class="flex-shrink-0 flex items-center gap-2"
     data-testid="control-smart-search-setting"
     @click.stop
     @mousedown.stop
+    @keydown.esc.stop.prevent="emit('leave')"
+    @keydown.shift.tab.prevent="emit('leave')"
   >
     <span
       v-if="control.envPinned"
@@ -30,7 +33,7 @@
         :aria-checked="value === 'true'"
         :aria-label="$t('search.palette.setting.switchLabel', { name })"
         :disabled="saving"
-        class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+        class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)] disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid="btn-smart-search-setting-toggle"
         @click="emit('change', value === 'true' ? 'false' : 'true')"
       >
@@ -79,5 +82,6 @@ defineProps<{
 
 const emit = defineEmits<{
   change: [value: string]
+  leave: []
 }>()
 </script>

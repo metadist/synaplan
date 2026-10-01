@@ -37,7 +37,7 @@ final readonly class SearchEmbeddingModel
      * @param list<string> $texts
      * @param bool         $fit   false keeps the provider's native width
      *
-     * @return array{modelId: int, vectors: list<list<float>>}|null null when no embedding model is usable
+     * @return array{modelId: int, provider: string, model: string, vectors: list<list<float>>, usage: array<string, int>}|null null when no embedding model is usable
      */
     public function embed(array $texts, ?int $userId = null, bool $fit = true): ?array
     {
@@ -88,11 +88,12 @@ final readonly class SearchEmbeddingModel
     /**
      * @param list<string> $texts
      *
-     * @return array{modelId: int, vectors: list<list<float>>}
+     * @return array{modelId: int, provider: string, model: string, vectors: list<list<float>>, usage: array<string, int>}
      */
     private function embedWith(Model $model, array $texts, ?int $userId, bool $fit): array
     {
-        $result = $this->aiFacade->embedBatch($texts, $userId, strtolower($model->getService()), [
+        $provider = strtolower($model->getService());
+        $result = $this->aiFacade->embedBatch($texts, $userId, $provider, [
             'model' => $model->getProviderId(),
         ]);
 
@@ -102,7 +103,13 @@ final readonly class SearchEmbeddingModel
             $vectors[] = $fit ? self::fit($vector) : $vector;
         }
 
-        return ['modelId' => (int) $model->getId(), 'vectors' => $vectors];
+        return [
+            'modelId' => (int) $model->getId(),
+            'provider' => $provider,
+            'model' => $model->getProviderId(),
+            'vectors' => $vectors,
+            'usage' => $result['usage'],
+        ];
     }
 
     private function model(): ?Model

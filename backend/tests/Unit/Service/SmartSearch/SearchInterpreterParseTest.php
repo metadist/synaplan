@@ -65,7 +65,7 @@ final class SearchInterpreterParseTest extends TestCase
         $list = InterpretCandidate::listFromPayload([
             ['id' => 'chat:7', 'kind' => 'chat', 'title' => "  Plumber\n invoice ", 'subtitle' => ''],
             ['id' => 'chat:7', 'kind' => 'chat', 'title' => 'Again'],
-        ]);
+        ], true);
 
         self::assertCount(1, $list);
         self::assertSame('Plumber invoice', $list[0]->title);
@@ -76,12 +76,43 @@ final class SearchInterpreterParseTest extends TestCase
     public function testCandidatePayloadRejectsUnknownKindsAndOversizedLists(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        InterpretCandidate::listFromPayload([['id' => 'x', 'kind' => 'ask', 'title' => 'Ask']]);
+        InterpretCandidate::listFromPayload([['id' => 'x', 'kind' => 'ask', 'title' => 'Ask']], true);
     }
 
     public function testCandidatePayloadRejectsTooMany(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        InterpretCandidate::listFromPayload(array_fill(0, InterpretCandidate::MAX_CANDIDATES + 1, ['id' => 'a', 'kind' => 'page', 'title' => 'A']));
+        InterpretCandidate::listFromPayload(array_fill(0, InterpretCandidate::MAX_CANDIDATES + 1, ['id' => 'a', 'kind' => 'page', 'title' => 'A']), true);
+    }
+
+    public function testAMemberIsNeverToldToChangeASetting(): void
+    {
+        $result = SearchInterpreter::parse(
+            '{"intent":"change_setting","targetIds":["page:/files"],"answer":"Switch it here."}',
+            $this->candidates(),
+            mayChangeSettings: false,
+        );
+
+        self::assertSame('ok', $result->outcome);
+        self::assertSame('navigate', $result->intent);
+    }
+
+    public function testSettingCandidatesAreDroppedForAMember(): void
+    {
+        $list = InterpretCandidate::listFromPayload([
+            ['id' => 'page:/files', 'kind' => 'page', 'title' => 'Files'],
+            ['id' => 'setting:FEATURE_IAM_GROUPS_ENABLED', 'kind' => 'setting', 'title' => 'Groups'],
+        ], false);
+
+        self::assertSame(['page:/files'], array_map(static fn (InterpretCandidate $c): string => $c->id, $list));
+
+        $this->expectException(\InvalidArgumentException::class);
+        InterpretCandidate::listFromPayload([['id' => 'setting:X', 'kind' => 'setting', 'title' => 'X']], false);
+    }
+
+    public function testAnIdMustNameItsOwnKind(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        InterpretCandidate::listFromPayload([['id' => 'setting:X', 'kind' => 'page', 'title' => 'Sneaky']], true);
     }
 }

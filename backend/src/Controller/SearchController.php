@@ -68,7 +68,7 @@ final class SearchController extends AbstractController
                     property: 'results',
                     type: 'array',
                     items: new OA\Items(
-                        required: ['id', 'kind', 'title', 'subtitle', 'snippet', 'route', 'score', 'matchedBy', 'action'],
+                        required: ['id', 'kind', 'title', 'subtitle', 'snippet', 'route', 'score', 'matchedBy', 'action', 'sharedBy'],
                         properties: [
                             new OA\Property(property: 'id', type: 'string', example: 'file:42'),
                             new OA\Property(property: 'kind', type: 'string', enum: SmartSearchService::KINDS, example: 'file'),
@@ -93,12 +93,13 @@ final class SearchController extends AbstractController
                                     new OA\Property(property: 'envPinned', type: 'boolean', description: 'An environment variable pins the value; show it read-only', example: false),
                                 ],
                             ),
+                            new OA\Property(property: 'sharedBy', type: 'string', nullable: true, description: 'Display name of the owner when the item is shared with the caller; null for own items', example: null),
                         ],
                     ),
                 ),
                 new OA\Property(property: 'semanticAvailable', type: 'boolean', description: 'False when no embedding model could answer, so only keyword search ran', example: true),
                 new OA\Property(property: 'degraded', type: 'array', description: 'Providers that were skipped or failed', items: new OA\Items(type: 'string'), example: []),
-                new OA\Property(property: 'indexing', type: 'boolean', description: 'True while the first index build for this user is running', example: false),
+                new OA\Property(property: 'indexing', type: 'boolean', description: 'True while the index for this user is being built or re-embedded', example: false),
             ],
         ),
     )]
@@ -166,7 +167,7 @@ final class SearchController extends AbstractController
     )]
     #[OA\Response(
         response: 200,
-        description: 'The pick. outcome "failed" means the model gave no usable answer; the palette keeps its list.',
+        description: 'The pick. outcome "failed" means the model gave no usable answer; "limit_reached" means the message allowance is used up and no model was called. The palette keeps its list in both cases. Setting candidates and the change_setting intent are only honoured for admins.',
         content: new OA\JsonContent(
             required: ['outcome', 'intent', 'targetIds', 'answer'],
             properties: [
@@ -196,7 +197,7 @@ final class SearchController extends AbstractController
             return $this->json(['error' => sprintf('Send a question of 1 to %d characters in "q".', SmartSearchService::MAX_QUERY_LENGTH)], Response::HTTP_BAD_REQUEST);
         }
         try {
-            $candidates = InterpretCandidate::listFromPayload($data['candidates'] ?? null);
+            $candidates = InterpretCandidate::listFromPayload($data['candidates'] ?? null, $user->isAdmin());
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }

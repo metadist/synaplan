@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Service\SmartSearch\SearchModelConfigService;
 use App\Service\SmartSearch\SmartSearchConfig;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,8 +41,11 @@ final class SearchInterpretControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
-    public function testNoToolsModelRemovesTheSurface(): void
+    public function testAnUnavailableSearchModelRemovesTheSurface(): void
     {
+        // Pinned explicitly: without a pin the slot inherits the chat model,
+        // which the CI database may well be able to reach.
+        $this->bindTestSearchModel(service: 'ollama', providerId: 'smart-search-test-never-pulled');
         $this->authenticateClient($this->client, $this->createUser('interpret-nomodel@synaplan.internal'));
 
         $this->postInterpret(['q' => 'turn on groups', 'candidates' => self::CANDIDATES]);
@@ -51,7 +55,7 @@ final class SearchInterpretControllerTest extends WebTestCase
 
     public function testRejectsMissingCandidates(): void
     {
-        $this->bindTestToolsModel();
+        $this->bindTestSearchModel();
         $this->authenticateClient($this->client, $this->createUser('interpret-validate@synaplan.internal'));
 
         $this->postInterpret(['q' => 'turn on groups']);
@@ -59,12 +63,28 @@ final class SearchInterpretControllerTest extends WebTestCase
 
         $this->postInterpret(['q' => 'turn on groups', 'candidates' => [['id' => 'x:1', 'kind' => 'best', 'title' => 'Nope']]]);
         self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+
+        // The id must name its own kind, so a candidate cannot smuggle in another one.
+        $this->postInterpret(['q' => 'turn on groups', 'candidates' => [['id' => 'setting:X', 'kind' => 'page', 'title' => 'Nope']]]);
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testOnlyAnAdminIsPointedAtASetting(): void
+    {
+        $this->bindTestSearchModel();
+        $this->authenticateClient($this->client, $this->createUser('interpret-user@synaplan.internal'));
+
+        $body = $this->postInterpret(['q' => 'how do I turn on groups', 'language' => 'de', 'candidates' => self::CANDIDATES]);
+
+        self::assertResponseIsSuccessful();
+        self::assertNotSame('change_setting', $body['intent']);
+        self::assertSame([], array_values(array_filter($body['targetIds'], static fn (string $id): bool => str_starts_with($id, 'setting:'))));
     }
 
     public function testPointsAtASentCandidate(): void
     {
-        $this->bindTestToolsModel();
-        $this->authenticateClient($this->client, $this->createUser('interpret-pick@synaplan.internal'));
+        $this->bindTestSearchModel();
+        $this->authenticateClient($this->client, $this->createUser('interpret-pick@synaplan.internal', admin: true));
 
         $body = $this->postInterpret(['q' => 'how do I turn on groups', 'language' => 'de', 'candidates' => self::CANDIDATES]);
 
@@ -77,7 +97,7 @@ final class SearchInterpretControllerTest extends WebTestCase
 
     public function testFlagOffRemovesTheSurface(): void
     {
-        $this->bindTestToolsModel();
+        $this->bindTestSearchModel();
         $user = $this->createUser('interpret-off@synaplan.internal');
         static::getContainer()->get(ConfigRepository::class)
             ->setValue(0, SmartSearchConfig::CONFIG_GROUP, SmartSearchConfig::KEY_AI_ENABLED, '0');
@@ -111,31 +131,31 @@ final class SearchInterpretControllerTest extends WebTestCase
         return is_array($decoded) ? $decoded : [];
     }
 
-    private function bindTestToolsModel(): void
+    private function bindTestSearchModel(string $service = 'test', string $providerId = 'test-search'): void
     {
         $model = (new Model())
-            ->setService('test')
-            ->setName('Test Tools Model')
+            ->setService($service)
+            ->setName('Test Search Model')
             ->setTag('chat')
             ->setSelectable(1)
-            ->setProviderId('test-tools')
+            ->setProviderId($providerId)
             ->setPriceIn(0)
             ->setPriceOut(0);
         $this->em->persist($model);
         $this->em->flush();
 
         static::getContainer()->get(ConfigRepository::class)
-            ->setValue(0, 'DEFAULTMODEL', 'TOOLS', (string) $model->getId());
+            ->setValue(0, 'DEFAULTMODEL', SearchModelConfigService::SLOT_AI, (string) $model->getId());
         $this->em->flush();
     }
 
-    private function createUser(string $email): User
+    private function createUser(string $email, bool $admin = false): User
     {
         $user = (new User())
             ->setMail($email)
             ->setType('WEB')
             ->setProviderId('interpret-test-'.uniqid())
-            ->setUserLevel('NEW');
+            ->setUserLevel($admin ? 'ADMIN' : 'NEW');
         $user->setCreated(date('YmdHis'));
         $user->setEmailVerified(true);
         $this->em->persist($user);

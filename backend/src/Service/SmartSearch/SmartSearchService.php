@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\SmartSearch;
 
+use App\Entity\RevectorizeRun;
 use App\Entity\User;
+use App\Repository\RevectorizeRunRepository;
 use App\Service\SmartSearch\Index\BackfillTracker;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
@@ -39,6 +41,7 @@ final readonly class SmartSearchService
         iterable $providers,
         private BackfillTracker $backfill,
         private QueryVectorsFactory $vectors,
+        private RevectorizeRunRepository $runs,
         private LoggerInterface $logger,
     ) {
         $this->providers = array_values([...$providers]);
@@ -54,8 +57,8 @@ final readonly class SmartSearchService
         $kinds = null === $kinds ? self::KINDS : array_values(array_intersect(self::KINDS, $kinds));
         $limit = max(1, min(self::MAX_LIMIT, $limit));
         $userId = (int) $user->getId();
-        $request = new SearchRequest($user, $query, $kinds, $limit, $this->vectors->create($userId, $query));
-        $indexing = $this->backfill->ensure($userId);
+        $request = new SearchRequest($user, $query, $kinds, $limit, $this->vectors->create($user, $query));
+        $indexing = $this->backfill->ensure($userId) || $this->reembedding();
 
         $lists = [];
         $degraded = [];
@@ -84,6 +87,12 @@ final readonly class SmartSearchService
             degraded: $degraded,
             indexing: $indexing,
         );
+    }
+
+    /** A search model switch re-embeds every row; meaning matches are partial until it ends. */
+    private function reembedding(): bool
+    {
+        return RevectorizeRun::SCOPE_SEARCH === $this->runs->findActive()?->getScope();
     }
 
     private function elapsedMs(int $started): float

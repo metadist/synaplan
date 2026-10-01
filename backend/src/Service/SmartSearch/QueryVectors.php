@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service\SmartSearch;
 
+use App\Entity\User;
 use App\Repository\SearchIndexRepository;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use App\Service\SmartSearch\Index\SearchEmbeddingModel;
 use App\Service\SmartSearch\Index\SettingsCatalog;
 use App\Service\UserMemoryService;
@@ -32,15 +34,22 @@ final class QueryVectors
     private array $resolved = [];
     private ?float $indexMinScore = null;
 
+    private const USAGE_ACTION = 'EMBEDDINGS';
+    private const USAGE_SOURCE = 'smart_search';
+
+    private readonly int $userId;
+
     public function __construct(
-        private readonly int $userId,
+        private readonly User $user,
         private readonly string $query,
         private readonly SearchEmbeddingModel $searchModel,
         private readonly ModelConfigService $modelConfig,
         private readonly UserMemoryService $memories,
         private readonly SearchIndexRepository $index,
+        private readonly RateLimitService $rateLimits,
         private readonly LoggerInterface $logger,
     ) {
+        $this->userId = (int) $user->getId();
     }
 
     /**
@@ -153,10 +162,25 @@ final class QueryVectors
     private function rawIndexVector(): ?array
     {
         return $this->resolve('index', function (): ?array {
+            // Spent allowance means keyword search only, like any other embed path.
+            if (!($this->rateLimits->checkLimit($this->user, self::USAGE_ACTION)['allowed'] ?? false)) {
+                return null;
+            }
             $result = $this->searchModel->embed([$this->query], $this->userId, fit: false);
             $vector = $result['vectors'][0] ?? null;
+            if (null === $result || null === $vector) {
+                return null;
+            }
+            $this->rateLimits->recordUsage($this->user, self::USAGE_ACTION, [
+                'usage' => $result['usage'],
+                'provider' => $result['provider'],
+                'model' => $result['model'],
+                'model_id' => $result['modelId'],
+                'input_text' => $this->query,
+                'source' => self::USAGE_SOURCE,
+            ]);
 
-            return null === $result || null === $vector ? null : ['modelId' => $result['modelId'], 'vector' => $vector];
+            return ['modelId' => $result['modelId'], 'vector' => $vector];
         });
     }
 

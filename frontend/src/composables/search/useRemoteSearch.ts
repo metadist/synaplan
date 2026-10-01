@@ -14,6 +14,7 @@ import {
   type SmartSearchHit,
   type SmartSearchKind,
 } from '@/services/api/searchApi'
+import { isSafeRedirectPath } from '@/utils/pendingAuthRedirect'
 import { localizedSettingName } from './settingNames'
 import type { SearchScope } from './useSmartSearch'
 import type { SearchResult } from './types'
@@ -50,7 +51,8 @@ export function toSearchResult(hit: SmartSearchHit): SearchResult {
     title: settingName ?? hit.title,
     subtitle: hit.subtitle ?? undefined,
     snippet: hit.snippet ?? undefined,
-    route: hit.route,
+    sharedBy: hit.sharedBy ?? undefined,
+    route: isSafeRedirectPath(hit.route) ? hit.route : undefined,
     icon: KIND_ICONS[hit.kind],
     matchedBy: hit.matchedBy,
     score: hit.score,

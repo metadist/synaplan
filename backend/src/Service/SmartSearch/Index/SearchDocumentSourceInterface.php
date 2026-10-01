@@ -38,8 +38,18 @@ interface SearchDocumentSourceInterface
     public function allForUser(int $userId): iterable;
 
     /**
-     * Live view of the hits the user may still open, keyed by ref id. Ids the
-     * user cannot access (or that no longer exist) are absent. Numeric ref
+     * Ref ids of items of this kind that other people shared with the user.
+     * Their index rows stay under the owner; resolve() re-checks the grant.
+     * Empty when the kind is not shared or sharing is off.
+     *
+     * @return list<string>
+     */
+    public function sharedRefIds(int $userId): array;
+
+    /**
+     * Live view of the hits the user may still open (own items and live
+     * shares), keyed by ref id. Ids the user cannot access (or that no longer
+     * exist) are absent. Numeric ref
      * ids become integer keys, as PHP stores them.
      *
      * @param list<string> $refIds

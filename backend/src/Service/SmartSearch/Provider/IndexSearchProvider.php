@@ -12,7 +12,7 @@ use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Keyword tier over the user's own index rows (chats, files, widgets,
- * assistants, saved tasks).
+ * assistants, saved tasks) and the chats and files shared with them.
  */
 #[AsTaggedItem(priority: 100)]
 final readonly class IndexSearchProvider implements SearchProviderInterface
@@ -33,11 +33,13 @@ final readonly class IndexSearchProvider implements SearchProviderInterface
 
     public function search(SearchRequest $request): array
     {
+        $kinds = $this->resolver->searchableKinds($request);
         $rows = $this->repository->searchLexical(
             $request->userId(),
             $request->fulltext,
-            $this->resolver->searchableKinds($request),
+            $kinds,
             $request->limit * self::OVERFETCH,
+            $this->resolver->sharedRefs($request, $kinds),
         );
 
         return [] === $rows ? [] : $this->resolver->toHits($request, $rows, SearchHit::MATCHED_LEXICAL);

@@ -29,6 +29,7 @@ const response = (title: string, overrides: Partial<SmartSearchResponse> = {}) =
       score: 0.03,
       matchedBy: 'semantic' as const,
       action: null,
+      sharedBy: null as string | null,
     },
   ],
   semanticAvailable: true,
@@ -177,6 +178,19 @@ describe('toSearchResult', () => {
     expect(result.snippet).toBeUndefined()
     expect(result.icon).toBeTruthy()
     expect(result.setting).toBeUndefined()
+    expect(result.sharedBy).toBeUndefined()
+  })
+
+  it('names the owner of a shared item', () => {
+    const result = toSearchResult({ ...response('t').results[0], sharedBy: 'Ada Lovelace' })
+    expect(result.sharedBy).toBe('Ada Lovelace')
+  })
+
+  it('drops a route that leaves the app', () => {
+    for (const route of ['https://evil.example', '//evil.example', 'javascript:alert(1)']) {
+      expect(toSearchResult({ ...response('t').results[0], route }).route).toBeUndefined()
+    }
+    expect(toSearchResult(response('t').results[0]).route).toBe('/?chat=1')
   })
 
   it('carries an inline setting action as the row control', () => {

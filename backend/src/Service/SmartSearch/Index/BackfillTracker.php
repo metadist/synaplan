@@ -58,6 +58,12 @@ final readonly class BackfillTracker
         }
     }
 
+    /** Drops the state, so the next {@see ensure()} queues the build again. */
+    public function forget(int $userId): void
+    {
+        $this->cache->delete(self::KEY_PREFIX.$userId);
+    }
+
     public function markDone(int $userId): void
     {
         $key = self::KEY_PREFIX.$userId;

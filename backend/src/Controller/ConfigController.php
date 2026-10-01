@@ -220,7 +220,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'toolsApprovalsEnabled', type: 'boolean', example: false, description: 'When true, write-class tools ask for approval and Manage → Automations → Approvals is shown. On by default; pin with FEATURE_TOOLS_APPROVALS_ENABLED.'),
                         new OA\Property(property: 'toolsCustomHttpEnabled', type: 'boolean', example: false, description: 'When true, Connections shows Custom tools for HTTP/OpenAPI tools. On by default; pin with FEATURE_TOOLS_CUSTOM_HTTP_ENABLED.'),
                         new OA\Property(property: 'workflowsBuilderEnabled', type: 'boolean', example: false, description: 'When true, Saved Tasks show a Steps editor and can start from another system. On by default; pin with FEATURE_WORKFLOWS_BUILDER_ENABLED.'),
-                        new OA\Property(property: 'smartSearchAi', type: 'boolean', example: true, description: 'When true, the search palette offers AI help (POST /api/v1/search/interpret): FEATURE_SEARCH_AI_ENABLED is on and a tools model can answer. False for anonymous clients.'),
+                        new OA\Property(property: 'smartSearchAi', type: 'boolean', example: true, description: 'When true, the search palette offers AI help (POST /api/v1/search/interpret): FEATURE_SEARCH_AI_ENABLED is on and the search model (the chat model of the person unless an admin pins one) can answer. False for anonymous clients.'),
                     ]
                 ),
                 new OA\Property(

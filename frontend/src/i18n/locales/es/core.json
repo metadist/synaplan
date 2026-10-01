@@ -237,7 +237,8 @@
         "thinking": "La IA está revisando los resultados…",
         "failed": "La IA no pudo ayudar esta vez. Los resultados de abajo siguen funcionando.",
         "rateLimited": "La ayuda de la IA está en pausa durante un minuto. Los resultados de abajo siguen funcionando.",
-        "noMatch": "La IA no encontró un resultado mejor. Pregunta en el chat para obtener una respuesta."
+        "noMatch": "La IA no encontró un resultado mejor. Pregunta en el chat para obtener una respuesta.",
+        "limitReached": "Has agotado tus mensajes de IA por ahora, así que la ayuda de la IA está desactivada. Los resultados de abajo siguen funcionando."
       },
       "foundByMeaning": "Encontrado por significado",
       "footer": {
@@ -394,8 +395,13 @@
         "where": "Dónde está",
         "current": "Valor actual",
         "byMeaning": "Encontrado por el significado: otras palabras, el mismo tema.",
-        "tabHint": "Pulse Tab para llegar a estas acciones con el teclado."
-      }
+        "tabHint": "Pulsa Tab para llegar a estas acciones con el teclado."
+      },
+      "ask": {
+        "commandDraft": "Tu pregunta empieza por «/», así que está como borrador en el cuadro de mensaje. Revísala y pulsa Intro para enviarla.",
+        "notSent": "Tu pregunta está en el cuadro de mensaje, pero todavía no se ha enviado. Pulsa Intro para enviarla."
+      },
+      "sharedBy": "Compartido por {name}"
     }
   },
   "unsavedChanges": {

@@ -143,6 +143,28 @@ describe('useSearchInterpret', () => {
     scope.stop()
   })
 
+  it('reports a spent message allowance and a server-side failure', async () => {
+    const { ai, scope } = setup('groups')
+    interpretSearch.mockResolvedValueOnce({
+      outcome: 'limit_reached',
+      intent: 'none',
+      targetIds: [],
+      answer: null,
+    })
+    await ai.ask()
+    expect(ai.status.value).toBe('limitReached')
+
+    interpretSearch.mockResolvedValueOnce({
+      outcome: 'failed',
+      intent: 'none',
+      targetIds: [],
+      answer: null,
+    })
+    await ai.ask()
+    expect(ai.status.value).toBe('failed')
+    scope.stop()
+  })
+
   it('drops the answer when the text changes or the palette closes', async () => {
     interpretSearch.mockResolvedValue(okResponse)
     const { state, ai, scope } = setup('groups')

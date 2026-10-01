@@ -13,8 +13,9 @@ use App\Service\SmartSearch\SnippetBuilder;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
- * Meaning tier inside file contents: the RAG chunks of the user's own
- * files. One hit per file, with the best passage as the snippet.
+ * Meaning tier inside file contents: the RAG chunks of the user's own files
+ * and of knowledge folders shared with them. One hit per file, with the best
+ * passage as the snippet; resolve() re-checks access for every file.
  */
 #[AsTaggedItem(priority: 70)]
 final readonly class DocumentChunkProvider implements SearchProviderInterface
@@ -57,7 +58,7 @@ final readonly class DocumentChunkProvider implements SearchProviderInterface
         $best = [];
         foreach ($chunks as $chunk) {
             $fileId = (string) ($chunk['file_id'] ?? '');
-            if ('' === $fileId || (int) ($chunk['owner_id'] ?? $userId) !== $userId) {
+            if ('' === $fileId) {
                 continue;
             }
             if (!isset($best[$fileId]) || $chunk['score'] > $best[$fileId]['score']) {
@@ -85,6 +86,7 @@ final readonly class DocumentChunkProvider implements SearchProviderInterface
                 subtitle: $item->subtitle,
                 snippet: SnippetBuilder::build((string) ($chunk['chunk_text'] ?? ''), $request->fulltext->terms),
                 score: (float) $chunk['score'],
+                sharedBy: $item->sharedBy,
             );
         }
 

@@ -248,7 +248,8 @@
         "thinking": "L’IA examine les résultats…",
         "failed": "L’IA n’a pas pu aider cette fois. Les résultats ci-dessous restent utilisables.",
         "rateLimited": "L’aide de l’IA est en pause pendant une minute. Les résultats ci-dessous restent utilisables.",
-        "noMatch": "L’IA n’a pas trouvé de meilleur résultat. Posez la question dans le chat pour obtenir une réponse."
+        "noMatch": "L’IA n’a pas trouvé de meilleur résultat. Posez la question dans le chat pour obtenir une réponse.",
+        "limitReached": "Vous avez épuisé vos messages IA pour le moment : l’aide de l’IA est désactivée. Les résultats ci-dessous restent utilisables."
       },
       "foundByMeaning": "Trouvé par le sens",
       "footer": {
@@ -406,7 +407,12 @@
         "current": "Valeur actuelle",
         "byMeaning": "Trouvé par le sens : d’autres mots, le même sujet.",
         "tabHint": "Appuyez sur Tab pour atteindre ces actions au clavier."
-      }
+      },
+      "ask": {
+        "commandDraft": "Votre question commence par « / » : elle attend comme brouillon dans la zone de message. Vérifiez-la et appuyez sur Entrée pour l’envoyer.",
+        "notSent": "Votre question est dans la zone de message, mais n’a pas encore été envoyée. Appuyez sur Entrée pour l’envoyer."
+      },
+      "sharedBy": "Partagé par {name}"
     }
   },
   "unsavedChanges": {

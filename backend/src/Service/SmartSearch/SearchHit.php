@@ -28,6 +28,7 @@ final readonly class SearchHit
         public ?string $snippet = null,
         public float $score = 0.0,
         public ?array $action = null,
+        public ?string $sharedBy = null,
     ) {
     }
 
@@ -38,11 +39,11 @@ final readonly class SearchHit
 
     public function with(float $score, string $matchedBy): self
     {
-        return new self($this->kind, $this->refId, $this->title, $this->route, $matchedBy, $this->subtitle, $this->snippet, $score, $this->action);
+        return new self($this->kind, $this->refId, $this->title, $this->route, $matchedBy, $this->subtitle, $this->snippet, $score, $this->action, $this->sharedBy);
     }
 
     /**
-     * @return array{id: string, kind: string, title: string, subtitle: ?string, snippet: ?string, route: string, score: float, matchedBy: string, action: SettingAction|null}
+     * @return array{id: string, kind: string, title: string, subtitle: ?string, snippet: ?string, route: string, score: float, matchedBy: string, action: SettingAction|null, sharedBy: ?string}
      */
     public function toArray(): array
     {
@@ -56,6 +57,7 @@ final readonly class SearchHit
             'score' => round($this->score, 6),
             'matchedBy' => $this->matchedBy,
             'action' => $this->action,
+            'sharedBy' => $this->sharedBy,
         ];
     }
 }

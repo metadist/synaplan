@@ -719,6 +719,7 @@ export const selectors = {
     input: '[data-testid="input-smart-search"]',
     group: (kind: string) => `[data-testid="group-smart-search-${kind}"]`,
     row: (kind: string) => `[data-testid="row-smart-search-${kind}"]`,
+    result: (id: string) => `[data-result-id="${id}"]`,
     settingToggle: '[data-testid="btn-smart-search-setting-toggle"]',
     actionPane: '[data-testid="pane-smart-search-actions"]',
     action: (id: string) => `[data-testid="action-smart-search-${id}"]`,

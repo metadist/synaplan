@@ -6,9 +6,15 @@ namespace App\Tests\Controller;
 
 use App\Entity\Chat;
 use App\Entity\File;
+use App\Entity\Share;
 use App\Entity\User;
 use App\Message\SearchIndexMessage;
+use App\Repository\ConfigRepository;
 use App\Repository\SearchIndexRepository;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\ResourceKind\ConversationKind;
+use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
+use App\Service\Iam\ShareService;
 use App\Service\SmartSearch\Index\SearchIndexer;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
@@ -73,6 +79,87 @@ final class SearchControllerTest extends WebTestCase
             $body['results'],
             static fn (array $hit): bool => 'chat' === $hit['kind'],
         )));
+    }
+
+    public function testFindsAChatSharedWithTheUserUntilTheShareIsRevoked(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('search-share-owner@synaplan.internal');
+        $recipient = $this->createUser('search-share-recipient@synaplan.internal');
+        $chat = $this->createChat((int) $owner->getId(), 'Q7 offsite');
+        static::getContainer()->get(SearchIndexer::class)->reindexUser((int) $owner->getId());
+        $chatId = 'chat:'.$chat->getId();
+        // A short query takes the LIKE path: FULLTEXT does not see the rows of this uncommitted test transaction.
+        $shares = static::getContainer()->get(ShareService::class);
+
+        $this->authenticateClient($this->client, $recipient);
+        self::assertNotContains($chatId, array_column($this->postSearch(['q' => 'Q7', 'kinds' => ['chat']])['results'], 'id'));
+
+        $shares->grant($owner, ConversationKind::KEY, (string) $chat->getId(), Share::SUBJECT_USER, (int) $recipient->getId(), 'read');
+        $body = $this->postSearch(['q' => 'Q7', 'kinds' => ['chat']]);
+        self::assertResponseIsSuccessful();
+        self::assertSame($chatId, $body['results'][0]['id']);
+        self::assertSame($owner->getDisplayName(), $body['results'][0]['sharedBy']);
+
+        $shares->revoke($owner, ConversationKind::KEY, (string) $chat->getId(), Share::SUBJECT_USER, (int) $recipient->getId());
+        self::assertNotContains($chatId, array_column($this->postSearch(['q' => 'Q7', 'kinds' => ['chat']])['results'], 'id'));
+
+        $this->authenticateClient($this->client, $owner);
+        $body = $this->postSearch(['q' => 'Q7', 'kinds' => ['chat']]);
+        self::assertSame($chatId, $body['results'][0]['id']);
+        self::assertNull($body['results'][0]['sharedBy']);
+    }
+
+    public function testFindsAFileInAFolderSharedWithTheUser(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('search-folder-owner@synaplan.internal');
+        $recipient = $this->createUser('search-folder-recipient@synaplan.internal');
+        $file = (new File())
+            ->setUserId((int) $owner->getId())
+            ->setFileName('Q8 report.txt')
+            ->setFileType('txt')
+            ->setFileMime('text/plain')
+            ->setGroupKey('Reports');
+        $private = (new File())
+            ->setUserId((int) $owner->getId())
+            ->setFileName('Q8 private.txt')
+            ->setFileType('txt')
+            ->setFileMime('text/plain')
+            ->setGroupKey('Private');
+        $this->em->persist($file);
+        $this->em->persist($private);
+        $this->em->flush();
+        static::getContainer()->get(SearchIndexer::class)->reindexUser((int) $owner->getId());
+        static::getContainer()->get(ShareService::class)->grant(
+            $owner,
+            KnowledgeFolderKind::KEY,
+            KnowledgeFolderKind::resourceId((int) $owner->getId(), 'Reports'),
+            Share::SUBJECT_USER,
+            (int) $recipient->getId(),
+            'read',
+        );
+
+        $this->authenticateClient($this->client, $recipient);
+        $body = $this->postSearch(['q' => 'Q8', 'kinds' => ['file']]);
+
+        self::assertResponseIsSuccessful();
+        self::assertSame(['file:'.$file->getId()], array_column($body['results'], 'id'));
+        self::assertSame($owner->getDisplayName(), $body['results'][0]['sharedBy']);
+        self::assertSame('Reports', $body['results'][0]['subtitle']);
+    }
+
+    public function testDeleteByUserRemovesEveryIndexRow(): void
+    {
+        $owner = $this->createUser('search-purge@synaplan.internal');
+        $this->createChat((int) $owner->getId(), 'Purge me later');
+        static::getContainer()->get(SearchIndexer::class)->reindexUser((int) $owner->getId());
+        $rows = fn (): int => (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM BSEARCHINDEX WHERE BUSERID = ?', [$owner->getId()]);
+        self::assertGreaterThan(0, $rows());
+
+        static::getContainer()->get(SearchIndexRepository::class)->deleteByUser((int) $owner->getId());
+
+        self::assertSame(0, $rows());
     }
 
     public function testDeletedItemIsNotReturnedFromAStaleRow(): void
@@ -196,7 +283,9 @@ final class SearchControllerTest extends WebTestCase
             $body = $this->postSearch(['q' => 'lisbon unicorn', 'kinds' => ['file']]);
             self::assertSame(['file:'.$file->getId()], array_column($body['results'], 'id'));
         } finally {
-            static::getContainer()->get(SearchIndexRepository::class)->deleteMissing($userId, 'file', []);
+            static::getContainer()->get(SearchIndexRepository::class)->deleteByUser($userId);
+            // The query embeds are metered as the owner's usage.
+            $this->em->getConnection()->executeStatement('DELETE FROM BUSELOG WHERE BUSERID = ?', [$userId]);
             $this->em->remove($this->em->find(File::class, $file->getId()));
             $this->em->remove($this->em->find(File::class, $invoice->getId()));
             $this->em->remove($this->em->find(User::class, $userId));
@@ -221,6 +310,15 @@ final class SearchControllerTest extends WebTestCase
         $decoded = json_decode((string) $this->client->getResponse()->getContent(), true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function enableSharing(): void
+    {
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '1');
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_SHARING_ENABLED, '1');
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_USER_SEARCH_ENABLED, '1');
+        $this->em->flush();
     }
 
     private function createUser(string $email, string $level = 'NEW'): User

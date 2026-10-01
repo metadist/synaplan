@@ -30,21 +30,32 @@ function read(key: string): StoredRecent[] {
   }
 }
 
+/** Removes one person's recents from this device (logout). */
+export function clearSearchRecents(userId: number | string): void {
+  try {
+    localStorage.removeItem(`${STORAGE_PREFIX}${userId}`)
+  } catch {
+    // Storage blocked — nothing was stored.
+  }
+}
+
 /**
  * Recently opened palette results, per user and per device. Only ids,
- * titles and routes are stored — never snippets or file content.
+ * titles and routes are stored — never snippets or file content. An admin
+ * impersonating someone writes nothing, so neither sees the other's trail.
  */
 export function useSearchRecents() {
   const authStore = useAuthStore()
   const storageKey = computed(() => `${STORAGE_PREFIX}${authStore.user?.id ?? 'guest'}`)
-  const recents = ref<StoredRecent[]>(read(storageKey.value))
+  const recents = ref<StoredRecent[]>(authStore.isImpersonating ? [] : read(storageKey.value))
 
-  watch(storageKey, (key) => {
-    recents.value = read(key)
+  watch([storageKey, () => authStore.isImpersonating], ([key, impersonating]) => {
+    recents.value = impersonating ? [] : read(key)
   })
 
   const remember = (result: SearchResult) => {
     if (result.kind === 'ask' || result.kind === 'best') return
+    if (authStore.isImpersonating) return
     const entry: StoredRecent = {
       id: result.id,
       kind: result.kind,
@@ -61,6 +72,7 @@ export function useSearchRecents() {
   }
 
   const forget = (id: string) => {
+    if (authStore.isImpersonating) return
     recents.value = recents.value.filter((r) => r.id !== id)
     try {
       localStorage.setItem(storageKey.value, JSON.stringify(recents.value))

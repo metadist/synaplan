@@ -301,7 +301,8 @@
         "thinking": "Die KI sieht sich die Treffer an …",
         "failed": "Die KI konnte diesmal nicht helfen. Die Treffer unten funktionieren weiter.",
         "rateLimited": "Die KI-Hilfe pausiert für eine Minute. Die Treffer unten funktionieren weiter.",
-        "noMatch": "Die KI hat keinen besseren Treffer gefunden. Frag im Chat, um eine Antwort zu bekommen."
+        "noMatch": "Die KI hat keinen besseren Treffer gefunden. Frag im Chat, um eine Antwort zu bekommen.",
+        "limitReached": "Deine KI-Nachrichten sind für den Moment aufgebraucht, daher ist die KI-Hilfe aus. Die Treffer unten funktionieren weiter."
       },
       "foundByMeaning": "Nach Bedeutung gefunden",
       "footer": {
@@ -458,8 +459,13 @@
         "where": "Wo es liegt",
         "current": "Aktueller Wert",
         "byMeaning": "Über die Bedeutung gefunden: andere Wörter, gleiches Thema.",
-        "tabHint": "Mit Tab erreichen Sie diese Aktionen per Tastatur."
-      }
+        "tabHint": "Mit Tab erreichst du diese Aktionen per Tastatur."
+      },
+      "ask": {
+        "commandDraft": "Deine Frage beginnt mit „/“ und steht deshalb als Entwurf im Eingabefeld. Prüfe sie und drücke Enter zum Senden.",
+        "notSent": "Deine Frage steht im Eingabefeld, wurde aber noch nicht gesendet. Drücke Enter, um sie zu senden."
+      },
+      "sharedBy": "Geteilt von {name}"
     }
   },
   "cookies": {

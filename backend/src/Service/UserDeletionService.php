@@ -24,6 +24,7 @@ use App\Repository\PromptRepository;
 use App\Repository\RevectorizeRunRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
+use App\Repository\SearchIndexRepository;
 use App\Repository\SessionRepository;
 use App\Repository\ShareRepository;
 use App\Repository\TokenRepository;
@@ -79,6 +80,7 @@ final readonly class UserDeletionService
         private SavedTaskRepository $savedTaskRepository,
         private SavedTaskRunRepository $savedTaskRunRepository,
         private TelegramConnectionService $telegramConnections,
+        private SearchIndexRepository $searchIndexRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -126,6 +128,7 @@ final readonly class UserDeletionService
             $this->deleteRevectorizeRuns($userId);
             $this->deleteMemoriesFromSql($userId);
             $this->deleteMessageDigests($userId);
+            $this->deleteSearchIndex($userId);
             $this->deleteGroupMemberships($userId);
             $this->deleteExternalIdentities($userId);
             $telegramToken = $this->telegramConnections->removeForOwner($userId);
@@ -297,6 +300,12 @@ final readonly class UserDeletionService
     private function deleteMessageDigests(int $userId): void
     {
         $this->messageDigestRepository->deleteAllForUser($userId);
+    }
+
+    /** Smart Search rows hold chat questions and file text, so they go with the account. */
+    private function deleteSearchIndex(int $userId): void
+    {
+        $this->searchIndexRepository->deleteByUser($userId);
     }
 
     /** Best-effort: MariaDB rows are already gone; a Qdrant failure only leaves orphaned vectors. */
