@@ -16,6 +16,18 @@ describe('smartSearch store', () => {
     expect(store.pendingAsk).toBeNull()
   })
 
+  it('forgets the open palette and a pending question on reset', () => {
+    const store = useSmartSearchStore()
+    store.open('budget')
+    store.askInChat('summarise my week')
+
+    store.reset()
+
+    expect(store.isOpen).toBe(false)
+    expect(store.initialQuery).toBe('')
+    expect(store.pendingAsk).toBeNull()
+  })
+
   it('keeps nothing for a blank question', () => {
     const store = useSmartSearchStore()
     store.askInChat('   ')

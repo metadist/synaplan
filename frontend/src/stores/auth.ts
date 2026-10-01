@@ -175,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
       { useMemoriesStore },
       { useFeedbackStore },
       { useChatModelPickStore },
+      { useSmartSearchStore },
     ] = await Promise.all([
       import('./chats'),
       import('./history'),
@@ -182,12 +183,14 @@ export const useAuthStore = defineStore('auth', () => {
       import('./userMemories'),
       import('./userFeedback'),
       import('./chatModelPick'),
+      import('./smartSearch'),
     ])
     useChatsStore().$reset()
     useHistoryStore().clear()
     useMemoriesStore().$reset()
     useFeedbackStore().$reset()
     useChatModelPickStore().clear()
+    useSmartSearchStore().reset()
     clearSseToken()
   }
 

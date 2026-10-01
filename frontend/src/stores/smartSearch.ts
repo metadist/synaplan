@@ -44,5 +44,22 @@ export const useSmartSearchStore = defineStore('smartSearch', () => {
     return text
   }
 
-  return { isOpen, initialQuery, pendingAsk, open, close, toggle, askInChat, takePendingAsk }
+  /** Drops everything tied to the current person (logout, impersonation). */
+  const reset = () => {
+    isOpen.value = false
+    initialQuery.value = ''
+    pendingAsk.value = null
+  }
+
+  return {
+    isOpen,
+    initialQuery,
+    pendingAsk,
+    open,
+    close,
+    toggle,
+    askInChat,
+    takePendingAsk,
+    reset,
+  }
 })

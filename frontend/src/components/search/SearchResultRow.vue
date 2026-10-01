@@ -25,7 +25,14 @@
     <span class="flex-1 min-w-0">
       <span class="flex items-center gap-2 min-w-0">
         <span class="truncate font-medium">{{ result.title }}</span>
-        <span v-if="adminOnly" class="sr-only">{{ $t('search.palette.adminOnly') }}</span>
+        <span
+          v-if="adminOnly"
+          class="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium leading-none bg-[var(--status-error-muted)] text-[var(--status-error-text)]"
+          :title="$t('search.palette.adminOnlyHint')"
+          data-testid="badge-smart-search-admin-row"
+        >
+          {{ $t('search.palette.adminOnly') }}
+        </span>
         <span
           v-if="result.matchedBy === 'semantic'"
           class="flex-shrink-0 inline-flex items-center gap-1 text-[10px] txt-secondary"

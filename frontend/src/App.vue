@@ -22,7 +22,7 @@
     </ErrorBoundary>
     <NotificationContainer />
     <Dialog />
-    <SmartSearchPalette v-if="authStore.isAuthenticated" />
+    <SmartSearchPalette v-if="authStore.isAuthenticated" :key="authStore.user?.id" />
     <AnnouncementModal />
     <CookieConsent @consent="handleCookieConsent" />
     <BiometricLockScreen />

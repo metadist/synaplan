@@ -59,7 +59,10 @@ describe('SearchResultRow', () => {
       },
     })
     expect(setting.find('[data-testid="dot-smart-search-admin"]').exists()).toBe(true)
-    expect(setting.text()).toContain('Admin')
+    const badge = setting.get('[data-testid="badge-smart-search-admin-row"]')
+    expect(badge.classes()).not.toContain('sr-only')
+    expect(badge.text()).toBe('Admin')
+    expect(file.find('[data-testid="badge-smart-search-admin-row"]').exists()).toBe(false)
   })
 
   it('emits select on click', async () => {
