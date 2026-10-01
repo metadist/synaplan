@@ -240,10 +240,9 @@ cluster doc.
 preserves it (`ModelSeeder.php:168-170`), so later catalog price fixes for
 synced rows never land, and a deliberate catalog override is overwritten by
 LiteLLM the next day. The production cron runs this sync daily.
-Draft: `issue-price-sync-fingerprint.md`. A second pre-existing finding from
-the overlap audit (synchronous media renders longer than 90 s are reaped as
-"Render worker stopped responding") is drafted in
-`issue-media-sync-heartbeat.md`.
+Filed as #2309. A second pre-existing finding from the overlap audit
+(synchronous media renders longer than 90 s are reaped as "Render worker
+stopped responding") is filed as #2308.
 
 ## 9. Review log (2026-10-01)
 
