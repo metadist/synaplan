@@ -362,7 +362,7 @@
     },
     "language": {
       "title": "Sprache",
-      "description": "Wählen Sie die Sprache der Benutzeroberfläche"
+      "description": "Diese Sprache gilt in der App, in E-Mails und in Kanalnachrichten wie Telegram."
     },
     "webSearch": {
       "title": "Websuche",

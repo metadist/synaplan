@@ -77,6 +77,8 @@ export interface AuthUser {
    * so the UI has to take the user straight there.
    */
   mustChangePassword?: boolean
+  /** Account language, or null when the account has none yet. Absent on older payloads. */
+  language?: string | null
 }
 
 /**
@@ -155,7 +157,8 @@ export const authService = {
   async register(
     email: string,
     password: string,
-    recaptchaToken?: string
+    recaptchaToken?: string,
+    language?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const response = await authFetch(
@@ -163,7 +166,7 @@ export const authService = {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, recaptchaToken }),
+          body: JSON.stringify({ email, password, recaptchaToken, language }),
         },
         { bearer: false }
       )

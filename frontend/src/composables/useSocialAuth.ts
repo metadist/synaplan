@@ -11,6 +11,7 @@
  *   which must use the native sheet (App Review Guideline 4.8).
  */
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
 import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
@@ -31,6 +32,7 @@ export interface SocialProvider {
 export function useSocialAuth() {
   const config = useConfigStore()
   const authStore = useAuthStore()
+  const { locale } = useI18n()
 
   const providers = ref<SocialProvider[]>([])
   /** Provider-flow error, cleared on the next attempt. Empty = no error. */
@@ -93,7 +95,8 @@ export function useSocialAuth() {
       }
     }
 
-    window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
+    const params = new URLSearchParams({ language: String(locale.value) })
+    window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
     return false
   }
 

@@ -103,7 +103,10 @@ export async function preloadCore(locale: SupportedLanguage = getInitialLanguage
   await loadNamespaces(locale, ['core'])
 }
 
-export async function setLocale(lang: string): Promise<boolean> {
+export async function setLocale(
+  lang: string,
+  options: { persistAccount?: boolean } = {}
+): Promise<boolean> {
   if (!isSupportedLanguage(lang)) {
     return false
   }
@@ -112,6 +115,14 @@ export async function setLocale(lang: string): Promise<boolean> {
     await loadNamespaces(lang, [...activeNamespaces])
     i18n.global.locale.value = lang
     persistLanguage(lang)
+    if (options.persistAccount !== false) {
+      const { saveAccountLanguage } = await import('@/services/accountLanguage')
+      const saved = await saveAccountLanguage(lang)
+      if (saved === 'failed') {
+        const { error: toastError } = useNotification()
+        toastError(String(i18n.global.t('common.accountLanguageSaveFailed')))
+      }
+    }
     return true
   } catch (error) {
     console.error('[i18n] Failed to load locale', lang, error)

@@ -331,7 +331,7 @@
     },
     "language": {
       "title": "Idioma",
-      "description": "Elige el idioma de la interfaz"
+      "description": "Este idioma se usa en la aplicación, en los correos y en los mensajes de canales como Telegram."
     },
     "webSearch": {
       "title": "Búsqueda web",

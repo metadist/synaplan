@@ -223,6 +223,15 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame(['This bot only answers its owner.'], $this->texts());
     }
 
+    public function testOwnerWithoutAStoredLanguageReadsTelegramLanguage(): void
+    {
+        $service = $this->service(persist: false, locale: 'en', languageStored: false);
+
+        $service->handle(5, 1, $this->update(['text' => '/help'], languageCode: 'de'));
+
+        $this->assertStringStartsWith('Senden Sie Text, Fotos', $this->texts()[0]);
+    }
+
     public function testOwnerReadsTheirAppLanguage(): void
     {
         $service = $this->service(persist: false, locale: 'de');
@@ -879,6 +888,7 @@ final class TelegramInboundServiceTest extends TestCase
         ?MessageProcessor $processor = null,
         bool $allowed = true,
         string $locale = 'en',
+        bool $languageStored = true,
         bool $seen = false,
         ?ChatActivityNotifier $activity = null,
         array $chats = [],
@@ -940,6 +950,7 @@ final class TelegramInboundServiceTest extends TestCase
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
         $user->method('getLocale')->willReturn($locale);
+        $user->method('getPreferredLanguage')->willReturn($languageStored ? $locale : null);
         $users = $this->createMock(UserRepository::class);
         $users->method('find')->willReturn($user);
 

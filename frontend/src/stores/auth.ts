@@ -7,6 +7,7 @@ import { useConfigStore } from '@/stores/config'
 import { clearPendingRedirect } from '@/utils/pendingAuthRedirect'
 import { beginSessionTeardown, endSessionTeardown } from '@/services/sessionTeardown'
 import { redeemPendingIapPurchaseAfterAuth } from '@/services/iapPostAuthRedemption'
+import { syncAccountLanguage } from '@/services/accountLanguage'
 
 export type User = AuthUser
 export type { ImpersonatorInfo } from '@/services/authService'
@@ -62,7 +63,7 @@ export const useAuthStore = defineStore('auth', () => {
       await resetUserScopedClientState()
       const currentUser = await authService.getCurrentUser()
       if (currentUser) {
-        syncFromAuthService()
+        await syncFromAuthService()
         await useConfigStore().reload()
       } else {
         user.value = null
@@ -137,11 +138,19 @@ export const useAuthStore = defineStore('auth', () => {
    * Mirror the authService's in-memory state onto the Pinia store.
    * Centralised so we can't accidentally update one and forget the other.
    */
-  function syncFromAuthService(): void {
+  async function syncFromAuthService(): Promise<void> {
     user.value = authService.getUser().value
     impersonator.value = authService.getImpersonator().value
     if (user.value) endSessionTeardown()
     publishPrincipal()
+    if (!user.value || !('language' in user.value)) return
+    try {
+      await syncAccountLanguage(user.value.language ?? null, {
+        persistUnset: impersonator.value === null,
+      })
+    } catch (err) {
+      console.warn('Account language sync failed', err)
+    }
   }
 
   /**
@@ -256,7 +265,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (result.success) {
         await resetUserScopedClientState()
-        syncFromAuthService()
+        await syncFromAuthService()
         const { useGuestStore } = await import('./guest')
         useGuestStore().$reset()
         await useConfigStore().reload()
@@ -281,13 +290,14 @@ export const useAuthStore = defineStore('auth', () => {
   async function register(
     email: string,
     password: string,
-    recaptchaToken?: string
+    recaptchaToken?: string,
+    language?: string
   ): Promise<boolean> {
     loading.value = true
     error.value = null
 
     try {
-      const result = await authService.register(email, password, recaptchaToken)
+      const result = await authService.register(email, password, recaptchaToken, language)
 
       if (result.success) {
         return true
@@ -355,7 +365,7 @@ export const useAuthStore = defineStore('auth', () => {
    * of the SPA (and the completion-screen navigation) see a signed-in user.
    */
   function adoptCurrentSession(): void {
-    syncFromAuthService()
+    void syncFromAuthService()
   }
 
   async function refreshUser(): Promise<void> {
@@ -363,7 +373,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const currentUser = await authService.getCurrentUser()
       if (currentUser) {
-        syncFromAuthService()
+        await syncFromAuthService()
       } else {
         // Session invalid
         user.value = null
@@ -386,7 +396,7 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = true
       const currentUser = await authService.getCurrentUser()
       if (currentUser) {
-        syncFromAuthService()
+        await syncFromAuthService()
         // Reload config to get user-specific data like plugins
         await useConfigStore().reload()
       }
@@ -421,7 +431,7 @@ export const useAuthStore = defineStore('auth', () => {
         } catch (cleanupErr) {
           console.warn('User state cleanup failed during OAuth callback', cleanupErr)
         }
-        syncFromAuthService()
+        await syncFromAuthService()
         initialized.value = true
         // Also resolve authReady if not already done
         if (authReadyResolve) {

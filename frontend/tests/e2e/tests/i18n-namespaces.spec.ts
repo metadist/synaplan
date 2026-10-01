@@ -32,7 +32,11 @@ async function openWithLocale(page: Page, locale: 'de' | 'fr', path: string): Pr
   await page.addInitScript((lang) => {
     localStorage.setItem('language', lang)
   }, locale)
-  await page.goto(path)
+  // The account language replaces a device-only choice. ?lang= keeps this
+  // page load in the requested locale without writing the account.
+  const url = new URL(path, 'http://localhost')
+  url.searchParams.set('lang', locale)
+  await page.goto(`${url.pathname}${url.search}`)
 }
 
 test.describe('i18n namespace split', () => {
@@ -60,6 +64,15 @@ test.describe('i18n namespace split', () => {
     await expect(page.locator(SET.page)).toContainText('Exportieren & importieren')
     await expect(page.locator(SET.page)).not.toContainText('settings.title')
     await expect(page.locator(SET.page)).not.toContainText('bundle.title')
+
+    // This click is saved on the shared account. Put English back so later
+    // tests are not switched away from the locale they set up.
+    await page.locator(SET.btnLanguage('en')).click()
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('language')), {
+        timeout: TIMEOUTS.SHORT,
+      })
+      .toBe('en')
   })
 
   test('@ci Cold deep-links render complete copy in German', async ({ page }) => {

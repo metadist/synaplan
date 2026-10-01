@@ -253,21 +253,6 @@
               </h2>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div data-testid="field-language">
-                  <label class="block txt-primary font-medium mb-2">
-                    {{ $t('profile.accountSettings.language') }}
-                  </label>
-                  <select
-                    v-model="formData.language"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                    data-testid="select-language"
-                  >
-                    <option v-for="lang in languages" :key="lang.code" :value="lang.code">
-                      {{ lang.name }}
-                    </option>
-                  </select>
-                </div>
-
                 <div data-testid="field-timezone">
                   <label class="block txt-primary font-medium mb-2" for="profile-timezone">
                     {{ $t('profile.accountSettings.timezone') }}
@@ -729,7 +714,7 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
-import { countries, languages, type UserProfile } from '@/mocks/profile'
+import { countries, type UserProfile } from '@/mocks/profile'
 import { listTimezones, timezoneGroupsForSelect } from '@/utils/timezones'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
@@ -1023,8 +1008,12 @@ const handleSave = saveChanges(async () => {
 
     // Update profile. The sign-in email is included, and the password is sent
     // only when that address actually changed.
+    const profilePayload: Omit<UserProfile, 'language'> & { language?: string } = {
+      ...formData.value,
+    }
+    delete profilePayload.language
     const updated = await profileApi.updateProfile(
-      formData.value,
+      profilePayload,
       changingEmail ? emailPassword.value : undefined
     )
     if (typeof updated?.email === 'string' && updated.email !== '') {

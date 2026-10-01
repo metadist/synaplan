@@ -600,9 +600,9 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.allChats', i18n: ['chat', 'files'] },
     },
     {
-      // Language and theme are stored on the device, not on the account, so a
-      // guest can reach this page. The account block inside it hides itself
-      // when nobody is signed in.
+      // Theme stays on the device. Language is also saved on the account from
+      // Settings, and a guest can still reach this page. The account block
+      // inside it hides itself when nobody is signed in.
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),

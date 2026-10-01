@@ -227,6 +227,7 @@
     "cancel": "Abbrechen",
     "delete": "Löschen",
     "save": "Speichern",
+    "accountLanguageSaveFailed": "Die Sprache auf diesem Gerät wurde geändert, konnte aber nicht in Ihrem Konto gespeichert werden. E-Mails und Kanalnachrichten verwenden weiterhin die bisherige Sprache.",
     "saving": "Speichert...",
     "close": "Schließen",
     "open": "Öffnen",
