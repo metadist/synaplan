@@ -29,6 +29,8 @@ final class SchedulerSlotPolicyTest extends TestCase
         yield 'just claimed' => [1_000_000, 1_000_000, 3600, false, 3600];
         yield 'clock ahead of now' => [1_000_050, 1_000_000, 10, false, 60];
         yield 'claim more than a day ahead is repaired' => [1_000_000 + 86_401, 1_000_000, 3600, true, 0];
+        yield 'weekly interval waits the rest of the week' => [1_000_000 - (6 * 86_400), 1_000_000, 7 * 86_400, false, 86_400];
+        yield 'weekly interval is due after seven days' => [1_000_000 - (7 * 86_400), 1_000_000, 7 * 86_400, true, 0];
     }
 
     #[DataProvider('intervalCases')]

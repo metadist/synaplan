@@ -8,9 +8,11 @@ namespace App\Service\Scheduler;
  * Decides whether a scheduler slot is due. No I/O, so the rules can be tested
  * without a database.
  *
- * A stored claim more than a day in the future cannot come from clock skew
- * between nodes; it is treated as unreadable so the slot repairs itself
- * instead of staying silent until that date.
+ * The stored value is the start time of the last claimed run, never a planned
+ * next run, so it is only ahead of now through clock skew between nodes. One
+ * more than a day ahead is treated as unreadable so the slot repairs itself
+ * instead of staying silent until that date. Saved Task schedules keep their
+ * own next-run time and are not evaluated here.
  */
 final readonly class SchedulerSlotPolicy
 {
