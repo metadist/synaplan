@@ -1218,6 +1218,9 @@
     "telegram": {
       "label": "Telegram-Kanal"
     },
+    "federation": {
+      "label": "Partner"
+    },
     "opendesk_stt": {
       "label": "Besprechungsnotizen"
     },
@@ -1238,6 +1241,70 @@
       "body": "Diese Funktion ist optional. Sie wird vom Administrator dieser Installation eingeschaltet.",
       "howToEnable": "So wird sie aktiviert",
       "openFeatureStatus": "System-Status öffnen"
+    }
+  },
+  "partners": {
+    "title": "Partner",
+    "subtitle": "Verbinden Sie sich mit anderen Unternehmen. Es wird nichts geteilt, bis Sie es auswählen.",
+    "unreachable": "Ihr Server hat eine private Adresse, andere Unternehmen erreichen ihn nicht. Partner brauchen eine öffentliche https-Adresse.",
+    "empty": "Arbeiten Sie mit anderen Unternehmen. Senden Sie eine Einladung oder fügen Sie eine erhaltene ein. Ihre Dateien bleiben auf Ihrem Server.",
+    "companyName": "Firmenname",
+    "open": "Für Partner öffnen",
+    "openedLine": "Für Partner geöffnet als {name}.",
+    "fingerprint": "Schlüssel {fingerprint}",
+    "close": "Für Partner schließen",
+    "closeTitle": "Für Partner schließen?",
+    "closeMessage": "Neue Verbindungen stoppen. Jeder aktuelle Partner wird getrennt. Bereits kopierte Inhalte bleiben.",
+    "invite": "Partner einladen",
+    "inviteHelp": "Senden Sie diese Adresse an die Administration des anderen Unternehmens. Sie gilt einmal und läuft in 7 Tagen ab.",
+    "copy": "Adresse kopieren",
+    "copied": "Adresse kopiert.",
+    "pasteLabel": "Einladung erhalten?",
+    "pastePlaceholder": "Einladungsadresse einfügen",
+    "connect": "Verbinden",
+    "connected": "Verbunden. Es ist noch nichts geteilt, auf keiner Seite.",
+    "pending": "Einladung wartet",
+    "active": "Verbunden",
+    "paused": "Pausiert",
+    "pausedByThem": "Die andere Seite hat diese Verbindung pausiert.",
+    "pause": "Pausieren",
+    "resume": "Fortsetzen",
+    "disconnect": "Trennen",
+    "disconnectTitle": "{name} trennen?",
+    "disconnectMessage": "Diese Verbindung endet jetzt. Bereits kopierte Inhalte bleiben.",
+    "removeInvite": "Einladung entfernen",
+    "removeInviteTitle": "Diese Einladung entfernen?",
+    "removeInviteMessage": "Der Link funktioniert nicht mehr. Es wurde nichts geteilt.",
+    "pausedHere": "Pausiert. Die andere Seite kann diese Verbindung nicht nutzen, bis Sie fortsetzen.",
+    "pausedPending": "Hier pausiert. Der andere Server hat noch nicht bestätigt.",
+    "resumed": "Fortgesetzt.",
+    "resumedPending": "Hier fortgesetzt. Der andere Server hat noch nicht bestätigt.",
+    "disconnected": "Getrennt. Diese Verbindung endet jetzt.",
+    "disconnectedPending": "Hier getrennt. Der andere Server hat noch nicht bestätigt.",
+    "inviteRemoved": "Einladung entfernt. Der Link funktioniert nicht mehr.",
+    "closed": "Geschlossen. Neue Verbindungen stoppen.",
+    "inviteReady": "Einladung bereit. Senden Sie die Adresse an die andere Administration.",
+    "loadFailed": "Partner konnten nicht geladen werden. Versuchen Sie es erneut.",
+    "joinTitle": "Sie sind eingeladen",
+    "joinBody": "{name} ({domain}) hat Ihr Unternehmen eingeladen. Öffnen Sie in Ihrem Synaplan Operate, dann Partner, und fügen Sie diese Adresse ein.",
+    "joinInvalid": "Diese Einladung ist ungültig oder abgelaufen.",
+    "errors": {
+      "not_reachable": "Ihr Server hat eine private Adresse, andere Unternehmen erreichen ihn nicht. Partner brauchen eine öffentliche https-Adresse.",
+      "not_open": "Öffnen Sie zuerst für Partner.",
+      "invite_invalid": "Diese Einladung ist ungültig.",
+      "invite_expired": "Diese Einladung ist abgelaufen. Bitten Sie um eine neue.",
+      "already_partner": "Sie sind mit diesem Server bereits verbunden.",
+      "self": "Diese Einladung wurde auf diesem Server erstellt.",
+      "peer_unreachable": "Der andere Server hat nicht geantwortet. Es wurde nichts verbunden.",
+      "peer_rejected": "Der andere Server hat die Anfrage abgelehnt.",
+      "bad_signature": "Die Signatur der Anfrage ist ungültig.",
+      "sodium_missing": "Dieser Server kann Partneranfragen nicht signieren. Die Signaturbibliothek fehlt.",
+      "invalid_name": "Geben Sie einen Firmennamen mit höchstens 80 Zeichen ein.",
+      "invite_limit": "Sie haben bereits 20 ungenutzte Einladungen. Nutzen Sie eine oder warten Sie, bis eine abläuft.",
+      "not_paused_by_us": "Die andere Seite hat pausiert. Sie können trennen oder warten, bis sie fortsetzt.",
+      "not_partner": "Diese Verbindung wurde nicht gefunden.",
+      "bad_url": "Das ist keine öffentliche https-Adresse.",
+      "replay": "Diese Anfrage wurde bereits verwendet."
     }
   }
 }

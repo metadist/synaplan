@@ -40,6 +40,7 @@ final class MediaJobMessageSyncTest extends TestCase
     private ThumbnailService&MockObject $thumbnailService;
     private EntityManagerInterface&MockObject $em;
     private MediaJobMessageSync $sync;
+    private ?Message $syncedMessage = null;
 
     protected function setUp(): void
     {
@@ -123,6 +124,17 @@ final class MediaJobMessageSyncTest extends TestCase
         // A generated image prompt is a description, not spoken content — the
         // sync path never stored it as BFILETEXT, so neither must this one.
         self::assertNull($captured['fileText']);
+    }
+
+    public function testCompletedImageJobPersistsTheStorageMarkerAndPrompt(): void
+    {
+        $this->fileRegistrar->method('register')->willReturn(new File());
+
+        $this->sync->syncTerminalState($this->completedJob(MediaJob::TYPE_IMAGE, 'a fox'));
+
+        self::assertInstanceOf(Message::class, $this->syncedMessage);
+        self::assertSame('__IMAGE_GENERATED__', $this->syncedMessage->getText());
+        self::assertSame('a fox', $this->syncedMessage->getMeta('media_prompt'));
     }
 
     public function testCompletedAudioJobWithBlankPromptPassesNullFileText(): void
@@ -217,6 +229,7 @@ final class MediaJobMessageSyncTest extends TestCase
         $idProp = new \ReflectionProperty(Message::class, 'id');
         $idProp->setValue($message, 55);
 
+        $this->syncedMessage = $message;
         $this->messageRepository->method('find')->willReturn($message);
         $this->mediaJobService->method('toStatusArray')->willReturn(['state' => 'completed']);
         $this->usageRecorder->method('record')->willReturn(null);

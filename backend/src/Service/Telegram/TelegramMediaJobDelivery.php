@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Repository\TelegramBotRepository;
 use App\Repository\UserRepository;
+use App\Service\AccountLanguage;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -155,6 +156,8 @@ final readonly class TelegramMediaJobDelivery
             return null;
         }
 
-        return new TelegramTurn($bot, $owner, $token, $bot->getTgChatId(), 'job', $owner->getLocale());
+        $locale = AccountLanguage::normalize($answer->getLanguage()) ?? $owner->getLocale();
+
+        return new TelegramTurn($bot, $owner, $token, $bot->getTgChatId(), 'job', $locale);
     }
 }

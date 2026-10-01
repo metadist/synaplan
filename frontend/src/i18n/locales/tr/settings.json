@@ -332,7 +332,7 @@
     },
     "language": {
       "title": "Dil",
-      "description": "Arayüz dilini seçin"
+      "description": "Bu dil uygulamada, e-postalarda ve Telegram gibi kanal mesajlarında kullanılır."
     },
     "webSearch": {
       "title": "Web araması",

@@ -1214,6 +1214,9 @@
     "telegram": {
       "label": "Telegram kanalı"
     },
+    "federation": {
+      "label": "İş ortakları"
+    },
     "opendesk_stt": {
       "label": "Toplantı notları"
     },
@@ -1234,6 +1237,70 @@
       "body": "Bu özellik isteğe bağlıdır. Bu kurulumun yöneticisi tarafından açılır.",
       "howToEnable": "Nasıl etkinleştirilir",
       "openFeatureStatus": "Sistem durumunu aç"
+    }
+  },
+  "partners": {
+    "title": "İş ortakları",
+    "subtitle": "Diğer şirketlerle bağlantı kurun. Siz seçene kadar hiçbir şey paylaşılmaz.",
+    "unreachable": "Sunucunuz özel bir adreste, bu yüzden diğer şirketler ona ulaşamaz. İş ortakları genel bir https adresi ister.",
+    "empty": "Diğer şirketlerle çalışın. Bir davet gönderin veya aldığınız bir daveti yapıştırın. Dosyalarınız sunucunuzda kalır.",
+    "companyName": "Şirket adı",
+    "open": "İş ortaklarına aç",
+    "openedLine": "{name} olarak iş ortaklarına açık.",
+    "fingerprint": "Anahtar {fingerprint}",
+    "close": "İş ortaklarına kapat",
+    "closeTitle": "İş ortaklarına kapatılsın mı?",
+    "closeMessage": "Yeni bağlantılar durur. Mevcut her iş ortağı ayrılır. Daha önce kopyalananlar silinmez.",
+    "invite": "İş ortağı davet et",
+    "inviteHelp": "Bu adresi diğer şirketin yöneticisine gönderin. Bir kez geçerlidir ve 7 gün sonra sona erer.",
+    "copy": "Adresi kopyala",
+    "copied": "Adres kopyalandı.",
+    "pasteLabel": "Davetiniz mi var?",
+    "pastePlaceholder": "Davet adresini yapıştırın",
+    "connect": "Bağlan",
+    "connected": "Bağlandı. Henüz iki tarafta da hiçbir şey paylaşılmadı.",
+    "pending": "Davet bekliyor",
+    "active": "Bağlı",
+    "paused": "Duraklatıldı",
+    "pausedByThem": "Karşı taraf bu bağlantıyı duraklattı.",
+    "pause": "Duraklat",
+    "resume": "Sürdür",
+    "disconnect": "Ayır",
+    "disconnectTitle": "{name} ayrılsın mı?",
+    "disconnectMessage": "Bu bağlantı şimdi durur. Daha önce kopyalananlar silinmez.",
+    "removeInvite": "Daveti kaldır",
+    "removeInviteTitle": "Bu davet kaldırılsın mı?",
+    "removeInviteMessage": "Bağlantı artık çalışmaz. Hiçbir şey paylaşılmadı.",
+    "pausedHere": "Duraklatıldı. Siz sürdürmeden bu bağlantıyı kullanamazlar.",
+    "pausedPending": "Burada duraklatıldı. Diğer sunucu henüz onaylamadı.",
+    "resumed": "Sürdürüldü.",
+    "resumedPending": "Burada sürdürüldü. Diğer sunucu henüz onaylamadı.",
+    "disconnected": "Ayrıldı. Bu bağlantı şimdi durur.",
+    "disconnectedPending": "Burada ayrıldı. Diğer sunucu henüz onaylamadı.",
+    "inviteRemoved": "Davet kaldırıldı. Bağlantı artık çalışmaz.",
+    "closed": "Kapatıldı. Yeni bağlantılar durur.",
+    "inviteReady": "Davet hazır. Adresi diğer yöneticiye gönderin.",
+    "loadFailed": "İş ortakları yüklenemedi. Yeniden deneyin.",
+    "joinTitle": "Davetlisiniz",
+    "joinBody": "{name} ({domain}) şirketinizi davet etti. Kendi Synaplan'ınızda Operate, sonra İş ortakları'nı açın ve bu adresi yapıştırın.",
+    "joinInvalid": "Bu davet geçersiz veya süresi dolmuş.",
+    "errors": {
+      "not_reachable": "Sunucunuz özel bir adreste, bu yüzden diğer şirketler ona ulaşamaz. İş ortakları genel bir https adresi ister.",
+      "not_open": "Bağlanmadan önce iş ortaklarına açın.",
+      "invite_invalid": "Bu davet geçersiz.",
+      "invite_expired": "Bu davetin süresi doldu. Yenisini isteyin.",
+      "already_partner": "Bu sunucuyla zaten bağlısınız.",
+      "self": "Bu davet bu sunucuda oluşturuldu.",
+      "peer_unreachable": "Diğer sunucu yanıt vermedi. Hiçbir şey bağlanmadı.",
+      "peer_rejected": "Diğer sunucu isteği reddetti.",
+      "bad_signature": "İsteğin imzası geçerli değil.",
+      "sodium_missing": "Bu sunucu iş ortağı isteklerini imzalayamaz. İmza kitaplığı eksik.",
+      "invalid_name": "En fazla 80 karakterlik bir şirket adı girin.",
+      "invite_limit": "Zaten 20 kullanılmamış davetiniz var. Birini kullanın veya birinin süresi dolsun.",
+      "not_paused_by_us": "Bu bağlantıyı onlar duraklattı. Ayırabilir veya sürdürmelerini bekleyebilirsiniz.",
+      "not_partner": "Bu bağlantı bulunamadı.",
+      "bad_url": "Bu adres genel bir https sunucusu değil.",
+      "replay": "Bu istek zaten kullanıldı."
     }
   }
 }

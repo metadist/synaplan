@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\AI\Health\ModelHealthAlert;
 use App\Service\Email\MarkdownEmailFormatter;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
@@ -26,6 +27,7 @@ final readonly class InternalEmailService
         private Environment $twig,
         private TranslatorInterface $translator,
         private LoggerInterface $logger,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -161,6 +163,15 @@ final readonly class InternalEmailService
         }
     }
 
+    private function imageAlt(?string $locale): string
+    {
+        if (null !== $this->mediaTextRenderer) {
+            return $this->mediaTextRenderer->forUser(GeneratedMediaTextRenderer::MARKER_IMAGE, $locale, $locale);
+        }
+
+        return GeneratedMediaTextRenderer::renderModel(GeneratedMediaTextRenderer::MARKER_IMAGE);
+    }
+
     /**
      * Send AI response email (for smart@synaplan.net chat).
      *
@@ -174,6 +185,7 @@ final readonly class InternalEmailService
      * @param string|null $attachmentPath    Path to attachment file
      * @param string|null $originalRecipient The address the user originally wrote to (used as From/Reply-To)
      * @param string|null $mediaType         Type of media attachment ('image', 'video', 'audio') for inline embedding
+     * @param string|null $locale            Recipient language for the image alternative text
      */
     public function sendAiResponseEmail(
         string $to,
@@ -187,6 +199,7 @@ final readonly class InternalEmailService
         ?string $originalRecipient = null,
         ?string $mediaType = null,
         ?array $additionalAttachmentPaths = null,
+        ?string $locale = null,
     ): void {
         $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
         $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
@@ -203,7 +216,12 @@ final readonly class InternalEmailService
 
         // Embed images inline via CID for broad email client compatibility (Outlook, Gmail, etc.)
         if ('image' === $mediaType && $attachmentPath && file_exists($attachmentPath)) {
-            $htmlBody .= '<br><br><img src="cid:generated-image" alt="Generated image" style="max-width: 100%; border-radius: 8px;">';
+            $imageAlt = htmlspecialchars(
+                $this->imageAlt($locale),
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8',
+            );
+            $htmlBody .= '<br><br><img src="cid:generated-image" alt="'.$imageAlt.'" style="max-width: 100%; border-radius: 8px;">';
             $hasInlineImage = true;
         }
 
@@ -309,7 +327,7 @@ final readonly class InternalEmailService
      * @param string                                        $markdown    Result text in markdown
      * @param list<array{path: string, type?: string|null}> $attachments Absolute file paths (+ optional media kind)
      */
-    public function sendTaskResultEmail(string $to, string $subject, string $markdown, array $attachments = []): void
+    public function sendTaskResultEmail(string $to, string $subject, string $markdown, array $attachments = [], ?string $locale = null): void
     {
         $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
@@ -333,7 +351,12 @@ final readonly class InternalEmailService
         }
 
         if (null !== $inlineImagePath) {
-            $htmlBody .= '<br><br><img src="cid:generated-image" alt="Generated image" style="max-width: 100%; border-radius: 8px;">';
+            $imageAlt = htmlspecialchars(
+                $this->imageAlt($locale),
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8',
+            );
+            $htmlBody .= '<br><br><img src="cid:generated-image" alt="'.$imageAlt.'" style="max-width: 100%; border-radius: 8px;">';
         }
 
         $htmlBody .= '<br><br><div style="font-size: 11px; color: #888888; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">'

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -51,12 +52,6 @@ final readonly class Text2SoundRunner implements TaskRunner
         }
         $text = is_string($text) ? $text : (string) $context->message->getText();
 
-        // Strip markdown, <think> blocks, [Memory:ID] badges and other
-        // non-speakable artifacts, then cap at the shared TTS input limit
-        // (issues #1164, #1665). StreamController / WhatsAppService use the
-        // same helper so a long essay does not trip OpenAI's 4096-char max.
-        $text = TtsTextSanitizer::prepareForSynthesis($text);
-
         if ('' === trim($text)) {
             return NodeResult::failed('no text to synthesize');
         }
@@ -66,10 +61,12 @@ final readonly class Text2SoundRunner implements TaskRunner
             : ($context->message->getLanguage() ?: 'en');
 
         try {
-            $result = $this->aiFacade->synthesize($text, $context->userId, [
+            // Facade sanitizes + truncates (#2283, #1665).
+            $result = $this->aiFacade->synthesize($text, $language, $context->userId, [
                 'format' => is_string($node->params['format'] ?? null) ? $node->params['format'] : 'mp3',
-                'language' => $language,
             ]);
+        } catch (NoSpeakableTextException) {
+            return NodeResult::failed('no text to synthesize');
         } catch (\Throwable $e) {
             $this->logger->warning('Text2SoundRunner: synthesize failed', ['error' => $e->getMessage()]);
 
@@ -85,9 +82,9 @@ final readonly class Text2SoundRunner implements TaskRunner
             'path' => '/api/v1/files/uploads/'.$relativePath,
             'type' => 'audio',
             'local_path' => $relativePath,
-            // #1251: carried through ResultAssembler → persistTaskPlanFiles so
-            // GeneratedFileRegistrar can store the spoken script as BFILETEXT.
-            'source_text' => $text,
+            // #1251: spoken script for GeneratedFileRegistrar / BFILETEXT.
+            // Store the sanitized form so the gallery text matches what was spoken.
+            'source_text' => TtsTextSanitizer::prepareForSynthesis($text),
         ];
 
         return NodeResult::ok(null, [$file], [

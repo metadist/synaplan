@@ -1218,6 +1218,9 @@
     "telegram": {
       "label": "Canal Telegram"
     },
+    "federation": {
+      "label": "Partenaires"
+    },
     "opendesk_stt": {
       "label": "Notes de réunion"
     },
@@ -1238,6 +1241,70 @@
       "body": "Cette fonctionnalité est optionnelle. Elle est activée par l’administrateur de cette installation.",
       "howToEnable": "Comment l’activer",
       "openFeatureStatus": "Ouvrir l’état du système"
+    }
+  },
+  "partners": {
+    "title": "Partenaires",
+    "subtitle": "Connectez-vous à d’autres entreprises. Rien n’est partagé tant que vous ne le choisissez pas.",
+    "unreachable": "Votre serveur a une adresse privée, les autres entreprises ne peuvent pas l’atteindre. Les partenaires ont besoin d’une adresse https publique.",
+    "empty": "Travaillez avec d’autres entreprises. Envoyez une invitation ou collez-en une reçue. Vos fichiers restent sur votre serveur.",
+    "companyName": "Nom de l’entreprise",
+    "open": "Ouvrir aux partenaires",
+    "openedLine": "Ouvert aux partenaires en tant que {name}.",
+    "fingerprint": "Clé {fingerprint}",
+    "close": "Fermer aux partenaires",
+    "closeTitle": "Fermer aux partenaires ?",
+    "closeMessage": "Les nouvelles connexions s’arrêtent. Chaque partenaire actuel est déconnecté. Ce qui a déjà été copié n’est pas effacé.",
+    "invite": "Inviter un partenaire",
+    "inviteHelp": "Envoyez cette adresse à l’administrateur de l’autre entreprise. Elle ne sert qu’une fois et expire dans 7 jours.",
+    "copy": "Copier l’adresse",
+    "copied": "Adresse copiée.",
+    "pasteLabel": "Vous avez une invitation ?",
+    "pastePlaceholder": "Collez l’adresse d’invitation",
+    "connect": "Connecter",
+    "connected": "Connecté. Rien n’est encore partagé, d’aucun côté.",
+    "pending": "Invitation en attente",
+    "active": "Connecté",
+    "paused": "En pause",
+    "pausedByThem": "L’autre entreprise a mis cette connexion en pause.",
+    "pause": "Pause",
+    "resume": "Reprendre",
+    "disconnect": "Déconnecter",
+    "disconnectTitle": "Déconnecter {name} ?",
+    "disconnectMessage": "Cette connexion s’arrête maintenant. Ce qui a déjà été copié n’est pas effacé.",
+    "removeInvite": "Retirer l’invitation",
+    "removeInviteTitle": "Retirer cette invitation ?",
+    "removeInviteMessage": "Le lien ne fonctionne plus. Rien n’a été partagé.",
+    "pausedHere": "En pause. Ils ne peuvent plus utiliser cette connexion tant que vous ne reprenez pas.",
+    "pausedPending": "En pause ici. L’autre serveur n’a pas encore confirmé.",
+    "resumed": "Reprise.",
+    "resumedPending": "Reprise ici. L’autre serveur n’a pas encore confirmé.",
+    "disconnected": "Déconnecté. Cette connexion s’arrête maintenant.",
+    "disconnectedPending": "Déconnecté ici. L’autre serveur n’a pas encore confirmé.",
+    "inviteRemoved": "Invitation retirée. Le lien ne fonctionne plus.",
+    "closed": "Fermé. Les nouvelles connexions s’arrêtent.",
+    "inviteReady": "Invitation prête. Envoyez l’adresse à l’autre administrateur.",
+    "loadFailed": "Les partenaires n’ont pas pu être chargés. Réessayez.",
+    "joinTitle": "Vous êtes invité",
+    "joinBody": "{name} ({domain}) a invité votre entreprise. Dans votre Synaplan, ouvrez Exploiter, puis Partenaires, et collez cette adresse.",
+    "joinInvalid": "Cette invitation n’est pas valable ou a expiré.",
+    "errors": {
+      "not_reachable": "Votre serveur a une adresse privée, les autres entreprises ne peuvent pas l’atteindre. Les partenaires ont besoin d’une adresse https publique.",
+      "not_open": "Ouvrez aux partenaires avant de vous connecter.",
+      "invite_invalid": "Cette invitation n’est pas valable.",
+      "invite_expired": "Cette invitation a expiré. Demandez-en une nouvelle.",
+      "already_partner": "Vous êtes déjà connecté à ce serveur.",
+      "self": "Cette invitation a été créée sur ce serveur.",
+      "peer_unreachable": "L’autre serveur n’a pas répondu. Rien n’a été connecté.",
+      "peer_rejected": "L’autre serveur a refusé la demande.",
+      "bad_signature": "La signature de la demande n’est pas valable.",
+      "sodium_missing": "Ce serveur ne peut pas signer les demandes de partenaires. La bibliothèque de signature est absente.",
+      "invalid_name": "Saisissez un nom d’entreprise de 80 caractères au plus.",
+      "invite_limit": "Vous avez déjà 20 invitations inutilisées. Utilisez-en une ou attendez qu’une expire.",
+      "not_paused_by_us": "Ils ont mis cette connexion en pause. Vous pouvez déconnecter ou attendre qu’ils reprennent.",
+      "not_partner": "Cette connexion est introuvable.",
+      "bad_url": "Cette adresse n’est pas un serveur https public.",
+      "replay": "Cette demande a déjà été utilisée."
     }
   }
 }

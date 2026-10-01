@@ -363,6 +363,21 @@
             :foreign-memory="foreignMemory"
           />
 
+          <p
+            v-if="role === 'assistant' && voiceReplyFailed"
+            class="px-4 pb-2 text-sm txt-secondary"
+            data-testid="voice-reply-failed"
+          >
+            {{ $t(`chat.voiceReplyFailed.${voiceReplyFailed}`) }}
+          </p>
+          <p
+            v-if="role === 'assistant' && readAloudFailed"
+            class="px-4 pb-2 text-sm txt-secondary"
+            data-testid="read-aloud-failed"
+          >
+            {{ $t('chat.readAloudStopped') }}
+          </p>
+
           <ChatErrorNotice
             v-if="role === 'assistant' && errorReason"
             class="m-3"
@@ -415,8 +430,10 @@
             <!-- Header with Expand/Collapse Button -->
             <div class="flex items-center justify-between gap-2">
               <button
+                type="button"
                 class="flex items-center gap-2 text-sm font-medium txt-tertiary hover:txt-primary transition-colors"
                 data-testid="btn-message-sources-toggle"
+                :aria-expanded="sourcesExpanded"
                 @click="sourcesExpanded = !sourcesExpanded"
               >
                 <Icon icon="mdi:web" class="w-4 h-4" />
@@ -467,7 +484,7 @@
             </div>
 
             <!-- Carousel Container (collapsible) -->
-            <div v-show="sourcesExpanded" class="py-2 px-3">
+            <div v-show="sourcesExpanded" class="py-2 px-3" data-testid="message-sources-list">
               <div
                 class="relative overflow-x-auto sm:overflow-x-hidden scroll-thin snap-x snap-mandatory sm:snap-none"
               >
@@ -1107,6 +1124,10 @@ interface Props {
     ok?: boolean
   }>
   documentFidelityLossy?: boolean
+  /** Voice-reply failure reason when TTS was requested but no audio was stored (#2282). */
+  voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited'
+  /** Live reading stopped. Stays visible when the full spoken file arrives. */
+  readAloudFailed?: boolean
   searchResults?: Array<{
     title: string
     url: string
@@ -1267,11 +1288,11 @@ const copyMessageText = async () => {
 const showAllBadges = ref(false)
 
 // Sources expand/collapse state.
-// Default OPEN: when the assistant ran a web search, the sources are part of
-// the answer's citation context, so they should be visible without an extra
-// click. Users can still collapse the section via the chevron toggle if they
-// want a denser thread view.
-const sourcesExpanded = ref(true)
+// Default FOLDED: a web search drops its result cards under the answer. The
+// standard view keeps that section closed so the thread stays readable. The
+// Sources control unfolds and folds it again. A citation click still opens
+// the matching card.
+const sourcesExpanded = ref(false)
 
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)

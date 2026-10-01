@@ -10,9 +10,11 @@ use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Realtime\Notifier\ChatActivityNotifier;
 use App\Service\Digest\MessageReferenceResolver;
+use App\Service\File\FileTypeResolver;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
@@ -33,7 +35,6 @@ final readonly class TelegramConversation
     private const EDIT_WINDOW_SECONDS = 47 * 3600;
     private const MAX_SOURCES = 5;
     private const ACTIVE_JOB_STATES = ['queued', 'submitting', 'running', 'finalizing'];
-    private const FILE_MARKER = '/^__FILE_GENERATED__:.*$/m';
 
     public function __construct(
         private TelegramMessageStore $store,
@@ -55,6 +56,7 @@ final readonly class TelegramConversation
         private PlatformDocReferenceResolver $docs,
         private ClockInterface $clock,
         private string $frontendUrl,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -144,6 +146,16 @@ final readonly class TelegramConversation
         $replyTo = ctype_digit($externalId) ? (int) $externalId : null;
         $this->typing($turn, 'typing');
         try {
+            // A killed worker can resume a voice note before it was transcribed.
+            // answer() already waits for that transcript; resume() must too.
+            if ($this->inboundNeedsTranscript($inbound)) {
+                $this->preProcessor->process($inbound);
+                if ('' === trim($inbound->getText())) {
+                    $this->finish($turn, $chat, $inbound, $this->say($turn, 'transcript_empty'), 'failed');
+
+                    return;
+                }
+            }
             $this->respond($turn, $chat, $inbound, [], null, $replyTo, []);
         } catch (\Throwable $e) {
             $this->fail($turn, $chat, $inbound, $e);
@@ -248,6 +260,25 @@ final readonly class TelegramConversation
     }
 
     /**
+     * Spoken audio that has not been transcribed yet. A caption or an
+     * already stored transcript does not need another pass.
+     */
+    private function inboundNeedsTranscript(Message $inbound): bool
+    {
+        foreach ($inbound->getFiles() as $file) {
+            if ('' !== trim($file->getFileText())) {
+                continue;
+            }
+            $category = FileTypeResolver::resolveCategory($file->getFileType() ?: '', $file->getFileName());
+            if ('audio' === $category) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param array<string, mixed> $options
      * @param list<string>         $notes
      */
@@ -290,7 +321,11 @@ final readonly class TelegramConversation
             $stored = $this->memories->resolveMemoryTags($stored, $owner);
             $stored = $this->references->resolveMessageTags($stored, $owner);
         }
-        $channelReply = trim((string) (preg_replace(self::FILE_MARKER, '', $stored) ?? ''));
+        $channelReply = trim(
+            null !== $this->mediaTextRenderer
+                ? $this->mediaTextRenderer->forUser($stored, $inbound->getLanguage(), $owner->getLocale())
+                : GeneratedMediaTextRenderer::renderModel($stored)
+        );
 
         $recorded = $this->recordUsage($turn, $inbound, $metadata, $channelReply);
         $this->store->applyClassification($inbound, $classification);

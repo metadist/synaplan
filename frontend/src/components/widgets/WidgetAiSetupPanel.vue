@@ -239,7 +239,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
-const md = getMarkdownRenderer()
+const md = getMarkdownRenderer((key, params) => String(t(key, params ?? {})))
 
 function renderMarkdown(text: string): string {
   return md.render(text)

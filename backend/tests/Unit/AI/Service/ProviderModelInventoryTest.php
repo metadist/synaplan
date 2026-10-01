@@ -187,6 +187,60 @@ final class ProviderModelInventoryTest extends TestCase
         $this->assertStringContainsString('after_id=claude-a', $requested[1]);
     }
 
+    public function testReadsUnixCreatedAsReleaseDate(): void
+    {
+        $listing = $this->inventory(new MockResponse(json_encode([
+            'data' => [
+                ['id' => 'gpt-4o', 'created' => 1715558400],
+                ['id' => 'GPT-6.1-Sol', 'created' => 1790186400],
+                ['id' => 'undated'],
+            ],
+        ], \JSON_THROW_ON_ERROR)), 'openai')->fetch('openai');
+
+        $this->assertSame(['gpt-4o' => 1715558400, 'gpt-6.1-sol' => 1790186400], $listing->releasedAt);
+        $this->assertSame(['gpt-6.1-sol'], $listing->releasedSince(new \DateTimeImmutable('2026-09-10 00:00:00 UTC')));
+    }
+
+    public function testReadsRfc3339CreatedAtAcrossPages(): void
+    {
+        $client = new MockHttpClient([
+            new MockResponse(json_encode([
+                'data' => [['id' => 'claude-a', 'created_at' => '2025-02-24T00:00:00Z']],
+                'has_more' => true,
+                'last_id' => 'claude-a',
+            ], \JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode([
+                'data' => [['id' => 'claude-b', 'created_at' => '2026-09-22T00:00:00Z']],
+                'has_more' => false,
+                'last_id' => 'claude-b',
+            ], \JSON_THROW_ON_ERROR)),
+        ]);
+
+        $listing = $this->inventoryWithClient($client, 'anthropic')->fetch('anthropic');
+
+        $this->assertSame(['claude-b'], $listing->releasedSince(new \DateTimeImmutable('2026-09-10 00:00:00 UTC')));
+    }
+
+    /**
+     * Mistral stamps every row with the request time and Meta with 0; neither
+     * is a release date, so no id may look freshly released.
+     */
+    public function testPlaceholderStampsAreNotReleaseDates(): void
+    {
+        $now = time();
+        $mistral = $this->inventory(new MockResponse(json_encode([
+            'data' => [['id' => 'mistral-large', 'created' => $now], ['id' => 'mistral-small', 'created' => $now]],
+        ], \JSON_THROW_ON_ERROR)), 'mistral')->fetch('mistral');
+        $meta = $this->inventory(new MockResponse(json_encode([
+            'data' => [['id' => 'llama-a', 'created' => 0], ['id' => 'llama-b', 'created' => 0]],
+        ], \JSON_THROW_ON_ERROR)))->fetch('groq');
+
+        $since = new \DateTimeImmutable('-14 days');
+        $this->assertSame([], $mistral->releasedSince($since));
+        $this->assertSame([], $meta->releasedAt);
+        $this->assertSame([], $meta->releasedSince($since));
+    }
+
     public function testSecondPageHttpErrorIsUnreachableWithoutPartialList(): void
     {
         $client = new MockHttpClient([

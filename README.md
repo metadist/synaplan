@@ -247,7 +247,7 @@ Set these up under **Manage → Connections** (or **Manage → Connections → M
 | **Nextcloud / ownCloud / WebDAV** | File results into a folder you own (`nextcloud` / `folder`) | **Manage → Connections** — app password, never your account password |
 | **CalDAV calendar** | Put generated meetings into a calendar you own (`calendar`) | Same Nextcloud preset can create folder + calendar in one step |
 | **IMAP mailbox** | Live search of any IMAP inbox, merged with Microsoft 365 results | **Manage → Channels → Email** |
-| **Jira & Confluence** | Search and summarize; create tickets or pages when you allow writes | **Manage → Connections → MCP Servers** — Atlassian quick-start presets |
+| **Jira & Confluence** | Search and summarize; create tickets or pages when you allow writes. A pasted Confluence page is read through the signed-in account | **Manage → Connections → MCP Servers** — Jira & Confluence card, then sign in with Atlassian (no API token) |
 | **Saved Tasks** | Pin a plan and run it on demand or on a schedule (hourly / daily / weekdays) | **Manage → Automations → Saved Tasks** |
 | **Nextcloud / OpenCloud apps** | Use files from those clouds as AI knowledge — the file store stays in charge | [synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud) · [synaplan-opencloud](https://github.com/metadist/synaplan-opencloud) |
 

@@ -600,9 +600,9 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.allChats', i18n: ['chat', 'files'] },
     },
     {
-      // Language and theme are stored on the device, not on the account, so a
-      // guest can reach this page. The account block inside it hides itself
-      // when nobody is signed in.
+      // Theme stays on the device. Language is also saved on the account from
+      // Settings, and a guest can still reach this page. The account block
+      // inside it hides itself when nobody is signed in.
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),
@@ -700,6 +700,28 @@ const router = createRouter({
         i18n: ['admin', 'config'],
       },
       beforeEnter: aiInfrastructureRedirect,
+    },
+    {
+      path: '/admin/partners',
+      name: 'admin-partners',
+      component: () => import('@/views/PartnersView.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.adminPartners',
+        i18n: ['admin'],
+      },
+    },
+    {
+      path: '/partners/join/:token',
+      name: 'partners-join',
+      component: () => import('@/views/PartnersJoinView.vue'),
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.adminPartners',
+        i18n: ['admin'],
+      },
     },
     {
       path: '/admin/people',

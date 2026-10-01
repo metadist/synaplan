@@ -9,6 +9,7 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -54,6 +55,7 @@ final readonly class ChatTitleService
         private RateLimitService $rateLimitService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -177,7 +179,10 @@ final readonly class ChatTitleService
         $turns = [];
 
         foreach ($messages as $message) {
-            $text = trim($message->getText());
+            $raw = null !== $this->mediaTextRenderer
+                ? $this->mediaTextRenderer->forModel($message->getText())
+                : GeneratedMediaTextRenderer::renderModel((string) $message->getText());
+            $text = trim($raw);
             if ('' === $text) {
                 continue;
             }

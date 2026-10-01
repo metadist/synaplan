@@ -362,7 +362,7 @@
     },
     "language": {
       "title": "Language",
-      "description": "Pick the language used across the interface"
+      "description": "This language is used in the app, in emails, and in channel messages such as Telegram."
     },
     "webSearch": {
       "title": "Web search",

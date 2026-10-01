@@ -139,6 +139,7 @@ final readonly class MessageSorter
         private ?AgentConfig $agentConfig = null,
         private ?AgentService $agentService = null,
         private ?UserRepository $users = null,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -266,7 +267,7 @@ final readonly class MessageSorter
         $fileAnnotationBudget = self::FILE_ANNOTATION_BUDGET;
         foreach ($conversationHistory as $msg) {
             if ('IN' === $msg->getDirection()) {
-                $msgText = $msg->getText();
+                $msgText = $this->modelFacingText($msg->getText());
                 if ($msg->getFileText()) {
                     $msgText .= ' User provided a file: '.$msg->getFileType().', saying: \''.substr($msg->getFileText(), 0, 200).'\'';
                 }
@@ -274,8 +275,9 @@ final readonly class MessageSorter
                 $messages[] = ['role' => 'user', 'content' => $msgText];
             } elseif ('OUT' === $msg->getDirection()) {
                 // Truncate assistant responses
-                $assistantText = substr($msg->getText(), 0, 200);
-                if (strlen($msg->getText()) > 200) {
+                $modelText = $this->modelFacingText($msg->getText());
+                $assistantText = substr($modelText, 0, 200);
+                if (strlen($modelText) > 200) {
                     $assistantText .= '...';
                 }
                 $assistantText .= $this->fileAnnotation($msg, $fileAnnotationBudget);
@@ -587,6 +589,13 @@ final readonly class MessageSorter
      * path stays query-free. Returns an empty string once the shared budget is
      * spent or the turn has no file.
      */
+    private function modelFacingText(?string $text): string
+    {
+        return null !== $this->mediaTextRenderer
+            ? $this->mediaTextRenderer->forModel($text)
+            : GeneratedMediaTextRenderer::renderModel((string) $text);
+    }
+
     private function fileAnnotation(Message $message, int &$budget): string
     {
         if ($budget <= 0) {

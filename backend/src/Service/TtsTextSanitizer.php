@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Service\Message\GeneratedMediaTextRenderer;
+
 /**
  * TTS Text Sanitizer.
  *
  * Strips non-speakable artifacts from AI response text before TTS synthesis.
  * Removes: <think> tags, [Memory:ID] badges, code blocks, markdown formatting, HTML tags.
  *
- * Call TtsTextSanitizer::prepareForSynthesis($text) BEFORE passing text to
- * AiFacade::synthesize() so every caller stays inside provider input limits
- * (OpenAI TTS rejects more than 4096 characters — #1665).
+ * AiFacade::synthesize() / synthesizeStream() call prepareForSynthesis() so
+ * every spoken reply stays inside provider input limits (OpenAI TTS rejects
+ * more than 4096 characters — #1665, #2283). Callers should pass raw text.
  */
 final readonly class TtsTextSanitizer
 {
@@ -24,6 +26,9 @@ final readonly class TtsTextSanitizer
      */
     public static function sanitize(string $text): string
     {
+        // 0. Speak localized / model prose instead of internal media markers
+        $text = GeneratedMediaTextRenderer::renderModel($text);
+
         // 1. Remove <think>...</think> reasoning blocks
         $text = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $text);
 

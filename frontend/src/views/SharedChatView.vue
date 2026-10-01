@@ -229,7 +229,7 @@
                 <MessageImage
                   v-if="message.file.type === 'image'"
                   :url="message.file.path"
-                  :alt="message.text || 'Generated image'"
+                  :alt="t('message.imageGenerated')"
                 />
                 <MessageVideo v-if="message.file.type === 'video'" :url="message.file.path" />
               </div>
@@ -471,17 +471,17 @@ const initLanguage = () => {
 
   if (langParam && supportedLanguages.includes(langParam as SupportedLanguage)) {
     currentLang.value = langParam
-    void setLocale(langParam)
+    void setLocale(langParam, { persistAccount: false })
   } else {
     // Default to English for backwards compatibility
     currentLang.value = 'en'
-    void setLocale('en')
+    void setLocale('en', { persistAccount: false })
   }
 }
 
 // Switch language and update URL
 const switchLanguage = () => {
-  void setLocale(currentLang.value)
+  void setLocale(currentLang.value, { persistAccount: false })
 
   // Update URL to include language
   const newPath = `/shared/${currentLang.value}/${token.value}`

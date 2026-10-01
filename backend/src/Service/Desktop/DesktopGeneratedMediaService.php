@@ -52,10 +52,9 @@ final readonly class DesktopGeneratedMediaService
     /**
      * @return array{success: true, file: array{url: string, type: string, mimeType: string, id: int|null}, provider: string, model: string}
      */
-    public function speak(User $user, string $text, string $catalogKey): array
+    public function speak(User $user, string $text, string $catalogKey, ?string $language = null): array
     {
-        $text = TtsTextSanitizer::prepareForSynthesis($text);
-        if ('' === trim($text)) {
+        if ('' === trim(TtsTextSanitizer::sanitize($text))) {
             throw new \InvalidArgumentException('No speakable text provided');
         }
 
@@ -67,7 +66,12 @@ final readonly class DesktopGeneratedMediaService
             throw new NoModelAvailableException('Model not found: '.$modelId);
         }
 
-        $result = $this->aiFacade->synthesize($text, $user->getId(), [
+        $ttsLanguage = is_string($language) && '' !== trim($language)
+            ? trim($language)
+            : $user->getLocale();
+
+        // Facade sanitizes + truncates; language is required (#2283).
+        $result = $this->aiFacade->synthesize($text, $ttsLanguage, $user->getId(), [
             'provider' => strtolower($model->getService()),
             'model' => $model->getProviderId() ?: $model->getName(),
         ]);

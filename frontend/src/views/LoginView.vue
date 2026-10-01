@@ -668,7 +668,8 @@ const handleSocialLogin = async (provider: string) => {
     return
   }
 
-  window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
+  const params = new URLSearchParams({ language: String(locale.value) })
+  window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
 }
 </script>
 

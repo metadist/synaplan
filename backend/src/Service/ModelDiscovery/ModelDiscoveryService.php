@@ -20,8 +20,12 @@ use Psr\Clock\ClockInterface;
  * availability check uses. Nothing is written to BMODELS or ModelCatalog;
  * findings are advisory until a human adds a catalog row or an ignore entry.
  *
- * Per-provider silent baseline: the first successful listing records every
- * current id and reports none as pending. The baseline stays in
+ * Per-provider baseline: the first successful listing records every current
+ * id that is older than {@see BASELINE_FRESH_DAYS} and reports none of those
+ * as pending. Ids the provider dates inside that window stay out of the
+ * baseline and are reported right away, so a model released shortly before
+ * the first run is not swallowed. Providers without usable release dates
+ * (Google, Mistral) baseline everything. The baseline stays in
  * {@see ModelDiscoveryReport::$baselinesRecorded} until Discord (or a
  * `--notify` run with Discord disabled) marks it announced.
  *
@@ -29,8 +33,8 @@ use Psr\Clock\ClockInterface;
  * {@see ModelDiscoveryIdNormalizer::isKnown()}, not ignored / class-silenced)
  * split into `newPending` (not yet announced) and `openPending` (announced
  * earlier). Discord posts new ids once, summarises open ones, and reminds
- * fully every Monday. Provider listing failures follow the same once + Monday
- * cadence via `failingSince` / `failureAnnounced`.
+ * fully once every Monday. Provider listing failures follow the same once +
+ * Monday cadence via `failingSince` / `failureAnnounced`.
  *
  * @phpstan-type ProviderState array{
  *     baselineRecorded: bool,
@@ -44,6 +48,10 @@ use Psr\Clock\ClockInterface;
  */
 final readonly class ModelDiscoveryService
 {
+    public const BASELINE_FRESH_DAYS = 14;
+
+    private const NOTIFY_SLOT_FORMAT = 'Y-m-d H';
+
     /**
      * @param array<string, array{reason: string, decidedOn: string}>|null                                                     $ignoreEntries
      *                                                                                                                                        test seam; production leaves null to use ModelDiscoveryIgnoreList
@@ -72,8 +80,10 @@ final readonly class ModelDiscoveryService
             throw new \LogicException('Model discovery is disabled (MODEL_DISCOVERY_ENABLED=false).');
         }
 
-        $today = $this->clock->now()->format('Y-m-d');
-        $isMonday = '1' === $this->clock->now()->format('N');
+        $now = $this->clock->now();
+        $today = $now->format('Y-m-d');
+        $isMonday = '1' === $now->format('N');
+        $freshSince = $now->modify(sprintf('-%d days', self::BASELINE_FRESH_DAYS));
         $knownByProvider = $this->indexKnownModels();
         $state = $this->stateStore->loadProviders();
 
@@ -136,9 +146,7 @@ final readonly class ModelDiscoveryService
             }
 
             if (!$providerState['baselineRecorded']) {
-                $state[$provider] = $this->recordBaseline($listedIds, $today);
-
-                continue;
+                $providerState = $this->recordBaseline($listedIds, $listing->releasedSince($freshSince), $today);
             }
 
             $updated = $this->advanceSeen($providerState, $listedIds, $today);
@@ -193,7 +201,9 @@ final readonly class ModelDiscoveryService
             }
         }
 
-        $isMondayReminder = $isMonday && ([] !== $openPending || $hasOpenFailure);
+        $isMondayReminder = $isMonday
+            && $today !== $this->stateStore->loadReminderSentOn()
+            && ([] !== $openPending || $hasOpenFailure);
         $shouldNotify = [] !== $newPending
             || $hasNewFailure
             || [] !== $baselinesRecorded
@@ -214,19 +224,33 @@ final readonly class ModelDiscoveryService
     }
 
     /**
-     * Claim the Discord post for today. Returns false when another node already posted.
+     * Claim the Discord post for the current hour. Returns false when another node already posted in it.
      */
-    public function claimNotifyDay(): bool
+    public function claimNotifySlot(): bool
     {
-        return $this->stateStore->claimNotifyDay($this->clock->now()->format('Y-m-d'));
+        return $this->stateStore->claimNotifySlot($this->clock->now()->format(self::NOTIFY_SLOT_FORMAT));
     }
 
     /**
-     * Release today's Discord claim after a failed post so the next run can retry.
+     * Release this hour's Discord claim after a failed post so the next run can retry.
      */
-    public function releaseNotifyDay(): void
+    public function releaseNotifySlot(): void
     {
-        $this->stateStore->releaseNotifyDay($this->clock->now()->format('Y-m-d'));
+        $this->stateStore->releaseNotifySlot($this->clock->now()->format(self::NOTIFY_SLOT_FORMAT));
+    }
+
+    /**
+     * Claim today's "the check could not run" post, so a check that keeps
+     * crashing posts once a day rather than on every run.
+     */
+    public function claimFailureNoticeDay(): bool
+    {
+        return $this->stateStore->claimFailureDay($this->clock->now()->format('Y-m-d'));
+    }
+
+    public function releaseFailureNoticeDay(): void
+    {
+        $this->stateStore->releaseFailureDay($this->clock->now()->format('Y-m-d'));
     }
 
     /**
@@ -308,6 +332,10 @@ final readonly class ModelDiscoveryService
         if ($changed) {
             $this->stateStore->saveProviders($state);
         }
+
+        if ($report->isMondayReminder) {
+            $this->stateStore->saveReminderSentOn($today);
+        }
     }
 
     /**
@@ -328,10 +356,11 @@ final readonly class ModelDiscoveryService
 
     /**
      * @param list<string> $listedIds
+     * @param list<string> $freshIds  listed ids released inside the fresh window; kept out of the baseline
      *
      * @return ProviderState
      */
-    private function recordBaseline(array $listedIds, string $today): array
+    private function recordBaseline(array $listedIds, array $freshIds, string $today): array
     {
         $seen = [];
         foreach ($listedIds as $id) {
@@ -341,7 +370,7 @@ final readonly class ModelDiscoveryService
         return [
             'baselineRecorded' => true,
             'baselineAnnounced' => false,
-            'baselineIds' => $listedIds,
+            'baselineIds' => array_values(array_diff($listedIds, $freshIds)),
             'seen' => $seen,
             'announced' => [],
             'failingSince' => null,

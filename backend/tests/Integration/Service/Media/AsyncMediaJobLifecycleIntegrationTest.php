@@ -23,6 +23,7 @@ use App\Service\Media\MediaJobService;
 use App\Service\Media\MediaJobStore;
 use App\Service\Media\MediaJobUsageRecorder;
 use App\Service\Media\SyncMediaJobGenerator;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\RateLimitService;
@@ -302,9 +303,11 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         // The reload contract — what the chat history shows when the user
         // refreshes their browser. The message must now have a `video` part
         // sourced from the persisted File entity (not from the live SSE
-        // payload), and an empty text body (no placeholder lingering).
+        // payload). The text is the storage marker; the prompt stays in meta
+        // so the chat can show a localized sentence without the rewritten prompt.
         $this->em->refresh($message);
-        self::assertSame('', $message->getText());
+        self::assertSame(GeneratedMediaTextRenderer::MARKER_VIDEO, $message->getText());
+        self::assertSame('a cat surfing', $message->getMeta('media_prompt'));
         self::assertGreaterThan(0, $message->getFiles()->count(), 'Generated file must be attached to the message');
 
         $file = $message->getFiles()->first();
@@ -319,7 +322,7 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
         // the `parts` array on reload — see `frontend/src/utils/messageMapper.ts`).
         $payload = $this->apiFormatter->format($message);
         self::assertSame('done', $payload['mediaJob']['state'] ?? null);
-        self::assertSame('', $payload['text']);
+        self::assertSame(GeneratedMediaTextRenderer::MARKER_VIDEO, $payload['text']);
 
         $files = $payload['files'] ?? [];
         self::assertIsArray($files);

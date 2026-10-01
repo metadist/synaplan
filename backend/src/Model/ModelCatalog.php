@@ -419,6 +419,9 @@ class ModelCatalog
         // Official OpenAI pricing 2026-09-24: base $2/$10, >272k is 2x input
         // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-sol).
         'gpt-6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.40],
+        // Official OpenAI pricing 2026-09-30: base $2/$10, cache $0.10; >272k is
+        // 2x input and cache, 1.5x output (https://developers.openai.com/api/docs/models/gpt-6.1-sol).
+        'gpt-6.1-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.20],
         // Official OpenAI pricing 2026-09-24: base $0.10/$0.50, >272k is 2x input
         // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-luna).
         'gpt-6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.20, 'price_out_above' => 0.75, 'cache_price_in_above' => 0.02],
@@ -2090,6 +2093,78 @@ class ModelCatalog
                     'context_window' => '1050000',
                     'max_output' => '128000',
                     'knowledge_cutoff' => '2026-04-20',
+                ],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // GPT-6.1 Sol — released 2026-09-29. Near-Astra quality for complex
+        // coding, computer use and professional work. Responses API (Chat
+        // Completions has no tool calling); image input; reasoning.effort
+        // supports low / medium / high / xhigh / max — no `none`, unlike
+        // GPT-6 Sol. Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6.1-sol
+        // (verified 2026-09-30): $2 in / $10 out, cached input $0.10,
+        // cache writes $2.50. Long-context (>272k) in CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 381,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.1 Sol',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.1-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.1 Sol - near-Astra quality for complex coding, computer use and professional work at a fraction of the cost. Very large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6.1-sol'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.10/1M (0.05x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.10,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-30',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 382,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.1 Sol (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.1-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.1 Sol for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6.1-sol'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.10,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-30',
                 ],
             ],
         ],

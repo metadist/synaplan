@@ -56,18 +56,6 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class MessageClassifier
 {
-    private const TOOL_COMMANDS = [
-        '/pic' => 'tools:pic',
-        '/vid' => 'tools:vid',
-        '/tts' => 'tools:tts',
-        '/search' => 'tools:search',
-        '/lang' => 'tools:lang',
-        '/web' => 'tools:web',
-        '/list' => 'tools:list',
-        '/docs' => 'tools:filesort',
-        '/help' => 'synaplan',
-    ];
-
     /**
      * Meta-questions about this product (EN/DE/ES/FR/TR). A match only
      * defers to the AI sorter — it never routes by itself.
@@ -123,9 +111,49 @@ final readonly class MessageClassifier
         $messageId = $message->getId();
         $text = $message->getText();
 
+        // Slash commands first (shared parser, every channel — issue #2280).
+        // Must run BEFORE the agent-pin fast-return: WhatsApp/MCP often supply
+        // agentId, and a bare /pic|/search|/docs must still return a usage hint
+        // instead of reaching the chat model. /search and /docs with an argument
+        // keep any pinned runtime profile and only overlay force_web_search /
+        // rag_query.
+        $forceWebSearchFromSlash = false;
+        $slashDocsFromSlash = false;
+        if (!empty($text) && str_starts_with(ltrim($text), '/')) {
+            $slashResult = $this->resolveSlashCommand($message, $text);
+            if (null !== $slashResult['return']) {
+                return $slashResult['return'];
+            }
+            $forceWebSearchFromSlash = $slashResult['force_web_search'];
+            $slashDocsFromSlash = $slashResult['slash_docs'];
+            $text = $message->getText();
+        }
+
         $pinned = $this->tryPinAgent($message, $options);
         if (null !== $pinned) {
-            return $pinned;
+            return $this->applySlashOverlaysToClassification(
+                $pinned,
+                $forceWebSearchFromSlash,
+                $slashDocsFromSlash,
+            );
+        }
+
+        // /docs <query> with no pin: route to rag_query without the AI sorter.
+        if ($slashDocsFromSlash) {
+            $language = $message->getLanguage() ?: 'en';
+            if ('NN' === $language) {
+                $language = 'en';
+            }
+            $docsDecision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, 'general');
+
+            return array_merge([
+                'topic' => 'general',
+                'language' => $language,
+                'intent' => Capability::RagQuery->value,
+                'source' => $docsDecision->toClassificationSource(),
+                'skip_sorting' => true,
+                'slash_docs' => true,
+            ], $docsDecision->toClassificationFields());
         }
 
         $this->logger->info('MessageClassifier: Starting classification', [
@@ -176,7 +204,7 @@ final readonly class MessageClassifier
                 // later in `MessageProcessor` via `WebSearchTopicPolicy`.
                 $fastPathDecision = RoutingDecision::deterministic(RoutingLayer::FastPathHeuristic, 'general');
 
-                return array_merge([
+                $fastPath = array_merge([
                     'topic' => 'general',
                     'language' => $confidentLanguage,
                     'web_search' => null,
@@ -187,6 +215,11 @@ final readonly class MessageClassifier
                     'provider' => null,
                     'model_name' => null,
                 ], $fastPathDecision->toClassificationFields());
+                if ($forceWebSearchFromSlash) {
+                    $fastPath['force_web_search'] = true;
+                }
+
+                return $fastPath;
             }
 
             $this->logger->info('MessageClassifier: Fast-path declined (language ambiguous) — deferring to AI sorter', [
@@ -251,28 +284,7 @@ final readonly class MessageClassifier
             return $result;
         }
 
-        // 2. Check for tool commands
-        if (!empty($text) && str_starts_with($text, '/')) {
-            $toolTopic = $this->detectToolCommand($text);
-            if ($toolTopic) {
-                $this->logger->info('MessageClassifier: Tool command detected', [
-                    'message_id' => $messageId,
-                    'tool' => $toolTopic,
-                ]);
-
-                $toolCommandDecision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, $toolTopic);
-
-                return array_merge([
-                    'topic' => $toolTopic,
-                    'language' => $message->getLanguage() ?: 'en',
-                    'intent' => $this->mapTopicToIntent($toolTopic),
-                    'source' => $toolCommandDecision->toClassificationSource(),
-                    'skip_sorting' => true,
-                ], $toolCommandDecision->toClassificationFields());
-            }
-        }
-
-        // 3. Document / audio / video attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595, #722)
+        // 2. Document / audio / video attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595, #722)
         if ($this->messageHasAnalyzableNonImageAttachment($message)) {
             if ($this->shouldRouteOfficeEditToOfficemaker($message)) {
                 $this->logger->info('MessageClassifier: Routing office edit to officemaker', [
@@ -405,7 +417,7 @@ final readonly class MessageClassifier
                     // reason as the fast-path: no AI-sorter round-trip means
                     // no BWEBSEARCH vote, and under the "trust the model"
                     // policy a missing vote means no search.
-                    return array_merge([
+                    return $this->withForceWebSearch(array_merge([
                         'topic' => $embeddingMatch->topic,
                         'language' => $confidentLanguage,
                         'web_search' => null,
@@ -415,7 +427,7 @@ final readonly class MessageClassifier
                         'model_id' => null,
                         'provider' => null,
                         'model_name' => null,
-                    ], $embeddingDecision->toClassificationFields());
+                    ], $embeddingDecision->toClassificationFields()), $forceWebSearchFromSlash);
                 }
 
                 $embeddingDeclinedForLanguage = true;
@@ -467,7 +479,7 @@ final readonly class MessageClassifier
 
             $deferredDecision = RoutingDecision::deterministic(RoutingLayer::NativeToolCalling, 'general');
 
-            return array_merge([
+            return $this->withForceWebSearch(array_merge([
                 'topic' => 'general',
                 // Unlike the fast-path and the embedding router, an ambiguous
                 // language does NOT force an escalation here: those layers
@@ -490,7 +502,7 @@ final readonly class MessageClassifier
                 // Absent (not false) on every other path, so no existing
                 // caller changes behaviour.
                 'defer_routing_to_chat' => true,
-            ], $deferredDecision->toClassificationFields());
+            ], $deferredDecision->toClassificationFields()), $forceWebSearchFromSlash);
         }
 
         // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
@@ -631,6 +643,10 @@ final readonly class MessageClassifier
             ]);
 
             $classification['multi_step'] = true;
+        }
+
+        if ($forceWebSearchFromSlash) {
+            $classification['force_web_search'] = true;
         }
 
         // Pass through duration if detected (for video generation)
@@ -821,17 +837,127 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Detect tool command from text.
+     * Resolve a leading slash command via {@see SlashCommandParser}.
+     *
+     * Bare argument-required commands and media tool topics return immediately.
+     * `/search` and `/docs` with an argument strip the prefix and continue so a
+     * pinned assistant profile can still be applied on top.
+     *
+     * @return array{return: array<string, mixed>|null, force_web_search: bool, slash_docs: bool}
      */
-    private function detectToolCommand(string $text): ?string
+    private function resolveSlashCommand(Message $message, string $text): array
     {
-        foreach (self::TOOL_COMMANDS as $command => $topic) {
-            if (str_starts_with($text, $command)) {
-                return $topic;
-            }
+        $parsed = (new SlashCommandParser())->parse($text);
+        if (null === $parsed) {
+            return ['return' => null, 'force_web_search' => false, 'slash_docs' => false];
         }
 
-        return null;
+        $language = $message->getLanguage() ?: 'en';
+        if ('NN' === $language) {
+            $language = 'en';
+        }
+
+        if ($parsed->requiresArgument() && $parsed->isBare()) {
+            $this->logger->info('MessageClassifier: Bare slash command — usage hint', [
+                'message_id' => $message->getId(),
+                'command' => $parsed->name,
+            ]);
+
+            $decision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, 'general');
+
+            return [
+                'return' => array_merge([
+                    'topic' => 'general',
+                    'language' => $language,
+                    'intent' => Capability::Chat->value,
+                    'source' => $decision->toClassificationSource(),
+                    'skip_sorting' => true,
+                    'slash_hint' => true,
+                    'slash_command' => $parsed->name,
+                ], $decision->toClassificationFields()),
+                'force_web_search' => false,
+                'slash_docs' => false,
+            ];
+        }
+
+        if ('search' === $parsed->name) {
+            $message->setText($parsed->argument);
+            $this->logger->info('MessageClassifier: /search stripped — force web search', [
+                'message_id' => $message->getId(),
+                'query_length' => strlen($parsed->argument),
+            ]);
+
+            return ['return' => null, 'force_web_search' => true, 'slash_docs' => false];
+        }
+
+        if ('docs' === $parsed->name) {
+            $message->setText($parsed->argument);
+            $this->logger->info('MessageClassifier: /docs stripped — rag_query', [
+                'message_id' => $message->getId(),
+                'query_length' => strlen($parsed->argument),
+            ]);
+
+            return ['return' => null, 'force_web_search' => false, 'slash_docs' => true];
+        }
+
+        $toolTopic = $parsed->toolTopic();
+        if (null !== $toolTopic) {
+            $this->logger->info('MessageClassifier: Tool command detected', [
+                'message_id' => $message->getId(),
+                'tool' => $toolTopic,
+            ]);
+
+            $decision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, $toolTopic);
+
+            return [
+                'return' => array_merge([
+                    'topic' => $toolTopic,
+                    'language' => $language,
+                    'intent' => $this->mapTopicToIntent($toolTopic),
+                    'source' => $decision->toClassificationSource(),
+                    'skip_sorting' => true,
+                ], $decision->toClassificationFields()),
+                'force_web_search' => false,
+                'slash_docs' => false,
+            ];
+        }
+
+        return ['return' => null, 'force_web_search' => false, 'slash_docs' => false];
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function applySlashOverlaysToClassification(
+        array $classification,
+        bool $forceWebSearch,
+        bool $slashDocs,
+    ): array {
+        if ($forceWebSearch) {
+            $classification['force_web_search'] = true;
+        }
+        if ($slashDocs) {
+            $classification['intent'] = Capability::RagQuery->value;
+            $classification['slash_docs'] = true;
+        }
+
+        return $classification;
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function withForceWebSearch(array $classification, bool $force): array
+    {
+        if ($force) {
+            $classification['force_web_search'] = true;
+        }
+
+        return $classification;
     }
 
     /**
@@ -1173,6 +1299,11 @@ final readonly class MessageClassifier
         $files = $message->getFiles();
         if ($files->count() > 0) {
             foreach ($files as $file) {
+                // A voice note whose transcript is the message text is the
+                // user's words. Documents and other audio on the turn still count.
+                if (SpokenInput::isSpokenAudio($message, $file)) {
+                    continue;
+                }
                 if ($this->attachedFileIsAnalyzableNonImage($file)) {
                     return true;
                 }
@@ -1182,6 +1313,10 @@ final readonly class MessageClassifier
         }
 
         if ($message->getFile() > 0 && '' !== (string) $message->getFilePath()) {
+            if (SpokenInput::isLegacySpokenAudio($message)) {
+                return false;
+            }
+
             $category = FileTypeResolver::resolveCategory(
                 $message->getFileType() ?: '',
                 '',

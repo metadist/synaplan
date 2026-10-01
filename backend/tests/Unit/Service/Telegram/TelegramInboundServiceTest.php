@@ -132,6 +132,66 @@ final class TelegramInboundServiceTest extends TestCase
         $this->assertSame(['I could not understand the voice message. Speak a little longer or send text.'], $this->texts());
     }
 
+    /**
+     * Issue #2287: a killed worker resumes a voice note by transcribing it
+     * before the answer, same as a fresh voice note.
+     */
+    public function testResumeTranscribesAnUntranscribedVoiceNoteBeforeAnswering(): void
+    {
+        $bot = $this->connectedBot();
+        $inbound = $this->untranscribedVoiceNote($bot);
+        $preprocessor = $this->createMock(MessagePreProcessor::class);
+        $preprocessor->expects($this->once())->method('process')->willReturnCallback(static function (Message $message): Message {
+            $message->setText('Wie wird das Wetter heute in Münster?');
+            foreach ($message->getFiles() as $file) {
+                $file->setFileText('Wie wird das Wetter heute in Münster?');
+            }
+
+            return $message;
+        });
+
+        $service = $this->service(bot: $bot, reply: 'Sunny in Münster.', preprocessor: $preprocessor);
+        $service->handle(5, 1, $this->update(['voice' => ['file_id' => 'v', 'mime_type' => 'audio/ogg']]));
+
+        $this->assertSame('Wie wird das Wetter heute in Münster?', $inbound->getText());
+        $this->assertCount(1, $this->processed);
+        $this->assertSame(['Sunny in Münster.'], $this->texts());
+    }
+
+    public function testResumeOfAnEmptyTranscriptStillSaysSo(): void
+    {
+        $bot = $this->connectedBot();
+        $this->untranscribedVoiceNote($bot);
+        $preprocessor = $this->createMock(MessagePreProcessor::class);
+        $preprocessor->expects($this->once())->method('process')->willReturnArgument(0);
+
+        $service = $this->service(bot: $bot, reply: 'never', preprocessor: $preprocessor);
+        $service->handle(5, 1, $this->update(['voice' => ['file_id' => 'v', 'mime_type' => 'audio/ogg']]));
+
+        $this->assertSame([], $this->processed);
+        $this->assertSame(['I could not understand the voice message. Speak a little longer or send text.'], $this->texts());
+    }
+
+    private function untranscribedVoiceNote(TelegramBot $bot): Message
+    {
+        $inbound = new Message();
+        $inbound->setUserId(7);
+        $inbound->setTrackingId(1);
+        $inbound->setDirection('IN');
+        $inbound->setStatus('processing');
+        $inbound->setText('');
+        (new \ReflectionProperty(Message::class, 'id'))->setValue($inbound, 50);
+        $inbound->setMeta(TelegramMessageStore::META_UPDATE, $bot->getBotId().':1');
+        $audio = new File();
+        $audio->setUserId(7);
+        $audio->setFileType('ogg');
+        $audio->setFileName('voice.ogg');
+        $inbound->addFile($audio);
+        $this->messages[] = $inbound;
+
+        return $inbound;
+    }
+
     public function testALocationBecomesTextForTheAi(): void
     {
         $service = $this->service(reply: 'That is Berlin.');
@@ -161,6 +221,15 @@ final class TelegramInboundServiceTest extends TestCase
         $service->handle(5, 1, $this->update(['text' => 'hello'], fromId: 999));
 
         $this->assertSame(['This bot only answers its owner.'], $this->texts());
+    }
+
+    public function testOwnerWithoutAStoredLanguageReadsTelegramLanguage(): void
+    {
+        $service = $this->service(persist: false, locale: 'en', languageStored: false);
+
+        $service->handle(5, 1, $this->update(['text' => '/help'], languageCode: 'de'));
+
+        $this->assertStringStartsWith('Senden Sie Text, Fotos', $this->texts()[0]);
     }
 
     public function testOwnerReadsTheirAppLanguage(): void
@@ -376,7 +445,9 @@ final class TelegramInboundServiceTest extends TestCase
         $upload = $this->call('sendFile');
         $this->assertSame(TelegramFileMethod::Document, $upload[2]);
         $this->assertSame('Report.docx', $upload[4]);
-        $this->assertSame('Your report is ready.', $upload[5]);
+        $this->assertStringContainsString('Your report is ready.', $upload[5]);
+        $this->assertStringNotContainsString('__FILE_GENERATED__', $upload[5]);
+        $this->assertStringContainsString('report.docx', $upload[5]);
         $this->assertSame("Your report is ready.\n__FILE_GENERATED__:report.docx", $this->messages[1]->getText());
     }
 
@@ -424,7 +495,8 @@ final class TelegramInboundServiceTest extends TestCase
         $upload = $this->call('sendFile');
         $this->assertSame(TelegramFileMethod::Document, $upload[2]);
         $this->assertSame('Report.docx', $upload[4]);
-        $this->assertSame('', $upload[5]);
+        $this->assertStringNotContainsString('__', $upload[5]);
+        $this->assertStringContainsString('report.docx', $upload[5]);
         $this->assertSame([], $this->texts());
     }
 
@@ -816,6 +888,7 @@ final class TelegramInboundServiceTest extends TestCase
         ?MessageProcessor $processor = null,
         bool $allowed = true,
         string $locale = 'en',
+        bool $languageStored = true,
         bool $seen = false,
         ?ChatActivityNotifier $activity = null,
         array $chats = [],
@@ -830,6 +903,7 @@ final class TelegramInboundServiceTest extends TestCase
         ?MediaJobCanceller $canceller = null,
         ?PlatformDocReferenceResolver $docs = null,
         ?ClockInterface $clock = null,
+        ?MessagePreProcessor $preprocessor = null,
     ): TelegramInboundService {
         $bot ??= $this->connectedBot();
         /** @var list<object> $pending */
@@ -876,6 +950,7 @@ final class TelegramInboundServiceTest extends TestCase
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
         $user->method('getLocale')->willReturn($locale);
+        $user->method('getPreferredLanguage')->willReturn($languageStored ? $locale : null);
         $users = $this->createMock(UserRepository::class);
         $users->method('find')->willReturn($user);
 
@@ -918,7 +993,7 @@ final class TelegramInboundServiceTest extends TestCase
             $sender,
             $downloader,
             $copy,
-            $this->createStub(MessagePreProcessor::class),
+            $preprocessor ?? $this->createStub(MessagePreProcessor::class),
             $processor,
             $errors,
             $limits,

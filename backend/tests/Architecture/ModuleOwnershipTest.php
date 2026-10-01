@@ -48,6 +48,7 @@ final class ModuleOwnershipTest extends TestCase
         'mobile_iap',
         'whatsapp',
         'telegram',
+        'federation',
         'compute',
         'opendesk_stt',
     ];
@@ -204,7 +205,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(15, self::MODULE_IDS);
+        $this->assertCount(16, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);

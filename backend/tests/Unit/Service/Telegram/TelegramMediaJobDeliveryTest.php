@@ -88,6 +88,19 @@ final class TelegramMediaJobDeliveryTest extends TestCase
         $this->assertSame(1000, $message[4]);
     }
 
+    public function testAFailureUsesTheLanguageStoredOnTheAnswerWhenTheAccountHasNone(): void
+    {
+        $answer = $this->answer();
+        $answer->setLanguage('de');
+
+        $this->delivery($answer, $this->job(MediaJob::STATUS_TIMED_OUT))->deliver('job-1', 55);
+
+        $this->assertStringStartsWith(
+            'Das Bild konnte nicht erstellt werden.',
+            $this->calls('sendMessage')[0][2],
+        );
+    }
+
     public function testACancelledRenderSaysNothingWasCreated(): void
     {
         $this->delivery($this->answer(), $this->job(MediaJob::STATUS_CANCELLED))->deliver('job-1', 55);
@@ -183,6 +196,7 @@ final class TelegramMediaJobDeliveryTest extends TestCase
         $translator = new Translator('en');
         $translator->addLoader('yaml', new YamlFileLoader());
         $translator->addResource('yaml', dirname(__DIR__, 4).'/translations/telegram.en.yaml', 'en', 'telegram');
+        $translator->addResource('yaml', dirname(__DIR__, 4).'/translations/telegram.de.yaml', 'de', 'telegram');
         $copy = new TelegramCopy($translator);
         $store = new TelegramMessageStore($em, $connections);
 

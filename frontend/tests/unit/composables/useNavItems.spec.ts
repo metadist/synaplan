@@ -91,6 +91,7 @@ const navMessages = {
     adminProviderSetup: 'AI infrastructure',
     adminSystemConfig: 'System configuration',
     adminPeople: 'People',
+    adminPartners: 'Partners',
   },
   pageTitles: {
     configApiDocs: 'API docs',
@@ -366,6 +367,7 @@ describe('useNavItems rail', () => {
       'admin-features',
       'admin-setup',
       'admin-people',
+      'admin-partners',
       'admin-config',
     ])
     expect(children.find((child) => child.key === 'admin-features')?.label).toBe('System status')

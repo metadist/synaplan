@@ -114,11 +114,12 @@ final class DesktopMediaController extends AbstractController
             properties: [
                 new OA\Property(property: 'text', type: 'string', example: 'Good morning'),
                 new OA\Property(property: 'model', type: 'string', example: 'openai:tts-1:text2sound'),
+                new OA\Property(property: 'language', type: 'string', description: 'Language of the spoken text (e.g. de, en). Defaults to the user locale when omitted.', example: 'de', nullable: true),
             ]
         )
     )]
     #[OA\Response(response: 200, description: 'Generated audio file URL')]
-    #[OA\Response(response: 400, description: 'Invalid text or model')]
+    #[OA\Response(response: 400, description: 'Invalid text, model, or language, or the text has nothing to speak')]
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 422, description: 'Model not available')]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]
@@ -135,9 +136,18 @@ final class DesktopMediaController extends AbstractController
 
         $text = trim((string) ($data['text'] ?? ''));
         $model = trim((string) ($data['model'] ?? ''));
+        if (\array_key_exists('language', $data) && null !== $data['language'] && !\is_string($data['language'])) {
+            return new JsonResponse(['error' => 'language must be a string'], Response::HTTP_BAD_REQUEST);
+        }
+        $language = isset($data['language']) && \is_string($data['language'])
+            ? trim($data['language'])
+            : null;
+        if (null !== $language && '' === $language) {
+            $language = null;
+        }
 
         try {
-            return new JsonResponse($this->media->speak($user, $text, $model));
+            return new JsonResponse($this->media->speak($user, $text, $model, $language));
         } catch (\InvalidArgumentException $e) {
             return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (RateLimitExceededException $e) {

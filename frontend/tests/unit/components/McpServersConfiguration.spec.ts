@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import McpServersConfiguration from '@/components/config/McpServersConfiguration.vue'
 
@@ -105,6 +105,21 @@ const mountOptions = {
   },
 }
 
+// Opening the editor scrolls it into view. The environment does not have to
+// provide Element.scrollIntoView, and every test in this file that opens the
+// form (Edit and Add) hits that path.
+const scrollIntoView = vi.fn()
+const previousScrollIntoView = Element.prototype.scrollIntoView
+
+beforeEach(() => {
+  Element.prototype.scrollIntoView = scrollIntoView
+  scrollIntoView.mockClear()
+})
+
+afterEach(() => {
+  Element.prototype.scrollIntoView = previousScrollIntoView
+})
+
 describe('McpServersConfiguration — task usage panel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -135,6 +150,25 @@ describe('McpServersConfiguration — task usage panel', () => {
     expect(wrapper.find('[data-testid="mcp-usage-warning"]').exists()).toBe(false)
     const toggle = wrapper.find('[data-testid="toggle-mcp-topic-general"]')
     expect((toggle.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('scrolls the edit form into view and focuses its first field', async () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(() => {})
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="btn-mcp-edit-3"]').trigger('click')
+    await flushPromises()
+
+    const name = wrapper.get('[data-testid="input-mcp-name"]').element
+    expect(wrapper.find('[data-testid="section-mcp-editor"]').exists()).toBe(true)
+    expect(focus.mock.instances).toContain(name)
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true })
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    expect(focus.mock.invocationCallOrder[0]).toBeLessThan(
+      scrollIntoView.mock.invocationCallOrder[0]
+    )
+    focus.mockRestore()
   })
 
   it('hides the whole panel when no servers are connected', async () => {
@@ -278,25 +312,25 @@ describe('McpServersConfiguration — add-server templates', () => {
 
     expect(wrapper.find('[data-testid="mcp-empty"]').exists()).toBe(true)
     const custom = wrapper.find('[data-testid="btn-mcp-template-custom"]')
-    const jira = wrapper.find('[data-testid="btn-mcp-template-jira"]')
+    const github = wrapper.find('[data-testid="btn-mcp-template-github"]')
     expect(custom.exists()).toBe(true)
-    expect(jira.exists()).toBe(true)
+    expect(github.exists()).toBe(true)
     expect(custom.attributes('aria-checked')).toBe('true')
-    expect(jira.attributes('aria-checked')).toBe('false')
+    expect(github.attributes('aria-checked')).toBe('false')
   })
 
   it('opens the form from a template and prefills only that template', async () => {
     const wrapper = mount(McpServersConfiguration, mountOptions)
     await flushPromises()
 
-    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await wrapper.find('[data-testid="btn-mcp-template-github"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.find('[data-testid="section-mcp-editor"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="mcp-empty"]').exists()).toBe(false)
     const name = wrapper.find('[data-testid="input-mcp-name"]').element as HTMLInputElement
-    expect(name.value).toBe('Jira')
-    expect(wrapper.find('[data-testid="btn-mcp-template-jira"]').attributes('aria-checked')).toBe(
+    expect(name.value).toBe('GitHub')
+    expect(wrapper.find('[data-testid="btn-mcp-template-github"]').attributes('aria-checked')).toBe(
       'true'
     )
   })
@@ -306,20 +340,20 @@ describe('McpServersConfiguration — add-server templates', () => {
     await flushPromises()
 
     await wrapper.find('[data-testid="btn-mcp-add"]').trigger('click')
-    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await wrapper.find('[data-testid="btn-mcp-template-github"]').trigger('click')
     await flushPromises()
 
     const name = () => wrapper.find('[data-testid="input-mcp-name"]').element as HTMLInputElement
-    expect(name().value).toBe('Jira')
+    expect(name().value).toBe('GitHub')
 
-    await wrapper.find('[data-testid="btn-mcp-template-jira"]').trigger('click')
+    await wrapper.find('[data-testid="btn-mcp-template-github"]').trigger('click')
     await flushPromises()
 
     expect(name().value).toBe('')
     expect(wrapper.find('[data-testid="btn-mcp-template-custom"]').attributes('aria-checked')).toBe(
       'true'
     )
-    expect(wrapper.find('[data-testid="btn-mcp-template-jira"]').attributes('aria-checked')).toBe(
+    expect(wrapper.find('[data-testid="btn-mcp-template-github"]').attributes('aria-checked')).toBe(
       'false'
     )
   })

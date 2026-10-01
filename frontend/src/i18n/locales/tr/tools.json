@@ -353,16 +353,6 @@
         "summary": "Herhangi bir MCP uç noktası",
         "hint": "Herhangi bir Streamable HTTP MCP sunucusunun HTTPS URL'sini ve gerekirse bir erişim token'ını yapıştırın. CRM, wiki, talepler, otomasyon — MCP konuşuyorsa burada çalışır."
       },
-      "jira": {
-        "name": "Jira",
-        "summary": "Talepler ve sorunlar",
-        "hint": "Jira uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken talepleri listeleyebilir ve bir prompt ile yenilerini oluşturabilirsiniz."
-      },
-      "confluence": {
-        "name": "Confluence",
-        "summary": "Wiki sayfaları",
-        "hint": "Confluence uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken sayfalarda arama yapabilir, özetler alabilir ve bir prompt ile yeni sayfalar oluşturabilirsiniz."
-      },
       "github": {
         "name": "GitHub",
         "summary": "Depolar, issue'lar, pull request'ler",
@@ -382,6 +372,11 @@
         "name": "Higgsfield",
         "summary": "Görüntü ve video araçları",
         "hint": "Bağlantıyı kaydedin, ardından Higgsfield hesabınızla oturum açın. Geçmişe bakmak salt okunurdur; görüntü veya video oluşturmak yazma eylemleri ister ve Higgsfield kredilerinizi kullanır."
+      },
+      "atlassian": {
+        "name": "Jira ve Confluence",
+        "summary": "Atlassian Cloud ile oturum açma",
+        "hint": "Bağlantıyı kaydedin, ardından Atlassian hesabınızla oturum açın. Synaplan, görebildiğiniz Jira kayıtlarını ve Confluence sayfalarını, sohbete yapıştırdığınız sayfalar dahil, okuyabilir. API belirteci gerekmez. Erişimi istediğiniz zaman Atlassian hesabınızdan iptal edebilirsiniz."
       }
     },
     "oauthFormHint": "Bu sunucu hesap oturumunuzu kullanır. Kaydedin, ardından erişime izin vermek için sağlayıcıya yönlendirilirsiniz. Yapıştırılacak bir erişim token'ı yoktur.",

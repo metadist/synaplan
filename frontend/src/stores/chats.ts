@@ -117,6 +117,13 @@ export const useChatsStore = defineStore('chats', () => {
    */
   const pendingEmptyCreates = new Set<Promise<Chat | null>>()
   /**
+   * Boot GET /chats while it has not applied yet. New Chat must wait for it:
+   * choosing against the still-empty local list creates a duplicate, then the
+   * late response runs ensureValidActiveChat() and puts the previous thread
+   * back on screen.
+   */
+  let listLoading: Promise<void> | null = null
+  /**
    * Live generating marks, keyed by chat id → `chatsLoadSeq` at mark time.
    * Applied only to loads that were already in flight (`epoch >= loadSeq`) so
    * a later snapshot can turn the marker off after the user walked away.
@@ -279,28 +286,39 @@ export const useChatsStore = defineStore('chats', () => {
     loading.value = true
     error.value = null
 
+    const run = (async () => {
+      try {
+        const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
+          '/api/v1/chats'
+        )
+        if (seq !== chatsLoadSeq) {
+          return
+        }
+        applyChatsFromServer(
+          (data.chats || []).map((chat) => normalizeChat(chat)),
+          data.activeRunChatIds ?? [],
+          seq
+        )
+        ensureValidActiveChat()
+      } catch (err: unknown) {
+        if (seq !== chatsLoadSeq) {
+          return
+        }
+        error.value = getErrorMessage(err) || 'Failed to load chats'
+        console.error('Error loading chats:', err)
+      } finally {
+        if (seq === chatsLoadSeq) {
+          loading.value = false
+        }
+      }
+    })()
+
+    listLoading = run
     try {
-      const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
-        '/api/v1/chats'
-      )
-      if (seq !== chatsLoadSeq) {
-        return
-      }
-      applyChatsFromServer(
-        (data.chats || []).map((chat) => normalizeChat(chat)),
-        data.activeRunChatIds ?? [],
-        seq
-      )
-      ensureValidActiveChat()
-    } catch (err: unknown) {
-      if (seq !== chatsLoadSeq) {
-        return
-      }
-      error.value = getErrorMessage(err) || 'Failed to load chats'
-      console.error('Error loading chats:', err)
+      await run
     } finally {
-      if (seq === chatsLoadSeq) {
-        loading.value = false
+      if (listLoading === run) {
+        listLoading = null
       }
     }
   }
@@ -458,6 +476,14 @@ export const useChatsStore = defineStore('chats', () => {
 
     if (pendingEmptyCreates.size > 0) {
       await Promise.all(pendingEmptyCreates)
+    }
+
+    // A click that lands while the boot list is still in flight must not
+    // decide against `chats === []`. That creates a chat the selection guard
+    // then refuses to show, because the list response moves the selection to
+    // the previous thread.
+    while (listLoading) {
+      await listLoading
     }
 
     // Find all empty chats (not widget sessions, no messages, default title).

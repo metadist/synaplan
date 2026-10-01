@@ -45,10 +45,11 @@ class OidcUserService
     /**
      * Find or create a user from OIDC claims, sync roles, persist.
      *
-     * @param array<string, mixed> $claims       OIDC token/userinfo claims
-     * @param string|null          $refreshToken Keycloak refresh token (only set during browser login)
+     * @param array<string, mixed> $claims         OIDC token/userinfo claims
+     * @param string|null          $refreshToken   Keycloak refresh token (only set during browser login)
+     * @param string|null          $signupLanguage UI language for a brand-new account (de, en, es, fr, tr)
      */
-    public function findOrCreateFromClaims(array $claims, ?string $refreshToken = null): User
+    public function findOrCreateFromClaims(array $claims, ?string $refreshToken = null, ?string $signupLanguage = null): User
     {
         $sub = $claims['sub'] ?? null;
         $email = $claims['email'] ?? null;
@@ -95,6 +96,9 @@ class OidcUserService
         }
 
         $this->updateUserDetails($user, $claims, $refreshToken);
+        if ($isNewUser) {
+            $user->applySignupLanguage($signupLanguage);
+        }
         $this->syncRoles($user, $claims);
 
         $this->em->persist($user);

@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\DTO\WhatsApp\IncomingMessageDto;
@@ -16,7 +17,9 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ExternalReplyReferences;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
+use App\Service\Message\SpokenInput;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
 use App\Service\WhatsApp\WhatsAppAgentBinding;
@@ -114,6 +117,7 @@ final class WhatsAppService
         private ?ChatActivityNotifier $chatActivityNotifier = null,
         private ?WhatsAppAgentBinding $agentBinding = null,
         private ?AgentConfig $agentConfig = null,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -907,7 +911,14 @@ final class WhatsAppService
         // The stored reply keeps [Doc:slug] so the web chat can render the pill.
         // The phone gets the same text with those tags turned into links.
         $responseText = $this->externalReplyReferences->resolveStored($responseText, $user);
-        $channelText = $this->externalReplyReferences->resolveDocTags($responseText);
+        $userFacing = null !== $this->mediaTextRenderer
+            ? $this->mediaTextRenderer->forUser(
+                $responseText,
+                $message->getLanguage(),
+                $user->getLocale(),
+            )
+            : GeneratedMediaTextRenderer::renderModel($responseText);
+        $channelText = $this->externalReplyReferences->resolveDocTags($userFacing);
         $metadata = $result['response']['metadata'] ?? [];
         $classification = is_array($result['classification'] ?? null) ? $result['classification'] : null;
         $fileData = $metadata['file'] ?? null;
@@ -1334,18 +1345,6 @@ final class WhatsAppService
      */
     private function generateTtsResponse(string $text, int $userId, string $language = 'en'): ?array
     {
-        // Compare against the SANITIZED length: stripping markdown shortens
-        // almost every answer, so measuring against the raw text would log a
-        // truncation on each one.
-        $speakable = TtsTextSanitizer::sanitize($text);
-        $text = TtsTextSanitizer::truncateForSynthesis($speakable);
-        if (mb_strlen($text) < mb_strlen($speakable)) {
-            $this->logger->info('WhatsApp: TTS text truncated', [
-                'original_length' => mb_strlen($speakable),
-                'max_length' => TtsTextSanitizer::MAX_SYNTHESIS_CHARS,
-            ]);
-        }
-
         try {
             $this->logger->info('WhatsApp: Generating TTS response', [
                 'user_id' => $userId,
@@ -1353,9 +1352,9 @@ final class WhatsAppService
                 'language' => $language,
             ]);
 
-            $result = $this->aiFacade->synthesize($text, $userId, [
+            // Facade sanitizes + truncates; language is required (#2283).
+            $result = $this->aiFacade->synthesize($text, $language, $userId, [
                 'format' => 'mp3',
-                'language' => $language,
             ]);
 
             $this->logger->info('WhatsApp: TTS generation successful', [
@@ -1364,6 +1363,12 @@ final class WhatsAppService
             ]);
 
             return $result;
+        } catch (NoSpeakableTextException) {
+            $this->logger->info('WhatsApp: TTS skipped, no speakable text', [
+                'user_id' => $userId,
+            ]);
+
+            return null;
         } catch (\Throwable $e) {
             $this->logger->error('WhatsApp: TTS generation failed', [
                 'user_id' => $userId,
@@ -1686,6 +1691,12 @@ final class WhatsAppService
                         $placeholders = ['[Audio message]', '[Audio]', '[Video]', '[Video message]'];
 
                         if (empty($currentText) || in_array($currentText, $placeholders, true)) {
+                            // Only a caption-less voice note is spoken input.
+                            // A video, or audio that already has a caption, keeps
+                            // today's attachment handling.
+                            if ('audio' === $dto->type && SpokenInput::isReplaceablePlaceholder((string) $currentText)) {
+                                SpokenInput::mark($message);
+                            }
                             $message->setText($extractedText);
                             $this->logger->info('WhatsApp: Replaced media placeholder with transcription', [
                                 'type' => $dto->type,

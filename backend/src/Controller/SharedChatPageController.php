@@ -8,6 +8,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\File\OgImageService;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\PastedContentText;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -44,6 +45,7 @@ class SharedChatPageController extends AbstractController
         private OgImageService $ogImageService,
         private BrandingService $brandingService,
         private string $synaplanUrl,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -136,18 +138,21 @@ class SharedChatPageController extends AbstractController
             }
         }
 
-        // Try to use first meaningful AI response as title
+        // Prefer the next non-media AI reply; never use a media prompt as title.
         foreach ($messages as $message) {
             if ('OUT' === $message->getDirection()) {
-                $text = strip_tags($message->getText());
-
-                // Skip media generation responses - extract the actual content
-                if (preg_match('/^Generated (?:image|video|audio):\s*(.+)$/i', $text, $matches)) {
-                    $text = $matches[1];
+                $raw = strip_tags($message->getText());
+                if ((null !== $this->mediaTextRenderer && $this->mediaTextRenderer->isMediaMarker($raw))
+                    || str_starts_with(trim($raw), '__IMAGE_GENERATED__')
+                    || str_starts_with(trim($raw), '__VIDEO_GENERATED__')
+                    || str_starts_with(trim($raw), '__AUDIO_GENERATED__')
+                    || str_starts_with(trim($raw), '__FILE_GENERATED__:')
+                    || str_starts_with(trim($raw), '__FILE_GENERATION_FAILED__')
+                    || 1 === preg_match('/^Generated (?:image|video|audio):/i', trim($raw))) {
+                    continue;
                 }
 
-                // Remove slash commands from the beginning
-                $text = $this->cleanSlashCommands($text);
+                $text = $this->cleanSlashCommands($raw);
 
                 // Get first sentence or first 60 chars
                 $firstSentence = preg_split('/[.!?]/', $text, 2)[0] ?? $text;

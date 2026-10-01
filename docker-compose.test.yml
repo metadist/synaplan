@@ -65,6 +65,7 @@ services:
       TELEGRAM_API_BASE_URL: http://telegram-stub:3998
       TELEGRAM_WEBHOOK_BASE_URL: https://e2e.synaplan.test
       TELEGRAM_ALLOW_LOCAL_WEBHOOK: "false"
+      FEDERATION_ALLOW_LOCAL: "false"
     depends_on:
       db_test:
         condition: service_healthy

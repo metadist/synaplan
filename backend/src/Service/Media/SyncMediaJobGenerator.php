@@ -62,16 +62,19 @@ final readonly class SyncMediaJobGenerator
     {
         $options = $job->getOptions();
         $language = is_string($options['lang'] ?? null)
-            ? (string) $options['lang']
-            : (is_string($options['language'] ?? null) ? (string) $options['language'] : 'en');
+            ? trim((string) $options['lang'])
+            : (is_string($options['language'] ?? null) ? trim((string) $options['language']) : '');
+
+        if ('' === $language) {
+            throw new \RuntimeException(sprintf('Audio job "%s" is missing language (options.lang). Refusing silent English default (#2283).', $job->getJobKey()));
+        }
 
         // synthesize() already writes the file to the user-scoped upload path and
         // returns the relative path — no extra save step needed for audio.
-        $result = $this->aiFacade->synthesize($job->getPrompt() ?? '', $job->getUserId(), [
+        $result = $this->aiFacade->synthesize($job->getPrompt() ?? '', $language, $job->getUserId(), [
             'provider' => $job->getProvider(),
             'model' => $job->getModel(),
             'format' => 'mp3',
-            'language' => $language,
         ]);
 
         $relativePath = $result['relativePath'] ?? '';

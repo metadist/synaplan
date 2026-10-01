@@ -427,16 +427,6 @@
         "summary": "Any MCP endpoint",
         "hint": "Paste the HTTPS URL of any Streamable HTTP MCP server and, if needed, an access token. CRM, wiki, tickets, automation — if it speaks MCP, it works here."
       },
-      "jira": {
-        "name": "Jira",
-        "summary": "Tickets and issues",
-        "hint": "Connect a Jira-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can list tickets and create new ones from a prompt."
-      },
-      "confluence": {
-        "name": "Confluence",
-        "summary": "Wiki pages",
-        "hint": "Connect a Confluence-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can search pages, get summaries, and create new pages from a prompt."
-      },
       "github": {
         "name": "GitHub",
         "summary": "Repos, issues, pull requests",
@@ -456,6 +446,11 @@
         "name": "Higgsfield",
         "summary": "Image and video tools",
         "hint": "Save the connection, then sign in with your Higgsfield account. Browsing your history is read-only; creating images or videos needs write actions and uses your Higgsfield credits."
+      },
+      "atlassian": {
+        "name": "Jira & Confluence",
+        "summary": "Atlassian Cloud sign-in",
+        "hint": "Save the connection, then sign in with your Atlassian account. Synaplan can then read the Jira issues and Confluence pages you can see, including pages you paste into the chat. No API token is needed. You can revoke access in your Atlassian account at any time."
       }
     },
     "oauthFormHint": "This server uses your account sign-in. Save it, then you will be sent to the provider to allow access. No access token to paste.",

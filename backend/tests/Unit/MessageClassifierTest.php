@@ -116,6 +116,92 @@ class MessageClassifierTest extends TestCase
         $this->assertTrue($result['skip_sorting']);
     }
 
+    #[DataProvider('bareSlashCommands')]
+    public function testBareSlashCommandReturnsUsageHint(string $text, string $command): void
+    {
+        $message = $this->mutableTextMessage($text);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertTrue($result['slash_hint'] ?? false);
+        $this->assertSame($command, $result['slash_command'] ?? null);
+        $this->assertSame('general', $result['topic']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function bareSlashCommands(): iterable
+    {
+        yield 'pic' => ['/pic', 'pic'];
+        yield 'pic whitespace' => ['/pic   ', 'pic'];
+        yield 'pic at bot' => ['/pic@TestBot', 'pic'];
+        yield 'vid' => ['/vid', 'vid'];
+        yield 'tts' => ['/tts', 'tts'];
+        yield 'search' => ['/search', 'search'];
+        yield 'docs' => ['/docs', 'docs'];
+    }
+
+    public function testSearchCommandStripsAndForcesWebSearch(): void
+    {
+        $message = $this->mutableTextMessage('/search Wetter in Münster heute');
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+        ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('Wetter in Münster heute', $message->getText());
+        $this->assertTrue($result['force_web_search'] ?? false);
+        $this->assertSame('general', $result['topic']);
+        $this->assertArrayNotHasKey('slash_hint', $result);
+        $this->assertNotSame('tools:search', $result['topic']);
+    }
+
+    public function testDocsCommandRoutesToRagQuery(): void
+    {
+        $message = $this->mutableTextMessage('/docs Rechnung');
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('Rechnung', $message->getText());
+        $this->assertSame('rag_query', $result['intent']);
+        $this->assertSame('general', $result['topic']);
+        $this->assertTrue($result['slash_docs'] ?? false);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    private function mutableTextMessage(string $text): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(42);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getText')->willReturnCallback(static function () use (&$text): string {
+            return $text;
+        });
+        $message->method('setText')->willReturnCallback(static function (string $value) use (&$text, $message): Message {
+            $text = $value;
+
+            return $message;
+        });
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $message->method('getFile')->willReturn(0);
+
+        return $message;
+    }
+
     public function testHelpCommandRoutesToSynaplan(): void
     {
         $message = $this->createMock(Message::class);
@@ -528,6 +614,51 @@ class MessageClassifierTest extends TestCase
 
         $this->assertSame('analyzefile', $result['topic']);
         $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    /**
+     * Issue #2287: a voice note whose transcript is the message text is
+     * classified like the same words typed, not as a file task.
+     */
+    public function testSpokenVoiceNoteIsClassifiedLikeTypedText(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $sorterResult = ['topic' => 'general', 'language' => 'de', 'web_search' => true];
+        $this->messageSorter->method('classify')->willReturn($sorterResult);
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $typed = $this->createMock(Message::class);
+        $typed->method('getId')->willReturn(21);
+        $typed->method('getUserId')->willReturn(10);
+        $typed->method('getText')->willReturn($text);
+        $typed->method('getLanguage')->willReturn('de');
+        $typed->method('getFiles')->willReturn(new ArrayCollection());
+        $typed->method('getFile')->willReturn(0);
+
+        $file = $this->createMock(File::class);
+        $file->method('getFileType')->willReturn('ogg');
+        $file->method('getFileName')->willReturn('voice.ogg');
+        $file->method('getFileText')->willReturn($text);
+
+        $voice = $this->createMock(Message::class);
+        $voice->method('getId')->willReturn(22);
+        $voice->method('getUserId')->willReturn(10);
+        $voice->method('getText')->willReturn($text);
+        $voice->method('getLanguage')->willReturn('de');
+        $voice->method('getFile')->willReturn(0);
+        $voice->method('getFiles')->willReturn(new ArrayCollection([$file]));
+        $voice->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        $typedResult = $this->service->classify($typed);
+        $voiceResult = $this->service->classify($voice);
+
+        $this->assertSame($typedResult['topic'], $voiceResult['topic']);
+        $this->assertSame($typedResult['intent'], $voiceResult['intent']);
+        $this->assertSame('general', $voiceResult['topic']);
+        $this->assertNotSame('file_analysis', $voiceResult['intent']);
+        $this->assertNotSame('analyzefile', $voiceResult['topic']);
     }
 
     /**

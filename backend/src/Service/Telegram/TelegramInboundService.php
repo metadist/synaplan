@@ -59,6 +59,8 @@ final readonly class TelegramInboundService
             return;
         }
 
+        $this->connections->ensureCommandMenu($bot);
+
         $updateKey = $bot->getBotId().':'.$updateId;
         $lock = $this->lockFactory->createLock('telegram_turn_'.$botRowId.'_'.$updateId, self::LOCK_SECONDS);
         if (!$lock->acquire()) {
@@ -486,18 +488,27 @@ final readonly class TelegramInboundService
     private function localeFor(TelegramBot $bot, User $owner, string $tgUserId, array $from): string
     {
         $isOwner = TelegramBot::STATUS_PENDING === $bot->getStatus() || $bot->getTgUserId() === $tgUserId;
+        $telegramLanguage = $this->telegramLanguage($from);
         if ($isOwner) {
-            return $owner->getLocale();
-        }
-        $code = $from['language_code'] ?? null;
-        if (is_string($code)) {
-            $language = strtolower(substr($code, 0, 2));
-            if (in_array($language, self::SUPPORTED_LOCALES, true)) {
-                return $language;
-            }
+            return $owner->getPreferredLanguage() ?? $telegramLanguage ?? 'en';
         }
 
-        return $owner->getLocale();
+        return $telegramLanguage ?? $owner->getLocale();
+    }
+
+    /**
+     * @param array<string, mixed> $from
+     */
+    private function telegramLanguage(array $from): ?string
+    {
+        $code = $from['language_code'] ?? null;
+        if (!is_string($code)) {
+            return null;
+        }
+
+        $language = strtolower(substr($code, 0, 2));
+
+        return in_array($language, self::SUPPORTED_LOCALES, true) ? $language : null;
     }
 
     private function scalarId(mixed $value): ?string

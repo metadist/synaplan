@@ -1214,6 +1214,9 @@
     "telegram": {
       "label": "Canal de Telegram"
     },
+    "federation": {
+      "label": "Socios"
+    },
     "opendesk_stt": {
       "label": "Notas de la reunión"
     },
@@ -1234,6 +1237,70 @@
       "body": "Esta función es opcional. La activa el administrador de esta instalación.",
       "howToEnable": "Cómo activarla",
       "openFeatureStatus": "Abrir estado del sistema"
+    }
+  },
+  "partners": {
+    "title": "Socios",
+    "subtitle": "Conéctese con otras empresas. No se comparte nada hasta que usted lo elija.",
+    "unreachable": "Su servidor tiene una dirección privada, así que otras empresas no pueden llegar. Los socios necesitan una dirección https pública.",
+    "empty": "Trabaje con otras empresas. Envíe una invitación o pegue una que haya recibido. Sus archivos se quedan en su servidor.",
+    "companyName": "Nombre de la empresa",
+    "open": "Abrir a socios",
+    "openedLine": "Abierto a socios como {name}.",
+    "fingerprint": "Clave {fingerprint}",
+    "close": "Cerrar a socios",
+    "closeTitle": "¿Cerrar a socios?",
+    "closeMessage": "Las conexiones nuevas se detienen. Cada socio actual se desconecta. Lo que ya copiaron no se borra.",
+    "invite": "Invitar a un socio",
+    "inviteHelp": "Envíe esta dirección al administrador de la otra empresa. Sirve una vez y caduca en 7 días.",
+    "copy": "Copiar dirección",
+    "copied": "Dirección copiada.",
+    "pasteLabel": "¿Tiene una invitación?",
+    "pastePlaceholder": "Pegue la dirección de invitación",
+    "connect": "Conectar",
+    "connected": "Conectado. Aún no se comparte nada, en ningún lado.",
+    "pending": "Invitación en espera",
+    "active": "Conectado",
+    "paused": "En pausa",
+    "pausedByThem": "La otra empresa pausó esta conexión.",
+    "pause": "Pausar",
+    "resume": "Reanudar",
+    "disconnect": "Desconectar",
+    "disconnectTitle": "¿Desconectar a {name}?",
+    "disconnectMessage": "Esta conexión se detiene ahora. Lo que ya se copió no se borra.",
+    "removeInvite": "Quitar invitación",
+    "removeInviteTitle": "¿Quitar esta invitación?",
+    "removeInviteMessage": "El enlace deja de funcionar. No se compartió nada.",
+    "pausedHere": "En pausa. No pueden usar esta conexión hasta que usted reanude.",
+    "pausedPending": "En pausa aquí. El otro servidor aún no ha confirmado.",
+    "resumed": "Reanudado.",
+    "resumedPending": "Reanudado aquí. El otro servidor aún no ha confirmado.",
+    "disconnected": "Desconectado. Esta conexión se detiene ahora.",
+    "disconnectedPending": "Desconectado aquí. El otro servidor aún no ha confirmado.",
+    "inviteRemoved": "Invitación quitada. El enlace ya no funciona.",
+    "closed": "Cerrado. Las conexiones nuevas se detienen.",
+    "inviteReady": "Invitación lista. Envíe la dirección al otro administrador.",
+    "loadFailed": "No se pudieron cargar los socios. Inténtelo de nuevo.",
+    "joinTitle": "Está invitado",
+    "joinBody": "{name} ({domain}) invitó a su empresa. En su Synaplan abra Operar, luego Socios, y pegue esta dirección.",
+    "joinInvalid": "Esta invitación no es válida o ha caducado.",
+    "errors": {
+      "not_reachable": "Su servidor tiene una dirección privada, así que otras empresas no pueden llegar. Los socios necesitan una dirección https pública.",
+      "not_open": "Abra a socios antes de conectar.",
+      "invite_invalid": "Esta invitación no es válida.",
+      "invite_expired": "Esta invitación ha caducado. Pida una nueva.",
+      "already_partner": "Ya está conectado con este servidor.",
+      "self": "Esa invitación se creó en este servidor.",
+      "peer_unreachable": "El otro servidor no respondió. No se conectó nada.",
+      "peer_rejected": "El otro servidor rechazó la solicitud.",
+      "bad_signature": "La firma de la solicitud no es válida.",
+      "sodium_missing": "Este servidor no puede firmar solicitudes de socios. Falta la biblioteca de firmas.",
+      "invalid_name": "Escriba un nombre de empresa de hasta 80 caracteres.",
+      "invite_limit": "Ya tiene 20 invitaciones sin usar. Use una o espere a que caduque alguna.",
+      "not_paused_by_us": "Ellos pausaron esta conexión. Puede desconectar o esperar a que reanuden.",
+      "not_partner": "No se encontró esa conexión.",
+      "bad_url": "Esa dirección no es un servidor https público.",
+      "replay": "Esta solicitud ya se usó."
     }
   }
 }

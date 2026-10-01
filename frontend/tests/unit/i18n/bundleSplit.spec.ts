@@ -32,6 +32,12 @@ describe('i18n bundle split', () => {
     expect(src).not.toMatch(/import\('\.\/i18n'\)/)
   })
 
+  it('gives the widget i18n stub a setLocale so the inlined auth store can build', () => {
+    const src = readSrc('src/widget-embed-stubs/i18n.ts')
+    expect(src).toContain('export async function setLocale')
+    expect(src).not.toContain('i18n/loader')
+  })
+
   it('stubs the SPA router in the widget Vite config so httpClient cannot inline it', () => {
     const src = readSrc('vite.config.widget.ts')
     expect(src).toContain("find: '@/router/setupGate'")

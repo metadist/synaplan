@@ -103,7 +103,8 @@ final class RoutingCharacterizationTest extends TestCase
      *     language?: string,
      *     topic?: string,
      *     fastPath?: bool,
-     *     files?: list<array{type?: string, name?: string, mime?: string}>,
+     *     files?: list<array{type?: string, name?: string, mime?: string, text?: string}>,
+     *     textSource?: string,
      *     meta?: array<string, string>,
      *     modelTag?: string,
      *     sorter?: array<string, mixed>
@@ -123,12 +124,23 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'cmd_pic', 'text' => '/pic a watercolor cat', 'language' => 'en'],
             ['id' => 'cmd_vid', 'text' => '/vid a drone shot of the alps', 'language' => 'en'],
             ['id' => 'cmd_tts', 'text' => '/tts read this aloud', 'language' => 'en'],
-            ['id' => 'cmd_search', 'text' => '/search latest php release', 'language' => 'en'],
+            // /search strips the command and continues through normal classification
+            // with force_web_search (issue #2280).
+            ['id' => 'cmd_search', 'text' => '/search latest php release', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en']],
             ['id' => 'cmd_lang', 'text' => '/lang de', 'language' => 'en'],
             ['id' => 'cmd_web', 'text' => '/web example.com', 'language' => 'en'],
             ['id' => 'cmd_list', 'text' => '/list', 'language' => 'en'],
+            // /docs strips and routes to rag_query (no tools:filesort).
             ['id' => 'cmd_docs', 'text' => '/docs sort my files', 'language' => 'en'],
             ['id' => 'cmd_help', 'text' => '/help', 'language' => 'en'],
+            // Bare arg-required commands → usage hint, no model (#2280).
+            ['id' => 'cmd_pic_bare', 'text' => '/pic', 'language' => 'en'],
+            ['id' => 'cmd_pic_bare_ws', 'text' => '/pic   ', 'language' => 'en'],
+            ['id' => 'cmd_pic_bare_at', 'text' => '/pic@TestBot', 'language' => 'en'],
+            ['id' => 'cmd_vid_bare', 'text' => '/vid', 'language' => 'en'],
+            ['id' => 'cmd_tts_bare', 'text' => '/tts', 'language' => 'en'],
+            ['id' => 'cmd_search_bare', 'text' => '/search', 'language' => 'en'],
+            ['id' => 'cmd_docs_bare', 'text' => '/docs', 'language' => 'en'],
 
             // ---- Again overrides (fast-path off, like the existing override tests) ----
             ['id' => 'again_prompt_override', 'text' => 'redo that', 'language' => 'en', 'fastPath' => false, 'meta' => ['PROMPTID' => 'tools:pic']],
@@ -139,6 +151,9 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'attach_pdf', 'text' => 'Summarize this', 'language' => 'en', 'files' => [['type' => 'pdf', 'name' => 'report.pdf']]],
             ['id' => 'attach_docx', 'text' => 'What is in here?', 'language' => 'en', 'files' => [['type' => 'docx', 'name' => 'contract.docx']]],
             ['id' => 'attach_audio_mp3', 'text' => 'Transcribe', 'language' => 'de', 'files' => [['type' => 'mp3', 'name' => 'voice.mp3']]],
+            // A caption-less voice note is the user's words (#2287). Same route
+            // as the typed question: web search, not file analysis.
+            ['id' => 'voice_note_weather', 'text' => 'Wie wird das Wetter heute in Münster?', 'language' => 'de', 'fastPath' => false, 'textSource' => 'transcript', 'files' => [['type' => 'ogg', 'name' => 'voice.ogg', 'text' => 'Wie wird das Wetter heute in Münster?']], 'sorter' => ['topic' => 'general', 'language' => 'de', 'web_search' => true]],
             ['id' => 'attach_merge_pdf', 'text' => 'führe beide dateien in eine pdf zusammen', 'language' => 'de', 'files' => [
                 ['type' => 'xlsx', 'name' => 'Finanzmodell.xlsx'],
                 ['type' => 'pdf', 'name' => 'Finanzmodell.pdf'],
@@ -229,7 +244,7 @@ final class RoutingCharacterizationTest extends TestCase
     /**
      * @param array{
      *     id: string, text: string, language?: string, topic?: string,
-     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string}>,
+     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string, text?: string}>, textSource?: string,
      *     meta?: array<string, string>, modelTag?: string, sorter?: array<string, mixed>
      * } $case
      *
@@ -328,22 +343,40 @@ final class RoutingCharacterizationTest extends TestCase
     /**
      * @param array{
      *     id: string, text: string, language?: string, topic?: string,
-     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string}>,
+     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string, text?: string}>, textSource?: string,
      *     meta?: array<string, string>, modelTag?: string, sorter?: array<string, mixed>
      * } $case
      */
     private function buildMessage(array $case): Message
     {
+        $text = $case['text'];
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(1);
         $message->method('getUserId')->willReturn(10);
-        $message->method('getText')->willReturn($case['text']);
+        $message->method('getText')->willReturnCallback(static function () use (&$text): string {
+            return $text;
+        });
+        $message->method('setText')->willReturnCallback(static function (string $value) use (&$text, $message): Message {
+            $text = $value;
+
+            return $message;
+        });
         $message->method('getLanguage')->willReturn($case['language'] ?? 'en');
         $message->method('getDateTime')->willReturn('20260607120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn($case['topic'] ?? '');
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
+        $textSource = $case['textSource'] ?? null;
+        $message->method('getMeta')->willReturnCallback(
+            static function (string $key, ?string $default = null) use ($textSource): ?string {
+                if ('text_source' === $key && is_string($textSource)) {
+                    return $textSource;
+                }
+
+                return $default;
+            }
+        );
 
         $files = [];
         foreach ($case['files'] ?? [] as $f) {
@@ -351,6 +384,7 @@ final class RoutingCharacterizationTest extends TestCase
             $file->method('getFileType')->willReturn($f['type'] ?? '');
             $file->method('getFileName')->willReturn($f['name'] ?? '');
             $file->method('getFileMime')->willReturn($f['mime'] ?? '');
+            $file->method('getFileText')->willReturn($f['text'] ?? '');
             $files[] = $file;
         }
         $message->method('getFiles')->willReturn(new ArrayCollection($files));

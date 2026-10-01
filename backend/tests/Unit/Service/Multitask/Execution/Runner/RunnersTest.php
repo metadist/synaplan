@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\AI\Exception\ChatFailureReason;
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\Entity\Connection;
 use App\Entity\File;
@@ -567,6 +568,20 @@ final class RunnersTest extends TestCase
         self::assertFalse($result->isSuccessful());
     }
 
+    public function testText2SoundReportsNoTextWhenNothingIsSpeakable(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('synthesize')->willThrowException(new NoSpeakableTextException());
+
+        $runner = new Text2SoundRunner($aiFacade, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n3', Capability::Text2Sound, [], ['text' => '<think>plan</think>']);
+
+        $result = $runner->run($node, $this->context($this->message()));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame('no text to synthesize', $result->error);
+    }
+
     public function testText2SoundTruncatesLongTextBeforeSynthesize(): void
     {
         $longText = str_repeat('Word ', 1500);
@@ -576,11 +591,12 @@ final class RunnersTest extends TestCase
             ->expects(self::once())
             ->method('synthesize')
             ->with(
-                self::callback(static function (string $text): bool {
-                    return mb_strlen($text) <= \App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS;
+                $longText,
+                'en',
+                self::anything(),
+                self::callback(static function (array $opts): bool {
+                    return 'mp3' === ($opts['format'] ?? null);
                 }),
-                self::anything(),
-                self::anything(),
             )
             ->willReturn([
                 'relativePath' => '1/000/2026/06/tts_x.mp3',
@@ -597,6 +613,27 @@ final class RunnersTest extends TestCase
         self::assertLessThanOrEqual(\App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS, mb_strlen((string) $result->files[0]['source_text']));
     }
 
+    public function testText2SoundPassesClassificationLanguage(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade
+            ->expects(self::once())
+            ->method('synthesize')
+            ->with('Hallo Welt', 'de', self::anything(), self::anything())
+            ->willReturn([
+                'relativePath' => '1/000/2026/06/tts_de.mp3',
+                'provider' => 'piper',
+                'model' => 'piper-multi',
+            ]);
+
+        $runner = new Text2SoundRunner($aiFacade, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n3', Capability::Text2Sound, [], ['text' => 'Hallo Welt'], ['format' => 'mp3']);
+
+        $result = $runner->run($node, new NodeContext($this->message('Hallo Welt'), [], 1, ['language' => 'de']));
+
+        self::assertTrue($result->isSuccessful());
+    }
+
     public function testMediaGenerationRunnerProducesImageFile(): void
     {
         $handler = $this->createMock(MediaGenerationHandler::class);
@@ -605,7 +642,7 @@ final class RunnersTest extends TestCase
             $captured = $classification;
 
             return [
-                'content' => 'Generated image: a dog',
+                'content' => '__IMAGE_GENERATED__',
                 'metadata' => [
                     'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
                     'local_path' => '1/000/dog.png',
@@ -689,7 +726,7 @@ final class RunnersTest extends TestCase
                 $capturedOptions = $options;
 
                 return [
-                    'content' => 'Generated image',
+                    'content' => '__IMAGE_GENERATED__',
                     'metadata' => [
                         'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
                         'local_path' => '1/000/dog.png',
