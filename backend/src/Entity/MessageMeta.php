@@ -17,7 +17,7 @@ class MessageMeta
     private ?int $id = null;
 
     #[ORM\Column(name: 'BMESSAGEID', type: 'bigint')]
-    private int $messageId;
+    private ?int $messageId = null;
 
     #[ORM\ManyToOne(targetEntity: Message::class, inversedBy: 'metadata')]
     #[ORM\JoinColumn(name: 'BMESSAGEID', referencedColumnName: 'BID')]
@@ -44,6 +44,10 @@ class MessageMeta
 
     public function getMessageId(): int
     {
+        if (null === $this->messageId) {
+            throw new \LogicException('Message meta has no message id yet.');
+        }
+
         return $this->messageId;
     }
 
@@ -62,7 +66,10 @@ class MessageMeta
     public function setMessage(?Message $message): self
     {
         $this->message = $message;
-        if ($message) {
+        // A transient message (incognito, or not flushed yet) has no id.
+        // The meta still has to live on the in-memory collection so routing
+        // can read it before the row exists.
+        if (null !== $message && null !== $message->getId()) {
             $this->messageId = $message->getId();
         }
 

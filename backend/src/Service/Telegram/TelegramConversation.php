@@ -10,6 +10,7 @@ use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Realtime\Notifier\ChatActivityNotifier;
 use App\Service\Digest\MessageReferenceResolver;
+use App\Service\File\FileTypeResolver;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\ChatErrorPresenter;
@@ -145,6 +146,16 @@ final readonly class TelegramConversation
         $replyTo = ctype_digit($externalId) ? (int) $externalId : null;
         $this->typing($turn, 'typing');
         try {
+            // A killed worker can resume a voice note before it was transcribed.
+            // answer() already waits for that transcript; resume() must too.
+            if ($this->inboundNeedsTranscript($inbound)) {
+                $this->preProcessor->process($inbound);
+                if ('' === trim($inbound->getText())) {
+                    $this->finish($turn, $chat, $inbound, $this->say($turn, 'transcript_empty'), 'failed');
+
+                    return;
+                }
+            }
             $this->respond($turn, $chat, $inbound, [], null, $replyTo, []);
         } catch (\Throwable $e) {
             $this->fail($turn, $chat, $inbound, $e);
@@ -241,6 +252,25 @@ final readonly class TelegramConversation
     {
         foreach ($media as $ref) {
             if ($ref->isSpoken()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Spoken audio that has not been transcribed yet. A caption or an
+     * already stored transcript does not need another pass.
+     */
+    private function inboundNeedsTranscript(Message $inbound): bool
+    {
+        foreach ($inbound->getFiles() as $file) {
+            if ('' !== trim($file->getFileText())) {
+                continue;
+            }
+            $category = FileTypeResolver::resolveCategory($file->getFileType() ?: '', $file->getFileName());
+            if ('audio' === $category) {
                 return true;
             }
         }

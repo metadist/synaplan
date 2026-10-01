@@ -297,12 +297,9 @@ final readonly class MessagePreProcessor
                     $messageFile->setFileText($transcribedText);
                     $messageFile->setStatus('processed');
 
-                    // Update message text for better classification
-                    // If message text is placeholder like '[Audio message]', replace it with transcription
-                    $currentText = $message->getText();
-                    if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
-                        $message->setText($transcribedText);
-                    }
+                    // A voice note with no caption becomes the message text and
+                    // is routed like typed text. A caption is left alone.
+                    SpokenInput::applyTranscript($message, $transcribedText);
 
                     $this->logger->info('PreProcessor: Audio transcribed', [
                         'file_id' => $messageFile->getId(),
@@ -471,12 +468,9 @@ final readonly class MessagePreProcessor
                 if ('' !== $transcribedText) {
                     $message->setFileText($transcribedText);
 
-                    // Update message text for better classification
-                    // If message text is placeholder like '[Audio message]', replace it with transcription
-                    $currentText = $message->getText();
-                    if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
-                        $message->setText($transcribedText);
-                    }
+                    // A voice note with no caption becomes the message text and
+                    // is routed like typed text. A caption is left alone.
+                    SpokenInput::applyTranscript($message, $transcribedText);
 
                     // Update detected language if different
                     if ('unknown' !== $result['language'] && $result['language'] !== $message->getLanguage()) {
