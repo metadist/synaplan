@@ -152,4 +152,11 @@ describe('usePaletteKeys', () => {
     shortcut()
     expect(allowed.state.toggle).toHaveBeenCalledTimes(1)
   })
+
+  it('ignores a keydown that has no key', () => {
+    const { state, wrapper } = setup({ open: false })
+    expect(() => window.dispatchEvent(new Event('keydown', { cancelable: true }))).not.toThrow()
+    expect(state.toggle).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
 })
