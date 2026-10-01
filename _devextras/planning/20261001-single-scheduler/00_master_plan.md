@@ -66,7 +66,7 @@ never did), so it starts as a second web server and no job runs locally.
 | `app:approvals:expire` | hourly | covered by the saved-tasks tick | hourly |
 | `app:updates:check` | daily | host cron, daily, `--force` | daily (manifest cache TTL is 6 h, `--force` not needed) |
 | `app:models:check-availability --notify` | daily | host cron, daily | daily |
-| `app:models:discover --notify` | daily | **missing** (`MODEL_DISCOVERY_ENABLED=1` is set) | daily |
+| `app:models:discover --notify` | hourly (#2277, not released yet) | **missing** (`MODEL_DISCOVERY_ENABLED=1` is set) | hourly (posts claimed per hour) |
 | `app:digest:run` | daily | **missing** | daily (see §0 #8) |
 | `app:selfaware:sync-docs` | daily | **missing** | daily |
 | `app:approvals:digest` | daily | **missing** | daily |
@@ -111,8 +111,8 @@ order.
 | ---- | --- | ---- | ----------------------- |
 | `tick` | every tick | media, stuck chats, desktop, mail handlers, smart mailbox (opt-in) | 300 s |
 | `tasks` | every tick | saved-tasks tick | none — it runs AI tasks inline and has no stale-run reaper; verify before choosing a cap |
-| `hourly` | claimed slot | ephemeral files, approval expiry | 900 s |
-| `daily` | claimed slot at `DAILY_AT` | updates, availability, discover, digest, docs sync, approval digest, price sync (opt-in) | 3600 s (digest: 3 h) |
+| `hourly` | claimed slot | ephemeral files, approval expiry, new-model discovery | 900 s |
+| `daily` | claimed slot at `DAILY_AT` | updates, availability, digest, docs sync, approval digest, price sync (opt-in) | 3600 s (digest: 3 h) |
 | `health` | claimed slot every 900 s | model health check | 600 s |
 
 The heartbeat file keeps its meaning (loop alive) because the loop itself
