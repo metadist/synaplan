@@ -19,6 +19,7 @@ use App\Service\Context\AttachmentDigest;
 use App\Service\Context\TokenEstimator;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
+use App\Service\File\FileTypeResolver;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\Message\SpokenInput;
 use App\Service\ModelConfigService;
@@ -326,7 +327,10 @@ final readonly class TaskPlanner
             $catalog = array_values(array_filter(
                 $catalog,
                 static function (ConversationFile $file) use ($spokenText, $messageId): bool {
-                    if (ConversationFile::CATEGORY_AUDIO !== $file->category || $file->messageId !== $messageId) {
+                    // ConversationFile labels .webm as video. Browser voice
+                    // notes are audio, same as FileTypeResolver / SpokenInput.
+                    $category = FileTypeResolver::resolveCategory('', $file->displayName, $file->relativePath);
+                    if ('audio' !== $category || $file->messageId !== $messageId) {
                         return true;
                     }
 
@@ -536,7 +540,14 @@ final readonly class TaskPlanner
         if ([] !== $attached) {
             $data['BATTACHED_FILES'] = implode(', ', $attached);
             $data['BATTACHED_COUNT'] = count($attached);
-        } elseif ($message->getFile() > 0 && !SpokenInput::isLegacySpokenAudio($message)) {
+        } elseif (
+            $message->getFile() > 0
+            && 0 === $message->getFiles()->count()
+            && !SpokenInput::isLegacySpokenAudio($message)
+        ) {
+            // File rows were already considered above. Falling through after a
+            // spoken recording was skipped would advertise it again, including
+            // a .webm voice note whose legacy type is still set.
             $data['BATTACHED_FILES'] = (string) $message->getFileType();
             $data['BATTACHED_COUNT'] = 1;
         }

@@ -494,4 +494,129 @@ final class TaskPlannerTest extends TestCase
         self::assertNotContains(Capability::FileAnalysis, $capabilities);
         self::assertNotContains(Capability::ExtractText, $capabilities);
     }
+
+    public function testSpokenWebmNoteIsNotReattachedFromTheLegacyFileSlot(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $file = $this->createMock(File::class);
+        $file->method('getFileType')->willReturn('webm');
+        $file->method('getFileName')->willReturn('recording.webm');
+        $file->method('getFileText')->willReturn($text);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(55);
+        $message->method('getFileType')->willReturn('webm');
+        $message->method('getFilePath')->willReturn('uploads/7/recording.webm');
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getFiles')->willReturn(new ArrayCollection([$file]));
+        $message->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages): array {
+            $current = json_decode((string) end($messages)['content'], true);
+            $offered = is_array($current) && isset($current['BATTACHED_FILES']);
+
+            return ['content' => json_encode([
+                'version' => 1,
+                'language' => 'de',
+                'reply_node' => 'n1',
+                'tasks' => [[
+                    'id' => 'n1',
+                    'capability' => $offered ? 'extract_text' : 'web_search',
+                ]],
+            ])];
+        });
+
+        $result = $this->planner->plan($message, [], 1);
+
+        self::assertSame(Capability::WebSearch, $result->plan->nodes[0]->capability);
+    }
+
+    public function testSpokenWebmNoteIsLeftOutOfTheConversationFileInventory(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(9);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $message->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        /** @var list<ConversationFile>|null $rendered */
+        $rendered = null;
+        $catalog = $this->createMock(ConversationFileCatalog::class);
+        $catalog->method('build')->willReturn([
+            new ConversationFile(
+                'file:3',
+                'recording.webm',
+                ConversationFile::CATEGORY_VIDEO,
+                ConversationFile::ORIGIN_ATTACHED,
+                '/tmp/recording.webm',
+                '7/recording.webm',
+                3,
+                9,
+                'IN',
+                $text,
+            ),
+            new ConversationFile(
+                'file:4',
+                'brief.pdf',
+                ConversationFile::CATEGORY_DOCUMENT,
+                ConversationFile::ORIGIN_UPLOADED,
+                '/tmp/brief.pdf',
+                '7/brief.pdf',
+                4,
+                8,
+                'IN',
+                'a letter',
+            ),
+        ]);
+        $catalog->method('renderInventoryBlock')->willReturnCallback(
+            /**
+             * @param list<ConversationFile> $files
+             */
+            function (array $files) use (&$rendered): string {
+                $rendered = $files;
+
+                return "\n\n## Files available in this conversation\n";
+            }
+        );
+
+        $planner = new TaskPlanner(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->modelConfigService,
+            new TaskPlanValidator(),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(UserRepository::class),
+            new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
+            $this->createMock(RateLimitService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            conversationFiles: $catalog,
+        );
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '{"version":1,"language":"de","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}',
+        ]);
+
+        $planner->plan($message, [], 1);
+
+        self::assertIsArray($rendered);
+        $references = array_map(static fn (ConversationFile $file): string => $file->reference, $rendered);
+        self::assertSame(['file:4'], $references);
+    }
 }
