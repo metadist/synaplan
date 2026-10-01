@@ -107,7 +107,9 @@
   "welcomeUser": "Hoş geldin, {name}",
   "sidebar": {
     "featureStatus": "Özellik Durumu",
-    "upgrade": "Yükselt"
+    "upgrade": "Yükselt",
+    "schedulerStopped": "Arka plan işleri durdu",
+    "schedulerStoppedShort": "İşler durdu"
   },
   "nav": {
     "desktop": "Synaplan Desktop",

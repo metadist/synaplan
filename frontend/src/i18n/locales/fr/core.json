@@ -108,7 +108,9 @@
   "welcomeUser": "Bienvenue, {name}",
   "sidebar": {
     "featureStatus": "État des fonctionnalités",
-    "upgrade": "Passer à une formule supérieure"
+    "upgrade": "Passer à une formule supérieure",
+    "schedulerStopped": "Travaux en arrière-plan arrêtés",
+    "schedulerStoppedShort": "Travaux arrêtés"
   },
   "nav": {
     "desktop": "Synaplan Desktop",

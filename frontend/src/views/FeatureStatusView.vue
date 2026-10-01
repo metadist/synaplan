@@ -13,6 +13,8 @@
           data-testid="section-header"
         />
 
+        <SchedulerStatusCard />
+
         <!-- Loading State -->
         <div
           v-if="isLoadingFeatures"
@@ -255,6 +257,7 @@ import AccordionStack from '@/components/AccordionStack.vue'
 import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
 import ComputeStatusCard from '@/components/admin/ComputeStatusCard.vue'
+import SchedulerStatusCard from '@/components/admin/SchedulerStatusCard.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import {
   getFeaturesStatus,
