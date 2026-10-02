@@ -340,6 +340,7 @@ test.describe('Navigation: User menu', () => {
       await expect(dropdown).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(dropdown.locator(USR.statisticsBtn)).toBeVisible()
       await expect(dropdown.locator(USR.preferencesBtn)).toBeVisible()
+      await expect(dropdown.locator(USR.profileBtn)).toHaveCount(0)
       await expect(dropdown.locator(USR.logoutBtn)).toBeVisible()
     })
   })

@@ -43,6 +43,7 @@ const router = useRouter()
 
 function activeSectionId(): string {
   if (route.hash === '#memories') return '#chat'
+  if (route.hash === '#app') return '#app-server'
   return route.hash
 }
 

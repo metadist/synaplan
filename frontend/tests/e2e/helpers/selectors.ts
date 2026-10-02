@@ -349,6 +349,8 @@ export const selectors = {
     overlay: '[data-testid="overlay-sidebar-v2-user"]',
     /** Avatar menu entry for the /settings page — labeled "Preferences" */
     preferencesBtn: '[data-testid="btn-sidebar-v2-preferences"]',
+    /** Removed with the profile/preferences split. The menu must not grow this row back. */
+    profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',

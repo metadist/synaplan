@@ -2,6 +2,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import {
   ref,
   computed,
+  watch,
   onMounted,
   onUnmounted,
   nextTick,
@@ -181,6 +182,9 @@ export function useProfileSettings() {
     if (wantsMemories) {
       document.getElementById('memories')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       shouldHighlight.value = true
+      if (highlightTimer !== undefined) {
+        clearTimeout(highlightTimer)
+      }
       highlightTimer = setTimeout(() => {
         shouldHighlight.value = false
       }, 3000)
@@ -189,7 +193,9 @@ export function useProfileSettings() {
       }
       return
     }
-    const id = route.hash.replace(/^#/, '')
+    const raw = route.hash.replace(/^#/, '')
+    // `#app` is the Vue mount node. The native-server section uses `#app-server`.
+    const id = raw === 'app' ? 'app-server' : raw
     if (!id) return
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -200,6 +206,15 @@ export function useProfileSettings() {
     await loadProfile()
     await focusRequestedSection()
   })
+
+  // The account page stays mounted while the hash changes (sidebar memories
+  // link, section index, browser back). Mount-only focusing would miss those.
+  watch(
+    () => `${route.hash}|${String(route.query.highlight ?? '')}`,
+    () => {
+      void focusRequestedSection()
+    }
+  )
 
   onUnmounted(() => {
     cleanupGuard?.()

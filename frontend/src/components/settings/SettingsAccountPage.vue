@@ -61,7 +61,7 @@
         </fieldset>
 
         <!-- Outside the disabled fieldset. Enter saves the server, not the profile. -->
-        <section v-if="showApp" id="app" class="scroll-mt-6" @keydown.enter.prevent>
+        <section v-if="showApp" id="app-server" class="scroll-mt-6" @keydown.enter.prevent>
           <NativeServerControl />
         </section>
 
@@ -136,7 +136,7 @@ const sections = computed<SettingsSectionLink[]>(() => {
     items.push({ id: 'security', labelKey: 'settings.sections.security' })
   }
   if (showApp) {
-    items.push({ id: 'app', labelKey: 'settings.sections.app' })
+    items.push({ id: 'app-server', labelKey: 'settings.sections.app' })
   }
   if (!failed) {
     items.push(
