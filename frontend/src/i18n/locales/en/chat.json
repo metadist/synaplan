@@ -75,7 +75,19 @@
     "config": "AI Config",
     "statistics": "Statistics",
     "newChat": "New Chat",
+    "pin": "Pin chat",
+    "unpin": "Unpin chat",
+    "pinSaveFailed": "The pin could not be saved. The chat stays where it was.",
     "stillGenerating": "Still answering",
+    "listOrigin": {
+      "web": "Chat",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "email": "Email",
+      "widget": "Chat widget",
+      "api": "API",
+      "incoming": "Shared with you"
+    },
     "quote": {
       "button": "Mention in chat",
       "remove": "Remove quote"

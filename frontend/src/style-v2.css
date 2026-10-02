@@ -551,29 +551,25 @@
    13. V2 Sidebar Specific — Glass Rail & Flyout
    ---------------------------------------------------------- */
 
-.design-v2 .v2-sidebar-rail {
-  /* iOS Safari < 15.4 does not support dvh; declare 100vh first as a
-     fallback, then override with 100dvh on supporting browsers. This prevents
-     the bottom avatar button from being pushed behind the browser chrome on
-     mobile Safari, matching the MainLayout h-dvh fix from PR #832. */
-  height: 100vh;
-  height: 100dvh;
-  /* Respect the iOS notch (PWA / standalone) so the avatar at the bottom
-     stays tappable. Also pad the leading edge so a landscape side cutout
-     never clips the rail. */
+.design-v2 .v2-sidebar-rail,
+.design-v2 .v2-sidebar-panel {
+  /* Respect the iOS notch (PWA / standalone). The shell owns the viewport
+     height; these columns fill it. Pad the rail's leading edge so a landscape
+     side cutout never clips the icons. */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-
   background: var(--bg-sidebar);
+  border-right: 1px solid var(--v2-border);
+}
+.design-v2 .v2-sidebar-rail {
+  padding-left: env(safe-area-inset-left);
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
-  border-right: 1px solid var(--v2-border);
 }
 .design-v2 .v2-sidebar-rail .sidebar-scroll {
   scrollbar-gutter: auto;
 }
-.design-v2.dark .v2-sidebar-rail {
+.design-v2.dark .v2-sidebar-panel {
   box-shadow: 1px 0 20px rgba(0, 0, 0, 0.3);
 }
 

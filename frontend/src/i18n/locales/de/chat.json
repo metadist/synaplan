@@ -70,7 +70,19 @@
   "chat": {
     "title": "Chat",
     "newChat": "Neuer Chat",
+    "pin": "Chat anheften",
+    "unpin": "Anheften aufheben",
+    "pinSaveFailed": "Das Anheften konnte nicht gespeichert werden. Der Chat bleibt, wo er war.",
     "stillGenerating": "Antwortet noch",
+    "listOrigin": {
+      "web": "Chat",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "email": "E-Mail",
+      "widget": "Chat-Widget",
+      "api": "API",
+      "incoming": "Mit dir geteilt"
+    },
     "quote": {
       "button": "Im Chat erwähnen",
       "remove": "Zitat entfernen"

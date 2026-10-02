@@ -387,7 +387,7 @@
       "promptContentSubtitle": "Markdown-formatted system message used for this topic.",
       "knowledgeTitle": "Knowledge Base",
       "knowledgeSubtitle": "Link vectorized files for retrieval-augmented context.",
-      "openFileManager": "Sources",
+      "openFileManager": "Library",
       "linkedFiles": "Linked files ({n})",
       "noFilesLinked": "No files linked yet",
       "noFilesLinkedHint": "Link files below to add them to this prompt's knowledge base.",

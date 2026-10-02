@@ -1043,6 +1043,8 @@
       "title": "Gelen sohbetler",
       "subtitle": "Kişilerin veya grupların sizinle paylaştığı sohbetler",
       "menu": "Gelen sohbetler",
+      "purpose": "Sizinle paylaşılan",
+      "none": "Gelen sohbet yok",
       "menuNew": "Yeni gelen sohbetler",
       "new": "Yeni",
       "newCount": "{count} yeni gelen",

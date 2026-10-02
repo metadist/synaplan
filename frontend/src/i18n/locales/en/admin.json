@@ -1047,6 +1047,8 @@
       "title": "Incoming chats",
       "subtitle": "Chats that people or groups shared with you",
       "menu": "Incoming chats",
+      "purpose": "Shared with you",
+      "none": "No incoming chats",
       "menuNew": "New incoming chats",
       "new": "New",
       "newCount": "{count} new incoming",

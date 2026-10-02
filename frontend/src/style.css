@@ -58,12 +58,27 @@
   }
 }
 
-/* Rail width includes the landscape notch so icons are never clipped when
-   the desktop chrome is showing (iPad landscape, notched desktops). */
+/* Icon rail plus the wider context panel. The rail width includes the
+   landscape notch so icons are never clipped (iPad landscape, notched desktops). */
+.v2-sidebar {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
 .v2-sidebar-rail {
   box-sizing: border-box;
-  width: calc(80px + env(safe-area-inset-left, 0px));
-  min-width: calc(80px + env(safe-area-inset-left, 0px));
+  width: calc(56px + env(safe-area-inset-left, 0px));
+  min-width: calc(56px + env(safe-area-inset-left, 0px));
+  height: 100%;
+}
+.v2-sidebar-panel {
+  box-sizing: border-box;
+  width: 280px;
+  min-width: 280px;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Mobile floating header button clearance — pushes titles below the button.

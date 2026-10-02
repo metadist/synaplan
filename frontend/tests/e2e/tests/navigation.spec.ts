@@ -8,9 +8,9 @@ const NAV = selectors.nav
 const SET = selectors.settings
 const USR = selectors.userMenu
 
-/** Wait until the signed-in Work + Manage rail is painted. */
+/** Wait until the signed-in rail (Assistants) is painted. */
 async function ensureNavReady(page: Page) {
-  await expect(page.locator(NAV.sidebarV2Manage)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await expect(page.locator(NAV.sidebarV2Assistants)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
 /** Avatar menu → Preferences → /settings page. */
@@ -21,21 +21,28 @@ async function openPreferences(page: Page) {
   await expect(page.locator(SET.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
-/** Open a rail flyout (Manage / Operate) and wait for it. */
-async function openFlyout(page: Page, railItemSelector: string) {
+/** Open a rail section and wait for its context panel. */
+async function openSection(page: Page, railItemSelector: string) {
   await page.locator(railItemSelector).click()
-  const flyout = page.locator(NAV.navDropdown)
-  await expect(flyout).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  return flyout
+  const panel = page.locator(NAV.sidebarPanel)
+  await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  return panel
 }
 
-/** Open Manage, then a named group (channels, assistants, …) in the second flyout. */
+const GROUP_RAIL: Record<string, string> = {
+  assistants: NAV.sidebarV2Assistants,
+  automations: NAV.sidebarV2Assistants,
+  channels: NAV.sidebarV2Channels,
+  connections: NAV.sidebarV2Channels,
+  developer: NAV.sidebarV2Channels,
+}
+
+/** Open the rail section that owns a group and return that group's block. */
 async function openManageGroup(page: Page, groupKey: string) {
-  await openFlyout(page, NAV.sidebarV2Manage)
-  await page.locator(NAV.flyoutGroup(groupKey)).click()
-  const sub = page.locator(NAV.navSubDropdown)
-  await expect(sub).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  return sub
+  await openSection(page, GROUP_RAIL[groupKey])
+  const group = page.locator(NAV.panelGroup(groupKey))
+  await expect(group).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  return group
 }
 
 /**
@@ -57,21 +64,20 @@ async function isAiAccountsNavEnabled(page: Page): Promise<boolean> {
 }
 
 test.describe('Navigation: Sidebar basics (non-admin)', () => {
-  test('@ci Sidebar shows Work + Manage (no leftover Channels / AI Setup pair)', async ({
-    page,
-  }) => {
+  test('@ci Sidebar shows Chats, Library, Assistants and Channels', async ({ page }) => {
     await test.step('Arrange: login', async () => {
       await openApp(page)
     })
 
-    await test.step('Assert: everyday rail is New / History / Sources / Manage', async () => {
+    await test.step('Assert: everyday rail is Chats / Library / Assistants / Channels', async () => {
       await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(NAV.sidebarV2NewChat)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(NAV.sidebarV2ChatNav)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(NAV.sidebarV2Files)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(page.locator(NAV.sidebarV2Manage)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(page.locator('[data-testid="btn-sidebar-v2-nav-channels"]')).toHaveCount(0)
+      await expect(page.locator(NAV.sidebarV2Assistants)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(NAV.sidebarV2Channels)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator('[data-testid="btn-sidebar-v2-nav-ai-setup"]')).toHaveCount(0)
+      await expect(page.locator('[data-testid="btn-sidebar-v2-nav-manage"]')).toHaveCount(0)
     })
   })
 
@@ -89,17 +95,17 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
     })
   })
 
-  test('@ci History button opens chat manager modal', async ({ page }) => {
+  test('@ci Chats rail shows the chat list in the side panel', async ({ page }) => {
     await test.step('Arrange: login', async () => {
       await openApp(page)
     })
 
-    await test.step('Act: click History nav button', async () => {
+    await test.step('Act: click Chats nav button', async () => {
       await page.locator(NAV.sidebarV2ChatNav).click()
     })
 
-    await test.step('Assert: chat manager modal visible', async () => {
-      await expect(page.locator(NAV.modalChatManager)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await test.step('Assert: chat list is in the side panel', async () => {
+      await expect(page.locator(NAV.sidebarChats)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
   })
 
@@ -120,45 +126,33 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
   // additionally asserts tap-target size.
 })
 
-test.describe('Navigation: Rail flyouts (non-admin)', () => {
-  test('@ci Manage flyout opens with group entries, not a flat dump', async ({ page }) => {
+test.describe('Navigation: section panels (non-admin)', () => {
+  test('@ci Assistants and Channels panels keep their pages apart', async ({ page }) => {
     await test.step('Arrange: login and wait for nav', async () => {
       await openApp(page)
       await ensureNavReady(page)
     })
 
-    await test.step('Act+Assert: first flyout lists groups only', async () => {
-      const flyout = await openFlyout(page, NAV.sidebarV2Manage)
-      await expect(flyout.locator(NAV.flyoutGroup('assistants'))).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutGroup('automations'))).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutGroup('channels'))).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutGroup('connections'))).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutGroup('developer'))).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutGroup('api'))).toHaveCount(0)
-      await expect(flyout.locator(NAV.flyoutGroup('tools'))).toHaveCount(0)
-      await expect(flyout.locator(NAV.flyoutLinkInbound)).toHaveCount(0)
-      await expect(flyout.locator(NAV.flyoutLinkChatWidget)).toHaveCount(0)
+    await test.step('Act+Assert: Assistants lists models and automations, not channels', async () => {
+      const panel = await openSection(page, NAV.sidebarV2Assistants)
+      await expect(panel.locator(NAV.panelGroup('assistants'))).toBeVisible()
+      await expect(panel.locator(NAV.panelGroup('automations'))).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkAiModels)).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkInbound)).toHaveCount(0)
+      await expect(panel.locator(NAV.flyoutLinkChatWidget)).toHaveCount(0)
+      await expect(panel.locator('[data-testid="link-sidebar-v2-doc-summary"]')).toHaveCount(0)
     })
 
-    await test.step('Act+Assert: Channels submenu shows inbound, widgets, live support', async () => {
-      await page.locator(NAV.flyoutGroup('channels')).click()
-      const sub = page.locator(NAV.navSubDropdown)
-      await expect(sub).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(sub.locator(NAV.flyoutLinkInbound)).toBeVisible()
-      await expect(sub.locator(NAV.flyoutLinkChatWidget)).toBeVisible()
-      await expect(sub.locator(NAV.flyoutLinkLiveSupport)).toBeVisible()
-    })
-
-    await test.step('Act+Assert: Developer & devices submenu shows API docs', async () => {
-      await page.locator(NAV.flyoutGroup('developer')).click()
-      const sub = page.locator(NAV.navSubDropdown)
-      await expect(sub.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
-    })
-
-    await test.step('Act+Assert: Assistants submenu has no Summarizer page', async () => {
-      await page.locator(NAV.flyoutGroup('assistants')).click()
-      const sub = page.locator(NAV.navSubDropdown)
-      await expect(sub.locator('[data-testid="link-sidebar-v2-doc-summary"]')).toHaveCount(0)
+    await test.step('Act+Assert: Channels lists inbound, widgets, live support and API docs', async () => {
+      const panel = await openSection(page, NAV.sidebarV2Channels)
+      await expect(panel.locator(NAV.panelGroup('channels'))).toBeVisible()
+      await expect(panel.locator(NAV.panelGroup('connections'))).toBeVisible()
+      await expect(panel.locator(NAV.panelGroup('developer'))).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkInbound)).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkChatWidget)).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkLiveSupport)).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkAiModels)).toHaveCount(0)
     })
   })
 
@@ -178,8 +172,7 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
 
     await test.step('Assert: Saved Tasks lives under Automations and navigates', async () => {
-      await page.locator(NAV.flyoutGroup('automations')).click()
-      const automations = page.locator(NAV.navSubDropdown)
+      const automations = await openManageGroup(page, 'automations')
       await expect(automations.locator(NAV.flyoutLinkSavedTasks)).toBeVisible()
       await automations.locator(NAV.flyoutLinkSavedTasks).click()
       await expect(page).toHaveURL(/\/channels\/tasks/, { timeout: TIMEOUTS.STANDARD })
@@ -205,11 +198,9 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
       }
     })
 
-    await test.step('Act+Assert: Channels submenu shows email handler', async () => {
-      await page.locator(NAV.flyoutGroup('channels')).click()
-      await expect(
-        page.locator(NAV.navSubDropdown).locator(NAV.flyoutLinkMailHandler)
-      ).toBeVisible()
+    await test.step('Act+Assert: Channels panel shows email handler', async () => {
+      const channels = await openManageGroup(page, 'channels')
+      await expect(channels.locator(NAV.flyoutLinkMailHandler)).toBeVisible()
     })
   })
 
@@ -221,7 +212,7 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
 
     await test.step('Act: click Chat Widget link', async () => {
-      await page.locator(NAV.navSubDropdown).locator(NAV.flyoutLinkChatWidget).click()
+      await page.locator(NAV.flyoutLinkChatWidget).click()
     })
 
     await test.step('Assert: Widgets page visible', async () => {
@@ -239,7 +230,7 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
 
     await test.step('Act: click Live support', async () => {
-      await page.locator(NAV.navSubDropdown).locator(NAV.flyoutLinkLiveSupport).click()
+      await page.locator(NAV.flyoutLinkLiveSupport).click()
     })
 
     await test.step('Assert: live support URL resolves', async () => {
@@ -257,7 +248,7 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
 
     await test.step('Act: click AI Models link', async () => {
-      await page.locator(NAV.navSubDropdown).locator(NAV.flyoutLinkAiModels).click()
+      await page.locator(NAV.flyoutLinkAiModels).click()
     })
 
     await test.step('Assert: AI Models page visible', async () => {
@@ -284,9 +275,9 @@ test.describe('Navigation: Admin sidebar', () => {
       await login(page, CREDENTIALS.getAdminCredentials())
     })
 
-    await test.step('Act: open Admin flyout and click Dashboard', async () => {
-      const flyout = await openFlyout(page, NAV.sidebarV2Admin)
-      await flyout.locator(NAV.flyoutLinkAdminDashboard).click()
+    await test.step('Act: open Operate and click Overview', async () => {
+      const panel = await openSection(page, NAV.sidebarV2Admin)
+      await panel.locator(NAV.flyoutLinkAdminDashboard).click()
     })
 
     await test.step('Assert: Admin dashboard page visible', async () => {

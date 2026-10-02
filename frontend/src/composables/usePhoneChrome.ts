@@ -2,7 +2,7 @@
  * Phone chrome vs desktop rail.
  *
  * Tailwind `md` (768px) is width-only, so a phone in landscape (e.g. 844×390)
- * used to flip to the desktop rail. That rail is a fixed 80px column that then
+ * used to flip to the desktop rail. That rail is a fixed 56px column that then
  * adds `padding-left: env(safe-area-inset-left)` for the notch — on landscape
  * the padding eats most of the 80px, the layout root clips overflow, and a
  * sliver of the menu peeks out from behind the chat card.

@@ -55,6 +55,10 @@ export interface Chat {
   source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api' | 'telegram'
   widgetSession?: WidgetSessionInfo | null
   firstMessagePreview?: string | null
+  /** True when this chat is in the Pinned category. */
+  pinned?: boolean
+  /** When the chat was last pinned. Null when it is not pinned. */
+  pinnedAt?: string | null
   access?: 'owner' | 'read' | 'use'
 }
 
@@ -154,6 +158,8 @@ export const useChatsStore = defineStore('chats', () => {
     return {
       ...c,
       widgetSession: c.widgetSession ?? null,
+      pinned: c.pinned === true,
+      pinnedAt: typeof c.pinnedAt === 'string' ? c.pinnedAt : null,
     }
   }
 
@@ -521,6 +527,37 @@ export const useChatsStore = defineStore('chats', () => {
 
     // No empty chat found - create a new one
     return await createChat()
+  }
+
+  async function toggleChatPin(chatId: number) {
+    if (!checkAuthOrRedirect()) return
+
+    const chat = chats.value.find((c) => c.id === chatId)
+    if (!chat) return
+
+    const previousPinned = chat.pinned === true
+    const previousPinnedAt = chat.pinnedAt ?? null
+    const nextPinned = !previousPinned
+    chat.pinned = nextPinned
+    chat.pinnedAt = nextPinned ? new Date().toISOString() : null
+    invalidateInFlightChatsLoad()
+
+    try {
+      await httpClient(`/api/v1/chats/${chatId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ pinned: nextPinned }),
+      })
+      invalidateInFlightChatsLoad()
+    } catch (err: unknown) {
+      const current = chats.value.find((c) => c.id === chatId)
+      if (current) {
+        current.pinned = previousPinned
+        current.pinnedAt = previousPinnedAt
+      }
+      error.value = getErrorMessage(err) || 'Failed to update chat'
+      useNotification().error(i18n.global.t('chat.pinSaveFailed'))
+      console.error('Error pinning chat:', err)
+    }
   }
 
   async function updateChatTitle(chatId: number, title: string) {
@@ -900,6 +937,7 @@ export const useChatsStore = defineStore('chats', () => {
     createChat,
     findOrCreateEmptyChat,
     updateChatTitle,
+    toggleChatPin,
     applyChatTitle,
     deleteChat,
     shareChat,

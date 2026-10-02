@@ -75,7 +75,19 @@
     "config": "Configuración de IA",
     "statistics": "Estadísticas",
     "newChat": "Nuevo Chat",
+    "pin": "Fijar chat",
+    "unpin": "Quitar fijado",
+    "pinSaveFailed": "No se pudo fijar el chat. El chat se queda donde estaba.",
     "stillGenerating": "Sigue respondiendo",
+    "listOrigin": {
+      "web": "Chat",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "email": "Correo",
+      "widget": "Widget de chat",
+      "api": "API",
+      "incoming": "Compartido contigo"
+    },
     "quote": {
       "button": "Mencionar en el chat",
       "remove": "Quitar cita"

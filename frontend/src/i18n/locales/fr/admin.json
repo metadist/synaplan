@@ -1047,6 +1047,8 @@
       "title": "Chats reçus",
       "subtitle": "Discussions que des personnes ou des groupes ont partagées avec vous",
       "menu": "Chats reçus",
+      "purpose": "Partagés avec vous",
+      "none": "Aucun chat reçu",
       "menuNew": "Nouveaux chats reçus",
       "new": "Nouveau",
       "newCount": "{count} nouveaux reçus",

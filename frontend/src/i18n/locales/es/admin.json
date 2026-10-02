@@ -1043,6 +1043,8 @@
       "title": "Chats entrantes",
       "subtitle": "Chats que personas o grupos han compartido contigo",
       "menu": "Chats entrantes",
+      "purpose": "Compartidos contigo",
+      "none": "No hay chats entrantes",
       "menuNew": "Nuevos chats entrantes",
       "new": "Nuevo",
       "newCount": "{count} entrantes nuevos",

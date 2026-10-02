@@ -636,12 +636,10 @@ const router = createRouter({
       beforeEnter: groupsRouteGuard,
     },
     {
-      // Conversations other people or groups shared with me ("incoming").
-      // Sibling of /files/incoming, which is the file inbox.
+      // The incoming list lives in the sidebar now. Keep the old address
+      // from landing on a dead page.
       path: '/chats/incoming',
-      name: 'chats-incoming',
-      component: () => import('@/views/ChatsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.incoming', i18n: ['chat', 'files'] },
+      redirect: { name: 'chats' },
     },
     {
       // Dead end for an account that still carries a deployment-generated

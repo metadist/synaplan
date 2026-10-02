@@ -75,7 +75,19 @@
     "config": "AI Yapılandırması",
     "statistics": "İstatistikler",
     "newChat": "Yeni Sohbet",
+    "pin": "Sohbeti sabitle",
+    "unpin": "Sabitlemeyi kaldır",
+    "pinSaveFailed": "Sabitleme kaydedilemedi. Sohbet olduğu yerde kalır.",
     "stillGenerating": "Hâlâ yanıtlıyor",
+    "listOrigin": {
+      "web": "Chat",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "email": "E-posta",
+      "widget": "Sohbet widget'ı",
+      "api": "API",
+      "incoming": "Sizinle paylaşıldı"
+    },
     "quote": {
       "button": "Sohbette belirt",
       "remove": "Alıntıyı kaldır"

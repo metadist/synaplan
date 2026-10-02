@@ -217,15 +217,17 @@ test.describe('@ci @layout UI guard — chat surface', () => {
       const btn = navButtons.nth(i)
       const testid = await btn.getAttribute('data-testid')
 
-      // Phase 2 contract (§4.1 #3): every rail control carries an
-      // ALWAYS-VISIBLE label node — tooltips are additive, never the only
-      // affordance.
-      const label = btn.locator(NAV.railLabel)
-      await expect(label, `${testid}: rail label node missing`).toBeVisible()
-      expect(
-        ((await label.textContent()) ?? '').trim() !== '',
-        `${testid}: rail label is empty`
-      ).toBe(true)
+      // Icon rail: each control has an accessible name and a 44px target.
+      // Visible text lives in the context panel, not under the icon.
+      const name = (await btn.getAttribute('aria-label')) ?? ''
+      expect(name.trim() !== '', `${testid}: accessible name missing`).toBe(true)
+
+      const box = await btn.boundingBox()
+      expect(box, `${testid}: not rendered`).not.toBeNull()
+      if (box) {
+        expect(box.width, `${testid}: tap target too narrow`).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+        expect(box.height, `${testid}: tap target too short`).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      }
     }
   })
 
@@ -329,9 +331,9 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     } else {
       await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await page.locator(NAV.sidebarV2ChatNav).click()
-      await expect(page.locator(NAV.modalChatManager)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expectNoHorizontalOverflow(page, 'history sheet')
-      await expectInsideViewport(page, NAV.modalChatManager, 'history sheet')
+      await expect(page.locator(NAV.sidebarChats)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expectNoHorizontalOverflow(page, 'chat list panel')
+      await expectInsideViewport(page, NAV.sidebarChats, 'chat list panel')
     }
   })
 
@@ -436,8 +438,8 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     if (!isMobileViewport(page)) {
       await axeBlocking(page, 'empty-chat')
-      await page.locator(NAV.sidebarV2Manage).click()
-      await expect(page.locator(NAV.navDropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await page.locator(NAV.sidebarV2Assistants).click()
+      await expect(page.locator(NAV.sidebarPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await axeBlocking(page, 'manage-panel')
     }
   })

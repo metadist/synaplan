@@ -5,42 +5,21 @@ import { assertStreamSucceeded } from './stream'
 import { TIMEOUTS } from '../config/config'
 
 /**
- * Open History and wait until the sheet's list refresh has landed.
- *
- * The sheet fires `loadChats()` on open. Clicking a row while that GET is
- * still replacing the list detaches the menu button — that is the J-NV-2
- * CI signature (`btn-chat-v2-row-menu` detached, then a rename that never
- * appears). Wait for the GET and for `data-chats-loading="false"` before
- * touching a row.
+ * Focus the desktop chats panel and wait until its list has finished loading.
+ * The panel loads chats on mount, so this does not wait for a fresh GET —
+ * it waits until `data-chats-loading` is false and a row is painted.
  */
 export async function openChatManager(page: Page): Promise<Locator> {
-  const modal = page.locator(selectors.nav.modalChatManager)
-  const refresh = page.waitForResponse(
-    (res) => {
-      try {
-        const url = new URL(res.url())
-        return (
-          url.pathname.endsWith('/api/v1/chats') &&
-          res.request().method() === 'GET' &&
-          !url.searchParams.has('limit')
-        )
-      } catch {
-        return false
-      }
-    },
-    { timeout: TIMEOUTS.STANDARD }
-  )
-
+  const panel = page.locator(selectors.nav.sidebarChats)
   await page.locator(selectors.nav.sidebarV2ChatNav).click()
-  await refresh
-  await expect(modal).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-  await expect(modal).toHaveAttribute('data-chats-loading', 'false', {
+  await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await expect(panel).toHaveAttribute('data-chats-loading', 'false', {
     timeout: TIMEOUTS.STANDARD,
   })
-  await modal
+  await panel
     .locator(selectors.nav.chatManagerListRows)
     .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-  return modal
+  return panel
 }
 
 /**
@@ -172,7 +151,7 @@ export class ChatHelper {
     await this.page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
     await this.page.reload()
     await this.page
-      .locator(selectors.nav.sidebarV2Manage)
+      .locator(selectors.nav.sidebarV2Assistants)
       .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 

@@ -1047,6 +1047,8 @@
       "title": "Eingehende Chats",
       "subtitle": "Chats, die Personen oder Gruppen mit Ihnen geteilt haben",
       "menu": "Eingehende Chats",
+      "purpose": "Mit Ihnen geteilt",
+      "none": "Keine eingehenden Chats",
       "menuNew": "Neue eingehende Chats",
       "new": "Neu",
       "newCount": "{count} neu im Eingang",

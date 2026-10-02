@@ -372,7 +372,7 @@
       "promptContentSubtitle": "Markdown-formatierte System-Nachricht für dieses Topic.",
       "knowledgeTitle": "Wissensdatenbank",
       "knowledgeSubtitle": "Vektorisierte Dateien für RAG-Kontext verknüpfen.",
-      "openFileManager": "Quellen",
+      "openFileManager": "Bibliothek",
       "linkedFiles": "Verknüpfte Dateien ({n})",
       "noFilesLinked": "Noch keine Dateien verknüpft",
       "noFilesLinkedHint": "Verknüpfen Sie Dateien unten, um sie der Wissensdatenbank dieses Prompts hinzuzufügen.",

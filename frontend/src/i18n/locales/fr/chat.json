@@ -75,7 +75,19 @@
     "config": "Config IA",
     "statistics": "Statistiques",
     "newChat": "Nouveau chat",
+    "pin": "Épingler le chat",
+    "unpin": "Retirer l'épingle",
+    "pinSaveFailed": "L'épingle n'a pas pu être enregistrée. Le chat reste où il était.",
     "stillGenerating": "Réponse en cours",
+    "listOrigin": {
+      "web": "Chat",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "email": "E-mail",
+      "widget": "Widget de chat",
+      "api": "API",
+      "incoming": "Partagé avec vous"
+    },
     "quote": {
       "button": "Mentionner dans le chat",
       "remove": "Retirer la citation"
