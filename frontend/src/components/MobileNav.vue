@@ -255,16 +255,6 @@
                     {{ authStore.user?.email || '' }}
                   </p>
                   <button
-                    class="v2-drawer-account"
-                    :class="isPathActive('/profile') ? 'v2-drawer-account--active' : 'txt-primary'"
-                    :data-nav-active="isPathActive('/profile') ? 'true' : undefined"
-                    data-testid="btn-mobile-more-profile"
-                    @click="handleNavigate('/profile')"
-                  >
-                    <UserCircleIcon class="w-5 h-5" />
-                    <span>{{ $t('nav.profile') }}</span>
-                  </button>
-                  <button
                     v-if="iamSharingEnabled"
                     class="v2-drawer-account"
                     :class="
@@ -380,14 +370,14 @@
                 </template>
 
                 <!--
-                  Preferences holds the language and the theme, both stored on
-                  the device rather than on the account, so it stays outside the
-                  guest/authenticated split and is offered to everyone.
+                  Preferences is the single settings page. Theme stays on the
+                  device, so the entry is offered to guests as well as signed-in
+                  users. /profile is the old URL and still counts as this row.
                 -->
                 <button
                   class="v2-drawer-account"
-                  :class="isPathActive('/settings') ? 'v2-drawer-account--active' : 'txt-primary'"
-                  :data-nav-active="isPathActive('/settings') ? 'true' : undefined"
+                  :class="settingsActive ? 'v2-drawer-account--active' : 'txt-primary'"
+                  :data-nav-active="settingsActive ? 'true' : undefined"
                   data-testid="btn-mobile-more-preferences"
                   @click="handleNavigate('/settings')"
                 >
@@ -598,7 +588,6 @@ import {
   PlusIcon,
   RocketLaunchIcon,
   ServerIcon,
-  UserCircleIcon,
   UserGroupIcon,
   InboxArrowDownIcon,
   MagnifyingGlassIcon,
@@ -688,16 +677,18 @@ const moreActive = computed(() => moreSections.value.some((item) => isItemActive
 
 // Account-block entries live inside the "More" panel but outside navItems, so
 // they need their own active tracking to keep "More" expanded and highlight the
-// row the user is on (Profile, Memories, Statistics, Preferences, Subscription).
+// row the user is on (Preferences, Memories, Statistics, Subscription).
+// /settings covers the old /profile paths.
 const isPathActive = (path: string) => route.path.startsWith(path)
+const settingsActive = computed(() => isPathActive('/settings') || isPathActive('/profile'))
 const accountActive = computed(() =>
   [
+    '/settings',
     '/profile',
     '/groups',
     '/memories',
     '/statistics',
     '/feedbacks',
-    '/settings',
     '/subscription',
   ].some(isPathActive)
 )
@@ -785,7 +776,7 @@ const handleNavigate = async (path: string) => {
 const handleOpenMemories = () => {
   closeDrawer()
   if (!memoriesEnabledForUser.value) {
-    router.push('/profile?highlight=memories')
+    router.push('/settings#memories')
     return
   }
   // Navigate to the dedicated memories page instead of opening a modal — the

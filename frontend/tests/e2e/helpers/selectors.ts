@@ -347,8 +347,7 @@ export const selectors = {
     dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
     /** Full-screen catcher behind the account menu. Clicking it closes the menu. */
     overlay: '[data-testid="overlay-sidebar-v2-user"]',
-    profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
-    /** Avatar menu entry for the /settings page — labeled "Preferences" since phase 2 */
+    /** Avatar menu entry for the /settings page — labeled "Preferences" */
     preferencesBtn: '[data-testid="btn-sidebar-v2-preferences"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',

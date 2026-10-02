@@ -351,7 +351,7 @@
         "admin_people": "users people groups roles permissions iam",
         "admin_config": "system configuration settings feature flags environment",
         "profile": "profile account name email password",
-        "settings": "preferences language theme appearance",
+        "settings": "preferences language theme appearance profile account name email password",
         "memories": "memories remember facts personal knowledge",
         "statistics": "statistics usage costs tokens analytics",
         "chats": "all chats history conversations",

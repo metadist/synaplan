@@ -338,6 +338,18 @@
   "settings": {
     "title": "Preferences",
     "subtitle": "Manage your preferences and configuration",
+    "sections": {
+      "indexLabel": "On this page",
+      "profile": "Profile",
+      "appearance": "Language & appearance",
+      "chat": "Chat & AI",
+      "data": "Data & privacy",
+      "billing": "Billing",
+      "security": "Security",
+      "app": "App",
+      "legal": "Legal",
+      "delete": "Delete account"
+    },
     "tabs": {
       "general": "General",
       "features": "Features"

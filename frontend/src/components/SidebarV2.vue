@@ -239,15 +239,6 @@
               </p>
             </div>
             <button
-              role="menuitem"
-              class="dropdown-item"
-              data-testid="btn-sidebar-v2-profile"
-              @click="handleProfileSettings"
-            >
-              <UserCircleIcon class="w-4 h-4" />
-              <span>{{ $t('nav.profile') }}</span>
-            </button>
-            <button
               v-if="iamSharingEnabled"
               role="menuitem"
               class="dropdown-item"
@@ -337,9 +328,8 @@
           </template>
 
           <!--
-            Preferences holds the language and the theme, both stored on the
-            device rather than on the account, so it stays outside the
-            guest/authenticated split and is offered to everyone.
+            Preferences is the single settings page. Theme stays on the device,
+            so the entry is offered to guests as well as signed-in users.
           -->
           <div class="border-t border-light-border/10 dark:border-dark-border/10">
             <button
@@ -722,7 +712,6 @@ import {
   RocketLaunchIcon,
   Cog6ToothIcon,
   ChartBarIcon,
-  UserCircleIcon,
   UserGroupIcon,
   InboxArrowDownIcon,
   ArrowRightOnRectangleIcon,
@@ -990,13 +979,9 @@ const handleNavigate = (path: string) => {
   router.push(path)
 }
 
-const handleProfileSettings = () => {
-  handleNavigate('/profile')
-}
-
 const handleOpenMemories = () => {
   if (!memoriesEnabledForUser.value) {
-    handleNavigate('/profile?highlight=memories')
+    handleNavigate('/settings#memories')
     return
   }
   handleNavigate('/memories')

@@ -340,7 +340,7 @@
         "admin_people": "usuarios personas grupos roles permisos",
         "admin_config": "configuración del sistema ajustes feature flags entorno",
         "profile": "perfil cuenta nombre correo contraseña",
-        "settings": "preferencias idioma tema apariencia",
+        "settings": "preferencias idioma tema apariencia perfil cuenta nombre correo contraseña",
         "memories": "memorias recordar datos personal",
         "statistics": "estadísticas uso costes tokens",
         "chats": "todos los chats historial conversaciones",

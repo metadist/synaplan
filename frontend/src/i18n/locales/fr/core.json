@@ -351,7 +351,7 @@
         "admin_people": "utilisateurs personnes groupes rôles droits",
         "admin_config": "configuration système réglages feature flags environnement",
         "profile": "profil compte nom e-mail mot de passe",
-        "settings": "préférences langue thème apparence",
+        "settings": "préférences langue thème apparence profil compte nom e-mail mot de passe",
         "memories": "mémoires se souvenir faits personnel",
         "statistics": "statistiques utilisation coûts jetons",
         "chats": "tous les chats historique conversations",
