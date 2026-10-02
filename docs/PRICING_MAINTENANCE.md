@@ -432,6 +432,17 @@ Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no dri
 
 **Writes stay conservative:** only per_token rows are auto-written. `--force` overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog). Same-mode media drift is surfaced (and fails `--fail-on-drift`) but left for a human to apply in `ModelCatalog.php`.
 
+### Who owns a per-token price (#2309)
+
+LiteLLM owns the **live** per-token price. The catalog owns every other field, and it owns the price again in two cases:
+
+1. **The catalog price changed** since the last successful sync. The sync stores that price in `BJSON.__catalog_price_at_sync` and refreshes `BJSON.__catalog_fingerprint`, so `ModelSeeder` does not mistake the write for an admin edit. The next `app:seed` applies the new catalog price. Until the catalog price changes, seed leaves the LiteLLM price in place (including when a release only changes the description or features).
+2. **The catalog entry sets `json.pricePinned: true`.** The sync reports the LiteLLM number and does not write it. Seed applies the catalog price. Use this when the official page and LiteLLM disagree and the catalog number must stick — the same intent as `LITELLM_DEVIATIONS`, which already silences a known-wrong LiteLLM pair. A pin is the override; a deviation entry is the drift-check silence. A row can have either or both.
+
+An admin edit (the stored fingerprint no longer matches the row, and the row is not price-pinned) is still preserved. The sync only refreshes the fingerprint when the non-price fields still match the catalog, so a renamed model is not silently claimed back.
+
+`ModelPriceHistory` is unchanged: a sync write is still `source = litellm`, and an admin price is still skipped unless `--force`.
+
 ### Automated daily drift check (CI)
 
 `.github/workflows/price-drift.yml` runs every day at 06:00 UTC (and on manual dispatch): it seeds the catalog and runs `app:sync-model-prices --dry-run --fail-on-drift`. The flag exits with code **2** when any per-token model **or** any same-mode non-per-token model (whisper/tts/veo/imagen, individual resolution tiers included) differs from LiteLLM. Mode-mismatch and unmatched rows never trip it (no false alarms). It lives outside the PR CI on purpose: it depends on the external LiteLLM source, which must never turn a code PR red.
