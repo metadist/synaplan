@@ -174,8 +174,10 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $captured = null;
         $this->jobService->expects(self::once())
             ->method('markCompleted')
-            ->willReturnCallback(function (MediaJob $j, array $result) use (&$captured): void {
+            ->willReturnCallback(function (MediaJob $j, array $result) use (&$captured): bool {
                 $captured = $result;
+
+                return true;
             });
 
         $this->dispatcher->expects(self::never())->method('dispatch');
@@ -210,8 +212,10 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $captured = null;
         $this->jobService->expects(self::once())
             ->method('markFailed')
-            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): void {
+            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): bool {
                 $captured = $message;
+
+                return true;
             });
 
         // At the cap, we fail rather than re-dispatch.
@@ -239,8 +243,10 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $captured = null;
         $this->jobService->expects(self::once())
             ->method('markFailed')
-            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): void {
+            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): bool {
                 $captured = $message;
+
+                return true;
             });
 
         // It must NOT be treated as transient: no heartbeat-retry, no re-dispatch.
@@ -287,8 +293,10 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $captured = null;
         $this->jobService->expects(self::once())
             ->method('markFailed')
-            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): void {
+            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): bool {
                 $captured = $message;
+
+                return true;
             });
 
         $handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
@@ -339,7 +347,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->syncGenerator->expects(self::once())->method('generate')->with($job)->willReturn($result);
 
         $this->jobService->expects(self::once())->method('markSubmitting')->with($job);
-        $this->jobService->expects(self::once())->method('markCompleted')->with($job, $result);
+        $this->jobService->expects(self::once())->method('markCompleted')->with($job, $result)->willReturn(true);
         $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         // Image jobs never touch the video async API and never poll.
@@ -363,8 +371,10 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $captured = null;
         $this->jobService->expects(self::once())
             ->method('markFailed')
-            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): void {
+            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): bool {
                 $captured = $message;
+
+                return true;
             });
 
         $this->handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
@@ -382,7 +392,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->aiFacade->method('startVideoGeneration')
             ->willThrowException(new \RuntimeException('boom'));
 
-        $this->jobService->expects(self::once())->method('markFailed');
+        $this->jobService->expects(self::once())->method('markFailed')->willReturn(true);
         $this->jobService->expects(self::never())->method('markRunning');
         $this->dispatcher->expects(self::never())->method('dispatch');
 
@@ -399,7 +409,7 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         $this->aiFacade->expects(self::once())
             ->method('cancelVideoOperation')
             ->with('op-1', 'higgsfield', 7, new IsType(NativeType::Array));
-        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String));
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String))->willReturn(true);
 
         // A timed-out job must not poll or re-dispatch.
         $this->aiFacade->expects(self::never())->method('pollVideoOperation');

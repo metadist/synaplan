@@ -188,7 +188,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         // job failed, sync the message, and surface a localized error in the
         // same turn — no empty bubble, no endless poll.
         $this->mediaJobDispatcher->expects(self::once())->method('dispatch')->with($job)->willReturn(false);
-        $this->mediaJobService->expects(self::once())->method('markFailed')->with($job, new IsType(NativeType::String));
+        $this->mediaJobService->expects(self::once())->method('markFailed')->with($job, new IsType(NativeType::String))->willReturn(true);
         $this->mediaJobMessageSync->expects(self::once())->method('syncTerminalState')->with($job);
         $this->aiFacade->expects(self::never())->method('generateVideo');
 
