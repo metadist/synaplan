@@ -186,7 +186,14 @@ final class CatalogPriceOwnership
         $json = is_array($row['json'] ?? null) ? $row['json'] : [];
         unset($json[ModelCatalog::FINGERPRINT_KEY]);
         $json[self::PRICE_OWNER_KEY] = self::PRICE_OWNER_LITELLM;
-        $json[self::CATALOG_PRICE_AT_SYNC_KEY] = self::snapshot($catalogRow);
+        // A catalog price that moved since the last stamp must stay visible to
+        // the seeder. Overwriting the snapshot with the new catalog price would
+        // make the next seed treat that change as already applied.
+        $current = self::snapshot($catalogRow);
+        $prior = $json[self::CATALOG_PRICE_AT_SYNC_KEY] ?? null;
+        $json[self::CATALOG_PRICE_AT_SYNC_KEY] = is_array($prior) && $current != self::normalizeSnapshot($prior)
+            ? self::normalizeSnapshot($prior)
+            : $current;
         $row['json'] = $json;
         $json[ModelCatalog::FINGERPRINT_KEY] = ModelCatalog::fingerprint($row);
         $row['json'] = $json;

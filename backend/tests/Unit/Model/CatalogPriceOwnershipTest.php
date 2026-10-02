@@ -43,6 +43,29 @@ final class CatalogPriceOwnershipTest extends TestCase
         self::assertFalse(CatalogPriceOwnership::needsOwnershipStamp($synced, $moved));
     }
 
+    public function testLaterSyncKeepsTheSnapshotFromBeforeTheCatalogPriceMoved(): void
+    {
+        $catalog = $this->pricedRow();
+        $synced = CatalogPriceOwnership::stamp([
+            ...$catalog,
+            'priceIn' => 8.5,
+        ], $catalog);
+        $moved = $catalog;
+        $moved['priceIn'] = (float) $catalog['priceIn'] + 1.0;
+
+        $restamped = CatalogPriceOwnership::stamp([
+            ...$synced,
+            'priceIn' => 9.5,
+        ], $moved);
+
+        self::assertEquals(
+            CatalogPriceOwnership::snapshot($catalog),
+            $restamped['json'][CatalogPriceOwnership::CATALOG_PRICE_AT_SYNC_KEY],
+        );
+        self::assertFalse(CatalogPriceOwnership::shouldKeepLiteLlmPrice($restamped, $moved));
+        self::assertEqualsWithDelta(9.5, (float) $restamped['priceIn'], 0.000001);
+    }
+
     public function testMergeKeepsTheLivePriceAndTheSyncStamp(): void
     {
         $catalog = $this->pricedRow();
