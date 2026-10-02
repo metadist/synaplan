@@ -77,7 +77,8 @@ final class MediaJobReaperTest extends TestCase
             ->with('op-1', 'higgsfield', 7, new IsType(NativeType::Array));
         $this->jobService->expects(self::once())
             ->method('markTimedOut')
-            ->with($job, new IsType(NativeType::String));
+            ->with($job, new IsType(NativeType::String))
+            ->willReturn(true);
         $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         self::assertSame(1, $this->reaper->reap());
@@ -96,7 +97,7 @@ final class MediaJobReaperTest extends TestCase
         $this->jobService->method('findPastDeadline')->willReturn([$job]);
         $this->jobService->method('langFromJob')->willReturn('en');
 
-        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String));
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String))->willReturn(true);
         $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         self::assertSame(1, $this->reaper->reap());
@@ -175,9 +176,26 @@ final class MediaJobReaperTest extends TestCase
         $this->jobService->method('langFromJob')->willReturn('en');
 
         $this->lock->expects(self::once())->method('release');
-        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String));
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String))->willReturn(true);
 
         self::assertSame(1, $this->reaper->reap());
+    }
+
+    public function testLostTimeoutRaceIsNotCounted(): void
+    {
+        $job = (new MediaJob())
+            ->setUserId(7)
+            ->setType(MediaJob::TYPE_AUDIO)
+            ->setStatus(MediaJob::STATUS_SUBMITTING)
+            ->setDeadlineAt(time() + 120);
+
+        $this->jobService->method('findStale')->willReturn([$job]);
+        $this->jobService->method('findPastDeadline')->willReturn([]);
+        $this->jobService->method('langFromJob')->willReturn('en');
+        $this->jobService->expects(self::once())->method('markTimedOut')->willReturn(false);
+        $this->messageSync->expects(self::never())->method('syncTerminalState');
+
+        self::assertSame(0, $this->reaper->reap());
     }
 
     public function testSyncRenderPastDeadlineIsReapedEvenWhenTheWorkerLockIsHeld(): void
@@ -194,7 +212,7 @@ final class MediaJobReaperTest extends TestCase
         $this->jobService->method('findPastDeadline')->willReturn([$job]);
         $this->jobService->method('langFromJob')->willReturn('en');
 
-        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String));
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String))->willReturn(true);
 
         self::assertSame(1, $this->reaper->reap());
     }

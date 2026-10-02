@@ -240,66 +240,102 @@ final class MediaJobService
     /**
      * @param array<string, mixed> $result completed file descriptor
      */
-    public function markCompleted(MediaJob $job, array $result): void
+    public function markCompleted(MediaJob $job, array $result): bool
     {
         if ($this->adoptFreshMessageBinding($job)) {
-            return;
+            return false;
         }
         $job->setResult($result)
             ->setPercent(100)
             ->setError(null)
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_COMPLETED);
-        $this->store->save($job);
+        if (!$this->persist($job)) {
+            return false;
+        }
 
         $this->logger->info('MediaJob completed', [
             'job_key' => $job->getJobKey(),
             'elapsed_seconds' => $job->getElapsedSeconds(),
         ]);
+
+        return true;
     }
 
-    public function markFailed(MediaJob $job, string $error): void
+    public function markFailed(MediaJob $job, string $error): bool
     {
         if ($this->adoptFreshMessageBinding($job)) {
-            return;
+            return false;
         }
         $job->setError($this->truncateError($error))
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_FAILED);
-        $this->store->save($job);
+        if (!$this->persist($job)) {
+            return false;
+        }
 
         $this->logger->warning('MediaJob failed', [
             'job_key' => $job->getJobKey(),
             'error' => $job->getError(),
             'elapsed_seconds' => $job->getElapsedSeconds(),
         ]);
+
+        return true;
     }
 
-    public function markCancelled(MediaJob $job): void
+    public function markCancelled(MediaJob $job): bool
     {
         if ($this->adoptFreshMessageBinding($job)) {
-            return;
+            return false;
         }
         $job->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_CANCELLED);
-        $this->store->save($job);
+        if (!$this->persist($job)) {
+            return false;
+        }
+
+        return true;
     }
 
-    public function markTimedOut(MediaJob $job, string $reason): void
+    public function markTimedOut(MediaJob $job, string $reason): bool
     {
         if ($this->adoptFreshMessageBinding($job)) {
-            return;
+            return false;
         }
         $job->setError($this->truncateError($reason))
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_TIMED_OUT);
-        $this->store->save($job);
+        if (!$this->persist($job)) {
+            return false;
+        }
 
         $this->logger->warning('MediaJob timed out', [
             'job_key' => $job->getJobKey(),
             'reason' => $reason,
             'elapsed_seconds' => $job->getElapsedSeconds(),
         ]);
+
+        return true;
+    }
+
+    /**
+     * Store the job unless a terminal snapshot already won the race.
+     * On a loss the in-memory job adopts that snapshot.
+     */
+    private function persist(MediaJob $job): bool
+    {
+        $winner = $this->store->save($job);
+        if (null === $winner) {
+            return true;
+        }
+
+        $this->copyStoredOutcome($job, $winner);
+        $this->logger->info('MediaJob kept the stored outcome', [
+            'job_key' => $job->getJobKey(),
+            'status' => $winner->getStatus(),
+        ]);
+
+        return false;
     }
 
     /**
@@ -340,18 +376,27 @@ final class MediaJobService
             return false;
         }
 
-        $job->setStatus($stored->getStatus())
-            ->setError($stored->getError())
-            ->setFinishedAt($stored->getFinishedAt());
-        if (null !== $stored->getResult()) {
-            $job->setResult($stored->getResult());
-        }
+        $this->copyStoredOutcome($job, $stored);
         $this->logger->info('MediaJob kept its terminal outcome', [
             'job_key' => $job->getJobKey(),
             'status' => $stored->getStatus(),
         ]);
 
         return true;
+    }
+
+    private function copyStoredOutcome(MediaJob $job, MediaJob $stored): void
+    {
+        $storedMessageId = $stored->getMessageId();
+        if (null !== $storedMessageId && $storedMessageId !== $job->getMessageId()) {
+            $job->setMessageId($storedMessageId);
+        }
+        $job->setStatus($stored->getStatus())
+            ->setError($stored->getError())
+            ->setFinishedAt($stored->getFinishedAt());
+        if (null !== $stored->getResult()) {
+            $job->setResult($stored->getResult());
+        }
     }
 
     public function heartbeat(MediaJob $job): void

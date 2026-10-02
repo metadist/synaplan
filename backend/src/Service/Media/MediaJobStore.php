@@ -48,7 +48,7 @@ final class MediaJobStore
     ) {
     }
 
-    public function save(MediaJob $job): void
+    public function save(MediaJob $job): ?MediaJob
     {
         $terminal = $job->isTerminal();
         $ttl = $terminal ? self::TERMINAL_TTL_SECONDS : self::ACTIVE_TTL_SECONDS;
@@ -63,7 +63,15 @@ final class MediaJobStore
             throw new \RuntimeException(sprintf('MediaJobStore: failed to serialize job %s: %s', $job->getJobKey(), json_last_error_msg()));
         }
 
-        $this->redis->set(self::JOB_PREFIX.$job->getJobKey(), $encoded, $ttl);
+        $rejected = $this->redis->setUnlessMediaJobTerminal(self::JOB_PREFIX.$job->getJobKey(), $encoded, $ttl);
+        if (is_string($rejected)) {
+            $decoded = json_decode($rejected, true);
+            if (!is_array($decoded)) {
+                throw new \RuntimeException(sprintf('MediaJobStore: terminal snapshot for job %s was not readable', $job->getJobKey()));
+            }
+
+            return MediaJob::fromArray($decoded);
+        }
 
         $messageId = $job->getMessageId();
         if (null !== $messageId) {
@@ -89,6 +97,8 @@ final class MediaJobStore
                 $this->redis->expire($userKey, self::ACTIVE_TTL_SECONDS);
             }
         }
+
+        return null;
     }
 
     public function find(string $jobKey): ?MediaJob

@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
 
 /**
  * Backstop that guarantees the "no job runs forever / nothing fails silently"
@@ -70,30 +71,33 @@ final readonly class MediaJobReaper
                 continue;
             }
 
-            // A live synchronous render has a stale heartbeat by nature: the
-            // worker is blocked in the provider call. The advance lock, held
-            // until the deadline, is the liveness signal. Past the deadline
-            // the job is reaped either way.
-            if (!$job->isPastDeadline($now) && $this->synchronousWorkerIsAlive($job)) {
+            $claim = $this->claimForTimeout($job, $job->isPastDeadline($now));
+            if (!$claim['reap']) {
                 continue;
             }
 
-            $this->cancelProvider($job);
-            $this->jobService->markTimedOut(
-                $job,
-                $job->isPastDeadline($now)
-                    ? $this->errorBuilder->buildTimeoutMessage(
-                        $job->getType(),
-                        $this->jobService->langFromJob($job),
-                    )
-                    : $this->errorBuilder->buildErrorMessage(
-                        new \RuntimeException('Render worker stopped responding'),
-                        $job->getType(),
-                        $this->jobService->langFromJob($job),
-                    ),
-            );
-            $this->messageSync->syncTerminalState($job);
-            ++$reaped;
+            try {
+                $this->cancelProvider($job);
+                $timedOut = $this->jobService->markTimedOut(
+                    $job,
+                    $job->isPastDeadline($now)
+                        ? $this->errorBuilder->buildTimeoutMessage(
+                            $job->getType(),
+                            $this->jobService->langFromJob($job),
+                        )
+                        : $this->errorBuilder->buildErrorMessage(
+                            new \RuntimeException('Render worker stopped responding'),
+                            $job->getType(),
+                            $this->jobService->langFromJob($job),
+                        ),
+                );
+                if ($timedOut) {
+                    $this->messageSync->syncTerminalState($job);
+                    ++$reaped;
+                }
+            } finally {
+                $claim['lock']?->release();
+            }
         }
 
         if ($reaped > 0) {
@@ -107,25 +111,29 @@ final readonly class MediaJobReaper
     }
 
     /**
-     * True when an image or audio job is inside its blocking provider call and
-     * the worker still holds the advance lock. Video jobs poll and heartbeat,
-     * so they are never treated as alive by this check.
+     * Decide whether this candidate is timed out, and hold the advance lock
+     * across that write when the worker is not already inside generate().
+     *
+     * Image and audio stay in `submitting` for the whole provider call. A held
+     * advance lock means that call is still running: leave the job alone until
+     * its deadline. When the lock is free, this process keeps it until the
+     * timeout is stored so a redelivered worker cannot start the same render
+     * in the gap.
+     *
+     * @return array{reap: bool, lock: ?LockInterface}
      */
-    private function synchronousWorkerIsAlive(MediaJob $job): bool
+    private function claimForTimeout(MediaJob $job, bool $pastDeadline): array
     {
         if (MediaJob::TYPE_VIDEO === $job->getType() || MediaJob::STATUS_SUBMITTING !== $job->getStatus()) {
-            return false;
+            return ['reap' => true, 'lock' => null];
         }
 
         $lock = $this->lockFactory->createLock(MediaJob::ADVANCE_LOCK_PREFIX.$job->getJobKey(), 30.0);
         if ($lock->acquire(false)) {
-            // Nobody held it. Drop it immediately so the real worker can take it.
-            $lock->release();
-
-            return false;
+            return ['reap' => true, 'lock' => $lock];
         }
 
-        return true;
+        return ['reap' => $pastDeadline, 'lock' => null];
     }
 
     private function cancelProvider(MediaJob $job): void
