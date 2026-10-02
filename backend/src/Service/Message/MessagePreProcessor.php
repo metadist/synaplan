@@ -10,6 +10,8 @@ use App\Repository\UserRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\TikaClient;
 use App\Service\RateLimitService;
+use App\Service\Stt\SpeechLanguageContext;
+use App\Service\Stt\TranscriptionLanguageDecider;
 use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 
@@ -289,8 +291,10 @@ final readonly class MessagePreProcessor
 
             try {
                 $result = $useExternal
-                    ? $this->aiFacade->transcribe($fullPath, $userId)
-                    : $this->transcribeWithWhisper($fullPath, null);
+                    ? $this->aiFacade->transcribe($fullPath, $userId, [
+                        'channel_language' => $message->getLanguage(),
+                    ])
+                    : $this->transcribeLocal($fullPath, $message->getLanguage());
                 $this->persistTranscriptionUsage($message, $result);
                 $transcribedText = $this->transcribedText($result);
                 if ('' !== $transcribedText) {
@@ -300,6 +304,7 @@ final readonly class MessagePreProcessor
                     // A voice note with no caption becomes the message text and
                     // is routed like typed text. A caption is left alone.
                     SpokenInput::applyTranscript($message, $transcribedText);
+                    $this->rememberDetectedLanguage($message, $result);
 
                     $this->logger->info('PreProcessor: Audio transcribed', [
                         'file_id' => $messageFile->getId(),
@@ -461,7 +466,9 @@ final readonly class MessagePreProcessor
 
             try {
                 $result = $useExternal
-                    ? $this->aiFacade->transcribe($fullPath, $userId)
+                    ? $this->aiFacade->transcribe($fullPath, $userId, [
+                        'channel_language' => $message->getLanguage(),
+                    ])
                     : $this->transcribeWithWhisper($fullPath, $message->getLanguage());
                 $this->persistTranscriptionUsage($message, $result);
                 $transcribedText = $this->transcribedText($result);
@@ -602,6 +609,52 @@ final readonly class MessagePreProcessor
         }
 
         return trim($result['text']);
+    }
+
+    /**
+     * Local whisper.cpp, with the same unhinted-then-hinted rule as the
+     * external path. Only the channel language is known here; the external
+     * path also sees the account and recent messages.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function transcribeLocal(string $filePath, string $channelLanguage): ?array
+    {
+        $speech = SpeechLanguageContext::fromSignals(
+            ['channel_language' => $channelLanguage],
+            null,
+            null,
+            [],
+        );
+        if ([] === $speech['expected']) {
+            return $this->transcribeWithWhisper($filePath, null);
+        }
+
+        return (new TranscriptionLanguageDecider())->transcribe(
+            function (?string $hint) use ($filePath): array {
+                return $this->transcribeWithWhisper($filePath, $hint) ?? [
+                    'text' => '',
+                    'language' => 'unknown',
+                    'duration' => 0,
+                ];
+            },
+            $speech['expected'],
+            $speech['hint'],
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $result
+     */
+    private function rememberDetectedLanguage(Message $message, ?array $result): void
+    {
+        $language = $result['language'] ?? null;
+        if (!is_string($language) || 1 !== preg_match('/^[a-z]{2}$/', $language)) {
+            return;
+        }
+        if ($language !== $message->getLanguage()) {
+            $message->setLanguage($language);
+        }
     }
 
     /**
