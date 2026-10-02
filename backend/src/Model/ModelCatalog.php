@@ -363,6 +363,18 @@ class ModelCatalog
             'successor' => 'trustedtokens:zai-org/GLM-5.3:chat',
             'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Pro-0813; migrate to GLM-5.3.',
         ],
+
+        // --- 2026-10-02 (OpenAI deprecation notice, shutdown 2027-04-01) ---
+        // Retired ahead of the shutdown: the model is still served, so the
+        // availability check cannot see it until 2027-04-01, when it would
+        // already fail for users. GPT-5.6 Luna is the same price tier
+        // ($0.20 vs $0.20 in, $1.20 vs $1.25 out) on the same Responses API.
+        234 => [
+            'providerId' => 'gpt-5.4-nano',
+            'retiredOn' => '2026-10-02',
+            'successor' => 'openai:gpt-5.6-luna:chat',
+            'reason' => 'Deprecated by OpenAI; access ends on 2027-04-01. Migrate to GPT-5.6 Luna.',
+        ],
     ];
 
     /**
