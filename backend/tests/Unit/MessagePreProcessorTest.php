@@ -237,7 +237,7 @@ class MessagePreProcessorTest extends TestCase
                 ->willReturn(true);
 
             $this->whisperService
-                ->expects($this->once())
+                ->expects($this->exactly(2))
                 ->method('transcribe')
                 ->willThrowException(new \Exception('Transcription failed'));
 

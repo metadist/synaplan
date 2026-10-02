@@ -469,7 +469,7 @@ final readonly class MessagePreProcessor
                     ? $this->aiFacade->transcribe($fullPath, $userId, [
                         'channel_language' => $message->getLanguage(),
                     ])
-                    : $this->transcribeWithWhisper($fullPath, $message->getLanguage());
+                    : $this->transcribeLocal($fullPath, $message->getLanguage());
                 $this->persistTranscriptionUsage($message, $result);
                 $transcribedText = $this->transcribedText($result);
                 if ('' !== $transcribedText) {
@@ -478,11 +478,7 @@ final readonly class MessagePreProcessor
                     // A voice note with no caption becomes the message text and
                     // is routed like typed text. A caption is left alone.
                     SpokenInput::applyTranscript($message, $transcribedText);
-
-                    // Update detected language if different
-                    if ('unknown' !== $result['language'] && $result['language'] !== $message->getLanguage()) {
-                        $message->setLanguage($result['language']);
-                    }
+                    $this->rememberDetectedLanguage($message, $result);
 
                     $this->logger->info('PreProcessor: Audio transcribed successfully', [
                         'text_length' => strlen($transcribedText),

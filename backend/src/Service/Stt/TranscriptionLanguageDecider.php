@@ -56,7 +56,7 @@ final class TranscriptionLanguageDecider
             $first['language'] = $detected;
         }
 
-        if (null === $hint || [] === $expected || null === $detected || in_array($detected, $expected, true)) {
+        if (null === $hint || [] === $expected || (null !== $detected && in_array($detected, $expected, true))) {
             return $first;
         }
 

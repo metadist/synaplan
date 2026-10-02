@@ -69,6 +69,27 @@ final class TranscriptionLanguageDeciderTest extends TestCase
         self::assertSame('ru', $result['language']);
     }
 
+    public function testUnknownDetectionRetriesWhenAHintExists(): void
+    {
+        $calls = [];
+        $result = (new TranscriptionLanguageDecider())->transcribe(
+            function (?string $hint) use (&$calls): array {
+                $calls[] = $hint;
+                if (null === $hint) {
+                    return ['text' => '', 'language' => 'unknown', 'duration' => 1.0];
+                }
+
+                return ['text' => 'Hallo', 'language' => 'de', 'duration' => 1.0];
+            },
+            ['de', 'en'],
+            'de',
+        );
+
+        self::assertSame([null, 'de'], $calls);
+        self::assertSame('Hallo', $result['text']);
+        self::assertSame('de', $result['language']);
+    }
+
     public function testAccountLanguageHintsAndEnglishStaysExpected(): void
     {
         $speech = SpeechLanguageContext::fromSignals(
