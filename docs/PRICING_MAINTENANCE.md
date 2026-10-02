@@ -193,6 +193,18 @@ TrustedTokens dropped the remaining DeepSeek V4 ids (`deepseek-ai/DeepSeek-V4-Fl
 
 Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 336 or 337, so nothing is orphaned. Neither BID is a `ProviderDefaultsService` recommendation. The health monitor skips rows that carry `BRETIREDON`, so this also stops the hourly incident mail for these ids.
 
+### OpenAI deprecation notice (2026-10-02, shutdown 2027-04-01)
+
+OpenAI announced by email on 2026-10-02 that `gpt-5.4-nano`, `gpt-5.1` and `gpt-5.3-codex` stop being served on **2027-04-01**. Only `gpt-5.4-nano` was ever in the catalog; `gpt-5.1` and `gpt-5.3-codex` have no `BMODELS` row (the retired BIDs 193/194 are `gpt-5.3`, a different id).
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 234 | GPT-5.4 nano | `gpt-5.4-nano` | `openai:gpt-5.6-luna:chat` (GPT-5.6 Luna, BID 255) |
+
+**Retired ahead of the shutdown, on purpose.** Neither detector sees an announced deprecation: `app:models:check-availability` reports a model only once the provider stops serving it, and OpenAI's `/v1/models` carries no deprecation date. Waiting for the check means users hit the failure first on 2027-04-01. The provider's notice (mail or [deprecations page](https://developers.openai.com/api/docs/deprecations)) is the only early signal, so a notice is retired by hand on the day it arrives.
+
+GPT-5.6 Luna is the suggested successor `app:models:check-availability` would print for BID 234 and the same price tier ($0.20 in both, $1.20 vs $1.25 out) on the same Responses API, with vision on top. Retired via the registry, no migration. No shipped `DEFAULTMODEL` binding or `ProviderDefaultsService` recommendation names BID 234; any binding an operator or user stored (`DEFAULTMODEL`, a widget's `aiModelId`, a prompt's `aiModel`) follows `BSUCCESSORID` to Luna at resolution time.
+
 ## Maintenance links
 
 **Official provider price pages** (use these first — step 2 of the playbook):
