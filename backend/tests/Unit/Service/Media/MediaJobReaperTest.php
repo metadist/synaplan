@@ -16,6 +16,8 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\SharedLockInterface;
 
 /**
  * The reaper is the "no job runs forever" backstop for renders whose worker
@@ -29,6 +31,9 @@ final class MediaJobReaperTest extends TestCase
     private MediaJobConfig&MockObject $config;
     private AiFacade&MockObject $aiFacade;
     private MediaErrorMessageBuilder $errorBuilder;
+    private LockFactory&MockObject $lockFactory;
+    private SharedLockInterface&MockObject $lock;
+    private bool $workerHoldsLock = false;
     private MediaJobReaper $reaper;
 
     protected function setUp(): void
@@ -39,6 +44,10 @@ final class MediaJobReaperTest extends TestCase
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->errorBuilder = new MediaErrorMessageBuilder();
         $this->config->method('heartbeatStaleSeconds')->willReturn(90);
+        $this->lockFactory = $this->createMock(LockFactory::class);
+        $this->lock = $this->createMock(SharedLockInterface::class);
+        $this->lock->method('acquire')->willReturnCallback(fn (): bool => !$this->workerHoldsLock);
+        $this->lockFactory->method('createLock')->willReturn($this->lock);
 
         $this->reaper = new MediaJobReaper(
             $this->jobService,
@@ -46,6 +55,7 @@ final class MediaJobReaperTest extends TestCase
             $this->config,
             $this->aiFacade,
             $this->errorBuilder,
+            $this->lockFactory,
             new NullLogger(),
         );
     }
@@ -102,6 +112,7 @@ final class MediaJobReaperTest extends TestCase
             $this->config,
             $this->aiFacade,
             $this->errorBuilder,
+            $this->lockFactory,
             new NullLogger(),
         );
 
@@ -128,6 +139,64 @@ final class MediaJobReaperTest extends TestCase
         $this->jobService->expects(self::never())->method('markTimedOut');
 
         self::assertSame(0, $this->reaper->reap());
+    }
+
+    public function testLiveSyncRenderWithStaleHeartbeatIsNotReapedBeforeDeadline(): void
+    {
+        $job = (new MediaJob())
+            ->setUserId(7)
+            ->setType(MediaJob::TYPE_IMAGE)
+            ->setProvider('openai')
+            ->setStatus(MediaJob::STATUS_SUBMITTING)
+            ->setDeadlineAt(time() + 120);
+        $this->workerHoldsLock = true;
+
+        $this->jobService->method('findStale')->willReturn([$job]);
+        $this->jobService->method('findPastDeadline')->willReturn([]);
+
+        $this->aiFacade->expects(self::never())->method('cancelVideoOperation');
+        $this->jobService->expects(self::never())->method('markTimedOut');
+        $this->messageSync->expects(self::never())->method('syncTerminalState');
+
+        self::assertSame(0, $this->reaper->reap());
+    }
+
+    public function testSyncRenderWithStaleHeartbeatIsReapedWhenTheWorkerLockIsFree(): void
+    {
+        $job = (new MediaJob())
+            ->setUserId(7)
+            ->setType(MediaJob::TYPE_AUDIO)
+            ->setProvider('openai')
+            ->setStatus(MediaJob::STATUS_SUBMITTING)
+            ->setDeadlineAt(time() + 120);
+
+        $this->jobService->method('findStale')->willReturn([$job]);
+        $this->jobService->method('findPastDeadline')->willReturn([]);
+        $this->jobService->method('langFromJob')->willReturn('en');
+
+        $this->lock->expects(self::once())->method('release');
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String));
+
+        self::assertSame(1, $this->reaper->reap());
+    }
+
+    public function testSyncRenderPastDeadlineIsReapedEvenWhenTheWorkerLockIsHeld(): void
+    {
+        $job = (new MediaJob())
+            ->setUserId(7)
+            ->setType(MediaJob::TYPE_IMAGE)
+            ->setProvider('openai')
+            ->setStatus(MediaJob::STATUS_SUBMITTING)
+            ->setDeadlineAt(time() - 5);
+        $this->workerHoldsLock = true;
+
+        $this->jobService->method('findStale')->willReturn([]);
+        $this->jobService->method('findPastDeadline')->willReturn([$job]);
+        $this->jobService->method('langFromJob')->willReturn('en');
+
+        $this->jobService->expects(self::once())->method('markTimedOut')->with($job, new IsType(NativeType::String));
+
+        self::assertSame(1, $this->reaper->reap());
     }
 
     public function testNoStaleJobsReturnsZero(): void

@@ -325,8 +325,11 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
     public function testSyncImageJobGeneratesAndCompletesInOneStep(): void
     {
         $job = $this->job(MediaJob::STATUS_QUEUED);
-        $job->setType(MediaJob::TYPE_IMAGE)->setPrompt('a red balloon');
+        $job->setType(MediaJob::TYPE_IMAGE)->setPrompt('a red balloon')->setDeadlineAt(time() + 240);
         $this->jobService->method('findByKey')->willReturn($job);
+        $this->lock->expects(self::once())
+            ->method('refresh')
+            ->with(self::greaterThanOrEqual(240.0));
 
         $result = [
             'file' => ['url' => '/api/v1/files/uploads/x.png', 'type' => 'image', 'mimeType' => 'image/png'],

@@ -152,6 +152,7 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
             $this->config,
             $this->aiFacade,
             $this->errorBuilder,
+            $this->lockFactory,
             $jobLogger,
         );
 

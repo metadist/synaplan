@@ -7,6 +7,7 @@ namespace App\Service\Media;
 use App\AI\Service\AiFacade;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * Backstop that guarantees the "no job runs forever / nothing fails silently"
@@ -23,6 +24,12 @@ use Psr\Log\LoggerInterface;
  * drives them to `timed_out`, best-effort cancelling the provider operation so
  * we stop being billed for output nobody is waiting for.
  *
+ * Synchronous image and audio renders are the exception (#2308). They block
+ * inside one provider call and cannot refresh the heartbeat, so a stale
+ * heartbeat there does not mean the worker died. While that job is still
+ * `submitting`, before its deadline, and its advance lock is held, it is left
+ * alone. The deadline remains the hard stop.
+ *
  * Run periodically from cron via {@see \App\Command\ReapMediaJobsCommand}.
  */
 final readonly class MediaJobReaper
@@ -33,6 +40,7 @@ final readonly class MediaJobReaper
         private MediaJobConfig $config,
         private AiFacade $aiFacade,
         private MediaErrorMessageBuilder $errorBuilder,
+        private LockFactory $lockFactory,
         private LoggerInterface $logger,
     ) {
     }
@@ -62,6 +70,14 @@ final readonly class MediaJobReaper
                 continue;
             }
 
+            // A live synchronous render has a stale heartbeat by nature: the
+            // worker is blocked in the provider call. The advance lock, held
+            // until the deadline, is the liveness signal. Past the deadline
+            // the job is reaped either way.
+            if (!$job->isPastDeadline($now) && $this->synchronousWorkerIsAlive($job)) {
+                continue;
+            }
+
             $this->cancelProvider($job);
             $this->jobService->markTimedOut(
                 $job,
@@ -88,6 +104,28 @@ final readonly class MediaJobReaper
         }
 
         return $reaped;
+    }
+
+    /**
+     * True when an image or audio job is inside its blocking provider call and
+     * the worker still holds the advance lock. Video jobs poll and heartbeat,
+     * so they are never treated as alive by this check.
+     */
+    private function synchronousWorkerIsAlive(MediaJob $job): bool
+    {
+        if (MediaJob::TYPE_VIDEO === $job->getType() || MediaJob::STATUS_SUBMITTING !== $job->getStatus()) {
+            return false;
+        }
+
+        $lock = $this->lockFactory->createLock(MediaJob::ADVANCE_LOCK_PREFIX.$job->getJobKey(), 30.0);
+        if ($lock->acquire(false)) {
+            // Nobody held it. Drop it immediately so the real worker can take it.
+            $lock->release();
+
+            return false;
+        }
+
+        return true;
     }
 
     private function cancelProvider(MediaJob $job): void

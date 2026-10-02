@@ -242,7 +242,9 @@ final class MediaJobService
      */
     public function markCompleted(MediaJob $job, array $result): void
     {
-        $this->adoptFreshMessageBinding($job);
+        if ($this->adoptFreshMessageBinding($job)) {
+            return;
+        }
         $job->setResult($result)
             ->setPercent(100)
             ->setError(null)
@@ -258,7 +260,9 @@ final class MediaJobService
 
     public function markFailed(MediaJob $job, string $error): void
     {
-        $this->adoptFreshMessageBinding($job);
+        if ($this->adoptFreshMessageBinding($job)) {
+            return;
+        }
         $job->setError($this->truncateError($error))
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_FAILED);
@@ -273,7 +277,9 @@ final class MediaJobService
 
     public function markCancelled(MediaJob $job): void
     {
-        $this->adoptFreshMessageBinding($job);
+        if ($this->adoptFreshMessageBinding($job)) {
+            return;
+        }
         $job->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_CANCELLED);
         $this->store->save($job);
@@ -281,7 +287,9 @@ final class MediaJobService
 
     public function markTimedOut(MediaJob $job, string $reason): void
     {
-        $this->adoptFreshMessageBinding($job);
+        if ($this->adoptFreshMessageBinding($job)) {
+            return;
+        }
         $job->setError($this->truncateError($reason))
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_TIMED_OUT);
@@ -306,12 +314,17 @@ final class MediaJobService
      * terminal transition makes the last write carry the freshest target.
      * (A rebind landing inside the refresh→save window is still lost, but the
      * window is milliseconds instead of the whole render.)
+     *
+     * Returns true when the stored job is already terminal. The in-memory job
+     * is aligned to that outcome and the caller must not write a new one:
+     * a slow render used to finish after the reaper had timed it out and
+     * silently flip the chat to completed (#2308).
      */
-    private function adoptFreshMessageBinding(MediaJob $job): void
+    private function adoptFreshMessageBinding(MediaJob $job): bool
     {
         $stored = $this->store->find($job->getJobKey());
         if (null === $stored) {
-            return;
+            return false;
         }
         $storedMessageId = $stored->getMessageId();
         if (null !== $storedMessageId && $storedMessageId !== $job->getMessageId()) {
@@ -322,6 +335,23 @@ final class MediaJobService
             ]);
             $job->setMessageId($storedMessageId);
         }
+
+        if (!$stored->isTerminal()) {
+            return false;
+        }
+
+        $job->setStatus($stored->getStatus())
+            ->setError($stored->getError())
+            ->setFinishedAt($stored->getFinishedAt());
+        if (null !== $stored->getResult()) {
+            $job->setResult($stored->getResult());
+        }
+        $this->logger->info('MediaJob kept its terminal outcome', [
+            'job_key' => $job->getJobKey(),
+            'status' => $stored->getStatus(),
+        ]);
+
+        return true;
     }
 
     public function heartbeat(MediaJob $job): void
@@ -400,9 +430,11 @@ final class MediaJobService
 
     /**
      * Detect the "worker isn't picking jobs up" signal: a non-terminal job that
-     * has been `queued` or `submitting` for longer than {@see STALL_QUEUED_SECONDS}
-     * without ever transitioning to `running`. Returns [stalled, reason] where
-     * the reason is a short i18n key the frontend maps to localized copy.
+     * has been `queued` (or a video job stuck in `submitting`) for longer than
+     * {@see STALL_QUEUED_SECONDS} without ever transitioning to `running`.
+     * Image and audio stay in `submitting` while the provider renders, so that
+     * status is not a stall. Returns [stalled, reason] where the reason is a
+     * short i18n key the frontend maps to localized copy.
      *
      * @return array{0:bool, 1:?string}
      */
@@ -412,7 +444,13 @@ final class MediaJobService
             return [false, null];
         }
 
-        if (in_array($job->getStatus(), [MediaJob::STATUS_QUEUED, MediaJob::STATUS_SUBMITTING], true)) {
+        // Image and audio stay in `submitting` for the whole provider call.
+        // That is the render, not a job sitting in the queue (#2308). Only a
+        // job that has not been picked up, or a video submit that never
+        // returned, is a stalled worker.
+        $awaitingWorker = MediaJob::STATUS_QUEUED === $job->getStatus()
+            || (MediaJob::STATUS_SUBMITTING === $job->getStatus() && MediaJob::TYPE_VIDEO === $job->getType());
+        if ($awaitingWorker) {
             $age = $now - $job->getCreated();
             if ($age >= self::STALL_QUEUED_SECONDS) {
                 return [true, 'queue_worker_down'];
