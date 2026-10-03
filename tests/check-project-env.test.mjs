@@ -68,6 +68,19 @@ test('a copied backend env reports overrides and ignored settings by name only',
   assert.doesNotMatch(result.stderr, /SYNAPLAN_FRONTEND_PORT/)
 })
 
+test('a misspelled port name is reported as ignored', () => {
+  const result = runCheck('SYNAPLAN_FRONTED_PORT=5174\n')
+  assert.equal(result.status, 0)
+  assert.match(result.stderr, /has 1 setting\(s\) Docker Compose never reads/)
+  assert.match(result.stderr, /SYNAPLAN_FRONTED_PORT/)
+})
+
+test('documented port names stay silent even when this stack does not read them', () => {
+  const result = runCheck('SYNAPLAN_KEYCLOAK_HTTP_PORT=8081\nSYNAPLAN_OLLAMA_PORT=11436\n')
+  assert.equal(result.status, 0)
+  assert.equal(result.stderr, '')
+})
+
 test('long lists are truncated', () => {
   const keys = Array.from({ length: 11 }, (_, i) => `UNUSED_${String(i).padStart(2, '0')}=x`)
   const result = runCheck(keys.join('\n'))

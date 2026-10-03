@@ -11,9 +11,10 @@
 #   - a variable no compose file references (APP_SECRET, DATABASE_*_URL, ...)
 #     does nothing at all, yet looks like it configures the app.
 #
-# SYNAPLAN_*_PORT and COMPOSE_PROFILES are the documented knobs (see
-# .env.example) and are never reported. The check only warns; it never stops
-# the start, and it prints variable names, never values.
+# The documented knobs are never reported: exactly the names in .env.example
+# (not a SYNAPLAN_*_PORT wildcard, so a misspelled port name still shows up
+# as ignored) plus Compose's own COMPOSE_* settings. The check only warns; it
+# never stops the start, and it prints variable names, never values.
 #
 # Usage:
 #   scripts/check-project-env.sh <env-file> [global docker-compose flags...]
@@ -23,12 +24,18 @@ env_file="${1:-}"
 [ -n "$env_file" ] && [ -f "$env_file" ] || exit 0
 shift
 
+root="$(cd "$(dirname "$0")/.." && pwd)"
 MAX_LISTED=8
 
+env_keys() {
+    [ -f "$1" ] || return 0
+    sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' "$1" | sort -u
+}
+
+documented_keys=$(env_keys "${root}/.env.example")
 file_keys=$(
-    sed -nE 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' "$env_file" \
-        | grep -vE '^(SYNAPLAN_[A-Z0-9_]*_PORT|COMPOSE_PROFILES)$' \
-        | sort -u
+    comm -23 <(env_keys "$env_file") <(printf '%s\n' "$documented_keys" | sed '/^$/d') \
+        | grep -vE '^COMPOSE_[A-Z0-9_]+$'
 )
 [ -n "$file_keys" ] || exit 0
 
