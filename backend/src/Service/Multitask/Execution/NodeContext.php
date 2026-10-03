@@ -29,9 +29,23 @@ use App\Service\Multitask\Plan\TaskNode;
  * in-place. This prevents literal placeholder text (e.g. "Summary: $n1.text")
  * from leaking into the persisted reply when the planner emits prose with
  * embedded references instead of a pure `"$n1.text"` value.
+ *
+ * Planner models also write the text field under other names
+ * (`$n1.output`, `$n1.result`, `$n1.content`, …). Those aliases resolve to the
+ * node text as well ({@see TEXT_FIELD_ALIASES}); leaving them unresolved would
+ * hand the answering model a literal placeholder instead of the data.
  */
 final class NodeContext
 {
+    /**
+     * Field names planners use for a node's text output besides `text`. All
+     * resolve to {@see NodeResult::$text}; `file`/`files` keep their meaning.
+     */
+    public const TEXT_FIELD_ALIASES = ['text', 'output', 'result', 'results', 'content', 'data', 'response', 'value', 'summary', 'answer'];
+
+    /** Alternation with longer spellings first (`results` before `result`). */
+    private const TEXT_FIELD_PATTERN = 'text|output|results|result|content|data|response|value|summary|answer';
+
     /** @var array<string, NodeResult> nodeId => result */
     private array $results = [];
 
@@ -229,7 +243,7 @@ final class NodeContext
         // token with no surrounding prose — return the typed value as-is (may be null,
         // a string, or a file list). Must match from ^ to $ so that a multi-token prose
         // string like "$n1.text and also $n2.text" falls through to interpolateRefs.
-        if (1 === preg_match('/^\$(?:message\.(text|fileText|files)|[A-Za-z0-9_]+\.(text|file|files))$/', $value)) {
+        if (1 === preg_match('/^\$(?:message\.(text|fileText|files)|[A-Za-z0-9_]+\.(?:'.self::TEXT_FIELD_PATTERN.'|file|files))$/', $value)) {
             return match (true) {
                 '$message.text' === $value => $this->message->getText(),
                 '$message.fileText' === $value => $this->message->getFileText() ?: '',
@@ -249,18 +263,19 @@ final class NodeContext
     }
 
     /**
-     * Inline-replace every `$nX.text` / `$message.text` / `$message.fileText`
-     * token inside a prose string. Unknown or unresolvable references are
-     * replaced with an empty string so no placeholder leaks to the user.
+     * Inline-replace every `$nX.text` (or text alias) / `$message.text` /
+     * `$message.fileText` token inside a prose string. Unknown or unresolvable
+     * references are replaced with an empty string so no placeholder leaks to
+     * the user. Also accepts the `${n1.text}` brace spelling some models emit.
      */
     private function interpolateRefs(string $value): string
     {
         return preg_replace_callback(
-            '/\$(?:message\.(text|fileText)|([A-Za-z0-9_]+)\.(text))/',
+            '/\$\{?(?:message\.(text|fileText)|([A-Za-z0-9_]+)\.('.self::TEXT_FIELD_PATTERN.'))\}?/',
             function (array $m): string {
                 // Group 1 is non-empty when the match is $message.text or $message.fileText.
                 if ('' !== $m[1]) {
-                    $resolved = '$message.text' === $m[0]
+                    $resolved = 'text' === $m[1]
                         ? $this->message->getText()
                         : ($this->message->getFileText() ?: '');
                 } else {
@@ -275,7 +290,7 @@ final class NodeContext
 
     private function resolveNodeRef(string $ref): mixed
     {
-        if (1 !== preg_match('/^\$(?<id>[A-Za-z0-9_]+)\.(?<field>text|file|files)$/', $ref, $m)) {
+        if (1 !== preg_match('/^\$(?<id>[A-Za-z0-9_]+)\.(?<field>'.self::TEXT_FIELD_PATTERN.'|file|files)$/', $ref, $m)) {
             return null; // unknown reference shape → null (runner decides fallback)
         }
 
@@ -285,9 +300,9 @@ final class NodeContext
         }
 
         return match ($m['field']) {
-            'text' => $result->text,
             'file' => $result->firstFile(),
-            default => $result->files, // 'files' — regex constrains field to text|file|files
+            'files' => $result->files,
+            default => $result->text, // `text` and its aliases
         };
     }
 

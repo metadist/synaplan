@@ -6,6 +6,7 @@ namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -77,6 +78,33 @@ final readonly class McpToolRegistry
         });
 
         return $tools;
+    }
+
+    /**
+     * Tools of one server ONLY when discovery already ran and is still cached
+     * — never a network round-trip. Null when nothing is cached (or the pool
+     * cannot be inspected). For callers on the sorter's critical path that
+     * may hint at tool names but must not pay for discovery.
+     *
+     * @return list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}>|null
+     */
+    public function cachedToolsFor(McpServerConfig $server): ?array
+    {
+        if (!$this->cache instanceof CacheItemPoolInterface) {
+            return null;
+        }
+
+        try {
+            $item = $this->cache->getItem($this->cacheKey($server));
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!$item->isHit()) {
+            return null;
+        }
+        $tools = $item->get();
+
+        return is_array($tools) ? array_values($tools) : null;
     }
 
     /**
