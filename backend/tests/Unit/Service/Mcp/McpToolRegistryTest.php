@@ -99,6 +99,53 @@ final class McpToolRegistryTest extends TestCase
         self::assertSame($callsAfterFirst, $this->httpCalls, 'second lookup must be served from cache');
     }
 
+    /**
+     * The sorter hint reads the cache only: cold ⇒ null and no HTTP, warm
+     * (primed by a planned turn or the Settings test) ⇒ the cached tools
+     * without another round-trip.
+     */
+    public function testCachedToolsForNeverDiscoversAndServesAPrimedEntry(): void
+    {
+        $registry = $this->registry($this->happySession());
+        $server = $this->server();
+
+        self::assertNull($registry->cachedToolsFor($server), 'cold cache yields null');
+        self::assertSame(0, $this->httpCalls, 'a cold read must not trigger discovery');
+
+        $discovered = $registry->toolsFor($server);
+        $callsAfterDiscovery = $this->httpCalls;
+        self::assertGreaterThan(0, $callsAfterDiscovery);
+
+        self::assertSame($discovered, $registry->cachedToolsFor($server));
+        self::assertSame('lookup', $registry->cachedToolsFor($server)[0]['name'] ?? null);
+        self::assertSame($callsAfterDiscovery, $this->httpCalls, 'the cache-only read must not call the server');
+    }
+
+    public function testCachedToolsForIsNullWhenThePoolCannotBeInspected(): void
+    {
+        // A CacheInterface that is not a PSR-6 pool has no "is this cached?"
+        // answer — the hint then renders names only instead of discovering.
+        $contractOnly = new class implements \Symfony\Contracts\Cache\CacheInterface {
+            public function get(string $key, callable $callback, ?float $beta = null, ?array &$metadata = null): mixed
+            {
+                return $callback(new \Symfony\Component\Cache\CacheItem(), true);
+            }
+
+            public function delete(string $key): bool
+            {
+                return true;
+            }
+        };
+        $registry = new McpToolRegistry(
+            $this->createMock(McpClient::class),
+            $this->createMock(McpServerConfigRepository::class),
+            $contractOnly,
+            new NullLogger(),
+        );
+
+        self::assertNull($registry->cachedToolsFor($this->server()));
+    }
+
     public function testDiscoveryFailureDegradesToEmptyList(): void
     {
         $registry = $this->registry(

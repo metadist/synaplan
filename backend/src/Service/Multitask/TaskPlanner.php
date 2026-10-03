@@ -24,6 +24,7 @@ use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\Message\SpokenInput;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlan;
+use App\Service\Multitask\Plan\TaskPlanNormalizer;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Prompt\TimeContextBuilder;
@@ -155,6 +156,17 @@ final readonly class TaskPlanner
         }
         if (null === $decoded) {
             return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage);
+        }
+
+        // A node that reads `$nX.text` but forgot to list nX in depends_on
+        // may be scheduled before nX and answer from an empty reference.
+        // Complete the edges from the references themselves (#mcp-handover).
+        $repaired = TaskPlanNormalizer::missingDependencies($decoded);
+        if ([] !== $repaired) {
+            $this->logger->info('TaskPlanner: inferred missing depends_on edges from $nX references', [
+                'added' => $repaired,
+            ]);
+            $decoded = TaskPlanNormalizer::inferDependencies($decoded);
         }
 
         $allowed = $this->allowedCapabilitiesFromOptions($options);

@@ -27,6 +27,28 @@ Every data node obeys the same rules (plan 09 §2):
 7. **Flag-gated** — one `BCONFIG` flag per node; a disabled block is omitted
    from the planner catalog entirely (the planner never learns it exists) and
    the runner re-checks the flag at run time.
+8. **Guaranteed handover** — the answering node always sees what its data
+   nodes returned, however the planner wired the reference (see below).
+
+## How data reaches the answer (and what guards it)
+
+The planner is asked to wire `"… based on:\n$n1.text"` into the answering
+node's `inputs.text` and to list `n1` in `depends_on`. Planner models get this
+wrong in predictable ways, and every one of them used to end as "the tool
+call succeeded, the answer says no data was provided" (reported against a
+connected B2 storage server). Three layers now make the handover structural:
+
+| Layer | Where | What it catches |
+| ----- | ----- | --------------- |
+| Sorter hint | `ConnectedSystemsHint` → appended to the `tools:sort` prompt | The BMULTI vote decides whether the planner runs at all. Without knowing the user's connections, "is my Backblaze bucket reachable?" was voted single-step and MCP never ran. The hint names the enabled MCP servers (and cached tool names); no connection ⇒ prompt unchanged. |
+| Plan repair | `TaskPlanNormalizer` (before validation) | A node that reads `$nX.text` but omits `nX` from `depends_on` could be scheduled before its data node. Missing edges are inferred from the references (logged as `TaskPlanner: inferred missing depends_on edges`). |
+| Reference tolerance | `NodeContext` | `$n1.output`, `$n1.result`, `$n1.content`, `${n1.text}` … resolve to the node text instead of leaking as literal placeholders. |
+| Runner safety net | `UpstreamHandover` in `ChatRunner` | Whatever is still missing — `inputs.text = "$message.text"`, data parked under `inputs.context` — is appended to the user message as a labelled "Data returned by the previous steps" block. A correctly spliced plan already contains the text verbatim, so nothing is added; when it fires, `ChatRunner: plan did not hand over upstream step output` is logged with the node ids. |
+
+Debugging a turn: `BMESSAGEMETA.task_plan_definition` holds the executed plan
+(exact `inputs`/`depends_on`), the usage ledger shows whether a `PLANNING`
+call happened at all, and `McpFetchRunner: tool call succeeded` reports the
+returned character count per tool call.
 
 ## The nodes
 
