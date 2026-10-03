@@ -892,7 +892,7 @@ services:
   # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
     profiles: [local-ai]
-    image: ollama/ollama:latest@sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551
+    image: ollama/ollama:latest@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c
     container_name: synaplan-ollama
     ports:
       - "${SYNAPLAN_OLLAMA_PORT:-11435}:11434"
@@ -1091,7 +1091,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    image: quay.io/keycloak/keycloak:26.7@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85
     container_name: synaplan-keycloak
     depends_on:
       keycloak_certs:
@@ -1124,7 +1124,7 @@ services:
       - synaplan-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.7@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    image: quay.io/keycloak/keycloak:26.7@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85
     container_name: synaplan-keycloak-setup
     depends_on:
       keycloak:
