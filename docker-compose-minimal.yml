@@ -378,9 +378,11 @@ services:
       - synaplan-network
 
   # Worker - consumes async messenger jobs (memory extraction, URL crawling,
-  # reindexing). Runs in `prod` to dodge the dev-mode messenger:consume bug, and
-  # recycles hourly (--time-limit) to bound Doctrine EM growth. Cloud-AI variant:
-  # no Ollama, no Whisper models.
+  # reindexing). Runs in `dev` like the backend -- RedisService prefixes every
+  # key with "synaplan:{env}:", so a worker in another env never finds the
+  # backend's media jobs -- with APP_DEBUG=0 to dodge the debug-mode
+  # messenger:consume bug, and recycles hourly (--time-limit) to bound Doctrine
+  # EM growth. Cloud-AI variant: no Ollama, no Whisper models.
   worker:
     image: ghcr.io/metadist/synaplan:latest
     # Build the same lightweight `dev` stage as the backend (base + phpredis).
@@ -401,7 +403,7 @@ services:
       - /var/www/backend/var/cache
       - ./plugins:/plugins:ro
     environment:
-      APP_ENV: prod
+      APP_ENV: dev
       APP_DEBUG: "0"
       APP_URL: http://backend
       # Browser links in channel replies (Telegram) point at the frontend.
@@ -432,25 +434,30 @@ services:
     entrypoint: ["bash", "-c"]
     command:
       - |
-        echo "[worker] clearing prod cache..."
-        rm -rf var/cache/prod
-        php bin/console --env=prod cache:warmup
+        echo "[worker] clearing dev cache..."
+        rm -rf var/cache/dev
+        if ! php bin/console --env=dev cache:warmup; then
+          echo "[worker] FATAL: cache:warmup failed -- refusing to start." >&2
+          exit 65
+        fi
 
-        until php bin/console --env=prod dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
+        until php bin/console --env=dev dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
           echo "[worker] waiting for db schema..."; sleep 3;
         done
 
         echo "[worker] db + cache ready, starting messenger:consume"
-        exec php bin/console --env=prod messenger:consume \
+        exec php bin/console --env=dev messenger:consume \
           async_ai_high async_extract async_index \
           --time-limit=3600 --memory-limit=512M -v
+    # Healthy, not just started: the backend entrypoint is still running
+    # `composer install` into the shared ./backend/vendor at that point.
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
       backend:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       disable: true
