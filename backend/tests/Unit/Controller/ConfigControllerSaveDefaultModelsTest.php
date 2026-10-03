@@ -394,6 +394,124 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
     }
 
     /**
+     * The jump-back bug: the save stored CHAT 385, the page re-read the
+     * defaults and showed 249 without a word. The save response must say
+     * which model applies instead, from a fresh (post-write) resolution.
+     */
+    public function testReportsASavedModelThatDoesNotApply(): void
+    {
+        $this->modelRepository
+            ->method('find')
+            ->willReturnCallback(fn (int $id) => $this->makeActiveModel($id));
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('isLocked')->willReturn(false);
+        $resolver->expects($this->once())->method('reset');
+
+        $modelConfig = $this->createStub(ModelConfigService::class);
+        $modelConfig->method('reportedDefault')->willReturnCallback(
+            static fn (string $capability): array => [
+                'id' => 'CHAT' === $capability ? 249 : 12,
+                'source' => 'admin',
+                'locked' => false,
+            ],
+        );
+
+        $response = $this->makeGroupPolicyController($modelConfig, $resolver)->saveDefaultModels(
+            $this->makeRequest(['defaults' => ['CHAT' => 385, 'SORT' => 12, 'VECTORIZE' => 3]]),
+            $this->makeUser(7),
+        );
+
+        $payload = $this->decode($response);
+
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertSame(['CHAT' => 249], $payload['replaced']);
+        $this->assertSame(249, $payload['defaults']['CHAT']);
+    }
+
+    public function testOmitsReplacedWhenEverySavedModelApplies(): void
+    {
+        $this->modelRepository
+            ->method('find')
+            ->willReturnCallback(fn (int $id) => $this->makeActiveModel($id));
+
+        $resolver = $this->createStub(LayeredConfigResolver::class);
+        $resolver->method('isLocked')->willReturn(false);
+
+        $modelConfig = $this->createStub(ModelConfigService::class);
+        $modelConfig->method('reportedDefault')->willReturn(['id' => 385, 'source' => 'user', 'locked' => false]);
+
+        $response = $this->makeGroupPolicyController($modelConfig, $resolver)->saveDefaultModels(
+            $this->makeRequest(['defaults' => ['CHAT' => 385]]),
+            $this->makeUser(7),
+        );
+
+        $payload = $this->decode($response);
+
+        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertArrayNotHasKey('replaced', $payload);
+        $this->assertSame(385, $payload['defaults']['CHAT']);
+    }
+
+    private function makeGroupPolicyController(ModelConfigService $modelConfig, LayeredConfigResolver $resolver): ConfigController
+    {
+        $iam = $this->createStub(IamConfig::class);
+        $iam->method('isGroupPoliciesEnabled')->willReturn(true);
+        $policy = $this->createStub(GroupPolicyService::class);
+        $policy->method('isModelAllowed')->willReturn(true);
+
+        $controller = new ConfigController(
+            $this->em,
+            $this->configRepository,
+            $this->modelRepository,
+            $this->createStub(ProviderRegistry::class),
+            $this->createStub(WhisperService::class),
+            $this->createStub(PluginManager::class),
+            $this->createStub(BillingService::class),
+            $this->createStub(UserMemoryService::class),
+            $this->embeddingChangeGuard,
+            $this->embeddingMetadata,
+            $modelConfig,
+            new ClientContextResolver(),
+            $this->createStub(BrandingService::class),
+            $this->createStub(MobileVersionService::class),
+            $this->createStub(MarketingNewsConfig::class),
+            $this->createStub(UsageTaximeterConfig::class),
+            $this->createStub(ProgressNarrationConfig::class),
+            $this->createStub(RegistrationConfig::class),
+            $this->createStub(GuestChatConfig::class),
+            $this->createStub(WebSpeechConfig::class),
+            $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
+            $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
+            $this->createStub(\App\Service\Agent\AgentConfig::class),
+            $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
+            $iam,
+            $this->createStub(ChatReadinessService::class),
+            new DemoLoginHint(
+                $this->createStub(UserRepository::class),
+                $this->createStub(UserPasswordHasherInterface::class),
+                'test',
+            ),
+            $this->createStub(SetupStateService::class),
+            $this->createStub(AiProviderDisclosure::class),
+            $this->createStub(LocalAiDownloadStatusService::class),
+            new MailerConfig(),
+            new CapabilityService(),
+            $this->createStub(FeatureStatusReporter::class),
+            $this->createStub(ModuleRegistry::class),
+            $this->createStub(ModuleGateConfig::class),
+            'http://qdrant.example',
+            null,
+            null,
+            $resolver,
+            $policy,
+        );
+        $controller->setContainer(new Container());
+
+        return $controller;
+    }
+
+    /**
      * @param array<string, mixed> $payload
      */
     private function makeRequest(array $payload): Request

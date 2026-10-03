@@ -396,6 +396,8 @@
       "noModels": "Bu amaç için model yok",
       "modelNotAvailable": "{model} kullanılamıyor. Lütfen sağlayıcı yapılandırmasını kontrol edin.",
       "modelNotConfigured": "{model} hazır değil: {envVar} değerini Admin → AI Sağlayıcıları altında (veya ortamınızda) ekleyin.",
+      "saveReplaced": "{model} kaydedildi ancak şu anda kullanılamıyor, bu yüzden yerine {fallback} kullanılıyor. Sağlayıcısını Admin → AI Sağlayıcıları altında kontrol edin.",
+      "saveReplacedNone": "{model} kaydedildi ancak şu anda kullanılamıyor ve yerini alabilecek başka bir model yok. Sağlayıcısını Admin → AI Sağlayıcıları altında kontrol edin.",
       "id": "ID",
       "purpose": "AMAÇ",
       "service": "HİZMET",

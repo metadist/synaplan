@@ -82,6 +82,8 @@
       "noModels": "Aucun modèle disponible pour cet usage",
       "modelNotAvailable": "{model} n’est pas disponible. Veuillez vérifier la configuration du fournisseur.",
       "modelNotConfigured": "{model} n’est pas prêt : ajoutez {envVar} sous Exploitation → Fournisseurs IA (ou dans votre environnement).",
+      "saveReplaced": "{model} est enregistré mais ne peut pas être utilisé pour le moment ; {fallback} est utilisé à la place. Vérifiez son fournisseur sous Exploitation → Fournisseurs IA.",
+      "saveReplacedNone": "{model} est enregistré mais ne peut pas être utilisé pour le moment, et aucun autre modèle ne peut prendre le relais. Vérifiez son fournisseur sous Exploitation → Fournisseurs IA.",
       "id": "ID",
       "purpose": "USAGE",
       "service": "SERVICE",

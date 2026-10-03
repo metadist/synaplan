@@ -1278,7 +1278,16 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $userId = $user->getId();
+        return $this->json(['success' => true] + $this->reportedDefaults((int) $user->getId()));
+    }
+
+    /**
+     * The defaults the AI Models page shows for a user, per capability.
+     *
+     * @return array{defaults: array<string, ?int>, locked: array<string, bool>, sources: array<string, ?string>}
+     */
+    private function reportedDefaults(int $userId): array
+    {
         $capabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
@@ -1345,12 +1354,40 @@ class ConfigController extends AbstractController
                 && $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
         }
 
-        return $this->json([
-            'success' => true,
+        return [
             'defaults' => $defaults,
             'locked' => $locked,
             'sources' => $sources,
-        ]);
+        ];
+    }
+
+    /**
+     * Requested capabilities whose saved model is not the one that applies,
+     * mapped to the model that applies instead (null when none does).
+     *
+     * @param array<mixed, mixed>  $requested
+     * @param array<string, ?int>  $effective
+     * @param array<string, mixed> $skipped
+     *
+     * @return array<string, ?int>
+     */
+    private function replacedDefaults(array $requested, array $effective, array $skipped): array
+    {
+        $replaced = [];
+        foreach ($requested as $capability => $modelId) {
+            // VECTORIZE always resolves through the global row, so a per-user
+            // echo of it is never the applied value and is not a replacement.
+            if (!is_string($capability) || 'VECTORIZE' === $capability || !is_numeric($modelId)
+                || isset($skipped[$capability]) || !array_key_exists($capability, $effective)
+            ) {
+                continue;
+            }
+            if ($effective[$capability] !== (int) $modelId) {
+                $replaced[$capability] = $effective[$capability];
+            }
+        }
+
+        return $replaced;
     }
 
     /**
@@ -1400,6 +1437,20 @@ class ConfigController extends AbstractController
                     description: 'Capabilities whose model ID was rejected because the model no longer exists or is inactive',
                     example: ['TEXT2PIC' => 99],
                     nullable: true
+                ),
+                new OA\Property(
+                    property: 'defaults',
+                    type: 'object',
+                    description: 'Per-user saves only: the defaults that apply after the save, as GET /api/v1/config/models/defaults reports them',
+                    additionalProperties: new OA\AdditionalProperties(type: 'integer', nullable: true),
+                    example: ['CHAT' => 249, 'SORT' => 12]
+                ),
+                new OA\Property(
+                    property: 'replaced',
+                    type: 'object',
+                    description: 'Per-user saves only: requested capabilities whose saved model does not apply (for example its provider has no working key), mapped to the model that applies instead, or null when none does',
+                    additionalProperties: new OA\AdditionalProperties(type: 'integer', nullable: true),
+                    example: ['CHAT' => 249]
                 ),
             ]
         )
@@ -1610,6 +1661,18 @@ class ConfigController extends AbstractController
         if (!empty($skipped)) {
             $response['skipped'] = $skipped;
             $response['message'] .= ' (some models were skipped because they are no longer available)';
+        }
+
+        if (!$global) {
+            // The lock and allow-list checks above memoized the pre-save chain.
+            $this->layeredConfigResolver?->reset();
+            $effective = $this->reportedDefaults((int) $user->getId())['defaults'];
+            $response['defaults'] = $effective;
+
+            $replaced = $this->replacedDefaults($data['defaults'], $effective, $skipped);
+            if ([] !== $replaced) {
+                $response['replaced'] = $replaced;
+            }
         }
 
         return $this->json($response);

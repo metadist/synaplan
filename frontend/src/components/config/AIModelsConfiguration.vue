@@ -1466,6 +1466,21 @@ watch([selectedPurpose, sortBy, sortDirection, modelSearch], () => {
   modelsPage.value = 1
 })
 
+function warnReplacedChoice(
+  capability: Capability,
+  requestedId: number | null,
+  effectiveId: number | null
+): void {
+  const nameOf = (id: number | null) =>
+    getModelsByPurpose(capability).find((m) => m.id === id)?.name || `ID ${id}`
+  const model = nameOf(requestedId)
+  if (effectiveId === null) {
+    warning(t('config.aiModels.saveReplacedNone', { model }))
+    return
+  }
+  warning(t('config.aiModels.saveReplaced', { model, fallback: nameOf(effectiveId) }))
+}
+
 const saveConfiguration = async () => {
   saving.value = true
   try {
@@ -1481,8 +1496,15 @@ const saveConfiguration = async () => {
 
     if (response.success) {
       savedChoiceEpoch += 1
+      const replaced = Object.entries(response.replaced ?? {}) as [Capability, number | null][]
+      for (const [capability, effectiveId] of replaced) {
+        warnReplacedChoice(capability, defaultConfig.value[capability], effectiveId)
+        defaultConfig.value[capability] = effectiveId
+      }
       originalConfig.value = { ...defaultConfig.value }
-      success(t('config.aiModels.saveSuccess'))
+      if (replaced.length === 0) {
+        success(t('config.aiModels.saveSuccess'))
+      }
     }
   } catch (err: unknown) {
     console.error('Failed to save configuration:', err)
