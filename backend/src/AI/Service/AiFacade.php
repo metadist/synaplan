@@ -22,6 +22,8 @@ use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use App\Service\Stt\SpeechLanguageContext;
+use App\Service\Stt\TranscriptionLanguageDecider;
 use App\Service\TtsTextSanitizer;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use Psr\Cache\CacheItemPoolInterface;
@@ -67,6 +69,7 @@ class AiFacade
         private string $uploadDir = '/var/www/backend/var/uploads',
         private string $embeddingFallbackProvider = '',
         private StructuredOutputRecovery $structuredOutputRecovery = new StructuredOutputRecovery(),
+        private ?SpeechLanguageContext $speechLanguages = null,
     ) {
     }
 
@@ -1410,23 +1413,47 @@ class AiFacade
 
         $provider = $this->registry->getSpeechToTextProvider($providerName);
 
+        // An explicit language is the hint for a second pass, not a forced
+        // first pass. Callers also pass ui_language / channel_language; those
+        // stay out of the provider payload (#2288).
+        $explicit = is_string($options['language'] ?? null) ? $options['language'] : null;
+        $languageOptions = $options;
+        unset($options['language'], $options['ui_language'], $options['channel_language'], $options['expected_languages']);
+        $speech = null !== $this->speechLanguages
+            ? $this->speechLanguages->resolve($userId, $languageOptions, $explicit)
+            : SpeechLanguageContext::fromSignals($languageOptions, $explicit, null, []);
+
         $this->logger->info('AI transcription request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
             'audio' => basename($audioPath),
             'model' => $options['model'] ?? null,
             'model_id' => $sttModelId,
+            'language_hint' => $speech['hint'],
         ]);
 
         try {
-            $result = $this->executeWithHealth(
-                callback: fn () => $provider->transcribe($audioPath, $options),
-                serviceName: 'ai_provider_stt_'.$provider->getName(),
-                capability: 'speech_to_text',
-                provider: $provider,
-                options: $options,
-                userId: $userId,
-                fallback: null // NO FALLBACK
+            $result = (new TranscriptionLanguageDecider())->transcribe(
+                function (?string $hint) use ($provider, $audioPath, $options, $userId): array {
+                    $callOptions = $options;
+                    if (null !== $hint && '' !== $hint) {
+                        $callOptions['language'] = $hint;
+                    }
+
+                    $transcribed = $this->executeWithHealth(
+                        callback: fn () => $provider->transcribe($audioPath, $callOptions),
+                        serviceName: 'ai_provider_stt_'.$provider->getName(),
+                        capability: 'speech_to_text',
+                        provider: $provider,
+                        options: $callOptions,
+                        userId: $userId,
+                        fallback: null // NO FALLBACK
+                    );
+
+                    return is_array($transcribed) ? $transcribed : [];
+                },
+                $speech['expected'],
+                $speech['hint'],
             );
         } catch (ProviderException $e) {
             throw $e;
@@ -1453,7 +1480,7 @@ class AiFacade
             modelId: $sttModelId,
             provider: $provider->getName(),
             model: (string) $enriched['model'],
-            durationSeconds: (float) ($result['duration'] ?? 0),
+            durationSeconds: (float) ($result['duration'] ?? 0) + (float) ($result['first_pass_duration'] ?? 0),
             extraMetadata: ['language' => $result['language'] ?? 'unknown'],
         );
         if (null !== $recordedTranscriptionUsage) {

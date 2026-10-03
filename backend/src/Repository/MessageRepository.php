@@ -31,6 +31,41 @@ class MessageRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Distinct two-letter language codes from this user's recent messages.
+     * `NN` is the "not yet detected" placeholder and is not a language they speak.
+     *
+     * @return list<string>
+     */
+    public function findRecentLanguageCodes(int $userId, int $limit = 20): array
+    {
+        /** @var list<mixed> $rows */
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.language')
+            ->where('m.userId = :userId')
+            ->andWhere('m.language NOT IN (:ignored)')
+            ->setParameter('userId', $userId)
+            ->setParameter('ignored', ['NN', ''])
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        $codes = [];
+        foreach ($rows as $code) {
+            if (!is_string($code)) {
+                continue;
+            }
+            $code = strtolower($code);
+            if (1 === preg_match('/^[a-z]{2}$/', $code) && !in_array($code, $codes, true)) {
+                $codes[] = $code;
+            }
+        }
+
+        return $codes;
+    }
+
     public function findRecentByUser(int $userId, int $limit = 10): array
     {
         return $this->createQueryBuilder('m')
