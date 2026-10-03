@@ -48,7 +48,11 @@ final readonly class MediaJobCanceller
             );
         }
 
-        $this->jobService->markCancelled($job);
+        if (!$this->jobService->markCancelled($job)) {
+            $this->messageSync->syncTerminalState($job);
+
+            return false;
+        }
         $this->messageSync->syncTerminalState($job);
 
         $this->logger->info('MediaJob cancelled by user', [

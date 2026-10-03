@@ -19,6 +19,7 @@ use App\Service\Media\SyncMediaJobGenerator;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -100,7 +101,7 @@ final readonly class AdvanceMediaJobCommandHandler
         // Serialise advances for this one job: the reaper and a re-dispatched
         // step must never advance the same job concurrently. A missed lock is
         // not an error — whoever holds it will re-arm the next step.
-        $lock = $this->lockFactory->createLock('media-job-advance.'.$jobKey, self::ADVANCE_LOCK_TTL_SECONDS);
+        $lock = $this->lockFactory->createLock(MediaJob::ADVANCE_LOCK_PREFIX.$jobKey, self::ADVANCE_LOCK_TTL_SECONDS);
         if (!$lock->acquire()) {
             // Another advance for this job holds the lock. Do NOT silently drop
             // this step — re-dispatch after a short delay so the loop is never
@@ -133,6 +134,12 @@ final readonly class AdvanceMediaJobCommandHandler
                 return;
             }
 
+            // Image and audio block inside generate(). The lock has to outlive
+            // the 90s heartbeat window or the reaper kills a render that is
+            // still in flight (#2308). Video steps return immediately and keep
+            // the short crash TTL.
+            $this->extendLockForSyncRender($lock, $job);
+
             match ($job->getStatus()) {
                 MediaJob::STATUS_QUEUED, MediaJob::STATUS_SUBMITTING => $this->advanceInitial($job),
                 MediaJob::STATUS_RUNNING => $this->poll($job),
@@ -142,6 +149,26 @@ final readonly class AdvanceMediaJobCommandHandler
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Hold the advance lock until the job's deadline so a blocking image or
+     * audio render still looks alive to the reaper.
+     */
+    private function extendLockForSyncRender(LockInterface $lock, MediaJob $job): void
+    {
+        if (MediaJob::TYPE_VIDEO === $job->getType()) {
+            return;
+        }
+        if (!in_array($job->getStatus(), [MediaJob::STATUS_QUEUED, MediaJob::STATUS_SUBMITTING], true)) {
+            return;
+        }
+
+        $deadlineAt = $job->getDeadlineAt();
+        $remaining = null !== $deadlineAt
+            ? $deadlineAt - time()
+            : $this->jobService->deadlineSecondsFor($job->getType());
+        $lock->refresh((float) max(self::ADVANCE_LOCK_TTL_SECONDS, $remaining + 15));
     }
 
     /**

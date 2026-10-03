@@ -155,6 +155,47 @@ final class RedisService
         }
     }
 
+    /**
+     * SET the payload unless the current value is a terminal media-job snapshot.
+     *
+     * Returns null when this caller stored the payload. Returns the existing
+     * payload when a terminal status already won, so the caller can adopt it
+     * instead of overwriting it. Redis runs the check and the write in one
+     * script, which closes the window between a separate GET and SET.
+     */
+    public function setUnlessMediaJobTerminal(string $key, string $value, int $ttlSeconds): ?string
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return null;
+        }
+
+        $script = <<<'LUA'
+local current = redis.call('GET', KEYS[1])
+if current then
+  local ok, decoded = pcall(cjson.decode, current)
+  if ok and type(decoded) == 'table' then
+    local status = decoded['status']
+    if status == 'completed' or status == 'failed' or status == 'cancelled' or status == 'timed_out' then
+      return current
+    end
+  end
+end
+redis.call('SET', KEYS[1], ARGV[1], 'EX', tonumber(ARGV[2]))
+return false
+LUA;
+
+        try {
+            $result = $client->eval($script, 1, $this->prefix($key), $value, (string) $ttlSeconds);
+
+            return is_string($result) && '' !== $result ? $result : null;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('EVAL', $key, $e);
+
+            return null;
+        }
+    }
+
     public function delete(string $key): bool
     {
         $client = $this->client();
