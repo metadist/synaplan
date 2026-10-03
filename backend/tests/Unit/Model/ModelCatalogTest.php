@@ -1185,10 +1185,17 @@ class ModelCatalogTest extends TestCase
         }
 
         $gptOss = ModelCatalog::find('cerebras:gpt-oss-120b');
-        $this->assertCount(1, $gptOss, 'GPT OSS 120B is text-only on Cerebras');
-        $this->assertEqualsWithDelta(0.35, (float) $gptOss[0]['priceIn'], 1e-9);
-        $this->assertEqualsWithDelta(0.75, (float) $gptOss[0]['priceOut'], 1e-9);
-        $this->assertNotContains('vision', $gptOss[0]['json']['features'] ?? []);
+        $this->assertSame(['chat', 'mem'], array_column($gptOss, 'tag'), 'GPT OSS 120B is text-only on Cerebras');
+        $this->assertSame(386, ModelCatalog::findBidByKey('cerebras:gpt-oss-120b:mem'));
+        foreach ($gptOss as $variant) {
+            $this->assertEqualsWithDelta(0.35, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(0.75, (float) $variant['priceOut'], 1e-9);
+            $this->assertNotContains('vision', $variant['json']['features'] ?? []);
+        }
+
+        $mem = ModelCatalog::find('cerebras:gpt-oss-120b:mem')[0];
+        $this->assertSame(0, $mem['selectable'], 'MEM rows stay out of the chat picker');
+        $this->assertTrue($mem['json']['is_system'] ?? false);
 
         foreach ([...$qwen, ...$gptOss] as $variant) {
             $this->assertSame('Cerebras', $variant['service']);

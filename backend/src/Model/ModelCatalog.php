@@ -1332,6 +1332,7 @@ class ModelCatalog
         //   - 220: Groq gpt-oss-120b      (~200 ms TTFT, $0.15/$0.60 per 1M tokens)
         //   - 221: Local Ollama gpt-oss:120b (free, latency depends on the GPU box)
         //   - 222: Anthropic Claude Sonnet 5 (highest quality, slowest)
+        //   - 386: Cerebras GPT OSS 120B  (~3,000 t/s, $0.35/$0.75 per 1M tokens)
         [
             'id' => 220,
             'service' => 'Groq',
@@ -5591,6 +5592,37 @@ class ModelCatalog
                 'features' => ['reasoning', 'tool_use', 'code', 'multilingual'],
                 'cache_read_price_per_1M' => 0.35,
                 'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '131072',
+                    'max_output' => '40960',
+                    'license' => 'Apache-2.0',
+                    'host' => 'api.cerebras.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            // MEM twin of BID 385, same contract as Groq's BID 220: hidden from
+            // the chat picker, offered only in the memory-extraction dropdown.
+            'id' => 386,
+            'service' => 'Cerebras',
+            'name' => 'GPT OSS 120B',
+            'tag' => 'mem',
+            'selectable' => 0,
+            'active' => 1,
+            'providerId' => 'gpt-oss-120b',
+            'priceIn' => 0.35,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.75,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 4,
+            'json' => [
+                'description' => 'Cerebras-hosted GPT OSS 120B for memory extraction. ~3,000 tokens per second keeps the post-stream memory pipeline short. Prompts are processed by Cerebras (US).',
+                'max_tokens' => 4096,
+                'is_system' => true,
+                'params' => ['model' => 'gpt-oss-120b'],
+                'cache_read_price_per_1M' => 0.35,
                 'meta' => [
                     'context_window' => '131072',
                     'max_output' => '40960',

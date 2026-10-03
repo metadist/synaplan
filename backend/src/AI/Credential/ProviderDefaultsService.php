@@ -141,6 +141,7 @@ final readonly class ProviderDefaultsService
             'SORT' => 'cerebras:gpt-oss-120b:chat',
             'PLAN' => 'cerebras:gpt-oss-120b:chat',
             'SUMMARIZE' => 'cerebras:gpt-oss-120b:chat',
+            'MEM' => 'cerebras:gpt-oss-120b:mem',
             'PIC2TEXT' => 'cerebras:qwen-3.8-27b:pic2text',
         ],
         // NB: colons inside a catalog providerId are normalized to dashes by

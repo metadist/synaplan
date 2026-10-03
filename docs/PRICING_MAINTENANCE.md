@@ -336,7 +336,7 @@ OpenAI-compatible Chat Completions at `https://api.cerebras.ai/v1` (Shared Infer
 | BID | Model | Catalog in/out | Official (cache) | Context |
 | --- | ----- | -------------- | ---------------- | ------- |
 | 383 / 384 | `qwen-3.8-27b` (chat + vision) | $0.99 / $1.49 | $0.99 / $1.49 (cache $0.99) | 131K |
-| 385 | `gpt-oss-120b` (chat) | $0.35 / $0.75 | $0.35 / $0.75 (cache $0.35) | 131K |
+| 385 / 386 | `gpt-oss-120b` (chat + memory extraction) | $0.35 / $0.75 | $0.35 / $0.75 (cache $0.35) | 131K |
 
 ### TheHive (verified 2026-07-13)
 
