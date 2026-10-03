@@ -224,6 +224,7 @@ GPT-5.6 Luna is the suggested successor `app:models:check-availability` would pr
 - TrustedTokens (JSON catalog, not the JS marketing page): https://trustedtokens.eu/api/billing/models · docs https://trustedtokens.eu/docs/
 - A2Agent (models page; `GET /v1/models` is key-gated and answers `401`; not in LiteLLM): https://a2agent.me/models · https://a2agent.me/pricing
 - xAI: https://docs.x.ai/developers/pricing · models https://docs.x.ai/developers/models
+- Cerebras: https://inference-docs.cerebras.ai/models/overview · caching https://inference-docs.cerebras.ai/capabilities/prompt-caching
 
 **Tooling / cross-checks:**
 
@@ -247,6 +248,7 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | **TrustedTokens** | ✅ verified 2026-09-17 (V4 Flash, Flash-0731 and V4 Pro retired) | https://trustedtokens.eu/api/billing/models |
 | **A2Agent** | ✅ verified 2026-09-14 (public group rate) | https://a2agent.me/models |
 | **Meta** | ✅ verified 2026-09-23 (Muse Spark 1.3 standard tier) | https://developer.meta.com/ai/models/muse-spark/ |
+| **Cerebras** | ✅ verified 2026-10-03 (pay-as-you-go; matches LiteLLM) | https://inference-docs.cerebras.ai/models/overview |
 | **xAI Grok Imagine + voice** | ✅ verified 2026-09-24 (chat rows are synced; grok-4.7 cache + long-context corrected) | https://docs.x.ai/docs/models · https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
@@ -326,6 +328,15 @@ OpenAI-compatible Chat Completions at `https://api.meta.ai/v1`. Catalog stores t
 | BID | Model | Catalog in/out | Official (cache) | Context |
 | --- | ----- | -------------- | ---------------- | ------- |
 | 369 / 370 | `muse-spark-1.3` (chat + vision) | $1.25 / $4.25 | $1.25 / $4.25 (cache $0.15) | 1M |
+
+### Cerebras (verified 2026-10-03)
+
+OpenAI-compatible Chat Completions at `https://api.cerebras.ai/v1` (Shared Inference). Catalog stores the pay-as-you-go USD per 1M rate from https://inference-docs.cerebras.ai/models/overview. Prompt caching has **no discount** — cached input is billed at the full input rate (https://inference-docs.cerebras.ai/capabilities/prompt-caching), so every row authors `cache_read_price_per_1M` equal to its input price; leaving it out would bill cache hits at the 0.5x default. LiteLLM lists both ids under the `cerebras/` prefix at the same rates, so the daily sync matches them. Context and output limits are the paid-tier values; the free trial allows 65K context and 32K output.
+
+| BID | Model | Catalog in/out | Official (cache) | Context |
+| --- | ----- | -------------- | ---------------- | ------- |
+| 383 / 384 | `qwen-3.8-27b` (chat + vision) | $0.99 / $1.49 | $0.99 / $1.49 (cache $0.99) | 131K |
+| 385 / 386 | `gpt-oss-120b` (chat + memory extraction) | $0.35 / $0.75 | $0.35 / $0.75 (cache $0.35) | 131K |
 
 ### TheHive (verified 2026-07-13)
 

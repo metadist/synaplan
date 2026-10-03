@@ -77,6 +77,19 @@ final class ReasoningLevelCatalogTest extends TestCase
         self::assertNull(ReasoningLevelCatalog::levels('Ollama', 'deepseek-r1', ['reasoning']));
     }
 
+    public function testCerebrasQwenCanSkipReasoningButGptOssCannot(): void
+    {
+        self::assertSame(
+            ['none', 'low', 'medium', 'high'],
+            ReasoningLevelCatalog::levels('Cerebras', 'qwen-3.8-27b', ['reasoning']),
+        );
+        self::assertSame(
+            ['low', 'medium', 'high'],
+            ReasoningLevelCatalog::levels('Cerebras', 'gpt-oss-120b', ['reasoning']),
+        );
+        self::assertNull(ReasoningLevelCatalog::levels('Cerebras', 'qwen-3.8-27b', ['vision']));
+    }
+
     public function testClampDropsMaxOntoAFamilyThatTopsOutAtHigh(): void
     {
         $levels = ReasoningLevelCatalog::levels('Anthropic', 'claude-sonnet-4-6', ['reasoning']);

@@ -19,7 +19,7 @@ use Psr\Log\LoggerInterface;
  * Shared client, chat, stream and vision path for fixed-URL OpenAI-compatible
  * cloud providers (key store + one base URI).
  *
- * TrustedTokens, A2Agent and Meta are the current subclasses. Mistral, Groq and xAI
+ * TrustedTokens, A2Agent, Meta and Cerebras are the current subclasses. Mistral, Groq and xAI
  * are candidates later — they carry provider-specific extras (audio, media,
  * per-endpoint clients) that this base does not model.
  */
@@ -184,10 +184,11 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
                     $finishReason = $chunkFinishReason;
                 }
 
-                if (isset($response->choices[0]->delta->reasoning_content)) {
+                $reasoning = $this->streamedReasoning($responseArray);
+                if (null !== $reasoning) {
                     $callback([
                         'type' => 'reasoning',
-                        'content' => $response->choices[0]->delta->reasoning_content,
+                        'content' => $reasoning,
                     ]);
                 }
 
@@ -221,7 +222,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         $prompt = '' !== $prompt ? $prompt : 'Please describe this image in detail.';
 
         try {
-            $response = $this->client()->chat()->create([
+            $response = $this->client()->chat()->create(array_merge([
                 'model' => $model,
                 'messages' => [[
                     'role' => 'user',
@@ -231,7 +232,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
                     ],
                 ]],
                 'max_tokens' => $options['max_tokens'] ?? self::VISION_MAX_TOKENS,
-            ]);
+            ], $this->visionRequestOptions((string) $model)));
 
             return $response->choices[0]->message->content ?? '';
         } catch (ProviderException $e) {
@@ -254,7 +255,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         $this->assertApiKey();
 
         try {
-            $response = $this->client()->chat()->create([
+            $response = $this->client()->chat()->create(array_merge([
                 'model' => $this->defaultVisionModel(),
                 'messages' => [[
                     'role' => 'user',
@@ -265,7 +266,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
                     ],
                 ]],
                 'max_tokens' => self::VISION_MAX_TOKENS,
-            ]);
+            ], $this->visionRequestOptions($this->defaultVisionModel())));
 
             return [
                 'comparison' => $response->choices[0]->message->content ?? '',
@@ -330,6 +331,32 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
     }
 
     /**
+     * Extra top-level fields for vision requests. Reasoning tokens count
+     * against the vision output cap, so a model that thinks by default can
+     * truncate its own description unless the subclass turns thinking down.
+     *
+     * @return array<string, mixed>
+     */
+    protected function visionRequestOptions(string $model): array
+    {
+        return [];
+    }
+
+    /**
+     * Reasoning text carried by one streamed chunk, or null when it has none.
+     *
+     * Providers disagree on the field name (`reasoning` vs `reasoning_content`)
+     * and the SDK delta object drops unknown fields, so the raw chunk is read.
+     * The base streams no reasoning; a subclass whose upstream does overrides this.
+     *
+     * @param array<string, mixed> $responseArray
+     */
+    protected function streamedReasoning(array $responseArray): ?string
+    {
+        return null;
+    }
+
+    /**
      * @param array<string, mixed> $usage
      *
      * @return array{prompt_tokens: int, completion_tokens: int, total_tokens: int, cached_tokens: int, cache_creation_tokens: int}
@@ -347,7 +374,21 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         ];
     }
 
+    /**
+     * Last chance to adapt an image URL (data URL or public link) to what the
+     * upstream accepts. Throw a ProviderException for input it cannot take.
+     */
+    protected function prepareImageUrl(string $imageUrl): string
+    {
+        return $imageUrl;
+    }
+
     private function imageToDataUrl(string $imageUrl): string
+    {
+        return $this->prepareImageUrl($this->resolveImageUrl($imageUrl));
+    }
+
+    private function resolveImageUrl(string $imageUrl): string
     {
         if (str_starts_with($imageUrl, 'data:')) {
             return $imageUrl;

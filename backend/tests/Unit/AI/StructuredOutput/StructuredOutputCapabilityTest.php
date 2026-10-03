@@ -65,6 +65,7 @@ final class StructuredOutputCapabilityTest extends TestCase
             'trustedtokens' => ['trustedtokens', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'a2agent' => ['a2agent', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'meta' => ['meta', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
+            'cerebras' => ['cerebras', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'openaicompatible' => ['openaicompatible', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'huggingface' => ['huggingface', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'openai' => ['openai', StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT],

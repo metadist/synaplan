@@ -483,4 +483,16 @@ final class ProviderKeyStoreTest extends TestCase
         self::assertSame('https://api.meta.ai/v1/models', $meta['validation']['url']);
         self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
     }
+
+    public function testCerebrasCatalogUsesTheCanonicalEnvVarAndModelListing(): void
+    {
+        $meta = ProviderKeyCatalog::get('cerebras');
+
+        self::assertSame('CEREBRAS_API_KEY', $meta['envVar']);
+        self::assertSame('https://cloud.cerebras.ai/', $meta['consoleUrl']);
+        self::assertSame('https://api.cerebras.ai/v1/models', $meta['validation']['url']);
+        self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
+        self::assertTrue(ProviderKeyCatalog::listsModels('cerebras'));
+        self::assertContains('cerebras', ProviderKeyStore::SUPPORTED_PROVIDERS);
+    }
 }

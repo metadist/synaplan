@@ -1332,6 +1332,7 @@ class ModelCatalog
         //   - 220: Groq gpt-oss-120b      (~200 ms TTFT, $0.15/$0.60 per 1M tokens)
         //   - 221: Local Ollama gpt-oss:120b (free, latency depends on the GPU box)
         //   - 222: Anthropic Claude Sonnet 5 (highest quality, slowest)
+        //   - 386: Cerebras GPT OSS 120B  (~3,000 t/s, $0.35/$0.75 per 1M tokens)
         [
             'id' => 220,
             'service' => 'Groq',
@@ -5502,6 +5503,131 @@ class ModelCatalog
                 'meta' => [
                     'supports_images' => true,
                     'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        // ==================== CEREBRAS (Shared Inference) ====================
+        // Snapshot 2026-10-03 from https://inference-docs.cerebras.ai/models/overview
+        // (USD per 1M, pay-as-you-go). OpenAI-compatible API at
+        // https://api.cerebras.ai/v1. Cached input is billed at the full input
+        // rate (no cache discount), so `cache_read_price_per_1M` equals priceIn —
+        // without it billing would assume the 0.5x default. Context and output
+        // limits are the paid-tier values; the free trial halves the context
+        // (65K) and caps output at 32K, which `max_tokens` stays under.
+        [
+            'id' => 383,
+            'service' => 'Cerebras',
+            'name' => 'Qwen 3.8 27B',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'qwen-3.8-27b',
+            'priceIn' => 0.99,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.49,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Qwen 3.8 27B on Cerebras — dense multimodal model for agentic coding, tool use and research at ~1,850 tokens per second. Text and image input, configurable reasoning (the Thinking toggle turns it off). Prompts are processed by Cerebras (US).',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'qwen-3.8-27b'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.99,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '131072',
+                    'max_output' => '40960',
+                    'host' => 'api.cerebras.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 384,
+            'service' => 'Cerebras',
+            'name' => 'Qwen 3.8 27B (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'qwen-3.8-27b',
+            'priceIn' => 0.99,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.49,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Qwen 3.8 27B on Cerebras — image understanding and OCR-style text extraction (PNG and JPEG). Reasoning is switched off for image requests. Prompts are processed by Cerebras (US).',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'qwen-3.8-27b'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.99,
+                'meta' => [
+                    'supports_images' => true,
+                    'host' => 'api.cerebras.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 385,
+            'service' => 'Cerebras',
+            'name' => 'GPT OSS 120B',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-oss-120b',
+            'priceIn' => 0.35,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.75,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT OSS 120B on Cerebras — reasoning model for coding, document Q&A and agentic research at ~3,000 tokens per second. Text only. Reasoning cannot be switched off; the Thinking toggle lowers it to low. Prompts are processed by Cerebras (US).',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'gpt-oss-120b'],
+                'features' => ['reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.35,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '131072',
+                    'max_output' => '40960',
+                    'license' => 'Apache-2.0',
+                    'host' => 'api.cerebras.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            // MEM twin of BID 385, same contract as Groq's BID 220: hidden from
+            // the chat picker, offered only in the memory-extraction dropdown.
+            'id' => 386,
+            'service' => 'Cerebras',
+            'name' => 'GPT OSS 120B',
+            'tag' => 'mem',
+            'selectable' => 0,
+            'active' => 1,
+            'providerId' => 'gpt-oss-120b',
+            'priceIn' => 0.35,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.75,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 4,
+            'json' => [
+                'description' => 'Cerebras-hosted GPT OSS 120B for memory extraction. ~3,000 tokens per second keeps the post-stream memory pipeline short. Prompts are processed by Cerebras (US).',
+                'max_tokens' => 4096,
+                'is_system' => true,
+                'params' => ['model' => 'gpt-oss-120b'],
+                'cache_read_price_per_1M' => 0.35,
+                'meta' => [
+                    'context_window' => '131072',
+                    'max_output' => '40960',
+                    'license' => 'Apache-2.0',
+                    'host' => 'api.cerebras.ai',
                     'jurisdiction' => 'US',
                 ],
             ],
