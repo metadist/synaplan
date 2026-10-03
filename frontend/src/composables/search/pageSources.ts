@@ -6,7 +6,6 @@ import {
   Cog6ToothIcon,
   DocumentMagnifyingGlassIcon,
   InboxArrowDownIcon,
-  UserCircleIcon,
   UserGroupIcon,
   CircleStackIcon,
 } from '@heroicons/vue/24/outline'
@@ -71,12 +70,6 @@ export function usePageSources() {
     const account = String(t('search.palette.breadcrumb.account'))
     const files = String(t('nav.files'))
     list.push(
-      {
-        path: '/profile',
-        label: String(t('nav.profile')),
-        breadcrumb: account,
-        icon: UserCircleIcon,
-      },
       {
         path: '/settings',
         label: String(t('nav.preferences')),

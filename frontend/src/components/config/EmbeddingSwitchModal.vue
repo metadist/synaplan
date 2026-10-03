@@ -63,7 +63,7 @@
                 </p>
                 <a
                   v-if="purchaseAllowed"
-                  href="/profile?tab=subscription"
+                  href="/settings#billing"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
                   data-testid="btn-upgrade-cta"
                 >

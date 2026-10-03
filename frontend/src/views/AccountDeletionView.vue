@@ -69,7 +69,7 @@
           </ol>
           <div class="mt-5 flex flex-wrap gap-3">
             <RouterLink
-              to="/profile"
+              to="/settings#profile"
               class="btn-primary px-4 py-2.5 rounded-lg font-medium text-sm"
               data-testid="link-profile-delete"
             >

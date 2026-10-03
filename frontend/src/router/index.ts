@@ -88,6 +88,21 @@ export function brandName(): string {
   return useConfigStore().branding.name || APP_NAME
 }
 
+/**
+ * `/profile` stays a named route so existing links and guards keep working.
+ * A `redirect` record would skip the auth guard, so this runs from beforeEnter.
+ */
+function profileToSettings(to: RouteLocationNormalized): RouteLocationRaw {
+  if (to.query.highlight === 'memories' || to.hash === '#memories') {
+    return { path: '/settings', hash: '#memories' }
+  }
+  if (to.query.tab === 'subscription') {
+    return { path: '/settings', hash: '#billing' }
+  }
+  const hash = to.hash && to.hash !== '#' ? to.hash : '#profile'
+  return { path: '/settings', hash }
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -601,8 +616,8 @@ const router = createRouter({
     },
     {
       // Theme stays on the device. Language is also saved on the account from
-      // Settings, and a guest can still reach this page. The account block
-      // inside it hides itself when nobody is signed in.
+      // this page. Guests see language and theme only; signed-in sections
+      // mount with the profile form.
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),
@@ -621,12 +636,13 @@ const router = createRouter({
     {
       path: '/profile',
       name: 'profile',
-      component: () => import('@/views/ProfileView.vue'),
+      component: () => import('@/views/SettingsView.vue'),
       meta: {
         requiresAuth: true,
         titleKey: 'pageTitles.profile',
         i18n: ['settings', 'config', 'tools'],
       },
+      beforeEnter: (to) => profileToSettings(to),
     },
     {
       path: '/groups',

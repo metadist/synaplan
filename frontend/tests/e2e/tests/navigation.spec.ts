@@ -326,7 +326,7 @@ test.describe('Navigation: Admin sidebar', () => {
 })
 
 test.describe('Navigation: User menu', () => {
-  test('@ci User menu shows Profile, Statistics, Preferences and Logout', async ({ page }) => {
+  test('@ci User menu shows Statistics, Preferences and Logout', async ({ page }) => {
     await test.step('Arrange: login', async () => {
       await openApp(page)
     })
@@ -338,25 +338,28 @@ test.describe('Navigation: User menu', () => {
     await test.step('Assert: dropdown visible with menu items', async () => {
       const dropdown = page.locator(USR.dropdown)
       await expect(dropdown).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(dropdown.locator(USR.profileBtn)).toBeVisible()
       await expect(dropdown.locator(USR.statisticsBtn)).toBeVisible()
       await expect(dropdown.locator(USR.preferencesBtn)).toBeVisible()
+      await expect(dropdown.locator(USR.profileBtn)).toHaveCount(0)
       await expect(dropdown.locator(USR.logoutBtn)).toBeVisible()
     })
   })
 
-  test('@ci User menu navigates to Profile page', async ({ page }) => {
+  test('@ci User menu navigates to Preferences', async ({ page }) => {
     await test.step('Arrange: login and open user menu', async () => {
       await openApp(page)
       await page.locator(USR.button).click()
       await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
 
-    await test.step('Act: click Profile', async () => {
-      await page.locator(USR.dropdown).locator(USR.profileBtn).click()
+    await test.step('Act: click Preferences', async () => {
+      await page.locator(USR.dropdown).locator(USR.preferencesBtn).click()
     })
 
-    await test.step('Assert: Profile page visible', async () => {
+    await test.step('Assert: Preferences page shows the profile section', async () => {
+      await expect(page.locator(selectors.settings.page)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
       await expect(page.locator(selectors.pages.profile)).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })

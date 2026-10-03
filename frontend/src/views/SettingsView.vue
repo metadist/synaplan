@@ -4,8 +4,7 @@
       class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-settings"
     >
-      <div class="max-w-4xl mx-auto space-y-6">
-        <!-- Header -->
+      <div class="max-w-6xl mx-auto space-y-6">
         <PageHeader
           :title="$t('settings.title')"
           :subtitle="$t('settings.subtitle')"
@@ -13,128 +12,9 @@
           data-testid="section-header"
         />
 
-        <!-- General Settings Content -->
         <div class="space-y-6" data-testid="section-general-settings">
-          <!-- Language -->
-          <div class="surface-card p-6" data-testid="section-language-settings">
-            <h2 class="text-lg font-semibold txt-primary mb-2">
-              {{ $t('settings.language.title') }}
-            </h2>
-            <p class="txt-secondary text-sm mb-4">
-              {{ $t('settings.language.description') }}
-            </p>
-
-            <div
-              class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
-              data-testid="grid-language-options"
-            >
-              <button
-                v-for="lang in languages"
-                :key="lang.value"
-                :class="[
-                  'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
-                  selectedLanguage === lang.value
-                    ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
-                    : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
-                ]"
-                :data-testid="`btn-language-${lang.value}`"
-                :data-language="lang.value"
-                @click="selectLanguage(lang.value)"
-              >
-                <span class="text-2xl" aria-hidden="true">{{ lang.flag }}</span>
-                <span class="text-sm font-medium txt-primary">{{ lang.label }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Theme Settings -->
-          <div class="surface-card p-6" data-testid="section-theme-settings">
-            <h2 class="text-lg font-semibold txt-primary mb-2">{{ $t('settings.theme.title') }}</h2>
-            <p class="txt-secondary text-sm mb-4">{{ $t('settings.theme.description') }}</p>
-
-            <div class="grid grid-cols-3 gap-3">
-              <button
-                :class="[
-                  'p-4 rounded-lg border-2 transition-all',
-                  theme === 'light'
-                    ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
-                    : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
-                ]"
-                data-testid="btn-theme-light"
-                @click="setTheme('light')"
-              >
-                <SunIcon class="w-6 h-6 mx-auto mb-2 txt-primary" />
-                <div class="text-sm font-medium txt-primary text-center">
-                  {{ $t('settings.theme.light') }}
-                </div>
-              </button>
-
-              <button
-                :class="[
-                  'p-4 rounded-lg border-2 transition-all',
-                  theme === 'dark'
-                    ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
-                    : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
-                ]"
-                data-testid="btn-theme-dark"
-                @click="setTheme('dark')"
-              >
-                <MoonIcon class="w-6 h-6 mx-auto mb-2 txt-primary" />
-                <div class="text-sm font-medium txt-primary text-center">
-                  {{ $t('settings.theme.dark') }}
-                </div>
-              </button>
-
-              <button
-                :class="[
-                  'p-4 rounded-lg border-2 transition-all',
-                  theme === 'system'
-                    ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
-                    : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
-                ]"
-                data-testid="btn-theme-system"
-                @click="setTheme('system')"
-              >
-                <ComputerDesktopIcon class="w-6 h-6 mx-auto mb-2 txt-primary" />
-                <div class="text-sm font-medium txt-primary text-center">
-                  {{ $t('settings.theme.system') }}
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <WebSearchProviderSetting v-if="authStore.isAuthenticated" />
-          <ExportImportPanel v-if="authStore.isAuthenticated" />
-
-          <!-- Account Info (signed-in users only — a guest has nothing to show here) -->
-          <div
-            v-if="authStore.isAuthenticated"
-            class="surface-card p-6"
-            data-testid="section-account-info"
-          >
-            <h2 class="text-lg font-semibold txt-primary mb-4">
-              {{ $t('settings.account.title') }}
-            </h2>
-            <div class="space-y-4">
-              <div data-testid="text-account-email">
-                <label class="block text-sm font-medium txt-secondary mb-1">{{
-                  $t('settings.account.email')
-                }}</label>
-                <div class="txt-primary">
-                  {{ authStore.user?.email || $t('settings.notLoggedIn') }}
-                </div>
-              </div>
-              <div data-testid="text-account-level">
-                <label class="block text-sm font-medium txt-secondary mb-1">{{
-                  $t('settings.account.userLevel')
-                }}</label>
-                <div class="txt-primary">{{ authStore.user?.level || 'N/A' }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- App server (native shell only, every authenticated user) -->
-          <NativeServerControl v-if="isNativeServerControlAvailable()" />
+          <SettingsAppearanceSection v-if="!authStore.isAuthenticated" />
+          <SettingsAccountPage v-else />
         </div>
       </div>
     </div>
@@ -142,28 +22,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { languageOptions, setLocale, type SupportedLanguage } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
-import { useTheme } from '@/composables/useTheme'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
-import NativeServerControl from '@/components/NativeServerControl.vue'
-import WebSearchProviderSetting from '@/components/settings/WebSearchProviderSetting.vue'
-import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
-import { isNativeServerControlAvailable } from '@/services/api/nativeServer'
-import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/vue/24/outline'
+import SettingsAppearanceSection from '@/components/settings/SettingsAppearanceSection.vue'
+import SettingsAccountPage from '@/components/settings/SettingsAccountPage.vue'
 
 const authStore = useAuthStore()
-const { theme, setTheme } = useTheme()
-const { locale } = useI18n()
-
-const languages = languageOptions
-
-const selectedLanguage = computed(() => locale.value)
-
-const selectLanguage = async (value: string) => {
-  await setLocale(value as SupportedLanguage)
-}
 </script>
