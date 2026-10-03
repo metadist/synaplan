@@ -119,7 +119,7 @@ the embedding router and the tool-call deferral are all still off.
    model *does* return a `multi_step` probability.
 5. **Regex lexicons in five languages.** Self-awareness guard, spoken-output,
    produce-a-file, merge/export, code-execution — each is a hand-kept word
-   list that has misfired before (#952, #1042, #1237, #2047, #2049).
+   list that has misfired before (#952, #1237, #2047, #2049).
 6. **Eval corpus is too small to calibrate.** `sort_eval_corpus.json` has
    52 cases (38 general, 8 mediamaker, 4 officemaker, 2 docsummary).
 

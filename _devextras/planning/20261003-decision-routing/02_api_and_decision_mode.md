@@ -127,7 +127,7 @@ Response:
 {
   "id": "dec_01J…",
   "model": "nimble",
-  "outcome": "accepted",
+  "outcome": "needs_review",
   "answers": {
     "refund":  {"type": "noul", "noul": 0.9989, "accepted": true, "decided_by": "decision_model"},
     "urgency": {"type": "score", "score": 0.83, "legend": {"0": "Routine", "1": "Soon…", "2": "Immediate…"},
@@ -153,7 +153,7 @@ Response:
 | Case | Status | UI sentence |
 | ---- | ------ | ----------- |
 | Model not pulled | 404 | "This decision model isn't installed on the server yet. An admin can add it under AI infrastructure." |
-| Ollama too old / unreachable | 503 | "Decision models are unavailable right now. Your text was not sent anywhere — try again in a minute." |
+| Ollama too old / unreachable | 503 | "Decision models are unavailable right now, so no result came back. Try again in a minute." |
 | Body too large | 413 | "This text is too long for a quick decision. Shorten it, or ask in normal chat." |
 | > 26 options | 400 | Inline on the field: "Up to 26 options per question." |
 | Rate limit | 429 | "You've reached your decision limit for now. It resets at {time}." |
@@ -245,7 +245,7 @@ How urgent is it?
   Routine ─────── Soon ──●──── Immediate      score 0.83 of 2
   ▁▃ ▇▅ ▂                                    (distribution)
 ──────────────────────────────────────────────────────────────────
-Read only — this scored your text; nothing was sent or changed.
+Read only — this scored your text and changed nothing.
 [Edit and rerun]  [Run on Clef Flash]  [</> API call]  [Copy JSON]
 ```
 

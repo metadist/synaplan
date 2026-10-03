@@ -343,7 +343,9 @@ it fully before P1; the vibe briefs below refer to its sections.
   module gate 404 when `DecisionRoutingModule` is inactive.
 - Do: contract fixtures under `backend/tests/Fixtures/systemone/` copied
   from the Ollama docs examples (choice, multiple questions, 404, 413).
-- Do: `make -C frontend generate-schemas`, commit the generated schemas.
+- Do: `make -C frontend generate-schemas` and `vue-tsc` locally. Nothing to
+  commit there: `frontend/src/generated/` is gitignored and CI regenerates it
+  from the OpenAPI annotations, so the step stays `backend-only`.
 
 ### Vibe brief
 
