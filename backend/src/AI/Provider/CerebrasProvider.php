@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Exception\ProviderException;
+use App\AI\Image\PngJpegInlineImages;
+use App\AI\Image\UnsupportedImageInputException;
+
 /**
  * Cerebras Inference — wafer-scale hosting for open models (GPT OSS 120B,
  * Qwen 3.8 27B) at roughly 2,000–3,000 tokens per second.
@@ -17,7 +21,8 @@ namespace App\AI\Provider;
  *   - Reasoning streams in `delta.reasoning`, not `delta.reasoning_content`.
  *   - gpt-oss-120b rejects `tools` together with `response_format`; Cerebras
  *     documents the combination as model-dependent, so it is never sent.
- *   - Images must be base64 data URIs; external image URLs are rejected.
+ *   - Images must be base64 PNG or JPEG data URIs without `detail`; other
+ *     formats are transcoded and links are rejected ({@see PngJpegInlineImages}).
  *
  * @see https://inference-docs.cerebras.ai/resources/openai
  * @see https://inference-docs.cerebras.ai/capabilities/reasoning
@@ -93,6 +98,12 @@ class CerebrasProvider extends AbstractChatCompletionsCloudProvider
     {
         $request = parent::buildChatOptions($messages, $options, $stream);
 
+        try {
+            $request['messages'] = PngJpegInlineImages::normalizeMessages($request['messages'], $this->getDisplayName());
+        } catch (UnsupportedImageInputException $e) {
+            throw new ProviderException($e->getMessage(), $this->getName(), null, 0, $e);
+        }
+
         $effort = $this->resolveReasoningEffort((string) $options['model'], $options);
         if (null !== $effort) {
             $request['reasoning_effort'] = $effort;
@@ -118,6 +129,15 @@ class CerebrasProvider extends AbstractChatCompletionsCloudProvider
         return null !== $levels && in_array('none', $levels, true)
             ? ['reasoning_effort' => 'none']
             : [];
+    }
+
+    protected function prepareImageUrl(string $imageUrl): string
+    {
+        try {
+            return PngJpegInlineImages::toDataUrl($imageUrl, $this->getDisplayName());
+        } catch (UnsupportedImageInputException $e) {
+            throw new ProviderException($e->getMessage(), $this->getName(), null, 0, $e);
+        }
     }
 
     protected function streamedReasoning(array $responseArray): ?string

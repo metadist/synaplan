@@ -374,7 +374,21 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         ];
     }
 
+    /**
+     * Last chance to adapt an image URL (data URL or public link) to what the
+     * upstream accepts. Throw a ProviderException for input it cannot take.
+     */
+    protected function prepareImageUrl(string $imageUrl): string
+    {
+        return $imageUrl;
+    }
+
     private function imageToDataUrl(string $imageUrl): string
+    {
+        return $this->prepareImageUrl($this->resolveImageUrl($imageUrl));
+    }
+
+    private function resolveImageUrl(string $imageUrl): string
     {
         if (str_starts_with($imageUrl, 'data:')) {
             return $imageUrl;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\AI\Provider;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Provider\AbstractChatCompletionsCloudProvider;
 use App\AI\Provider\CerebrasProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +20,8 @@ use Psr\Log\NullLogger;
  */
 class CerebrasProviderTest extends TestCase
 {
+    private const ONE_PIXEL_GIF = 'R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+
     public function testMetadata(): void
     {
         $provider = $this->makeProvider();
@@ -164,6 +167,51 @@ class CerebrasProviderTest extends TestCase
         $this->assertSame([], $this->visionRequestOptions('gpt-oss-120b'));
     }
 
+    public function testChatTranscodesGifUploadsToPng(): void
+    {
+        $this->requireImagick();
+
+        $request = $this->buildChatOptions([
+            'model' => 'qwen-3.8-27b',
+        ], [[
+            'role' => 'user',
+            'content' => [
+                ['type' => 'text', 'text' => 'What is this?'],
+                ['type' => 'image_url', 'image_url' => ['url' => 'data:image/gif;base64,'.self::ONE_PIXEL_GIF]],
+            ],
+        ]]);
+
+        $this->assertStringStartsWith('data:image/png;base64,', $request['messages'][0]['content'][1]['image_url']['url']);
+    }
+
+    public function testChatRejectsImageLinksWithAReadableMessage(): void
+    {
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('not as links');
+
+        $this->buildChatOptions(['model' => 'qwen-3.8-27b'], [[
+            'role' => 'user',
+            'content' => [['type' => 'image_url', 'image_url' => ['url' => 'https://example.test/cat.png']]],
+        ]]);
+    }
+
+    public function testVisionTranscodesGifFilesToPng(): void
+    {
+        $this->requireImagick();
+        $path = tempnam(sys_get_temp_dir(), 'cerebras_gif_');
+        $this->assertIsString($path);
+        file_put_contents($path, base64_decode(self::ONE_PIXEL_GIF));
+
+        try {
+            $provider = $this->makeProvider();
+            $method = new \ReflectionMethod(AbstractChatCompletionsCloudProvider::class, 'imageToDataUrl');
+
+            $this->assertStringStartsWith('data:image/png;base64,', $method->invoke($provider, $path));
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function testStreamedReasoningIsReadFromTheReasoningField(): void
     {
         $provider = $this->makeProvider();
@@ -180,15 +228,23 @@ class CerebrasProviderTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $options
+     * @param array<string, mixed>       $options
+     * @param list<array<string, mixed>> $messages
      *
      * @return array<string, mixed>
      */
-    private function buildChatOptions(array $options): array
+    private function buildChatOptions(array $options, array $messages = []): array
     {
         $provider = $this->makeProvider();
 
-        return (new \ReflectionClass($provider))->getMethod('buildChatOptions')->invoke($provider, [], $options, false);
+        return (new \ReflectionClass($provider))->getMethod('buildChatOptions')->invoke($provider, $messages, $options, false);
+    }
+
+    private function requireImagick(): void
+    {
+        if (!extension_loaded('imagick')) {
+            $this->markTestSkipped('imagick is required for transcoding');
+        }
     }
 
     /**
