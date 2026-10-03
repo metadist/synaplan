@@ -350,7 +350,7 @@ services:
   # /centrifugo/api/* so the browser connects same-origin. Auth via short-lived
   # JWTs minted by the PHP backend.
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.6@sha256:3cfded0eb9216882dcb2a77256a89d185654b4e32294934f8de2935fff3c70ec
+    image: centrifugo/centrifugo:v6.9.7@sha256:d014d3e99e0e9e58c45e656a7ea4ab97c3f79f96c82a3614ea0f810b4dd0e461
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
@@ -530,7 +530,7 @@ services:
   # Optional Collabora CODE — LibreOffice convert-to over HTTP.
   #   docker compose -f docker-compose-minimal.yml --profile office up -d
   collabora:
-    image: collabora/code:26.04.4.1.1@sha256:1efda3043e8b9cb437d1b6c6efe20cc3753760e634de012b8dac391da488bf97
+    image: collabora/code:26.04.4.2.1@sha256:4e983196eb9878f339cc506c38c21f1cc3473bca3d6de883c5de08f9c0cc3a6c
     container_name: synaplan-collabora
     profiles: [office]
     restart: unless-stopped
