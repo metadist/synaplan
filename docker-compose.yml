@@ -478,11 +478,12 @@ services:
   # Doctrine queue (`messenger_messages` table) just grows forever and
   # the UI hangs on any "queued / running in background" flow.
   #
-  # Runs in `APP_ENV=prod` on purpose: the dev-mode TraceableEventDispatcher
-  # has a long-standing bug where `messenger:consume` triggers
+  # Runs in `APP_ENV=dev` like the backend, but with `APP_DEBUG=0`: the debug
+  # TraceableEventDispatcher has a long-standing bug where `messenger:consume`
+  # triggers
   #   Warning: Undefined array key "Symfony\Component\Messenger\Event\WorkerRunningEvent"
-  # which kills the consumer on the first message. The web container stays
-  # in `dev` so the profiler / debug toolbar still work for HTTP traffic.
+  # which kills the consumer on the first message. The web container keeps
+  # debug on so the profiler / debug toolbar still work for HTTP traffic.
   #
   # `--time-limit=3600` + `--memory-limit=512M` cooperate with `restart:
   # unless-stopped` to recycle the worker hourly, which is the standard
@@ -515,9 +516,10 @@ services:
       # AdvanceMediaJobCommand messages but every findByKey() lookup missed
       # because the job lived under synaplan:dev:mediajob:* and the worker
       # looked under synaplan:prod:mediajob:* -- silent "job not found",
-      # bubble stuck in queued forever. The synaplan-platform compose
-      # overrides both to prod for production.
-      APP_ENV: ${APP_ENV:-dev}
+      # bubble stuck in queued forever. Pinned, not interpolated, for the same
+      # reason as the scheduler: a host or project-.env APP_ENV must not split
+      # the worker off. The synaplan-platform compose sets prod for both.
+      APP_ENV: dev
       APP_DEBUG: "0"
       DAV_ALLOW_INSECURE_LOCAL: "1"
       APP_URL: http://backend
@@ -588,7 +590,7 @@ services:
 
         # Resolve the env once so cache:warmup, dbal:run-sql, and
         # messenger:consume all agree. APP_ENV is set in the service env
-        # block above (default: dev for local; prod overrides via compose).
+        # block above (dev locally; prod in the production compose).
         ENV="$${APP_ENV:-dev}"
         echo "[worker] APP_ENV=$$ENV"
 
@@ -661,13 +663,18 @@ services:
         exec php bin/console --env="$$ENV" messenger:consume \
           async_ai_high async_extract async_index \
           --time-limit=3600 --memory-limit=512M -v
+    # Waits for a HEALTHY backend: the backend entrypoint runs
+    # `composer install` into the shared ./backend/vendor bind mount. A worker
+    # started next to it warmed its cache against a half-written vendor/ and
+    # died with "Failed to open stream: .../vendor/..." until the restart
+    # policy caught it -- and on a fresh clone vendor/ does not exist yet.
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
       backend:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
     # Worker liveness: probe that messenger:consume is actually running.
     # Surfaces the silent-hang class of failure that took us hours to diagnose
