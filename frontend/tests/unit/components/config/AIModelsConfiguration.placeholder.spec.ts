@@ -20,8 +20,10 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn() }),
 }))
 
+const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }))
+
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }),
+  useNotification: () => notify,
 }))
 
 vi.mock('@/composables/useDialog', () => ({
@@ -145,6 +147,40 @@ describe('AIModelsConfiguration empty model row', () => {
 
     expect(chatTriggerLabel().classes()).not.toContain('txt-model-placeholder')
     expect(chatTriggerLabel().text()).toBe('Llama')
+  })
+
+  it('shows the model that applies and says why when a saved choice cannot be used', async () => {
+    const claude: AIModel = { ...chatModel, id: 249, service: 'anthropic', name: 'Claude' }
+    const cerebras: AIModel = { ...chatModel, id: 385, service: 'Cerebras', name: 'GPT OSS 120B' }
+    getModels.mockResolvedValue({
+      success: true,
+      models: { CHAT: [claude, cerebras] },
+      providers: [],
+    })
+    getDefaultModels.mockResolvedValue({ success: true, defaults: { ...emptyDefaults, CHAT: 249 } })
+    saveDefaultModels.mockResolvedValue({
+      success: true,
+      message: 'saved',
+      defaults: { CHAT: 249 },
+      replaced: { CHAT: 249 },
+    })
+
+    await mountPage()
+    const row = wrapper!
+      .findAll('[data-testid="item-capability"]')
+      .find((item) => item.text().includes('Chat / General AI'))!
+    await row.get('[data-testid="btn-model-dropdown"]').trigger('click')
+    await row
+      .findAll('[data-testid="btn-model-option"]')
+      .find((option) => option.text().includes('GPT OSS 120B'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(chatTriggerLabel().text()).toBe('Claude')
+    expect(notify.success).not.toHaveBeenCalled()
+    expect(notify.warning).toHaveBeenCalledWith(
+      "GPT OSS 120B is saved but can't be used right now, so Claude is used instead. Check its provider under Admin → AI Providers."
+    )
   })
 
   it('shows a retry instead of an empty menu when the model list fails', async () => {
