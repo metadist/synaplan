@@ -1164,6 +1164,49 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Cerebras Shared Inference — Qwen 3.8 27B (chat + vision) and GPT OSS
+     * 120B (text only), BIDs 383–385. Cached input is billed at the full
+     * input rate, so the authored cache price must equal priceIn; without it
+     * billing would fall back to the 0.5x default and under-bill cache hits.
+     */
+    public function testCerebrasModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $qwen = ModelCatalog::find('cerebras:qwen-3.8-27b');
+
+        $this->assertCount(2, $qwen, 'Expected qwen-3.8-27b chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($qwen, 'tag'));
+        $this->assertSame(383, ModelCatalog::findBidByKey('cerebras:qwen-3.8-27b:chat'));
+        $this->assertSame(384, ModelCatalog::findBidByKey('cerebras:qwen-3.8-27b:pic2text'));
+        $this->assertSame(385, ModelCatalog::findBidByKey('cerebras:gpt-oss-120b:chat'));
+
+        foreach ($qwen as $variant) {
+            $this->assertEqualsWithDelta(0.99, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(1.49, (float) $variant['priceOut'], 1e-9);
+        }
+
+        $gptOss = ModelCatalog::find('cerebras:gpt-oss-120b');
+        $this->assertCount(1, $gptOss, 'GPT OSS 120B is text-only on Cerebras');
+        $this->assertEqualsWithDelta(0.35, (float) $gptOss[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.75, (float) $gptOss[0]['priceOut'], 1e-9);
+        $this->assertNotContains('vision', $gptOss[0]['json']['features'] ?? []);
+
+        foreach ([...$qwen, ...$gptOss] as $variant) {
+            $this->assertSame('Cerebras', $variant['service']);
+            $this->assertSame($variant['providerId'], $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta((float) $variant['priceIn'], (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('api.cerebras.ai', $variant['json']['meta']['host'] ?? null);
+            $this->assertSame('US', $variant['json']['meta']['jurisdiction'] ?? null);
+        }
+
+        foreach (['cerebras:qwen-3.8-27b:chat', 'cerebras:gpt-oss-120b:chat'] as $key) {
+            $chat = ModelCatalog::find($key)[0];
+            $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+            $this->assertContains('reasoning', $chat['json']['features'] ?? []);
+            $this->assertLessThanOrEqual(32768, $chat['json']['max_tokens'] ?? 0, 'Free-trial keys cap output at 32K');
+        }
+    }
+
+    /**
      * Kimi K3 via the HF router — like every Kimi row, pinned to DeepInfra
      * (`:deepinfra` suffix) so the billed price is deterministic and matches
      * the catalog rate (DeepInfra snapshot 2026-08-20). K3 outputs text only,

@@ -33,6 +33,7 @@ final class CatalogToolUse
         'trustedtokens',
         'a2agent',
         'meta',
+        'cerebras',
     ];
 
     /**

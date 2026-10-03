@@ -483,6 +483,7 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertTrue($t->supports('trustedtokens'));
         $this->assertTrue($t->supports('a2agent'));
         $this->assertTrue($t->supports('meta'));
+        $this->assertTrue($t->supports('cerebras'));
         $this->assertTrue($t->supports('perplexity'));
         $this->assertTrue($t->supports('ollama'));
         $this->assertTrue($t->supports(OpenAiCompatibleEndpointRegistry::PROVIDER_NAME));
@@ -515,6 +516,10 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame(
             'https://api.meta.ai/v1/chat/completions',
             $t->resolveCompletionsUrl(['provider' => 'meta']),
+        );
+        $this->assertSame(
+            'https://api.cerebras.ai/v1/chat/completions',
+            $t->resolveCompletionsUrl(['provider' => 'cerebras']),
         );
         $this->assertSame(
             'https://api.openai.com/v1/chat/completions',

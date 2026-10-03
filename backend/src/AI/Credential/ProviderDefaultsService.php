@@ -130,6 +130,19 @@ final readonly class ProviderDefaultsService
             'SUMMARIZE' => 'meta:muse-spark-1.3:chat',
             'PIC2TEXT' => 'meta:muse-spark-1.3:pic2text',
         ],
+        // Qwen 3.8 27B for the main tier (tools, vision, reasoning that the
+        // Thinking toggle can switch off). gpt-oss-120b for the fast tier: a
+        // third of the price, ~3000 t/s, and the same strict-schema family the
+        // Groq SORT/PLAN default already runs.
+        'cerebras' => [
+            'CHAT' => 'cerebras:qwen-3.8-27b:chat',
+            'TOOLS' => 'cerebras:qwen-3.8-27b:chat',
+            'ANALYZE' => 'cerebras:qwen-3.8-27b:chat',
+            'SORT' => 'cerebras:gpt-oss-120b:chat',
+            'PLAN' => 'cerebras:gpt-oss-120b:chat',
+            'SUMMARIZE' => 'cerebras:gpt-oss-120b:chat',
+            'PIC2TEXT' => 'cerebras:qwen-3.8-27b:pic2text',
+        ],
         // NB: colons inside a catalog providerId are normalized to dashes by
         // ModelCatalog::modelKey() — hence "Kimi-K2.6-deepinfra", not ":deepinfra".
         'huggingface' => [
@@ -192,6 +205,7 @@ final readonly class ProviderDefaultsService
         'xai',
         'a2agent',
         'meta',
+        'cerebras',
         'ollama',
     ];
 

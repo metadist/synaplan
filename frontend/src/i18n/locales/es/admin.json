@@ -770,6 +770,10 @@
       "title": "Clave API de Meta",
       "message": "Crea una clave API en el panel de Meta Model API (API keys) y pégala aquí. Así se activa Muse Spark. Los prompts los procesa Meta."
     },
+    "cerebras": {
+      "title": "Clave API de Cerebras",
+      "message": "Crea una clave API en el panel de Cerebras Cloud (API Keys) y pégala aquí. Así se activan GPT OSS 120B y Qwen 3.8 27B con respuestas muy rápidas. Los prompts los procesa Cerebras en EE. UU."
+    },
     "huggingface": {
       "title": "Token API de HuggingFace",
       "message": "Crea un token de acceso en la configuración de HuggingFace y pégalo aquí para usar los modelos de HuggingFace Inference."
