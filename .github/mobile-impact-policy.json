@@ -113,6 +113,7 @@
       ".dockerignore",
       ".cursorindexingignore",
       ".git-blame-ignore-revs",
+      ".worktrees/**",
       ".vscode/**",
       ".github/**",
       "scripts/**",
