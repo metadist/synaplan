@@ -30,6 +30,10 @@ final readonly class ApprovalExpiryService
         $expired = $this->approvalRepository->findExpiredPending($now->getTimestamp());
         $count = 0;
         foreach ($expired as $approval) {
+            $id = $approval->getId();
+            if (null === $id || !$this->approvalRepository->expireIfPending($id, $now->getTimestamp())) {
+                continue;
+            }
             $approval->markExpired();
             $this->failLinkedRun($approval);
             ++$count;
