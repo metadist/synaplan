@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Entity\Model;
 use App\Entity\ModelPriceHistory;
+use App\Model\CatalogPriceOwnership;
 use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
@@ -193,6 +194,7 @@ class SyncModelPricesCommand extends Command
         $nonTokenDrift = 0;
         $cacheTierDrift = 0;
         $knownDeviation = 0;
+        $pricePinned = 0;
         $notMatched = 0;
         $unmatchedList = [];
         $nullPriceList = [];
@@ -200,6 +202,7 @@ class SyncModelPricesCommand extends Command
         $nonTokenDriftList = [];
         $cacheTierDriftList = [];
         $knownDeviationList = [];
+        $pricePinnedList = [];
         $obsoleteDeviationList = [];
 
         foreach ($dbModels as $model) {
@@ -363,6 +366,28 @@ class SyncModelPricesCommand extends Command
                 || abs($model->getPriceOut() - $pricing['price_out']) > self::TOKEN_PRICE_EPSILON
             );
 
+            $catalogRow = $this->catalogRowFor($model);
+
+            // A catalog `pricePinned` row is a deliberate override. LiteLLM is
+            // reported and never written, same as an admin price, so the next
+            // seed can put the catalog price back.
+            if (CatalogPriceOwnership::isPricePinned($catalogRow)) {
+                if ($priceChanged) {
+                    ++$pricePinned;
+                    $pricePinnedList[] = sprintf(
+                        '%s/%s (ID %d) — catalog price is pinned, LiteLLM in=%.6f out=%.6f was not written',
+                        $service,
+                        $model->getProviderId(),
+                        $model->getId(),
+                        $pricing['price_in'],
+                        $pricing['price_out'],
+                    );
+                } else {
+                    ++$unchanged;
+                }
+                continue;
+            }
+
             if ($priceChanged) {
                 if (!$force) {
                     $currentHistory = $this->priceHistoryRepository->findCurrentPrice($model);
@@ -385,7 +410,7 @@ class SyncModelPricesCommand extends Command
                     ));
                     ++$updated;
                 } else {
-                    $this->updateModelPrice($model, $pricing);
+                    $this->updateModelPrice($model, $pricing, $catalogRow);
                     ++$updated;
 
                     $io->text(sprintf(
@@ -401,6 +426,9 @@ class SyncModelPricesCommand extends Command
             } elseif ([] === $cacheResult['drift']
                 && [] === $cacheResult['known']
                 && 'pinned' !== $inOutVerdict) {
+                if (!$dryRun) {
+                    $this->adoptSyncedRow($model, $catalogRow);
+                }
                 ++$unchanged;
             }
         }
@@ -431,6 +459,11 @@ class SyncModelPricesCommand extends Command
             $io->listing($knownDeviationList);
         }
 
+        if ([] !== $pricePinnedList) {
+            $io->section(sprintf('Catalog price pinned — LiteLLM was not written (%d)', count($pricePinnedList)));
+            $io->listing($pricePinnedList);
+        }
+
         if ([] !== $obsoleteDeviationList) {
             $io->section(sprintf('Obsolete LiteLLM deviations — LiteLLM now agrees, remove the registry entry (%d)', count($obsoleteDeviationList)));
             $io->listing($obsoleteDeviationList);
@@ -451,12 +484,13 @@ class SyncModelPricesCommand extends Command
         // "unmatched" must stay the last word: the workflow reads the wrapped
         // summary block up to the line containing it.
         $io->success(sprintf(
-            'Price sync complete: %d updated, %d non-per-token drift, %d cache/tier drift, %d unchanged, %d skipped (admin), %d mode-mismatch, %d null-price protected, %d known-deviation, %d unmatched',
+            'Price sync complete: %d updated, %d non-per-token drift, %d cache/tier drift, %d unchanged, %d skipped (admin), %d price-pinned, %d mode-mismatch, %d null-price protected, %d known-deviation, %d unmatched',
             $updated,
             $nonTokenDrift,
             $cacheTierDrift,
             $unchanged,
             $skipped,
+            $pricePinned,
             $modeMismatch,
             $nullPriceSkipped,
             $knownDeviation,
@@ -471,6 +505,7 @@ class SyncModelPricesCommand extends Command
             'skipped' => $skipped,
             'mode_mismatch' => $modeMismatch,
             'null_price_skipped' => $nullPriceSkipped,
+            'price_pinned' => $pricePinned,
             'known_deviation' => $knownDeviation,
             'not_matched' => $notMatched,
             'dry_run' => $dryRun,
@@ -1193,9 +1228,99 @@ class SyncModelPricesCommand extends Command
     }
 
     /**
-     * @param array{pricing_mode: string, price_in: float, price_out: float, in_unit: string, out_unit: string, cache_price_in: float, mode_prices: array<string, float>} $pricing
+     * The catalog row for this model, matched the same way ModelSeeder identifies
+     * it (service + provider id + tag). Null for an operator-created row that
+     * is not in the catalog — those have no fingerprint for the seeder to freeze.
+     *
+     * @return array<string, mixed>|null
      */
-    private function updateModelPrice(Model $model, array $pricing): void
+    private function catalogRowFor(Model $model): ?array
+    {
+        $tag = $model->getTag();
+        if ('' === $tag) {
+            return null;
+        }
+
+        $service = strtolower($model->getService());
+        $providerId = strtolower(str_replace(':', '-', $model->getProviderId()));
+        $tag = strtolower($tag);
+        $match = null;
+
+        foreach (ModelCatalog::all() as $row) {
+            $rowProvider = strtolower(str_replace(':', '-', (string) ($row['providerId'] ?? '')));
+            if (strtolower((string) ($row['service'] ?? '')) !== $service
+                || $rowProvider !== $providerId
+                || strtolower((string) ($row['tag'] ?? '')) !== $tag) {
+                continue;
+            }
+
+            if (null !== $match) {
+                return null;
+            }
+
+            $match = $row;
+        }
+
+        return $match;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function catalogShape(Model $model): array
+    {
+        return [
+            'service' => $model->getService(),
+            'name' => $model->getName(),
+            'tag' => $model->getTag(),
+            'providerId' => $model->getProviderId(),
+            'priceIn' => $model->getPriceIn(),
+            'inUnit' => $model->getInUnit(),
+            'priceOut' => $model->getPriceOut(),
+            'outUnit' => $model->getOutUnit(),
+            'quality' => $model->getQuality(),
+            'rating' => $model->getRating(),
+            'json' => $model->getJson(),
+        ];
+    }
+
+    /**
+     * A previous sync wrote the price and left the fingerprint stale, so the
+     * seeder froze the row. When the price already matches LiteLLM, stamp
+     * ownership and refresh the fingerprint without another price write.
+     * Admin-owned prices are left alone. A catalog price that moved since the
+     * last stamp is also left alone — the seeder has to apply that change.
+     *
+     * @param array<string, mixed>|null $catalogRow
+     */
+    private function adoptSyncedRow(Model $model, ?array $catalogRow): void
+    {
+        if (null === $catalogRow) {
+            return;
+        }
+
+        $shape = $this->catalogShape($model);
+        if (!CatalogPriceOwnership::needsOwnershipStamp($shape, $catalogRow)) {
+            return;
+        }
+
+        $currentHistory = $this->priceHistoryRepository->findCurrentPrice($model);
+        if ($currentHistory && 'admin' === $currentHistory->getSource()) {
+            return;
+        }
+
+        $stamped = CatalogPriceOwnership::stamp($shape, $catalogRow);
+        $json = $stamped['json'] ?? null;
+        if (is_array($json)) {
+            $model->setJson($json);
+        }
+    }
+
+    /**
+     * @param array{pricing_mode: string, price_in: float, price_out: float, in_unit: string, out_unit: string, cache_price_in: float, mode_prices: array<string, float>} $pricing
+     * @param array<string, mixed>|null                                                                                                                                   $catalogRow
+     */
+    private function updateModelPrice(Model $model, array $pricing, ?array $catalogRow): void
     {
         $now = new \DateTime();
 
@@ -1233,5 +1358,25 @@ class SyncModelPricesCommand extends Command
         }
 
         $model->setJson($json);
+
+        // Refresh the catalog fingerprint only when the non-price fields still
+        // match the catalog. An admin who renamed the model keeps a stale
+        // fingerprint, so the seeder continues to preserve that edit. A pure
+        // price write is stamped as LiteLLM-owned and stays eligible for the
+        // next catalog update.
+        if (null === $catalogRow) {
+            return;
+        }
+
+        $shape = $this->catalogShape($model);
+        if (!CatalogPriceOwnership::nonPriceCatalogMatches($shape, $catalogRow)) {
+            return;
+        }
+
+        $stamped = CatalogPriceOwnership::stamp($shape, $catalogRow);
+        $stampedJson = $stamped['json'] ?? null;
+        if (is_array($stampedJson)) {
+            $model->setJson($stampedJson);
+        }
     }
 }

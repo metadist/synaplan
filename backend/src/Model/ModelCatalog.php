@@ -390,7 +390,12 @@ class ModelCatalog
      * comfortable headroom and shields the hash from float-string round-trips
      * via Doctrine DBAL.
      */
-    private const FINGERPRINT_FLOAT_PRECISION = 6;
+    /**
+     * Decimal places kept in the catalog fingerprint. Shared with
+     * {@see CatalogPriceOwnership} so a synced price and a seeded price
+     * compare the same rounded value.
+     */
+    public const FINGERPRINT_FLOAT_PRECISION = 6;
 
     /**
      * Long-context pricing tiers, keyed by providerId.

@@ -7,6 +7,8 @@ namespace App\Tests\Command;
 use App\Command\SyncModelPricesCommand;
 use App\Entity\Model;
 use App\Entity\ModelPriceHistory;
+use App\Model\CatalogPriceOwnership;
+use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -1296,6 +1298,75 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertStringContainsString('Cache / long-context price drift', $this->commandTester->getDisplay());
     }
 
+    public function testSyncWriteRefreshesCatalogFingerprintAndRecordsLiteLlmOwnership(): void
+    {
+        $catalog = null;
+        foreach (ModelCatalog::all() as $row) {
+            $mode = is_array($row['json'] ?? null) ? ($row['json']['pricing_mode'] ?? 'per_token') : 'per_token';
+            if ('OpenAI' === ($row['service'] ?? null) && 'chat' === ($row['tag'] ?? null) && 'per_token' === $mode) {
+                $catalog = $row;
+                break;
+            }
+        }
+        self::assertIsArray($catalog);
+
+        $model = new Model();
+        $model->setService((string) $catalog['service'])
+            ->setName((string) $catalog['name'])
+            ->setTag((string) $catalog['tag'])
+            ->setProviderId((string) $catalog['providerId'])
+            ->setPriceIn(1.0)
+            ->setPriceOut(1.0)
+            ->setInUnit((string) $catalog['inUnit'])
+            ->setOutUnit((string) $catalog['outUnit'])
+            ->setQuality((float) $catalog['quality'])
+            ->setRating((float) $catalog['rating'])
+            ->setJson(is_array($catalog['json'] ?? null) ? $catalog['json'] : []);
+
+        $id = new \ReflectionProperty(Model::class, 'id');
+        $id->setValue($model, (int) $catalog['id']);
+
+        $this->mockLiteLLMResponse([
+            (string) $catalog['providerId'] => [
+                'input_cost_per_token' => 0.000009,
+                'output_cost_per_token' => 0.000019,
+                'mode' => 'chat',
+                'litellm_provider' => 'openai',
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        self::assertEqualsWithDelta(9.0, $model->getPriceIn(), 0.000001);
+        self::assertEqualsWithDelta(19.0, $model->getPriceOut(), 0.000001);
+
+        $json = $model->getJson();
+        self::assertSame(CatalogPriceOwnership::PRICE_OWNER_LITELLM, $json[CatalogPriceOwnership::PRICE_OWNER_KEY] ?? null);
+        self::assertIsArray($json[CatalogPriceOwnership::CATALOG_PRICE_AT_SYNC_KEY] ?? null);
+
+        $shape = [
+            'service' => $model->getService(),
+            'name' => $model->getName(),
+            'tag' => $model->getTag(),
+            'providerId' => $model->getProviderId(),
+            'priceIn' => $model->getPriceIn(),
+            'inUnit' => $model->getInUnit(),
+            'priceOut' => $model->getPriceOut(),
+            'outUnit' => $model->getOutUnit(),
+            'quality' => $model->getQuality(),
+            'rating' => $model->getRating(),
+            'json' => $json,
+        ];
+        self::assertSame(ModelCatalog::fingerprint($shape), $json[ModelCatalog::FINGERPRINT_KEY] ?? null);
+        self::assertTrue(CatalogPriceOwnership::shouldKeepLiteLlmPrice($shape, $catalog));
+    }
+
     public function testSummaryLineEndsWithUnmatchedAndIncludesCacheTierCounter(): void
     {
         $this->mockLiteLLMResponse([]);
@@ -1547,6 +1618,7 @@ class SyncModelPricesCommandTest extends TestCase
         $model = $this->createMock(Model::class);
         $model->method('getId')->willReturn($id);
         $model->method('getService')->willReturn($service);
+        $model->method('getTag')->willReturn('');
         $model->method('getProviderId')->willReturn($providerId);
         $model->method('getPriceIn')->willReturn($priceIn);
         $model->method('getPriceOut')->willReturn($priceOut);
@@ -1576,6 +1648,7 @@ class SyncModelPricesCommandTest extends TestCase
         $model = $this->createMock(Model::class);
         $model->method('getId')->willReturn($id);
         $model->method('getService')->willReturn($service);
+        $model->method('getTag')->willReturn('');
         $model->method('getProviderId')->willReturn($providerId);
         $model->method('getPriceIn')->willReturn($priceIn);
         $model->method('getPriceOut')->willReturn($priceOut);
