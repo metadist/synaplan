@@ -56,6 +56,14 @@ the room is gone or not transcribing ⇒ `stopping`; `stopping` older than 60 s
 ⇒ finalize. No session can stay non-terminal for more than ~11 minutes after
 its meeting ended (Perfect-UX bar point 6).
 
+**Seven-day purge (v1.0, not v1.1).** A `failed` session whose file was never
+written keeps its segments so **Save again** can run. The watchdog deletes
+that session and its segment rows when `purge_after` (set to `failed_at` +
+7 days on entering `failed` without a `file_id`) is in the past. A `saved` or
+`saved_with_gaps` session is not purged: the file in Files has its own life.
+`MN-3` tests: a failed session aged 8 days is gone, one aged 6 days is still
+there, a saved session aged 8 days is untouched.
+
 ## 3. Start and stop authority
 
 | Action | Who | Path | Synaplan needed? |
@@ -82,6 +90,8 @@ All rows use `plugin_data` (`plugin_name = 'meeting_notes'`) and `BCONFIG`.
 | Session | owner | `session` | `ms_<16 hex>` | `{id, ref_hash, state, room, meeting_id, jitsi_host, language, folder_group_key, folder_label, profile, captions, started_at, connected_at, stopped_at, stop_reason, finished_at, file_id, gaps:[{from_ms,to_ms,reason}], segment_count, speakers:{endpointId:{name, user_sub?, guest}}, error}` |
 | Reference index | `0` | `session_ref` | `sha256(ref)` | `{owner_id, session_id, meeting_id, created_at}` |
 | Segment | owner | `segment` | `ms_<id>:<6-digit seq>` | `{seq, endpoint_id, speaker, t0_ms, t1_ms, text, language, confidence?, flags:[]}` |
+| Window receipt | owner | `window_receipt` | `ms_<id>:<endpointId>:<seq>` | `{state:"processing"\|"done", response:{seq,text,language,speaker,dropped,segmentSeq}|null, stored_at}`. Unique `data_key`. This is the idempotency record for an audio POST. |
+| Gap receipt | owner | `gap_receipt` | `ms_<id>:gap:<endpointId>:<t0Ms>:<t1Ms>` | `{reason, stored_at}`. Unique `data_key`. A duplicate gap is not stored twice. |
 | Room lock | `0` | `room_lock` | `sha256(jitsi_host + room)` | `{session_id, owner_id, meeting_id, since}` (one active session per room) |
 | Audit | core `BAUDITLOG` via the existing audit service, events `meeting_notes.started / stopped / saved / failed / settings_changed / connection_rotated` (metadata only, no text). | | | |
 
@@ -110,7 +120,7 @@ authentication (bearer), except `public/…`.
 | Method & path | Purpose | Request | Responses |
 |---------------|---------|---------|-----------|
 | `GET public/jitsi/loader.js` | The loader bundle (ES module). Public, `Cache-Control: public, max-age=300`, `Content-Type: text/javascript`. Served whenever the plugin is installed; on/off is decided by `config`, so a cached loader still exits when the plugin is off. | — | 200 JS |
-| `GET public/jitsi/config` | Is the button on, and how to sign in. Public, `max-age=60`. | `?host=meet.<domain>` | `{enabled:true, version, keycloak:{issuer, clientId}, api:"https://synaplan.<domain>/api/v1/plugins/meeting_notes", languages:["de","en",…], defaultLanguage:"de", captions:true}` or `{enabled:false}` |
+| `GET public/jitsi/config` | Is the button on, and how to sign in. Public, **`Cache-Control: no-store`**. A cached `enabled:true` would keep drawing the button after an admin turns the plugin off (U11). The loader script itself stays `max-age=300`; this JSON does not. | `?host=meet.<domain>` | `{enabled:true, version, keycloak:{issuer, clientId}, api:"https://synaplan.<domain>/api/v1/plugins/meeting_notes", languages:["de","en",…], defaultLanguage:"de", captions:true}` or `{enabled:false}` |
 | `GET jitsi/me` | Can this person start here; folders; defaults. | `?room=&meetingId=` | `{canStart:true, reason:null, displayName, folders:[{key,label}], defaultFolder:{key,label}, languages, defaultLanguage, running:null|{sessionId, startedBy, since, mine:bool}}`; `canStart:false` with `reason` in `guest | e2ee | breakout | not_allowed | running_elsewhere` |
 | `POST jitsi/sessions` | Start. | `{room, meetingId, jitsiHost, language, folder:{key}|{newLabel}, e2ee:false, breakout:false}` | 201 `{sessionId, state:"starting"}`; 409 `{error:"already_running", startedBy, since}`; 403 `{error:"not_allowed", message}`; 422 `{error:"not_in_room"|"meeting_changed", message}`; 503 `{error:"jitsi_unreachable"|"transcriber_unreachable"|"speech_unavailable", message}` |
 | `GET jitsi/sessions/{id}` | Poll own session (every 2 s while starting/stopping, 10 s while running). | — | `{sessionId, state, startedAt, segments, gaps, file:{id, name, folderLabel, url}|null, message}` |
@@ -170,13 +180,48 @@ gives up; no retries beyond 3 × backoff).
 | Method & path | Purpose | Request | Response |
 |---------------|---------|---------|----------|
 | `GET public/transcriber/sessions/{ref}` | Bind a bridge connection to a session. Called once on connect and every 30 s. | header `Authorization: Bearer <transcriber token>`, `?meetingId=` | 200 `{sessionId, state, language, profile:"balanced"|"fast"|"accurate", captions, glossary:[…], speakers:{endpointId:{name}}, excluded:[endpointId], maxConcurrency}`; 404 unknown ref; 409 meeting id mismatch or terminal ⇒ transcriber closes the socket (bridge reconnects are ignored) |
-| `POST public/transcriber/sessions/{ref}/audio` | One speech window. **The only way audio enters Synaplan.** | `multipart/form-data`: `audio` (Ogg/Opus, ≤ 2 MB, ≤ 30 s), `endpointId`, `seq`, `t0Ms`, `t1Ms` (relative to session start), `cut` (`pause`/`soft`/`hard`/`stop`), `prompt` (≤ 500 chars), `Idempotency-Key` header `<ref-hash8>:<endpointId>:<seq>` | 200 `{seq, text, language, speaker, dropped:null|"no_speech"|"hallucination"|"excluded"|"duplicate", segmentSeq}`; 409 session not accepting (stopping/terminal); 429/503 with `Retry-After` (speech busy or down; the plugin also records the gap) |
-| `POST public/transcriber/sessions/{ref}/events` | Lifecycle. | `{type:"connected"|"speaker-start"|"speaker-stop"|"stt-failure"|"session-end"|"finished", endpointId?, at, detail?}` | 204 |
+| `POST public/transcriber/sessions/{ref}/audio` | One speech window. **The only way audio enters Synaplan.** | `multipart/form-data`: `audio` (Ogg/Opus, ≤ 2 MB, ≤ 30 s), `endpointId`, `seq`, `t0Ms`, `t1Ms` (relative to session start), `cut` (`pause`/`soft`/`hard`/`stop`), `prompt` (≤ 500 chars), `Idempotency-Key` header `<ref-hash8>:<endpointId>:<seq>` | 200 `{seq, text, language, speaker, dropped:null\|"no_speech"\|"hallucination"\|"excluded"\|"duplicate", segmentSeq}`; 409 session not accepting, or the same key is still `processing` (`Retry-After: 2`); 429/503 with `Retry-After` (speech busy or down; the plugin also records the gap) |
+| `POST public/transcriber/sessions/{ref}/gaps` | A window the plugin never received, because Synaplan was unreachable. Retried. | `{ranges:[{endpointId, t0Ms, t1Ms, reason:"synaplan_unreachable"}]}`, `Idempotency-Key` `<ref-hash8>:gap:<endpointId>:<t0Ms>:<t1Ms>` (one key per range; a batch uses the first range's key plus a body hash — each range is stored under its own gap receipt) | 204. A range whose receipt already exists is skipped. |
+| `POST public/transcriber/sessions/{ref}/events` | Lifecycle. | `{type:"connected"\|"speaker-start"\|"speaker-stop"\|"stt-failure"\|"session-end"\|"finished", endpointId?, at, detail?, gaps?:[{endpointId, t0Ms, t1Ms, reason}]}` | 204. `finished.gaps` is merged with the same gap receipts, so a lost `gaps` POST is recovered here. |
 
-The plugin transcribes with `AiFacade::transcribe()` **as the session owner**
-(usage metering and rate limits on the owner, model from plugin settings or
-the owner's SOUND2TEXT default), writes the segment, then answers. The temp
-audio file is deleted in a `finally`. No audio is logged.
+**Replay of one audio window.** Before calling speech-to-text the plugin
+inserts the `window_receipt` row (`state: processing`). The `data_key` is
+unique, so a second request with the same `Idempotency-Key` loses the insert.
+
+- Insert wins → transcribe, store one segment, set the receipt to `done`
+  with the response body, answer 200.
+- Insert loses and the receipt is `done` → answer **200** with that stored
+  body and `dropped: "duplicate"`. No second call to `AiFacade`, no second
+  segment, no second usage row.
+- Insert loses and the receipt is `processing` younger than 60 s → **409**
+  with `Retry-After: 2`. The retry then hits the `done` receipt.
+- Insert loses and `processing` is older than 60 s (the first attempt died)
+  → this request takes over, transcribes once, and writes the one segment.
+
+`MN-3` tests the duplicate (one segment, identical body) and the stuck
+`processing` takeover (still one segment).
+
+**Gaps the plugin never saw.** If Synaplan is down, the audio POST never
+arrives, so the plugin cannot invent the missing range itself. The
+transcriber keeps those ranges and posts them to `…/gaps`, retried with the
+same key. `finished` repeats the same ranges; each range is stored once via
+its gap receipt. The watchdog, when it finalizes without a `finished` event,
+adds one gap from the last successful window to the session end with reason
+`synaplan_unreachable` instead of writing a transcript that silently skips
+that time. `MN-3` tests: two identical gap posts create one gap; a `finished`
+that repeats it does not add another; finalize without `finished` still marks
+the tail.
+
+The plugin transcribes with `AiFacade::transcribe(string $audioPath, ?int $userId, array $options)`
+**as the session owner** — the **integer** owner id, never a `User` object
+(`AiFacade.php` would throw `TypeError`). The options carry the chosen
+`BMODELS` row, not a bare model name: `provider` (service), `model` (the
+provider-facing name, the same string `resolveSttDefault()` puts in `model`)
+and `model_id`. The row is the plugin setting `speechModelId` when set,
+otherwise the owner's SOUND2TEXT default. If neither row exists, the window
+is a gap `speech_unavailable` and `transcribe()` is not called — omitting
+`provider` would let `AiFacade` pick the platform default and meter the wrong
+row. The temp audio file is deleted in a `finally`. No audio is logged.
 
 ### 5.6 Transcriber ↔ bridge (Jitsi protocol, verified)
 
@@ -246,8 +291,8 @@ in Synaplan. `MN-0` verifies the flow in Chromium, Firefox and Safari.
 | Transcriber never connects (30 s) | after Start | The starter sees the same sentence. Others saw "Meeting notes are starting…" for at most 30 s, then the chat line "Meeting notes could not start. Nothing was written down." | Plugin calls Prosody `stop`; session `failed` (`transcriber_unreachable`). |
 | Speech engine down mid-meeting | running | Banner: "Meeting notes are paused: speech recognition is not available. The meeting continues." | Windows answered 503; plugin records gap `[t0,t1]`; state `paused`; resumes on first success; file says "No notes from 10:14 to 10:17: speech recognition was not available." |
 | Transcriber crashes mid-meeting | running | Banner unchanged for ≤ 30 s, then paused text. | Bridge reconnects the WebSocket (Exporter reconnect); the transcriber binds again via `ref`; gap recorded for the missing time. |
-| Synaplan down mid-meeting | running | Captions stop; banner state from metadata still "on". | Transcriber retries windows for 60 s, then marks them lost and keeps going; on `session-end` it retries `finished` for 10 min. Watchdog finalizes when Synaplan is back. |
-| File write fails | finalize | Personal page and toast: "Your notes could not be saved to Files. The text is kept here for 7 days. Try again." with **Save again**. | Session `failed` with segments kept; retry button reruns finalize. |
+| Synaplan down mid-meeting | running | Captions stop; banner state from metadata still "on". | Transcriber retries each window for 60 s, then posts the missed range to `…/gaps` (retried, idempotent) and keeps going. `finished` repeats those ranges. Watchdog finalizes when Synaplan is back and, if `finished` never arrived, marks the tail as a gap. The file does not omit a window silently. |
+| File write fails | finalize | Personal page and toast: "Your notes could not be saved to Files. The text is kept here for 7 days. Try again." with **Save again**. | Session `failed`, `purge_after` = now + 7 days, segments kept. The personal page exists because the plugin was installed when the session was **created**, so **Save again** is reachable on a first session. The watchdog deletes the text after 7 days. |
 | Two people press Start | Start | Second: "Meeting notes are already on in this meeting, started by Anna." | Room lock row; Prosody `already_transcribing`. |
 
 Copy in all five locales lives in the plugin i18n files and the loader bundle
@@ -266,7 +311,7 @@ Copy in all five locales lives in the plugin i18n files and the loader bundle
 | Cloud speech on a sovereign install | Plugin setting `allow_cloud_stt` default **off**; the model picker then lists only self-hosted models; Start refuses with "No speech model on your organisation's servers is set up." |
 | Admin reads others' meetings | Admin list shows metadata only; files belong to their owners (core rule: admins do not see others' files unless shared). |
 | Loader script compromise | Served by Synaplan from the plugin directory (read-only mount), same site as Jitsi; versioned; renders text only (no `innerHTML` with server strings) inside a Shadow DOM. |
-| E2EE meetings | Loader detects `features/e2ee.enabled` and offers no Start; Prosody refuses `start` if the room has E2EE flagged. |
+| E2EE meetings | Loader detects `features/e2ee.enabled` and offers no Start; Prosody refuses `start` if the room has E2EE flagged, and stops a running session when an occupant enables E2EE ([04 §4.2](./04_jitsi_and_opendesk.md#42-behaviour)). |
 
 Legal note for the admin docs (not legal advice): employee meetings may need
 a works-council or staff-council agreement and a data-protection impact

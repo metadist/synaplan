@@ -7,10 +7,12 @@ tick the decisions in §4, then start with step `MN-1` in
 **Owner:** product owner.
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
 (U1–U12) and the Perfect-UX bar in `AGENTS.md`.
-**Roadmap:** this is the concrete plan for row 2 of
+**Roadmap:** this folder is the **only** plan of record for row 2 of
 [`../20260925_roadmap.md`](../20260925_roadmap.md) ("openDesk meeting notes
-(Jitsi) — minimum"). It narrows row 2 to a **Synaplan plugin** and reuses the
-sidecar from [#2252](https://github.com/metadist/synaplan/pull/2252).
+(Jitsi) — minimum"). The September sketch
+[`../20260917-backend-integrations/04_opendesk_audio_transcriber.md`](../20260917-backend-integrations/04_opendesk_audio_transcriber.md)
+points here. Row 2 is a **Synaplan plugin** and reuses the sidecar from
+[#2252](https://github.com/metadist/synaplan/pull/2252).
 
 ---
 

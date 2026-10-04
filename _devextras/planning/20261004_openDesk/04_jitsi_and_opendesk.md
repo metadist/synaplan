@@ -221,6 +221,7 @@ with `{ok:false, reason:"secret missing"}`.
 | `jitsi-metadata-allow-moderation` for key `recording` | If `data.isTranscribingEnabled == true` and the room has no `_synaplan_ref` ⇒ return `false` (deny; Synaplan is the only starter). If it is `false` ⇒ return `nil` (default moderator rule applies, so moderators can stop). When a moderator stops: set `synaplanNotes.state = "off"`, remove `transcription` and `room._synaplan_ref` (so nobody can restart from the client without Synaplan), send the stop chat line, callback `transcription-stopped` with the moderator's name. |
 | `jitsi-metadata-allow-moderation` for key `synaplanNotes` | Always `false` (server-only key). |
 | `muc-occupant-joined` / `-left` / nick change | If the room has a ref: debounce 2 s, callback `roster`. |
+| `muc-occupant-pre-change` (Prosody fires this when an occupant's presence is updated) | While `room._synaplan_ref` is set: if the presence shows E2EE on, run the same stop as `POST /v1/stop` with reason `e2ee`. The marker is the one the Jitsi client already publishes as `features/e2ee.enabled`; `MN-4` records one presence stanza from the dev cluster with E2EE switched on and matches that stanza, not a guessed tag. Then `synaplanNotes.state = "off"`, `transcription` and `_synaplan_ref` cleared, chat line `jitsi.reason.e2ee`, callback `transcription-stopped` `{by:"e2ee", name}`. Idempotent: a second presence with E2EE still on does not send a second callback. The plugin finalizes; the file ends with "Notes stopped because the meeting became end-to-end encrypted." |
 | `muc-room-destroyed` | If the room has a ref: callback `room-destroyed`. |
 
 Chat lines use Jitsi's system-message format (`json-message` with
@@ -343,7 +344,7 @@ normal Synaplan login.
 | Meeting embedded in Element (Jitsi in a widget iframe) | Same Jitsi page ⇒ loader runs; silent sign-in works same-site; verified in `MN-0`. |
 | Jitsi mobile app | No loader; transcribed like everyone (bridge); sees Jitsi's indicator and the chat lines; cannot start. |
 | Guest (no token) | Transcribed (bridge), sees banner and chat lines, no Start. Listed as "Guest 1, Guest 2" (display name if set, marked "guest"). |
-| E2EE switched on during notes | Prosody sees the E2EE flag change ⇒ stops notes and posts the e2ee sentence; the file ends with "Notes stopped because the meeting became end-to-end encrypted." |
+| E2EE switched on during notes | `muc-occupant-pre-change` ([§4.2](#42-behaviour)) stops notes, posts the e2ee sentence and callbacks `{by:"e2ee"}` once. The file ends with "Notes stopped because the meeting became end-to-end encrypted." |
 | Breakout rooms | No Start in breakout rooms. Main-room notes continue; people in breakouts are not heard (bridge sends what the main conference has). |
 | Room re-created with the same name | New meeting id ⇒ a new session; the old one is already terminal (room lock released on finalize). |
 | Several Jitsi deployments on one Synaplan | `jitsi_hosts` lists allowed hosts; each has its own Prosody URL and secret (v1.1; v1.0 supports one). |

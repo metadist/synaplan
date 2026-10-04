@@ -131,7 +131,7 @@ leaves, Jitsi stop) are in [02 §7](./02_architecture.md#7-failure-handling).
 | Prosody module `mod_synaplan_notes.lua` | Per-room on/off via room metadata, guard against client starts, chat notice, roster push, room-ended callback | same repo, `prosody/`; mounted into openDesk's Prosody | new |
 | `synaplan-transcriber` sidecar | Bridge WebSocket, per-speaker windows, voice detection, captions, calls the plugin | `synaplan/sidecars/synaplan-transcriber` | existing (#2252), gets "plugin mode" |
 | Synaplan core | Speech-to-text, files, auth, plugin host | `synaplan` | small prerequisites `MN-1` |
-| Speech engine | Whisper on GPU behind an OpenAI-compatible API | ops (GPU host) + new Synaplan provider (`MN-8`) | new |
+| Speech engine | Whisper on GPU, model loaded once | ops (GPU host) + **server mode of the existing `WhisperProvider`** (`MN-8a`, D7, [05 §6.2](./05_stt_quality.md#62-decision-one-whisper-story-two-run-modes-revised-d7)). Not a new provider. | existing, extended |
 | openDesk configuration | Loader `<script>`, `config.js` transcription, Jicofo URL + header, Prosody module + secret, Keycloak client | openDesk Helm values (for the dev cluster: a private overlay, [06](./06_dev_environment.md)) | config |
 
 ## 6. Repositories and what changes where

@@ -107,7 +107,14 @@ lines, PHPUnit + PHPStan green.
 **Tests:** every transition (table-driven), policy, HMAC (valid, wrong,
 expired, replay), audio window limits, filter rules with fixtures, "no
 audio left on disk after a window" (temp dir empty), secrets never in JSON
-responses except `POST admin/connection`.
+responses except `POST admin/connection`. Duplicate `Idempotency-Key` on
+audio → one segment and the stored body (`dropped: duplicate`); a
+`processing` receipt older than 60 s is taken over and still yields one
+segment. Two identical gap posts and a `finished` that repeats them → one
+gap; finalize without `finished` marks the tail. Failed session aged 8 days
+is purged, aged 6 days is not, a saved session aged 8 days is not.
+`transcribe()` is called with the owner id and `provider` / `model` /
+`model_id` from the chosen `BMODELS` row.
 
 **Exit:** a test script on the dev cluster (stub Prosody) creates a session,
 posts three audio windows through the transcriber endpoint and gets three
@@ -124,7 +131,10 @@ segments; watchdog fails a session that never connects.
 **Exit:** on the dev cluster, `ProsodyClient` starts and stops notes in a
 real room with a Playwright participant; the bridge connects to a logger
 with the right `urlParams`; a client `isTranscribingEnabled=true` without
-Synaplan is refused; a moderator stop is accepted and calls back.
+Synaplan is refused; a moderator stop is accepted and calls back. Busted:
+one occupant presence with E2EE enabled mid-session → one
+`transcription-stopped` `{by:"e2ee"}` and the ref cleared; the same presence
+again → no second callback.
 
 ## MN-5 — Transcriber plugin mode (`synaplan/sidecars/synaplan-transcriber`)
 
