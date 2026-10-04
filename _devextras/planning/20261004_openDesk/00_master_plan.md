@@ -139,7 +139,7 @@ leaves, Jitsi stop) are in [02 §7](./02_architecture.md#7-failure-handling).
 | Repo | Changes | Mobile-impact class |
 |------|---------|---------------------|
 | `metadist/synaplan-meetingnotes` (new, like `synaplan-synaform`) | Everything plugin-specific: `meetingnotes-plugin/` (manifest, backend, frontend, i18n, migrations), `jitsi/` loader sources, `prosody/` module, `deploy/` snippets, tests, CI. | n/a (separate repo; in Synaplan it is `plugins/**` = backend-only) |
-| `metadist/synaplan` | `MN-1`: public plugin route prefix in `security.yaml`; `File::SOURCES` + `meeting` source with a Files label (five locales); publish the transcriber image in CI. `MN-5`: transcriber plugin mode. `MN-8`: OpenAI-compatible speech-to-text provider. | backend-only, except the Files label (ota-candidate) |
+| `metadist/synaplan` | `MN-1`: public plugin route prefix in `security.yaml`; `File::SOURCES` + `meeting` source with a Files label (five locales); publish the transcriber image in CI. `MN-5`: transcriber plugin mode. `MN-8`: server mode for Synaplan's own Whisper provider (+ whisper.cpp bump in `synaplan-base-php`). | backend-only, except the Files label (ota-candidate) |
 | `metadist/synaplan-charts` | Optional `plugins:` values (init container copies plugin images into `/plugins/<id>` for web, worker, scheduler); transcriber sub-deployment. Until then the generic `volumes` / `additionalInitContainers` values suffice. | n/a |
 | openDesk edition / operator config | Loader include, Jitsi config, Jicofo, Prosody, Keycloak client. **Not** changed in the shared edition repo during development; see [06](./06_dev_environment.md). A merge request with default-off switches comes after the walk (`MN-12`). | n/a |
 

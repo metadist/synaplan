@@ -78,8 +78,9 @@ Until the GPU engine exists (`MN-8`), pick one, in this order:
    quality) through an init container into the whisper model directory,
    select "Whisper (local)" as the plugin's speech model. Enough for one or
    two synthetic speakers.
-2. **A temporary self-hosted server** (CPU faster-whisper with int8) in the
-   cluster, once the provider from `MN-8a` exists.
+2. **The GPU `whisper-server` on our GPU host** (running since 2026-10-04,
+   German model; endpoint in the private ops notes) or a CPU `whisper-server` pod in
+   the cluster — both once Synaplan has the server mode from `MN-8a`.
 3. **A cloud model** with `allow_cloud_stt` switched on — only on the dev
    cluster, only with synthetic audio, and recorded in `STATUS.md`.
 

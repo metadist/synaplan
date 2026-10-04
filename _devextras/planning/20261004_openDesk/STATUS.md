@@ -61,3 +61,26 @@ fake microphone. Results:
 Reverted the same day: logger removed, `custom-jicofo.conf` deleted and
 Jicofo restarted, Prosody module unloaded and deleted. Spike scripts are in
 the private `vultr-cluster` repo.
+
+**2026-10-04 — MN-0 engine round 0 (GPU part).** Our GPU host (NVIDIA RTX
+PRO 6000 Blackwell, 96 GB, shared with chat models that were idle during the
+runs). whisper.cpp
+`ghcr.io/ggml-org/whisper.cpp:main-cuda` (1.9.4, CUDA 13, runs on compute
+12.0 through PTX), `whisper-server` with `-l de --convert`, one model at a
+time. GPU access through NVIDIA Container Toolkit 1.20.1 + CDI, no Docker
+restart. Test set: FLEURS de_de dev (CC-BY-4.0), 363 read utterances,
+75.8 min, references normalised to lowercase without punctuation.
+
+| Model | WER | Median / p95 per utterance | Speed | VRAM |
+|-------|-----|----------------------------|-------|------|
+| `ggml-large-v3-turbo` (stock) | 5.88 % | 0.168 / 0.226 s | ~72× real time | 2.5 GB |
+| `primeline/whisper-large-v3-turbo-german` → ggml f16 | **5.36 %** | 0.166 / 0.216 s | ~73× real time | 2.5 GB |
+
+Notes: on the first 150 utterances the gap was larger (7.47 vs 4.94 %)
+because stock turbo dropped whole clauses there; over all 363 both models
+badly damage 8 utterances (≥ 30 % of words wrong or missing), and per
+utterance the German model is better on 26 and worse on 29 of the first
+150 (spelling variants such as "W-Lan"). FLEURS is not in primeline's
+training mix (Common Voice 17, MLS). Conversion needed a bf16 → f32 cast in
+whisper.cpp's `convert-h5-to-ggml.py`. Read speech only: meeting audio
+(set C) decides. CPU part of round 0 still open.

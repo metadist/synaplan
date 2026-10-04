@@ -41,8 +41,10 @@ MN-0 ─▶ MN-1 ─▶ MN-2 ─▶ MN-3 ─┬─▶ MN-5 ─▶ MN-6 ─▶ MN
       answer on the in-cluster service address.
 - [ ] `AiFacade::transcribe()` exact signature and options (`prompt`,
       `verbose_json`, owner for metering).
-- [ ] Engine benchmark round 0: whisper.cpp `small` and `large-v3-turbo`
-      on the dev cluster CPU, one cloud reference, set A only.
+- [x] Engine benchmark round 0, GPU: stock vs German large-v3-turbo on
+      the GPU host with `whisper-server` (2026-10-04, `STATUS.md`).
+- [ ] Engine benchmark round 0, CPU: whisper.cpp `small` and
+      `large-v3-turbo` on the dev cluster CPU, same set.
 - [ ] README §4 decisions ticked by the product owner.
 
 **Exit:** each box has a dated line in `STATUS.md` (finding + evidence).
@@ -197,8 +199,9 @@ Exit bullets:
 
 | Id | Work |
 |----|------|
-| `MN-8a` | Synaplan core: OpenAI-compatible speech-to-text provider ([05 §6](./05_stt_quality.md#6-engines)), tests with recorded responses, docs. backend-only. |
-| `MN-8b` | Ops (private): GPU speech server (Whisper large-v3-turbo) on a GPU host or GPU node, encrypted link, model row in Synaplan. |
+| `MN-8a` | Synaplan core: **server mode for `WhisperProvider`** (`WHISPER_SERVER_URL` → whisper.cpp `whisper-server`, verbose JSON with segment scores, prompt, language) plus CLI fixes (`--prompt`, `-oj`, cgroup threads) and whisper.cpp 1.9.x in `synaplan-base-php` ([05 §6.2](./05_stt_quality.md#62-decision-one-whisper-story-two-run-modes-revised-d7)). Tests with recorded server responses. backend-only. |
+| `MN-8a2` | `synaplan-charts`: `stt` sub-deployment like `tts` (CUDA image, `nvidia.com/gpu`, GPU node selector/tolerations, model via `oras` init, Service, sets `WHISPER_SERVER_URL`); CPU variant for clusters without GPU. `make all` green. |
+| `MN-8b` | Ops (private): the same server container on our GPU host (Docker, CUDA) with the stock and the German ggml models, encrypted link to the dev cluster. **Partly done 2026-10-04:** German server running for the dev cluster, test audio only; open: the encrypted link. Details in the private ops notes. |
 | `MN-8c` | Benchmark harness `tests/quality/` and runs A–C ([05 §9](./05_stt_quality.md#9-benchmark-and-acceptance)); tune the `balanced` profile and filters. |
 
 **Exit:** [05 §1](./05_stt_quality.md#1-targets-acceptance-in-mn-8) targets met with the chosen engine; numbers in `STATUS.md`.

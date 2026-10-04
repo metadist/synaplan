@@ -47,10 +47,11 @@ OpenCloud is v1.2.
 | 07 | [`07_sprints.md`](./07_sprints.md) | The steps `MN-0` … `MN-12`, each with files, tests and an exit. |
 | — | [`STATUS.md`](./STATUS.md) | Step log. The spike entry of 2026-10-04 is the first row. |
 
-Private cluster specifics (hostnames, namespaces, credentials, the spike
-scripts) are **not** in this public repository. They live in the private
-`vultr-cluster` repository (page "Meeting notes plugin: the Vultr dev
-cluster").
+Private cluster specifics (IP addresses, hostnames, ports, firewall rules,
+namespaces, credentials, the spike scripts) are **not** in this public
+repository — write "the dev cluster" or "our GPU host" here. They live in
+the private `vultr-cluster` repository (page "Meeting notes plugin: the
+Vultr dev cluster").
 
 ## 3. Words
 
@@ -79,7 +80,7 @@ recommendation.
 | D4 | Packaging | **Plugin `meeting_notes`** in its own repo `metadist/synaplan-meetingnotes` (Synaform layout). The transcriber stays in `synaplan/sidecars/synaplan-transcriber` and gets a "plugin mode". | [00 §6](./00_master_plan.md#6-repositories-and-what-changes-where) | |
 | D5 | Where audio goes for speech-to-text | Transcriber → **plugin endpoint** → Synaplan's normal speech-to-text (`AiFacade::transcribe`) as the **person who started**. No API key in the transcriber; every audio window is checked against a live session. | [02 §5](./02_architecture.md#5-apis) | |
 | D6 | Where the transcript lands (v1.0) | **One Markdown file in a Synaplan Files folder** chosen in the dialog (default from the admin, e.g. "Meetings"), owned by the person who started, extracted and vectorized like an upload. | [03 §8](./03_plugin_meeting_notes.md#8-storage-the-transcript-file) | |
-| D7 | Speech engine for quality | **Self-hosted Whisper large-v3-turbo on a GPU** behind an OpenAI-compatible endpoint, reached through a new Synaplan provider. CPU whisper.cpp only for development. Cloud speech-to-text only if the admin switches it on. | [05 §6](./05_stt_quality.md#6-engines) | |
+| D7 | Speech engine for quality | **Synaplan's own Whisper, with a server mode**: a whisper.cpp `whisper-server` (model loaded once) on GPU — on our GPU host now, as a GPU pod from `synaplan-charts` on openDesk clusters with GPU nodes. Stock and German (`primeline`) large-v3-turbo benchmarked; faster-whisper as the throughput alternative. Today's CLI path stays for small installs. Cloud only if the admin switches it on. | [05 §6](./05_stt_quality.md#6-engines) | |
 | D8 | Consent model in v1.0 | **Transparency + one-click stop**: banner for everyone who has the loader, Jitsi's own "transcribing" indicator for everyone, one chat line on start and stop. Per-person "leave my voice out" is v1.1. | [00 §7](./00_master_plan.md#7-ux-bar-mapped-to-this-feature) | |
 | D9 | Live captions | **On by default, admin can switch off.** Final captions per spoken segment (about 1–3 s after a pause on GPU). Word-by-word captions are later. | [05 §8](./05_stt_quality.md#8-live-captions) | |
 | D10 | Relation to the core `opendesk_stt` module | The core module stays for Element voice notes and the operator-key caption path. The plugin owns the Jitsi product. Merge later (open item). | [00 §6](./00_master_plan.md#6-repositories-and-what-changes-where) | |

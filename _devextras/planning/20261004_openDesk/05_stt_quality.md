@@ -111,28 +111,84 @@ phrase and duplicate rules still apply.
 
 | Engine | Quality (de) | Speed | Sovereign | How Synaplan reaches it | Use |
 |--------|--------------|-------|-----------|-------------------------|-----|
-| **Whisper large-v3-turbo on GPU** (faster-whisper / CTranslate2 behind an OpenAI-compatible server) | high | ~0.2–0.4 s per 10 s window on a mid-range GPU (*estimate*) | yes (own GPU) | **New**: OpenAI-compatible speech-to-text provider (`MN-8a`) | **Production default (D7)** |
+| **Whisper large-v3-turbo on GPU** (whisper.cpp `whisper-server`, CUDA) | FLEURS de dev: **5.88 % WER** (*measured*) | **0.17 s per 12.5 s utterance, ~72× real time** on an RTX PRO 6000 Blackwell (*measured*) | yes (own GPU) | **New**: server mode of Synaplan's own `WhisperProvider` (`MN-8a`, §6.2) | **Production default (D7)** |
+| Whisper large-v3-turbo on GPU via faster-whisper (CTranslate2, batched; e.g. speaches) | high | similar per window, better under many parallel meetings | yes | same server-mode contract (OpenAI-compatible path) | Benchmark alternative in `MN-8c` |
+| **German fine-tune** `primeline/whisper-large-v3-turbo-german` (Apache-2.0, 809M, same size and speed as turbo) | model card: 2.6 % vs 3.6 % on its own mix; **FLEURS de dev (not in its training data): 5.36 % vs 5.88 % stock** (*measured*, 363 utterances) — fewer dropped clauses, more spelling variants ("W-Lan") | as turbo (*measured*) | yes | same server; Transformers format only ⇒ convert once to ggml (whisper.cpp) or CTranslate2 (faster-whisper) | **Benchmark against stock turbo in `MN-8c`**; default for German meetings if it wins on set C |
 | Whisper large-v3 on GPU | highest of the Whisper family | ~2× slower than turbo | yes | same | "accurate" option if GPU headroom allows |
-| whisper.cpp in the Synaplan image (CPU) | `small`: fair; `large-v3-turbo` q5: high | CLI per call, model load each time; `large-v3-turbo` ≈ 0.6–1× real time on 8 vCPU (*estimate*) | yes | exists (`WhisperProvider`) | Development and single-speaker tests only |
-| whisper.cpp server with GPU | high | fast, model stays loaded | yes | needs a provider mode for its HTTP API (check whether it serves `/v1/audio/transcriptions` in the pinned version) | alternative to faster-whisper |
+| whisper.cpp CLI in the Synaplan image (CPU, today) | `small`: fair; `large-v3-turbo` q5: high | process + model load per call; `large-v3-turbo` ≈ 0.6–1× real time on 8 vCPU (*estimate*) | yes | exists (`WhisperProvider`) | Voice messages and uploads; development only for meetings |
+| whisper.cpp `whisper-server` on CPU (in-cluster pod) | as the model | model stays loaded; CPU speed | yes | server mode (`MN-8a`) | Development and small installs without GPU |
 | NVIDIA Parakeet TDT 0.6B v3 | high on benchmarks (German), punctuation | very fast | yes | different server API (NeMo/Riva) ⇒ later provider | candidate for v1.x throughput |
 | Voxtral Mini Realtime (vLLM) | good | true streaming (interim words) | yes | vLLM realtime API ⇒ later | word-by-word captions (later) |
 | Cloud (Groq whisper-large-v3-turbo, OpenAI, Mistral) | high | fast | **no** | exists | Only with `allow_cloud_stt`; useful as a **reference** in the benchmark |
 
-**`MN-8a` core provider (Synaplan repo):** give `OpenAICompatibleProvider`
-the `SpeechToTextProviderInterface` (or add a dedicated
-`SelfHostedSttProvider` — decide by reading the provider registry):
-base URL, optional key, model id, timeout; multipart
-`POST {base}/v1/audio/transcriptions` with `model`, `language`, `prompt`,
-`response_format=verbose_json`, `temperature=0`; map `segments[]` scores;
-health probe; mark the endpoint `self-hosted` so the sovereignty filter
-(`allow_cloud_stt = off`) accepts it. Model rows are added through the
-existing model catalogue screens, never hardcoded.
+### 6.1 What Synaplan's Whisper integration is today (2026-10-04)
+
+`WhisperProvider` → `WhisperService` runs the **whisper.cpp CLI**
+(`/usr/local/bin/whisper`, built **CPU-only**, pinned **v1.7.4**) as a
+process per request inside the PHP pod: ffmpeg to 16 kHz WAV, then
+`whisper -m ggml-<model>.bin -f … --output-txt --no-timestamps -l <lang|auto> -t $(nproc)`.
+Models are `ggml-<name>.bin` files in `var/whisper` (Compose downloads
+`tiny`; air-gapped openDesk editions pull a model OCI artifact with `oras` into a PVC).
+
+| Good | Not good enough for meetings |
+|------|------------------------------|
+| Sovereign, no key, no extra service | Model loaded from disk on **every** call (large models: seconds) |
+| Same model row everywhere ("Whisper (local)") | CPU only; the PHP image cannot use a GPU and should not carry CUDA |
+| Air-gap friendly model artifacts (OCI + `oras`) | Text only: no segments, times or scores ⇒ the filters of §5 cannot work |
+| Fine for voice messages, uploads, dictation | `prompt` is ignored; `-t $(nproc)` counts the node's cores, not the pod's ⇒ oversubscription under load |
+| | Runs in the web/worker pods and scales with them; 1.7.4 has no built-in VAD (upstream is at 1.9.4) |
+
+### 6.2 Decision: one Whisper story, two run modes (revised D7)
+
+Keep Whisper as **Synaplan's own** speech engine and add a **server
+mode**, instead of a separate generic provider:
+
+- **`MN-8a` (core):** `WhisperService` gets `WHISPER_SERVER_URL`. When set,
+  it posts the audio to a **whisper.cpp `whisper-server`** (model stays
+  loaded) with `language`, `prompt`, `temperature=0`,
+  `response_format=verbose_json`, and maps `segments[]`
+  (`avg_logprob`, `no_speech_prob`) for §5. When empty, the CLI path stays
+  as today. Same model row ("Whisper (local)"), same catalogue, same
+  sovereignty flag; every Synaplan surface (chat microphone, uploads,
+  `/v1/audio/transcriptions`, meeting notes) uses the GPU automatically.
+  Also fix the CLI path: pass `--prompt`, request JSON output (`-oj`) for
+  segments, take threads from the cgroup CPU quota, bump the base image to
+  whisper.cpp 1.9.x.
+- **Server runs (same container, three places):**
+  1. development: CPU `whisper-server` pod in the cluster;
+  2. **our GPU host** (Docker, CUDA image `ghcr.io/ggml-org/whisper.cpp:main-cuda`),
+     reached over WireGuard or TLS + token;
+  3. **openDesk Kubernetes with GPU nodes:** a `stt` sub-deployment in
+     `synaplan-charts`, built like the existing `tts` one —
+     `nvidia.com/gpu: 1`, GPU `nodeSelector`/tolerations, the model as an
+     OCI artifact pulled by `oras` (the air-gap pattern), Service
+     `synaplan-stt:8080`, `WHISPER_SERVER_URL` set by the chart when
+     `stt.enabled`. The cluster operator provides the GPU node pool and
+     the NVIDIA device plugin / GPU operator.
+- **Models:** ggml files, one format for CPU and GPU. German: convert
+  `primeline/whisper-large-v3-turbo-german` once with whisper.cpp's
+  `convert-h5-to-ggml.py`, quantize (`q8_0` for GPU, `q5_0` for CPU), ship
+  as `whisper-ggml-large-v3-turbo-german:<rev>`. VAD model
+  `ggml-silero-v5.x` next to it.
+- **Throughput (measured 2026-10-04, see `STATUS.md`):** `whisper-server`
+  serialises inference (one global lock per process), but on the GPU host
+  (RTX PRO 6000 Blackwell) one process transcribed 75.8 min of German in
+  62 s — **~72× real time**, 0.17 s median per 12.5 s utterance including
+  HTTP and ffmpeg, 2.5 GB VRAM. One process therefore carries roughly 50+
+  meetings with one active speaker each before queueing; beyond that, more
+  replicas (GPU time-slicing or MIG) or **faster-whisper** (CTranslate2,
+  batched; e.g. speaches) behind the same server-mode contract. `MN-8c`
+  still measures concurrency on set C.
+- `verbose_json` from `whisper-server` 1.9.4 carries per segment `start`,
+  `end`, `avg_logprob`, `no_speech_prob`, `temperature`, `tokens` and
+  `words` — enough for the §5 filters (no `compression_ratio`; use the
+  repetition rule instead).
 
 **GPU placement (ops, private):** a dedicated GPU (or a fixed share of
 one) for speech, separate from the chat models, reached over an encrypted
-link (WireGuard or mTLS). The current chat GPU host has no speech server
-yet; setting one up is an ops task in `MN-8b`.
+link (WireGuard or mTLS). Since 2026-10-04 a German `whisper-server` runs
+on our GPU host next to the chat models (2.5 GB VRAM), for development with
+test audio only; production use waits for the encrypted link (`MN-8b`).
 
 ## 7. Language
 

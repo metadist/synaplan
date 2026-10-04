@@ -280,7 +280,7 @@ baseline, v1.1 adds per-person opt-out.
 | Bridge → transcriber | ~30 kbit/s Opus | measured in the spike |
 | Transcriber CPU | Opus decode + voice detection, < 2 % of a core | WASM decoder |
 | Synaplan requests | 1 per 5–12 s of speech | one PHP request per window |
-| GPU (Whisper large-v3-turbo, fp16) | ~0.2–0.4 s per 10 s window (estimate) | one mid-range GPU ≈ 20 concurrent speakers; verify |
+| GPU (Whisper large-v3-turbo, f16, whisper-server) | **0.17 s per 12.5 s utterance, ~72× real time, 2.5 GB VRAM** (measured on an RTX PRO 6000 Blackwell, 2026-10-04) | one server process ≈ 50+ meetings with one active speaker each; concurrency measured in `MN-8c` |
 | CPU (whisper.cpp large-v3-turbo q5, 8 threads) | ~6–10 s per 10 s window (estimate) | dev only |
 
 ## 10. Observability
