@@ -74,10 +74,14 @@ One row per customer of an app (for SISmass: one per care service).
 
 | Column | Meaning |
 | ------ | ------- |
-| `BID`, `BAPPID`, `BUSERID` | Link app ↔ Synaplan user. Unique `(BAPPID, BEXTERNALID)`. |
-| `BEXTERNALID` | The app's stable id for its customer (SISmass: tenant `public_id` UUID). |
-| `BDISPLAYNAME`, `BCONTACTEMAIL` | Shown to the operator; contact email is the Stripe customer email and invoice recipient. |
-| `BSTATUS` | `active` / `paused` / `deleted`. |
+| `BID`, `BAPPID` | Identity and owning app. |
+| `BUSERID` | Synaplan user. Nullable, **no** `ON DELETE` clause: the delete flow clears the pointer itself (Galera: no cascade). Null on a tombstone, so origin lookup never follows a removed user. |
+| `BEXTERNALID` | The app's stable id for its customer (SISmass: tenant `public_id` UUID). Kept on the tombstone. Live uniqueness is `BLIVEEXTERNALID`, not this column. |
+| `BDISPLAYNAME`, `BCONTACTEMAIL` | Shown to the operator; contact email is the Stripe customer email and invoice recipient. Both are cleared when the row becomes a tombstone. |
+| `BSTATUS` | `active` / `paused` / `deleted`. `deleted` is a tombstone, see 2.7. |
+| `BPENDINGUSERID` | Nullable. Set only while a delete has tombstoned the row and the Synaplan user is not gone yet. A retry finishes that delete. |
+| `BDELETEDAT` | When the tombstone was written. Null until then. |
+| `BLIVEEXTERNALID` | Generated: `BEXTERNALID` while `BSTATUS <> 'deleted'`, otherwise NULL. Unique with `BAPPID`. MariaDB treats NULL as distinct, so tombstones do not block a later account with the same external id. |
 | `BTRIALTOKENS` | Lifetime token allowance granted at creation (copied from the app policy, so a later policy change does not silently move existing customers). |
 | `BCREATED`, `BLASTSEEN` | Lifecycle. |
 
@@ -98,17 +102,31 @@ The Synaplan user behind it:
 ### 2.4 Customer key and trial policy
 
 **Customer key.** Minted at account creation (plaintext returned once), with the
-new scope **`app:ai`**:
+new scope **`app:ai`**. The scope map in `ApiKeyScope::requiredScopesForPath()`
+matches **broad prefixes** (`/v1/*` → `desktop:messages`, and
+`/api/v1/messages*`, `/api/v1/tts`, `/api/v1/config/models*` → `chat` /
+`messages:*`). Attaching `app:ai` to those branches would also grant image and
+video APIs, message history, uploads, extracted memories and model-default
+writes. AA2 therefore adds **exact method-and-path branches before** those
+prefixes, and does not add `app:ai` to any existing prefix:
 
-| Path | Why |
-| ---- | --- |
-| `/v1/chat/completions`, `/v1/models` | SISmass extraction (OpenAI-compatible) |
-| `/v1/audio/transcriptions` | Server-side speech recognition in Germany |
-| `/api/v1/messages/stream`, `/api/v1/config/models` | Free-form assistant chat in SISmass |
-| `/api/v1/auth/me` | Already open to any key (self-service) |
+| Method and path | Why |
+| --------------- | --- |
+| `POST /v1/chat/completions` | SISmass extraction (OpenAI-compatible) |
+| `GET /v1/models` | List the models the privacy policy allows. Not `/v1/models/catalog` and not `/v1/*`. |
+| `POST /v1/audio/transcriptions` | Server-side speech recognition. The existing transcription branch stays; `app:ai` is added to that branch only. |
+| `POST /api/v1/messages/stream` | Free-form assistant chat. Not `GET`, not `/attach`, not the rest of `/api/v1/messages*`. |
+| `GET /api/v1/config/models` | Read the model list. Not `PUT /config/models/defaults` and not `…/check`. |
+| `/api/v1/auth/me` | Already open to any key (self-service); no new grant. |
 
-No files, RAG, memories, chats, agents, MCP, admin. `app:ai` is not a
-`desktop:` scope, so `DesktopOmittedModel` / `isPairedDesktop()` stay untouched.
+`ApiKeyScopeTest` pins each allow and representative denials:
+`POST /v1/images/generations`, `POST /v1/audio/speech`, `GET /v1/models/catalog`,
+`GET /api/v1/messages`, `POST /api/v1/messages/upload`,
+`GET /api/v1/messages/stream/attach`, `PUT /api/v1/config/models/defaults`,
+`/api/v1/files`, `/api/v1/rag`, `/api/v1/user/memories`, `/api/v1/chats`,
+`/api/v1/agents`, `/mcp`, `/api/v1/admin/apps`. No files, RAG, memories, chats,
+agents, MCP or admin. `app:ai` is not a `desktop:` scope, so
+`DesktopOmittedModel` / `isPairedDesktop()` stay untouched.
 
 **Trial policy** (`BPOLICY.trial`), applied by a new `AppTrialPolicy` service
 that `RateLimitService::checkLimit()` and `checkCostBudget()` consult **only for
@@ -197,9 +215,36 @@ app accounts at level `NEW`**:
 - `POST /api/v1/apps/accounts/{id}/keys` ⇒ revoke the account's app-minted keys,
   mint a new one (recovery after a lost or leaked key).
 - `POST /api/v1/apps/accounts/{id}/pause` / `…/resume`.
-- `DELETE /api/v1/apps/accounts/{id}` ⇒ cancel the Stripe subscription
-  immediately, then `UserDeletionService`. Invoices stay in Stripe (legal
-  retention). Called when a care service deletes itself in SISmass.
+- `DELETE /api/v1/apps/accounts/{id}` is the only delete path. It is safe to
+  call again. Invoices stay in Stripe (legal retention). Called when a care
+  service deletes itself in SISmass.
+
+**Delete, in this order:**
+
+1. The row is already `deleted` and `BPENDINGUSERID` is null → **204**. Stripe
+   is not called again and `UserDeletionService` is not called again.
+2. The row is `deleted` and `BPENDINGUSERID` is set → skip to step 4. A previous
+   call tombstoned the row and stopped before the user was removed.
+3. Otherwise cancel the Stripe subscription now. "Already canceled" is success.
+   Stripe unreachable → **503** `deletion_incomplete` and **no local change**,
+   so the next call repeats the cancel.
+4. One database transaction writes the tombstone and commits: `BSTATUS=deleted`,
+   `BDELETEDAT=now`, `BPENDINGUSERID` = the current user id, `BUSERID=NULL`,
+   `BCONTACTEMAIL` and `BDISPLAYNAME` cleared. `UserDeletionService` stays
+   **outside** this transaction (it deletes files and vector points and must
+   not hold a Galera transaction open).
+5. `UserDeletionService` runs for `BPENDINGUSERID`. A missing user row is
+   success (the previous attempt already deleted it). Any other failure →
+   **503** `deletion_incomplete`; the row stays `deleted` with
+   `BPENDINGUSERID` set, so a retry runs only this step.
+6. Clear `BPENDINGUSERID`, write audit `app_account_deleted`, **204**.
+
+`SignupOriginResolver` joins `BAPPACCOUNTS` only where `BUSERID` is not null,
+so a tombstone never points at a deleted user and the person disappears from
+People. The Apps detail still lists the tombstone: external id, created,
+deleted at — no name, no email, no user link. Because `BLIVEEXTERNALID` is
+NULL on a tombstone, a later `POST /apps/accounts` with the same `external_id`
+creates a **new** account and a new user. The old tombstone remains.
 
 ### 2.8 Operator visibility
 
@@ -232,12 +277,34 @@ UI.
 | `POST` | `/apps/accounts/{id}/checkout` | `{plan, success_url, cancel_url}` | `{url, session_id}` |
 | `POST` | `/apps/accounts/{id}/portal` | `{return_url}` | `{url}` |
 | `POST` | `/apps/accounts/{id}/pause` · `/resume` | — | 204 |
-| `DELETE` | `/apps/accounts/{id}` | — | 204 |
+| `DELETE` | `/apps/accounts/{id}` | — | 204 (again: 204, see 2.7). 503 `deletion_incomplete` leaves a retryable row |
 
 Error codes (stable strings the app maps to its own copy): `app_paused`,
 `account_paused`, `trial_budget_exhausted`, `app_trial_capacity`,
 `model_not_allowed_for_app`, `return_url_not_allowed`, `plan_not_allowed`,
-`new_accounts_limit`.
+`new_accounts_limit`, `deletion_incomplete`.
+
+### 3.1 Operator API (admin session, not the app credential)
+
+Every path in §3 is app-credential-only and account-scoped, so it cannot list
+apps, create one, pause a whole app, rotate the provisioning credential or edit
+policy. Those actions are a separate admin API. Session with `ROLE_ADMIN`
+only — never `apps:provision`. An app key that calls them is denied (they are
+not on the `apps:provision` map, and the restricted-key default is deny).
+A signed-in non-admin gets 403.
+
+| Method | Path | Result |
+| ------ | ---- | ------ |
+| `GET` | `/api/v1/admin/apps` | One row per app: name, status, account counts, tokens, return origins |
+| `POST` | `/api/v1/admin/apps` | `{name, slug, return_origins, policy}` → 201 and the credential **once** |
+| `GET` | `/api/v1/admin/apps/{id}` | The row, its policy and its accounts (tombstones included, no contact email once deleted) |
+| `PUT` | `/api/v1/admin/apps/{id}/policy` | Trial allowance, limits, allowed models, return origins |
+| `POST` | `/api/v1/admin/apps/{id}/pause` · `/resume` | 204. Pause stops AI for every account of the app |
+| `POST` | `/api/v1/admin/apps/{id}/rotate-key` | 201 and the new credential **once**; the previous credential stops immediately |
+
+AA7 implements this contract and nothing else speaks to the database from the
+Vue page. Tests: admin session can pause and rotate; a normal session is 403;
+an `apps:provision` key is denied on every row of this table.
 
 Example account:
 
@@ -259,7 +326,9 @@ Example account:
 ## 4. Security rules
 
 1. The app credential has exactly one scope, `apps:provision`; customer keys
-   have exactly `app:ai`. `ApiKeyScopeTest` pins both maps.
+   have exactly `app:ai`, granted only on the exact routes in §2.4.
+   `ApiKeyScopeTest` pins both maps, including the denials listed there.
+   `apps:provision` does not reach `/api/v1/admin/apps`.
 2. Every query under `/api/v1/apps` is scoped by `BAPPID` of the presenting key.
    A cross-app id is 404.
 3. `POST /apps/accounts` is idempotent on `(app, external_id)`; a replay never
@@ -284,8 +353,9 @@ Example account:
 - `AppAccountsModule` is a `FeatureModule`: decisive env `APP_ACCOUNTS_ENABLED`
   listed in `backend/.env.minimal` and `docker-compose.minimal.yml`; the registry
   drives feature status, runtime config and the 404 gate.
-- Mobile impact: backend steps are `backend-only`; the admin UI steps are
-  `ota-candidate` (`frontend/**`). Check with
+- Mobile impact: backend steps are `backend-only`; AA6 and the Vue part of AA7
+  are `ota-candidate` (`frontend/**`). AA8 is docs only and stays
+  `no-app-impact`. Check with
   `node scripts/mobile-impact.mjs --base <base> --head <head>`; new paths that
   fall outside the existing allow-lists are added to
   `.github/mobile-impact-policy.json` in the same PR.
@@ -297,13 +367,13 @@ Example account:
 | Step | Content | Class |
 | ---- | ------- | ----- |
 | `AA1` | `BAPPS` / `BAPPACCOUNTS` migration, entities, repositories, `AppAccountsModule`, CLI `app:apps:create <slug>` (prints the credential once) | backend-only |
-| `AA2` | `/api/v1/apps/accounts` create / get / keys / pause / resume / delete; scopes `apps:provision` and `app:ai` in `ApiKeyScope`; synthetic login email; mail suppression for app accounts | backend-only |
+| `AA2` | `/api/v1/apps/accounts` create / get / keys / pause / resume / delete (tombstone, retry, §2.7); `apps:provision` and exact-route `app:ai` branches in `ApiKeyScope` **before** the existing prefixes; synthetic login email; mail suppression for app accounts | backend-only |
 | `AA3` | `AppTrialPolicy` in `RateLimitService` (lifetime tokens, limit overrides, app daily cap, new-accounts cap) **and** the cost-budget check on `/v1/chat/completions` + `OpenAiGatewayToolLoop` for every user | backend-only |
 | `AA4` | `StripeCheckoutService` extraction (web regression tests first), app checkout and portal, contact email as Stripe customer email, `subscription_data.description` | backend-only |
 | `AA5` | Privacy policy: model allow-list on `/v1/models`, `/v1/chat/completions`, `/v1/audio/transcriptions`, `/api/v1/messages/stream`; forced incognito; memories and summaries off; confirm the German model keys against the live catalog | backend-only |
 | `AA6` | People list **Signed up via** column + filter, `SignupOriginResolver`, user-detail origin banner | ota-candidate |
-| `AA7` | Operate → Apps: list, status pill, Pause / Resume, Rotate key, detail with accounts and policy form, empty state | ota-candidate |
-| `AA8` | `docs/APP_ACCOUNTS.md` (integrator guide: create app, endpoints, error codes, return URLs, test mode), E2E for AA6/AA7, release note | ota-candidate (docs + tests) |
+| `AA7` | Admin API §3.1 (`/api/v1/admin/apps`, session `ROLE_ADMIN`) **and** Operate → Apps: list, status pill, Pause / Resume, Rotate key, detail with accounts and policy form, empty state. The page calls only that API | ota-candidate (the Vue page; the controller is backend-only in the same PR) |
+| `AA8` | `docs/APP_ACCOUNTS.md` (integrator guide: create app, endpoints, error codes, return URLs, test mode) and a release note. Docs only, so `no-app-impact` (`.github/mobile-impact-policy.json` `**/*.md`). E2E for journeys A1–A4 ships in the AA6 and AA7 PRs, which are the `ota-candidate` steps | no-app-impact |
 
 AA1–AA5 can merge behind the flag before any UI exists. SISmass M5 needs AA1–AA5;
 the operator view (AA6, AA7) is required before SISmass goes public (SISmass
@@ -369,7 +439,11 @@ stop = Pause; where from = registered date and return address.
   `/api/v1/messages/stream`; `model_not_allowed_for_app`; incognito forced (no
   `BMESSAGES` rows); checkout session payload (Stripe client mocked); webhook
   fixture moves `NEW` → `PRO` and the same key keeps working; delete cancels
-  Stripe first.
+  Stripe before any local write; a second delete is 204 and does not call
+  Stripe again; Stripe down leaves the row unchanged; a row left `deleted`
+  with `BPENDINGUSERID` set is finished by a retry; the tombstone has a null
+  `BUSERID` and empty contact fields; the same `external_id` can be
+  provisioned again afterwards.
 - **Regression:** web checkout / portal unchanged after the service
   extraction; cost budget now enforced on `/v1/chat/completions` for a `PRO`
   user over budget.
@@ -386,8 +460,8 @@ stop = Pause; where from = registered date and return address.
 3. Register **SISmass** (CLI or AA7 page): return origin
    `https://app.sismass.de` (SISmass decision E1), trial 3 M tokens, German
    models only.
-4. Put the credential into SISmass's `.env` on ch1 (`SYNAPLAN_APP_KEY`), never
-   into git.
+4. Put the credential into the SISmass deployment environment
+   (`SYNAPLAN_APP_KEY`), never into git and never into this public repository.
 5. SISmass staging talks to a Synaplan with **Stripe test keys** (local dev
    stack or a staging instance) — never test purchases against live Stripe.
 6. AA6/AA7 before SISmass removes its access password.
