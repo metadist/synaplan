@@ -66,6 +66,11 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
         $this->accessToken = $this->authenticateClient($this->client, $this->user);
     }
 
+    protected function assertPostConditions(): void
+    {
+        $this->stripeMock->assertParamsMatchSdk();
+    }
+
     protected function tearDown(): void
     {
         ApiRequestor::setHttpClient(CurlClient::instance());
