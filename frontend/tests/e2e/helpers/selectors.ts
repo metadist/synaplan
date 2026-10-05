@@ -319,20 +319,19 @@ export const selectors = {
     stateEmptyFolder: '[data-testid="state-empty-folder"]',
     /** File row action: delete this file (opens ConfirmDialog) */
     btnDeleteFile: '[data-testid="btn-delete"]',
-    /** §4.8: knowledge-base tabs shared by /files and its sub-views */
-    tabsBar: '[data-testid="tabs-files"]',
-    tabBrowse: '[data-testid="tab-files-browse"]',
-    tabSearch: '[data-testid="tab-files-search"]',
-    tabIncoming: '[data-testid="tab-files-incoming"]',
-    tabGenerated: '[data-testid="tab-files-generated"]',
-    tabWorkspace: '[data-testid="tab-files-workspace"]',
-    tabVectors: '[data-testid="tab-files-vectors"]',
-    /** Sub-view page roots reached via the Files tabs */
+    /** Library section links in the desktop sidebar */
+    linkBrowse: '[data-testid="link-sidebar-v2-files-browse"]',
+    linkSearch: '[data-testid="link-sidebar-v2-files-search"]',
+    linkIncoming: '[data-testid="link-sidebar-v2-files-incoming"]',
+    linkGenerated: '[data-testid="link-sidebar-v2-files-generated"]',
+    linkWorkspace: '[data-testid="link-sidebar-v2-files-workspace"]',
+    linkVectors: '[data-testid="link-sidebar-v2-files-vectors"]',
+    /** Sub-view page roots reached from the library sidebar */
     pageIncoming: '[data-testid="page-files-incoming"]',
     pageGenerated: '[data-testid="page-files-generated"]',
     pageWorkspace: '[data-testid="page-files-workspace"]',
     pageVectors: '[data-testid="page-vector-storage"]',
-    /** Workspace tab (COMPUTE.WORKSPACES_ENABLED on): list, preview dialog, delete, states */
+    /** Workspace page (COMPUTE.WORKSPACES_ENABLED on): list, preview dialog, delete, states */
     workspaceFiles: '[data-testid="workspace-files"]',
     workspaceEmpty: '[data-testid="workspace-empty"]',
     workspaceError: '[data-testid="workspace-error"]',

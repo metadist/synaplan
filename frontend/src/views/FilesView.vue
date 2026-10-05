@@ -5,8 +5,7 @@
       data-testid="page-files-upload"
     >
       <div class="max-w-7xl mx-auto space-y-6">
-        <!-- §4.8: the knowledge base tabs — Browse / Incoming / Generated / Search -->
-        <FilesTabs active="files" />
+        <FilesTabs />
 
         <!-- §4.9 E: first-visit dismissible explainer; remembered per user. -->
         <Transition name="fade">

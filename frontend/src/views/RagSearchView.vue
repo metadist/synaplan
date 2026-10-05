@@ -6,8 +6,7 @@
     >
       <div class="px-3 py-4 sm:p-4 md:p-8">
         <div class="max-w-7xl mx-auto space-y-6">
-          <!-- §4.8: the knowledge base has two tabs — Files (browse) + Search -->
-          <FilesTabs active="search" />
+          <FilesTabs />
 
           <!-- §4.8 #4: one compact status line instead of 4 jargon stat cards -->
           <p v-if="stats" class="text-sm txt-secondary" data-testid="section-stats">

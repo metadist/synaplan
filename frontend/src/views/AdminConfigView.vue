@@ -178,8 +178,8 @@ watch(
   }
 )
 
-// Mobile: one dropdown lists every tab under its topic header (same pattern as
-// FilesTabs.vue), so nothing the desktop side navigation shows is lost.
+// Mobile: one dropdown lists every tab under its topic header, so the
+// desktop topic list is not lost on a phone.
 const mobileTabMenuOpen = ref(false)
 const mobileTabDropdownRef = ref<HTMLElement | null>(null)
 

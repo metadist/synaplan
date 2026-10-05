@@ -17,23 +17,23 @@ const FILES = selectors.files
 const RAG = selectors.rag
 const NAV = selectors.nav
 
-test.describe('@ci Files & Search tabs (§4.8)', () => {
-  test('tabs link the two knowledge-base surfaces', async ({ page }) => {
+test.describe('@ci Files & Search (§4.8)', () => {
+  test('sidebar links the two knowledge-base surfaces', async ({ page }) => {
     await openApp(page)
 
-    await test.step('Files page shows the tab bar', async () => {
+    await test.step('Files page shows the library links', async () => {
       await page.goto('/files')
-      await expect(page.locator(FILES.tabsBar)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(FILES.linkBrowse)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
 
-    await test.step('Search tab navigates to /files/search', async () => {
-      await page.locator(FILES.tabSearch).click()
+    await test.step('Search link navigates to /files/search', async () => {
+      await page.locator(FILES.linkSearch).click()
       await expect(page).toHaveURL(/\/files\/search/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(RAG.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
 
-    await test.step('Files tab navigates back to /files', async () => {
-      await page.locator(FILES.tabBrowse).click()
+    await test.step('Browse link navigates back to /files', async () => {
+      await page.locator(FILES.linkBrowse).click()
       await expect(page).toHaveURL(/\/files$/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(FILES.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })

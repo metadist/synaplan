@@ -48,12 +48,46 @@
         <button
           class="v2-drawer-item"
           :class="[filesActive && 'v2-drawer-item--active', isGuestMode && 'opacity-60']"
+          :aria-expanded="isGuestMode ? undefined : libraryExpanded"
           data-testid="btn-mobile-nav-files"
           @click="handleFilesClick"
         >
           <FolderIcon class="w-5 h-5" aria-hidden="true" />
           <span class="flex-1 text-left">{{ $t('nav.files') }}</span>
+          <Icon
+            v-if="!isGuestMode"
+            icon="mdi:chevron-down"
+            class="w-5 h-5 flex-shrink-0 transition-transform txt-secondary"
+            :class="libraryExpanded && 'rotate-180'"
+            aria-hidden="true"
+          />
         </button>
+
+        <div v-if="!isGuestMode && libraryExpanded" class="pl-4 pb-1">
+          <router-link
+            v-for="link in libraryLinks"
+            :key="link.id"
+            :to="link.to"
+            class="v2-drawer-child"
+            :class="
+              isLibraryLinkActive(link.to, route.path)
+                ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                : 'txt-secondary'
+            "
+            :aria-current="isLibraryLinkActive(link.to, route.path) ? 'page' : undefined"
+            :data-testid="link.mobileTestId"
+            @click="closeDrawer"
+          >
+            <component :is="link.icon" class="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+            <span class="flex-1 truncate">{{ link.label }}</span>
+            <span
+              v-if="link.badge"
+              class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-warning-muted)] text-[var(--status-warning-text)] tabular-nums"
+            >
+              {{ link.badge }}
+            </span>
+          </router-link>
+        </div>
 
         <button
           v-if="!isGuestMode"
@@ -599,6 +633,7 @@ import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { useI18n } from 'vue-i18n'
+import { isLibraryLinkActive, useLibraryLinks } from '@/composables/useLibraryLinks'
 import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 import ChatShareModal from './ChatShareModal.vue'
@@ -618,8 +653,10 @@ const sidebarStore = useSidebarStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
 const { navItems, isItemActive, isGuestMode } = useNavItems()
+const { links: libraryLinks } = useLibraryLinks()
 
 const moreExpanded = ref(false)
+const libraryExpanded = ref(false)
 const expandedSection = ref<string | null>(null)
 const expandedGroup = ref<string | null>(null)
 const isCreatingChat = ref(false)
@@ -652,6 +689,14 @@ const moreSections = computed(() =>
 )
 
 const filesActive = computed(() => route.path.startsWith('/files'))
+
+watch(
+  filesActive,
+  (active) => {
+    if (active) libraryExpanded.value = true
+  },
+  { immediate: true }
+)
 const historyActive = computed(() => route.path === '/' || route.path.startsWith('/chat'))
 const moreActive = computed(() => moreSections.value.some((item) => isItemActive(item)))
 
@@ -714,8 +759,8 @@ const handleFilesClick = () => {
     featureGateOpen.value = true
     return
   }
-  closeDrawer()
-  router.push('/files')
+  triggerHapticImpact('light')
+  libraryExpanded.value = !libraryExpanded.value
 }
 
 const toggleMore = () => {

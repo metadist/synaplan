@@ -5,7 +5,7 @@
       data-testid="page-files-workspace"
     >
       <div class="max-w-7xl mx-auto space-y-6">
-        <FilesTabs active="workspace" />
+        <FilesTabs />
 
         <div class="surface-card p-4 sm:p-6 space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
