@@ -38,7 +38,7 @@ final class ConfigControllerInstanceDefaultsTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/config/models/defaults?scope=instance');
 
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testAdminSavesAndReadsTheInstanceDefault(): void
@@ -53,11 +53,11 @@ final class ConfigControllerInstanceDefaultsTest extends WebTestCase
             'defaults' => ['CHAT' => $instanceModelId],
             'global' => true,
         ], \JSON_THROW_ON_ERROR));
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         $this->client->request('GET', '/api/v1/config/models/defaults?scope=instance');
 
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $body = json_decode((string) $this->client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
         self::assertTrue($body['success']);
         self::assertSame($instanceModelId, $body['defaults']['CHAT']);
