@@ -205,11 +205,17 @@
             <span>{{ voiceActivityLabel }}</span>
           </div>
 
-          <!-- Textarea row. Same 12px inset as the control bar so the text
-               lines up with the buttons below it. -->
+          <!-- Text row. Enhance sits on this line, at the right, once there
+               is text. It stays at the top when the field grows, so it keeps
+               the first line instead of dropping into the control bar.
+               On desktop the row is already as tall as that button
+               (44px plus its 2px offset, inside the 10px vertical padding),
+               so the button appearing does not push the composer up. -->
           <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-            <div class="flex items-center gap-2 px-3 py-2.5">
-              <!-- Textarea -->
+            <div
+              class="flex items-start gap-1.5 px-3 py-2.5"
+              :class="isMobile ? undefined : 'min-h-[66px]'"
+            >
               <Textarea
                 ref="textareaRef"
                 v-model="message"
@@ -223,12 +229,29 @@
                 @focus="isFocused = true"
                 @blur="isFocused = false"
               />
+
+              <button
+                v-if="showEnhanceInInput"
+                type="button"
+                :class="[
+                  'mt-0.5 h-[44px] min-w-[44px] flex flex-shrink-0 items-center justify-center !rounded-xl',
+                  enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
+                  enhanceLoading && 'pill--loading',
+                ]"
+                :disabled="enhanceLoading"
+                :aria-label="$t('chatInput.enhance')"
+                :title="$t('chatInput.enhance')"
+                data-testid="btn-chat-enhance"
+                @click="toggleEnhance"
+              >
+                <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
+                <SparklesIcon v-else class="w-5 h-5" />
+              </button>
             </div>
           </div>
 
-          <!-- Control bar. Plus and the tool badge on the left; the model chip
-               and send actions on the right. The chip shrinks before the row
-               overflows, and the row wraps only when a badge leaves no room. -->
+          <!-- Control bar. Plus and the tool badge on the left; the model chip,
+               microphone and send on the right. Enhance lives on the text row. -->
           <div
             class="flex flex-wrap items-center gap-1.5 px-3 pb-2.5"
             data-testid="section-chat-controls"
@@ -376,24 +399,6 @@
                 :guest="isGuestMode"
                 @gate="emit('guestFeatureGate', 'models')"
               />
-
-              <button
-                v-if="showEnhanceInInput"
-                type="button"
-                :class="[
-                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative flex-shrink-0',
-                  enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
-                  enhanceLoading && 'pill--loading',
-                ]"
-                :disabled="enhanceLoading"
-                :aria-label="$t('chatInput.enhance')"
-                :title="$t('chatInput.enhance')"
-                data-testid="btn-chat-enhance"
-                @click="toggleEnhance"
-              >
-                <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
-                <SparklesIcon v-else class="w-5 h-5" />
-              </button>
 
               <button
                 v-if="showMicrophoneButton"
@@ -963,9 +968,9 @@ const showMicrophoneButton = computed(() => {
 })
 
 /**
- * Icon-only enhance control in the control bar; visible when there is text
- * to act on. Desktop only — on a phone it crowds the model chip, so the
- * control stays in the Tools menu instead.
+ * Icon-only enhance control on the text row, at the right. Visible when
+ * there is text to act on. Desktop only — on a phone it stays in the Tools
+ * menu so the narrow text line keeps its width.
  */
 const showEnhanceInInput = computed(() => message.value.trim().length > 0 && !isMobile.value)
 

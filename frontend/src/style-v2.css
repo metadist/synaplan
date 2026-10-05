@@ -1222,6 +1222,30 @@
   border-color: rgba(255, 255, 255, 0.2) !important;
   color: #d0d3db !important;
 }
+
+/* The model chip has no fill of its own. The border stays so it still reads
+   as a control on the composer; only hover and keyboard focus add a tint. */
+.design-v2 [data-testid='comp-chat-input-shell'] [data-testid='btn-model-toggle'].pill,
+.design-v2.dark [data-testid='comp-chat-input-shell'] [data-testid='btn-model-toggle'].pill {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.design-v2:not(.dark)
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:hover,
+.design-v2:not(.dark)
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:focus-visible {
+  background: rgba(0, 63, 199, 0.06) !important;
+  color: var(--brand) !important;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell'] [data-testid='btn-model-toggle'].pill:hover,
+.design-v2.dark
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:focus-visible {
+  background: rgba(107, 143, 214, 0.16) !important;
+  color: var(--brand-light) !important;
+}
 .design-v2.dark [data-testid='comp-chat-input-shell'] .pill--active {
   background: rgba(107, 143, 214, 0.16) !important;
   border-color: rgba(107, 143, 214, 0.36) !important;

@@ -88,6 +88,7 @@ describe('ModelDropdown', () => {
   it('moves between levels with the arrow keys and wraps', async () => {
     wrapper = mountPicker()
     await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="btn-reasoning-toggle"]').trigger('click')
     await flushPromises()
 
     const medium = wrapper.get('[data-testid="btn-reasoning-medium"]')
@@ -101,31 +102,35 @@ describe('ModelDropdown', () => {
     expect(document.activeElement).toBe(wrapper.get('[data-testid="btn-reasoning-low"]').element)
   })
 
-  it('returns focus to the trigger when Escape closes the list', async () => {
+  it('returns focus to the reasoning row when Escape closes the level list', async () => {
     wrapper = mountPicker()
-    const trigger = wrapper.get('[data-testid="btn-model-toggle"]')
-    await trigger.trigger('keydown.down')
+    await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
+    const reasoning = wrapper.get('[data-testid="btn-reasoning-toggle"]')
+    await reasoning.trigger('click')
     await flushPromises()
 
     await wrapper.get('[data-testid="btn-reasoning-medium"]').trigger('keydown.escape')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="dropdown-model-panel"]').exists()).toBe(false)
-    expect(document.activeElement).toBe(trigger.element)
+    expect(wrapper.find('[data-testid="dropdown-model-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="dropdown-reasoning-panel"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(reasoning.element)
   })
 
-  it('returns focus to the trigger after a level is chosen', async () => {
+  it('keeps the model list open after a level is chosen', async () => {
     wrapper = mountPicker()
-    const trigger = wrapper.get('[data-testid="btn-model-toggle"]')
-    await trigger.trigger('click')
+    await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
+    const reasoning = wrapper.get('[data-testid="btn-reasoning-toggle"]')
+    await reasoning.trigger('click')
     await flushPromises()
 
     await wrapper.get('[data-testid="btn-reasoning-high"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.emitted('update:reasoningEffort')?.[0]).toEqual(['high'])
-    expect(wrapper.find('[data-testid="dropdown-model-panel"]').exists()).toBe(false)
-    expect(document.activeElement).toBe(trigger.element)
+    expect(wrapper.find('[data-testid="dropdown-model-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="dropdown-reasoning-panel"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(reasoning.element)
   })
 
   it('emits the picked model and closes', async () => {
@@ -138,6 +143,21 @@ describe('ModelDropdown', () => {
 
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([56])
     expect(wrapper.find('[data-testid="dropdown-model-panel"]').exists()).toBe(false)
+  })
+
+  it('focuses the model whose name matches the typed letters without selecting it', async () => {
+    wrapper = mountPicker()
+    await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
+    await flushPromises()
+
+    const list = wrapper.get('[role="listbox"]')
+    await list.trigger('keydown', { key: 'c' })
+    await list.trigger('keydown', { key: 'l' })
+    await flushPromises()
+
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="btn-model-56"]').element)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.find('[data-testid="dropdown-model-panel"]').exists()).toBe(true)
   })
 
   it('asks a guest to sign in instead of opening the list', async () => {

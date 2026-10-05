@@ -815,6 +815,13 @@
     outline: 2px solid var(--brand);
     outline-offset: -2px;
   }
+  /* Typeahead moves focus in script, which does not set :focus-visible. */
+  [data-testid='dropdown-model-panel'] .dropdown-item:focus {
+    background: rgba(0, 63, 199, 0.09);
+  }
+  .dark [data-testid='dropdown-model-panel'] .dropdown-item:focus {
+    background: rgba(107, 143, 214, 0.16);
+  }
 
   .dropdown-item--active {
     background: rgba(0, 63, 199, 0.14);

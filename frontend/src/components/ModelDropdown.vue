@@ -38,12 +38,17 @@
     <div
       v-if="isOpen"
       :id="panelId"
-      class="dropdown-up left-auto right-0 max-h-[60vh] origin-bottom-right overflow-y-auto scroll-thin"
+      class="dropdown-up left-auto right-0 flex origin-bottom-right flex-col"
       :style="panelStyle"
       data-testid="dropdown-model-panel"
       @keydown.escape.stop.prevent="closeAndRestoreFocus"
     >
-      <div role="listbox" :aria-label="$t('chatInput.model')">
+      <div
+        class="max-h-[min(16rem,36vh)] min-h-0 overflow-y-auto scroll-thin"
+        role="listbox"
+        :aria-label="$t('chatInput.model')"
+        @keydown="onTypeaheadKeydown"
+      >
         <button
           ref="defaultRef"
           :class="['dropdown-item', modelValue === null && 'dropdown-item--active']"
@@ -104,6 +109,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
+import { useModelListKeyboard } from '@/composables/useModelListKeyboard'
 import { CheckIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -196,19 +202,22 @@ const placePanel = () => {
   if (next) panelStyle.value = next
 }
 
-const focusableItems = () =>
-  [defaultRef.value, ...modelRefs.value].filter(
-    (el): el is HTMLElement => el instanceof HTMLElement
-  )
+const { focusSelected, focusNext, focusPrevious, onTypeaheadKeydown, resetTypeahead } =
+  useModelListKeyboard({
+    defaultRef,
+    modelRefs,
+    labels: () => [
+      t('chatInput.modelDropdown.default'),
+      ...chatModels.value.map((model) => model.name),
+    ],
+  })
 
 const focusSelectedModel = async () => {
   await nextTick()
-  const items = focusableItems()
-  if (items.length === 0) return
-  const modelIndex = chatModels.value.findIndex((model) => model.id === props.modelValue)
-  const selected = props.modelValue === null || modelIndex < 0 ? 0 : modelIndex + 1
-  const index = selected >= 0 && selected < items.length ? selected : 0
-  items[index]?.focus()
+  focusSelected(
+    props.modelValue,
+    chatModels.value.map((model) => model.id)
+  )
 }
 
 const openMenu = async () => {
@@ -218,9 +227,15 @@ const openMenu = async () => {
   await focusSelectedModel()
 }
 
-const closeAndRestoreFocus = () => {
+const closeMenu = () => {
   if (!isOpen.value) return
   isOpen.value = false
+  resetTypeahead()
+}
+
+const closeAndRestoreFocus = () => {
+  if (!isOpen.value) return
+  closeMenu()
   void nextTick(() => triggerRef.value?.focus())
 }
 
@@ -256,36 +271,16 @@ const selectModel = (modelId: number | null) => {
 
 const selectLevel = (level: string) => {
   emit('update:reasoningEffort', level)
-  closeAndRestoreFocus()
-}
-
-const focusAt = (index: number) => {
-  const items = focusableItems()
-  if (items.length === 0) return
-  const wrapped = ((index % items.length) + items.length) % items.length
-  items[wrapped]?.focus()
-}
-
-const focusNext = () => {
-  const items = focusableItems()
-  focusAt(items.findIndex((el) => el === document.activeElement) + 1)
-}
-
-const focusPrevious = () => {
-  const items = focusableItems()
-  focusAt(items.findIndex((el) => el === document.activeElement) - 1)
 }
 
 const handleClickOutside = (event: MouseEvent) => {
   if (!isOpen.value) return
   const target = event.target as HTMLElement
   if (dropdownRef.value?.contains(target)) return
-  isOpen.value = false
+  closeMenu()
 }
 
-const onResize = () => {
-  if (isOpen.value) placePanel()
-}
+const onResize = () => isOpen.value && placePanel()
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)

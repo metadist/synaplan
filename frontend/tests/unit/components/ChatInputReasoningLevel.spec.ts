@@ -116,6 +116,7 @@ describe('ChatInput reasoning level', () => {
     )
 
     await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="btn-reasoning-toggle"]').trigger('click')
     await wrapper.get('[data-testid="btn-reasoning-xhigh"]').trigger('click')
     await wrapper.get('[data-testid="input-chat-message"]').setValue('Explain this')
     await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
@@ -136,6 +137,7 @@ describe('ChatInput reasoning level', () => {
     await flushPromises()
     await wrapper.get('[data-testid="input-chat-message"]').setValue('Hi')
     await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="btn-reasoning-toggle"]').trigger('click')
     await wrapper.get('[data-testid="btn-reasoning-none"]').trigger('click')
     await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
 
