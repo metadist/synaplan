@@ -69,6 +69,6 @@ test.describe('@visual UI guard — capped snapshots', () => {
     await page.locator(NAV.sidebarV2Assistants).click()
     const panel = page.locator(NAV.sidebarPanel)
     await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await expect(panel).toHaveScreenshot('manage-flyout.png', SNAPSHOT_OPTS)
+    await expect(panel).toHaveScreenshot('assistants-panel.png', SNAPSHOT_OPTS)
   })
 })

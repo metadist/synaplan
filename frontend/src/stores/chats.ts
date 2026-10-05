@@ -152,6 +152,8 @@ export const useChatsStore = defineStore('chats', () => {
    * can return to and keep watching.
    */
   const activeRunChatIds = ref<Set<number>>(new Set())
+  /** Chats with a pin PATCH in flight. A second toggle waits until the first settles. */
+  const pinPendingChatIds = ref<Set<number>>(new Set())
 
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
@@ -533,7 +535,7 @@ export const useChatsStore = defineStore('chats', () => {
     if (!checkAuthOrRedirect()) return
 
     const chat = chats.value.find((c) => c.id === chatId)
-    if (!chat) return
+    if (!chat || pinPendingChatIds.value.has(chatId)) return
 
     const previousPinned = chat.pinned === true
     const previousPinnedAt = chat.pinnedAt ?? null
@@ -541,6 +543,7 @@ export const useChatsStore = defineStore('chats', () => {
     chat.pinned = nextPinned
     chat.pinnedAt = nextPinned ? new Date().toISOString() : null
     invalidateInFlightChatsLoad()
+    pinPendingChatIds.value = new Set(pinPendingChatIds.value).add(chatId)
 
     try {
       await httpClient(`/api/v1/chats/${chatId}`, {
@@ -557,6 +560,10 @@ export const useChatsStore = defineStore('chats', () => {
       error.value = getErrorMessage(err) || 'Failed to update chat'
       useNotification().error(i18n.global.t('chat.pinSaveFailed'))
       console.error('Error pinning chat:', err)
+    } finally {
+      const next = new Set(pinPendingChatIds.value)
+      next.delete(chatId)
+      pinPendingChatIds.value = next
     }
   }
 
@@ -908,6 +915,7 @@ export const useChatsStore = defineStore('chats', () => {
     liveGeneratingEpoch.clear()
     liveClearedEpoch.clear()
     activeRunChatIds.value = new Set()
+    pinPendingChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
     historyHasMore.value = true
@@ -931,6 +939,7 @@ export const useChatsStore = defineStore('chats', () => {
     historyLoading,
     historyHasMore,
     activeRunChatIds,
+    pinPendingChatIds,
     markChatGenerating,
     loadChats,
     loadChatHistory,

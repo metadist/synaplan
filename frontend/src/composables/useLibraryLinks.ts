@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, type Component } from 'vue'
+import { computed, ref, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   CircleStackIcon,
@@ -23,17 +23,32 @@ export interface LibraryLink {
 }
 
 const incomingCount = ref(0)
-let incomingRequested = false
+/** Whose count is cached. A different user (login, impersonation) loads their own. */
+let incomingLoadedFor: number | null = null
+let incomingLoadSeq = 0
 
-async function loadIncomingCount(): Promise<void> {
-  if (incomingRequested) return
-  incomingRequested = true
+/** Reload the inbox badge for the signed-in user, e.g. after files were kept or dismissed. */
+export async function refreshIncomingCount(): Promise<void> {
+  const userId = useAuthStore().user?.id ?? null
+  if (userId === null) {
+    resetIncomingCount()
+    return
+  }
+  incomingLoadedFor = userId
+  const seq = ++incomingLoadSeq
   try {
     const facets = await filesService.getFacets()
-    incomingCount.value = facets.incoming
+    if (seq === incomingLoadSeq) incomingCount.value = facets.incoming
   } catch {
-    incomingCount.value = 0
+    if (seq === incomingLoadSeq) incomingCount.value = 0
   }
+}
+
+/** Drop the cached count with the rest of the user-scoped state. */
+export function resetIncomingCount(): void {
+  incomingLoadSeq += 1
+  incomingLoadedFor = null
+  incomingCount.value = 0
 }
 
 /** Browse is the section root, so only an exact match lights it up. */
@@ -49,10 +64,14 @@ export function useLibraryLinks() {
   const { t } = useI18n()
   const authStore = useAuthStore()
 
-  onMounted(() => {
-    if (!authStore.isAuthenticated) return
-    void loadIncomingCount()
-  })
+  watch(
+    () => (authStore.isAuthenticated ? (authStore.user?.id ?? null) : null),
+    (userId) => {
+      if (userId === null || incomingLoadedFor === userId) return
+      void refreshIncomingCount()
+    },
+    { immediate: true }
+  )
 
   const links = computed<LibraryLink[]>(() => {
     const items: LibraryLink[] = [

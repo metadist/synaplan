@@ -142,6 +142,7 @@ import { ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { refreshIncomingCount } from '@/composables/useLibraryLinks'
 import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import FileVectorPill from './FileVectorPill.vue'
 import FileSourceBadge from './FileSourceBadge.vue'
@@ -202,6 +203,7 @@ const keep = async (file: FileItem, group?: string) => {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     busy.value = false
+    void refreshIncomingCount()
   }
 }
 
@@ -220,6 +222,7 @@ const dismiss = async (file: FileItem) => {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     busy.value = false
+    void refreshIncomingCount()
   }
 }
 
@@ -250,6 +253,7 @@ const keepAll = async () => {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     busy.value = false
+    void refreshIncomingCount()
   }
 }
 
@@ -265,6 +269,7 @@ const dismissAll = async () => {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     busy.value = false
+    void refreshIncomingCount()
   }
 }
 

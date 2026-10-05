@@ -2410,6 +2410,19 @@ const buildDateTimestamp = (dateStr: string, end = false): number | undefined =>
 
 let loadFilesSeq = 0
 
+/** The filters behind the visible list. Select-all must use the same set, or it picks hidden files. */
+const activeListFilters = () => ({
+  groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
+  sharedFolder: openSharedFolder.value?.resourceId,
+  search: searchQuery.value || undefined,
+  fileType: filterFileType.value || undefined,
+  source: filterSource.value || undefined,
+  vectorState: filterVectorized.value || undefined,
+  incoming: filterIncoming.value ? true : undefined,
+  dateFrom: buildDateTimestamp(filterDateFrom.value),
+  dateTo: buildDateTimestamp(filterDateTo.value, true),
+})
+
 const loadFiles = async (page = currentPage.value) => {
   const seq = ++loadFilesSeq
   isLoading.value = true
@@ -2433,15 +2446,7 @@ const loadFiles = async (page = currentPage.value) => {
 
     const [response, groups] = await Promise.all([
       filesService.listFiles({
-        groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
-        sharedFolder: openSharedFolder.value?.resourceId,
-        search: searchQuery.value || undefined,
-        fileType: filterFileType.value || undefined,
-        source: filterSource.value || undefined,
-        vectorState: filterVectorized.value || undefined,
-        incoming: filterIncoming.value ? true : undefined,
-        dateFrom: buildDateTimestamp(filterDateFrom.value),
-        dateTo: buildDateTimestamp(filterDateTo.value, true),
+        ...activeListFilters(),
         page,
         limit: itemsPerPage,
       }),
@@ -2550,12 +2555,7 @@ const toggleSelectAll = async () => {
   } else {
     try {
       const response = await filesService.listFiles({
-        groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
-        sharedFolder: openSharedFolder.value?.resourceId,
-        search: searchQuery.value || undefined,
-        fileType: filterFileType.value || undefined,
-        dateFrom: buildDateTimestamp(filterDateFrom.value),
-        dateTo: buildDateTimestamp(filterDateTo.value, true),
+        ...activeListFilters(),
         page: 1,
         limit: totalCount.value || 1000,
       })

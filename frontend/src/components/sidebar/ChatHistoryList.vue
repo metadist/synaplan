@@ -58,6 +58,8 @@
           data-testid="btn-chat-v2-row-pin"
           :aria-label="chat.pinned ? $t('chat.unpin') : $t('chat.pin')"
           :aria-pressed="chat.pinned === true"
+          :aria-busy="chatsStore.pinPendingChatIds.has(chat.id)"
+          :disabled="chatsStore.pinPendingChatIds.has(chat.id)"
           @click="emit('pin', chat.id)"
         >
           <Icon
@@ -151,6 +153,7 @@ import { useI18n } from 'vue-i18n'
 import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
+import { useChatsStore } from '@/stores/chats'
 import type { HistoryChat } from '@/composables/useChatHistory'
 
 const PREVIEW_ID = 'chat-row-preview'
@@ -180,6 +183,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const chatsStore = useChatsStore()
 
 const menuChatId = ref<number | null>(null)
 const menuStyle = ref<Record<string, string>>({})
@@ -461,6 +465,11 @@ onUnmounted(() => {
 .chat-row-menu-btn.icon-ghost:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: -2px;
+}
+
+.chat-row-menu-btn.icon-ghost:disabled {
+  opacity: 0.4;
+  cursor: progress;
 }
 
 @media (hover: hover) and (pointer: fine) {
