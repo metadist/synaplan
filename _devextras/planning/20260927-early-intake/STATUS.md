@@ -14,7 +14,7 @@ Live order: [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d
 | E1 #2205 host ports | done 2026-09-28 | `SYNAPLAN_TTS_PORT` publishes spoken answers (default 10200, bound to 127.0.0.1). J-EASY-2 walked: `.env` set `SYNAPLAN_FRONTEND_PORT=15173`, `docker compose up -d frontend` published `0.0.0.0:15173`, and `http://127.0.0.1:15173/login` loaded. Frontend restored to 5173. [#2215](https://github.com/metadist/synaplan/pull/2215), [#2242](https://github.com/metadist/synaplan/pull/2242). |
 | E1 #2206 two-file compose docs | done 2026-09-28 | Centrifugo via env plus `secrets-init`. Dev compose unchanged. |
 | E2 Telegram channel | walked 2026-09-29 | J-TG-1: invalid token stays on the card with the BotFather sentence; valid token pairs via the stub and the reply `2 + 2 = 4` is in History as `Telegram: @synaplan_test_bot` (Telegram icon). J-TG-2: Disconnect on the card, confirm says the history stays, a later webhook sends nothing, the thread remains. J-TG-3: the token sentence names the fix (no HTTP code). Public-URL rejection is covered by `PublicWebhookUrlValidatorTest` (this dev stack uses `TELEGRAM_WEBHOOK_BASE_URL`). Light, dark, 320 px; de, en, tr on the card, es on the login screen. `telegram.spec.ts` passed in the local `@ci` run (111 passed, 17 failed elsewhere: MailHog `:8026`, WhatsApp stub `:3999`, Stripe signature, a few unrelated timeouts). [#2202](https://github.com/metadist/synaplan/issues/2202). |
-| openDesk OD-0 | waiting on E1 | Then [`../20260917-backend-integrations/04_opendesk_audio_transcriber.md`](../20260917-backend-integrations/04_opendesk_audio_transcriber.md). |
+| openDesk OD-0 | waiting on E1 | Then [`../20261004_openDesk/README.md`](../20261004_openDesk/README.md). |
 
 ## Decisions
 
