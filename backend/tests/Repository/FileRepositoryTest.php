@@ -148,6 +148,9 @@ class FileRepositoryTest extends KernelTestCase
 
         $this->assertSame(2, $sheets[$sheetFolder]);
         $this->assertArrayNotHasKey($docFolder, $sheets);
+
+        $leadingComma = $this->repository->getGroupCountsByUser($userId, ['file_type' => ',xlsx']);
+        $this->assertSame(1, $leadingComma[$sheetFolder]);
     }
 
     public function testFindFilesByChatIdRespectsLimitNewestFirst(): void

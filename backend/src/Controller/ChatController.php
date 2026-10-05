@@ -513,6 +513,7 @@ class ChatController extends AbstractController
         ],
         responses: [
             new OA\Response(response: 200, description: 'Chat updated successfully'),
+            new OA\Response(response: 400, description: 'title is not a string or pinned is not a boolean'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Chat not found'),
         ]
@@ -533,20 +534,30 @@ class ChatController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-
-        if (isset($data['title'])) {
-            $chat->setTitle($data['title']);
+        if (!\is_array($data)) {
+            $data = [];
         }
 
-        if (\is_array($data) && \array_key_exists('pinned', $data)) {
+        if (isset($data['title'])) {
+            if (!\is_string($data['title'])) {
+                return $this->json(['error' => 'title must be a string'], Response::HTTP_BAD_REQUEST);
+            }
+            $chat->setTitle($data['title']);
+            $chat->updateTimestamp();
+        }
+
+        if (\array_key_exists('pinned', $data)) {
             if (!\is_bool($data['pinned'])) {
                 return $this->json(['error' => 'pinned must be a boolean'], Response::HTTP_BAD_REQUEST);
             }
-            $chat->setPinned($data['pinned']);
-            $chat->setPinnedAt($data['pinned'] ? new \DateTime() : null);
+            // Pinning is list placement, not activity: updatedAt stays, so an
+            // unpinned chat returns to where it was in the history.
+            if ($data['pinned'] !== $chat->isPinned()) {
+                $chat->setPinned($data['pinned']);
+                $chat->setPinnedAt($data['pinned'] ? new \DateTime() : null);
+            }
         }
 
-        $chat->updateTimestamp();
         $this->em->flush();
 
         return $this->json([

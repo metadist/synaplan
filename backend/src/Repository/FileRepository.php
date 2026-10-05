@@ -476,7 +476,7 @@ class FileRepository extends ServiceEntityRepository
 
         $fileType = $filters['file_type'] ?? null;
         if (null !== $fileType && '' !== $fileType) {
-            $types = array_filter(array_map('trim', explode(',', $fileType)));
+            $types = array_values(array_filter(array_map('trim', explode(',', $fileType))));
             if (1 === count($types)) {
                 $qb->andWhere(sprintf('%s.fileType = :fileType', $alias))
                     ->setParameter('fileType', $types[0]);
