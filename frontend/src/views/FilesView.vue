@@ -1893,7 +1893,7 @@ const listingNarrowed = computed(
   () => searchQuery.value.trim() !== '' || activeFilterCount.value > 0
 )
 
-const visibleFolders = computed(() => {
+const visibleFolders = computed((): DisplayedFolder[] => {
   if (listingNarrowed.value) {
     const counts = matchingGroupCounts.value
     if (!counts) return []

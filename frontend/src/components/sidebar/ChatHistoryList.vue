@@ -199,7 +199,7 @@ const previewChat = computed(
 
 const finePointer = (): boolean => window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
-const bindTitle = (id: number) => (el: Element | null) => {
+const bindTitle = (id: number) => (el: unknown) => {
   if (el instanceof HTMLElement) titleEls.set(id, el)
   else titleEls.delete(id)
 }
