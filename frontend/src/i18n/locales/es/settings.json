@@ -399,6 +399,48 @@
         "failed24": "{count} fallidas (24h)",
         "openConfig": "Ajustes de trabajo con archivos",
         "stateTierBlocked": "Activado, pero por debajo del aislamiento requerido. El trabajo con archivos está oculto."
+      },
+      "scheduler": {
+        "title": "Trabajos en segundo plano",
+        "loading": "Comprobando los trabajos en segundo plano…",
+        "error": "No pudimos cargar el estado de los trabajos en segundo plano. Recarga la página.",
+        "never": "Los trabajos en segundo plano nunca se han ejecutado en este servidor.",
+        "running": "Los trabajos en segundo plano están en marcha. Última ejecución: {time}.",
+        "stale": "Los trabajos en segundo plano se han detenido. Última ejecución: {time}. Las tareas programadas, los recordatorios y las limpiezas no se están ejecutando. Reinicia el servicio del planificador.",
+        "howToStart": "Cómo iniciar el planificador",
+        "refresh": "Actualizar",
+        "notRunYet": "Aún no se ha ejecutado",
+        "statusRunning": "En marcha",
+        "statusStopped": "Detenido",
+        "statusNever": "Sin iniciar",
+        "failures": "1 trabajo falló: {names}. El registro del planificador tiene los detalles. | {count} trabajos fallaron: {names}. El registro del planificador tiene los detalles.",
+        "unfinished": "Se inició, pero aún no ha terminado: {names} (sigue en ejecución o se detuvo por su límite de tiempo).",
+        "owner": "Estos trabajos se ejecutan en el servicio del planificador de este servidor, iniciado por su archivo de Docker Compose. Reinícialo con {command}.",
+        "lanes": {
+          "tick": "Cada minuto",
+          "tasks": "Tareas guardadas",
+          "hourly": "Cada hora",
+          "daily": "Cada día",
+          "health": "Estado de los modelos"
+        },
+        "jobs": {
+          "mediaReap": "limpieza de trabajos de imagen y vídeo",
+          "chatReap": "limpieza de chats atascados",
+          "desktopReap": "limpieza de trabajos de escritorio",
+          "mailHandlers": "gestores de correo entrante",
+          "processEmails": "buzón inteligente",
+          "savedTasks": "Tareas guardadas",
+          "ephemeralFiles": "limpieza de archivos temporales",
+          "approvalsExpire": "aprobaciones caducadas",
+          "modelsDiscover": "comprobación de modelos nuevos",
+          "updatesCheck": "comprobación de actualizaciones",
+          "modelsAvailability": "comprobación de disponibilidad de modelos",
+          "digest": "resumen de mensajes",
+          "syncDocs": "sincronización de la documentación",
+          "approvalsDigest": "correo de resumen de aprobaciones",
+          "syncPrices": "sincronización de precios de modelos",
+          "modelHealth": "comprobación del estado de los modelos"
+        }
       }
     },
     "notLoggedIn": "No has iniciado sesión"

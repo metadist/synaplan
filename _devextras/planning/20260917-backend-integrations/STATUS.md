@@ -1,7 +1,7 @@
 # Status — Backend integrations (Wave 6)
 
-Plan of record: [`00_master_plan.md`](./00_master_plan.md).
-Flagship: [`04_opendesk_audio_transcriber.md`](./04_opendesk_audio_transcriber.md).
+Plan of record for this folder: [`00_master_plan.md`](./00_master_plan.md) (catalog and clients).
+Jitsi meeting notes: [metadist/synaScriber](https://github.com/metadist/synaScriber). The September sketch [`04_opendesk_audio_transcriber.md`](./04_opendesk_audio_transcriber.md) is superseded.
 
 ## Steps
 

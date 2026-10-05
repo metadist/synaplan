@@ -430,6 +430,48 @@
         "failed24": "{count} fehlgeschlagen (24h)",
         "openConfig": "Dateiarbeit-Einstellungen",
         "stateTierBlocked": "Eingeschaltet, aber unter der erforderlichen Isolierung. Dateiarbeit bleibt verborgen."
+      },
+      "scheduler": {
+        "title": "Hintergrundjobs",
+        "loading": "Hintergrundjobs werden geprüft…",
+        "error": "Der Status der Hintergrundjobs konnte nicht geladen werden. Laden Sie die Seite neu.",
+        "never": "Auf diesem Server sind noch nie Hintergrundjobs gelaufen.",
+        "running": "Hintergrundjobs laufen. Letzter Lauf: {time}.",
+        "stale": "Hintergrundjobs sind stehen geblieben. Letzter Lauf: {time}. Geplante Aufgaben, Erinnerungen und Aufräumarbeiten laufen nicht. Starten Sie den Scheduler-Dienst neu.",
+        "howToStart": "So starten Sie den Scheduler",
+        "refresh": "Aktualisieren",
+        "notRunYet": "Noch nicht gelaufen",
+        "statusRunning": "Läuft",
+        "statusStopped": "Gestoppt",
+        "statusNever": "Nie gestartet",
+        "failures": "1 Job ist fehlgeschlagen: {names}. Details stehen im Scheduler-Protokoll. | {count} Jobs sind fehlgeschlagen: {names}. Details stehen im Scheduler-Protokoll.",
+        "unfinished": "Gestartet, aber noch nicht beendet: {names} (läuft noch oder wurde vom Zeitlimit gestoppt).",
+        "owner": "Diese Jobs laufen im Scheduler-Dienst dieses Servers und werden über seine Docker-Compose-Datei gestartet. Starten Sie ihn neu mit {command}.",
+        "lanes": {
+          "tick": "Jede Minute",
+          "tasks": "Gespeicherte Aufgaben",
+          "hourly": "Stündlich",
+          "daily": "Täglich",
+          "health": "Modellzustand"
+        },
+        "jobs": {
+          "mediaReap": "Aufräumen von Bild- und Videoaufträgen",
+          "chatReap": "Aufräumen hängender Chats",
+          "desktopReap": "Aufräumen von Desktop-Aufträgen",
+          "mailHandlers": "Verarbeitung eingehender E-Mails",
+          "processEmails": "Intelligentes Postfach",
+          "savedTasks": "Gespeicherte Aufgaben",
+          "ephemeralFiles": "Aufräumen temporärer Dateien",
+          "approvalsExpire": "Abgelaufene Freigaben",
+          "modelsDiscover": "Prüfung auf neue Modelle",
+          "updatesCheck": "Update-Prüfung",
+          "modelsAvailability": "Prüfung der Modellverfügbarkeit",
+          "digest": "Nachrichtenübersicht",
+          "syncDocs": "Dokumentation abgleichen",
+          "approvalsDigest": "E-Mail mit Freigabeübersicht",
+          "syncPrices": "Modellpreise abgleichen",
+          "modelHealth": "Prüfung der Modellgesundheit"
+        }
       }
     },
     "notLoggedIn": "Nicht angemeldet"

@@ -16,7 +16,7 @@ those tools and the contract they share.
 | [`01_catalog.md`](./01_catalog.md) | 20+ open-source consumers, grouped, with a state |
 | [`02_developer_clients.md`](./02_developer_clients.md) | Neovim, VS Code, Cursor, Claude Code |
 | [`03_office_and_mail.md`](./03_office_and_mail.md) | Outlook (have), Word, Excel, Thunderbird, OX |
-| [`04_opendesk_audio_transcriber.md`](./04_opendesk_audio_transcriber.md) | **Flagship.** Element + Jitsi STT |
+| [`04_opendesk_audio_transcriber.md`](./04_opendesk_audio_transcriber.md) | September sketch. **Superseded** for Jitsi by [metadist/synaScriber](https://github.com/metadist/synaScriber) |
 | [`STATUS.md`](./STATUS.md) | Step log |
 
 **Not this track:** in-process `plugins/` packaging

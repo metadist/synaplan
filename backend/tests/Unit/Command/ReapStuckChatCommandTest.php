@@ -21,7 +21,7 @@ final class ReapStuckChatCommandTest extends TestCase
         $lock = $this->createMock(SharedLockInterface::class);
         $lock->method('acquire')->willReturn(true);
         $locks = $this->createMock(LockFactory::class);
-        $locks->expects(self::once())->method('createLock')->with('chat-stuck-reaper', 120)->willReturn($lock);
+        $locks->expects(self::once())->method('createLock')->with('chat-stuck-reaper', 600)->willReturn($lock);
 
         $tester = new CommandTester(new ReapStuckChatCommand($reaper, $locks));
         self::assertSame(0, $tester->execute([]));
