@@ -837,7 +837,8 @@
         "sorting": "Sınıflandırma",
         "search_query": "Arama Sorgusu",
         "api_chat": "API Sohbeti",
-        "rerank": "Yeniden sıralama"
+        "rerank": "Yeniden sıralama",
+        "message_digest": "Uzun süreli bellek"
       },
       "sources": {
         "whatsapp": "WhatsApp",

@@ -246,7 +246,9 @@
                     :key="action"
                     class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
                   >
-                    <span class="txt-primary font-medium">{{ action }}</span>
+                    <span class="txt-primary font-medium">{{
+                      usageActionLabel(String(action))
+                    }}</span>
                     <div class="flex gap-6 text-sm txt-secondary">
                       <span
                         >{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span
@@ -612,6 +614,13 @@ async function loadUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week')
 }
 
 // Helpers
+function usageActionLabel(action: string): string {
+  return t(
+    `config.usage.actions.${action.toLowerCase()}`,
+    action.replaceAll('_', ' ').toUpperCase()
+  )
+}
+
 function getLevelIcon(level: string): string {
   const icons: Record<string, string> = {
     NEW: 'mdi:star-outline',

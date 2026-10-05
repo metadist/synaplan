@@ -96,7 +96,9 @@ const chartData = computed(() => {
   const tokens = labels.map((action) => props.data[action].tokens)
 
   return {
-    labels: labels.map((l) => l.replace('_', ' ').toUpperCase()),
+    labels: labels.map((action) =>
+      t(`config.usage.actions.${action.toLowerCase()}`, action.replaceAll('_', ' ').toUpperCase())
+    ),
     datasets: [
       {
         label: t('admin.usage.requests'),
