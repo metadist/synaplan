@@ -83,7 +83,7 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  class="w-24 px-2 py-1 text-right text-sm rounded-xl border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-24 px-2 py-1 text-right text-sm rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-price-monthly"
                 />
                 <span v-else class="txt-primary">
@@ -97,7 +97,7 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  class="w-24 px-2 py-1 text-right text-sm rounded-xl border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-24 px-2 py-1 text-right text-sm rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-price-yearly"
                 />
                 <span v-else class="txt-primary">
@@ -110,7 +110,7 @@
                   v-model="editForm.currency"
                   type="text"
                   maxlength="3"
-                  class="w-16 px-2 py-1 text-center text-sm uppercase rounded-xl border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-16 px-2 py-1 text-center text-sm uppercase rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-currency"
                 />
                 <span v-else class="txt-secondary">
@@ -124,7 +124,7 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  class="w-24 px-2 py-1 text-right text-sm rounded-xl border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-24 px-2 py-1 text-right text-sm rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-budget-monthly"
                 />
                 <span v-else class="txt-primary">
@@ -139,7 +139,7 @@
                   type="number"
                   min="0"
                   step="0.01"
-                  class="w-24 px-2 py-1 text-right text-sm rounded-xl border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-24 px-2 py-1 text-right text-sm rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-budget-yearly"
                 />
                 <span v-else class="txt-primary">

@@ -44,7 +44,7 @@
             :placeholder="defaultServer || 'https://web.synaplan.com'"
             :disabled="saving"
             data-testid="input-app-server-url"
-            class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none disabled:opacity-60"
+            class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none disabled:opacity-60"
             @keyup.enter="testAndSave"
           />
           <p class="text-xs txt-secondary mt-2">{{ $t('nativeServer.appServer.hint') }}</p>
@@ -54,7 +54,7 @@
         <div class="flex flex-wrap items-center justify-end gap-3">
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-xl mr-auto disabled:opacity-50"
+            class="btn-secondary px-4 py-2.5 rounded-lg mr-auto disabled:opacity-50"
             :disabled="saving"
             data-testid="btn-app-server-reset"
             @click="confirmReset"
@@ -63,7 +63,7 @@
           </button>
           <button
             type="button"
-            class="btn-primary px-6 py-2.5 rounded-xl disabled:opacity-50 flex items-center gap-2"
+            class="btn-primary px-6 py-2.5 rounded-lg disabled:opacity-50 flex items-center gap-2"
             :disabled="saving || !serverInput.trim()"
             data-testid="btn-app-server-save"
             @click="testAndSave"
