@@ -105,7 +105,7 @@ The outbound MCP client rolls out via seed rows, not a code default:
 activates the client, while an operator's explicit `0` override survives
 every deploy (the kill switch). The built-in code default stays OFF as the
 safety net when no row exists and the seeder has not run. Calls still
-require a connected server (Channels → MCP Servers) and the per-topic
+require a connected server (Manage → Connections → MCP Servers) and the per-topic
 "MCP Data Sources" opt-in.
 
 `email_search` rolls out the same way (Phase M step M3d):
@@ -165,7 +165,7 @@ node. The runner re-checks every gate at run time (defense in depth).
 
 ## Connections UI
 
-- **Channels → MCP Servers** (`/channels/mcp`): connect external MCP servers
+- **Manage → Connections → MCP Servers** (`/channels/mcp`): connect external MCP servers
   (Streamable HTTP URL + optional auth header, encrypted at rest), test the
   connection, browse discovered tools. The page also shows a **task usage
   panel**: one flip switch per routing topic that toggles the topic's

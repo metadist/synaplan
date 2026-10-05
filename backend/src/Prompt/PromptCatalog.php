@@ -58,7 +58,7 @@ class PromptCatalog
                 // when the prompt row is first created — bootstrap-only, an
                 // operator's later change is never overwritten):
                 //   - MCP data sources ON (`tool_mcp=1`) — a freshly connected
-                //     server (Channels → MCP Servers) works for normal chat
+                //     server (Manage → Connections → MCP Servers) works for normal chat
                 //     questions out of the box, no hidden per-topic toggle hunt.
                 //   - Web search on AUTO — `tool_internet` is deliberately NOT
                 //     seeded: an absent key is the "auto" state (the
