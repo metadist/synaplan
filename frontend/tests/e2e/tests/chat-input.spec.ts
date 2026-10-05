@@ -2,11 +2,11 @@
  * Chat-input controls — Release 4.0 lean composer
  * (_devextras/planning/release4.0/10_landing-streamline-guest-ux.md §5).
  *
- * The old always-visible action row is gone. Per-message controls (Model,
- * Tools, Knowledge folder) plus "Attach files" now live inside the "+" menu.
- * The menu always opens; Thinking/Voice reply/Enhance remain toggle rows
- * INSIDE the Tools dropdown, and the only navigation lives inside the pickers
- * as clearly marked rows (Manage folders…, Summarize a document).
+ * Attach, Tools and the knowledge folder live inside the "+" menu. The model
+ * and its reasoning level are a chip in the composer, next to send. The menu
+ * always opens; Thinking/Voice reply/Enhance remain toggle rows INSIDE the
+ * Tools dropdown, and the only navigation lives inside the pickers as clearly
+ * marked rows (Manage folders…, Summarize a document).
  */
 import { test, expect, type Page } from '../test-setup'
 import { openApp } from '../helpers/auth'
@@ -65,10 +65,11 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await expect(page.locator(CHAT.plusToggle)).toBeVisible({ timeout: TIMEOUTS.SHORT })
   })
 
-  test('@ci "+" menu holds Attach, Model, Tools and Knowledge folder', async ({ page }) => {
+  test('@ci "+" menu holds Attach, Tools and Knowledge folder', async ({ page }) => {
     const panel = await openPlusMenu(page)
     await expect(panel.locator(CHAT.attachBtn)).toBeVisible()
-    await expect(panel.locator(CHAT.modelToggle)).toBeVisible()
+    await expect(panel.locator(CHAT.modelToggle)).toHaveCount(0)
+    await expect(page.locator(CHAT.modelToggle)).toBeVisible()
     await expect(panel.locator(CHAT.toolsToggle)).toBeVisible()
     await expect(panel.locator(CHAT.knowledgeFolderBtn)).toBeVisible()
 
@@ -76,6 +77,37 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await expect(panel.locator(CHAT.legacyThinkingPill)).toHaveCount(0)
     await expect(panel.locator(CHAT.legacyVoiceReplyPill)).toHaveCount(0)
     await expect(panel.locator(CHAT.legacyManageKnowledgeGroupsBtn)).toHaveCount(0)
+  })
+
+  test('@ci model chip sits in the composer and updates when a model is picked', async ({
+    page,
+  }) => {
+    const chip = page.locator(CHAT.modelChipName)
+    await expect(chip).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    const before = (await chip.innerText()).trim()
+
+    await page.locator(CHAT.modelToggle).click()
+    const panel = page.locator(CHAT.modelPanel)
+    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+
+    const options = panel.locator('[data-testid^="btn-model-"]')
+    await expect(options.first()).toBeVisible()
+    const count = await options.count()
+    let targetName = ''
+    for (let i = 0; i < count; i++) {
+      const option = options.nth(i)
+      if ((await option.getAttribute('data-testid')) === 'btn-model-default') continue
+      const label = (await option.locator('span.font-medium').first().innerText()).trim()
+      if (label && label !== before) {
+        targetName = label
+        await option.click()
+        break
+      }
+    }
+
+    expect(targetName, 'a chat model whose name differs from the chip').not.toBe('')
+    await expect(chip).toHaveText(targetName)
+    await expect(panel).toBeHidden()
   })
 
   test('@ci Tools dropdown lists command tools, toggles and Summarize a document', async ({

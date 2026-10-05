@@ -171,13 +171,11 @@
         />
 
         <!--
-          Composer body. On mobile (< md) this is a vertical stack: the textarea
-          spans the full width on top and a control bar sits below it, both inside
-          the same card. On md+ it collapses to a plain block and the two control
-          clusters return to their absolute bottom-left / bottom-right overlay
-          (via `md:contents` on the control bar).
+          Composer body. Two rows at every size: the textarea spans the full
+          width, and the control bar below holds attach, the model chip and
+          the send actions. Nothing overlays the text.
         -->
-        <div class="flex flex-col md:block">
+        <div class="flex flex-col">
           <!-- Voice activity strip.
                Only shown on the record-then-transcribe path (see
                `showVoiceActivity`): there the transcript arrives in one piece
@@ -207,26 +205,10 @@
             <span>{{ voiceActivityLabel }}</span>
           </div>
 
-          <!-- Textarea row. Mobile: full width with a comfortable 12px horizontal
-               inset (matches the control bar below) so text never sits flush
-               against the card edge. md+: py-2 (16px) + textarea min-h-[40px] =
-               56px shell, with room reserved for the overlaid plus button (left)
-               and action buttons (right). -->
+          <!-- Textarea row. Same 12px inset as the control bar so the text
+               lines up with the buttons below it. -->
           <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-            <div
-              class="flex items-center gap-2 px-3 py-2.5 md:pl-[56px] md:py-2"
-              :style="isMobile ? undefined : { paddingRight: `${textareaPaddingRightPx}px` }"
-            >
-              <!-- Inline badge pinned to the caret start — desktop only. On mobile
-                   the badge moves next to the plus button in the control bar.
-                   (`.tool-badge` sets display unlayered and would beat a `hidden`
-                   utility, so we gate visibility with v-if, not CSS.) -->
-              <ToolBadge
-                v-if="activeTool && !isMobile"
-                :tool="activeTool"
-                class="flex-shrink-0"
-                @remove="clearTool"
-              />
+            <div class="flex items-center gap-2 px-3 py-2.5">
               <!-- Textarea -->
               <Textarea
                 ref="textareaRef"
@@ -244,20 +226,18 @@
             </div>
           </div>
 
-          <!-- Control bar. Mobile: a real row below the textarea (plus + badge on
-               the left, actions on the right), same 12px inset as the textarea
-               row above. md+: `display: contents` so the plus group and action
-               group fall back to their absolute overlay positions relative to
-               the card. -->
-          <div class="flex items-center gap-2 px-3 pb-2.5 md:contents">
-            <!-- Plus menu: attach + per-message controls (Model / Reasoning / Tools / Knowledge).
+          <!-- Control bar. Plus and the tool badge on the left; the model chip
+               and send actions on the right. The chip shrinks before the row
+               overflows, and the row wraps only when a badge leaves no room. -->
+          <div
+            class="flex flex-wrap items-center gap-1.5 px-3 pb-2.5"
+            data-testid="section-chat-controls"
+          >
+            <!-- Plus menu: attach, tools and knowledge folder.
              Exempt from the guest lock rule — the menu always opens; gated items
-             inside surface the guest hint popover. -->
-            <div
-              ref="plusMenuRef"
-              class="relative flex-shrink-0 md:absolute md:bottom-[6px] md:left-[6px]"
-              data-testid="section-chat-plus"
-            >
+             inside surface the guest hint popover. The model chip is in the
+             control bar and gates itself. -->
+            <div ref="plusMenuRef" class="relative flex-shrink-0" data-testid="section-chat-plus">
               <button
                 type="button"
                 :class="[
@@ -308,23 +288,9 @@
                 </button>
 
                 <!-- Guest-mode rows: same `.pill` chip style as "Attach files"
-                     above (and the real Model/Tools/Knowledge triggers in the
-                     authenticated branch below) for a consistent list. -->
+                     above. The model chip lives in the control bar and gates
+                     itself. -->
                 <template v-if="isGuestMode">
-                  <button
-                    type="button"
-                    class="pill text-xs md:text-sm justify-between"
-                    data-testid="btn-plus-model"
-                    @click="handlePlusGate('models')"
-                  >
-                    <span class="inline-flex items-center gap-1.5">
-                      <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                      <span class="font-medium">{{ $t('chatInput.plusMenu.model') }}</span>
-                    </span>
-                    <span class="text-xs txt-muted">{{
-                      $t('chatInput.modelDropdown.default')
-                    }}</span>
-                  </button>
                   <button
                     type="button"
                     class="pill text-xs md:text-sm"
@@ -346,12 +312,6 @@
                 </template>
 
                 <template v-else>
-                  <ModelDropdown v-model="selectedModelId" />
-                  <ReasoningLevelMenu
-                    v-if="reasoningLevels.length > 0"
-                    v-model="reasoningEffort"
-                    :levels="reasoningLevels"
-                  />
                   <ToolsDropdown
                     :active-command="activeTool"
                     :thinking-enabled="thinkingEnabled"
@@ -396,28 +356,32 @@
               />
             </div>
 
-            <!-- Mobile-only badge, right of the plus button. -->
+            <!-- (`.tool-badge` sets display unlayered and would beat a `hidden`
+                 utility, so we gate visibility with v-if, not CSS.) -->
             <ToolBadge
-              v-if="activeTool && isMobile"
+              v-if="activeTool"
               :tool="activeTool"
-              class="flex-shrink-0"
+              class="min-w-0 max-w-[6.5rem] flex-shrink overflow-hidden"
               @remove="clearTool"
             />
 
-            <!-- Spacer pushes the actions to the right edge on mobile (removed on md+). -->
-            <div class="flex-1 md:hidden"></div>
-
-            <!-- Action buttons. Mobile: right side of the control bar. md+: absolute
-             bottom-right overlay (same 6px inset as the plus button, 6px gap). -->
             <div
-              class="flex flex-shrink-0 items-center gap-1.5 md:pointer-events-none md:absolute md:bottom-[6px] md:right-[6px]"
+              class="ml-auto flex min-w-0 max-w-full items-center gap-1.5"
               data-testid="section-chat-primary-actions"
             >
+              <ModelDropdown
+                v-model="selectedModelId"
+                v-model:reasoning-effort="reasoningEffort"
+                :levels="reasoningLevels"
+                :guest="isGuestMode"
+                @gate="emit('guestFeatureGate', 'models')"
+              />
+
               <button
                 v-if="showEnhanceInInput"
                 type="button"
                 :class="[
-                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto relative',
+                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative flex-shrink-0',
                   enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
                   enhanceLoading && 'pill--loading',
                 ]"
@@ -435,7 +399,7 @@
                 v-if="showMicrophoneButton"
                 type="button"
                 :class="[
-                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto',
+                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl flex-shrink-0',
                   isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
                 ]"
                 :aria-label="$t('chatInput.voice')"
@@ -450,7 +414,7 @@
               <button
                 type="button"
                 :disabled="!isStreaming && !canSend"
-                class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl pointer-events-auto transition-all"
+                class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl flex-shrink-0 transition-all"
                 :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
                 data-testid="btn-chat-send"
                 @click="isStreaming ? emit('stop') : sendMessage()"
@@ -461,16 +425,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Selected-model caption: tiny hint shown only when the user picked a
-           specific model (the Model control now lives inside the + menu). -->
-      <div
-        v-if="selectedModelId !== null && selectedModelName"
-        class="mt-1 text-center text-[8px] leading-none txt-muted"
-        data-testid="chat-model-caption"
-      >
-        {{ $t('chatInput.modelCaption', { name: selectedModelName }) }}
       </div>
     </div>
 
@@ -508,7 +462,6 @@ import ToolsDropdown from './ToolsDropdown.vue'
 import ToolBadge from './ToolBadge.vue'
 import DesktopJobCard from './DesktopJobCard.vue'
 import ModelDropdown from './ModelDropdown.vue'
-import ReasoningLevelMenu from './ReasoningLevelMenu.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import PastedTextCard from './chat/PastedTextCard.vue'
@@ -1010,19 +963,11 @@ const showMicrophoneButton = computed(() => {
 })
 
 /**
- * Icon-only enhance control inside the input shell; visible when there is
- * text to act on. Desktop only — on mobile it crowds the narrow input, so the
- * control moves into the Tools dropdown instead.
+ * Icon-only enhance control in the control bar; visible when there is text
+ * to act on. Desktop only — on a phone it crowds the model chip, so the
+ * control stays in the Tools menu instead.
  */
 const showEnhanceInInput = computed(() => message.value.trim().length > 0 && !isMobile.value)
-
-/** Reserve horizontal space so the textarea does not sit under the absolute action buttons. */
-const textareaPaddingRightPx = computed(() => {
-  if (showMicrophoneButton.value) {
-    return showEnhanceInInput.value ? 192 : 140
-  }
-  return showEnhanceInInput.value ? 120 : 80
-})
 
 /**
  * Determine which speech recognition method to use.
@@ -1157,12 +1102,6 @@ const currentChatModel = computed(() => {
   }
 
   return chatModels.find((model) => model.id === resolvedModelId) ?? null
-})
-
-// Name of the explicitly-picked model (null selection = "Default", no caption).
-const selectedModelName = computed(() => {
-  if (selectedModelId.value === null) return ''
-  return currentChatModel.value?.name ?? ''
 })
 
 const supportsReasoning = computed(() => {

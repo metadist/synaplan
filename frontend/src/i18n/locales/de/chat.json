@@ -230,12 +230,14 @@
     "placeholderShort": "Nachricht...",
     "provider": "Anbieter",
     "model": "Modell",
-    "modelCaption": "Modell: {name}",
+    "modelPicker": {
+      "ariaLabel": "Modell {model}, Denkaufwand {level}",
+      "ariaLabelNoLevel": "Modell {model}"
+    },
     "plusMenu": {
       "label": "Hinzufügen",
       "attach": "Dateien anhängen",
       "photo": "Foto aufnehmen",
-      "model": "Modell",
       "tools": "Tools",
       "knowledge": "Wissensordner"
     },

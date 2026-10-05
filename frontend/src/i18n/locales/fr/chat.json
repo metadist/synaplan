@@ -234,12 +234,14 @@
     "placeholderShort": "Message…",
     "provider": "Fournisseur",
     "model": "Modèle",
-    "modelCaption": "Modèle : {name}",
+    "modelPicker": {
+      "ariaLabel": "Modèle {model}, raisonnement {level}",
+      "ariaLabelNoLevel": "Modèle {model}"
+    },
     "plusMenu": {
       "label": "Ajouter",
       "attach": "Joindre des fichiers",
       "photo": "Prendre une photo",
-      "model": "Modèle",
       "tools": "Outils",
       "knowledge": "Dossier de connaissances"
     },

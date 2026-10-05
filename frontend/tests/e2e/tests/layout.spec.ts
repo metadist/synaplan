@@ -342,6 +342,15 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await openApp(page)
     await expectNoHorizontalOverflow(page, 'chat @320px')
     await expectInsideViewport(page, CHAT.sendBtn, 'send button @320px')
+    await expectInsideViewport(
+      page,
+      '[data-testid="section-chat-controls"]',
+      'composer controls @320px'
+    )
+    await expectInsideViewport(page, CHAT.modelToggle, 'model chip @320px')
+    const controls = page.locator('[data-testid="section-chat-controls"]')
+    const overflow = await controls.evaluate((el) => el.scrollWidth - el.clientWidth)
+    expect(overflow, 'composer controls overflow @320px').toBeLessThanOrEqual(1)
   })
 })
 

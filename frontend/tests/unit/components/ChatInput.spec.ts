@@ -343,7 +343,7 @@ describe('ChatInput explicit model pick', () => {
     document.body.innerHTML = ''
   })
 
-  it('drops the caption and modelId after a model mix is applied', async () => {
+  it('drops the explicit model pick after a model mix is applied', async () => {
     const aiConfig = useAiConfigStore()
     aiConfig.models.CHAT = [pickedChatModel()]
 
@@ -363,7 +363,7 @@ describe('ChatInput explicit model pick', () => {
             props: ['modelValue'],
             emits: ['update:modelValue'],
             template:
-              '<button type="button" data-testid="stub-pick-model" @click="$emit(\'update:modelValue\', 55)">pick</button>',
+              '<button type="button" data-testid="model-chip-name" @click="$emit(\'update:modelValue\', 55)">{{ modelValue === null ? "default" : "GPT" }}</button>',
           },
           KnowledgeFolderPicker: true,
           FileSelectionModal: true,
@@ -373,18 +373,18 @@ describe('ChatInput explicit model pick', () => {
       },
     })
 
-    expect(wrapper.find('[data-testid="chat-model-caption"]').exists()).toBe(false)
+    const chip = wrapper.get('[data-testid="model-chip-name"]')
+    expect(chip.text()).toBe('default')
 
-    await wrapper.get('[data-testid="btn-chat-plus"]').trigger('click')
-    await wrapper.get('[data-testid="stub-pick-model"]').trigger('click')
+    await chip.trigger('click')
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('[data-testid="chat-model-caption"]').exists()).toBe(true)
+    expect(chip.text()).toBe('GPT')
 
     expect(await useModelMixStore().applyMix('default')).toBe(true)
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('[data-testid="chat-model-caption"]').exists()).toBe(false)
+    expect(chip.text()).toBe('default')
 
     await wrapper.get('[data-testid="input-chat-message"]').setValue('Hello')
     await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')

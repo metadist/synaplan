@@ -228,12 +228,14 @@
     "placeholderShort": "Mesaj...",
     "provider": "Sağlayıcı",
     "model": "Model",
-    "modelCaption": "Model: {name}",
+    "modelPicker": {
+      "ariaLabel": "Model {model}, akıl yürütme {level}",
+      "ariaLabelNoLevel": "Model {model}"
+    },
     "plusMenu": {
       "label": "Ekle",
       "attach": "Dosya ekle",
       "photo": "Fotoğraf çek",
-      "model": "Model",
       "tools": "Araçlar",
       "knowledge": "Bilgi klasörü"
     },
