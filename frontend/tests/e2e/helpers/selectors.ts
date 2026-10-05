@@ -5,6 +5,7 @@ export const selectors = {
   notification: {
     /** Error toast – use for fail-fast when racing with success state */
     error: notificationError,
+    success: '[data-testid="comp-notification-item"][data-notification-type="success"]',
   },
   login: {
     email: '#email',
@@ -643,6 +644,24 @@ export const selectors = {
     inputKey: '[data-testid="input-memory-key"]',
     inputValue: '[data-testid="input-memory-value"]',
     btnSave: '[data-testid="btn-memory-save"]',
+    btnViewLongTerm: '[data-testid="btn-memories-view-long-term"]',
+    sectionLongTerm: '[data-testid="section-long-term-memory"]',
+    textLongTermIntro: '[data-testid="text-long-term-intro"]',
+    btnLongTermSettings: '[data-testid="btn-long-term-settings"]',
+    textLongTermServerOff: '[data-testid="text-long-term-server-off"]',
+    textLongTermTotal: '[data-testid="text-long-term-total"]',
+    itemLongTerm: '[data-testid="item-long-term-entry"]',
+    btnLongTermOpen: '[data-testid="btn-long-term-open"]',
+    textLongTermOpenUnavailable: '[data-testid="text-long-term-open-unavailable"]',
+    btnLongTermDelete: '[data-testid="btn-long-term-delete"]',
+    btnLongTermDeleteAll: '[data-testid="btn-long-term-delete-all"]',
+    btnLongTermLoadMore: '[data-testid="btn-long-term-load-more"]',
+    stateLongTermEmpty: '[data-testid="state-long-term-empty"]',
+    btnLongTermEmptyAction: '[data-testid="btn-long-term-empty-action"]',
+    stateLongTermLoading: '[data-testid="state-long-term-loading"]',
+    stateLongTermError: '[data-testid="state-long-term-error"]',
+    btnLongTermRetry: '[data-testid="btn-long-term-retry"]',
+    btnLongTermFromOverlay: '[data-testid="btn-long-term-from-overlay"]',
   },
   /** UnsavedChangesBar.vue (profile & config pages) */
   unsavedBar: {

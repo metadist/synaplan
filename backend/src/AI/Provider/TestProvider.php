@@ -236,6 +236,13 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
             return $this->mockMemoryExtraction($userContent, $schema);
         }
 
+        // Message digest (tools:message_digest): MessageDigestService always
+        // starts the user prompt with this marker, including when the system
+        // prompt in the database differs from the catalog fallback.
+        if (str_contains($userContent, 'Message batch (each line starts with [#id direction channel date]):')) {
+            return $this->mockMessageDigest($userContent, $schema);
+        }
+
         // Search-query-style request (e.g. SearchQueryGenerator with tools:search prompt): return cleaned query like fallbackExtraction
         if (str_contains($systemContent, 'search') && str_contains($systemContent, 'query')) {
             return $this->mockSearchQueryExtraction($userContent);
@@ -592,6 +599,51 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         }
 
         return json_encode($memories, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Mock message digest: deterministic contract for E2E tests.
+     *
+     * Each user line whose text contains `remember: <title>` becomes one
+     * digest for that message id. Every other line yields nothing, so ordinary
+     * chat turns never create long-term memory entries. Assistant lines are
+     * skipped because the canned chat reply echoes the user's text.
+     *
+     * Schema-aware: {@see \App\AI\StructuredOutput\Schema\MessageDigestSchema}
+     * wraps the list under `digests`. Without a schema the stub returns a
+     * bare array. {@see
+     * \App\Service\Digest\MessageDigestService::parseDigestsFromResponse()}
+     * accepts both.
+     */
+    private function mockMessageDigest(string $userContent, ?StructuredOutputSchema $schema): string
+    {
+        $digests = [];
+        $parts = preg_split('/(?=\[#\d+\s+\S+\s+\S+\s+\d{4}-\d{2}-\d{2}\])/', $userContent) ?: [];
+        foreach ($parts as $part) {
+            if (!preg_match('/^\[#(\d+)\s+user\s+\S+\s+\d{4}-\d{2}-\d{2}\]\s*(.*)$/s', $part, $match)) {
+                continue;
+            }
+            if (!preg_match('/remember:\s*([^\n]+)/', $match[2], $titleMatch)) {
+                continue;
+            }
+            $title = trim($titleMatch[1]);
+            if ('' === $title) {
+                continue;
+            }
+            $digests[] = [
+                'title' => $title,
+                'message_id' => (int) $match[1],
+            ];
+        }
+
+        if (null !== $schema) {
+            $wrapped = ['digests' => $digests];
+            $this->assertMatchesSchema($wrapped, $schema);
+
+            return json_encode($wrapped, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+
+        return json_encode($digests, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
     private function detectLanguage(string $text, string $fallback = 'en'): string

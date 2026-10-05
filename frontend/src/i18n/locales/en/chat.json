@@ -821,7 +821,9 @@
   },
   "messageRefs": {
     "olderConversation": "Older conversation",
-    "clickToOpen": "Click to open the original conversation",
+    "clickToOpen": "Opens the original message",
+    "openSource": "Open the original message: {title}",
+    "notFound": "This message no longer exists.",
     "missing": {
       "badge": "Older message",
       "tooltip": "This message reference could not be resolved. The message may have been deleted."

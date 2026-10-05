@@ -20,6 +20,10 @@ const DEFAULTS_PATH = '/api/v1/config/models/defaults'
 const TEST_PROVIDER_DEFAULTS: Record<string, number> = {
   CHAT: -1,
   SORT: -1,
+  // Memory extraction and long-term memory both resolve DEFAULTMODEL.MEM
+  // before CHAT. The dev seed points MEM at a paid model; the test seed
+  // uses the TestProvider chat model (-1).
+  MEM: -1,
   VECTORIZE: -2,
   PIC2TEXT: -3,
   TEXT2PIC: -4,

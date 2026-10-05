@@ -269,10 +269,10 @@
     },
     "memories": {
       "title": "Memories",
-      "subtitle": "Control whether Synaplan should use and automatically update your memories for personalization.",
-      "toggleLabel": "Enable memories for my account",
-      "enabledHint": "Enabled: the AI may use and update your memories based on conversations.",
-      "disabledHint": "Disabled: the AI will not use or auto-update memories. You can re-enable at any time."
+      "subtitle": "Turn memories and long-term memory on or off. The AI uses them to remember your chats.",
+      "toggleLabel": "Enable memories and long-term memory",
+      "enabledHint": "On. The AI can use your memories and long-term memory, and it can save new ones from your chats.",
+      "disabledHint": "Off. The AI stops using your memories and long-term memory, and it does not save new ones. Existing long-term memory entries stay. You can delete them under Memories, on the Long-term memory tab."
     },
     "changePassword": {
       "title": "Change Password",

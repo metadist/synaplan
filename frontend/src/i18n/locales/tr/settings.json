@@ -73,6 +73,13 @@
       "invoiceEmail": "Fatura E-postası",
       "invoiceEmailPlaceholder": "Faturalar için alternatif e-posta (ana e-postayı kullanmak için boş bırakın)"
     },
+    "memories": {
+      "title": "Anılar",
+      "subtitle": "Anıları ve uzun süreli belleği buradan açıp kapatırsınız. Yapay zeka sohbetlerinizi hatırlamak için bunları kullanır.",
+      "toggleLabel": "Hesabım için anıları ve uzun süreli belleği aç",
+      "enabledHint": "Açık. Yapay zeka anılarınızı ve uzun süreli belleğinizi kullanabilir ve sohbetlerinizden yenilerini kaydedebilir.",
+      "disabledHint": "Kapalı. Yapay zeka anılarınızı ve uzun süreli belleğinizi kullanmayı bırakır ve yenilerini kaydetmez. Mevcut uzun süreli bellek kayıtları kalır. Bunları Anılar bölümünde, Uzun süreli bellek sekmesinden silebilirsiniz."
+    },
     "changePassword": {
       "title": "Şifre Değiştir",
       "subtitle": "Mevcut şifreyi korumak için boş bırakın",

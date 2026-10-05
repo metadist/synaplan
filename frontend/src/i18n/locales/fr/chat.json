@@ -821,7 +821,9 @@
   },
   "messageRefs": {
     "olderConversation": "Conversation plus ancienne",
-    "clickToOpen": "Cliquez pour ouvrir la conversation d’origine",
+    "clickToOpen": "Ouvre le message d’origine",
+    "openSource": "Ouvrir le message d’origine : {title}",
+    "notFound": "Ce message n’existe plus.",
     "missing": {
       "badge": "Message plus ancien",
       "tooltip": "Cette référence de message n’a pas pu être résolue. Le message a peut-être été supprimé."

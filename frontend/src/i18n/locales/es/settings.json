@@ -73,6 +73,13 @@
       "invoiceEmail": "Correo de Facturación",
       "invoiceEmailPlaceholder": "Correo alternativo para facturas (deja vacío para usar correo principal)"
     },
+    "memories": {
+      "title": "Recuerdos",
+      "subtitle": "Activa o desactiva los recuerdos y la memoria a largo plazo. La IA los usa para recordar tus chats.",
+      "toggleLabel": "Activar recuerdos y memoria a largo plazo en mi cuenta",
+      "enabledHint": "Activado. La IA puede usar tus recuerdos y tu memoria a largo plazo, y guardar otros nuevos a partir de tus chats.",
+      "disabledHint": "Desactivado. La IA deja de usar tus recuerdos y tu memoria a largo plazo, y no guarda otros nuevos. Las entradas de memoria a largo plazo que ya tienes se conservan. Puedes borrarlas en Recuerdos, en la pestaña Memoria a largo plazo."
+    },
     "changePassword": {
       "title": "Cambiar Contraseña",
       "subtitle": "Deja vacío para mantener la contraseña actual",

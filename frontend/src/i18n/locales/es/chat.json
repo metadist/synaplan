@@ -799,7 +799,9 @@
   },
   "messageRefs": {
     "olderConversation": "Conversación anterior",
-    "clickToOpen": "Haz clic para abrir la conversación original",
+    "clickToOpen": "Abre el mensaje original",
+    "openSource": "Abrir el mensaje original: {title}",
+    "notFound": "Este mensaje ya no existe.",
     "missing": {
       "badge": "Mensaje anterior",
       "tooltip": "No se pudo resolver esta referencia de mensaje. Es posible que el mensaje haya sido eliminado."

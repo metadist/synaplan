@@ -6,6 +6,7 @@
       isSuperseded && 'opacity-50',
     ]"
     data-testid="message-container"
+    :data-message-id="backendMessageId != null ? String(backendMessageId) : undefined"
   >
     <!-- E2E: role marker for message-user / message-assistant -->
     <span :data-testid="`message-${role}`" class="sr-only" aria-hidden="true" />

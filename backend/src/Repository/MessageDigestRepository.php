@@ -8,6 +8,7 @@ use App\Entity\MessageDigest;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -101,6 +102,131 @@ class MessageDigestRepository extends ServiceEntityRepository
             ->orderBy('d.messageId', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * One page of the user's active digests, newest source message first.
+     *
+     * Chat title comes from the same query. It is null when the chat is gone
+     * or belongs to someone else; placeholder titles are left for the caller.
+     *
+     * @return list<array{
+     *     id: int,
+     *     title: string,
+     *     messageId: int,
+     *     chatId: int,
+     *     channel: string,
+     *     sourceDate: int,
+     *     created: int,
+     *     chatTitle: string|null
+     * }>
+     */
+    public function findActivePage(int $userId, int $limit, int $offset): array
+    {
+        $rows = $this->getEntityManager()->getConnection()->executeQuery(
+            <<<'SQL'
+                SELECT
+                    d.BID AS id,
+                    d.BTITLE AS title,
+                    d.BMESSAGEID AS messageId,
+                    d.BCHATID AS chatId,
+                    d.BCHANNEL AS channel,
+                    d.BSOURCEDATE AS sourceDate,
+                    d.BCREATED AS created,
+                    c.BTITLE AS chatTitle
+                FROM BMESSAGEDIGESTS d
+                LEFT JOIN BCHATS c ON c.BID = d.BCHATID AND c.BUSERID = d.BUSERID
+                WHERE d.BUSERID = :userId AND d.BACTIVE = 1
+                ORDER BY d.BSOURCEDATE DESC, d.BID DESC
+                LIMIT :limit OFFSET :offset
+                SQL,
+            ['userId' => $userId, 'limit' => $limit, 'offset' => $offset],
+            [
+                'userId' => ParameterType::INTEGER,
+                'limit' => ParameterType::INTEGER,
+                'offset' => ParameterType::INTEGER,
+            ],
+        )->fetchAllAssociative();
+
+        return array_map($this->mapPageRow(...), $rows);
+    }
+
+    /**
+     * Every active digest of one user, in the same order as {@see findActivePage()}.
+     *
+     * @return list<array{title: string, messageId: int, chatId: int, channel: string, sourceDate: int}>
+     */
+    public function findActiveForExport(int $userId): array
+    {
+        $rows = $this->getEntityManager()->getConnection()->executeQuery(
+            <<<'SQL'
+                SELECT
+                    BTITLE AS title,
+                    BMESSAGEID AS messageId,
+                    BCHATID AS chatId,
+                    BCHANNEL AS channel,
+                    BSOURCEDATE AS sourceDate
+                FROM BMESSAGEDIGESTS
+                WHERE BUSERID = :userId AND BACTIVE = 1
+                ORDER BY BSOURCEDATE DESC, BID DESC
+                SQL,
+            ['userId' => $userId],
+            ['userId' => ParameterType::INTEGER],
+        )->fetchAllAssociative();
+
+        return array_map(static fn (array $row): array => [
+            'title' => (string) $row['title'],
+            'messageId' => (int) $row['messageId'],
+            'chatId' => (int) $row['chatId'],
+            'channel' => (string) $row['channel'],
+            'sourceDate' => (int) $row['sourceDate'],
+        ], $rows);
+    }
+
+    /**
+     * Active digest id only when this user owns it. Unknown, foreign and
+     * already inactive ids all miss, so a caller can 404 without learning which.
+     */
+    public function findActiveOwnedId(int $userId, int $digestId): ?int
+    {
+        $stmt = $this->getEntityManager()->getConnection()->prepare(
+            'SELECT BID FROM BMESSAGEDIGESTS WHERE BID = :id AND BUSERID = :userId AND BACTIVE = 1',
+        );
+        $stmt->bindValue('id', $digestId);
+        $stmt->bindValue('userId', $userId);
+        $value = $stmt->executeQuery()->fetchOne();
+
+        return false === $value || null === $value ? null : (int) $value;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     *
+     * @return array{
+     *     id: int,
+     *     title: string,
+     *     messageId: int,
+     *     chatId: int,
+     *     channel: string,
+     *     sourceDate: int,
+     *     created: int,
+     *     chatTitle: string|null
+     * }
+     */
+    private function mapPageRow(array $row): array
+    {
+        $chatTitle = $row['chatTitle'] ?? null;
+
+        return [
+            'id' => (int) $row['id'],
+            'title' => (string) $row['title'],
+            'messageId' => (int) $row['messageId'],
+            'chatId' => (int) $row['chatId'],
+            'channel' => (string) $row['channel'],
+            'sourceDate' => (int) $row['sourceDate'],
+            'created' => (int) $row['created'],
+            'chatTitle' => is_string($chatTitle) ? $chatTitle : null,
+        ];
     }
 
     /**

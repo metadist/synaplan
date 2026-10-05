@@ -558,6 +558,12 @@ import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
+import {
+  openSourceMessage,
+  parseOpenMessageQuery,
+  parsePositiveQueryId,
+  type OpenMessageTarget,
+} from '@/composables/useScrollToMessage'
 import { useFirstRunSetup } from '@/composables/useFirstRunSetup'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
@@ -706,6 +712,7 @@ const {
   error: showErrorToast,
   success: showSuccessToast,
   warning: notifyWarning,
+  info: notifyInfo,
 } = useNotification()
 const smartSearchStore = useSmartSearchStore()
 const { goToProviderSetup } = useFirstRunSetup()
@@ -950,6 +957,18 @@ const {
 const assistantThreadReady = ref(queryAgentId.value == null || !isAgentsEnabled())
 let assistantChatBootstrapped = assistantThreadReady.value
 let suppressNextChatHistoryLoad = false
+let suppressBottomScrollForFocus = false
+let historyLoadedChatId: number | null = null
+let programmaticMessageScroll = false
+let messageFocusGeneration = 0
+let messageFocusQueue: Promise<void> = Promise.resolve()
+const messageFocusIdleStops = new Set<() => void>()
+
+// A chat load that began before a message focus was requested must not pull
+// the view back to the bottom once that focus has already scrolled.
+function bottomScrollYieldsToFocus(focusAtStart: number): boolean {
+  return suppressBottomScrollForFocus || messageFocusGeneration !== focusAtStart
+}
 
 async function openFreshAssistantChatIfNeeded(): Promise<void> {
   if (!queryAgentId.value || !isAgentsEnabled() || !authStore.isAuthenticated) {
@@ -1613,27 +1632,44 @@ onMounted(async () => {
 
   await Promise.all([chatsLoaded, modelsLoaded])
 
-  // Deep link from Saved Tasks ("Run now" / "Show results"): /?chat=<id>
-  // opens the task's chat so the user sees the run's result. Without this
-  // the query was silently ignored and the view reopened the LAST ACTIVE
-  // chat — for a task saved from a chat turn that was the original prompt
-  // with the old output.
-  const requestedChatId = Number(route.query.chat)
-  const openedSpecificChat = Number.isInteger(requestedChatId) && requestedChatId > 0
+  // Deep link: /?chat=<id> opens that thread (Saved Tasks). Without it the
+  // view reopened the last active chat. /?chat=<id>&message=<id> also scrolls
+  // to that message (long-term memory and [Message:ID] badges). Both params
+  // are removed after handling so a reload does not jump again.
+  const focusTarget = parseOpenMessageQuery(route.query)
+  const requestedChatId = focusTarget?.chatId ?? parsePositiveQueryId(route.query.chat)
+  const openedSpecificChat = requestedChatId !== null
   if (openedSpecificChat) {
-    chatsStore.setActiveChat(requestedChatId)
-    router.replace({ query: { ...route.query, chat: undefined } })
+    void router.replace({
+      query: {
+        ...route.query,
+        chat: undefined,
+        ...(focusTarget ? { message: undefined } : {}),
+      },
+    })
   }
 
-  // If no active chat, create one
-  if (!chatsStore.activeChatId) {
-    await chatsStore.createChat('New Chat')
-  } else {
-    // Load messages for active chat
-    await historyStore.loadMessages(chatsStore.activeChatId)
-    // A turn that was still generating when the page was reloaded keeps
-    // writing into this bubble instead of being lost.
-    void resumeActiveRunIfAny()
+  if (focusTarget) {
+    await enqueueMessageFocus(focusTarget)
+  } else if (requestedChatId !== null) {
+    chatsStore.setActiveChat(requestedChatId)
+  }
+
+  // If no active chat, create one. A message deep link loads through
+  // enqueueMessageFocus, which owns that chat's history.
+  if (!focusTarget) {
+    if (!chatsStore.activeChatId) {
+      await chatsStore.createChat('New Chat')
+    } else {
+      // Load messages for active chat
+      await historyStore.loadMessages(chatsStore.activeChatId)
+      if (chatsStore.activeChatId !== null) {
+        historyLoadedChatId = chatsStore.activeChatId
+      }
+      // A turn that was still generating when the page was reloaded keeps
+      // writing into this bubble instead of being lost.
+      void resumeActiveRunIfAny()
+    }
   }
 
   // Start chat from an assistant must not reopen an unrelated last thread.
@@ -1656,9 +1692,12 @@ onMounted(async () => {
     usageTaximeterStore.seedFromHistory(historyStore.messages)
   }
 
-  // Scroll to newest message after initial load
+  // Scroll to newest message after initial load. A message deep link already
+  // scrolled to that message inside enqueueMessageFocus.
   await nextTick()
-  scrollToBottom(true)
+  if (!focusTarget) {
+    scrollToBottom(true)
+  }
 
   // Auto-focus ChatInput after mounting with delay
   setTimeout(() => {
@@ -1759,17 +1798,146 @@ const handleOpenFirstRunSetupEvent = () => {
   void goToProviderSetup()
 }
 
-// Window event handler for [Message:ID] digest badges (used by MessageText.vue):
-// open the older conversation the reference points into.
+function waitForMessagesIdle(): Promise<void> {
+  if (!historyStore.isLoadingMessages) return Promise.resolve()
+  return new Promise((resolve) => {
+    let settled = false
+    let stop: (() => void) | undefined
+    const finish = () => {
+      if (settled) return
+      settled = true
+      stop?.()
+      messageFocusIdleStops.delete(finish)
+      resolve()
+    }
+    stop = watch(
+      () => historyStore.isLoadingMessages,
+      (loading) => {
+        if (!loading) finish()
+      }
+    )
+    messageFocusIdleStops.add(finish)
+    if (!historyStore.isLoadingMessages) finish()
+  })
+}
+
+async function prepareChatForMessage(
+  chatId: number,
+  isCancelled: () => boolean
+): Promise<'ready' | 'gone'> {
+  if (isCancelled()) return 'ready'
+
+  if (incognitoStore.active) {
+    await incognitoStore.endSession()
+    await nextTick()
+    if (historyStore.isLoadingMessages) await waitForMessagesIdle()
+    await nextTick()
+  }
+  if (isCancelled()) return 'ready'
+
+  if (chatsStore.activeChatId !== chatId) {
+    suppressNextChatHistoryLoad = true
+    chatsStore.setActiveChat(chatId)
+    await nextTick()
+    if (historyStore.isLoadingMessages) await waitForMessagesIdle()
+  }
+  if (isCancelled()) return 'ready'
+  if (chatsStore.activeChatId !== chatId) return 'gone'
+  if (historyStore.isLoadingMessages) await waitForMessagesIdle()
+  if (isCancelled()) return 'ready'
+  if (chatsStore.activeChatId !== chatId) return 'gone'
+
+  if (historyLoadedChatId !== chatId) {
+    await historyStore.loadMessages(chatId)
+    if (isCancelled()) return 'ready'
+    if (chatsStore.activeChatId !== chatId) return 'gone'
+    historyLoadedChatId = chatId
+    void resumeActiveRunIfAny()
+    if (usageTaximeterStore.active) {
+      usageTaximeterStore.seedFromHistory(historyStore.messages)
+    }
+  }
+
+  await nextTick()
+  return chatsStore.activeChatId === chatId ? 'ready' : 'gone'
+}
+
+function findLoadedMessageElement(messageId: number): HTMLElement | null {
+  const root = chatContainer.value
+  if (!root) return null
+  return root.querySelector<HTMLElement>(
+    `[data-testid="message-container"][data-message-id="${messageId}"]`
+  )
+}
+
+function enqueueMessageFocus(target: OpenMessageTarget): Promise<void> {
+  const generation = ++messageFocusGeneration
+  const isCancelled = () => generation !== messageFocusGeneration || isViewUnmounted
+  const run = messageFocusQueue.then(async () => {
+    if (isCancelled() || !authStore.isAuthenticated) return
+    suppressBottomScrollForFocus = true
+    try {
+      await openSourceMessage(target, {
+        ensureChatReady: (chatId) => prepareChatForMessage(chatId, isCancelled),
+        isMessageLoaded: (messageId) =>
+          historyStore.messages.some((message) => message.backendMessageId === messageId),
+        hasMoreMessages: () => historyStore.hasMoreMessages,
+        loadOlderMessages: async () => {
+          const chatId = chatsStore.activeChatId
+          if (chatId === null) return
+          await historyStore.loadMoreMessages(chatId)
+        },
+        loadedCount: () => historyStore.messages.length,
+        findElement: findLoadedMessageElement,
+        nextTick: () => nextTick(),
+        beforeScroll: () => {
+          programmaticMessageScroll = true
+        },
+        afterScroll: () => {
+          if (chatContainer.value) {
+            expectedScrollTop = chatContainer.value.scrollTop
+          }
+          autoScroll.value = false
+          stickToBottom = false
+          programmaticMessageScroll = false
+        },
+        notifyMissing: () => {
+          notifyInfo(t('messageRefs.notFound'))
+        },
+        isCancelled,
+      })
+    } finally {
+      if (generation === messageFocusGeneration) suppressBottomScrollForFocus = false
+    }
+  })
+  messageFocusQueue = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
+
+// [Message:ID] badges and `/?chat=&message=` both land here.
 const handleOpenMessageReferenceEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ messageId: number; chatId: number }>
   const chatId = customEvent.detail?.chatId
-  if (!chatId || chatId <= 0) return
-  if (chatsStore.activeChatId === chatId) return
-
-  chatsStore.setActiveChat(chatId)
-  void historyStore.loadMessages(chatId)
+  const messageId = customEvent.detail?.messageId
+  if (!chatId || chatId <= 0 || !messageId || messageId <= 0) return
+  void enqueueMessageFocus({ chatId, messageId })
 }
+
+watch(
+  () => [route.query.chat, route.query.message] as const,
+  () => {
+    if (!assistantChatBootstrapped) return
+    const target = parseOpenMessageQuery(route.query)
+    if (!target) return
+    void router.replace({
+      query: { ...route.query, chat: undefined, message: undefined },
+    })
+    void enqueueMessageFocus(target)
+  }
+)
 
 // Detach (do NOT cancel) a running turn when the user navigates away or
 // switches chats (issues #1142 / #1223 / #1225). Closes the SSE connection and
@@ -1894,6 +2062,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
   window.removeEventListener('open-message-reference', handleOpenMessageReferenceEvent)
+  for (const stop of messageFocusIdleStops) stop()
+  messageFocusIdleStops.clear()
   if (stopShortcutListen) {
     stopShortcutListen()
     stopShortcutListen = null
@@ -1912,12 +2082,14 @@ onBeforeUnmount(() => {
 watch(
   () => incognitoStore.active,
   async (active) => {
+    const focusAtStart = messageFocusGeneration
     // Detach any running turn (same semantics as switching chats).
     if (isStreaming.value) {
       handleNavigateAway()
     }
     quoting.clearPendingQuote()
     historyStore.clear()
+    historyLoadedChatId = null
 
     if (!active) {
       // Session ended: restore the persisted chat. No toast here — the UI
@@ -1925,11 +2097,16 @@ watch(
       // confirmation toast would just be noise.
       if (chatsStore.activeChatId) {
         await historyStore.loadMessages(chatsStore.activeChatId)
+        if (chatsStore.activeChatId !== null) {
+          historyLoadedChatId = chatsStore.activeChatId
+        }
       }
     }
 
     await nextTick()
-    scrollToBottom(true)
+    if (!bottomScrollYieldsToFocus(focusAtStart)) {
+      scrollToBottom(true)
+    }
     setTimeout(() => {
       chatInputRef.value?.textareaRef?.focus()
     }, 100)
@@ -1940,6 +2117,7 @@ watch(
 watch(
   () => chatsStore.activeChatId,
   async (newChatId, oldChatId) => {
+    const focusAtStart = messageFocusGeneration
     // Picking a chat from the sidebar while incognito is active ends the
     // session (the incognito transcript is meant to be discarded). The
     // incognito watcher above restores nothing here — this watcher loads the
@@ -1983,26 +2161,40 @@ watch(
       // Calling clear() first causes empty chat if loadMessages() fails silently.
       // Start chat loads this history itself and keeps Send locked until it
       // finishes; skipping the second load avoids wiping the first message.
+      // A message deep link sets the skip so it can await its own load.
+      if (oldChatId !== newChatId) {
+        historyLoadedChatId = null
+      }
+      const skippedHistoryLoad = suppressNextChatHistoryLoad
       if (suppressNextChatHistoryLoad) {
         suppressNextChatHistoryLoad = false
       } else {
         await historyStore.loadMessages(newChatId)
+        if (chatsStore.activeChatId === newChatId) {
+          historyLoadedChatId = newChatId
+        }
       }
 
       // Coming back to a chat whose turn is still generating: keep watching it
       // live. A different chat means a different run, so the previous
-      // attachment no longer applies.
+      // attachment no longer applies. The message deep link resumes after its
+      // own load; doing it here would attach to the previous transcript.
       attachedRunId = null
-      void resumeActiveRunIfAny()
+      if (!skippedHistoryLoad) {
+        void resumeActiveRunIfAny()
+      }
 
       // Usage taximeter: a chat switch resets the session (not the day totals)
-      // and rebuilds it from the newly loaded history.
-      if (usageTaximeterStore.active) {
+      // and rebuilds it from the newly loaded history. A message deep link
+      // loads that history itself and seeds after the load.
+      if (!skippedHistoryLoad && usageTaximeterStore.active) {
         usageTaximeterStore.seedFromHistory(historyStore.messages)
       }
 
       await nextTick()
-      scrollToBottom(true)
+      if (!bottomScrollYieldsToFocus(focusAtStart)) {
+        scrollToBottom(true)
+      }
 
       // Auto-focus input when switching chats
       setTimeout(() => {
@@ -2131,7 +2323,7 @@ const handleDrop = async (event: DragEvent) => {
 }
 
 const handleScroll = async () => {
-  if (!chatContainer.value) return
+  if (!chatContainer.value || programmaticMessageScroll) return
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
 

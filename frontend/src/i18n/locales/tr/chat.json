@@ -799,7 +799,9 @@
   },
   "messageRefs": {
     "olderConversation": "Önceki konuşma",
-    "clickToOpen": "Orijinal konuşmayı açmak için tıklayın",
+    "clickToOpen": "Orijinal mesajı açar",
+    "openSource": "Orijinal mesajı aç: {title}",
+    "notFound": "Bu mesaj artık yok.",
     "missing": {
       "badge": "Önceki mesaj",
       "tooltip": "Bu mesaj referansı çözümlenemedi. Mesaj silinmiş olabilir."
