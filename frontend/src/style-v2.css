@@ -1373,3 +1373,23 @@
   color: var(--brand);
   background: color-mix(in srgb, var(--brand) 16%, transparent);
 }
+
+/* The sidebar search field wears .surface-card, whose fill and border
+   otherwise sit still. Ease the same brand edge as the other fields. */
+.design-v2 [data-testid='btn-sidebar-v2-search'] {
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.design-v2 [data-testid='btn-sidebar-v2-search']:hover {
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+.design-v2.dark [data-testid='btn-sidebar-v2-search']:hover {
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+}

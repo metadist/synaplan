@@ -134,6 +134,8 @@
     "filesDescription": "Yapay zekanın sohbetlerinizde kullanabileceği dosyalar",
     "channels": "Kanallar",
     "channelsDescription": "Bağlı kanallar",
+    "assistantsDescription": "Asistanlar ve otomasyonlar",
+    "operateDescription": "Kişiler, durum ve ayarlar",
     "aiSetup": "AI Kurulumu ve Araçlar",
     "aiSetupDescription": "Modeller, talimatlar, yönlendirme ve araçlar",
     "preferences": "Tercihler",
@@ -228,7 +230,7 @@
     "palette": {
       "label": "Akıllı arama",
       "placeholder": "Sayfa, ayar, sohbet ve dosya ara…",
-      "openButton": "Ara",
+      "openButton": "Her şeyi ara",
       "openHint": "Her şeyi ara ({shortcut})",
       "modifier": "Ctrl",
       "adminOnly": "Yönetici",

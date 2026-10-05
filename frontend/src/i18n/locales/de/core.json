@@ -135,6 +135,8 @@
     "filesDescription": "Dateien, die die KI in deinen Chats nutzen kann",
     "channels": "Kanäle",
     "channelsDescription": "Verbundene Kanäle",
+    "assistantsDescription": "Assistenten und Automatisierungen",
+    "operateDescription": "Personen, Status und Einstellungen",
     "aiSetup": "KI-Setup & Tools",
     "aiSetupDescription": "Modelle, Anweisungen, Routing & Tools",
     "preferences": "Einstellungen",
@@ -292,7 +294,7 @@
     "palette": {
       "label": "Smart Search",
       "placeholder": "Seiten, Einstellungen, Chats und Dateien durchsuchen…",
-      "openButton": "Suche",
+      "openButton": "Alles suchen",
       "openHint": "Alles durchsuchen ({shortcut})",
       "modifier": "Strg",
       "adminOnly": "Admin",

@@ -134,6 +134,8 @@
     "filesDescription": "Files the AI can use in your chats",
     "channels": "Channels",
     "channelsDescription": "Connected channels",
+    "assistantsDescription": "Assistants and automations",
+    "operateDescription": "People, status and settings",
     "aiSetup": "AI Setup & Tools",
     "aiSetupDescription": "Models, instructions, routing & tools",
     "preferences": "Preferences",
@@ -239,7 +241,7 @@
     "palette": {
       "label": "Smart search",
       "placeholder": "Search pages, settings, chats and files…",
-      "openButton": "Search",
+      "openButton": "Search everything",
       "openHint": "Search everything ({shortcut})",
       "modifier": "Ctrl",
       "adminOnly": "Admin",

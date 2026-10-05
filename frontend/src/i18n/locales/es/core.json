@@ -134,6 +134,8 @@
     "filesDescription": "Archivos que la IA puede usar en tus chats",
     "channels": "Canales",
     "channelsDescription": "Canales conectados",
+    "assistantsDescription": "Asistentes y automatizaciones",
+    "operateDescription": "Personas, estado y ajustes",
     "aiSetup": "IA y herramientas",
     "aiSetupDescription": "Modelos, instrucciones, enrutamiento y herramientas",
     "preferences": "Preferencias",
@@ -228,7 +230,7 @@
     "palette": {
       "label": "Búsqueda inteligente",
       "placeholder": "Busca páginas, ajustes, chats y archivos…",
-      "openButton": "Buscar",
+      "openButton": "Buscar todo",
       "openHint": "Buscar en todo ({shortcut})",
       "modifier": "Ctrl",
       "adminOnly": "Admin",

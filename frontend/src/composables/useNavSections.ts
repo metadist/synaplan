@@ -122,7 +122,7 @@ export function useNavSections() {
       {
         key: 'assistants',
         label: t('nav.assistants'),
-        description: t('nav.manageDescription'),
+        description: t('nav.assistantsDescription'),
         icon: SparklesIcon,
         testId: 'btn-sidebar-v2-nav-assistants',
         requiresAuth: true,
@@ -143,7 +143,7 @@ export function useNavSections() {
       items.push({
         key: 'operate',
         label: t('nav.admin'),
-        description: t('nav.admin'),
+        description: t('nav.operateDescription'),
         icon: ShieldCheckIcon,
         testId: 'btn-sidebar-v2-nav-admin',
         requiresAuth: true,

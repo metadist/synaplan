@@ -135,6 +135,8 @@
     "filesDescription": "Fichiers que l’IA peut utiliser dans vos chats",
     "channels": "Canaux",
     "channelsDescription": "Canaux connectés",
+    "assistantsDescription": "Assistants et automatisations",
+    "operateDescription": "Personnes, état et réglages",
     "aiSetup": "Configuration IA et outils",
     "aiSetupDescription": "Modèles, instructions, routage et outils",
     "preferences": "Préférences",
@@ -239,7 +241,7 @@
     "palette": {
       "label": "Recherche intelligente",
       "placeholder": "Rechercher des pages, réglages, chats et fichiers…",
-      "openButton": "Rechercher",
+      "openButton": "Tout rechercher",
       "openHint": "Tout rechercher ({shortcut})",
       "modifier": "Ctrl",
       "adminOnly": "Admin",

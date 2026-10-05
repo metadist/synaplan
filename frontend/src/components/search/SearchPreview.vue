@@ -9,7 +9,7 @@
         class="flex-shrink-0 w-10 h-10 rounded-lg surface-chip flex items-center justify-center"
         aria-hidden="true"
       >
-        <component :is="result.icon" class="w-5 h-5" />
+        <component :is="result.icon" class="w-5 h-5 txt-primary" />
       </span>
       <div class="min-w-0">
         <p

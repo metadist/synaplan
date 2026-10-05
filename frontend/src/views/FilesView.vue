@@ -969,13 +969,15 @@
                 <table class="w-full hidden sm:table">
                   <thead>
                     <tr class="border-b border-light-border/30 dark:border-dark-border/8">
-                      <th class="text-left py-2.5 px-2 w-8">
-                        <input
-                          type="checkbox"
-                          :checked="allSelected"
-                          class="checkbox-brand"
-                          @change="toggleSelectAll"
-                        />
+                      <th class="p-0 w-9 align-middle">
+                        <div class="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            :checked="allSelected"
+                            class="checkbox-brand"
+                            @change="toggleSelectAll"
+                          />
+                        </div>
                       </th>
                       <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
                         {{ $t('files.name') }}
@@ -1341,13 +1343,15 @@
               <table class="w-full hidden sm:table">
                 <thead>
                   <tr class="border-b border-light-border/30 dark:border-dark-border/8">
-                    <th class="text-left py-2.5 px-2 w-8">
-                      <input
-                        type="checkbox"
-                        :checked="allSelected"
-                        class="checkbox-brand"
-                        @change="toggleSelectAll"
-                      />
+                    <th class="p-0 w-9 align-middle">
+                      <div class="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          :checked="allSelected"
+                          class="checkbox-brand"
+                          @change="toggleSelectAll"
+                        />
+                      </div>
                     </th>
                     <th class="text-left py-2.5 px-3 txt-secondary text-xs font-medium">
                       {{ $t('files.name') }}
