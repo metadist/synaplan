@@ -154,7 +154,7 @@ test.describe('@ci Navigation journeys', () => {
     })
 
     if (sharing) {
-      await test.step('Incoming is a sidebar category, and the old page redirects', async () => {
+      await test.step('Incoming is a sidebar category, and the old page opens the filtered list', async () => {
         await page.goto('/chats')
         await expect(page.locator(selectors.pages.chats)).toBeVisible({
           timeout: TIMEOUTS.STANDARD,
@@ -162,7 +162,7 @@ test.describe('@ci Navigation journeys', () => {
         await expect(page.locator('[data-testid="tab-chats-incoming"]')).toHaveCount(0)
 
         await page.goto('/chats/incoming')
-        await expect(page).toHaveURL(/\/chats$/, { timeout: TIMEOUTS.STANDARD })
+        await expect(page).toHaveURL(/\/chats\?type=group$/, { timeout: TIMEOUTS.STANDARD })
 
         await page.locator(NAV.sidebarV2ChatNav).click()
         await expect(page.locator('[data-testid="section-sidebar-incoming"]')).toBeVisible({

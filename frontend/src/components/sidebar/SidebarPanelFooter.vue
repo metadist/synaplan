@@ -39,18 +39,10 @@
       data-testid="btn-sidebar-v2-user"
       @click="toggleUserMenu"
     >
-      <span class="relative flex-shrink-0">
-        <span
-          class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-[13px] font-semibold txt-primary"
-        >
-          {{ initials }}
-        </span>
-        <span
-          v-if="incomingStore.hasNew"
-          class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-sidebar)]"
-          data-testid="dot-sidebar-v2-incoming-new"
-          :aria-label="$t('iam.incoming.newCount', { count: incomingStore.unseenCount })"
-        />
+      <span
+        class="w-8 h-8 flex-shrink-0 rounded-full surface-chip flex items-center justify-center text-[13px] font-semibold txt-primary"
+      >
+        {{ initials }}
       </span>
       <span class="flex-1 min-w-0">
         <span class="block text-[15px] font-medium txt-primary truncate">
@@ -117,16 +109,6 @@
                 {{ authStore.user?.email || '' }}
               </p>
             </div>
-            <button
-              type="button"
-              role="menuitem"
-              class="dropdown-item"
-              data-testid="btn-sidebar-v2-profile"
-              @click="go('/profile')"
-            >
-              <UserCircleIcon class="w-4 h-4" />
-              <span>{{ $t('nav.profile') }}</span>
-            </button>
             <button
               v-if="isMemoryServiceAvailable"
               type="button"
@@ -224,14 +206,12 @@ import {
   CreditCardIcon,
   MagnifyingGlassIcon,
   RocketLaunchIcon,
-  UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useSmartSearchStore } from '@/stores/smartSearch'
-import { useIncomingStore } from '@/stores/incoming'
 import { useAuth } from '@/composables/useAuth'
 import { paletteShortcutLabel } from '@/composables/search/shortcut'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
@@ -242,7 +222,6 @@ const router = useRouter()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 const smartSearchStore = useSmartSearchStore()
-const incomingStore = useIncomingStore()
 const { logout, isImpersonating } = useAuth()
 
 const isGuestMode = computed(() => !authStore.isAuthenticated)
@@ -283,7 +262,6 @@ const toggleUserMenu = () => {
     }
   }
   userMenuOpen.value = !userMenuOpen.value
-  if (userMenuOpen.value && authStore.isAuthenticated) incomingStore.refreshUnseen()
 }
 
 const go = (path: string) => {
@@ -292,7 +270,7 @@ const go = (path: string) => {
 }
 
 const openMemories = () => {
-  go(memoriesEnabledForUser.value ? '/memories' : '/profile?highlight=memories')
+  go(memoriesEnabledForUser.value ? '/memories' : '/settings#memories')
 }
 
 const handleLogout = async () => {

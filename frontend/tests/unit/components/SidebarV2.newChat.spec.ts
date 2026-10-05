@@ -7,8 +7,6 @@ import SidebarV2 from '@/components/SidebarV2.vue'
 import { httpClient } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
-import { useSidebarStore } from '@/stores/sidebar'
-
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn().mockResolvedValue({ chats: [], total: 0, success: true }),
   getApiBaseUrl: () => '',
@@ -133,26 +131,6 @@ describe('SidebarV2 New Chat lock', () => {
     pending.release(null)
     await flushPromises()
     expect(button.attributes('disabled')).toBeUndefined()
-    wrapper.unmount()
-  })
-
-  it('releases the history-sheet New Chat button when create settles', async () => {
-    const wrapper = await mountSidebar()
-    const chats = useChatsStore()
-    const pending = pendingCreate()
-    vi.spyOn(chats, 'findOrCreateEmptyChat').mockReturnValue(pending.promise)
-    useSidebarStore().chatSheetOpen = true
-    await flushPromises()
-
-    const button = document.querySelector<HTMLButtonElement>('[data-testid="btn-chat-modal-new"]')
-    expect(button).not.toBeNull()
-    button!.click()
-    await flushPromises()
-    expect(button!.disabled).toBe(true)
-
-    pending.release(null)
-    await flushPromises()
-    expect(document.querySelector('[data-testid="btn-chat-modal-new"]')).toBeNull()
     wrapper.unmount()
   })
 })

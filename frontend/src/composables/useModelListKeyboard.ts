@@ -3,13 +3,14 @@ import { nextTypeaheadTarget } from '@/utils/modelTypeahead'
 
 const TYPEAHEAD_RESET_MS = 500
 
+/** Vue does not keep a `v-for` ref array in source order, so sort by position in the DOM. */
 const focusableItems = (
   defaultRef: Ref<HTMLElement | null>,
   modelRefs: Ref<HTMLElement[]>
 ): HTMLElement[] =>
-  [defaultRef.value, ...modelRefs.value].filter(
-    (el): el is HTMLElement => el instanceof HTMLElement
-  )
+  [defaultRef.value, ...modelRefs.value]
+    .filter((el): el is HTMLElement => el instanceof HTMLElement)
+    .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
 
 /**
  * Arrow keys and typeahead for the model list. Typing focuses the closest
@@ -57,6 +58,8 @@ export function useModelListKeyboard(options: {
   const onTypeaheadKeydown = (event: KeyboardEvent) => {
     if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return
     if (event.key.length !== 1) return
+    // Space confirms the focused row unless it continues a typed name ("gpt 4").
+    if (event.key === ' ' && query === '') return
     event.preventDefault()
 
     const current = items().findIndex((el) => el === document.activeElement)

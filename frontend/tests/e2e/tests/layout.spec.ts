@@ -189,7 +189,9 @@ test.describe('@ci @layout UI guard — chat surface', () => {
 
       const tabs = page.locator('[data-testid^="btn-mobile-nav-"]')
       const count = await tabs.count()
-      expect(count, 'drawer renders New/History/Files/Search/More buttons').toBe(5)
+      // "Shared with me" only renders while chat sharing is enabled.
+      const incoming = await page.locator('[data-testid="btn-mobile-nav-incoming"]').count()
+      expect(count, 'drawer renders New/History/Files/Search/More buttons').toBe(5 + incoming)
 
       for (let i = 0; i < count; i++) {
         const tab = tabs.nth(i)

@@ -52,6 +52,26 @@
         </button>
 
         <button
+          v-if="iamSharingEnabled && !isGuestMode"
+          type="button"
+          class="v2-drawer-item"
+          :class="incomingActive && 'v2-drawer-item--active'"
+          data-testid="btn-mobile-nav-incoming"
+          @click="handleNavigate('/chats/incoming')"
+        >
+          <InboxArrowDownIcon class="w-5 h-5" aria-hidden="true" />
+          <span class="flex-1 text-left">{{
+            incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
+          }}</span>
+          <span
+            v-if="incomingStore.hasNew"
+            class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+            data-testid="text-mobile-nav-incoming-count"
+            >{{ incomingStore.unseenCount }}</span
+          >
+        </button>
+
+        <button
           class="v2-drawer-item"
           :class="[filesActive && 'v2-drawer-item--active', isGuestMode && 'opacity-60']"
           :aria-expanded="isGuestMode ? undefined : libraryExpanded"
@@ -294,16 +314,6 @@
                   <p class="px-3 pb-1.5 text-xs txt-secondary truncate">
                     {{ authStore.user?.email || '' }}
                   </p>
-                  <button
-                    class="v2-drawer-account"
-                    :class="isPathActive('/profile') ? 'v2-drawer-account--active' : 'txt-primary'"
-                    :data-nav-active="isPathActive('/profile') ? 'true' : undefined"
-                    data-testid="btn-mobile-more-profile"
-                    @click="handleNavigate('/profile')"
-                  >
-                    <UserCircleIcon class="w-5 h-5" />
-                    <span>{{ $t('nav.profile') }}</span>
-                  </button>
                   <button
                     v-if="iamGroupsEnabled"
                     class="v2-drawer-account"
@@ -608,10 +618,10 @@ import {
   Cog6ToothIcon,
   CreditCardIcon,
   FolderIcon,
+  InboxArrowDownIcon,
   PlusIcon,
   RocketLaunchIcon,
   ServerIcon,
-  UserCircleIcon,
   UserGroupIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
@@ -626,6 +636,7 @@ import { useAuthStore } from '../stores/auth'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useConfigStore } from '../stores/config'
 import { useSidebarStore } from '../stores/sidebar'
+import { useIncomingStore } from '../stores/incoming'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { useAuth } from '../composables/useAuth'
 import {
@@ -689,6 +700,8 @@ let observer: IntersectionObserver | null = null
 const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
 const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const incomingStore = useIncomingStore()
 
 /** Everything that is not a primary button lands in the "More" section. */
 const moreSections = computed(() =>
@@ -704,7 +717,12 @@ watch(
   },
   { immediate: true }
 )
-const historyActive = computed(() => route.path === '/' || route.path.startsWith('/chat'))
+const incomingActive = computed(
+  () => route.path.startsWith('/chats') && route.query.type === 'group'
+)
+const historyActive = computed(
+  () => !incomingActive.value && (route.path === '/' || route.path.startsWith('/chat'))
+)
 const moreActive = computed(() => moreSections.value.some((item) => isItemActive(item)))
 
 // Account-block entries live inside the "More" panel but outside navItems, so

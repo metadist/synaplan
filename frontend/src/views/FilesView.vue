@@ -1894,6 +1894,8 @@ const listingNarrowed = computed(
 
 const visibleFolders = computed((): DisplayedFolder[] => {
   if (listingNarrowed.value) {
+    // Shared folders cannot be counted against the filters on the server.
+    if (filterSharedWithMe.value) return []
     const counts = matchingGroupCounts.value
     if (!counts) return []
     return [...counts.entries()]
@@ -2414,7 +2416,7 @@ let loadFilesSeq = 0
 const activeListFilters = () => ({
   groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
   sharedFolder: openSharedFolder.value?.resourceId,
-  search: searchQuery.value || undefined,
+  search: searchQuery.value.trim() || undefined,
   fileType: filterFileType.value || undefined,
   source: filterSource.value || undefined,
   vectorState: filterVectorized.value || undefined,
@@ -2427,26 +2429,18 @@ const loadFiles = async (page = currentPage.value) => {
   const seq = ++loadFilesSeq
   isLoading.value = true
 
-  const narrowed = searchQuery.value.trim() !== '' || activeFilterCount.value > 0
+  const { groupKey, sharedFolder, ...listingFilters } = activeListFilters()
 
   try {
-    const groupsPromise = narrowed
-      ? filesService
-          .getFileGroups({
-            search: searchQuery.value.trim() || undefined,
-            fileType: filterFileType.value || undefined,
-            source: filterSource.value || undefined,
-            vectorState: filterVectorized.value || undefined,
-            incoming: filterIncoming.value ? true : undefined,
-            dateFrom: buildDateTimestamp(filterDateFrom.value),
-            dateTo: buildDateTimestamp(filterDateTo.value, true),
-          })
-          .catch(() => [])
+    const groupsPromise = listingNarrowed.value
+      ? filesService.getFileGroups(listingFilters).catch(() => [])
       : Promise.resolve(null)
 
     const [response, groups] = await Promise.all([
       filesService.listFiles({
-        ...activeListFilters(),
+        ...listingFilters,
+        groupKey,
+        sharedFolder,
         page,
         limit: itemsPerPage,
       }),

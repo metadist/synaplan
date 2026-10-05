@@ -18,9 +18,9 @@
         v-for="section in sections"
         :key="section.key"
         type="button"
-        class="v2-rail-icon w-11 h-11 inline-flex items-center justify-center rounded-xl"
+        class="v2-rail-icon relative w-11 h-11 inline-flex items-center justify-center rounded-xl"
         :class="activeKey === section.key && 'v2-rail-icon--active'"
-        :aria-label="section.label"
+        :aria-label="railLabel(section)"
         :aria-describedby="tip?.key === section.key ? TOOLTIP_ID : undefined"
         :aria-current="activeKey === section.key ? 'page' : undefined"
         :data-testid="section.testId"
@@ -31,6 +31,12 @@
         @click="openSection(section.key)"
       >
         <component :is="section.icon" class="w-6 h-6" aria-hidden="true" />
+        <span
+          v-if="section.key === 'chats' && incomingStore.hasNew"
+          class="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-sidebar)]"
+          aria-hidden="true"
+          data-testid="dot-sidebar-v2-incoming-new"
+        />
       </button>
     </nav>
 
@@ -57,6 +63,12 @@
             class="mt-0.5 max-w-[14rem] text-xs leading-snug txt-secondary"
           >
             {{ tip.description }}
+          </p>
+          <p
+            v-if="tip.key === 'chats' && incomingStore.hasNew"
+            class="mt-0.5 text-xs font-medium text-[var(--status-error-text)] whitespace-nowrap"
+          >
+            {{ incomingNewLabel }}
           </p>
         </div>
       </Transition>
@@ -102,6 +114,7 @@ import SchedulerStaleHint from '@/components/SchedulerStaleHint.vue'
 import { useConfigStore } from '@/stores/config'
 import { useSchedulerStore } from '@/stores/scheduler'
 import { useUpdatesStore } from '@/stores/updates'
+import { useIncomingStore } from '@/stores/incoming'
 import { useTheme } from '@/composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { useNavSections, type NavSection } from '@/composables/useNavSections'
@@ -110,7 +123,18 @@ import { formatRunningVersion } from '@/utils/formatRunningVersion'
 const configStore = useConfigStore()
 const updatesStore = useUpdatesStore()
 const schedulerStore = useSchedulerStore()
+const incomingStore = useIncomingStore()
 const { t } = useI18n()
+
+const incomingNewLabel = computed(() =>
+  t('iam.incoming.newCount', { count: incomingStore.unseenCount })
+)
+
+/** The chats icon carries the incoming badge, so its name says so too. */
+function railLabel(section: NavSection): string {
+  if (section.key !== 'chats' || !incomingStore.hasNew) return section.label
+  return `${section.label}, ${incomingNewLabel.value}`
+}
 const { isDark } = useTheme()
 const { iconSrc } = useBrandLogo(isDark)
 const { sections, activeKey, selectSection, loadFeatureStatus } = useNavSections()

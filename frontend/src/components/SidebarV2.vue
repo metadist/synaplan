@@ -4,8 +4,6 @@
     <SidebarPanel />
   </div>
 
-  <ChatHistorySheet />
-
   <ChatShareModal
     :is-open="shareModalOpen"
     :chat-id="shareModalChatId"
@@ -28,7 +26,6 @@
 <script setup lang="ts">
 import SidebarRail from './sidebar/SidebarRail.vue'
 import SidebarPanel from './sidebar/SidebarPanel.vue'
-import ChatHistorySheet from './sidebar/ChatHistorySheet.vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
 import { useChatHistory, useChatShareDialog } from '@/composables/useChatHistory'

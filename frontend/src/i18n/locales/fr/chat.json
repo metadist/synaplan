@@ -60,10 +60,6 @@
     }
   },
   "chats": {
-    "tabs": {
-      "all": "Tous",
-      "incoming": "Entrants"
-    },
     "empty": "Vous n'avez pas encore de conversation.",
     "emptyAction": "Nouveau chat"
   },

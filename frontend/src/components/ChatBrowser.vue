@@ -558,9 +558,18 @@ const { success: showSuccess } = useNotification()
 const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 
+const CHAT_LIST_FILTERS: readonly ChatListFilter[] = ['all', 'private', 'group', 'widget']
+
+/** `?type=group` opens the list on chats shared with me (the old incoming page links here). */
+const typeFromQuery = (): ChatListFilter => {
+  const raw = router.currentRoute.value.query.type
+  const type = CHAT_LIST_FILTERS.find((filter) => filter === raw) ?? 'all'
+  return type === 'group' && !isIamSharingEnabled() ? 'all' : type
+}
+
 // Filter states
 const searchQuery = ref('')
-const selectedType = ref<ChatListFilter>('all')
+const selectedType = ref<ChatListFilter>(typeFromQuery())
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
 const incomingStore = useIncomingStore()
 const selectedDateRange = ref<'all' | 'today' | 'yesterday' | 'lastWeek' | 'lastMonth' | 'older'>(
@@ -974,5 +983,8 @@ const goToNewChat = async () => {
 onMounted(async () => {
   await Promise.all([chatsStore.loadChats(), incomingStore.load()])
   listSettled.value = true
+  // Arriving through the incoming badge is what "seeing" means: the badge goes,
+  // while the rows keep their "new" marker until the next load.
+  if (selectedType.value === 'group' && incomingStore.hasNew) await incomingStore.markSeen()
 })
 </script>

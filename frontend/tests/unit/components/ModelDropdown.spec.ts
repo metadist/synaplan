@@ -160,6 +160,22 @@ describe('ModelDropdown', () => {
     expect(wrapper.find('[data-testid="dropdown-model-panel"]').exists()).toBe(true)
   })
 
+  it('leaves Space to the focused row while nothing has been typed', async () => {
+    wrapper = mountPicker()
+    await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
+    await flushPromises()
+
+    const list = wrapper.get('[role="listbox"]')
+    const idle = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+    list.element.dispatchEvent(idle)
+    expect(idle.defaultPrevented).toBe(false)
+
+    await list.trigger('keydown', { key: 'c' })
+    const typed = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+    list.element.dispatchEvent(typed)
+    expect(typed.defaultPrevented).toBe(true)
+  })
+
   it('asks a guest to sign in instead of opening the list', async () => {
     wrapper = mountPicker({ guest: true })
 

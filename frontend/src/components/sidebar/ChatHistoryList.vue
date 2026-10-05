@@ -31,6 +31,14 @@
           <span class="sr-only">{{ $t('chat.stillGenerating') }}</span>
         </span>
         <span
+          v-else-if="chat.isNew"
+          class="inline-flex flex-shrink-0"
+          data-testid="indicator-chat-incoming-new"
+        >
+          <span class="w-2 h-2 rounded-full bg-[var(--status-error)]" />
+          <span class="sr-only">{{ $t('iam.incoming.new') }}</span>
+        </span>
+        <span
           class="chat-row-clip flex h-5 min-w-0 flex-1 items-center overflow-hidden"
           :class="{ 'is-reserved': !chat.incoming }"
         >
@@ -101,6 +109,13 @@
       <p class="mt-1.5 flex items-center gap-1.5 text-[13px] txt-secondary">
         <Icon :icon="originOf(previewChat).icon" class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
         <span class="min-w-0 break-words">{{ originOf(previewChat).label }}</span>
+      </p>
+      <p
+        v-if="previewChat.incoming && (previewChat.ownerName || previewChat.permission)"
+        class="mt-1 text-[13px] txt-secondary break-words"
+        data-testid="text-chat-preview-access"
+      >
+        {{ accessOf(previewChat) }}
       </p>
     </div>
 
@@ -231,6 +246,15 @@ const originOf = (chat: HistoryChat): { label: string; icon: string } => {
   }
 }
 
+/** "from Anna · Can view": who owns an incoming chat and what I may do with it. */
+const accessOf = (chat: HistoryChat): string =>
+  [
+    chat.ownerName ? t('iam.incoming.owner', { name: chat.ownerName }) : null,
+    chat.permission ? t(`iam.permission.${chat.permission}`) : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' · ')
+
 const hidePreview = () => {
   window.clearTimeout(previewTimer)
   previewTimer = 0
@@ -360,7 +384,12 @@ const onScroll = () => {
   if (previewChatId.value !== null) hidePreview()
 }
 
+const onKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && menuChatId.value !== null) menuChatId.value = null
+}
+
 window.addEventListener('scroll', onScroll, true)
+document.addEventListener('keydown', onKeydown)
 
 const toggleMenu = (chatId: number, event: MouseEvent) => {
   triggerHapticImpact('light')
@@ -405,6 +434,7 @@ onUnmounted(() => {
   hidePreview()
   hideMarquee()
   window.removeEventListener('scroll', onScroll, true)
+  document.removeEventListener('keydown', onKeydown)
 })
 </script>
 

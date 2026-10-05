@@ -126,10 +126,6 @@ export const selectors = {
     flyoutLinkAdminPeople: '[data-testid="link-sidebar-v2-admin-people"]',
     flyoutLinkAdminSetup: '[data-testid="link-sidebar-v2-admin-setup"]',
     flyoutLinkAdminConfig: '[data-testid="link-sidebar-v2-admin-config"]',
-    /** V2 chat list modal */
-    modalChatManager: '[data-testid="modal-chat-manager"]',
-    /** V2 chat list modal: backdrop — click outside the panel to close */
-    modalChatManagerBackdrop: '[data-testid="modal-chat-manager-backdrop"]',
     /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
     chatManagerListRows: '[data-testid="list-chat-manager-rows"]',
     /** V2 chat list: one row per chat; scope menu to this */
@@ -367,7 +363,7 @@ export const selectors = {
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
     memoriesBtn: '[data-testid="btn-sidebar-v2-memories"]',
-    incomingBtn: '[data-testid="btn-sidebar-v2-incoming"]',
+    incomingToggle: '[data-testid="btn-sidebar-v2-incoming-toggle"]',
   },
   oidc: {
     keycloakButton: '[data-testid="btn-social-keycloak"]',

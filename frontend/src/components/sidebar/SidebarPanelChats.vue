@@ -20,7 +20,7 @@
         class="btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium min-h-11"
         :disabled="isCreatingChat"
         data-testid="btn-sidebar-v2-new-chat"
-        @click="createChat(false)"
+        @click="createChat()"
       >
         <Icon
           v-if="isCreatingChat"
@@ -73,7 +73,7 @@
           class="px-3 py-2 text-sm txt-secondary"
           data-testid="text-sidebar-v2-incoming-empty"
         >
-          {{ $t('iam.incoming.none') }}
+          {{ $t('iam.incoming.emptyText') }}
         </p>
         <ChatHistoryList
           v-else
@@ -172,7 +172,7 @@
               class="px-3 py-2 text-sm txt-secondary"
               data-testid="text-sidebar-v2-chats-empty"
             >
-              {{ $t('nav.noChats') }}
+              {{ $t('nav.chatsEmpty') }}
             </p>
           </template>
         </ChatHistoryList>

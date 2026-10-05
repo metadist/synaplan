@@ -652,10 +652,10 @@ const router = createRouter({
       beforeEnter: groupsRouteGuard,
     },
     {
-      // The incoming list lives in the sidebar now. Keep the old address
-      // from landing on a dead page.
+      // Chats shared with me: the full chat list, filtered to incoming.
+      // The phone drawer links here; old bookmarks keep working.
       path: '/chats/incoming',
-      redirect: { name: 'chats' },
+      redirect: { name: 'chats', query: { type: 'group' } },
     },
     {
       // Dead end for an account that still carries a deployment-generated

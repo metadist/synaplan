@@ -5,7 +5,7 @@ import {
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   DocumentMagnifyingGlassIcon,
-  UserCircleIcon,
+  InboxArrowDownIcon,
   UserGroupIcon,
   CircleStackIcon,
 } from '@heroicons/vue/24/outline'
@@ -13,7 +13,7 @@ import { i18n } from '@/i18n/instance'
 import { allLocaleTexts } from './localeTexts'
 import { useNavItems } from '@/composables/useNavItems'
 import { useConfigStore } from '@/stores/config'
-import { isIamGroupsEnabled } from '@/composables/useIamFeature'
+import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
 import type { LocalSearchDoc, SearchResult } from './types'
 
 export interface LocalEntry {
@@ -71,12 +71,6 @@ export function usePageSources() {
     const files = String(t('nav.files'))
     list.push(
       {
-        path: '/profile',
-        label: String(t('nav.profile')),
-        breadcrumb: account,
-        icon: UserCircleIcon,
-      },
-      {
         path: '/settings',
         label: String(t('nav.preferences')),
         breadcrumb: account,
@@ -113,6 +107,14 @@ export function usePageSources() {
         label: String(t('pageTitles.memories')),
         breadcrumb: account,
         icon: CircleStackIcon,
+      })
+    }
+    if (isIamSharingEnabled()) {
+      list.push({
+        path: '/chats/incoming',
+        label: String(t('pageTitles.incoming')),
+        breadcrumb: account,
+        icon: InboxArrowDownIcon,
       })
     }
     if (isIamGroupsEnabled()) {

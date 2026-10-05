@@ -7,12 +7,6 @@ export const useSidebarStore = defineStore('sidebar', () => {
   const showChats = ref(localStorage.getItem('sidebar-show-chats') !== 'false')
 
   /**
-   * History sheet (recent chats). Shared state so both the desktop rail and
-   * the mobile bottom nav can open the same sheet (rendered by SidebarV2).
-   */
-  const chatSheetOpen = ref(false)
-
-  /**
    * Mobile push-drawer (primary navigation on small screens). Opening it slides
    * the content column to the right and reveals the drawer (nav buttons + chat
    * history) underneath. Desktop is unaffected.
@@ -29,18 +23,6 @@ export const useSidebarStore = defineStore('sidebar', () => {
 
   const toggleMobileDrawer = () => {
     mobileDrawerOpen.value = !mobileDrawerOpen.value
-  }
-
-  const openChatSheet = () => {
-    chatSheetOpen.value = true
-  }
-
-  const closeChatSheet = () => {
-    chatSheetOpen.value = false
-  }
-
-  const toggleChatSheet = () => {
-    chatSheetOpen.value = !chatSheetOpen.value
   }
 
   // Disclosure state for chat groups
@@ -100,7 +82,6 @@ export const useSidebarStore = defineStore('sidebar', () => {
     isCollapsed,
     showChats,
     chatDisclosure,
-    chatSheetOpen,
     mobileDrawerOpen,
     toggle,
     close,
@@ -108,9 +89,6 @@ export const useSidebarStore = defineStore('sidebar', () => {
     toggleCollapsed,
     toggleShowChats,
     toggleChatDisclosure,
-    openChatSheet,
-    closeChatSheet,
-    toggleChatSheet,
     openMobileDrawer,
     closeMobileDrawer,
     toggleMobileDrawer,

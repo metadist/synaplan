@@ -38,10 +38,10 @@
         <ChannelAssistantSelect
           :model-value="whatsappAgentId"
           :label="$t('channels.whatsappAssistant')"
-          @update:model-value="saveWhatsappAssistant"
           :none-label="$t('channels.whatsappAssistantNone')"
           :hint="$t('channels.whatsappAssistantHint')"
           test-id="select-whatsapp-assistant"
+          @update:model-value="saveWhatsappAssistant"
         />
       </div>
     </div>

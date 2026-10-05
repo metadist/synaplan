@@ -3,7 +3,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
-import { useSidebarStore } from '../stores/sidebar'
 import { useIncomingStore } from '../stores/incoming'
 import { useDialog } from './useDialog'
 import { useDateFormat } from './useDateFormat'
@@ -20,6 +19,10 @@ export type HistoryChat = StoreChat & {
   kindLabel: string | null
   isNew: boolean
   incoming: boolean
+  /** Who shared an incoming chat. Null for my own chats. */
+  ownerName: string | null
+  /** What I may do with an incoming chat (IAM permission). Null for my own chats. */
+  permission: string | null
 }
 
 /**
@@ -43,7 +46,7 @@ const shareModalChatTitle = ref('')
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
 
-/** Share dialogs render once; both the panel and the phone sheet open them. */
+/** Share dialogs render once in SidebarV2; every chat row opens the same pair. */
 export function useChatShareDialog() {
   return {
     shareModalOpen,
@@ -55,8 +58,8 @@ export function useChatShareDialog() {
 }
 
 /**
- * Chat list shared by the desktop panel and the phone history sheet.
- * The create lock is module-scoped so a second click on either button is ignored.
+ * Chat list behind the desktop chats panel.
+ * The create lock is module-scoped so a second click on New chat is ignored.
  */
 export function useChatHistory() {
   const { t } = useI18n()
@@ -66,7 +69,6 @@ export function useChatHistory() {
   const { formatRelativeTime } = useDateFormat()
   const authStore = useAuthStore()
   const chatsStore = useChatsStore()
-  const sidebarStore = useSidebarStore()
   const incomingStore = useIncomingStore()
 
   const iamSharingEnabled = computed(() => isIamSharingEnabled())
@@ -94,6 +96,8 @@ export function useChatHistory() {
         kindLabel: null,
         isNew: false,
         incoming: false,
+        ownerName: null,
+        permission: null,
       }))
   })
 
@@ -117,6 +121,8 @@ export function useChatHistory() {
           kindLabel: label,
           isNew: item.isNew === true,
           incoming: true,
+          ownerName: item.ownerName ?? null,
+          permission: item.permission ?? null,
         }
       })
   })
@@ -128,12 +134,6 @@ export function useChatHistory() {
   const splitOwn = computed(() => splitPinnedChats(sortedOwnChats.value))
   const pinnedChats = computed(() => splitOwn.value.pinned)
   const unpinnedChats = computed(() => splitOwn.value.unpinned)
-
-  const sheetChats = computed<HistoryChat[]>(() => {
-    return [...unpinnedChats.value, ...incomingChatList.value].sort(
-      (a, b) => chatActivityTimestamp(b) - chatActivityTimestamp(a)
-    )
-  })
 
   const displayTitle = (chat: StoreChat): string => {
     const raw = !isDefaultChatTitle(chat.title, t('chat.newChat'))
@@ -180,25 +180,22 @@ export function useChatHistory() {
     }
   }
 
-  const createChat = async (closeSheet: boolean) => {
+  const createChat = async () => {
     if (isCreatingChat.value) return
     isCreatingChat.value = true
-    const sheetWasOpen = sidebarStore.chatSheetOpen
     try {
       await chatsStore.findOrCreateEmptyChat()
       if (route.path !== '/') router.push('/')
-      if (closeSheet || sheetWasOpen) sidebarStore.closeChatSheet()
     } finally {
       isCreatingChat.value = false
     }
   }
 
   const selectChat = (chatId: number) => {
-    const chat = sheetChats.value.find((row) => row.id === chatId)
+    const chat = incomingChatList.value.find((row) => row.id === chatId)
     if (chat?.isNew) void incomingStore.markChatOpened(chatId)
     chatsStore.setActiveChat(chatId)
     if (route.path !== '/') router.push('/')
-    sidebarStore.closeChatSheet()
   }
 
   const renameChat = async (chatId: number) => {
@@ -236,7 +233,7 @@ export function useChatHistory() {
   const shareChat = (chatId: number) => {
     const chat = chatsStore.chats.find((row) => row.id === chatId)
     shareModalChatId.value = chatId
-    shareModalChatTitle.value = chat?.title || 'Chat'
+    shareModalChatTitle.value = chat ? displayTitle(chat) : t('chat.newChat')
     if (isIamSharingEnabled()) {
       iamShareResourceId.value = String(chatId)
       iamShareOpen.value = true
@@ -258,7 +255,6 @@ export function useChatHistory() {
     pinnedChats,
     unpinnedChats,
     incomingChatList,
-    sheetChats,
     displayTitle,
     formatTimestamp,
     isGenerating,

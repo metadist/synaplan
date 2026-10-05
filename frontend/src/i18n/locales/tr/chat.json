@@ -60,10 +60,6 @@
     }
   },
   "chats": {
-    "tabs": {
-      "all": "Tümü",
-      "incoming": "Gelen"
-    },
     "empty": "Henüz sohbetiniz yok.",
     "emptyAction": "Yeni sohbet"
   },
