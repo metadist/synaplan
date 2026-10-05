@@ -44,11 +44,11 @@
         >
           <span
             :ref="bindTitle(chat.id)"
-            class="block h-5 max-w-full truncate text-[15px] leading-5"
+            class="block h-5 max-w-full truncate text-[13px] leading-5"
             :class="[
               chat.id === activeChatId
-                ? 'font-semibold text-[var(--brand)]'
-                : 'chat-row-title font-medium',
+                ? 'font-medium text-[var(--brand)]'
+                : 'chat-row-title font-normal',
               marqueeChatId === chat.id && 'chat-title-marquee',
             ]"
           >
@@ -440,15 +440,18 @@ onUnmounted(() => {
 
 <style scoped>
 .chat-row-btn {
-  padding: 0.375rem;
+  padding: 0.3125rem 0.375rem;
 }
 
+/* History sits one step below the menu: smaller, regular weight, and a
+   softer ink than the menu's primary text. Both stay above WCAG AA on the
+   sidebar (light #d0daea ≈ 7:1, dark #070b15 ≈ 13:1). */
 .chat-row-title {
-  color: #1c212b;
+  color: #3b4353;
 }
 
 .dark .chat-row-title {
-  color: #e3e6ee;
+  color: #cdd1da;
 }
 
 .chat-row-clip.is-reserved {

@@ -1125,4 +1125,90 @@ describe('Chats Store', () => {
       expect(store.pinPendingChatIds.has(3)).toBe(false)
     })
   })
+
+  describe('loadRailChats', () => {
+    const menuChat = (id: number, title: string) => ({
+      id,
+      title,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      messageCount: 2,
+      isShared: false,
+    })
+
+    const menuPage = (chats: ReturnType<typeof menuChat>[], hasMore = false) => ({
+      success: true,
+      chats,
+      total: chats.length,
+      offset: 0,
+      limit: 30,
+      hasMore,
+      activeRunChatIds: [],
+    })
+
+    it('asks the server for one page and appends the next one', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce(menuPage([menuChat(1, 'One')], true))
+      httpClientMock.mockResolvedValueOnce(menuPage([menuChat(2, 'Two')]))
+
+      await store.loadRailChats(true)
+      await store.loadRailChats(false)
+
+      expect(httpClientMock.mock.calls.map(([url]) => url)).toEqual([
+        '/api/v1/chats?limit=30&offset=0',
+        '/api/v1/chats?limit=30&offset=1',
+      ])
+      expect(store.railChats.map((c) => c.id)).toEqual([1, 2])
+      expect(store.railHasMore).toBe(false)
+    })
+
+    it('shows a title that changed elsewhere instead of the stale one', async () => {
+      const store = useChatsStore()
+      store.chats = [{ ...menuChat(5, 'New Chat') }]
+      httpClientMock.mockResolvedValueOnce(menuPage([menuChat(5, 'Renamed on the server')]))
+
+      await store.loadRailChats(true)
+
+      expect(store.chats.find((c) => c.id === 5)?.title).toBe('Renamed on the server')
+    })
+
+    it('keeps a title the user saved while the page was loading', async () => {
+      const store = useChatsStore()
+      store.chats = [{ ...menuChat(5, 'Old') }]
+      let resolvePage: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolvePage = resolve
+        })
+      )
+      const loading = store.loadRailChats(true)
+
+      httpClientMock.mockResolvedValueOnce({ success: true })
+      await store.updateChatTitle(5, 'Saved locally')
+      resolvePage(menuPage([menuChat(5, 'Old')]))
+      await loading
+
+      expect(store.chats.find((c) => c.id === 5)?.title).toBe('Saved locally')
+    })
+
+    it('does not bring back a chat deleted while the page was loading', async () => {
+      const store = useChatsStore()
+      store.chats = [{ ...menuChat(5, 'Doomed') }, { ...menuChat(6, 'Kept') }]
+      let resolvePage: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolvePage = resolve
+        })
+      )
+      const loading = store.loadRailChats(true)
+
+      httpClientMock.mockResolvedValueOnce({ success: true })
+      await store.deleteChat(5)
+      resolvePage(menuPage([menuChat(5, 'Doomed'), menuChat(6, 'Kept')]))
+      await loading
+
+      expect(store.railChats.map((c) => c.id)).toEqual([6])
+      expect(store.chats.map((c) => c.id)).toEqual([6])
+    })
+  })
 })

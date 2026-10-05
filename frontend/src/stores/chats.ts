@@ -157,6 +157,8 @@ export const useChatsStore = defineStore('chats', () => {
   const railLoading = ref(false)
   const railOffset = ref(0)
   let railLoadSeq = 0
+  /** Chats removed here. A menu page requested before the removal must not bring them back. */
+  const removedChatIds = new Set<number>()
 
   /**
    * Chats whose answer is still being written on the server. A turn survives
@@ -422,12 +424,23 @@ export const useChatsStore = defineStore('chats', () => {
     return locallyCreatedIds.has(chatId)
   }
 
-  /** So pin, rename, and delete can find a chat the menu loaded before the full list. */
-  function ensureChatsKnown(page: Chat[]) {
-    const known = new Set(chats.value.map((chat) => chat.id))
+  /**
+   * Keep `chats` in step with a menu page. Pin, rename, and delete then find a
+   * chat the menu loaded before the full list, and a title changed elsewhere
+   * replaces the stale one. A local write since the request started keeps
+   * its own value.
+   */
+  function mergeRailPage(page: Chat[], mutatedSinceRequest: boolean) {
+    const serverById = new Map(page.map((chat) => [chat.id, chat]))
+    const known = new Set<number>()
+    const next = chats.value.map((local) => {
+      known.add(local.id)
+      const server = serverById.get(local.id)
+      if (!server || mutatedSinceRequest) return local
+      return mergeLoadedChat(local, server)
+    })
     const missing = page.filter((chat) => !known.has(chat.id))
-    if (missing.length === 0) return
-    chats.value = [...chats.value, ...missing]
+    chats.value = missing.length > 0 ? [...next, ...missing] : next
   }
 
   function forgetRailChat(chatId: number) {
@@ -448,6 +461,7 @@ export const useChatsStore = defineStore('chats', () => {
     if (!reset && (railLoading.value || !railHasMore.value)) return
 
     const seq = ++railLoadSeq
+    const mutationSeq = chatsLoadSeq
     const offset = reset ? 0 : railOffset.value
     railLoading.value = true
 
@@ -457,15 +471,16 @@ export const useChatsStore = defineStore('chats', () => {
       })
       if (seq !== railLoadSeq) return
 
-      const page = (data.chats ?? []).map((chat) => normalizeChat(chat))
+      const received = (data.chats ?? []).map((chat) => normalizeChat(chat))
+      const page = received.filter((chat) => !removedChatIds.has(chat.id))
       if (reset) {
         railChats.value = page
       } else {
         const seen = new Set(railChats.value.map((chat) => chat.id))
         railChats.value = [...railChats.value, ...page.filter((chat) => !seen.has(chat.id))]
       }
-      ensureChatsKnown(page)
-      railOffset.value = offset + page.length
+      mergeRailPage(page, chatsLoadSeq !== mutationSeq)
+      railOffset.value = offset + received.length
       railHasMore.value = data.hasMore === true
       if (Array.isArray(data.activeRunChatIds)) {
         activeRunChatIds.value = applyLiveRunOverlay(data.activeRunChatIds, chatsLoadSeq)
@@ -696,6 +711,7 @@ export const useChatsStore = defineStore('chats', () => {
       const wasActiveChat = activeChatId.value === chatId
       locallyCreatedIds.delete(chatId)
       chats.value = chats.value.filter((c) => c.id !== chatId)
+      removedChatIds.add(chatId)
       forgetRailChat(chatId)
       invalidateInFlightChatsLoad()
 
@@ -964,6 +980,7 @@ export const useChatsStore = defineStore('chats', () => {
       const owned = chats.value.some((chat) => chat.id === chatId)
       const reason: 'deleted' | 'unshared' = status === 404 && owned ? 'deleted' : 'unshared'
       chats.value = chats.value.filter((chat) => chat.id !== chatId)
+      removedChatIds.add(chatId)
       forgetRailChat(chatId)
       useIncomingStore().drop(chatId)
       if (activeChatId.value === chatId) {
@@ -1007,6 +1024,7 @@ export const useChatsStore = defineStore('chats', () => {
     railHasMore.value = true
     railLoading.value = false
     railLoadSeq += 1
+    removedChatIds.clear()
     updateActiveChatSelection(null)
     loading.value = false
     error.value = null
