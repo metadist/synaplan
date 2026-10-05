@@ -317,6 +317,41 @@ describe('Chats Store', () => {
       expect(store.chats.map((c) => c.id)).toEqual([9])
     })
 
+    it('a superseded loadChats resolves only once the newer load has applied its list', async () => {
+      const store = useChatsStore()
+      let resolveFirst: (value: unknown) => void = () => {}
+      let resolveSecond: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      )
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecond = resolve
+        })
+      )
+      const first = store.loadChats()
+      const second = store.loadChats()
+      let firstSettled = false
+      void first.then(() => {
+        firstSettled = true
+      })
+
+      resolveFirst({ chats: [regularChat(1)] })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(firstSettled).toBe(false)
+      expect(store.activeChatId).toBeNull()
+
+      resolveSecond({ chats: [regularChat(9)] })
+      await first
+
+      expect(store.chats.map((c) => c.id)).toEqual([9])
+      expect(store.activeChatId).toBe(9)
+      await second
+    })
+
     it('does not let a late loadChats overwrite a title that was just saved', async () => {
       const store = useChatsStore()
       httpClientMock.mockResolvedValueOnce({ chats: [regularChat(1)] })
