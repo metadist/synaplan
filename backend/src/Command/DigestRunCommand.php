@@ -64,14 +64,24 @@ final class DigestRunCommand extends Command
             $lock->release();
         }
 
-        $io->success(sprintf(
-            'Digest run: %d users processed, %d skipped, %d batches, %d messages scanned, %d digests created.',
+        $line = sprintf(
+            'Digest run: %d users processed, %d skipped, %d batches, %d messages scanned, %d digests created, %d failed batches, %d skipped for budget.',
             $summary['users'],
             $summary['skipped_users'],
             $summary['batches'],
             $summary['scanned'],
             $summary['created'],
-        ));
+            $summary['failed_batches'],
+            $summary['skipped_budget'],
+        );
+
+        if ($summary['aborted']) {
+            $io->error($line.' Aborted: '.($summary['abort_reason'] ?? 'unknown').'.');
+
+            return Command::FAILURE;
+        }
+
+        $io->success($line);
 
         return Command::SUCCESS;
     }

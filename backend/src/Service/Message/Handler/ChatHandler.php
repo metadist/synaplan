@@ -676,12 +676,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $digestResult = $this->loadDigestContext(
             $message,
+            $thread,
             $user,
             $options,
             $classification,
             $progressCallback,
             $resolveMemoryVector,
             $perfTimer,
+            promptIncludesFileText: false,
         );
         $digestContext = $digestResult['context'];
         $loadedDigests = $digestResult['digests'];
@@ -1454,12 +1456,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $digestResult = $this->loadDigestContext(
             $message,
+            $thread,
             $user,
             $options,
             $classification,
             $progressCallback,
             $resolveMemoryVector,
             $perfTimer,
+            promptIncludesFileText: true,
         );
         $digestContext = $digestResult['context'];
         $loadedDigests = $digestResult['digests'];
@@ -4075,11 +4079,72 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
+     * Message ids replayed verbatim. `$thread` is already the history window
+     * (message and character caps, and only the recent tail when a rolling
+     * summary replaced the older turns). Empty assistant turns are omitted by
+     * the same rule as the message builders: only the streaming builder adds
+     * file text, so `$promptIncludesFileText` must match the path. The current
+     * message is included.
+     *
+     * @param array<int, array{role: string, content: string}|Message> $thread
+     *
+     * @return list<int>
+     */
+    private function verbatimPromptMessageIds(array $thread, Message $current, bool $promptIncludesFileText): array
+    {
+        $mediaReferences = $this->generatedMediaReferences($current, $thread);
+        $ids = [];
+        $currentId = $current->getId();
+
+        foreach ($thread as $msg) {
+            if (!$msg instanceof Message) {
+                continue;
+            }
+            $id = $msg->getId();
+            if (null === $id || $id === $currentId) {
+                continue;
+            }
+            if ($this->isOmittedAssistantTurn($msg, $mediaReferences, $promptIncludesFileText)) {
+                continue;
+            }
+            $ids[] = $id;
+        }
+
+        if (null !== $currentId) {
+            $ids[] = $currentId;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param array<int, string> $mediaReferences
+     */
+    private function isOmittedAssistantTurn(Message $msg, array $mediaReferences, bool $promptIncludesFileText): bool
+    {
+        if ('IN' === $msg->getDirection()) {
+            return false;
+        }
+
+        $content = $this->humanizeFileMarkersForModel($msg->getText());
+        $files = $promptIncludesFileText ? $msg->getAllFilesText() : '';
+        if ('' !== $files) {
+            $content .= "\n".$files;
+        }
+        $id = $msg->getId();
+        if (null !== $id && isset($mediaReferences[$id])) {
+            $reference = $mediaReferences[$id];
+            $content = '' === trim($content) ? $reference : $content."\n".$reference;
+        }
+
+        return $this->isEmptyAssistantContent($content);
+    }
+
+    /**
      * Deep-memory retrieval over the message digest index: find key messages
-     * from OLDER conversations that are relevant to the current prompt and
-     * inject them (plus verbatim excerpts for the top hits) into the system
-     * prompt — so "what did the realtor write about the rent?" finds the
-     * letter from three months ago.
+     * from older turns — including earlier in this chat, outside the verbatim
+     * history window — that are relevant to the current prompt and inject them
+     * (plus verbatim excerpts for the top hits) into the system prompt.
      *
      * Shared between streaming and non-streaming paths (channel parity), and
      * gated by exactly the same request/user levers as memories: a widget or
@@ -4088,19 +4153,22 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * Reuses the per-turn memory embedding (digest titles are embedded with
      * the same memory embedding model), so this adds no extra embed call.
      *
-     * @param array<string, mixed> $options
-     * @param array<string, mixed> $classification
+     * @param array<int, array{role: string, content: string}|Message> $thread
+     * @param array<string, mixed>                                     $options
+     * @param array<string, mixed>                                     $classification
      *
      * @return array{context: string, digests: list<array<string, mixed>>}
      */
     private function loadDigestContext(
         Message $message,
+        array $thread,
         ?User $user,
         array $options,
         array $classification,
         ?callable $progressCallback,
         \Closure $resolveMemoryVector,
         PerfTimer $perfTimer,
+        bool $promptIncludesFileText,
     ): array {
         $disabledByRequest = !empty($options['disable_memories'])
             || ('WIDGET' === ($options['channel'] ?? null))
@@ -4120,7 +4188,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $digests = $this->digestSearchService->search(
                     $message->getUserId(),
                     $memoryVector,
-                    excludeChatId: $message->getChatId(),
+                    excludeMessageIds: $this->verbatimPromptMessageIds($thread, $message, $promptIncludesFileText),
                 );
             }
             $perfTimer->stop('digests_search');

@@ -12,6 +12,7 @@ use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Repository\MessageDigestRepository;
 use App\Repository\MessageRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
@@ -101,6 +102,7 @@ class ChatHandlerDigestAcceptanceTest extends TestCase
         $digestSearchService = new DigestSearchService(
             $qdrantClient,
             $messageRepository,
+            $this->confirmingDigestRepository(),
             $digestConfig,
             new NullLogger(),
         );
@@ -155,6 +157,188 @@ class ChatHandlerDigestAcceptanceTest extends TestCase
 
         // 4. The reference list reaches the caller (for non-streaming channels).
         self::assertSame(self::RENT_MESSAGE_ID, $result['metadata']['digests'][0]['message_id']);
+    }
+
+    public function testSameChatRetrievesTheOldKeyMessageAndSkipsThePromptWindow(): void
+    {
+        $oldId = 1001;
+        $windowId = 2002;
+
+        $oldMessage = new Message();
+        (new \ReflectionProperty(Message::class, 'id'))->setValue($oldMessage, $oldId);
+        $oldMessage->setUserId(self::USER_ID);
+        $oldMessage->setTrackingId(0);
+        $oldMessage->setChatId(self::CURRENT_CHAT_ID);
+        $oldMessage->setDirection('IN');
+        $oldMessage->setText('The office rent rises to 1450 euros from June.');
+
+        $windowMessage = new Message();
+        (new \ReflectionProperty(Message::class, 'id'))->setValue($windowMessage, $windowId);
+        $windowMessage->setUserId(self::USER_ID);
+        $windowMessage->setTrackingId(0);
+        $windowMessage->setChatId(self::CURRENT_CHAT_ID);
+        $windowMessage->setDirection('IN');
+        $windowMessage->setText('Unrelated chatter still inside the history window.');
+
+        $qdrantClient = $this->createMock(QdrantClientInterface::class);
+        $qdrantClient->method('searchDigests')->willReturn([
+            [
+                'score' => 0.91,
+                'payload' => [
+                    'message_id' => $oldId,
+                    'chat_id' => self::CURRENT_CHAT_ID,
+                    'title' => 'office rent rises to 1450 euros from June',
+                    'channel' => 'web',
+                    'source_date' => time() - 120 * 86400,
+                ],
+            ],
+            [
+                'score' => 0.88,
+                'payload' => [
+                    'message_id' => $windowId,
+                    'chat_id' => self::CURRENT_CHAT_ID,
+                    'title' => 'lunch order for the team on Friday',
+                    'channel' => 'web',
+                    'source_date' => time(),
+                ],
+            ],
+        ]);
+
+        $messageRepository = $this->createMock(MessageRepository::class);
+        $messageRepository->method('find')->willReturnCallback(
+            static fn (mixed $id) => $oldId === $id ? $oldMessage : null
+        );
+        $messageRepository->method('findRecentOtherChatTail')->willReturn([]);
+
+        $configRepository = $this->createMock(ConfigRepository::class);
+        $configRepository->method('getValue')->willReturn(null);
+        $digestConfig = new MessageDigestConfig($configRepository);
+
+        $digestSearchService = new DigestSearchService(
+            $qdrantClient,
+            $messageRepository,
+            $this->confirmingDigestRepository(),
+            $digestConfig,
+            new NullLogger(),
+        );
+
+        $capturedMessages = null;
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->expects($this->once())->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$capturedMessages): array {
+                $capturedMessages = $messages;
+
+                return ['content' => 'ok', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $handler = $this->handler($aiFacade, $digestSearchService, $digestConfig);
+
+        $prompt = $this->createMock(Message::class);
+        $prompt->method('getUserId')->willReturn(self::USER_ID);
+        $prompt->method('getId')->willReturn(900000);
+        $prompt->method('getChatId')->willReturn(self::CURRENT_CHAT_ID);
+        $prompt->method('getText')->willReturn('How much will the office rent be?');
+        $prompt->method('getFileText')->willReturn('');
+        $prompt->method('getFilePath')->willReturn('');
+        $prompt->method('getFileType')->willReturn('');
+        $prompt->method('getTopic')->willReturn('CHAT');
+        $prompt->method('getLanguage')->willReturn('en');
+        $prompt->method('getUnixTimestamp')->willReturn(time());
+        $prompt->method('getDateTime')->willReturn(date('YmdHis'));
+
+        $result = $handler->handle($prompt, [$windowMessage], ['topic' => 'CHAT', 'language' => 'en']);
+
+        self::assertNotNull($capturedMessages);
+        $systemPrompt = $capturedMessages[0]['content'] ?? '';
+        self::assertStringContainsString('office rent rises to 1450 euros from June', $systemPrompt);
+        self::assertStringNotContainsString('lunch order for the team on Friday', $systemPrompt);
+
+        $loadedIds = array_column($result['metadata']['digests'] ?? [], 'message_id');
+        self::assertContains($oldId, $loadedIds);
+        self::assertNotContains($windowId, $loadedIds);
+    }
+
+    public function testFileOnlyAssistantTurnLeftOutOfTheNonStreamingPromptStaysRetrievable(): void
+    {
+        $fileTurnId = 3003;
+
+        $fileTurn = new Message();
+        (new \ReflectionProperty(Message::class, 'id'))->setValue($fileTurn, $fileTurnId);
+        $fileTurn->setUserId(self::USER_ID);
+        $fileTurn->setTrackingId(0);
+        $fileTurn->setChatId(self::CURRENT_CHAT_ID);
+        $fileTurn->setDirection('OUT');
+        $fileTurn->setText('');
+        $fileTurn->setFile(1);
+        $fileTurn->setFileText('Quarterly budget draft: marketing 12000 euros.');
+
+        $qdrantClient = $this->createMock(QdrantClientInterface::class);
+        $qdrantClient->method('searchDigests')->willReturn([
+            [
+                'score' => 0.9,
+                'payload' => [
+                    'message_id' => $fileTurnId,
+                    'chat_id' => self::CURRENT_CHAT_ID,
+                    'title' => 'quarterly budget draft with the marketing figure',
+                    'channel' => 'web',
+                    'source_date' => time() - 86400,
+                ],
+            ],
+        ]);
+
+        $messageRepository = $this->createMock(MessageRepository::class);
+        $messageRepository->method('find')->willReturnCallback(
+            static fn (mixed $id) => $fileTurnId === $id ? $fileTurn : null
+        );
+        $messageRepository->method('findRecentOtherChatTail')->willReturn([]);
+
+        $configRepository = $this->createMock(ConfigRepository::class);
+        $configRepository->method('getValue')->willReturn(null);
+        $digestConfig = new MessageDigestConfig($configRepository);
+
+        $digestSearchService = new DigestSearchService(
+            $qdrantClient,
+            $messageRepository,
+            $this->confirmingDigestRepository(),
+            $digestConfig,
+            new NullLogger(),
+        );
+
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chat')->willReturn(['content' => 'ok', 'provider' => 'test', 'model' => 'test']);
+
+        $handler = $this->handler($aiFacade, $digestSearchService, $digestConfig);
+
+        $prompt = $this->createMock(Message::class);
+        $prompt->method('getUserId')->willReturn(self::USER_ID);
+        $prompt->method('getId')->willReturn(900001);
+        $prompt->method('getChatId')->willReturn(self::CURRENT_CHAT_ID);
+        $prompt->method('getText')->willReturn('What was the marketing budget again?');
+        $prompt->method('getFileText')->willReturn('');
+        $prompt->method('getFilePath')->willReturn('');
+        $prompt->method('getFileType')->willReturn('');
+        $prompt->method('getTopic')->willReturn('CHAT');
+        $prompt->method('getLanguage')->willReturn('en');
+        $prompt->method('getUnixTimestamp')->willReturn(time());
+        $prompt->method('getDateTime')->willReturn(date('YmdHis'));
+
+        $result = $handler->handle($prompt, [$fileTurn], ['topic' => 'CHAT', 'language' => 'en']);
+
+        $loadedIds = array_column($result['metadata']['digests'] ?? [], 'message_id');
+        self::assertContains($fileTurnId, $loadedIds);
+    }
+
+    private function confirmingDigestRepository(): MessageDigestRepository
+    {
+        $digestRepository = $this->createMock(MessageDigestRepository::class);
+        $digestRepository->method('findActiveMatches')->willReturnCallback(
+            static fn (int $userId, array $messageIds, array $digestIds): array => [
+                'message_ids' => $messageIds,
+                'digest_ids' => $digestIds,
+            ],
+        );
+
+        return $digestRepository;
     }
 
     private function handler(

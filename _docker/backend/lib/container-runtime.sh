@@ -718,9 +718,9 @@ run_scheduler_daily_lane() {
     run_scheduler_job 3600 bin/console --env="$env" app:models:check-availability --notify --no-interaction
 
     # Message digest: out-of-band deep-memory indexing of new user
-    # messages (self-locking, per-user cost caps). A failure is
-    # harmless — the per-user cursor means the next run resumes
-    # exactly where this one stopped.
+    # messages (self-locking, per-user cost caps). A failed batch
+    # keeps the per-user cursor, so the next run retries it. The
+    # cursor moves past a batch only after repeated failures.
     run_scheduler_job 10800 bin/console --env="$env" app:digest:run --no-interaction
 
     # Official documentation corpus for the self-aware chat (owner 0 /

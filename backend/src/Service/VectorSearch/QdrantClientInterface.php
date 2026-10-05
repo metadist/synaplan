@@ -267,6 +267,17 @@ interface QdrantClientInterface
      */
     public function deleteAllDigestsForUser(int $userId): int;
 
+    /**
+     * List every digest point for one user (payload filter on `user_id`).
+     *
+     * Pages through `POST /collections/{name}/points/scroll` via `next_page_offset`.
+     * Does not filter on `active`: reindex uses this to find points whose
+     * MariaDB row is inactive or gone, and those points may still say active.
+     *
+     * @return list<array{id: string, payload: array<string, mixed>}>
+     */
+    public function scrollDigests(int $userId): array;
+
     // --- Memory Collection Management ---
 
     /**

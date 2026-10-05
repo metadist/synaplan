@@ -163,4 +163,9 @@ final class QdrantClientMockTest extends TestCase
     {
         $this->assertEmpty($this->client->getFilesWithChunks(1));
     }
+
+    public function testScrollDigestsReturnsEmptyArray(): void
+    {
+        $this->assertSame([], $this->client->scrollDigests(7));
+    }
 }

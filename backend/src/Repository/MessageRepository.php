@@ -476,6 +476,57 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Smallest message id above `$afterId` that matches the digest candidate
+     * content and source predicates but was excluded only by the quiet-window
+     * predicate of {@see findDigestCandidates()}.
+     *
+     * With a live chat, that predicate excludes only young live-chat rows and
+     * young chat-less rows, so older history can still move the cursor.
+     * The outer parentheses on the live-chat form are load-bearing: Doctrine
+     * andWhere() concatenates with AND and does not wrap the expression, so
+     * an ungrouped OR would bypass the user, cursor, and source predicates.
+     */
+    public function lowestSkippedDigestCandidateId(
+        int $userId,
+        int $afterId,
+        int $beforeUnix,
+        ?int $sinceUnix = null,
+        ?int $liveChatId = null,
+    ): ?int {
+        $qb = $this->createQueryBuilder('m')
+            ->select('MIN(m.id)')
+            ->where('m.userId = :userId')
+            ->andWhere('m.id > :afterId')
+            ->andWhere("(m.text != '' OR m.fileText != '')")
+            ->andWhere(
+                'm.chatId IS NULL OR m.chatId NOT IN (
+                    SELECT c.id FROM App\Entity\Chat c WHERE c.source IN (:excludedSources)
+                )'
+            )
+            ->setParameter('userId', $userId)
+            ->setParameter('afterId', $afterId)
+            ->setParameter('excludedSources', ['widget', 'guest']);
+
+        if (null !== $liveChatId && $liveChatId > 0) {
+            $qb->andWhere('((m.chatId IS NULL OR m.chatId = :liveChatId) AND m.unixTimestamp >= :beforeUnix)')
+                ->setParameter('liveChatId', $liveChatId)
+                ->setParameter('beforeUnix', $beforeUnix);
+        } else {
+            $qb->andWhere('m.unixTimestamp >= :beforeUnix')
+                ->setParameter('beforeUnix', $beforeUnix);
+        }
+
+        if (null !== $sinceUnix) {
+            $qb->andWhere('m.unixTimestamp >= :sinceUnix')
+                ->setParameter('sinceUnix', $sinceUnix);
+        }
+
+        $value = $qb->getQuery()->getSingleScalarResult();
+
+        return null === $value || '' === $value ? null : (int) $value;
+    }
+
+    /**
      * Verbatim tail of the user's most recently updated other chat (not widget/guest).
      *
      * @return list<Message> chronological (oldest first)

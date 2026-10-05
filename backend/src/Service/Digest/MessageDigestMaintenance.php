@@ -18,8 +18,8 @@ use Psr\Log\LoggerInterface;
  *    into it stop resolving and its vectors leave the search index.
  *
  * MariaDB is authoritative: the DB soft-delete always happens; the Qdrant
- * point deletes are best-effort (an orphaned vector is filtered out at
- * search time by the `active` payload flag and removed on the next reindex).
+ * point deletes are best-effort. Search drops a hit unless BMESSAGEDIGESTS
+ * still has an active row for it, and `app:digest:reindex` removes the point.
  */
 final readonly class MessageDigestMaintenance
 {
