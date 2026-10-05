@@ -5,7 +5,7 @@
       {{ $t('profile.personalInfo.title') }}
     </h2>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6 @min-[36rem]:grid-cols-2">
       <div data-testid="field-first-name">
         <label class="block txt-primary font-medium mb-2">
           {{ $t('profile.personalInfo.firstName') }}

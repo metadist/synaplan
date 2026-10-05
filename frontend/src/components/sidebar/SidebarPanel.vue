@@ -1,33 +1,24 @@
 <template>
-  <aside class="v2-sidebar-panel flex flex-col min-h-0" data-testid="section-sidebar-panel">
+  <aside class="v2-sidebar-panel flex h-full min-h-0 flex-col" data-testid="section-sidebar-panel">
+    <header class="flex h-14 flex-shrink-0 items-center px-3">
+      <h2 class="truncate text-[15px] font-semibold txt-primary">{{ activeSection.label }}</h2>
+    </header>
+
+    <!--
+      The list is the only part that scrolls. Search and the profile stay in
+      the footer, so a long history cannot push them off the menu.
+    -->
     <div
-      v-if="activeKey === 'chats'"
-      class="sidebar-scroll flex-1 min-h-0 overflow-y-auto"
-      @scroll="onChatsScroll"
+      class="sidebar-scroll min-h-0 flex-1 overflow-y-auto"
+      data-testid="section-sidebar-scroll"
+      @scroll="onPanelScroll"
     >
-      <div class="flex min-h-full flex-col">
-        <header class="flex items-center h-14 px-3">
-          <h2 class="text-[15px] font-semibold txt-primary truncate">{{ activeSection.label }}</h2>
-        </header>
-        <SidebarPanelChats ref="chatsPanel" class="flex-1" />
-        <SidebarPanelFooter class="mt-auto" />
-      </div>
+      <SidebarPanelChats v-if="activeKey === 'chats'" ref="chatsPanel" />
+      <SidebarPanelLibrary v-else-if="activeKey === 'library'" />
+      <SidebarPanelLinks v-else :groups="activeGroups" :section-path="activeSectionPath" />
     </div>
 
-    <template v-else>
-      <header class="flex items-center h-14 px-3 flex-shrink-0">
-        <h2 class="text-[15px] font-semibold txt-primary truncate">{{ activeSection.label }}</h2>
-      </header>
-
-      <div class="flex-1 min-h-0 flex flex-col">
-        <div class="flex-1 min-h-0 overflow-y-auto sidebar-scroll">
-          <SidebarPanelLibrary v-if="activeKey === 'library'" />
-          <SidebarPanelLinks v-else :groups="activeGroups" :section-path="activeSectionPath" />
-        </div>
-      </div>
-
-      <SidebarPanelFooter />
-    </template>
+    <SidebarPanelFooter />
   </aside>
 </template>
 
@@ -43,7 +34,8 @@ const { activeKey, activeSection, activeGroups, activeSectionPath } = useNavSect
 
 const chatsPanel = ref<{ showMoreChats: () => void } | null>(null)
 
-const onChatsScroll = (event: Event) => {
+const onPanelScroll = (event: Event) => {
+  if (activeKey.value !== 'chats') return
   const el = event.currentTarget
   if (!(el instanceof HTMLElement)) return
   if (el.scrollHeight - el.scrollTop - el.clientHeight > 160) return

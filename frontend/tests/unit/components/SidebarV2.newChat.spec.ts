@@ -133,4 +133,37 @@ describe('SidebarV2 New Chat lock', () => {
     expect(button.attributes('disabled')).toBeUndefined()
     wrapper.unmount()
   })
+
+  it('keeps search and profile fixed and pages the chat list by 30', async () => {
+    const chats = Array.from({ length: 45 }, (_, index) => ({
+      id: index + 1,
+      title: `Topic ${index + 1}`,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 45 - index)).toISOString(),
+      messageCount: 2,
+      pinned: false,
+    }))
+    vi.mocked(httpClient).mockImplementation(async (url: unknown) => {
+      if (typeof url === 'string' && url.startsWith('/api/v1/chats')) {
+        return { chats, success: true, activeRunChatIds: [] }
+      }
+      return { success: true }
+    })
+
+    const wrapper = await mountSidebar()
+    const rows = () => wrapper.findAll('[data-testid="row-chat-v2"]')
+    expect(rows()).toHaveLength(30)
+
+    const scroll = wrapper.get('[data-testid="section-sidebar-scroll"]')
+    const footer = wrapper.get('[data-testid="section-sidebar-footer"]')
+    expect(scroll.element.contains(footer.element)).toBe(false)
+    expect(wrapper.get('[data-testid="btn-sidebar-v2-search"]').isVisible()).toBe(true)
+    expect(wrapper.get('[data-testid="btn-sidebar-v2-user"]').isVisible()).toBe(true)
+
+    await scroll.trigger('scroll')
+    expect(rows()).toHaveLength(45)
+
+    vi.mocked(httpClient).mockResolvedValue({ chats: [], total: 0, success: true })
+    wrapper.unmount()
+  })
 })

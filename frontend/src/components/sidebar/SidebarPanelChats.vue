@@ -191,13 +191,17 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
+import {
+  CHAT_HISTORY_PAGE,
+  listOverflows,
+  nextChatHistoryWindow,
+  scrollerGrewWithContent,
+} from './chatHistoryPaging'
 import { chatsPanelRefresh } from '@/composables/useNavSections'
 import { useChatHistory } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
-
-const UNPINNED_PAGE = 30
 
 const {
   isCreatingChat,
@@ -261,45 +265,53 @@ const chatsExpanded = ref(readExpanded(CHATS_EXPANDED_KEY))
 const pinnedExpanded = ref(readExpanded(PINNED_EXPANDED_KEY))
 const incomingExpanded = ref(readExpanded(INCOMING_EXPANDED_KEY))
 const chatsReady = ref(false)
-const unpinnedShown = ref(UNPINNED_PAGE)
+const unpinnedShown = ref(CHAT_HISTORY_PAGE)
 
 const visibleUnpinned = computed(() => unpinnedChats.value.slice(0, unpinnedShown.value))
 const chatsLoading = computed(() => (!chatsReady.value || chatsStore.loading ? 'true' : 'false'))
 
 watch(chatsExpanded, (open) => {
   rememberExpanded(CHATS_EXPANDED_KEY, open)
-  if (open) void nextTick(() => revealUntilFull())
+  if (open) void nextTick(() => fillUntilScrollable())
 })
 watch(pinnedExpanded, (open) => rememberExpanded(PINNED_EXPANDED_KEY, open))
 watch(incomingExpanded, (open) => rememberExpanded(INCOMING_EXPANDED_KEY, open))
 
 const scrollRoot = (): HTMLElement | null => {
-  const root = document.querySelector('[data-testid="section-sidebar-panel"] .sidebar-scroll')
+  const root = document.querySelector('[data-testid="section-sidebar-scroll"]')
   return root instanceof HTMLElement ? root : null
 }
 
-/** Keep fetching the next slice until the list fills the sidebar or runs out. */
-const revealUntilFull = () => {
+/**
+ * If the first page does not fill the menu, pull the next page. Stop once the
+ * list can scroll, or if the pane grows with the rows (it is not a real
+ * scrollport, and continuing would render every chat).
+ */
+const fillUntilScrollable = () => {
   if (!chatsExpanded.value) return
-  if (unpinnedShown.value >= unpinnedChats.value.length) return
   const root = scrollRoot()
   if (!root || root.clientHeight === 0) return
-  if (root.scrollHeight > root.clientHeight + 160) return
-  unpinnedShown.value += UNPINNED_PAGE
-  void nextTick(() => revealUntilFull())
+  if (listOverflows(root.clientHeight, root.scrollHeight)) return
+  if (unpinnedShown.value >= unpinnedChats.value.length) return
+  const before = { clientHeight: root.clientHeight, scrollHeight: root.scrollHeight }
+  unpinnedShown.value = nextChatHistoryWindow(unpinnedShown.value, unpinnedChats.value.length)
+  void nextTick(() => {
+    const next = scrollRoot()
+    if (!next || scrollerGrewWithContent(before, next)) return
+    fillUntilScrollable()
+  })
 }
 
+/** One more page. Further pages wait for the next scroll to the end. */
 const showMoreChats = () => {
   if (!chatsExpanded.value) return
-  if (unpinnedShown.value >= unpinnedChats.value.length) return
-  unpinnedShown.value += UNPINNED_PAGE
-  void nextTick(() => revealUntilFull())
+  unpinnedShown.value = nextChatHistoryWindow(unpinnedShown.value, unpinnedChats.value.length)
 }
 
 watch(
   () => unpinnedChats.value.length,
   () => {
-    if (chatsReady.value) void nextTick(() => revealUntilFull())
+    if (chatsReady.value) void nextTick(() => fillUntilScrollable())
   }
 )
 
@@ -313,7 +325,7 @@ const refreshChats = async () => {
     await Promise.all([chatsStore.loadChats(), incomingStore.load()])
   } finally {
     chatsReady.value = true
-    void nextTick(() => revealUntilFull())
+    void nextTick(() => fillUntilScrollable())
   }
 }
 

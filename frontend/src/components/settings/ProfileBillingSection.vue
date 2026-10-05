@@ -1,7 +1,7 @@
 <template>
   <section
     id="billing"
-    class="surface-card rounded-lg p-6 scroll-mt-6"
+    class="surface-card rounded-lg p-6 scroll-mt-24"
     data-testid="section-billing"
   >
     <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
@@ -23,7 +23,7 @@
         />
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 gap-6 @min-[40rem]:grid-cols-3">
         <div data-testid="field-zip">
           <label class="block txt-primary font-medium mb-2">
             {{ $t('profile.billingAddress.zipCode') }}
@@ -37,7 +37,7 @@
           />
         </div>
 
-        <div class="md:col-span-2" data-testid="field-city">
+        <div class="@min-[40rem]:col-span-2" data-testid="field-city">
           <label class="block txt-primary font-medium mb-2">
             {{ $t('profile.billingAddress.city') }}
           </label>
