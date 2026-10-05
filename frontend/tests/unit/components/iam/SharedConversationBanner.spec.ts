@@ -81,7 +81,7 @@ describe('SharedConversationBanner', () => {
     const wrapper = mountBanner({ canContinue: true, access: 'use' })
     const button = wrapper.get('[data-testid="btn-continue-as-copy"]')
     expect(button.classes()).toEqual(
-      expect.arrayContaining(['btn-primary', 'px-4', 'py-2.5', 'rounded-lg'])
+      expect.arrayContaining(['btn-primary', 'px-4', 'py-2.5', 'rounded-xl'])
     )
     await button.trigger('click')
     expect(wrapper.emitted('continue')).toHaveLength(1)
