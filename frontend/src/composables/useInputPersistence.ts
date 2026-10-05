@@ -373,7 +373,17 @@ export function useAttachmentPersist<T extends PersistedChatAttachment>(
           return
         }
         save(toPersisted(filesRef.value), oldId)
-        filesRef.value = fromPersisted(load(newId))
+        const incoming = load(newId)
+
+        // null → real id: a brand-new chat receives its id while a file is
+        // still uploading (file_id 0, so it was not saved). Keep that row
+        // instead of replacing the list with the empty slot.
+        if (incoming.length === 0 && oldId == null && filesRef.value.length > 0) {
+          save(toPersisted(filesRef.value), newId)
+          return
+        }
+
+        filesRef.value = fromPersisted(incoming)
       },
       { immediate: false }
     )
