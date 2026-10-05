@@ -430,6 +430,48 @@
         "failed24": "{count} échouées (24h)",
         "openConfig": "Réglages du travail sur fichiers",
         "stateTierBlocked": "Activé, mais sous l'isolation requise. Le traitement de fichiers reste masqué."
+      },
+      "scheduler": {
+        "title": "Travaux en arrière-plan",
+        "loading": "Vérification des travaux en arrière-plan…",
+        "error": "Impossible de charger l’état des travaux en arrière-plan. Rechargez la page.",
+        "never": "Les travaux en arrière-plan n’ont jamais été exécutés sur ce serveur.",
+        "running": "Les travaux en arrière-plan fonctionnent. Dernière exécution : {time}.",
+        "stale": "Les travaux en arrière-plan se sont arrêtés. Dernière exécution : {time}. Les tâches planifiées, les rappels et les nettoyages ne s’exécutent pas. Redémarrez le service du planificateur.",
+        "howToStart": "Comment démarrer le planificateur",
+        "refresh": "Actualiser",
+        "notRunYet": "Pas encore exécuté",
+        "statusRunning": "En cours",
+        "statusStopped": "Arrêté",
+        "statusNever": "Jamais démarré",
+        "failures": "1 travail a échoué : {names}. Le journal du planificateur contient les détails. | {count} travaux ont échoué : {names}. Le journal du planificateur contient les détails.",
+        "unfinished": "Démarré, mais pas encore terminé : {names} (encore en cours, ou arrêté par sa limite de temps).",
+        "owner": "Ces travaux s’exécutent dans le service du planificateur de ce serveur, démarré par son fichier Docker Compose. Redémarrez-le avec {command}.",
+        "lanes": {
+          "tick": "Chaque minute",
+          "tasks": "Tâches enregistrées",
+          "hourly": "Toutes les heures",
+          "daily": "Chaque jour",
+          "health": "Santé des modèles"
+        },
+        "jobs": {
+          "mediaReap": "nettoyage des tâches image et vidéo",
+          "chatReap": "nettoyage des discussions bloquées",
+          "desktopReap": "nettoyage des tâches du bureau",
+          "mailHandlers": "gestionnaires de courrier entrant",
+          "processEmails": "boîte mail intelligente",
+          "savedTasks": "Tâches enregistrées",
+          "ephemeralFiles": "nettoyage des fichiers temporaires",
+          "approvalsExpire": "approbations expirées",
+          "modelsDiscover": "vérification des nouveaux modèles",
+          "updatesCheck": "vérification des mises à jour",
+          "modelsAvailability": "vérification de la disponibilité des modèles",
+          "digest": "résumé des messages",
+          "syncDocs": "synchronisation de la documentation",
+          "approvalsDigest": "e-mail de résumé des approbations",
+          "syncPrices": "synchronisation des prix des modèles",
+          "modelHealth": "contrôle de santé des modèles"
+        }
       }
     },
     "notLoggedIn": "Non connecté"
