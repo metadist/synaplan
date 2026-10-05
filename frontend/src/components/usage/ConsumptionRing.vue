@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
+import { useSidebarLayout } from '@/composables/useSidebarLayout'
 import { formatCostDisplay, formatTokens } from '@/utils/usageFormat'
 import UsageStatsPanel from '@/components/usage/UsageStatsPanel.vue'
 
@@ -14,6 +15,7 @@ import UsageStatsPanel from '@/components/usage/UsageStatsPanel.vue'
  */
 const store = useUsageTaximeterStore()
 const { t, locale } = useI18n()
+const { panelDocked } = useSidebarLayout()
 
 const SIZE = 48
 const STROKE = 5
@@ -110,7 +112,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootEl" class="usage-ring" data-testid="usage-consumption-ring">
+  <div
+    ref="rootEl"
+    class="usage-ring"
+    :class="!panelDocked && 'usage-ring--roomy'"
+    data-testid="usage-consumption-ring"
+  >
     <button
       type="button"
       class="usage-ring__trigger"
@@ -176,10 +183,15 @@ onBeforeUnmount(() => {
   display: block;
 }
 
-/* Compact view up to 1023 px; the full bar takes over on wide desktops
-   (>= 1024 px), where it can never overlap the chat column. */
-@media (min-width: 1024px) {
+/* The ring gives way to the full bar exactly where ConsumptionBar.vue shows
+   it: 1440px with the docked panel, 1160px with the rail alone. */
+@media (min-width: 1440px) {
   .usage-ring {
+    display: none;
+  }
+}
+@media (min-width: 1160px) {
+  .usage-ring.usage-ring--roomy {
     display: none;
   }
 }

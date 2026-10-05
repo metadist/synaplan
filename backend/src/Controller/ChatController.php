@@ -140,9 +140,9 @@ class ChatController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Pagination is opt-in so existing callers (desktop rail, chat switching)
-        // keep receiving the full list. The mobile history drawer passes `limit`
-        // to page through the chats with infinite scroll.
+        // Pagination is opt-in. Chat switching still omits `limit` and receives
+        // the full list. The desktop chat menu and the mobile history drawer
+        // pass `limit` and `offset` and append the next page.
         $paginate = $request->query->has('limit');
         $limit = max(1, min((int) $request->query->get('limit', 20), 100));
         $offset = max(0, (int) $request->query->get('offset', 0));

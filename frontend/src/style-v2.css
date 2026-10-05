@@ -19,6 +19,8 @@
      edges stop blending tone-in-tone. */
   --bg-app: #d5dee9;
   --bg-sidebar: rgba(208, 218, 234, 0.94);
+  /* Same hue, opaque: for a sidebar surface that floats over content. */
+  --bg-sidebar-solid: #d0daea;
   --bg-chat: #e8edf4;
   --bg-card: rgba(255, 255, 255, 0.96);
   --bg-chip: rgba(0, 0, 0, 0.07);
@@ -59,6 +61,7 @@
      glass stops blending tone-in-tone (card vs app 1.12:1 -> 1.25:1, +12%). */
   --bg-app: #02050c;
   --bg-sidebar: rgba(8, 13, 24, 0.78);
+  --bg-sidebar-solid: #070b15;
   --bg-chat: #02050c;
   --bg-card: rgba(20, 31, 56, 0.94);
   --bg-chip: rgba(255, 255, 255, 0.07);
@@ -573,6 +576,9 @@
   padding-bottom: env(safe-area-inset-bottom);
   background: var(--bg-sidebar);
   border-right: 1px solid var(--v2-border);
+}
+.design-v2 .v2-sidebar-panel.v2-sidebar-panel--overlay {
+  background: var(--bg-sidebar-solid);
 }
 .design-v2 .v2-sidebar-rail {
   padding-left: env(safe-area-inset-left);

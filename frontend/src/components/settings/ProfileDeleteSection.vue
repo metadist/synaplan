@@ -1,7 +1,7 @@
 <template>
   <section
     id="delete"
-    class="surface-card rounded-lg p-6 scroll-mt-6 border-2 border-red-200 dark:border-red-800/50"
+    class="surface-card rounded-lg p-6 scroll-mt-24 border-2 border-red-200 dark:border-red-800/50"
     data-testid="section-danger-zone"
   >
     <h2 class="text-xl font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2">

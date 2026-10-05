@@ -2,7 +2,7 @@
   <fieldset :disabled="!profileLoaded" class="border-0 p-0 m-0 min-w-0 disabled:opacity-60">
     <section
       id="memories"
-      class="surface-card rounded-lg p-6 scroll-mt-6 transition-all duration-500"
+      class="surface-card rounded-lg p-6 scroll-mt-24 transition-all duration-500"
       :class="{ 'ring-4 ring-brand-500/50 shadow-2xl': shouldHighlight }"
       data-testid="section-memories-settings"
     >

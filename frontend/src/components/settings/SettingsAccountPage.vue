@@ -1,8 +1,8 @@
 <template>
-  <div class="flex flex-col md:flex-row md:items-start gap-6">
+  <div class="space-y-6">
     <SettingsSectionIndex :items="sections" />
 
-    <div class="flex-1 min-w-0 space-y-6">
+    <div class="min-w-0 space-y-6">
       <form
         class="space-y-6"
         autocomplete="off"
@@ -10,7 +10,7 @@
         :aria-busy="loading"
         @submit.prevent="handleSave"
       >
-        <div id="profile" class="scroll-mt-6 space-y-6" data-testid="page-profile">
+        <div id="profile" class="scroll-mt-24 space-y-6" data-testid="page-profile">
           <p
             v-if="loading && !profileLoaded"
             class="txt-secondary text-sm"
@@ -61,7 +61,7 @@
         </fieldset>
 
         <!-- Outside the disabled fieldset. Enter saves the server, not the profile. -->
-        <section v-if="showApp" id="app-server" class="scroll-mt-6" @keydown.enter.prevent>
+        <section v-if="showApp" id="app-server" class="scroll-mt-24" @keydown.enter.prevent>
           <NativeServerControl />
         </section>
 

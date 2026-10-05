@@ -1,5 +1,5 @@
 <template>
-  <div id="security" class="space-y-6 scroll-mt-6">
+  <div id="security" class="space-y-6 scroll-mt-24">
     <section class="surface-card rounded-lg p-6" data-testid="section-change-password">
       <h2 class="text-xl font-semibold txt-primary mb-2 flex items-center gap-2">
         <Icon icon="mdi:lock" class="w-5 h-5" />

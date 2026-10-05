@@ -339,7 +339,11 @@
       "enhanceDesc": "Nachricht vor dem Senden mit KI verbessern"
     },
     "modelDropdown": {
-      "default": "Standard"
+      "default": "Standard",
+      "filterLabel": "Modelle filtern",
+      "filterPlaceholder": "Modelle filtern…",
+      "clearFilter": "Filter löschen",
+      "noMatch": "Kein Modell passt zu „{query}“."
     },
     "removeTool": "Werkzeug entfernen",
     "pastedText": {

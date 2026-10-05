@@ -335,7 +335,11 @@
       "enhanceDesc": "Mesajını göndermeden önce yapay zekâ ile iyileştir"
     },
     "modelDropdown": {
-      "default": "Standart"
+      "default": "Standart",
+      "filterLabel": "Modelleri filtrele",
+      "filterPlaceholder": "Modelleri filtrele…",
+      "clearFilter": "Filtreyi temizle",
+      "noMatch": "“{query}” ile eşleşen model yok."
     },
     "removeTool": "Aracı kaldır",
     "pastedText": {

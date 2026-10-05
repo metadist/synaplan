@@ -51,10 +51,7 @@
             data-testid="text-sidebar-v2-incoming-count"
             >{{ incomingStore.unseenCount }}</span
           >
-          <ChevronDownIcon
-            :class="[sectionChevronClass, { '-rotate-90': !incomingExpanded }]"
-            aria-hidden="true"
-          />
+          <ChevronDownIcon :class="chevronClass(incomingExpanded)" aria-hidden="true" />
         </button>
         <router-link
           v-if="groupsEnabled"
@@ -103,10 +100,7 @@
           @click="pinnedExpanded = !pinnedExpanded"
         >
           {{ $t('nav.pinned') }}
-          <ChevronDownIcon
-            :class="[sectionChevronClass, { '-rotate-90': !pinnedExpanded }]"
-            aria-hidden="true"
-          />
+          <ChevronDownIcon :class="chevronClass(pinnedExpanded)" aria-hidden="true" />
         </button>
       </div>
       <div v-show="pinnedExpanded" id="sidebar-pinned-list" class="px-1">
@@ -136,11 +130,8 @@
           data-testid="btn-sidebar-v2-chats-toggle"
           @click="chatsExpanded = !chatsExpanded"
         >
-          {{ $t('nav.chats') }}
-          <ChevronDownIcon
-            :class="[sectionChevronClass, { '-rotate-90': !chatsExpanded }]"
-            aria-hidden="true"
-          />
+          {{ $t('nav.chatHistory') }}
+          <ChevronDownIcon :class="chevronClass(chatsExpanded)" aria-hidden="true" />
         </button>
         <router-link
           to="/chats"
@@ -155,11 +146,12 @@
 
       <div v-show="chatsExpanded" id="sidebar-chat-list" class="px-1">
         <ChatHistoryList
-          :chats="visibleUnpinned"
+          :chats="unpinnedChats"
           :active-chat-id="chatsStore.activeChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
+          :group-of="dateGroupLabel"
           @select="selectChat"
           @share="shareChat"
           @rename="renameChat"
@@ -191,13 +183,15 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
+import { chatDateGroup } from './chatDateGroups'
+import { listOverflows, scrollerGrewWithContent } from './chatHistoryPaging'
 import { chatsPanelRefresh } from '@/composables/useNavSections'
-import { useChatHistory } from '@/composables/useChatHistory'
+import { useMidnightNow } from '@/composables/useMidnightNow'
+import { useI18n } from 'vue-i18n'
+import { useChatHistory, type HistoryChat } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
-
-const UNPINNED_PAGE = 30
 
 const {
   isCreatingChat,
@@ -241,8 +235,17 @@ const rememberExpanded = (key: string, open: boolean) => {
 const sectionToggleClass =
   'mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-3 py-1 text-left text-[13px] font-semibold txt-secondary hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'
 
-const sectionChevronClass =
-  'h-3.5 w-3.5 flex-shrink-0 opacity-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none group-hover/section:opacity-100 group-focus-visible/section:opacity-100'
+const sectionChevronBase =
+  'h-3.5 w-3.5 flex-shrink-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none'
+
+/**
+ * An open section shows its chevron on hover only. A folded one always shows
+ * it, pointing right, or the heading would look like an empty list.
+ */
+const chevronClass = (expanded: boolean): string =>
+  expanded
+    ? `${sectionChevronBase} opacity-0 group-hover/section:opacity-100 group-focus-visible/section:opacity-100`
+    : `${sectionChevronBase} -rotate-90 opacity-100`
 
 const sectionSideLinkClass =
   'absolute right-2 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary transition-opacity hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]'
@@ -253,6 +256,25 @@ const sectionHoverLinkClass =
 
 const groupsEnabled = computed(() => isIamGroupsEnabled())
 
+const { t } = useI18n()
+/**
+ * One "now" per list change, so every row is bucketed against the same day —
+ * and a fresh one at midnight, so the headings cannot go stale while the
+ * sidebar stays mounted overnight.
+ */
+const midnightNow = useMidnightNow()
+const dateGroupLabels = computed(() => {
+  const now = midnightNow.value
+  return new Map(
+    unpinnedChats.value.map((chat) => [
+      chat.id,
+      t(`chat.browser.${chatDateGroup(chat.updatedAt || chat.createdAt, now)}`),
+    ])
+  )
+})
+const dateGroupLabel = (chat: HistoryChat): string | null =>
+  dateGroupLabels.value.get(chat.id) ?? null
+
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 const isGuest = computed(() => !authStore.isAuthenticated)
@@ -261,45 +283,61 @@ const chatsExpanded = ref(readExpanded(CHATS_EXPANDED_KEY))
 const pinnedExpanded = ref(readExpanded(PINNED_EXPANDED_KEY))
 const incomingExpanded = ref(readExpanded(INCOMING_EXPANDED_KEY))
 const chatsReady = ref(false)
-const unpinnedShown = ref(UNPINNED_PAGE)
+let filling = false
 
-const visibleUnpinned = computed(() => unpinnedChats.value.slice(0, unpinnedShown.value))
 const chatsLoading = computed(() => (!chatsReady.value || chatsStore.loading ? 'true' : 'false'))
 
 watch(chatsExpanded, (open) => {
   rememberExpanded(CHATS_EXPANDED_KEY, open)
-  if (open) void nextTick(() => revealUntilFull())
+  if (open) void nextTick(() => fillUntilScrollable())
 })
 watch(pinnedExpanded, (open) => rememberExpanded(PINNED_EXPANDED_KEY, open))
 watch(incomingExpanded, (open) => rememberExpanded(INCOMING_EXPANDED_KEY, open))
 
 const scrollRoot = (): HTMLElement | null => {
-  const root = document.querySelector('[data-testid="section-sidebar-panel"] .sidebar-scroll')
+  const root = document.querySelector('[data-testid="section-sidebar-scroll"]')
   return root instanceof HTMLElement ? root : null
 }
 
-/** Keep fetching the next slice until the list fills the sidebar or runs out. */
-const revealUntilFull = () => {
-  if (!chatsExpanded.value) return
-  if (unpinnedShown.value >= unpinnedChats.value.length) return
+/**
+ * If the loaded page does not fill the menu, ask for the next page. Stop once
+ * the list can scroll, or if the pane grows with the rows (it is not a real
+ * scrollport, and continuing would download every chat).
+ *
+ * Progress tracks the server offset, not the visible row count: a fetched
+ * page of only pinned, empty, or widget-session chats adds no visible rows,
+ * but the older valid chats are still waiting on later pages.
+ */
+const fillUntilScrollable = async () => {
+  if (filling || !chatsExpanded.value || !chatsStore.railHasMore || chatsStore.railLoading) return
   const root = scrollRoot()
   if (!root || root.clientHeight === 0) return
-  if (root.scrollHeight > root.clientHeight + 160) return
-  unpinnedShown.value += UNPINNED_PAGE
-  void nextTick(() => revealUntilFull())
+  if (listOverflows(root.clientHeight, root.scrollHeight)) return
+  const before = { clientHeight: root.clientHeight, scrollHeight: root.scrollHeight }
+  const beforeOffset = chatsStore.railOffset
+  filling = true
+  try {
+    await chatsStore.loadRailChats(false)
+  } finally {
+    filling = false
+  }
+  await nextTick()
+  const next = scrollRoot()
+  if (!next || scrollerGrewWithContent(before, next)) return
+  if (chatsStore.railOffset === beforeOffset) return
+  await fillUntilScrollable()
 }
 
+/** One more page from the server. Further pages wait for the next scroll. */
 const showMoreChats = () => {
   if (!chatsExpanded.value) return
-  if (unpinnedShown.value >= unpinnedChats.value.length) return
-  unpinnedShown.value += UNPINNED_PAGE
-  void nextTick(() => revealUntilFull())
+  return chatsStore.loadRailChats(false)
 }
 
 watch(
   () => unpinnedChats.value.length,
   () => {
-    if (chatsReady.value) void nextTick(() => revealUntilFull())
+    if (chatsReady.value) void nextTick(() => fillUntilScrollable())
   }
 )
 
@@ -310,10 +348,10 @@ const refreshChats = async () => {
   if (isGuest.value) return
   chatsReady.value = false
   try {
-    await Promise.all([chatsStore.loadChats(), incomingStore.load()])
+    await Promise.all([chatsStore.loadRailChats(true), incomingStore.load()])
   } finally {
     chatsReady.value = true
-    void nextTick(() => revealUntilFull())
+    void nextTick(() => fillUntilScrollable())
   }
 }
 

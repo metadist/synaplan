@@ -344,7 +344,11 @@
       "enhanceDesc": "Rewrite your message with AI before sending"
     },
     "modelDropdown": {
-      "default": "Default"
+      "default": "Default",
+      "filterLabel": "Filter models",
+      "filterPlaceholder": "Filter models…",
+      "clearFilter": "Clear filter",
+      "noMatch": "No model matches “{query}”."
     },
     "removeTool": "Remove tool",
     "pastedText": {

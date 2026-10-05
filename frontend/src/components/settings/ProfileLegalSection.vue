@@ -1,5 +1,5 @@
 <template>
-  <section id="legal" class="surface-card rounded-lg p-6 scroll-mt-6" data-testid="section-legal">
+  <section id="legal" class="surface-card rounded-lg p-6 scroll-mt-24" data-testid="section-legal">
     <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
       <Icon icon="mdi:shield-check" class="w-5 h-5" />
       {{ $t('profile.legal.title') }}

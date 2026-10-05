@@ -1,90 +1,111 @@
 <template>
-  <div v-if="chats.length > 0" class="space-y-0.5" role="list" :data-testid="rowsTestId">
+  <div v-if="chats.length > 0" :data-testid="rowsTestId">
     <div
-      v-for="chat in chats"
-      :key="chat.id"
-      role="listitem"
-      class="group/chat relative overflow-hidden rounded-lg"
-      :class="
-        chat.id === activeChatId
-          ? 'bg-[var(--brand)]/[0.08]'
-          : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
-      "
-      data-testid="row-chat-v2"
-      @mouseenter="onRowEnter(chat, $event)"
-      @mouseleave="onRowLeave"
-      @focusin="onRowEnter(chat, $event)"
-      @focusout="onRowFocusOut"
+      v-for="section in sections"
+      :key="section.key"
+      class="chat-history-section"
+      data-testid="section-chat-history-group"
     >
-      <button
-        type="button"
-        class="chat-row-btn flex w-full min-w-0 items-center gap-2 text-left rounded-xl cursor-pointer"
-        :aria-describedby="previewChatId === chat.id ? PREVIEW_ID : undefined"
-        @click="emit('select', chat.id)"
+      <p
+        v-if="section.label"
+        :id="`${groupIdPrefix}-${section.key}`"
+        class="chat-group-label px-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wide txt-secondary"
+        data-testid="text-chat-history-group"
       >
-        <span
-          v-if="generating(chat)"
-          class="inline-flex flex-shrink-0"
-          data-testid="indicator-chat-active-run"
-        >
-          <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
-          <span class="sr-only">{{ $t('chat.stillGenerating') }}</span>
-        </span>
-        <span
-          v-else-if="chat.isNew"
-          class="inline-flex flex-shrink-0"
-          data-testid="indicator-chat-incoming-new"
-        >
-          <span class="w-2 h-2 rounded-full bg-[var(--status-error)]" />
-          <span class="sr-only">{{ $t('iam.incoming.new') }}</span>
-        </span>
-        <span
-          class="chat-row-clip flex h-5 min-w-0 flex-1 items-center overflow-hidden"
-          :class="{ 'is-reserved': !chat.incoming }"
-        >
-          <span
-            :ref="bindTitle(chat.id)"
-            class="block h-5 max-w-full truncate text-[15px] leading-5"
-            :class="[
-              chat.id === activeChatId
-                ? 'font-semibold text-[var(--brand)]'
-                : 'chat-row-title font-medium',
-              marqueeChatId === chat.id && 'chat-title-marquee',
-            ]"
-          >
-            {{ titleOf(chat) }}
-          </span>
-        </span>
-      </button>
+        {{ section.label }}
+      </p>
       <div
-        v-if="!chat.incoming"
-        class="chat-row-menu absolute inset-y-0 right-0 flex items-stretch"
+        class="space-y-0.5"
+        role="list"
+        :aria-labelledby="section.label ? `${groupIdPrefix}-${section.key}` : undefined"
       >
-        <button
-          type="button"
-          class="chat-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5 cursor-pointer"
-          data-testid="btn-chat-v2-row-pin"
-          :aria-label="chat.pinned ? $t('chat.unpin') : $t('chat.pin')"
-          :aria-pressed="chat.pinned === true"
-          :aria-busy="chatsStore.pinPendingChatIds.has(chat.id)"
-          :disabled="chatsStore.pinPendingChatIds.has(chat.id)"
-          @click="emit('pin', chat.id)"
+        <div
+          v-for="chat in section.chats"
+          :key="chat.id"
+          role="listitem"
+          class="group/chat relative overflow-hidden rounded-lg"
+          :class="
+            chat.id === activeChatId
+              ? 'bg-[var(--brand)]/[0.08]'
+              : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
+          "
+          data-testid="row-chat-v2"
+          @mouseenter="onRowEnter(chat, $event)"
+          @mouseleave="onRowLeave"
+          @focusin="onRowEnter(chat, $event)"
+          @focusout="onRowFocusOut"
         >
-          <Icon
-            :icon="chat.pinned ? 'ph:push-pin-fill' : 'ph:push-pin'"
-            class="w-4 h-4"
-            aria-hidden="true"
-          />
-        </button>
-        <button
-          type="button"
-          class="chat-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5 cursor-pointer"
-          data-testid="btn-chat-v2-row-menu"
-          :aria-label="$t('common.actions')"
-          @click="toggleMenu(chat.id, $event)"
-        >
-          <EllipsisHorizontalIcon class="w-5 h-5" aria-hidden="true" />
-        </button>
+          <button
+            type="button"
+            class="chat-row-btn flex w-full min-w-0 items-center gap-2 text-left rounded-xl cursor-pointer"
+            :aria-describedby="previewChatId === chat.id ? PREVIEW_ID : undefined"
+            @click="emit('select', chat.id)"
+          >
+            <span
+              v-if="generating(chat)"
+              class="inline-flex flex-shrink-0"
+              data-testid="indicator-chat-active-run"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
+              <span class="sr-only">{{ $t('chat.stillGenerating') }}</span>
+            </span>
+            <span
+              v-else-if="chat.isNew"
+              class="inline-flex flex-shrink-0"
+              data-testid="indicator-chat-incoming-new"
+            >
+              <span class="w-2 h-2 rounded-full bg-[var(--status-error)]" />
+              <span class="sr-only">{{ $t('iam.incoming.new') }}</span>
+            </span>
+            <span
+              class="chat-row-clip flex h-5 min-w-0 flex-1 items-center overflow-hidden"
+              :class="{ 'is-reserved': !chat.incoming }"
+            >
+              <span
+                :ref="bindTitle(chat.id)"
+                class="block h-5 max-w-full truncate text-[13px] leading-5"
+                :class="[
+                  chat.id === activeChatId
+                    ? 'font-medium text-[var(--brand)]'
+                    : 'chat-row-title font-normal',
+                  marqueeChatId === chat.id && 'chat-title-marquee',
+                ]"
+              >
+                {{ titleOf(chat) }}
+              </span>
+            </span>
+          </button>
+          <div
+            v-if="!chat.incoming"
+            class="chat-row-menu absolute inset-y-0 right-0 flex items-stretch"
+          >
+            <button
+              type="button"
+              class="chat-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5 cursor-pointer"
+              data-testid="btn-chat-v2-row-pin"
+              :aria-label="chat.pinned ? $t('chat.unpin') : $t('chat.pin')"
+              :aria-pressed="chat.pinned === true"
+              :aria-busy="chatsStore.pinPendingChatIds.has(chat.id)"
+              :disabled="chatsStore.pinPendingChatIds.has(chat.id)"
+              @click="emit('pin', chat.id)"
+            >
+              <Icon
+                :icon="chat.pinned ? 'ph:push-pin-fill' : 'ph:push-pin'"
+                class="w-4 h-4"
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              class="chat-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5 cursor-pointer"
+              data-testid="btn-chat-v2-row-menu"
+              :aria-label="$t('common.actions')"
+              @click="toggleMenu(chat.id, $event)"
+            >
+              <EllipsisHorizontalIcon class="w-5 h-5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -163,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -185,9 +206,34 @@ const props = defineProps<{
   timeOf: (chat: HistoryChat) => string
   generating: (chat: HistoryChat) => boolean
   listTestId?: string
+  /** Label of the date group a row belongs to. Rows must arrive sorted, so groups stay contiguous. */
+  groupOf?: (chat: HistoryChat) => string | null
 }>()
 
 const rowsTestId = computed(() => props.listTestId ?? 'list-chat-manager-rows')
+const groupIdPrefix = `chat-group-${useId()}`
+
+interface HistorySection {
+  key: string
+  label: string | null
+  chats: HistoryChat[]
+}
+
+const sections = computed<HistorySection[]>(() => {
+  const groupOf = props.groupOf
+  if (!groupOf) return [{ key: 'all', label: null, chats: props.chats }]
+  const out: HistorySection[] = []
+  for (const chat of props.chats) {
+    const label = groupOf(chat)
+    const last = out[out.length - 1]
+    if (last && last.label === label) {
+      last.chats.push(chat)
+    } else {
+      out.push({ key: String(out.length), label, chats: [chat] })
+    }
+  }
+  return out
+})
 
 const emit = defineEmits<{
   select: [chatId: number]
@@ -440,19 +486,28 @@ onUnmounted(() => {
 
 <style scoped>
 .chat-row-btn {
-  padding: 0.375rem;
+  padding: 0.3125rem 0.375rem;
 }
 
+/* History sits one step below the menu: smaller, regular weight, and a
+   softer ink than the menu's primary text. Both stay above WCAG AA on the
+   sidebar (light #d0daea ≈ 7:1, dark #070b15 ≈ 13:1). */
 .chat-row-title {
-  color: #1c212b;
+  color: #3b4353;
 }
 
 .dark .chat-row-title {
-  color: #e3e6ee;
+  color: #cdd1da;
 }
 
 .chat-row-clip.is-reserved {
   padding-right: 4rem;
+}
+
+/* Date groups break a long history into short runs, which reads calmer
+   than one undivided list. */
+.chat-history-section + .chat-history-section {
+  margin-top: 0.875rem;
 }
 
 .chat-row-menu {

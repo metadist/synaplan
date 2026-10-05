@@ -176,6 +176,91 @@ describe('ModelDropdown', () => {
     expect(typed.defaultPrevented).toBe(true)
   })
 
+  describe('filter', () => {
+    const manyModels = () => [
+      chatModel(),
+      chatModel({ id: 56, name: 'Claude Sonnet 5', service: 'Anthropic', providerId: 'sonnet' }),
+      chatModel({ id: 57, name: 'Claude Haiku 4.5', service: 'Anthropic', providerId: 'haiku' }),
+      chatModel({ id: 58, name: 'Gemini 3.1 Pro', service: 'Google', providerId: 'gemini' }),
+      chatModel({ id: 59, name: 'Llama 4', service: 'Groq', providerId: 'llama' }),
+      chatModel({ id: 60, name: 'Mistral Large', service: 'Mistral', providerId: 'mistral' }),
+    ]
+
+    beforeEach(() => {
+      useAiConfigStore().models.CHAT = manyModels()
+    })
+
+    const openWithFilter = async () => {
+      wrapper = mountPicker()
+      await wrapper.get('[data-testid="btn-model-toggle"]').trigger('keydown.down')
+      await flushPromises()
+      return wrapper.get('[data-testid="input-model-filter"]')
+    }
+
+    const visibleIds = () =>
+      wrapper!
+        .findAll('[role="option"]')
+        .map((option) => option.attributes('data-testid'))
+        .filter((id): id is string => id !== undefined)
+
+    it('hides the filter for a short list', async () => {
+      useAiConfigStore().models.CHAT = [chatModel()]
+      wrapper = mountPicker()
+      await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="input-model-filter"]').exists()).toBe(false)
+    })
+
+    it('focuses the filter when opened from the keyboard and narrows by name or provider', async () => {
+      const input = await openWithFilter()
+      expect(document.activeElement).toBe(input.element)
+
+      await input.setValue('anthropic')
+      expect(visibleIds()).toEqual(['btn-model-57', 'btn-model-56'])
+
+      await input.setValue('GEMINI pro')
+      expect(visibleIds()).toEqual(['btn-model-58'])
+    })
+
+    it('picks the first match on Enter', async () => {
+      const input = await openWithFilter()
+      await input.setValue('haiku')
+      await input.trigger('keydown.enter')
+      await flushPromises()
+
+      expect(wrapper!.emitted('update:modelValue')?.[0]).toEqual([57])
+      expect(wrapper!.find('[data-testid="dropdown-model-panel"]').exists()).toBe(false)
+    })
+
+    it('says so when nothing matches, and Escape clears before it closes', async () => {
+      const input = await openWithFilter()
+      await input.setValue('zzz')
+
+      expect(wrapper!.get('[data-testid="text-model-filter-empty"]').text()).toContain(
+        'chatInput.modelDropdown.noMatch'
+      )
+
+      await input.trigger('keydown.escape')
+      expect((input.element as HTMLInputElement).value).toBe('')
+      expect(wrapper!.find('[data-testid="dropdown-model-panel"]').exists()).toBe(true)
+
+      await input.trigger('keydown.escape')
+      await flushPromises()
+      expect(wrapper!.find('[data-testid="dropdown-model-panel"]').exists()).toBe(false)
+    })
+
+    it('sends letters typed in the list to the filter', async () => {
+      const input = await openWithFilter()
+      await input.trigger('keydown.down')
+      const list = wrapper!.get('[role="listbox"]')
+      await list.trigger('keydown', { key: 'l' })
+
+      expect((input.element as HTMLInputElement).value).toBe('l')
+      expect(document.activeElement).toBe(input.element)
+    })
+  })
+
   it('asks a guest to sign in instead of opening the list', async () => {
     wrapper = mountPicker({ guest: true })
 

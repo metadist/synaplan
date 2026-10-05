@@ -66,6 +66,7 @@
   height: 100vh;
   height: 100dvh;
   min-height: 0;
+  overflow: hidden;
 }
 .v2-sidebar-rail {
   box-sizing: border-box;
@@ -78,7 +79,101 @@
   width: 280px;
   min-width: 280px;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
+}
+
+/* 768–1023 px: the panel floats above the content next to the rail instead
+   of taking width from the chat (see useSidebarLayout.ts). It needs an
+   opaque surface; the docked glass panel is translucent. */
+.v2-sidebar-panel--overlay {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: calc(56px + env(safe-area-inset-left, 0px));
+  z-index: 70;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg-sidebar-solid, var(--bg-sidebar));
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28);
+}
+.dark .v2-sidebar-panel--overlay {
+  border-right-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+}
+.v2-panel-scrim {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: calc(56px + env(safe-area-inset-left, 0px));
+  z-index: 65;
+  border: 0;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.18);
+  cursor: default;
+}
+.dark .v2-panel-scrim {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.v2-panel-dock-enter-active,
+.v2-panel-dock-leave-active {
+  transition:
+    width 0.18s ease,
+    min-width 0.18s ease,
+    opacity 0.18s ease;
+}
+.v2-panel-dock-enter-from,
+.v2-panel-dock-leave-to {
+  width: 0 !important;
+  min-width: 0 !important;
+  opacity: 0;
+}
+.v2-panel-overlay-enter-active,
+.v2-panel-overlay-leave-active,
+.v2-panel-scrim-enter-active,
+.v2-panel-scrim-leave-active {
+  transition:
+    transform 0.18s ease,
+    opacity 0.18s ease;
+}
+.v2-panel-overlay-enter-from,
+.v2-panel-overlay-leave-to {
+  transform: translateX(-12px);
+  opacity: 0;
+}
+.v2-panel-scrim-enter-from,
+.v2-panel-scrim-leave-to {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-panel-dock-enter-active,
+  .v2-panel-dock-leave-active,
+  .v2-panel-overlay-enter-active,
+  .v2-panel-overlay-leave-active,
+  .v2-panel-scrim-enter-active,
+  .v2-panel-scrim-leave-active {
+    transition: none;
+  }
+}
+
+/*
+ * Settings section links. On phone chrome the drawer toggle is fixed at
+ * safe-area + 10px with z-40. A sticky top-0 bar covers the first row and
+ * steals taps on it, including short landscape viewports. Stick only when
+ * the desktop rail is showing (same query as .v2-desktop-chrome).
+ */
+.settings-section-index {
+  position: static;
+}
+@media (min-width: 768px) and (min-height: 520px) {
+  .settings-section-index {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
 }
 
 /* Mobile floating header button clearance — pushes titles below the button.

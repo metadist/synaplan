@@ -1,5 +1,5 @@
 <template>
-  <section id="data" class="space-y-6 scroll-mt-6">
+  <section id="data" class="space-y-6 scroll-mt-24">
     <ExportImportPanel />
     <div v-show="!profileLoadFailed" class="info-box-blue" data-testid="section-privacy-notice">
       <p class="text-sm info-box-blue-text flex items-start gap-2">

@@ -1,14 +1,14 @@
 <template>
   <nav
-    class="md:w-56 md:shrink-0 md:sticky md:top-4 md:self-start"
+    class="settings-section-index -mx-1 bg-chat px-1 py-2"
     :aria-label="$t('settings.sections.indexLabel')"
     data-testid="nav-settings-sections"
   >
-    <ul class="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
-      <li v-for="item in items" :key="item.id" class="shrink-0 md:shrink">
+    <ul class="flex flex-wrap gap-2">
+      <li v-for="item in items" :key="item.id">
         <a
           :href="`#${item.id}`"
-          class="inline-flex px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap md:whitespace-normal md:w-full focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="inline-flex rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :class="
             activeSectionId() === `#${item.id}`
               ? 'txt-primary bg-[var(--brand-alpha-light)]'

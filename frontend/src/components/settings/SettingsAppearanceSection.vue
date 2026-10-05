@@ -1,5 +1,5 @@
 <template>
-  <section id="appearance" class="space-y-6 scroll-mt-6">
+  <section id="appearance" class="space-y-6 scroll-mt-24">
     <div class="surface-card p-6" data-testid="section-language-settings">
       <h2 class="text-lg font-semibold txt-primary mb-2">
         {{ $t('settings.language.title') }}
@@ -9,7 +9,7 @@
       </p>
 
       <div
-        class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+        class="grid grid-cols-2 gap-3 @min-[24rem]:grid-cols-3 @min-[40rem]:grid-cols-5"
         data-testid="grid-language-options"
       >
         <button

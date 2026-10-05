@@ -1,6 +1,7 @@
 <template>
   <div
     class="flex-shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] px-3 pt-3 pb-3 flex flex-col gap-2"
+    data-testid="section-sidebar-footer"
   >
     <button
       v-if="!isGuestMode"

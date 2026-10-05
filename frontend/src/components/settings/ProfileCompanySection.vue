@@ -6,7 +6,7 @@
     </h2>
     <p class="txt-secondary text-sm mb-6">{{ $t('profile.companyInfo.subtitle') }}</p>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6 @min-[36rem]:grid-cols-2">
       <div data-testid="field-company-name">
         <label class="block txt-primary font-medium mb-2">
           {{ $t('profile.companyInfo.companyName') }}
@@ -33,7 +33,7 @@
         />
       </div>
 
-      <div class="md:col-span-2" data-testid="field-invoice-email">
+      <div class="@min-[36rem]:col-span-2" data-testid="field-invoice-email">
         <label class="block txt-primary font-medium mb-2">
           {{ $t('profile.accountSettings.invoiceEmail') }}
         </label>
