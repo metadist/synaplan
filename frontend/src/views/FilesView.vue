@@ -801,12 +801,11 @@
                     >
                       <TrashIcon class="w-3.5 h-3.5" />
                     </button>
-                    <!-- Share, use in chat, and delete share one hover chip:
-                         brand ink on a quiet fill, same size, shown together. -->
+                    <!-- Share stays visible at rest. Use-in-chat and delete appear on hover. -->
                     <button
                       v-if="iamSharingEnabled && !folder.pending && !folder.shared"
                       type="button"
-                      class="absolute top-1 left-1 p-1.5 rounded-xl text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      class="absolute top-1 left-1 p-1.5 rounded-xl text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] hover:bg-[var(--brand)]/15 transition-colors"
                       :title="$t('iam.share')"
                       :aria-label="$t('iam.share')"
                       :data-testid="`btn-share-folder-${folder.name}`"

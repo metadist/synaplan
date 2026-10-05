@@ -18,6 +18,9 @@ import {
 } from './useNavItems'
 export type NavSectionKey = 'chats' | 'library' | 'assistants' | 'channels' | 'operate'
 
+/** Incremented when the chats rail icon is clicked while chats is already open. */
+export const chatsPanelRefresh = ref(0)
+
 export interface NavSection {
   key: NavSectionKey
   label: string
@@ -248,7 +251,13 @@ export function useNavSections() {
   }
 
   function selectSection(key: NavSectionKey) {
-    if (sectionKeyForPath(route.path) === key) return
+    // The chats panel stays mounted, so a second click on the active rail
+    // icon never remounts it. Bump the refresh so a chat renamed elsewhere
+    // (or created after the first load) shows up in the list.
+    if (sectionKeyForPath(route.path) === key) {
+      if (key === 'chats') chatsPanelRefresh.value += 1
+      return
+    }
     const target = homePath(key)
     if (route.path !== target) router.push(target)
   }

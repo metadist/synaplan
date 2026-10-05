@@ -177,6 +177,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
+import { chatsPanelRefresh } from '@/composables/useNavSections'
 import { useChatHistory } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 
@@ -284,12 +285,21 @@ watch(
 
 defineExpose({ showMoreChats })
 
-onMounted(async () => {
+const refreshChats = async () => {
+  chatsReady.value = false
   try {
     await Promise.all([chatsStore.loadChats(), incomingStore.load()])
   } finally {
     chatsReady.value = true
     void nextTick(() => revealUntilFull())
   }
+}
+
+watch(chatsPanelRefresh, () => {
+  void refreshChats()
+})
+
+onMounted(() => {
+  void refreshChats()
 })
 </script>
