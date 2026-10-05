@@ -256,4 +256,74 @@ describe('SidebarV2 New Chat lock', () => {
     })
     wrapper.unmount()
   })
+
+  it('keeps auto-filling through pages with no visible chats', async () => {
+    // Two full pages of pinned chats add zero rows to the visible history,
+    // but the older valid chats are still waiting on the third page. Fill
+    // progress tracks the server offset, so it continues instead of stalling.
+    const stamp = (hoursAgo: number) => new Date(Date.now() - hoursAgo * 3600 * 1000).toISOString()
+    const chats = Array.from({ length: 65 }, (_, index) => ({
+      id: index + 1,
+      title: `Topic ${index + 1}`,
+      createdAt: stamp(index + 2),
+      updatedAt: stamp(index + 1),
+      messageCount: 2,
+      isShared: false,
+      pinned: index < 60,
+      pinnedAt: index < 60 ? stamp(index + 1) : null,
+    }))
+    vi.mocked(httpClient).mockImplementation(async (url: unknown) => {
+      if (typeof url === 'string' && url.startsWith('/api/v1/chats')) {
+        const params = new URL(url, 'https://synaplan.local').searchParams
+        const limit = Number(params.get('limit') ?? chats.length)
+        const offset = Number(params.get('offset') ?? 0)
+        const page = chats.slice(offset, offset + limit)
+        return {
+          success: true,
+          chats: page,
+          total: chats.length,
+          offset,
+          limit,
+          hasMore: offset + page.length < chats.length,
+          activeRunChatIds: [],
+        }
+      }
+      return { success: true }
+    })
+
+    const wrapper = await mountSidebar()
+    const chatUrls = () =>
+      vi
+        .mocked(httpClient)
+        .mock.calls.map(([url]) => url)
+        .filter((url): url is string => typeof url === 'string' && url.startsWith('/api/v1/chats'))
+    expect(chatUrls()).toEqual(['/api/v1/chats?limit=30&offset=0'])
+
+    // jsdom has no layout: give the scroller a fixed box that fits its
+    // content, so the fill logic runs instead of bailing on zero height.
+    const scroll = wrapper.get('[data-testid="section-sidebar-scroll"]')
+    Object.defineProperty(scroll.element, 'clientHeight', { value: 200, configurable: true })
+    Object.defineProperty(scroll.element, 'scrollHeight', { value: 100, configurable: true })
+
+    await wrapper.get('[data-testid="btn-sidebar-v2-chats-toggle"]').trigger('click')
+    await wrapper.get('[data-testid="btn-sidebar-v2-chats-toggle"]').trigger('click')
+    await vi.waitFor(() => {
+      expect(chatUrls()).toEqual([
+        '/api/v1/chats?limit=30&offset=0',
+        '/api/v1/chats?limit=30&offset=30',
+        '/api/v1/chats?limit=30&offset=60',
+      ])
+    })
+    expect(wrapper.findAll('[data-testid="row-chat-v2"]')).toHaveLength(65)
+
+    vi.mocked(httpClient).mockResolvedValue({
+      success: true,
+      chats: [],
+      total: 0,
+      offset: 0,
+      limit: 30,
+      hasMore: false,
+    })
+    wrapper.unmount()
+  })
 })

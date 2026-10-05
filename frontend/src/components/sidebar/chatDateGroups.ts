@@ -4,25 +4,31 @@
  */
 export type ChatDateGroup = 'today' | 'yesterday' | 'lastWeek' | 'lastMonth' | 'older'
 
-const DAY_MS = 24 * 60 * 60 * 1000
 const LAST_WEEK_DAYS = 7
 const LAST_MONTH_DAYS = 30
-
-function startOfDay(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-}
 
 /**
  * Bucket a chat by its last activity, in the viewer's local calendar days.
  * An unreadable timestamp lands in "older" rather than breaking the list.
+ *
+ * Boundaries are built from local midnights with `setDate()`, never by
+ * subtracting fixed 24h blocks: across a daylight-saving transition a
+ * calendar day is 23 or 25 hours long, so millisecond cutoffs misclassify
+ * chats near the boundary (e.g. Nov 1 00:30 landing in "Last Week").
  */
 export function chatDateGroup(timestamp: string | null | undefined, now: Date): ChatDateGroup {
   const time = Date.parse(timestamp ?? '')
   if (Number.isNaN(time)) return 'older'
-  const today = startOfDay(now)
-  if (time >= today) return 'today'
-  if (time >= today - DAY_MS) return 'yesterday'
-  if (time >= today - LAST_WEEK_DAYS * DAY_MS) return 'lastWeek'
-  if (time >= today - LAST_MONTH_DAYS * DAY_MS) return 'lastMonth'
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startYesterday = new Date(startToday)
+  startYesterday.setDate(startYesterday.getDate() - 1)
+  const startLastWeek = new Date(startToday)
+  startLastWeek.setDate(startLastWeek.getDate() - LAST_WEEK_DAYS)
+  const startLastMonth = new Date(startToday)
+  startLastMonth.setDate(startLastMonth.getDate() - LAST_MONTH_DAYS)
+  if (time >= startToday.getTime()) return 'today'
+  if (time >= startYesterday.getTime()) return 'yesterday'
+  if (time >= startLastWeek.getTime()) return 'lastWeek'
+  if (time >= startLastMonth.getTime()) return 'lastMonth'
   return 'older'
 }

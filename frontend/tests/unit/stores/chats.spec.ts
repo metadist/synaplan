@@ -131,6 +131,9 @@ describe('Chats Store', () => {
 
     it('reuses the chat a pending boot create is adding instead of creating a second one', async () => {
       const store = useChatsStore()
+      // ChatView boots the full list before any create race can start.
+      httpClientMock.mockResolvedValueOnce({ chats: [], activeRunChatIds: [] })
+      await store.loadChats()
       const settleBoot = deferredCreate()
       const bootCreate = store.createChat('New Chat')
 
@@ -139,13 +142,15 @@ describe('Chats Store', () => {
       await bootCreate
 
       expect((await clicked)?.id).toBe(12)
-      expect(httpClientMock).toHaveBeenCalledTimes(1)
+      expect(httpClientMock).toHaveBeenCalledTimes(2)
       expect(store.chats.map((c) => c.id)).toEqual([12])
       expect(store.activeChatId).toBe(12)
     })
 
     it('shares one create between two New Chat clicks while the first is pending', async () => {
       const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [], activeRunChatIds: [] })
+      await store.loadChats()
       const settle = deferredCreate()
 
       const first = store.findOrCreateEmptyChat()
@@ -154,12 +159,14 @@ describe('Chats Store', () => {
 
       expect((await first)?.id).toBe(7)
       expect((await second)?.id).toBe(7)
-      expect(httpClientMock).toHaveBeenCalledTimes(1)
+      expect(httpClientMock).toHaveBeenCalledTimes(2)
       expect(store.chats.map((c) => c.id)).toEqual([7])
     })
 
     it('creates its own chat when the pending create fails', async () => {
       const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [], activeRunChatIds: [] })
+      await store.loadChats()
       const settleBoot = deferredCreate()
       const bootCreate = store.createChat('New Chat')
 
@@ -169,7 +176,7 @@ describe('Chats Store', () => {
       await bootCreate
 
       expect((await clicked)?.id).toBe(9)
-      expect(httpClientMock).toHaveBeenCalledTimes(2)
+      expect(httpClientMock).toHaveBeenCalledTimes(3)
       expect(store.activeChatId).toBe(9)
     })
 
@@ -211,6 +218,34 @@ describe('Chats Store', () => {
       expect((await clicked)?.id).toBe(4)
       expect(store.activeChatId).toBe(4)
       expect(httpClientMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('loads the complete list first when the menu only paged, reusing a distant empty chat', async () => {
+      // A non-chat landing (e.g. Settings) leaves `chats` with just the
+      // first merged rail page. The reusable empty chat may sit beyond it.
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        success: true,
+        chats: [
+          {
+            id: 9,
+            title: 'New Chat',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            messageCount: 0,
+            firstMessagePreview: null,
+          },
+        ],
+        activeRunChatIds: [],
+      })
+
+      const chat = await store.findOrCreateEmptyChat()
+
+      expect(chat?.id).toBe(9)
+      expect(store.activeChatId).toBe(9)
+      // One full-list GET, no duplicate-creating POST.
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
+      expect(httpClientMock.mock.calls[0][0]).toBe('/api/v1/chats')
     })
   })
 
@@ -1209,6 +1244,30 @@ describe('Chats Store', () => {
 
       expect(store.railChats.map((c) => c.id)).toEqual([6])
       expect(store.chats.map((c) => c.id)).toEqual([6])
+    })
+
+    it('starts the next page one row earlier after a loaded chat is deleted', async () => {
+      // Offset pagination counts server rows: deleting a loaded row moves
+      // every later row forward, so the next request must shift with it or
+      // it permanently skips the first chat of the next page.
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce(
+        menuPage([menuChat(5, 'Five'), menuChat(6, 'Six')], true)
+      )
+      await store.loadRailChats(true)
+
+      httpClientMock.mockResolvedValueOnce({ success: true })
+      await store.deleteChat(5)
+
+      httpClientMock.mockResolvedValueOnce(menuPage([menuChat(7, 'Seven')]))
+      await store.loadRailChats(false)
+
+      expect(httpClientMock.mock.calls.map(([url]) => url)).toEqual([
+        '/api/v1/chats?limit=30&offset=0',
+        '/api/v1/chats/5',
+        '/api/v1/chats?limit=30&offset=1',
+      ])
+      expect(store.railChats.map((c) => c.id)).toEqual([6, 7])
     })
   })
 })

@@ -6,8 +6,15 @@
     data-testid="comp-sidebar-v2"
   >
     <SidebarRail />
-    <Transition :name="panelDocked ? 'v2-panel-dock' : 'v2-panel-overlay'">
-      <SidebarPanel v-if="panelVisible" :overlay="panelOverlay" @navigate="onPanelNavigate" />
+    <!--
+      The transition and the overlay styling derive from the stable viewport
+      mode (`dockable`), not from visibility: closing flips `panelDocked` /
+      `panelOverlay` to false before the leave frame, which would otherwise
+      play the wrong leave animation and clip an overlay inside the 56px rail
+      while it fades out.
+    -->
+    <Transition :name="dockable ? 'v2-panel-dock' : 'v2-panel-overlay'">
+      <SidebarPanel v-if="panelVisible" :overlay="!dockable" @navigate="onPanelNavigate" />
     </Transition>
   </div>
 
@@ -70,7 +77,11 @@ const closeOverlay = () => {
 
 /** Choosing a chat or a page in the overlay closes it; the docked panel stays. */
 const onPanelNavigate = () => {
-  if (panelOverlay.value) sidebarStore.panelOverlayOpen = false
+  if (!panelOverlay.value) return
+  sidebarStore.panelOverlayOpen = false
+  // The activated row unmounts with the panel, so focus must move to the
+  // control that reopens it — like the scrim, Escape, and collapse paths.
+  focusSidebarToggle('expand')
 }
 
 const onKeydown = (event: KeyboardEvent) => {

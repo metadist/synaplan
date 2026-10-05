@@ -186,6 +186,7 @@ import ChatHistoryList from './ChatHistoryList.vue'
 import { chatDateGroup } from './chatDateGroups'
 import { listOverflows, scrollerGrewWithContent } from './chatHistoryPaging'
 import { chatsPanelRefresh } from '@/composables/useNavSections'
+import { useMidnightNow } from '@/composables/useMidnightNow'
 import { useI18n } from 'vue-i18n'
 import { useChatHistory, type HistoryChat } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
@@ -256,9 +257,14 @@ const sectionHoverLinkClass =
 const groupsEnabled = computed(() => isIamGroupsEnabled())
 
 const { t } = useI18n()
-/** One "now" per list change, so every row is bucketed against the same day. */
+/**
+ * One "now" per list change, so every row is bucketed against the same day —
+ * and a fresh one at midnight, so the headings cannot go stale while the
+ * sidebar stays mounted overnight.
+ */
+const midnightNow = useMidnightNow()
 const dateGroupLabels = computed(() => {
-  const now = new Date()
+  const now = midnightNow.value
   return new Map(
     unpinnedChats.value.map((chat) => [
       chat.id,
@@ -297,6 +303,10 @@ const scrollRoot = (): HTMLElement | null => {
  * If the loaded page does not fill the menu, ask for the next page. Stop once
  * the list can scroll, or if the pane grows with the rows (it is not a real
  * scrollport, and continuing would download every chat).
+ *
+ * Progress tracks the server offset, not the visible row count: a fetched
+ * page of only pinned, empty, or widget-session chats adds no visible rows,
+ * but the older valid chats are still waiting on later pages.
  */
 const fillUntilScrollable = async () => {
   if (filling || !chatsExpanded.value || !chatsStore.railHasMore || chatsStore.railLoading) return
@@ -304,7 +314,7 @@ const fillUntilScrollable = async () => {
   if (!root || root.clientHeight === 0) return
   if (listOverflows(root.clientHeight, root.scrollHeight)) return
   const before = { clientHeight: root.clientHeight, scrollHeight: root.scrollHeight }
-  const beforeCount = unpinnedChats.value.length
+  const beforeOffset = chatsStore.railOffset
   filling = true
   try {
     await chatsStore.loadRailChats(false)
@@ -314,7 +324,7 @@ const fillUntilScrollable = async () => {
   await nextTick()
   const next = scrollRoot()
   if (!next || scrollerGrewWithContent(before, next)) return
-  if (unpinnedChats.value.length === beforeCount) return
+  if (chatsStore.railOffset === beforeOffset) return
   await fillUntilScrollable()
 }
 

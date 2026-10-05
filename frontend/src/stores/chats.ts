@@ -116,6 +116,14 @@ export const useChatsStore = defineStore('chats', () => {
   /** Ids `createChat()` added that a snapshot started beforehand cannot list. */
   const locallyCreatedIds = new Set<number>()
   /**
+   * True once the full chat list has loaded successfully in this session.
+   * The desktop menu only pages (`loadRailChats`), so on a non-chat landing
+   * (e.g. Settings) `chats` may hold just the first merged page.
+   * `findOrCreateEmptyChat()` checks this before scanning, or a reusable
+   * empty chat beyond the first page is missed and duplicated.
+   */
+  let chatsListLoaded = false
+  /**
    * In-flight creates of chats that start empty. Their chat is not in `chats`
    * yet, so `findOrCreateEmptyChat()` waits for them instead of creating a
    * second empty chat (boot auto-create + "New Chat", or a double click).
@@ -321,6 +329,7 @@ export const useChatsStore = defineStore('chats', () => {
           data.activeRunChatIds ?? [],
           seq
         )
+        chatsListLoaded = true
         ensureValidActiveChat()
       } catch (err: unknown) {
         if (seq !== chatsLoadSeq) {
@@ -446,6 +455,10 @@ export const useChatsStore = defineStore('chats', () => {
   function forgetRailChat(chatId: number) {
     if (!railChats.value.some((chat) => chat.id === chatId)) return
     railChats.value = railChats.value.filter((chat) => chat.id !== chatId)
+    // Offset pagination counts server rows, so forgetting a loaded row moves
+    // every later row one position forward. Without this the next page starts
+    // one row too far in and permanently skips a chat.
+    railOffset.value = Math.max(0, railOffset.value - 1)
   }
 
   /**
@@ -587,6 +600,14 @@ export const useChatsStore = defineStore('chats', () => {
     // the previous thread.
     while (listLoading) {
       await listLoading
+    }
+
+    // The menu only pages, so on a non-chat landing (e.g. Settings) `chats`
+    // may hold just the first merged page. Scanning that for a reusable empty
+    // chat misses one sitting beyond the loaded pages and creates a
+    // duplicate. Load the complete list first when it never arrived.
+    if (!chatsListLoaded) {
+      await loadChats()
     }
 
     // Find all empty chats (not widget sessions, no messages, default title).
@@ -1011,6 +1032,7 @@ export const useChatsStore = defineStore('chats', () => {
     conversationAccessSeq += 1
     invalidateInFlightChatsLoad()
     locallyCreatedIds.clear()
+    chatsListLoaded = false
     liveGeneratingEpoch.clear()
     liveClearedEpoch.clear()
     activeRunChatIds.value = new Set()
@@ -1046,6 +1068,7 @@ export const useChatsStore = defineStore('chats', () => {
     railChats,
     railHasMore,
     railLoading,
+    railOffset,
     loadRailChats,
     isLocallyCreated,
     activeRunChatIds,

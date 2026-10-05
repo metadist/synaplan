@@ -130,6 +130,11 @@ describe('SidebarV2 below the dock width', () => {
     await wrapper.get('[data-testid="row-chat-v2"] .chat-row-btn').trigger('click')
     await flushPromises()
     expect(panelOpen()).toBe(false)
+    // The activated row unmounts with the panel, so focus must land on the
+    // control that reopens it instead of falling back to the document body.
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-testid="btn-sidebar-v2-expand"]').element
+    )
 
     await open()
     document.querySelector<HTMLElement>('[data-testid="btn-sidebar-v2-scrim"]')?.click()
