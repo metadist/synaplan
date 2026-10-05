@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { ELEMENT_CALL_LATER } from './matrix.js'
 import { createMeetingSession } from './jitsiSession.js'
+import { createPluginSession } from './pluginSession.js'
 import { publishMeeting } from './publish.js'
 
 function json(response, status, body) {
@@ -21,7 +22,67 @@ function authorized(request, token) {
   return (request.headers.authorization || '') === `Bearer ${token}`
 }
 
-export function createApp(config, { synaplan, log = () => {} } = {}) {
+function refuse(socket, status, reason) {
+  socket.write(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\n\r\n`)
+  socket.destroy()
+}
+
+function wire(ws, session, onClose, log, label) {
+  const send = (message) => {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify(message))
+    }
+  }
+  ws.on('message', (data) => {
+    let message
+    try {
+      message = JSON.parse(data.toString())
+    } catch {
+      return
+    }
+    session.handle(message, send).catch((error) => {
+      log(`${label}: ${error.message}`)
+    })
+  })
+  ws.on('close', () => onClose(send))
+}
+
+/**
+ * synaScriber plugin mode: the room's metadata put `notes=<ref>` on the
+ * bridge URL. The plugin must confirm a live session before any audio is
+ * accepted; afterwards every window goes to the plugin.
+ */
+function upgradePlugin({ sockets, request, socket, head, ref, plugin, config, log }) {
+  plugin.bind(ref).then((binding) => {
+    if (!binding) {
+      log(`Notes ${ref}: no active session, connection refused.`)
+      refuse(socket, 410, 'Gone')
+      return
+    }
+    sockets.handleUpgrade(request, socket, head, (ws) => {
+      const session = createPluginSession({
+        ref,
+        language: binding.language || config.language,
+        client: plugin,
+        commitAfterMs: config.commitAfterMs,
+      })
+      log(`Notes ${ref}: bridge connected (${binding.language}).`)
+      wire(ws, session, (send) => {
+        session.finish(send).then((result) => {
+          const stats = session.stats()
+          log(`Notes ${ref}: ${result.state} after ${stats.windows} windows from ${stats.speakers} speakers (${stats.failures} failed).`)
+        }).catch((error) => {
+          log(`Notes ${ref} were not finished: ${error.message}`)
+        })
+      }, log, `Notes ${ref}`)
+    })
+  }).catch((error) => {
+    log(`Notes ${ref}: Synaplan not reachable (${error.message}), connection refused.`)
+    refuse(socket, 503, 'Service Unavailable')
+  })
+}
+
+export function createApp(config, { synaplan, plugin = null, log = () => {} } = {}) {
   const sockets = new WebSocketServer({ noServer: true })
 
   const server = createServer((request, response) => {
@@ -72,6 +133,15 @@ export function createApp(config, { synaplan, log = () => {} } = {}) {
     if (!authorized(request, config.authToken)) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n')
       socket.destroy()
+      return
+    }
+    const notesRef = url.searchParams.get('notes')
+    if (notesRef) {
+      if (!plugin || !/^[a-f0-9]{16}$/.test(notesRef)) {
+        refuse(socket, 400, 'Bad Request')
+        return
+      }
+      upgradePlugin({ sockets, request, socket, head, ref: notesRef, plugin, config, log })
       return
     }
     const meetingId = url.searchParams.get('sessionId') || url.searchParams.get('meetingId') || 'meeting'

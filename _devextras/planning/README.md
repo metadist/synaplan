@@ -13,6 +13,7 @@ paths were renamed on 2026-09-17.
 | [`20260925_roadmap.md`](./20260925_roadmap.md) | Current roadmap (UX close-out, in-app transcription, Telegram, openDesk meeting notes, Wave 6) |
 | [`20260927-early-intake/`](./20260927-early-intake/README.md) | Sprint files for transcription, the easy issues, and Telegram |
 | [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: catalog, Connect UI, openDesk STT, editor / office clients |
+| [metadist/synaScriber](https://github.com/metadist/synaScriber) | openDesk meeting notes (Jitsi first) as a Synaplan plugin: plan, research and steps live in that repository's `docs/` |
 | [`20260927_roadmap.md`](./20260927_roadmap.md) | Stub → folded into the 2026-09-25 plan |
 | [`20260917_roadmap.md`](./20260917_roadmap.md) | Stub → live plan + frozen 2026-09-17 text |
 | [`20260910_roadmap_update.md`](./20260910_roadmap_update.md) | Stub → live plan + frozen 2026-09-10 text |
