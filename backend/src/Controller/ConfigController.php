@@ -1278,16 +1278,25 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $userId = $user->getId();
+        return $this->json(['success' => true] + $this->reportedDefaults((int) $user->getId()));
+    }
+
+    /**
+     * The defaults the AI Models page shows for a user, per capability.
+     *
+     * @return array{defaults: array<string, ?int>, locked: array<string, bool>, sources: array<string, ?string>}
+     */
+    private function reportedDefaults(int $userId): array
+    {
         $capabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
         $locked = [];
         $sources = [];
+        $groupPolicies = null !== $this->layeredConfigResolver
+            && $this->iamConfig->isGroupPoliciesEnabled($userId);
 
         foreach ($capabilities as $capability) {
-            $groupPolicies = null !== $this->layeredConfigResolver
-                && $this->iamConfig->isGroupPoliciesEnabled($userId);
             // VECTORIZE is system-wide (single Qdrant collection,
             // single dimension). Skip the per-user lookup entirely so
             // the dropdown can never disagree with what the indexer
@@ -1302,55 +1311,70 @@ class ConfigController extends AbstractController
                     'setting' => 'VECTORIZE',
                 ]);
                 $source = null !== $config ? 'admin' : null;
-            } elseif ($groupPolicies) {
-                // Same allow-list rule as generation: a personal or group
-                // default outside the allow-list is not the effective default,
-                // and a locked instance default wins even when it is (#2103, #2104).
-                $reported = $this->modelConfigService->reportedDefault($capability, $userId);
-                $defaults[$capability] = $reported['id'];
-                $locked[$capability] = $reported['locked'];
-                $sources[$capability] = $reported['source'];
-                continue;
-            } else {
-                // Try user-specific config first
-                $config = $this->configRepository->findOneBy([
-                    'ownerId' => $userId,
-                    'group' => 'DEFAULTMODEL',
-                    'setting' => $capability,
-                ]);
-                $source = 'user';
-
-                // Fall back to global config
-                if (!$config) {
-                    $config = $this->configRepository->findOneBy([
-                        'ownerId' => 0,
-                        'group' => 'DEFAULTMODEL',
-                        'setting' => $capability,
-                    ]);
-                    $source = null !== $config ? 'admin' : null;
+                if ($config) {
+                    $modelId = (int) $config->getValue();
+                    $model = $this->modelRepository->find($modelId);
+                    $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
+                    $sources[$capability] = $source;
+                } else {
+                    $defaults[$capability] = null;
+                    $sources[$capability] = $source;
                 }
+                $locked[$capability] = null !== $this->layeredConfigResolver
+                    && $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
+                continue;
             }
 
-            if ($config) {
-                $modelId = (int) $config->getValue();
-                $model = $this->modelRepository->find($modelId);
-                // Only return model ID if the model still exists and is active
-                $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
-                $sources[$capability] = $source;
-            } else {
-                $defaults[$capability] = null;
-                $sources[$capability] = $source;
-            }
-            $locked[$capability] = null !== $this->layeredConfigResolver
-                && $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
+            // Same model generation will use: allow-list and locks when group
+            // policies are on, and the provider-usability fallback either way.
+            // An active database row whose provider has no key is not what runs.
+            $reported = $this->modelConfigService->reportedDefault($capability, $userId);
+            $defaults[$capability] = $reported['id'];
+            $locked[$capability] = $reported['locked'];
+            $sources[$capability] = $reported['source'];
         }
 
-        return $this->json([
-            'success' => true,
+        return [
             'defaults' => $defaults,
             'locked' => $locked,
             'sources' => $sources,
-        ]);
+        ];
+    }
+
+    /**
+     * Requested capabilities whose saved model is not the one that applies,
+     * mapped to the model that applies instead (null when none does).
+     *
+     * @param array<mixed, mixed>  $requested
+     * @param array<string, ?int>  $effective
+     * @param array<string, mixed> $skipped
+     *
+     * @return array<string, ?int>
+     */
+    private function replacedDefaults(array $requested, array $effective, array $skipped): array
+    {
+        $replaced = [];
+        foreach ($requested as $capability => $modelId) {
+            // VECTORIZE always resolves through the global row, so a per-user
+            // echo of it is never the applied value and is not a replacement.
+            if (!is_string($capability) || 'VECTORIZE' === $capability || !is_numeric($modelId)
+                || isset($skipped[$capability]) || !array_key_exists($capability, $effective)
+            ) {
+                continue;
+            }
+            $requestedId = (int) $modelId;
+            if ($effective[$capability] !== $requestedId) {
+                $replaced[$capability] = $effective[$capability];
+                continue;
+            }
+            // getDefaultModel() hands back the saved id when nothing else can
+            // serve. That is still a replacement: no model applies.
+            if (!$this->modelConfigService->isConfiguredModelUsable($requestedId)) {
+                $replaced[$capability] = null;
+            }
+        }
+
+        return $replaced;
     }
 
     /**
@@ -1400,6 +1424,20 @@ class ConfigController extends AbstractController
                     description: 'Capabilities whose model ID was rejected because the model no longer exists or is inactive',
                     example: ['TEXT2PIC' => 99],
                     nullable: true
+                ),
+                new OA\Property(
+                    property: 'defaults',
+                    type: 'object',
+                    description: 'Per-user saves only: the defaults that apply after the save, as GET /api/v1/config/models/defaults reports them',
+                    additionalProperties: new OA\AdditionalProperties(type: 'integer', nullable: true),
+                    example: ['CHAT' => 249, 'SORT' => 12]
+                ),
+                new OA\Property(
+                    property: 'replaced',
+                    type: 'object',
+                    description: 'Per-user saves only: requested capabilities whose saved model does not apply (for example its provider has no working key), mapped to the model that applies instead, or null when none does',
+                    additionalProperties: new OA\AdditionalProperties(type: 'integer', nullable: true),
+                    example: ['CHAT' => 249]
                 ),
             ]
         )
@@ -1483,12 +1521,9 @@ class ConfigController extends AbstractController
         // Admins always pass the guard.
         //
         // CRITICAL (#891): only fire the gate when the user is ACTUALLY
-        // changing VECTORIZE. The frontend's `saveConfiguration()` echoes
-        // EVERY non-null capability on every save — including the
-        // unchanged VECTORIZE seeded from `getDefaultModels()` — so a
-        // NEW user who only wants to change their CHAT model would
-        // otherwise get a 403 here and watch the entire save silently
-        // fail (CHAT/TEXT2PIC/etc all blocked as collateral damage).
+        // changing VECTORIZE. A payload can still include the unchanged
+        // VECTORIZE id seeded from `getDefaultModels()` next to another
+        // capability, and that echo must not 403 the whole save.
         // The VECTORIZE read side resolves through ownerId=0 (see
         // `getDefaultModels()` above for the matching rationale), so an
         // unchanged echo is byte-equal to the global row.
@@ -1610,6 +1645,18 @@ class ConfigController extends AbstractController
         if (!empty($skipped)) {
             $response['skipped'] = $skipped;
             $response['message'] .= ' (some models were skipped because they are no longer available)';
+        }
+
+        if (!$global) {
+            // The lock and allow-list checks above memoized the pre-save chain.
+            $this->layeredConfigResolver?->reset();
+            $effective = $this->reportedDefaults((int) $user->getId())['defaults'];
+            $response['defaults'] = $effective;
+
+            $replaced = $this->replacedDefaults($data['defaults'], $effective, $skipped);
+            if ([] !== $replaced) {
+                $response['replaced'] = $replaced;
+            }
         }
 
         return $this->json($response);

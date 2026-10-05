@@ -1251,7 +1251,7 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
     }
   }
 
-  await saveConfiguration()
+  await saveConfiguration(capability)
 }
 
 const onEmbeddingSwitchCancel = () => {
@@ -1466,23 +1466,45 @@ watch([selectedPurpose, sortBy, sortDirection, modelSearch], () => {
   modelsPage.value = 1
 })
 
-const saveConfiguration = async () => {
+function warnReplacedChoice(
+  capability: Capability,
+  requestedId: number | null,
+  effectiveId: number | null
+): void {
+  const nameOf = (id: number | null) =>
+    getModelsByPurpose(capability).find((m) => m.id === id)?.name || `ID ${id}`
+  const model = nameOf(requestedId)
+  if (effectiveId === null) {
+    warning(t('config.aiModels.saveReplacedNone', { model }))
+    return
+  }
+  warning(t('config.aiModels.saveReplaced', { model, fallback: nameOf(effectiveId) }))
+}
+
+const saveConfiguration = async (capability: Capability) => {
+  const value = defaultConfig.value[capability]
+  if (value === null) {
+    return
+  }
+
   saving.value = true
   try {
-    // Filter out null values
-    const defaults: Record<string, number> = {}
-    for (const [key, value] of Object.entries(defaultConfig.value)) {
-      if (value !== null) {
-        defaults[key] = value
-      }
-    }
-
-    const response = await saveDefaultModels({ defaults })
+    // Only the capability the person just changed. The dropdown may show a
+    // fallback while the saved row stays the choice that cannot be used yet;
+    // posting every visible id would overwrite that row with the fallback.
+    const response = await saveDefaultModels({ defaults: { [capability]: value } })
 
     if (response.success) {
       savedChoiceEpoch += 1
+      const replaced = Object.entries(response.replaced ?? {}) as [Capability, number | null][]
+      for (const [replacedCapability, effectiveId] of replaced) {
+        warnReplacedChoice(replacedCapability, defaultConfig.value[replacedCapability], effectiveId)
+        defaultConfig.value[replacedCapability] = effectiveId
+      }
       originalConfig.value = { ...defaultConfig.value }
-      success(t('config.aiModels.saveSuccess'))
+      if (replaced.length === 0) {
+        success(t('config.aiModels.saveSuccess'))
+      }
     }
   } catch (err: unknown) {
     console.error('Failed to save configuration:', err)

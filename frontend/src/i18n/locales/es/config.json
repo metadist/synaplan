@@ -396,6 +396,8 @@
       "noModels": "No hay modelos disponibles para este propósito",
       "modelNotAvailable": "{model} no está disponible. Verifique la configuración del proveedor.",
       "modelNotConfigured": "{model} no está listo: añade {envVar} en Admin → Proveedores de IA (o en el entorno).",
+      "saveReplaced": "{model} está guardado, pero no se puede usar ahora mismo, así que se usa {fallback} en su lugar. Revisa su proveedor en Admin → Proveedores de IA.",
+      "saveReplacedNone": "{model} está guardado, pero no se puede usar ahora mismo y ningún otro modelo puede sustituirlo. Revisa su proveedor en Admin → Proveedores de IA.",
       "id": "ID",
       "purpose": "PROPÓSITO",
       "service": "SERVICIO",
