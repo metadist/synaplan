@@ -13,7 +13,10 @@
            button is hidden unless every requiresKey provider has credentials —
            otherwise it would point defaults at models this install cannot use.
            URL/local providers (Ollama, custom endpoints) do not count. -->
-      <template v-if="activeTab === 'choice' && allProvidersAvailable" #actions>
+      <template
+        v-if="activeTab === 'choice' && allProvidersAvailable && defaultsScope === 'user'"
+        #actions
+      >
         <button
           type="button"
           class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -41,10 +44,47 @@
       :class="openDropdown ? 'z-20' : 'z-0'"
       data-testid="section-default-config"
     >
-      <h3 class="text-lg font-semibold txt-primary mb-6 flex items-center gap-2 min-w-0">
+      <h3
+        class="text-lg font-semibold txt-primary flex items-center gap-2 min-w-0"
+        :class="authStore.isAdmin ? 'mb-4' : 'mb-6'"
+      >
         <CpuChipIcon class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
         {{ $t('config.aiModels.defaultConfigTitle') }}
       </h3>
+
+      <!-- Admins choose for whom the defaults below apply. Guests run as a
+           system user with no choices of its own, so they always get the
+           instance defaults, never the admin's personal ones. -->
+      <div v-if="authStore.isAdmin" class="mb-6 space-y-2" data-testid="section-defaults-scope">
+        <div
+          role="radiogroup"
+          :aria-label="$t('config.aiModels.scope.label')"
+          class="inline-flex flex-wrap items-center gap-1"
+        >
+          <button
+            v-for="option in scopeOptions"
+            :key="option.value"
+            type="button"
+            role="radio"
+            :aria-checked="defaultsScope === option.value"
+            :class="[
+              'pill px-3 py-1.5 text-sm font-medium',
+              defaultsScope === option.value && 'pill--active',
+            ]"
+            :data-testid="`btn-defaults-scope-${option.value}`"
+            @click="setDefaultsScope(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <p class="text-sm txt-secondary" data-testid="text-defaults-scope-hint">
+          {{
+            defaultsScope === 'instance'
+              ? $t('config.aiModels.scope.instanceHint')
+              : $t('config.aiModels.scope.userHint')
+          }}
+        </p>
+      </div>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
@@ -635,6 +675,7 @@ import {
   saveDefaultModels,
   checkModelAvailability,
   resetDefaultModels,
+  type DefaultsScope,
 } from '@/services/api/configApi'
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { ApiError } from '@/services/api/httpClient'
@@ -824,6 +865,36 @@ const allProvidersAvailable = computed(() => {
 })
 const defaultLocked = ref<Partial<Record<Capability, boolean>>>({})
 const defaultSources = ref<Partial<Record<Capability, 'admin' | 'group' | 'user'>>>({})
+
+const DEFAULTS_SCOPE_KEY = 'ai-models-defaults-scope'
+
+/** Admins start on the instance defaults: that is what guests and new members get. */
+const readDefaultsScope = (): DefaultsScope => {
+  if (!authStore.isAdmin) return 'user'
+  try {
+    return localStorage.getItem(DEFAULTS_SCOPE_KEY) === 'user' ? 'user' : 'instance'
+  } catch {
+    return 'instance'
+  }
+}
+
+const defaultsScope = ref<DefaultsScope>(readDefaultsScope())
+
+const scopeOptions = computed<{ value: DefaultsScope; label: string }[]>(() => [
+  { value: 'instance', label: t('config.aiModels.scope.instance') },
+  { value: 'user', label: t('config.aiModels.scope.user') },
+])
+
+const setDefaultsScope = (scope: DefaultsScope) => {
+  if (defaultsScope.value === scope) return
+  defaultsScope.value = scope
+  try {
+    localStorage.setItem(DEFAULTS_SCOPE_KEY, scope)
+  } catch {
+    // Private mode can block storage. The scope still applies for this visit.
+  }
+  void loadData({ background: true, replaceDefaults: true })
+}
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
   CHAT: null,
@@ -1043,7 +1114,7 @@ const loadData = async (options?: { background?: boolean; replaceDefaults?: bool
   try {
     const [modelsResult, defaultsResult] = await Promise.allSettled([
       getModels(),
-      getDefaultModels(),
+      getDefaultModels(defaultsScope.value),
     ])
 
     if (requestId !== catalogRequest) {
@@ -1492,7 +1563,11 @@ const saveConfiguration = async (capability: Capability) => {
     // Only the capability the person just changed. The dropdown may show a
     // fallback while the saved row stays the choice that cannot be used yet;
     // posting every visible id would overwrite that row with the fallback.
-    const response = await saveDefaultModels({ defaults: { [capability]: value } })
+    const forEveryone = defaultsScope.value === 'instance'
+    const response = await saveDefaultModels({
+      defaults: { [capability]: value },
+      ...(forEveryone ? { global: true } : {}),
+    })
 
     if (response.success) {
       savedChoiceEpoch += 1
@@ -1503,7 +1578,9 @@ const saveConfiguration = async (capability: Capability) => {
       }
       originalConfig.value = { ...defaultConfig.value }
       if (replaced.length === 0) {
-        success(t('config.aiModels.saveSuccess'))
+        success(
+          forEveryone ? t('config.aiModels.scope.savedInstance') : t('config.aiModels.saveSuccess')
+        )
       }
     }
   } catch (err: unknown) {

@@ -402,7 +402,15 @@
       "purpose": "PROPÓSITO",
       "service": "SERVICIO",
       "name": "NOMBRE",
-      "descriptionHeader": "DESCRIPCIÓN"
+      "descriptionHeader": "DESCRIPCIÓN",
+      "scope": {
+        "label": "Se aplica a",
+        "instance": "Todos",
+        "user": "Solo yo",
+        "instanceHint": "Los invitados y todos los miembros sin elección propia usan estos modelos. Los miembros pueden seguir eligiendo los suyos.",
+        "userHint": "Solo tus chats usan estos modelos. Los invitados y los demás miembros mantienen la elección de «Todos».",
+        "savedInstance": "Guardado para todos. Los invitados y los miembros sin elección propia lo usan desde su próximo mensaje."
+      }
     },
     "providers": {
       "higgsfield": {

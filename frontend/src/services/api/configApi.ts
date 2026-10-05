@@ -23,7 +23,12 @@ export interface DefaultsResponse {
 
 export interface SaveDefaultsRequest {
   defaults: Partial<Record<Capability, number>>
+  /** Admin only: save the instance defaults guests and members without their own choice use. */
+  global?: boolean
 }
+
+/** `user`: the signed-in person's defaults. `instance` (admin only): everyone else's. */
+export type DefaultsScope = 'user' | 'instance'
 
 export interface ModelCheckResponse {
   available: boolean
@@ -47,8 +52,11 @@ export const getModels = async (): Promise<ModelsResponse> => {
 /**
  * Get current default model configuration
  */
-export const getDefaultModels = async (): Promise<DefaultsResponse> => {
-  return httpClient<DefaultsResponse>('/api/v1/config/models/defaults')
+export const getDefaultModels = async (
+  scope: DefaultsScope = 'user'
+): Promise<DefaultsResponse> => {
+  const query = scope === 'instance' ? '?scope=instance' : ''
+  return httpClient<DefaultsResponse>(`/api/v1/config/models/defaults${query}`)
 }
 
 export type SaveDefaultsResponse = z.infer<typeof PostApiConfigModelsDefaultsSaveResponseSchema>

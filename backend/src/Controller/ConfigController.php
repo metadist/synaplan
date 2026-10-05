@@ -70,6 +70,11 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Configuration')]
 class ConfigController extends AbstractController
 {
+    private const DEFAULTS_SCOPE_INSTANCE = 'instance';
+
+    /** Capabilities the AI Models page binds a default model to. */
+    private const DEFAULT_MODEL_CAPABILITIES = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+
     public function __construct(
         private EntityManagerInterface $em,
         private ConfigRepository $configRepository,
@@ -1227,9 +1232,18 @@ class ConfigController extends AbstractController
     #[OA\Get(
         path: '/api/v1/config/models/defaults',
         summary: 'Get default model configuration',
-        description: 'Returns the currently configured default model IDs per capability for the authenticated user. Falls back to global defaults when no user-specific setting exists. VECTORIZE always returns the system-wide default.',
+        description: 'Returns the currently configured default model IDs per capability for the authenticated user. Falls back to global defaults when no user-specific setting exists. VECTORIZE always returns the system-wide default. Admins may pass `scope=instance` to read the system-wide defaults (ownerId=0) that guests and every member without their own choice use.',
         security: [['Bearer' => []]],
-        tags: ['Configuration']
+        tags: ['Configuration'],
+        parameters: [
+            new OA\Parameter(
+                name: 'scope',
+                in: 'query',
+                required: false,
+                description: '`user` (default): the defaults that apply to the signed-in user. `instance` (admin only): the system-wide defaults, as guests and members without their own choice get them.',
+                schema: new OA\Schema(type: 'string', enum: ['user', 'instance'], default: 'user')
+            ),
+        ]
     )]
     #[OA\Response(
         response: 200,
@@ -1272,13 +1286,61 @@ class ConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    public function getDefaultModels(#[CurrentUser] ?User $user): JsonResponse
+    #[OA\Response(
+        response: 403,
+        description: '`scope=instance` used without ROLE_ADMIN',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Admin access required for instance defaults'),
+            ]
+        )
+    )]
+    public function getDefaultModels(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
+        if (self::DEFAULTS_SCOPE_INSTANCE === $request->query->get('scope')) {
+            if (!$this->isGranted('ROLE_ADMIN')) {
+                return $this->json(['error' => 'Admin access required for instance defaults'], Response::HTTP_FORBIDDEN);
+            }
+
+            return $this->json(['success' => true] + $this->instanceDefaults());
+        }
+
         return $this->json(['success' => true] + $this->reportedDefaults((int) $user->getId()));
+    }
+
+    /**
+     * The system-wide defaults (ownerId=0) as a member without their own row
+     * gets them: the same provider-usability fallback generation applies.
+     * Guests run as the ANONYMOUS processing user, which never stores its own
+     * defaults, so this is also exactly what a guest chat uses.
+     *
+     * @return array{defaults: array<string, ?int>, locked: array<string, bool>, sources: array<string, ?string>}
+     */
+    private function instanceDefaults(): array
+    {
+        $defaults = [];
+        $locked = [];
+        $sources = [];
+        foreach (self::DEFAULT_MODEL_CAPABILITIES as $capability) {
+            $defaults[$capability] = $this->modelConfigService->getDefaultModel($capability);
+            $locked[$capability] = false;
+            $stored = $this->configRepository->findOneBy([
+                'ownerId' => 0,
+                'group' => 'DEFAULTMODEL',
+                'setting' => $capability,
+            ]);
+            $sources[$capability] = null !== $stored ? 'admin' : null;
+        }
+
+        return [
+            'defaults' => $defaults,
+            'locked' => $locked,
+            'sources' => $sources,
+        ];
     }
 
     /**
@@ -1288,7 +1350,7 @@ class ConfigController extends AbstractController
      */
     private function reportedDefaults(int $userId): array
     {
-        $capabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $capabilities = self::DEFAULT_MODEL_CAPABILITIES;
 
         $defaults = [];
         $locked = [];
