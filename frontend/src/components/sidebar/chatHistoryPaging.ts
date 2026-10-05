@@ -6,13 +6,6 @@ export interface ScrollBox {
   scrollHeight: number
 }
 
-/** Grow the visible window by one page, and never past the list. */
-export function nextChatHistoryWindow(shown: number, total: number): number {
-  if (shown >= total) return shown
-  const start = Math.max(0, shown)
-  return Math.min(total, start + CHAT_HISTORY_PAGE)
-}
-
 /** The list is taller than the scroller, so the next page waits for a scroll. */
 export function listOverflows(clientHeight: number, scrollHeight: number): boolean {
   return scrollHeight > clientHeight + 8

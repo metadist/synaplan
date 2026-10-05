@@ -155,7 +155,7 @@
 
       <div v-show="chatsExpanded" id="sidebar-chat-list" class="px-1">
         <ChatHistoryList
-          :chats="visibleUnpinned"
+          :chats="unpinnedChats"
           :active-chat-id="chatsStore.activeChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
@@ -191,12 +191,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
-import {
-  CHAT_HISTORY_PAGE,
-  listOverflows,
-  nextChatHistoryWindow,
-  scrollerGrewWithContent,
-} from './chatHistoryPaging'
+import { listOverflows, scrollerGrewWithContent } from './chatHistoryPaging'
 import { chatsPanelRefresh } from '@/composables/useNavSections'
 import { useChatHistory } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
@@ -265,9 +260,8 @@ const chatsExpanded = ref(readExpanded(CHATS_EXPANDED_KEY))
 const pinnedExpanded = ref(readExpanded(PINNED_EXPANDED_KEY))
 const incomingExpanded = ref(readExpanded(INCOMING_EXPANDED_KEY))
 const chatsReady = ref(false)
-const unpinnedShown = ref(CHAT_HISTORY_PAGE)
+let filling = false
 
-const visibleUnpinned = computed(() => unpinnedChats.value.slice(0, unpinnedShown.value))
 const chatsLoading = computed(() => (!chatsReady.value || chatsStore.loading ? 'true' : 'false'))
 
 watch(chatsExpanded, (open) => {
@@ -283,29 +277,34 @@ const scrollRoot = (): HTMLElement | null => {
 }
 
 /**
- * If the first page does not fill the menu, pull the next page. Stop once the
- * list can scroll, or if the pane grows with the rows (it is not a real
- * scrollport, and continuing would render every chat).
+ * If the loaded page does not fill the menu, ask for the next page. Stop once
+ * the list can scroll, or if the pane grows with the rows (it is not a real
+ * scrollport, and continuing would download every chat).
  */
-const fillUntilScrollable = () => {
-  if (!chatsExpanded.value) return
+const fillUntilScrollable = async () => {
+  if (filling || !chatsExpanded.value || !chatsStore.railHasMore || chatsStore.railLoading) return
   const root = scrollRoot()
   if (!root || root.clientHeight === 0) return
   if (listOverflows(root.clientHeight, root.scrollHeight)) return
-  if (unpinnedShown.value >= unpinnedChats.value.length) return
   const before = { clientHeight: root.clientHeight, scrollHeight: root.scrollHeight }
-  unpinnedShown.value = nextChatHistoryWindow(unpinnedShown.value, unpinnedChats.value.length)
-  void nextTick(() => {
-    const next = scrollRoot()
-    if (!next || scrollerGrewWithContent(before, next)) return
-    fillUntilScrollable()
-  })
+  const beforeCount = unpinnedChats.value.length
+  filling = true
+  try {
+    await chatsStore.loadRailChats(false)
+  } finally {
+    filling = false
+  }
+  await nextTick()
+  const next = scrollRoot()
+  if (!next || scrollerGrewWithContent(before, next)) return
+  if (unpinnedChats.value.length === beforeCount) return
+  await fillUntilScrollable()
 }
 
-/** One more page. Further pages wait for the next scroll to the end. */
+/** One more page from the server. Further pages wait for the next scroll. */
 const showMoreChats = () => {
   if (!chatsExpanded.value) return
-  unpinnedShown.value = nextChatHistoryWindow(unpinnedShown.value, unpinnedChats.value.length)
+  return chatsStore.loadRailChats(false)
 }
 
 watch(
@@ -322,7 +321,7 @@ const refreshChats = async () => {
   if (isGuest.value) return
   chatsReady.value = false
   try {
-    await Promise.all([chatsStore.loadChats(), incomingStore.load()])
+    await Promise.all([chatsStore.loadRailChats(true), incomingStore.load()])
   } finally {
     chatsReady.value = true
     void nextTick(() => fillUntilScrollable())

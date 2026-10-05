@@ -2,22 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   CHAT_HISTORY_PAGE,
   listOverflows,
-  nextChatHistoryWindow,
   scrollerGrewWithContent,
 } from '@/components/sidebar/chatHistoryPaging'
 
 describe('chat history paging', () => {
-  it('opens on one page and advances a page at a time', () => {
+  it('pages the chat menu thirty at a time', () => {
     expect(CHAT_HISTORY_PAGE).toBe(30)
-    expect(nextChatHistoryWindow(0, 80)).toBe(30)
-    expect(nextChatHistoryWindow(30, 80)).toBe(60)
-    expect(nextChatHistoryWindow(60, 80)).toBe(80)
-    expect(nextChatHistoryWindow(80, 80)).toBe(80)
-  })
-
-  it('does not walk past a short list', () => {
-    expect(nextChatHistoryWindow(0, 12)).toBe(12)
-    expect(nextChatHistoryWindow(12, 12)).toBe(12)
   })
 
   it('treats a list taller than the pane as already scrollable', () => {

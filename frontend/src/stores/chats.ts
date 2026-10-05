@@ -14,6 +14,7 @@ import { isSessionTerminating } from '@/services/sessionTeardown'
 import { chatGoneStatus } from '@/utils/chatAccessError'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { buildChatShareUrl } from '@/utils/urlHelper'
+import { CHAT_HISTORY_PAGE } from '@/components/sidebar/chatHistoryPaging'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
@@ -138,13 +139,24 @@ export const useChatsStore = defineStore('chats', () => {
 
   /**
    * Paginated history for the mobile drawer. Kept separate from `chats` so the
-   * global list (chat switching, desktop rail, `ensureValidActiveChat`) is not
-   * affected by the incremental, page-by-page loading of the drawer.
+   * global list (chat switching, `ensureValidActiveChat`) is not affected by
+   * the incremental, page-by-page loading of the drawer.
    */
   const historyChats = ref<Chat[]>([])
   const historyLoading = ref(false)
   const historyHasMore = ref(true)
   const historyOffset = ref(0)
+
+  /**
+   * Pages for the desktop chat menu. Separate from `chats`, which chat
+   * switching still loads in full. The menu appends a page when its list
+   * reaches the end instead of downloading every chat up front.
+   */
+  const railChats = ref<Chat[]>([])
+  const railHasMore = ref(true)
+  const railLoading = ref(false)
+  const railOffset = ref(0)
+  let railLoadSeq = 0
 
   /**
    * Chats whose answer is still being written on the server. A turn survives
@@ -406,6 +418,68 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  function isLocallyCreated(chatId: number): boolean {
+    return locallyCreatedIds.has(chatId)
+  }
+
+  /** So pin, rename, and delete can find a chat the menu loaded before the full list. */
+  function ensureChatsKnown(page: Chat[]) {
+    const known = new Set(chats.value.map((chat) => chat.id))
+    const missing = page.filter((chat) => !known.has(chat.id))
+    if (missing.length === 0) return
+    chats.value = [...chats.value, ...missing]
+  }
+
+  function forgetRailChat(chatId: number) {
+    if (!railChats.value.some((chat) => chat.id === chatId)) return
+    railChats.value = railChats.value.filter((chat) => chat.id !== chatId)
+  }
+
+  /**
+   * One page of chats for the desktop menu.
+   *
+   * @param reset When true, start over at offset 0 and replace the menu list.
+   *   Otherwise append the next page. A reset supersedes a page already in
+   *   flight. No-op while a page is in flight, or when nothing more remains,
+   *   unless resetting.
+   */
+  async function loadRailChats(reset = false) {
+    if (!checkAuthOrRedirect()) return
+    if (!reset && (railLoading.value || !railHasMore.value)) return
+
+    const seq = ++railLoadSeq
+    const offset = reset ? 0 : railOffset.value
+    railLoading.value = true
+
+    try {
+      const data = await httpClient(`/api/v1/chats?limit=${CHAT_HISTORY_PAGE}&offset=${offset}`, {
+        schema: GetApiChatsListResponseSchema,
+      })
+      if (seq !== railLoadSeq) return
+
+      const page = (data.chats ?? []).map((chat) => normalizeChat(chat))
+      if (reset) {
+        railChats.value = page
+      } else {
+        const seen = new Set(railChats.value.map((chat) => chat.id))
+        railChats.value = [...railChats.value, ...page.filter((chat) => !seen.has(chat.id))]
+      }
+      ensureChatsKnown(page)
+      railOffset.value = offset + page.length
+      railHasMore.value = data.hasMore === true
+      if (Array.isArray(data.activeRunChatIds)) {
+        activeRunChatIds.value = applyLiveRunOverlay(data.activeRunChatIds, chatsLoadSeq)
+      }
+    } catch (err: unknown) {
+      if (seq !== railLoadSeq) return
+      console.error('Error loading chat menu:', err)
+    } finally {
+      if (seq === railLoadSeq) {
+        railLoading.value = false
+      }
+    }
+  }
+
   function createChat(title?: string): Promise<Chat | null> {
     const request = postNewChat(title)
     if (title === undefined || isDefaultChatTitle(title)) {
@@ -622,6 +696,7 @@ export const useChatsStore = defineStore('chats', () => {
       const wasActiveChat = activeChatId.value === chatId
       locallyCreatedIds.delete(chatId)
       chats.value = chats.value.filter((c) => c.id !== chatId)
+      forgetRailChat(chatId)
       invalidateInFlightChatsLoad()
 
       // If the deleted chat was active and it was the last chat, create a new one
@@ -889,6 +964,7 @@ export const useChatsStore = defineStore('chats', () => {
       const owned = chats.value.some((chat) => chat.id === chatId)
       const reason: 'deleted' | 'unshared' = status === 404 && owned ? 'deleted' : 'unshared'
       chats.value = chats.value.filter((chat) => chat.id !== chatId)
+      forgetRailChat(chatId)
       useIncomingStore().drop(chatId)
       if (activeChatId.value === chatId) {
         useHistoryStore().discardMessages()
@@ -926,6 +1002,11 @@ export const useChatsStore = defineStore('chats', () => {
     historyOffset.value = 0
     historyHasMore.value = true
     historyLoading.value = false
+    railChats.value = []
+    railOffset.value = 0
+    railHasMore.value = true
+    railLoading.value = false
+    railLoadSeq += 1
     updateActiveChatSelection(null)
     loading.value = false
     error.value = null
@@ -944,6 +1025,11 @@ export const useChatsStore = defineStore('chats', () => {
     historyChats,
     historyLoading,
     historyHasMore,
+    railChats,
+    railHasMore,
+    railLoading,
+    loadRailChats,
+    isLocallyCreated,
     activeRunChatIds,
     pinPendingChatIds,
     markChatGenerating,

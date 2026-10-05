@@ -1,6 +1,6 @@
 <template>
   <nav
-    class="sticky top-0 z-10 -mx-1 bg-chat px-1 py-2"
+    class="settings-section-index -mx-1 bg-chat px-1 py-2"
     :aria-label="$t('settings.sections.indexLabel')"
     data-testid="nav-settings-sections"
   >

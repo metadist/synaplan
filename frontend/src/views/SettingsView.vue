@@ -7,7 +7,10 @@
         so the form used to sit in a right-hand column a fixed distance from
         the menu. Container queries below follow this column, not the window.
       -->
-      <div class="@container mx-auto w-full max-w-3xl space-y-6" data-testid="section-settings-column">
+      <div
+        class="@container mx-auto w-full max-w-3xl space-y-6"
+        data-testid="section-settings-column"
+      >
         <PageHeader
           :title="$t('settings.title')"
           :subtitle="$t('settings.subtitle')"

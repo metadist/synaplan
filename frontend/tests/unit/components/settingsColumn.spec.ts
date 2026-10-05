@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import SettingsAccountPage from '@/components/settings/SettingsAccountPage.vue'
+import SettingsSectionIndex from '@/components/settings/SettingsSectionIndex.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -80,6 +82,26 @@ describe('settings column', () => {
     expect(root.classes()).toContain('space-y-6')
     const index = wrapper.get('[data-testid="nav-settings-sections"]')
     expect(root.element.firstElementChild).toBe(index.element)
+    wrapper.unmount()
+  })
+
+  it('does not stick the section index under the phone menu button', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+
+    const wrapper = mount(SettingsSectionIndex, {
+      props: { items: [{ id: 'profile', labelKey: 'settings.sections.profile' }] },
+      global: { plugins: [router] },
+    })
+
+    const nav = wrapper.get('[data-testid="nav-settings-sections"]')
+    expect(nav.classes()).toContain('settings-section-index')
+    expect(nav.classes()).not.toContain('sticky')
+    expect(nav.classes()).not.toContain('top-0')
     wrapper.unmount()
   })
 })

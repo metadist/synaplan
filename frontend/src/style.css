@@ -83,6 +83,23 @@
   overflow: hidden;
 }
 
+/*
+ * Settings section links. On phone chrome the drawer toggle is fixed at
+ * safe-area + 10px with z-40. A sticky top-0 bar covers the first row and
+ * steals taps on it, including short landscape viewports. Stick only when
+ * the desktop rail is showing (same query as .v2-desktop-chrome).
+ */
+.settings-section-index {
+  position: static;
+}
+@media (min-width: 768px) and (min-height: 520px) {
+  .settings-section-index {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+}
+
 /* Mobile floating header button clearance — pushes titles below the button.
    Excluded: ChatView (page-chat) where messages scroll behind the button. */
 @media (max-width: 767px), (max-height: 519px) {

@@ -39,6 +39,6 @@ const onPanelScroll = (event: Event) => {
   const el = event.currentTarget
   if (!(el instanceof HTMLElement)) return
   if (el.scrollHeight - el.scrollTop - el.clientHeight > 160) return
-  chatsPanel.value?.showMoreChats()
+  return chatsPanel.value?.showMoreChats()
 }
 </script>

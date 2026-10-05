@@ -8,7 +8,14 @@ import { httpClient } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
 vi.mock('@/services/api/httpClient', () => ({
-  httpClient: vi.fn().mockResolvedValue({ chats: [], total: 0, success: true }),
+  httpClient: vi.fn().mockResolvedValue({
+    success: true,
+    chats: [],
+    total: 0,
+    offset: 0,
+    limit: 30,
+    hasMore: false,
+  }),
   getApiBaseUrl: () => '',
   getConfigSync: () => ({
     billing: { enabled: false },
@@ -141,17 +148,36 @@ describe('SidebarV2 New Chat lock', () => {
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: new Date(Date.UTC(2026, 0, 1, 0, 45 - index)).toISOString(),
       messageCount: 2,
+      isShared: false,
       pinned: false,
     }))
     vi.mocked(httpClient).mockImplementation(async (url: unknown) => {
       if (typeof url === 'string' && url.startsWith('/api/v1/chats')) {
-        return { chats, success: true, activeRunChatIds: [] }
+        const params = new URL(url, 'https://synaplan.local').searchParams
+        const limit = Number(params.get('limit') ?? chats.length)
+        const offset = Number(params.get('offset') ?? 0)
+        const page = chats.slice(offset, offset + limit)
+        return {
+          success: true,
+          chats: page,
+          total: chats.length,
+          offset,
+          limit,
+          hasMore: offset + page.length < chats.length,
+          activeRunChatIds: [],
+        }
       }
       return { success: true }
     })
 
     const wrapper = await mountSidebar()
+    const chatUrls = () =>
+      vi
+        .mocked(httpClient)
+        .mock.calls.map(([url]) => url)
+        .filter((url): url is string => typeof url === 'string' && url.startsWith('/api/v1/chats'))
     const rows = () => wrapper.findAll('[data-testid="row-chat-v2"]')
+    expect(chatUrls()).toEqual(['/api/v1/chats?limit=30&offset=0'])
     expect(rows()).toHaveLength(30)
 
     const scroll = wrapper.get('[data-testid="section-sidebar-scroll"]')
@@ -161,9 +187,20 @@ describe('SidebarV2 New Chat lock', () => {
     expect(wrapper.get('[data-testid="btn-sidebar-v2-user"]').isVisible()).toBe(true)
 
     await scroll.trigger('scroll')
+    expect(chatUrls()).toEqual([
+      '/api/v1/chats?limit=30&offset=0',
+      '/api/v1/chats?limit=30&offset=30',
+    ])
     expect(rows()).toHaveLength(45)
 
-    vi.mocked(httpClient).mockResolvedValue({ chats: [], total: 0, success: true })
+    vi.mocked(httpClient).mockResolvedValue({
+      success: true,
+      chats: [],
+      total: 0,
+      offset: 0,
+      limit: 30,
+      hasMore: false,
+    })
     wrapper.unmount()
   })
 })

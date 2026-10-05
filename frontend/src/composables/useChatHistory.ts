@@ -79,8 +79,26 @@ export function useChatHistory() {
   const chatActivityTimestamp = (chat: StoreChat): number =>
     Date.parse(chat.updatedAt ?? '') || Date.parse(chat.createdAt ?? '') || 0
 
+  const sidebarChats = computed(() => {
+    const byId = new Map(chatsStore.chats.map((chat) => [chat.id, chat]))
+    const railIds = new Set<number>()
+    const rail = chatsStore.railChats.map((chat) => {
+      railIds.add(chat.id)
+      return byId.get(chat.id) ?? chat
+    })
+    // A chat created here, the one open now, or a pin already in the store
+    // stays visible even when it is not on the pages loaded so far.
+    const extra = chatsStore.chats.filter((chat) => {
+      if (railIds.has(chat.id)) return false
+      if (chatsStore.isLocallyCreated(chat.id)) return true
+      if (chat.id === chatsStore.activeChatId) return true
+      return chat.pinned === true
+    })
+    return [...extra, ...rail]
+  })
+
   const ownChatList = computed<HistoryChat[]>(() => {
-    return chatsStore.chats
+    return sidebarChats.value
       .filter((chat) => {
         if (chat.widgetSession) return false
         if (chat.id === chatsStore.activeChatId) return true
