@@ -286,7 +286,9 @@ describe('ChatInput run on this computer', () => {
     const input = wrapper.get('[data-testid="input-chat-message"]').element
     input.addEventListener('keydown', (event) => event.stopPropagation())
 
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
     await flushPromises()
 
     expect(wrapper.find('[data-testid="dropdown-plus-panel"]').exists()).toBe(false)
