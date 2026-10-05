@@ -76,7 +76,10 @@ console.log('🔧 Fixing Zod v4 compatibility...')
 // Handle multiline (z.record(\n), object literal, and inline value-schema patterns
 content = content.replace(/z\.record\(\s*\n/g, 'z.record(z.string(), \n')
 content = content.replace(/z\.record\(z\.object/g, 'z.record(z.string(), z.object')
-content = content.replace(/z\.record\((z\.[a-zA-Z]+\(\))\)/g, 'z.record(z.string(), $1)')
+content = content.replace(
+  /z\.record\((z\.[a-zA-Z]+\(\)(?:\.[a-zA-Z]+\(\))*)\)/g,
+  'z.record(z.string(), $1)'
+)
 // A value schema built from an OpenAPI oneOf, e.g. z.record(z.union([...]))
 content = content.replace(/z\.record\(z\.union\(/g, 'z.record(z.string(), z.union(')
 // additionalProperties: array or enum — Zod v4 still needs an explicit key type

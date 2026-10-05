@@ -74,6 +74,8 @@
       },
       "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
       "modelNotConfigured": "{model} ist nicht bereit: Füge {envVar} unter Admin → KI-Anbieter hinzu (oder in der Umgebung).",
+      "saveReplaced": "{model} ist gespeichert, kann aber gerade nicht genutzt werden. Stattdessen wird {fallback} verwendet. Prüfe den Anbieter unter Admin → KI-Anbieter.",
+      "saveReplacedNone": "{model} ist gespeichert, kann aber gerade nicht genutzt werden, und kein anderes Modell kann einspringen. Prüfe den Anbieter unter Admin → KI-Anbieter.",
       "admin": {
         "catalogSubtitle": "System-Modellkatalog durchsuchen und bearbeiten.",
         "bulkImportSubtitle": "SQL aus Anbieter-Dokumentation erzeugen und anwenden (erweitert).",

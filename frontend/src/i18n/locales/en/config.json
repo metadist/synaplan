@@ -84,6 +84,8 @@
       "noModels": "No models available for this purpose",
       "modelNotAvailable": "{model} is not available. Please check provider configuration.",
       "modelNotConfigured": "{model} is not ready: add {envVar} under Admin → AI Providers (or in your environment).",
+      "saveReplaced": "{model} is saved but can't be used right now, so {fallback} is used instead. Check its provider under Admin → AI Providers.",
+      "saveReplacedNone": "{model} is saved but can't be used right now, and no other model can take over. Check its provider under Admin → AI Providers.",
       "id": "ID",
       "purpose": "PURPOSE",
       "service": "SERVICE",
