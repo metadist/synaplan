@@ -22,6 +22,18 @@ export function isAnthropicAccountsEnabled(): boolean {
   return anthropicEnabled.value
 }
 
+/**
+ * Store a gateway status this screen already loaded.
+ * Availability checks then read that result instead of sending a second
+ * GET /messages-gateway that could fail and hide a page the first response
+ * already proved is available.
+ */
+export function rememberGatewayEnabled(enabled: boolean): void {
+  loadGeneration += 1
+  anthropicEnabled.value = enabled
+  gatewayStatusPromise = Promise.resolve(enabled)
+}
+
 export function loadGatewayEnabled(): Promise<boolean> {
   if (gatewayStatusPromise) {
     return gatewayStatusPromise

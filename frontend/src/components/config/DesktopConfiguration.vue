@@ -408,7 +408,7 @@ import {
   type DesktopPresence,
 } from '@/utils/desktopPresence'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
-import { isAiAccountsEnabled } from '@/composables/useAiAccounts'
+import { isAiAccountsEnabled, rememberGatewayEnabled } from '@/composables/useAiAccounts'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -526,6 +526,7 @@ const loadChatGate = async () => {
   }
   try {
     const status = await getMessagesGatewayStatus()
+    rememberGatewayEnabled(status.enabled === true)
     chatGateAdmin.value = status.is_admin
     if (!status.enabled) {
       chatGate.value = 'gateway'

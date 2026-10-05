@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { ref } from 'vue'
 import DesktopConfiguration from '@/components/config/DesktopConfiguration.vue'
+import { resetAiAccountsGatewayCache } from '@/composables/useAiAccounts'
 
 const {
   mockListJobs,
@@ -12,7 +13,6 @@ const {
   revokeDevice,
   createPairingCode,
   mockGatewayStatus,
-  aiAccountsOn,
 } = vi.hoisted(() => ({
   mockListJobs: vi.fn(),
   mockReload: vi.fn(),
@@ -22,7 +22,6 @@ const {
   revokeDevice: vi.fn(),
   createPairingCode: vi.fn(),
   mockGatewayStatus: vi.fn(),
-  aiAccountsOn: { value: false },
 }))
 
 const devicesRef = ref<
@@ -63,11 +62,11 @@ vi.mock('@/composables/useDesktopAgentFeature', () => ({
 }))
 
 vi.mock('@/services/api/messagesGatewayApi', () => ({
-  getMessagesGatewayStatus: mockGatewayStatus,
+  getMessagesGatewayStatus: (...args: unknown[]) => mockGatewayStatus(...args),
 }))
 
-vi.mock('@/composables/useAiAccounts', () => ({
-  isAiAccountsEnabled: () => aiAccountsOn.value,
+vi.mock('@/services/api/httpClient', () => ({
+  getConfigSync: () => ({ modules: { higgsfield: { configured: false } }, features: {} }),
 }))
 
 const readyGateway = {
@@ -88,17 +87,26 @@ const routerLinkStub = {
 
 const REPO = 'https://github.com/metadist/synaplan-desktop'
 
+let mounted: VueWrapper | null = null
+
 const mountPage = async () => {
+  mounted?.unmount()
   const wrapper = mount(DesktopConfiguration, {
     global: {
       stubs: { Icon: true, Teleport: true, Transition: false, RouterLink: routerLinkStub },
     },
   })
+  mounted = wrapper
   await flushPromises()
   return wrapper
 }
 
 describe('DesktopConfiguration', () => {
+  afterEach(() => {
+    mounted?.unmount()
+    mounted = null
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     desktopOn.value = true
@@ -108,8 +116,9 @@ describe('DesktopConfiguration', () => {
     confirmMock.mockResolvedValue(false)
     revokeDevice.mockResolvedValue({ cancelledJobs: 0, removed: false })
     createPairingCode.mockResolvedValue({ code: 'ABCD-EFGH', expiresAt: 4_000_000_000 })
+    mockGatewayStatus.mockReset()
     mockGatewayStatus.mockResolvedValue(readyGateway)
-    aiAccountsOn.value = false
+    resetAiAccountsGatewayCache()
   })
 
   it('is absent when desktop is off', async () => {
@@ -382,7 +391,6 @@ describe('DesktopConfiguration', () => {
   })
 
   it('links a member with no provider key to Your AI accounts', async () => {
-    aiAccountsOn.value = true
     mockGatewayStatus.mockResolvedValue({
       ...readyGateway,
       is_admin: false,
@@ -398,14 +406,26 @@ describe('DesktopConfiguration', () => {
     const link = wrapper.get('[data-testid="link-ai-accounts"]')
     expect(link.attributes('href')).toBe('/ai/providers')
     expect(link.text()).toBe('Your AI accounts')
+    expect(mockGatewayStatus).toHaveBeenCalledTimes(1)
   })
 
-  it('hides the AI accounts link when that page is off', async () => {
-    aiAccountsOn.value = false
-    mockGatewayStatus.mockResolvedValue({
+  it('keeps the member link when a second gateway request would fail', async () => {
+    mockGatewayStatus.mockResolvedValueOnce({
       ...readyGateway,
       is_admin: false,
       app_chat_credential: 'missing',
+    })
+    mockGatewayStatus.mockRejectedValueOnce(new Error('offline'))
+    const wrapper = await mountPage()
+    expect(wrapper.get('[data-testid="link-ai-accounts"]').attributes('href')).toBe('/ai/providers')
+    expect(mockGatewayStatus).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides the AI accounts link when the gateway is off', async () => {
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      enabled: false,
+      is_admin: false,
     })
     const wrapper = await mountPage()
     expect(wrapper.get('[data-testid="alert-chat-gate"]').exists()).toBe(true)
