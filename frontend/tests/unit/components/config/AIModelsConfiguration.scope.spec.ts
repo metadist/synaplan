@@ -132,7 +132,7 @@ describe('AIModelsConfiguration defaults scope', () => {
 
     expect(getDefaultModels).toHaveBeenCalledWith('instance')
     expect(
-      wrapper!.get('[data-testid="btn-defaults-scope-instance"]').attributes('aria-checked')
+      wrapper!.get('[data-testid="btn-defaults-scope-instance"]').attributes('aria-pressed')
     ).toBe('true')
     expect(wrapper!.get('[data-testid="text-defaults-scope-hint"]').text()).toContain('Guests')
 
@@ -152,6 +152,31 @@ describe('AIModelsConfiguration defaults scope', () => {
 
     await pickChatModel()
     expect(saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 385 } })
+  })
+
+  it('saves where the model was picked even if the scope changes during the check', async () => {
+    let resolveCheck: (value: unknown) => void = () => {}
+    checkModelAvailability.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCheck = resolve
+        })
+    )
+    await mountAs('ADMIN')
+
+    await pickChatModel()
+    await wrapper!.get('[data-testid="btn-defaults-scope-user"]').trigger('click')
+    await flushPromises()
+    resolveCheck({
+      available: true,
+      provider_type: 'external',
+      model_name: 'GPT OSS 120B',
+      service: 'Cerebras',
+    })
+    await flushPromises()
+
+    expect(saveDefaultModels).toHaveBeenCalledTimes(1)
+    expect(saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 385 }, global: true })
   })
 
   it('shows members no scope choice and keeps saving their own defaults', async () => {

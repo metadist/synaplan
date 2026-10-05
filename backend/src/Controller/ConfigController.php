@@ -70,6 +70,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Configuration')]
 class ConfigController extends AbstractController
 {
+    private const DEFAULTS_SCOPE_USER = 'user';
     private const DEFAULTS_SCOPE_INSTANCE = 'instance';
 
     /** Capabilities the AI Models page binds a default model to. */
@@ -1240,7 +1241,7 @@ class ConfigController extends AbstractController
                 name: 'scope',
                 in: 'query',
                 required: false,
-                description: '`user` (default): the defaults that apply to the signed-in user. `instance` (admin only): the system-wide defaults, as guests and members without their own choice get them.',
+                description: '`user` (default): the defaults that apply to the signed-in user. `instance` (admin only): the system-wide defaults, as guests and members without their own choice get them. With IAM group policies on, a group default still wins for that group\'s members. Any other value is rejected with 400.',
                 schema: new OA\Schema(type: 'string', enum: ['user', 'instance'], default: 'user')
             ),
         ]
@@ -1285,6 +1286,15 @@ class ConfigController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(
+        response: 400,
+        description: 'Unknown `scope` value',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Unknown scope "instnace". Use "user" or "instance".'),
+            ]
+        )
+    )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
     #[OA\Response(
         response: 403,
@@ -1301,7 +1311,15 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (self::DEFAULTS_SCOPE_INSTANCE === $request->query->get('scope')) {
+        $scope = $request->query->getString('scope', self::DEFAULTS_SCOPE_USER);
+        if (!in_array($scope, [self::DEFAULTS_SCOPE_USER, self::DEFAULTS_SCOPE_INSTANCE], true)) {
+            return $this->json(
+                ['error' => sprintf('Unknown scope "%s". Use "user" or "instance".', $scope)],
+                Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        if (self::DEFAULTS_SCOPE_INSTANCE === $scope) {
             if (!$this->isGranted('ROLE_ADMIN')) {
                 return $this->json(['error' => 'Admin access required for instance defaults'], Response::HTTP_FORBIDDEN);
             }
@@ -1313,10 +1331,11 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * The system-wide defaults (ownerId=0) as a member without their own row
-     * gets them: the same provider-usability fallback generation applies.
-     * Guests run as the ANONYMOUS processing user, which never stores its own
-     * defaults, so this is also exactly what a guest chat uses.
+     * The system-wide defaults (ownerId=0) with the same provider-usability
+     * fallback generation applies. Guests run as the ANONYMOUS processing user,
+     * which stores no defaults and belongs to no group, so this is exactly what
+     * a guest chat uses. With IAM group policies on, a group default still wins
+     * for that group's members; this is the layer beneath it.
      *
      * @return array{defaults: array<string, ?int>, locked: array<string, bool>, sources: array<string, ?string>}
      */

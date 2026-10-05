@@ -57,7 +57,7 @@
            instance defaults, never the admin's personal ones. -->
       <div v-if="authStore.isAdmin" class="mb-6 space-y-2" data-testid="section-defaults-scope">
         <div
-          role="radiogroup"
+          role="group"
           :aria-label="$t('config.aiModels.scope.label')"
           class="inline-flex flex-wrap items-center gap-1"
         >
@@ -65,8 +65,7 @@
             v-for="option in scopeOptions"
             :key="option.value"
             type="button"
-            role="radio"
-            :aria-checked="defaultsScope === option.value"
+            :aria-pressed="defaultsScope === option.value"
             :class="[
               'pill px-3 py-1.5 text-sm font-medium',
               defaultsScope === option.value && 'pill--active',
@@ -1296,13 +1295,19 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
   }
 
   defaultConfig.value[capability] = modelId
+  // Where and what to save is fixed by the click. The availability check
+  // below awaits, and a scope switch meanwhile reloads the other scope's
+  // values into defaultConfig.
+  const saveTarget = { scope: defaultsScope.value, value: modelId }
 
   if (modelId !== null) {
     try {
       const check = await checkModelAvailability(modelId)
 
       if (!check.available) {
-        defaultConfig.value[capability] = previousModelId
+        if (saveTarget.scope === defaultsScope.value) {
+          defaultConfig.value[capability] = previousModelId
+        }
         const modelName =
           getModelsByPurpose(capability).find((m) => m.id === modelId)?.name || `ID ${modelId}`
         if (check.env_var) {
@@ -1322,7 +1327,7 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
     }
   }
 
-  await saveConfiguration(capability)
+  await saveConfiguration(capability, saveTarget)
 }
 
 const onEmbeddingSwitchCancel = () => {
@@ -1552,8 +1557,12 @@ function warnReplacedChoice(
   warning(t('config.aiModels.saveReplaced', { model, fallback: nameOf(effectiveId) }))
 }
 
-const saveConfiguration = async (capability: Capability) => {
-  const value = defaultConfig.value[capability]
+const saveConfiguration = async (
+  capability: Capability,
+  target?: { scope: DefaultsScope; value: number | null }
+) => {
+  const scope = target?.scope ?? defaultsScope.value
+  const value = target ? target.value : defaultConfig.value[capability]
   if (value === null) {
     return
   }
@@ -1563,7 +1572,7 @@ const saveConfiguration = async (capability: Capability) => {
     // Only the capability the person just changed. The dropdown may show a
     // fallback while the saved row stays the choice that cannot be used yet;
     // posting every visible id would overwrite that row with the fallback.
-    const forEveryone = defaultsScope.value === 'instance'
+    const forEveryone = scope === 'instance'
     const response = await saveDefaultModels({
       defaults: { [capability]: value },
       ...(forEveryone ? { global: true } : {}),
@@ -1572,11 +1581,18 @@ const saveConfiguration = async (capability: Capability) => {
     if (response.success) {
       savedChoiceEpoch += 1
       const replaced = Object.entries(response.replaced ?? {}) as [Capability, number | null][]
-      for (const [replacedCapability, effectiveId] of replaced) {
-        warnReplacedChoice(replacedCapability, defaultConfig.value[replacedCapability], effectiveId)
-        defaultConfig.value[replacedCapability] = effectiveId
+      // The grid may already show the other scope; only its own values are touched.
+      if (scope === defaultsScope.value) {
+        for (const [replacedCapability, effectiveId] of replaced) {
+          warnReplacedChoice(
+            replacedCapability,
+            defaultConfig.value[replacedCapability],
+            effectiveId
+          )
+          defaultConfig.value[replacedCapability] = effectiveId
+        }
+        originalConfig.value = { ...defaultConfig.value }
       }
-      originalConfig.value = { ...defaultConfig.value }
       if (replaced.length === 0) {
         success(
           forEveryone ? t('config.aiModels.scope.savedInstance') : t('config.aiModels.saveSuccess')

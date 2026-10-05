@@ -41,6 +41,16 @@ final class ConfigControllerInstanceDefaultsTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
+    public function testUnknownScopeIsRejected(): void
+    {
+        $admin = $this->createUser('instance-defaults-admin@synaplan.internal', 'ADMIN');
+        $this->authenticateClient($this->client, $admin);
+
+        $this->client->request('GET', '/api/v1/config/models/defaults?scope=instnace');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
     public function testAdminSavesAndReadsTheInstanceDefault(): void
     {
         $admin = $this->createUser('instance-defaults-admin@synaplan.internal', 'ADMIN');
