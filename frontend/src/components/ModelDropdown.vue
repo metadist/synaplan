@@ -100,7 +100,7 @@
         >
           <Icon icon="mdi:robot-outline" class="h-[18px] w-[18px] flex-shrink-0" />
           <span class="min-w-0 flex-1">
-            <span class="model-option__name block truncate">
+            <span class="model-option__name block truncate font-medium">
               {{ $t('chatInput.modelDropdown.default') }}
             </span>
             <span class="model-option__meta block truncate txt-secondary">
@@ -129,7 +129,7 @@
           <ServiceIcon :service="model.service" :size="18" class="flex-shrink-0" />
           <span class="min-w-0 flex-1">
             <span class="flex min-w-0 items-center gap-1.5">
-              <span class="model-option__name min-w-0 truncate">{{ model.name }}</span>
+              <span class="model-option__name min-w-0 truncate font-medium">{{ model.name }}</span>
               <ModelCostBadge class="flex-shrink-0" :model="model" :peers="chatModels" />
             </span>
             <span class="model-option__meta block truncate txt-secondary">{{ model.service }}</span>
@@ -493,7 +493,6 @@ onBeforeUnmount(() => {
 }
 .model-option__name {
   font-size: 0.8125rem;
-  font-weight: 500;
   line-height: 1.125rem;
 }
 .model-option__meta {
