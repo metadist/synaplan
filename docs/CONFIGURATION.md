@@ -476,7 +476,7 @@ Pin a Task Prompt and run it on demand or on a schedule. Configured via
 ## Microsoft 365 connector (BCONFIG)
 
 Lets a user connect their Microsoft 365 account (currently delegated
-`Mail.Read`) from **Channels → Connections**. The app registration is
+`Mail.Read`) from **Manage → Connections**. The app registration is
 **operator-owned and install-wide**: rows live under `BOWNERID=0` only, so a
 user can never point the consent flow at an app registration the operator does
 not control. Admins manage it in **Settings → Inbound Channels → Microsoft 365
@@ -511,7 +511,7 @@ grant (consent revoked, refresh token expired), the connection flips to
 ## Dropbox connector (BCONFIG)
 
 Lets a user connect their Dropbox account as a file destination
-(`save_to_folder`, channel `dropbox`) from **Channels → Connections**. Same
+(`save_to_folder`, channel `dropbox`) from **Manage → Connections**. Same
 model as Microsoft 365: the Dropbox app is **operator-owned and install-wide**
 (`BOWNERID=0`), tokens live per user in the encrypted credential vault, and a
 rejected refresh flips the connection to `reauth_required`. Admins manage it

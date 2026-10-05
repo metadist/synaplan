@@ -17,7 +17,7 @@ use Doctrine\DBAL\Connection;
  * explicit `MCP.CLIENT_ENABLED = 0` override survives every deploy.
  *
  * Note the remaining per-user gates: connecting a server under
- * Channels → MCP Servers and the per-topic "MCP Data Sources" opt-in
+ * Manage → Connections → MCP Servers and the per-topic "MCP Data Sources" opt-in
  * (`tool_mcp`) are still required before any call happens.
  */
 final readonly class McpConfigSeeder

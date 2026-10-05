@@ -33,6 +33,14 @@
       >
         {{ $t('config.desktop.chatGate.openCodingClients') }}
       </RouterLink>
+      <RouterLink
+        v-else-if="chatGate === 'key' && isAiAccountsEnabled()"
+        to="/ai/providers"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center justify-center shrink-0"
+        data-testid="link-ai-accounts"
+      >
+        {{ $t('nav.aiAccounts') }}
+      </RouterLink>
     </div>
 
     <!-- There is no installer yet. The only link is the source repository,
@@ -400,6 +408,7 @@ import {
   type DesktopPresence,
 } from '@/utils/desktopPresence'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
+import { isAiAccountsEnabled } from '@/composables/useAiAccounts'
 
 const { t } = useI18n()
 const dialog = useDialog()

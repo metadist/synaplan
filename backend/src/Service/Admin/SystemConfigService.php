@@ -1649,12 +1649,12 @@ final readonly class SystemConfigService
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
             ],
             // Outbound MCP client master switch (BCONFIG group MCP / CLIENT_ENABLED).
-            // Also toggled from Channels → MCP Servers. Seeded ON for new installs;
+            // Also toggled from Manage → Connections → MCP Servers. Seeded ON for new installs;
             // an explicit 0 row is the operator kill switch.
             'MCP_CLIENT_ENABLED' => [
                 'tab' => 'channels', 'section' => 'mcp', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Allow the assistant to call connected MCP servers (Jira, Confluence, CRM, and any other MCP endpoint). When off, saved connections stay in place but no calls are made. You can also turn this on from Channels → MCP Servers.',
+                'description' => 'Allow the assistant to call connected MCP servers (Jira, Confluence, CRM, and any other MCP endpoint). When off, saved connections stay in place but no calls are made. You can also turn this on from Manage → Connections → MCP Servers.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => McpClientConfig::CONFIG_GROUP,

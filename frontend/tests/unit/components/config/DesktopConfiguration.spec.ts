@@ -12,6 +12,7 @@ const {
   revokeDevice,
   createPairingCode,
   mockGatewayStatus,
+  aiAccountsOn,
 } = vi.hoisted(() => ({
   mockListJobs: vi.fn(),
   mockReload: vi.fn(),
@@ -21,6 +22,7 @@ const {
   revokeDevice: vi.fn(),
   createPairingCode: vi.fn(),
   mockGatewayStatus: vi.fn(),
+  aiAccountsOn: { value: false },
 }))
 
 const devicesRef = ref<
@@ -64,6 +66,10 @@ vi.mock('@/services/api/messagesGatewayApi', () => ({
   getMessagesGatewayStatus: mockGatewayStatus,
 }))
 
+vi.mock('@/composables/useAiAccounts', () => ({
+  isAiAccountsEnabled: () => aiAccountsOn.value,
+}))
+
 const readyGateway = {
   enabled: true,
   is_admin: false,
@@ -103,6 +109,7 @@ describe('DesktopConfiguration', () => {
     revokeDevice.mockResolvedValue({ cancelledJobs: 0, removed: false })
     createPairingCode.mockResolvedValue({ code: 'ABCD-EFGH', expiresAt: 4_000_000_000 })
     mockGatewayStatus.mockResolvedValue(readyGateway)
+    aiAccountsOn.value = false
   })
 
   it('is absent when desktop is off', async () => {
@@ -372,6 +379,38 @@ describe('DesktopConfiguration', () => {
     expect(wrapper.get('[data-testid="link-coding-clients"]').attributes('href')).toBe(
       '/channels/agents'
     )
+  })
+
+  it('links a member with no provider key to Your AI accounts', async () => {
+    aiAccountsOn.value = true
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      is_admin: false,
+      app_chat_credential: 'missing',
+      keys: {
+        anthropic: { effective_source: 'none' },
+        openai: { effective_source: 'none' },
+        google: { effective_source: 'none' },
+      },
+    })
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="link-coding-clients"]').exists()).toBe(false)
+    const link = wrapper.get('[data-testid="link-ai-accounts"]')
+    expect(link.attributes('href')).toBe('/ai/providers')
+    expect(link.text()).toBe('Your AI accounts')
+  })
+
+  it('hides the AI accounts link when that page is off', async () => {
+    aiAccountsOn.value = false
+    mockGatewayStatus.mockResolvedValue({
+      ...readyGateway,
+      is_admin: false,
+      app_chat_credential: 'missing',
+    })
+    const wrapper = await mountPage()
+    expect(wrapper.get('[data-testid="alert-chat-gate"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="link-ai-accounts"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="link-coding-clients"]').exists()).toBe(false)
   })
 
   it('hides the chat notice when the gateway status cannot be loaded', async () => {
