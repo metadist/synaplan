@@ -301,11 +301,11 @@ final class McpServerFactory
     }
 
     /**
-     * @return \Closure(int, list<mixed>, list<mixed>, string, string): array<string, mixed>
+     * @return \Closure(int, list<mixed>, ?list<mixed>, string, string): array<string, mixed>
      */
     private function agentCheckinHandler(DesktopDevice $device): \Closure
     {
-        return function (int $protocol = DesktopJobContract::PROTOCOL_VERSION, array $capabilities = [], array $enabledSkills = [], string $agentKind = 'synaplan-desktop', string $status = 'idle') use ($device): array {
+        return function (int $protocol = DesktopJobContract::PROTOCOL_VERSION, array $capabilities = [], ?array $enabledSkills = null, string $agentKind = 'synaplan-desktop', string $status = 'idle') use ($device): array {
             $now = time();
 
             $device->touchLastSeen();
@@ -315,9 +315,10 @@ final class McpServerFactory
                     static fn ($c): bool => \is_string($c),
                 )));
             }
-            $skills = self::normalizeSkillNames($enabledSkills);
-            if ([] !== $skills) {
-                $device->setEnabledSkills($skills);
+            // null means the field was omitted: older clients keep the stored list.
+            // An array, including an empty one, replaces it.
+            if (null !== $enabledSkills) {
+                $device->setEnabledSkills(self::normalizeSkillNames($enabledSkills));
             }
             $this->desktopDeviceRepository->save($device);
 
@@ -390,9 +391,8 @@ final class McpServerFactory
     }
 
     /**
-     * Skill names the computer may be offered. An omitted or empty list leaves
-     * the last report in place, matching capabilities: a check-in that does
-     * not mention skills must not wipe them.
+     * Skill names the computer may be offered. Invalid entries are dropped.
+     * The caller decides whether an omitted field keeps the stored list.
      *
      * @param list<mixed> $enabledSkills
      *
@@ -440,7 +440,7 @@ final class McpServerFactory
                 'enabledSkills' => [
                     'type' => 'array',
                     'items' => ['type' => 'string'],
-                    'description' => 'Names of skills currently installed/enabled on the device. A hint so the server can skip jobs the device would refuse — an optimization, not a security boundary.',
+                    'description' => 'Names of skills that may run while the user is away. Omit the field to keep the last report. Send an empty list when none may run. A hint so the server can skip jobs the device would refuse — an optimization, not a security boundary.',
                 ],
                 'agentKind' => [
                     'type' => 'string',

@@ -715,6 +715,7 @@
         "skillMessage": "„{name}” üzerinde hangi skill çalıştırılsın?",
         "pickSkill": "{name} için bir skill seçin.",
         "noSkills": "{name} henüz skill bildirmedi. Skill adını yazın.",
+        "noRunnableSkills": "{name} siz yokken çalışabilecek bir skill'e sahip değil. Synaplan Desktop'ta bir skill için \"Ben yokken çalıştır\" seçeneğini açın.",
         "skillPlaceholder": "örn. pptx",
         "invalidSkill": "Yalnızca küçük harf, rakam ve kısa çizgi kullanın.",
         "sent": "„{name}” gönderildi.",

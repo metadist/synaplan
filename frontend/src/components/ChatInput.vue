@@ -66,7 +66,10 @@
         class="mb-3 surface-card rounded-lg p-3"
         data-testid="desktop-skill-picker"
       >
-        <p class="text-sm txt-primary">
+        <p v-if="pendingDesktopRun.skills.length === 0" class="text-sm txt-primary">
+          {{ $t('config.desktop.run.noRunnableSkills', { name: pendingDesktopRun.deviceName }) }}
+        </p>
+        <p v-else class="text-sm txt-primary">
           {{ $t('config.desktop.run.pickSkill', { name: pendingDesktopRun.deviceName }) }}
         </p>
         <div class="mt-2 flex flex-wrap gap-2">
@@ -601,6 +604,12 @@ const handlePlusClickOutside = (e: MouseEvent) => {
   plusMenuOpen.value = false
 }
 
+const handlePlusEscape = (e: KeyboardEvent) => {
+  if (!plusMenuOpen.value || e.key !== 'Escape') return
+  e.preventDefault()
+  plusMenuOpen.value = false
+}
+
 const message = ref('')
 const originalMessage = ref('')
 const enhancedMessage = ref('')
@@ -693,6 +702,7 @@ const handleRunOnDevice = async (device: {
   name: string
   enabledSkills?: string[]
 }) => {
+  plusMenuOpen.value = false
   const promptText = message.value.trim()
   if (!promptText) {
     warning(t('config.desktop.run.needPrompt'))
@@ -710,6 +720,16 @@ const handleRunOnDevice = async (device: {
   }
 
   const skills = reportedSkills(fresh.enabledSkills ?? device.enabledSkills)
+  if (fresh.skillsReported && skills.length === 0) {
+    pendingDesktopRun.value = {
+      deviceId: fresh.id,
+      deviceName: fresh.name,
+      skills: [],
+      prompt: promptText,
+      chatId,
+    }
+    return
+  }
   if (skills.length > 0) {
     pendingDesktopRun.value = {
       deviceId: fresh.id,
@@ -1722,12 +1742,14 @@ const clearSilenceTimer = () => {
 
 onMounted(() => {
   document.addEventListener('click', handlePlusClickOutside)
+  document.addEventListener('keydown', handlePlusEscape)
 })
 
 onUnmounted(() => {
   dictationUnmounted = true
   stopDictation({ keepText: false })
   document.removeEventListener('click', handlePlusClickOutside)
+  document.removeEventListener('keydown', handlePlusEscape)
   if (uploadAbortController.value) {
     uploadAbortController.value.abort()
     uploadAbortController.value = null

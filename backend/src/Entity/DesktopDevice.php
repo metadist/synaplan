@@ -145,6 +145,15 @@ class DesktopDevice
     }
 
     /**
+     * True once the computer has sent an enabledSkills list, including an empty one.
+     * Null means it has never reported skills.
+     */
+    public function hasReportedSkills(): bool
+    {
+        return null !== $this->enabledSkills;
+    }
+
+    /**
      * @param list<string>|null $enabledSkills
      */
     public function setEnabledSkills(?array $enabledSkills): self

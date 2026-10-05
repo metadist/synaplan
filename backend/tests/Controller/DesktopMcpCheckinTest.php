@@ -123,6 +123,16 @@ final class DesktopMcpCheckinTest extends WebTestCase
         $checkin2 = $this->callTool($sessionId, 'agent_checkin', ['protocol' => 1], 11);
         self::assertCount(0, $checkin2['result']['structuredContent']['jobs']);
         self::assertSame(['hello-files'], $this->reloadDevice($device)->getEnabledSkills());
+        self::assertTrue($this->reloadDevice($device)->hasReportedSkills());
+
+        // An empty list replaces the stored skills. A later check-in that omits the field keeps that empty list.
+        $this->callTool($sessionId, 'agent_checkin', ['protocol' => 1, 'enabledSkills' => []], 13);
+        $cleared = $this->reloadDevice($device);
+        self::assertSame([], $cleared->getEnabledSkills());
+        self::assertTrue($cleared->hasReportedSkills());
+
+        $this->callTool($sessionId, 'agent_checkin', ['protocol' => 1], 14);
+        self::assertSame([], $this->reloadDevice($device)->getEnabledSkills());
 
         // Report success.
         $report = $this->callTool($sessionId, 'agent_report_result', [

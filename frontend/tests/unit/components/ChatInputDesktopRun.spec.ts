@@ -10,6 +10,7 @@ type DesktopRow = {
   name: string
   status: string
   enabledSkills: string[]
+  skillsReported: boolean
   lastSeen: number
   created: number
   presence: 'online' | 'away' | 'never' | 'revoked'
@@ -43,6 +44,8 @@ vi.mock('vue-i18n', () => ({
         'config.desktop.run.enqueueFailed': 'The job could not be sent to {name}.',
         'config.desktop.run.noSkills':
           '{name} has not reported its skills yet. Type the skill name.',
+        'config.desktop.run.noRunnableSkills':
+          '{name} has no skill that may run while you are away. In Synaplan Desktop, turn on "Run when I am away" for a skill.',
         'config.desktop.run.pickSkill': 'Choose a skill for {name}.',
         'config.desktop.run.sent': 'Sent to "{name}".',
         'config.desktop.run.needPrompt': 'Type what the computer should do first.',
@@ -145,6 +148,7 @@ function device(overrides: Partial<DesktopRow> = {}): DesktopRow {
     name: 'tower',
     status: 'active',
     enabledSkills: ['pptx'],
+    skillsReported: false,
     lastSeen: 1,
     created: 1,
     presence: 'online',
@@ -161,7 +165,10 @@ async function mountInput(): Promise<VueWrapper> {
     attachTo: document.body,
     global: {
       plugins: [pinia],
-      mocks: { $t: (key: string, params?: Record<string, string>) => params?.name ?? key },
+      mocks: {
+        $t: (key: string, params?: Record<string, string>) =>
+          params?.name ? `${key}|${params.name}` : key,
+      },
       stubs: {
         Icon: true,
         Textarea: TextareaStub,
@@ -217,6 +224,7 @@ describe('ChatInput run on this computer', () => {
     const wrapper = await mountInput()
     await chooseComputer(wrapper)
 
+    expect(wrapper.find('[data-testid="dropdown-plus-panel"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="desktop-skill-picker"]').text()).toContain('pptx')
     harness.enqueueJob.mockImplementation(async () => {
       useChatsStore().activeChatId = 99
@@ -259,6 +267,30 @@ describe('ChatInput run on this computer', () => {
     expect(harness.error).toHaveBeenCalledWith(
       'tower is disconnected. Connect it again, then try once more.'
     )
+  })
+
+  it('closes the plus panel when Escape is pressed', async () => {
+    const wrapper = await mountInput()
+    await wrapper.get('[data-testid="btn-chat-plus"]').trigger('click')
+    expect(wrapper.find('[data-testid="dropdown-plus-panel"]').exists()).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dropdown-plus-panel"]').exists()).toBe(false)
+  })
+
+  it('shows the empty-skill sentence when the computer reported none', async () => {
+    harness.devices.value = [device({ enabledSkills: [], skillsReported: true })]
+    const wrapper = await mountInput()
+    await chooseComputer(wrapper, device({ enabledSkills: [], skillsReported: true }))
+
+    expect(wrapper.find('[data-testid="dropdown-plus-panel"]').exists()).toBe(false)
+    const picker = wrapper.get('[data-testid="desktop-skill-picker"]').text()
+    expect(picker).toContain('config.desktop.run.noRunnableSkills|tower')
+    expect(picker).not.toContain('config.desktop.run.noSkills')
+    expect(wrapper.find('[data-testid="btn-desktop-skill-pptx"]').exists()).toBe(false)
+    expect(harness.prompt).not.toHaveBeenCalled()
   })
 
   it('asks for a skill name, with a translated cancel, when none were reported', async () => {
