@@ -428,7 +428,7 @@ describe('DesktopConfiguration', () => {
       is_admin: false,
     })
     const wrapper = await mountPage()
-    expect(wrapper.get('[data-testid="alert-chat-gate"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="alert-chat-gate"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="link-ai-accounts"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="link-coding-clients"]').exists()).toBe(false)
   })
