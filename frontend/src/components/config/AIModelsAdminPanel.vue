@@ -14,12 +14,12 @@
           <input
             v-model="adminSearch"
             type="text"
-            class="px-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="px-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="t('config.aiModels.admin.searchPlaceholder')"
           />
           <button
             type="button"
-            class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition"
+            class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover:bg-black/5 dark:hover:bg-white/5 transition"
             :disabled="modelsLoading"
             @click="loadModels"
           >
@@ -131,31 +131,31 @@
                 <td class="py-2 px-2">
                   <input
                     v-model="editForm.service"
-                    class="w-32 px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-32 px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   />
                 </td>
                 <td class="py-2 px-2">
                   <input
                     v-model="editForm.tag"
-                    class="w-24 px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-24 px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   />
                 </td>
                 <td class="py-2 px-2">
                   <input
                     v-model="editForm.providerId"
-                    class="w-56 px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-56 px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   />
                 </td>
                 <td class="py-2 px-2">
                   <input
                     v-model="editForm.name"
-                    class="w-44 px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-44 px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   />
                 </td>
                 <td class="py-2 px-2">
                   <select
                     v-model.number="editForm.selectable"
-                    class="px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   >
                     <option :value="0">0</option>
                     <option :value="1">1</option>
@@ -164,7 +164,7 @@
                 <td class="py-2 px-2">
                   <select
                     v-model.number="editForm.active"
-                    class="px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   >
                     <option :value="0">0</option>
                     <option :value="1">1</option>
@@ -184,13 +184,13 @@
                     v-model.number="editForm.priceIn"
                     type="number"
                     step="0.000001"
-                    class="w-24 px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-24 px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   />
                 </td>
                 <td class="py-2 px-2">
                   <input
                     v-model="editForm.inUnit"
-                    class="w-24 px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-24 px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   />
                 </td>
                 <td class="py-2 px-2">
@@ -198,20 +198,20 @@
                     v-model.number="editForm.priceOut"
                     type="number"
                     step="0.000001"
-                    class="w-24 px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-24 px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   />
                 </td>
                 <td class="py-2 px-2">
                   <input
                     v-model="editForm.outUnit"
-                    class="w-24 px-2 py-1 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="w-24 px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   />
                 </td>
                 <td class="py-2 px-2">
                   <div class="flex items-center gap-1.5">
                     <button
                       type="button"
-                      class="px-3 py-1 rounded-lg bg-[var(--brand)] text-white text-xs font-medium hover:opacity-90 transition"
+                      class="px-3 py-1 rounded-xl bg-[var(--brand)] text-white text-xs font-medium hover:opacity-90 transition"
                       :disabled="rowSavingId === m.id"
                       @click="saveEditingModel(m.id)"
                     >
@@ -223,7 +223,7 @@
                     </button>
                     <button
                       type="button"
-                      class="px-3 py-1 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary transition"
+                      class="px-3 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary transition"
                       @click="cancelEdit"
                     >
                       {{ t('common.cancel') }}
@@ -308,14 +308,14 @@
                   <div class="flex items-center gap-1.5">
                     <button
                       type="button"
-                      class="px-3 py-1 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary hover:border-[var(--brand)]/50 transition"
+                      class="px-3 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary hover:border-[var(--brand)]/50 transition"
                       @click="startEdit(m)"
                     >
                       {{ t('config.aiModels.admin.edit') }}
                     </button>
                     <button
                       type="button"
-                      class="px-3 py-1 rounded-lg border border-red-500/40 text-red-500 text-xs font-medium hover:bg-red-500/10 transition"
+                      class="px-3 py-1 rounded-xl border border-red-500/40 text-red-500 text-xs font-medium hover:bg-red-500/10 transition"
                       :disabled="rowDeletingId === m.id"
                       @click="deleteModel(m)"
                     >
@@ -348,7 +348,7 @@
         </span>
         <div class="flex items-center gap-1">
           <button
-            class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            class="p-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             :disabled="adminPage <= 1"
             @click="adminPage--"
           >
@@ -358,7 +358,7 @@
             {{ adminPage }} / {{ adminTotalPages }}
           </span>
           <button
-            class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            class="p-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             :disabled="adminPage >= adminTotalPages"
             @click="adminPage++"
           >
@@ -398,7 +398,7 @@
             }}</label>
             <textarea
               v-model="urlsText"
-              class="w-full h-28 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="w-full h-28 px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               :placeholder="t('config.aiModels.admin.urlsPlaceholder')"
             />
           </div>
@@ -408,7 +408,7 @@
             }}</label>
             <textarea
               v-model="textDump"
-              class="w-full h-28 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="w-full h-28 px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               :placeholder="t('config.aiModels.admin.textDumpPlaceholder')"
             />
           </div>
@@ -426,7 +426,7 @@
 
           <button
             type="button"
-            class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+            class="btn-primary px-4 py-2 rounded-xl text-sm font-medium"
             :disabled="importLoading"
             @click="generatePreview"
           >
@@ -439,7 +439,7 @@
 
           <button
             type="button"
-            class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
+            class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
             :disabled="applyLoading || !sqlPreview || !validationOk"
             @click="applySql"
           >
@@ -457,7 +457,7 @@
           }}</label>
           <textarea
             v-model="sqlPreview"
-            class="w-full h-48 px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 font-mono text-xs txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full h-48 px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 font-mono text-xs txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="t('config.aiModels.admin.sqlPreviewPlaceholder')"
           />
 

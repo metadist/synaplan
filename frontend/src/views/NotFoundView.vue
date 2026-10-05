@@ -56,14 +56,14 @@
       >
         <router-link
           to="/"
-          class="btn-primary px-8 py-3 rounded-lg font-semibold flex items-center gap-2 min-w-[200px] justify-center"
+          class="btn-primary px-8 py-3 rounded-xl font-semibold flex items-center gap-2 min-w-[200px] justify-center"
           data-testid="btn-home"
         >
           <HomeIcon class="w-5 h-5" />
           {{ $t('notFound.goHome') }}
         </router-link>
         <button
-          class="px-8 py-3 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-semibold flex items-center gap-2 min-w-[200px] justify-center"
+          class="px-8 py-3 rounded-xl border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-semibold flex items-center gap-2 min-w-[200px] justify-center"
           data-testid="btn-back"
           @click="goBack"
         >

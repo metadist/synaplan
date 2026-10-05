@@ -9,7 +9,7 @@
           <select
             id="policy-group"
             v-model="selectedId"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="select-policy-group"
           >
             <option :value="null" disabled>{{ $t('people.policies.chooseGroup') }}</option>
@@ -63,7 +63,7 @@
               >
                 <span class="font-medium">{{ $t(`people.policies.capability.${cap}`) }}</span>
                 <select
-                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full mt-1 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   :value="stringSetting(`DEFAULTMODEL.${cap}`)"
                   :data-testid="`select-default-${cap}`"
                   @change="
@@ -153,7 +153,7 @@
                   $t(`people.policies.feature.${featureI18nKey(key)}`)
                 }}</span>
                 <select
-                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full mt-1 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   :value="featureMode(key)"
                   :data-testid="`select-feature-${featureI18nKey(key)}`"
                   @change="onFeature(key, ($event.target as HTMLSelectElement).value)"
@@ -184,7 +184,7 @@
               {{ $t('people.policies.rateLimit') }}
             </h3>
             <select
-              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               :value="stringSetting('RATELIMITS.TIER')"
               data-testid="select-rate-tier"
               @change="onSelect('RATELIMITS.TIER', ($event.target as HTMLSelectElement).value)"
@@ -204,7 +204,7 @@
           <div class="flex justify-end">
             <button
               type="button"
-              class="btn-primary px-4 py-2.5 rounded-lg"
+              class="btn-primary px-4 py-2.5 rounded-xl"
               :disabled="saving"
               data-testid="btn-save-policies"
               @click="save"

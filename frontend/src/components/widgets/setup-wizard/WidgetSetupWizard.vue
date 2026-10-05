@@ -16,7 +16,7 @@
             {{ $t('widgets.createWizard.title') }}
           </h2>
           <button
-            class="w-9 h-9 rounded-lg hover-surface transition-colors flex items-center justify-center"
+            class="w-9 h-9 rounded-xl hover-surface transition-colors flex items-center justify-center"
             :aria-label="$t('common.close')"
             data-testid="btn-close"
             @click="handleClose"
@@ -126,7 +126,7 @@
             <button
               v-if="currentStep === 0"
               type="button"
-              class="px-4 py-2.5 rounded-lg hover-surface transition-colors txt-secondary font-medium text-sm"
+              class="px-4 py-2.5 rounded-xl hover-surface transition-colors txt-secondary font-medium text-sm"
               data-testid="btn-cancel"
               @click="handleClose"
             >
@@ -135,7 +135,7 @@
             <button
               v-else
               type="button"
-              class="px-4 py-2.5 rounded-lg hover-surface transition-colors txt-secondary font-medium text-sm flex items-center gap-1.5"
+              class="px-4 py-2.5 rounded-xl hover-surface transition-colors txt-secondary font-medium text-sm flex items-center gap-1.5"
               :disabled="creating"
               data-testid="btn-wizard-back"
               @click="currentStep--"
@@ -148,7 +148,7 @@
               v-if="currentStep < steps.length - 1"
               type="button"
               :disabled="!canProceed"
-              class="btn-primary px-6 py-2.5 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              class="btn-primary px-6 py-2.5 rounded-xl transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               data-testid="btn-wizard-next"
               @click="currentStep++"
             >
@@ -159,7 +159,7 @@
               v-else
               type="button"
               :disabled="creating"
-              class="btn-primary px-6 py-2.5 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              class="btn-primary px-6 py-2.5 rounded-xl transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               data-testid="btn-create"
               @click="handleCreate"
             >

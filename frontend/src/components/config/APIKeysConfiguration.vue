@@ -59,13 +59,13 @@
             v-model="newKeyName"
             type="text"
             :placeholder="$t('config.apiKeys.namePlaceholder')"
-            class="w-full sm:flex-1 sm:min-w-0 px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full sm:flex-1 sm:min-w-0 px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-key-name"
             @keypress.enter="createAPIKey"
           />
           <button
             :disabled="!newKeyName.trim() || creating"
-            class="w-full sm:w-auto sm:shrink-0 btn-primary px-5 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full sm:w-auto sm:shrink-0 btn-primary px-5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-create"
             @click="createAPIKey"
           >
@@ -143,7 +143,7 @@
       </p>
       <router-link
         to="/channels/api/docs"
-        class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
+        class="btn-primary px-6 py-3 rounded-xl font-medium inline-flex items-center gap-2"
       >
         <CommandLineIcon class="w-4 h-4" />
         {{ $t('config.apiKeys.docsTitle') }}
@@ -396,7 +396,7 @@
               <div class="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  class="flex-1 btn-primary px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+                  class="flex-1 btn-primary px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium"
                   data-testid="btn-copy"
                   @click="copyKeyFromModal"
                 >
@@ -410,7 +410,7 @@
                 </button>
                 <button
                   type="button"
-                  class="flex-1 surface-chip px-4 py-3 rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  class="flex-1 surface-chip px-4 py-3 rounded-xl font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   data-testid="btn-close"
                   @click="closeKeyModal"
                 >

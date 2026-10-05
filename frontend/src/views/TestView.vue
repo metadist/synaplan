@@ -255,14 +255,14 @@
               <input
                 type="text"
                 placeholder="Enter text..."
-                class="w-full px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
 
             <div>
               <label class="block text-sm font-semibold txt-primary mb-2">Select</label>
               <select
-                class="w-full px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               >
                 <option>Option 1</option>
                 <option>Option 2</option>
@@ -275,7 +275,7 @@
               <textarea
                 rows="4"
                 placeholder="Enter text..."
-                class="w-full px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
               ></textarea>
             </div>
 

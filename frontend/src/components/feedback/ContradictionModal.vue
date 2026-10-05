@@ -131,7 +131,7 @@ function handleCancel() {
                 </div>
               </div>
               <button
-                class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
+                class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
                 @click="handleCancel"
               >
                 <Icon icon="mdi:close" class="w-5 h-5 txt-secondary" />
@@ -212,7 +212,7 @@ function handleCancel() {
                   <div class="flex items-center gap-1.5">
                     <button
                       type="button"
-                      class="text-[10px] font-medium px-2 py-1 rounded-md transition-colors"
+                      class="text-[10px] font-medium px-2 py-1 rounded-xl transition-colors"
                       :class="
                         allSelected
                           ? 'bg-red-500/10 text-red-500'
@@ -224,7 +224,7 @@ function handleCancel() {
                     </button>
                     <button
                       type="button"
-                      class="text-[10px] font-medium px-2 py-1 rounded-md transition-colors"
+                      class="text-[10px] font-medium px-2 py-1 rounded-xl transition-colors"
                       :class="
                         noneSelected
                           ? 'bg-green-500/10 text-green-500'

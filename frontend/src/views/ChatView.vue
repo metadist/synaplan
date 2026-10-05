@@ -133,7 +133,7 @@
                 <!-- Retrying a disabled trial can never succeed. -->
                 <button
                   v-if="!guestStore.guestChatDisabled"
-                  class="px-4 py-2 rounded-lg btn-brand text-sm font-medium"
+                  class="px-4 py-2 rounded-xl btn-brand text-sm font-medium"
                   @click="guestStore.retryInit()"
                 >
                   {{ $t('guest.retry') }}

@@ -51,7 +51,7 @@
         <button
           v-if="isAdmin && !clientEnabled"
           type="button"
-          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 disabled:opacity-50"
+          class="btn-primary px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap shrink-0 disabled:opacity-50"
           :disabled="togglingClient"
           data-testid="btn-mcp-enable-client"
           @click="setClientEnabled(true)"
@@ -86,7 +86,7 @@
         <h3 class="text-lg font-semibold txt-primary">{{ $t('mcpServers.listTitle') }}</h3>
         <button
           type="button"
-          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-primary px-4 py-2 rounded-xl text-sm font-medium"
           data-testid="btn-mcp-add"
           @click="startCreate"
         >
@@ -322,7 +322,7 @@
           <input
             v-model="form.name"
             type="text"
-            class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-mcp-name"
           />
         </label>
@@ -333,7 +333,7 @@
             type="url"
             placeholder="https://example.com/mcp"
             :readonly="form.authMode === 'oauth' && !!form.url"
-            class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
             :class="form.authMode === 'oauth' && form.url ? 'opacity-80' : ''"
             data-testid="input-mcp-url"
           />
@@ -348,7 +348,7 @@
               type="text"
               autocomplete="off"
               placeholder="Authorization"
-              class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
               data-testid="input-mcp-auth-header"
             />
           </label>
@@ -361,7 +361,7 @@
               type="password"
               autocomplete="new-password"
               :placeholder="editingHasToken ? '••••••••' : $t('mcpServers.authTokenPlaceholder')"
-              class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
               data-testid="input-mcp-auth-token"
             />
           </label>
@@ -389,7 +389,7 @@
       <div class="flex flex-wrap items-center gap-3 mt-6">
         <button
           type="button"
-          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          class="btn-primary px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
           :disabled="saving || !form.name.trim() || !form.url.trim()"
           data-testid="btn-mcp-save"
           @click="save"
@@ -398,7 +398,7 @@
         </button>
         <button
           type="button"
-          class="px-4 py-2 rounded-lg text-sm txt-secondary hover:txt-primary"
+          class="px-4 py-2 rounded-xl text-sm txt-secondary hover:txt-primary"
           @click="closeEditor"
         >
           {{ $t('common.cancel') }}

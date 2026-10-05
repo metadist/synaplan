@@ -198,7 +198,7 @@
                     {{ $t('promoTips.widgetPreview.inputPlaceholder') }}
                   </div>
                   <button
-                    class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                    class="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
                     style="
                       background: linear-gradient(
                         135deg,

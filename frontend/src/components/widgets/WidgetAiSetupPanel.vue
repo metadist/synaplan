@@ -37,7 +37,7 @@
       </div>
       <button
         v-if="messages.length > 1"
-        class="p-1.5 rounded-lg txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+        class="p-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
         :title="$t('widgets.detail.aiPanel.restart')"
         @click="restartChat"
       >

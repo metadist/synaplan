@@ -55,7 +55,7 @@ async function copyCommand(): Promise<void> {
             </code>
             <button
               type="button"
-              class="p-2 rounded-lg hover-surface"
+              class="p-2 rounded-xl hover-surface"
               :title="$t('admin.config.restartBanner.copyCommand')"
               :aria-label="$t('admin.config.restartBanner.copyCommand')"
               @click="copyCommand"
@@ -66,7 +66,7 @@ async function copyCommand(): Promise<void> {
         </div>
         <button
           type="button"
-          class="p-1 rounded hover-surface"
+          class="p-1 rounded-xl hover-surface"
           :aria-label="$t('common.close')"
           @click="$emit('dismiss')"
         >

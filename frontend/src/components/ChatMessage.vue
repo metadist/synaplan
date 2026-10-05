@@ -66,7 +66,7 @@
           v-if="role === 'assistant' && (isStreaming || copyableText)"
           type="button"
           :class="[
-            'absolute top-2 right-2 z-10 p-1.5 rounded-md txt-secondary bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary',
+            'absolute top-2 right-2 z-10 p-1.5 rounded-xl txt-secondary bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary',
             'transition-opacity duration-200',
             isStreaming
               ? 'opacity-0 pointer-events-none'
@@ -290,7 +290,7 @@
               <!-- Show More/Less Button -->
               <button
                 v-if="totalBadgesCount > 3"
-                class="flex items-center gap-1 px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-sm txt-secondary font-medium"
+                class="flex items-center gap-1 px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-sm txt-secondary font-medium"
                 data-testid="btn-message-badges-toggle"
                 @click="showAllBadges = !showAllBadges"
               >
@@ -403,7 +403,7 @@
             </p>
             <button
               type="button"
-              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-[var(--color-accent)] text-white hover:opacity-90 dark:bg-[var(--color-accent)] dark:text-white dark:hover:opacity-90"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors bg-[var(--color-accent)] text-white hover:opacity-90 dark:bg-[var(--color-accent)] dark:text-white dark:hover:opacity-90"
               data-testid="btn-continue-response"
               @click="emit('continue')"
             >
@@ -452,7 +452,7 @@
               >
                 <button
                   :disabled="carouselPage === 0"
-                  class="p-1 sm:p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  class="p-1 sm:p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   :title="'Previous'"
                   data-testid="btn-message-sources-prev"
                   @click="previousSource"
@@ -473,7 +473,7 @@
                 </span>
                 <button
                   :disabled="carouselPage >= Math.ceil(searchResults.length / 3) - 1"
-                  class="p-1 sm:p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  class="p-1 sm:p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   :title="'Next'"
                   data-testid="btn-message-sources-next"
                   @click="nextSource"
@@ -499,7 +499,7 @@
                     :key="index"
                     type="button"
                     :class="[
-                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0 snap-start',
+                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-xl transition-all cursor-pointer flex-shrink-0 snap-start',
                       'w-[85%] sm:w-[calc(33.333%-0.5rem)]',
                       'bg-[var(--bg-chip)] border shadow-sm text-left font-inherit',
                       highlightedSource === index
@@ -663,7 +663,7 @@
                       <span class="text-xs txt-tertiary">{{ t('chatMessage.infoAiModel') }}</span>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
                         @click="handleInfoModelClick('chat')"
                       >
                         <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
@@ -687,7 +687,7 @@
                       }}</span>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 transition-colors cursor-pointer"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-xs font-medium bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 transition-colors cursor-pointer"
                         @click="handleInfoModelClick('audio')"
                       >
                         <Icon icon="mdi:music" class="w-3.5 h-3.5" />
@@ -702,7 +702,7 @@
                       <span class="text-xs txt-tertiary">{{ $t('config.aiModels.sorting') }}</span>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
                         @click="handleInfoModelClick('sorting')"
                       >
                         <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
@@ -934,7 +934,7 @@
               <div class="flex flex-wrap gap-2">
                 <button
                   v-if="purchaseAllowed && config.billing.enabled"
-                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
                   @click="$router.push('/subscription')"
                 >
                   <Icon icon="mdi:crown" class="w-4 h-4" />
@@ -943,7 +943,7 @@
                 <button
                   v-if="canRewrite !== false"
                   type="button"
-                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   @click="handleRetry"
                 >
                   <Icon icon="mdi:refresh" class="w-4 h-4" />

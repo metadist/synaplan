@@ -84,7 +84,7 @@
             </p>
           </div>
           <button
-            class="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-500/30 transition-colors flex-shrink-0"
+            class="px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-500/30 transition-colors flex-shrink-0"
             @click="openAdvancedModal('privacy')"
           >
             {{ $t('widgets.detail.avvNoticeCta') }}
@@ -210,14 +210,14 @@
                         </div>
                         <div class="flex items-center gap-1 flex-shrink-0">
                           <button
-                            class="p-1.5 rounded-lg txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                            class="p-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                             :title="$t('widgets.detail.userData.edit')"
                             @click="openAdvancedModal('security')"
                           >
                             <Icon icon="heroicons:pencil-square" class="w-4 h-4" />
                           </button>
                           <button
-                            class="p-1.5 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            class="p-1.5 rounded-xl text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
                             :title="$t('widgets.detail.userData.remove')"
                             @click="removeUserDataIntegration"
                           >
@@ -366,13 +366,13 @@
                               </div>
                               <div class="flex items-center gap-0.5 flex-shrink-0">
                                 <button
-                                  class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
+                                  class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
                                   @click.stop="startEditing(trigger.id)"
                                 >
                                   <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
                                 </button>
                                 <button
-                                  class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
+                                  class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
                                   @click.stop="removeTrigger(trigger.id)"
                                 >
                                   <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
@@ -428,12 +428,12 @@
                               <div class="flex gap-1.5">
                                 <input
                                   v-model="wizardLabel"
-                                  class="flex-1 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                                 />
                                 <button
                                   type="button"
                                   :disabled="!wizardLabel.trim() || enhancingField === 'label'"
-                                  class="px-2.5 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                                  class="px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
                                   :title="$t('widgets.detail.wizard.aiEnhance')"
                                   @click="enhanceField('label')"
                                 >
@@ -466,12 +466,12 @@
                                       `widgets.detail.wizard.detailsPlaceholder.${activeWizard.key}`
                                     )
                                   "
-                                  class="flex-1 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                                 />
                                 <button
                                   type="button"
                                   :disabled="!wizardDetails.trim() || enhancingField === 'details'"
-                                  class="self-start px-2.5 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                                  class="self-start px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
                                   :title="$t('widgets.detail.wizard.aiEnhance')"
                                   @click="enhanceField('details')"
                                 >
@@ -491,14 +491,14 @@
                             </div>
                             <div class="flex justify-end gap-2">
                               <button
-                                class="px-3 py-1.5 rounded-lg text-xs font-medium txt-secondary hover:txt-primary transition-colors"
+                                class="px-3 py-1.5 rounded-xl text-xs font-medium txt-secondary hover:txt-primary transition-colors"
                                 @click="cancelWizard"
                               >
                                 {{ $t('widgets.detail.wizard.cancel') }}
                               </button>
                               <button
                                 :disabled="!wizardLabel.trim()"
-                                class="px-4 py-1.5 rounded-lg text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
+                                class="px-4 py-1.5 rounded-xl text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
                                 @click="confirmWizard"
                               >
                                 {{ $t('widgets.detail.wizard.create') }}
@@ -566,12 +566,12 @@
                           <input
                             v-model="newTriggerText"
                             :placeholder="$t('widgets.detail.addTrigger')"
-                            class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            class="flex-1 min-w-0 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                           />
                           <button
                             type="submit"
                             :disabled="!newTriggerText.trim()"
-                            class="px-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            class="px-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <Icon icon="heroicons:plus" class="w-4 h-4" />
                           </button>
@@ -665,13 +665,13 @@
                               </div>
                               <div class="flex items-center gap-0.5 flex-shrink-0">
                                 <button
-                                  class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
+                                  class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
                                   @click.stop="startEditing(response.id)"
                                 >
                                   <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
                                 </button>
                                 <button
-                                  class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
+                                  class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
                                   @click.stop="removeResponse(response.id)"
                                 >
                                   <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
@@ -726,12 +726,12 @@
                               <div class="flex gap-1.5">
                                 <input
                                   v-model="wizardLabel"
-                                  class="flex-1 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                                 />
                                 <button
                                   type="button"
                                   :disabled="!wizardLabel.trim() || enhancingField === 'label'"
-                                  class="px-2.5 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                                  class="px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
                                   :title="$t('widgets.detail.wizard.aiEnhance')"
                                   @click="enhanceField('label')"
                                 >
@@ -760,7 +760,7 @@
                               <input
                                 v-model="wizardUrl"
                                 placeholder="https://..."
-                                class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                               />
                             </div>
 
@@ -774,7 +774,7 @@
                                 <input
                                   v-model="wizardUrl"
                                   placeholder="https://api.example.com/v1/..."
-                                  class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                                 />
                               </div>
                               <div class="relative">
@@ -785,7 +785,7 @@
                                 </label>
                                 <select
                                   v-model="wizardMethod"
-                                  class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                                 >
                                   <option value="GET">GET</option>
                                   <option value="POST">POST</option>
@@ -816,12 +816,12 @@
                                       `widgets.detail.wizard.detailsPlaceholder.${activeWizard.key}`
                                     )
                                   "
-                                  class="flex-1 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                                 />
                                 <button
                                   type="button"
                                   :disabled="!wizardDetails.trim() || enhancingField === 'details'"
-                                  class="self-start px-2.5 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                                  class="self-start px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
                                   :title="$t('widgets.detail.wizard.aiEnhance')"
                                   @click="enhanceField('details')"
                                 >
@@ -909,7 +909,7 @@
                                 </label>
                                 <button
                                   type="button"
-                                  class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all"
+                                  class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all"
                                   @click="showWizardFilePicker = true"
                                 >
                                   <Icon
@@ -923,14 +923,14 @@
 
                             <div class="flex justify-end gap-2">
                               <button
-                                class="px-3 py-1.5 rounded-lg text-xs font-medium txt-secondary hover:txt-primary transition-colors"
+                                class="px-3 py-1.5 rounded-xl text-xs font-medium txt-secondary hover:txt-primary transition-colors"
                                 @click="cancelWizard"
                               >
                                 {{ $t('widgets.detail.wizard.cancel') }}
                               </button>
                               <button
                                 :disabled="!wizardLabel.trim()"
-                                class="px-4 py-1.5 rounded-lg text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
+                                class="px-4 py-1.5 rounded-xl text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
                                 @click="confirmWizard"
                               >
                                 {{ $t('widgets.detail.wizard.create') }}
@@ -996,12 +996,12 @@
                           <input
                             v-model="newResponseText"
                             :placeholder="$t('widgets.detail.addResponse')"
-                            class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            class="flex-1 min-w-0 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                           />
                           <button
                             type="submit"
                             :disabled="!newResponseText.trim()"
-                            class="px-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            class="px-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <Icon icon="heroicons:plus" class="w-4 h-4" />
                           </button>
@@ -1038,7 +1038,7 @@
                       </span>
                       <button
                         type="button"
-                        class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
+                        class="p-1.5 rounded-xl hover:bg-red-500/10 transition-colors flex-shrink-0"
                         :aria-label="$t('widgets.detail.knowledge.remove')"
                         data-testid="btn-remove-knowledge-file"
                         @click="removeKnowledgeFile(file)"
@@ -1090,7 +1090,7 @@
                     </label>
                     <button
                       type="button"
-                      class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-lg border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                      class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-xl border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
                       data-testid="btn-pick-knowledge-files"
                       @click="showKnowledgeFilePicker = true"
                     >

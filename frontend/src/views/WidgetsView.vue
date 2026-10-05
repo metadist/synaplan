@@ -25,7 +25,7 @@
               <span class="ml-1 text-xs">{{ sharedWidgets.length }}</span>
             </button>
             <button
-              class="btn-primary px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg transition-colors font-medium flex items-center gap-2 w-full sm:w-auto justify-center text-sm lg:text-base"
+              class="btn-primary px-4 lg:px-5 py-2 lg:py-2.5 rounded-xl transition-colors font-medium flex items-center gap-2 w-full sm:w-auto justify-center text-sm lg:text-base"
               data-testid="btn-create-widget"
               @click="startCreation"
             >
@@ -64,7 +64,7 @@
             </h3>
             <p class="txt-secondary mb-6 text-sm">{{ $t('widgets.emptyDescription') }}</p>
             <button
-              class="btn-primary px-4 lg:px-6 py-2.5 rounded-lg transition-colors font-medium inline-flex items-center gap-2 text-sm lg:text-base"
+              class="btn-primary px-4 lg:px-6 py-2.5 rounded-xl transition-colors font-medium inline-flex items-center gap-2 text-sm lg:text-base"
               data-testid="btn-create-first-widget"
               @click="startCreation"
             >
@@ -191,7 +191,7 @@
               <div class="flex flex-wrap items-center gap-1.5" @click.stop>
                 <!-- Primary: Configure -->
                 <button
-                  class="flex-1 min-w-[90px] btn-primary px-3 py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                  class="flex-1 min-w-[90px] btn-primary px-3 py-2 rounded-xl transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                   data-testid="btn-widget-advanced"
                   @click="openAdvancedConfig(widget)"
                 >
@@ -211,7 +211,7 @@
                 </button>
                 <button
                   v-if="!widget.shared"
-                  class="flex-1 min-w-[70px] px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
+                  class="flex-1 min-w-[70px] px-3 py-2 rounded-xl bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                   data-testid="btn-widget-sessions"
                   @click="viewSessions(widget)"
                 >
@@ -221,7 +221,7 @@
                 <!-- Get Code -->
                 <button
                   v-if="!widget.shared"
-                  class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
+                  class="p-2 rounded-xl hover-surface transition-colors flex-shrink-0"
                   :title="$t('widgets.code')"
                   :aria-label="$t('widgets.code')"
                   data-testid="btn-widget-embed"
@@ -231,7 +231,7 @@
                 </button>
                 <!-- Test Chat -->
                 <button
-                  class="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 transition-colors flex-shrink-0"
+                  class="p-2 rounded-xl bg-green-500/10 hover:bg-green-500/20 transition-colors flex-shrink-0"
                   :title="$t('widgets.testChat')"
                   :aria-label="$t('widgets.testChat')"
                   data-testid="btn-widget-test"
@@ -242,7 +242,7 @@
                 <!-- Delete -->
                 <button
                   v-if="!widget.shared"
-                  class="p-2 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
+                  class="p-2 rounded-xl hover:bg-red-500/10 transition-colors flex-shrink-0"
                   :title="$t('widgets.delete')"
                   :aria-label="$t('widgets.delete')"
                   data-testid="btn-widget-delete"
@@ -324,7 +324,7 @@
             <div class="flex gap-1 p-1 rounded-xl surface-card shadow-lg">
               <button
                 :class="[
-                  'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
+                  'px-3 md:px-4 py-1.5 rounded-xl text-xs md:text-sm font-medium transition-all',
                   overlayMode === 'internal'
                     ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'txt-secondary hover:txt-primary',
@@ -335,7 +335,7 @@
               </button>
               <button
                 :class="[
-                  'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
+                  'px-3 md:px-4 py-1.5 rounded-xl text-xs md:text-sm font-medium transition-all',
                   overlayMode === 'test'
                     ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'txt-secondary hover:txt-primary',
@@ -346,7 +346,7 @@
               </button>
             </div>
             <button
-              class="w-8 h-8 rounded-lg surface-card shadow-lg flex items-center justify-center hover-surface transition-colors"
+              class="w-8 h-8 rounded-xl surface-card shadow-lg flex items-center justify-center hover-surface transition-colors"
               :aria-label="$t('common.close')"
               @click="closeTestChat"
             >

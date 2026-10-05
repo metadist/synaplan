@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
                     <button
                       type="button"
                       :class="[
-                        'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors',
+                        'w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left text-sm transition-colors',
                         activeTab === tab.id
                           ? 'txt-brand bg-[var(--brand)]/5 font-medium'
                           : 'txt-secondary hover:txt-primary hover-surface',
@@ -422,7 +422,7 @@ onBeforeUnmount(() => {
           <p class="txt-secondary">{{ $t('admin.config.loadError') }}</p>
           <button
             type="button"
-            class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium"
             @click="systemConfig.load"
           >
             {{ $t('common.retry') }}

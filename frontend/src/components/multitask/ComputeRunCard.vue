@@ -93,7 +93,7 @@ const submitRerun = () => {
     <div v-if="canRerun" class="space-y-2">
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="compute-run-rerun"
         @click="showRerun = !showRerun"
       >
@@ -106,13 +106,13 @@ const submitRerun = () => {
           :id="notesId"
           v-model="notes"
           rows="3"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="compute-run-notes"
           :aria-describedby="notesHelpId"
         />
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!notes.trim()"
           data-testid="compute-run-rerun-submit"
           @click="submitRerun"

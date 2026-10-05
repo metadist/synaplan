@@ -24,7 +24,7 @@
         <button
           v-if="state?.chatId"
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-telegram-open-chat"
           @click="openChat"
         >
@@ -32,7 +32,7 @@
         </button>
         <button
           type="button"
-          class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-telegram-disconnect"
           :disabled="busy"
           @click="disconnect"
@@ -50,7 +50,7 @@
           <button
             v-if="state?.chatId"
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-telegram-open-chat"
             @click="openChat"
           >
@@ -58,7 +58,7 @@
           </button>
           <button
             type="button"
-            class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-telegram-disconnect"
             :disabled="busy"
             @click="disconnect"
@@ -76,7 +76,7 @@
         <p class="text-sm txt-secondary">{{ t('channels.telegram.disconnectedHistory') }}</p>
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-telegram-open-chat"
           @click="openChat"
         >

@@ -14,7 +14,7 @@
         >
           <button
             :class="[
-              'px-3 py-1.5 rounded text-xs font-medium transition-all',
+              'px-3 py-1.5 rounded-xl text-xs font-medium transition-all',
               chartType === 'line'
                 ? 'bg-[var(--brand)] text-white'
                 : 'txt-secondary hover:txt-primary',
@@ -26,7 +26,7 @@
           </button>
           <button
             :class="[
-              'px-3 py-1.5 rounded text-xs font-medium transition-all',
+              'px-3 py-1.5 rounded-xl text-xs font-medium transition-all',
               chartType === 'bar'
                 ? 'bg-[var(--brand)] text-white'
                 : 'txt-secondary hover:txt-primary',
@@ -40,7 +40,7 @@
 
         <select
           v-model="period"
-          class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="px-3 py-1.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           data-testid="select-period"
           @change="$emit('update:period', period)"
         >
@@ -53,7 +53,7 @@
 
         <select
           v-model="groupBy"
-          class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="px-3 py-1.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           data-testid="select-group-by"
           @change="$emit('update:groupBy', groupBy)"
         >

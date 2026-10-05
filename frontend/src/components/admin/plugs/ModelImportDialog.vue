@@ -14,7 +14,7 @@
         </div>
         <button
           type="button"
-          class="p-1 rounded txt-muted hover:txt-primary transition-colors"
+          class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
           :aria-label="$t('common.close')"
           data-testid="model-import-close"
           @click="close"
@@ -37,7 +37,7 @@
           <p class="txt-secondary mt-3">{{ error || $t('aiInfra.modelImport.unreachable') }}</p>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
             @click="loadPreview"
           >
             {{ $t('common.retry') }}
@@ -113,7 +113,7 @@
                     <input
                       v-model="row.tagsText"
                       type="text"
-                      class="w-full px-3 py-1.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      class="w-full px-3 py-1.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                       :data-testid="`model-import-tags-${row.providerId}`"
                     />
                     <div
@@ -149,14 +149,14 @@
       >
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           @click="close"
         >
           {{ $t('common.cancel') }}
         </button>
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="applying || selectedCount === 0"
           data-testid="model-import-apply"
           @click="apply"

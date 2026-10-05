@@ -210,14 +210,14 @@ onMounted(() => {
         <input
           v-model="url"
           type="url"
-          class="w-full flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
           :placeholder="$t('config.savedTasks.watches.urlPlaceholder')"
           :disabled="adding"
           data-testid="url-watch-input"
         />
         <button
           type="submit"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!canAdd"
           data-testid="url-watch-add"
         >
@@ -254,7 +254,7 @@ onMounted(() => {
         <div class="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            class="btn-secondary px-3 py-1.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="checkingId !== null"
             data-testid="url-watch-check"
             @click="onCheck(watch.id)"
@@ -267,7 +267,7 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-3 py-1.5 rounded-xl text-sm font-medium"
             data-testid="url-watch-view"
             @click="onView(watch.id)"
           >
@@ -275,7 +275,7 @@ onMounted(() => {
           </button>
           <button
             type="button"
-            class="btn-danger px-3 py-1.5 rounded-lg text-sm font-medium"
+            class="btn-danger px-3 py-1.5 rounded-xl text-sm font-medium"
             data-testid="url-watch-delete"
             @click="onDelete(watch)"
           >
@@ -315,7 +315,7 @@ onMounted(() => {
             >{{ viewing.body || $t('config.savedTasks.watches.neverFetched') }}</pre>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="url-watch-close"
             @click="viewing = null"
           >

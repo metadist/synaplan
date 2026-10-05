@@ -15,7 +15,7 @@
                 v-for="ft in filterTypes"
                 :key="ft.value"
                 type="button"
-                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
                 :class="
                   selectedType === ft.value
                     ? 'mode-toggle-active'
@@ -63,7 +63,7 @@
               </span>
               <button
                 type="button"
-                class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
+                class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
                 @click="confirmBulkDelete"
               >
                 <Icon icon="mdi:delete-outline" class="w-3.5 h-3.5" />
@@ -71,7 +71,7 @@
               </button>
               <button
                 type="button"
-                class="w-8 h-8 rounded-lg surface-chip flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                class="w-8 h-8 rounded-xl surface-chip flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 :title="$t('feedback.list.deselectAll')"
                 @click="deselectAll"
               >
@@ -227,14 +227,14 @@
                     <div class="flex justify-end gap-2 mt-2">
                       <button
                         type="button"
-                        class="px-3 py-1.5 rounded-lg text-xs font-medium surface-chip txt-secondary hover:txt-primary"
+                        class="px-3 py-1.5 rounded-xl text-xs font-medium surface-chip txt-secondary hover:txt-primary"
                         @click="cancelEdit"
                       >
                         {{ $t('common.cancel') }}
                       </button>
                       <button
                         type="button"
-                        class="btn-primary px-3 py-1.5 rounded-lg text-xs font-medium"
+                        class="btn-primary px-3 py-1.5 rounded-xl text-xs font-medium"
                         :disabled="!editValue.trim() || editValue.trim().length < 5"
                         @click="saveEdit(feedback.id)"
                       >
@@ -255,7 +255,7 @@
                 >
                   <button
                     type="button"
-                    class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+                    class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
                     :title="$t('common.edit')"
                     @click="startEdit(feedback)"
                   >
@@ -263,7 +263,7 @@
                   </button>
                   <button
                     type="button"
-                    class="w-8 h-8 rounded-lg hover:bg-red-500/10 flex items-center justify-center transition-colors"
+                    class="w-8 h-8 rounded-xl hover:bg-red-500/10 flex items-center justify-center transition-colors"
                     :title="$t('common.delete')"
                     @click="confirmDelete(feedback)"
                   >
@@ -278,7 +278,7 @@
           <div v-if="totalPages > 1" class="flex items-center justify-center gap-1.5 pt-2">
             <button
               type="button"
-              class="w-8 h-8 rounded-lg surface-chip flex items-center justify-center transition-colors"
+              class="w-8 h-8 rounded-xl surface-chip flex items-center justify-center transition-colors"
               :class="
                 currentPage === 1
                   ? 'opacity-40 cursor-not-allowed'
@@ -300,7 +300,7 @@
               <button
                 v-else
                 type="button"
-                class="w-8 h-8 rounded-lg text-xs font-medium transition-colors"
+                class="w-8 h-8 rounded-xl text-xs font-medium transition-colors"
                 :class="
                   currentPage === page
                     ? 'bg-brand text-white'
@@ -314,7 +314,7 @@
 
             <button
               type="button"
-              class="w-8 h-8 rounded-lg surface-chip flex items-center justify-center transition-colors"
+              class="w-8 h-8 rounded-xl surface-chip flex items-center justify-center transition-colors"
               :class="
                 currentPage === totalPages
                   ? 'opacity-40 cursor-not-allowed'

@@ -213,31 +213,44 @@
   box-shadow:
     0 0 12px rgba(0, 63, 199, 0.25),
     0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .design-v2 .btn-primary:hover {
   background: var(--brand-hover);
   box-shadow:
     0 0 24px rgba(0, 63, 199, 0.35),
     0 4px 16px rgba(0, 0, 0, 0.12);
-  transform: translateY(-1px);
 }
 .design-v2 .btn-primary:active {
-  transform: translateY(0);
+  transform: none;
 }
 
 .design-v2 .btn-secondary {
   background: rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(0, 0, 0, 0.26);
-  transition: all 0.2s ease;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .design-v2.dark .btn-secondary {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 .design-v2 .btn-secondary:hover {
-  border-color: var(--v2-border-hover);
-  box-shadow: 0 0 12px var(--v2-glow);
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.34);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+.design-v2.dark .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 .design-v2 .btn-danger {
@@ -457,7 +470,7 @@
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
   border: 1px solid var(--v2-border);
-  border-radius: var(--v2-radius);
+  border-radius: var(--radius-xl, 0.75rem);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.12),
     0 0 1px var(--v2-glow);
@@ -486,7 +499,7 @@
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
   border: 1px solid var(--v2-border);
-  border-radius: var(--v2-radius);
+  border-radius: var(--radius-xl, 0.75rem);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.15),
     0 0 1px var(--v2-glow);
@@ -809,7 +822,6 @@
 .design-v2 input[type='number'],
 .design-v2 input[type='url'],
 .design-v2 input[type='tel'],
-.design-v2 select,
 .design-v2 textarea {
   background: rgba(0, 0, 0, 0.03) !important;
   border-width: 1px !important;
@@ -826,7 +838,6 @@
 .design-v2 input[type='number']:focus,
 .design-v2 input[type='url']:focus,
 .design-v2 input[type='tel']:focus,
-.design-v2 select:focus,
 .design-v2 textarea:focus {
   background: rgba(255, 255, 255, 0.6) !important;
   border-color: var(--v2-border-hover) !important;
@@ -840,7 +851,6 @@
 .design-v2.dark input[type='number'],
 .design-v2.dark input[type='url'],
 .design-v2.dark input[type='tel'],
-.design-v2.dark select,
 .design-v2.dark textarea {
   background: rgba(255, 255, 255, 0.05) !important;
   border-color: rgba(255, 255, 255, 0.26) !important;
@@ -852,7 +862,6 @@
 .design-v2.dark input[type='number']:focus,
 .design-v2.dark input[type='url']:focus,
 .design-v2.dark input[type='tel']:focus,
-.design-v2.dark select:focus,
 .design-v2.dark textarea:focus {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: var(--v2-border-hover) !important;
@@ -879,6 +888,13 @@
 .design-v2.dark .checkbox-brand:hover {
   border-color: var(--brand-light);
   background: rgba(107, 143, 214, 0.06);
+}
+/* The unchecked dark rule has the same specificity as :checked and comes later,
+   so it was painting the box nearly black and leaving the near-black tick on it. */
+.design-v2.dark .checkbox-brand:checked,
+.design-v2.dark .checkbox-brand:checked:hover {
+  background: var(--brand);
+  border-color: var(--brand);
 }
 
 /* Native checkboxes and radios (not .checkbox-brand) */
@@ -1278,4 +1294,82 @@
 .design-v2:not(.dark) [data-testid='comp-chat-input-shell'] .icon-ghost:focus-visible {
   color: var(--brand);
   background: rgba(0, 63, 199, 0.08);
+}
+
+/* Card surfaces are 16px. A button that also wears surface-card stays 12px.
+   Specificity beats .design-v2 .surface-card. Pills stay round. */
+.design-v2 button:not(.rounded-full),
+.design-v2 input[type='button']:not(.rounded-full),
+.design-v2 input[type='submit']:not(.rounded-full),
+.design-v2 input[type='reset']:not(.rounded-full),
+.design-v2 a.btn-primary:not(.rounded-full),
+.design-v2 a.btn-secondary:not(.rounded-full),
+.design-v2 a.btn-danger:not(.rounded-full) {
+  border-radius: var(--radius-xl, 0.75rem);
+}
+
+/* Same 12px on fields. Beats .design-v2 .surface-card (16px) when a field
+   also wears that class. Excludes the bare composer and search inputs. */
+.design-v2 input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not([type='hidden']):not(.rounded-full):not([data-testid='input-smart-search']),
+.design-v2 textarea:not(.rounded-full):not(.chat-textarea),
+.design-v2 select:not(.rounded-full) {
+  border-radius: var(--radius-xl, 0.75rem);
+}
+
+/* Native dropdowns sit outside the !important form rules above. An !important
+   fill cannot be eased, which is why date fields faded and selects snapped. */
+.design-v2 select,
+.design-v2 .dropdown-trigger {
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.design-v2 select {
+  background: rgba(0, 0, 0, 0.03);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.28);
+}
+.design-v2 select:focus {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: var(--v2-border-hover);
+  box-shadow: 0 0 0 3px rgba(0, 63, 199, 0.08);
+}
+.design-v2.dark select {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+.design-v2.dark select:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--v2-border-hover);
+  box-shadow: 0 0 0 3px rgba(107, 143, 214, 0.06);
+}
+
+/* Beats the form-field background and .surface-card, which otherwise hide
+   the hover on native dropdowns, date fields, and custom dropdown triggers. */
+.design-v2 select:not(:disabled):hover,
+.design-v2 input[type='date']:not(:disabled):hover,
+.design-v2 input[type='datetime-local']:not(:disabled):hover,
+.design-v2 input[type='time']:not(:disabled):hover,
+.design-v2 input[type='month']:not(:disabled):hover,
+.design-v2 input[type='week']:not(:disabled):hover,
+.design-v2 .dropdown-trigger:not(:disabled):hover {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+
+.design-v2.dark select:not(:disabled):hover,
+.design-v2.dark input[type='date']:not(:disabled):hover,
+.design-v2.dark input[type='datetime-local']:not(:disabled):hover,
+.design-v2.dark input[type='time']:not(:disabled):hover,
+.design-v2.dark input[type='month']:not(:disabled):hover,
+.design-v2.dark input[type='week']:not(:disabled):hover,
+.design-v2.dark .dropdown-trigger:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
 }

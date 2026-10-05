@@ -982,17 +982,7 @@ class FileController extends AbstractController
         $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
 
-        $filters = [
-            'search' => $request->query->get('search'),
-            'file_type' => $request->query->get('file_type'),
-            'source' => $request->query->get('source'),
-            'vector_state' => $request->query->get('vector_state'),
-            'origin_kind' => $request->query->get('origin_kind'),
-            'incoming' => $request->query->has('incoming') ? $request->query->getBoolean('incoming') : null,
-            'sort' => $request->query->get('sort'),
-            'date_from' => $request->query->getInt('date_from') ?: null,
-            'date_to' => $request->query->getInt('date_to') ?: null,
-        ];
+        $filters = $this->listingFilters($request);
 
         $result = $this->fileListService->buildListing($listUserId, is_string($groupKey) ? $groupKey : null, $offset, $limit, $filters);
 
@@ -1013,36 +1003,52 @@ class FileController extends AbstractController
     #[OA\Get(
         path: '/api/v1/files/groups',
         summary: 'Get file groups with counts',
+        description: 'Without filters, every folder is returned. The same search and file filters as GET /api/v1/files limit the list to folders that contain at least one matching file, and the count is the number of matching files.',
         tags: ['Files'],
+        parameters: [
+            new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
+            new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
+            new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'vectorized')),
+            new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter by origin kind', schema: new OA\Schema(type: 'string', example: 'image')),
+            new OA\Parameter(name: 'incoming', in: 'query', required: false, description: 'Filter the Incoming inbox: 1 = only incoming, 0 = exclude incoming', schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(name: 'date_from', in: 'query', required: false, description: 'Unix timestamp lower bound', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'date_to', in: 'query', required: false, description: 'Unix timestamp upper bound', schema: new OA\Schema(type: 'integer')),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'List of file groups'),
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
-    public function getFileGroups(#[CurrentUser] ?User $user): JsonResponse
+    public function getFileGroups(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         try {
-            $merged = $this->fileRepository->getGroupCountsByUser($user->getId());
+            $filters = $this->listingFilters($request);
+            $merged = $this->fileRepository->getGroupCountsByUser($user->getId(), $filters);
 
-            try {
-                $vectorGroups = [];
-                $allChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
-                foreach ($allChunks as $info) {
-                    $gk = $info['groupKey'] ?? '';
-                    if ('' === $gk || 'DEFAULT' === $gk) {
-                        continue;
+            // Vector-only folders have no file row to match a type, source, or
+            // date filter, so they stay in the unfiltered library view only.
+            if (!$this->listingIsNarrowed($filters)) {
+                try {
+                    $vectorGroups = [];
+                    $allChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
+                    foreach ($allChunks as $info) {
+                        $gk = $info['groupKey'] ?? '';
+                        if ('' === $gk || 'DEFAULT' === $gk) {
+                            continue;
+                        }
+                        $vectorGroups[$gk] = ($vectorGroups[$gk] ?? 0) + 1;
                     }
-                    $vectorGroups[$gk] = ($vectorGroups[$gk] ?? 0) + 1;
+                    foreach ($vectorGroups as $gk => $count) {
+                        $merged[$gk] = max($merged[$gk] ?? 0, $count);
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->warning('FileController: Vector store group lookup failed', ['error' => $e->getMessage()]);
                 }
-                foreach ($vectorGroups as $gk => $count) {
-                    $merged[$gk] = max($merged[$gk] ?? 0, $count);
-                }
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileController: Vector store group lookup failed', ['error' => $e->getMessage()]);
             }
 
             ksort($merged);
@@ -1861,6 +1867,50 @@ class FileController extends AbstractController
         }
 
         return $this->sharedFileAccess->canRead($user, $file);
+    }
+
+    /**
+     * @return array{search: ?string, file_type: ?string, source: ?string, vector_state: ?string, origin_kind: ?string, incoming: ?bool, sort: ?string, date_from: ?int, date_to: ?int}
+     */
+    private function listingFilters(Request $request): array
+    {
+        return [
+            'search' => $this->optionalQueryString($request, 'search'),
+            'file_type' => $this->optionalQueryString($request, 'file_type'),
+            'source' => $this->optionalQueryString($request, 'source'),
+            'vector_state' => $this->optionalQueryString($request, 'vector_state'),
+            'origin_kind' => $this->optionalQueryString($request, 'origin_kind'),
+            'incoming' => $request->query->has('incoming') ? $request->query->getBoolean('incoming') : null,
+            'sort' => $this->optionalQueryString($request, 'sort'),
+            'date_from' => $request->query->getInt('date_from') ?: null,
+            'date_to' => $request->query->getInt('date_to') ?: null,
+        ];
+    }
+
+    private function optionalQueryString(Request $request, string $key): ?string
+    {
+        $value = $request->query->get($key);
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @param array{search?: ?string, file_type?: ?string, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, date_from?: ?int, date_to?: ?int} $filters
+     */
+    private function listingIsNarrowed(array $filters): bool
+    {
+        foreach (['search', 'file_type', 'source', 'vector_state', 'origin_kind'] as $key) {
+            $value = $filters[$key] ?? null;
+            if (is_string($value) && '' !== trim($value)) {
+                return true;
+            }
+        }
+
+        if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
+            return true;
+        }
+
+        return null !== ($filters['incoming'] ?? null);
     }
 
     /**

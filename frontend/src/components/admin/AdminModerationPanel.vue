@@ -17,7 +17,7 @@
             v-for="option in statusFilters"
             :key="option"
             type="button"
-            class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            class="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
             :class="
               statusFilter === option
                 ? 'bg-[var(--brand)] text-white'
@@ -112,7 +112,7 @@
               <td class="py-3 px-3 text-center">
                 <select
                   :value="report.status"
-                  class="px-2 py-1 text-xs rounded border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="px-2 py-1 text-xs rounded-xl border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   :data-testid="`report-status-${report.id}`"
                   @change="changeReportStatus(report, ($event.target as HTMLSelectElement).value)"
                 >
@@ -128,7 +128,7 @@
                 >
                   <button
                     v-if="report.reportedUserStatus !== 'suspended'"
-                    class="px-2.5 py-1 text-xs font-medium rounded border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                    class="px-2.5 py-1 text-xs font-medium rounded-xl border border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors"
                     :data-testid="`btn-suspend-${report.id}`"
                     @click="changeUserStatus(report, 'suspended')"
                   >
@@ -136,7 +136,7 @@
                   </button>
                   <button
                     v-if="report.reportedUserStatus !== 'banned'"
-                    class="px-2.5 py-1 text-xs font-medium rounded border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+                    class="px-2.5 py-1 text-xs font-medium rounded-xl border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
                     :data-testid="`btn-ban-${report.id}`"
                     @click="changeUserStatus(report, 'banned')"
                   >
@@ -144,7 +144,7 @@
                   </button>
                   <button
                     v-if="report.reportedUserStatus !== 'active'"
-                    class="px-2.5 py-1 text-xs font-medium rounded border border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/10 transition-colors"
+                    class="px-2.5 py-1 text-xs font-medium rounded-xl border border-green-500/40 text-green-600 dark:text-green-400 hover:bg-green-500/10 transition-colors"
                     :data-testid="`btn-reactivate-${report.id}`"
                     @click="changeUserStatus(report, 'active')"
                   >
@@ -164,7 +164,7 @@
         </p>
         <div class="flex items-center gap-2">
           <button
-            class="px-3 py-1 text-xs rounded border border-light-border dark:border-dark-border txt-secondary hover:txt-primary transition-colors disabled:opacity-40"
+            class="px-3 py-1 text-xs rounded-xl border border-light-border dark:border-dark-border txt-secondary hover:txt-primary transition-colors disabled:opacity-40"
             :disabled="page <= 1"
             @click="goToPage(page - 1)"
           >
@@ -172,7 +172,7 @@
           </button>
           <span class="text-xs txt-secondary">{{ page }} / {{ totalPages }}</span>
           <button
-            class="px-3 py-1 text-xs rounded border border-light-border dark:border-dark-border txt-secondary hover:txt-primary transition-colors disabled:opacity-40"
+            class="px-3 py-1 text-xs rounded-xl border border-light-border dark:border-dark-border txt-secondary hover:txt-primary transition-colors disabled:opacity-40"
             :disabled="page >= totalPages"
             @click="goToPage(page + 1)"
           >

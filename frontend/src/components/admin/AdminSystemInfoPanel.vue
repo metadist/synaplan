@@ -6,7 +6,7 @@
         {{ t('admin.systemInfo.title') }}
       </h3>
       <button
-        class="p-2 rounded-lg txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+        class="p-2 rounded-xl txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
         :disabled="loading"
         :title="t('admin.systemInfo.refresh')"
         data-testid="btn-refresh"

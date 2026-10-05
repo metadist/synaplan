@@ -17,7 +17,7 @@
             <InformationCircleIcon class="w-5 h-5 text-[var(--brand)] shrink-0 mt-0.5" />
             <p class="text-sm txt-secondary flex-1 min-w-0">{{ $t('files.explainer.text') }}</p>
             <button
-              class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors"
+              class="shrink-0 px-2.5 py-1 rounded-xl text-xs font-medium text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors"
               data-testid="btn-explainer-dismiss"
               @click="dismissExplainer"
             >
@@ -83,7 +83,7 @@
               </div>
               <button
                 :disabled="isUploading"
-                class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                class="p-1.5 rounded-xl hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 :aria-label="$t('files.removeFile')"
                 @click="removeSelectedFile(index)"
               >
@@ -97,7 +97,7 @@
             <!-- Smart Upload Button -->
             <button
               :disabled="isUploading"
-              class="btn-primary px-6 py-2.5 min-h-[44px] rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              class="btn-primary px-6 py-2.5 min-h-[44px] rounded-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               data-testid="btn-upload"
               @click="smartUploadAction"
             >
@@ -128,24 +128,24 @@
 
             <button
               v-if="selectedFiles.length > 0 && !isUploading"
-              class="px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-all text-sm flex items-center gap-1.5"
+              class="btn-secondary px-6 py-2.5 min-h-[44px] rounded-xl flex items-center gap-2"
               data-testid="btn-add-more"
               @click="fileInputRef?.click()"
             >
-              <Icon icon="heroicons:plus" class="w-4 h-4" />
+              <Icon icon="heroicons:plus" class="w-5 h-5" />
               {{ $t('files.addMore') }}
             </button>
 
             <!-- New folder button (always available, no selection required) -->
             <button
               :disabled="isUploading"
-              class="px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-all text-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              class="btn-secondary px-6 py-2.5 min-h-[44px] rounded-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="btn-new-folder"
               :aria-expanded="newFolderInputOpen"
               aria-controls="new-folder-input-row"
               @click="newFolderInputOpen ? cancelNewFolder() : openNewFolderInput()"
             >
-              <Icon icon="heroicons:folder-plus" class="w-4 h-4" />
+              <Icon icon="heroicons:folder-plus" class="w-5 h-5" />
               {{ $t('files.newFolder') }}
             </button>
 
@@ -181,7 +181,7 @@
             >
               <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                 <div
-                  class="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-light-border/30 dark:border-dark-border/8 focus-within:border-[var(--brand)]/60 focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-all"
+                  class="flex items-center gap-2 flex-1 px-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-light-border/30 dark:border-dark-border/8 focus-within:border-[var(--brand)]/60 focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-all"
                 >
                   <Icon icon="heroicons:folder-plus" class="w-4 h-4 text-[var(--brand)] shrink-0" />
                   <input
@@ -200,7 +200,7 @@
                 <div class="flex items-center gap-2 sm:shrink-0">
                   <button
                     :disabled="!newFolderName.trim() || isUploading"
-                    class="btn-primary px-4 py-2 rounded-lg text-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="btn-primary px-4 py-2 rounded-xl text-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     data-testid="btn-new-folder-create"
                     @click="createNewFolder"
                   >
@@ -208,7 +208,7 @@
                     {{ $t('files.newFolderCreate') }}
                   </button>
                   <button
-                    class="px-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:txt-primary hover:border-light-border/50 dark:hover:border-dark-border/15 transition-all text-sm"
+                    class="px-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:txt-primary hover:border-light-border/50 dark:hover:border-dark-border/15 transition-all text-sm"
                     data-testid="btn-new-folder-cancel"
                     @click="cancelNewFolder"
                   >
@@ -270,7 +270,7 @@
                     {{ $t('files.folderPicker.title') }}
                   </h3>
                   <button
-                    class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                    class="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                     @click="folderPickerOpen = false"
                   >
                     <XMarkIcon class="w-5 h-5" />
@@ -330,21 +330,23 @@
                 <!-- New folder input -->
                 <div class="mt-3 pt-3 border-t border-light-border/20 dark:border-dark-border/5">
                   <div class="flex items-center gap-2">
-                    <Icon
-                      icon="heroicons:folder-plus"
-                      class="w-4 h-4 text-[var(--brand)] shrink-0"
-                    />
-                    <input
-                      v-model="groupKeyword"
-                      type="text"
-                      class="flex-1 px-3 py-2 text-sm rounded-lg bg-black/[0.03] dark:bg-white/[0.03] txt-primary placeholder:txt-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                      :placeholder="$t('files.folderPicker.newPlaceholder')"
-                      data-testid="input-new-folder"
-                      @keyup.enter="(confirmNewFolder(), (folderPickerOpen = false))"
-                    />
+                    <div class="relative flex-1">
+                      <Icon
+                        icon="heroicons:folder-plus"
+                        class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--brand)] pointer-events-none"
+                      />
+                      <input
+                        v-model="groupKeyword"
+                        type="text"
+                        class="w-full pl-9 pr-3 py-2 text-sm rounded-xl bg-black/[0.03] dark:bg-white/[0.03] txt-primary placeholder:txt-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                        :placeholder="$t('files.folderPicker.newPlaceholder')"
+                        data-testid="input-new-folder"
+                        @keyup.enter="(confirmNewFolder(), (folderPickerOpen = false))"
+                      />
+                    </div>
                     <button
                       :disabled="!groupKeyword.trim()"
-                      class="px-3 py-2 rounded-lg btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      class="px-3 py-2 rounded-xl btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                       @click="(confirmNewFolder(), (folderPickerOpen = false))"
                     >
                       {{ $t('common.save') }}
@@ -385,7 +387,7 @@
                   />
                   <button
                     v-if="searchQuery"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 txt-secondary transition-colors"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-xl hover:bg-black/10 dark:hover:bg-white/10 txt-secondary transition-colors"
                     @click="clearSearch"
                   >
                     <XMarkIcon class="w-4 h-4" />
@@ -471,7 +473,7 @@
                     </label>
                     <select
                       v-model="filterFileType"
-                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      class="w-full px-3 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
                       data-testid="select-file-type"
                       @change="onFilterChange"
                     >
@@ -494,7 +496,7 @@
                     </label>
                     <select
                       v-model="filterSource"
-                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      class="w-full px-3 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
                       data-testid="select-source"
                       @change="onFilterChange"
                     >
@@ -524,7 +526,7 @@
                     </label>
                     <select
                       v-model="filterVectorized"
-                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      class="w-full px-3 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
                       data-testid="select-vectorized"
                       @change="onFilterChange"
                     >
@@ -544,7 +546,7 @@
                     <input
                       v-model="filterDateFrom"
                       type="date"
-                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      class="w-full px-3 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
                       data-testid="input-date-from"
                       @change="onFilterChange"
                     />
@@ -558,7 +560,7 @@
                     <input
                       v-model="filterDateTo"
                       type="date"
-                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      class="w-full px-3 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
                       data-testid="input-date-to"
                       @change="onFilterChange"
                     />
@@ -567,10 +569,12 @@
                 <div class="flex justify-end mt-3">
                   <button
                     v-if="activeFilterCount > 0"
-                    class="text-xs txt-secondary hover:text-[var(--brand)] transition-colors flex items-center gap-1"
+                    type="button"
+                    class="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium"
+                    data-testid="btn-filter-reset"
                     @click="resetFilters"
                   >
-                    <Icon icon="heroicons:x-circle" class="w-3.5 h-3.5" />
+                    <Icon icon="heroicons:x-circle" class="w-4 h-4" />
                     {{ $t('files.filterReset') }}
                   </button>
                 </div>
@@ -617,9 +621,9 @@
               </svg>
             </div>
 
-            <!-- No search results -->
+            <!-- A typed query with nothing behind it. -->
             <div
-              v-else-if="hasActiveSearch && paginatedFiles.length === 0"
+              v-else-if="searchQuery.trim() !== '' && paginatedFiles.length === 0"
               class="flex flex-col items-center justify-center py-20 gap-4"
               data-testid="state-no-results"
             >
@@ -630,11 +634,40 @@
               </div>
               <div class="text-center">
                 <p class="text-base font-medium txt-primary mb-1">
-                  {{ $t('files.noSearchResults', { query: searchQuery || '' }) }}
+                  {{ $t('files.noSearchResults', { query: searchQuery }) }}
                 </p>
                 <p class="text-sm txt-secondary max-w-sm">
                   {{ $t('files.noSearchResultsHint') }}
                 </p>
+              </div>
+            </div>
+
+            <!-- Filters with nothing behind them. No quoted search term. -->
+            <div
+              v-else-if="activeFilterCount > 0 && paginatedFiles.length === 0 && visibleFolders.length === 0"
+              class="flex flex-col items-center justify-center py-20 gap-4"
+              data-testid="state-no-filter-results"
+            >
+              <div
+                class="w-20 h-20 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center"
+              >
+                <Icon icon="heroicons:funnel" class="w-10 h-10 text-[var(--brand)]/40" />
+              </div>
+              <div class="text-center max-w-sm">
+                <p class="text-base font-medium txt-primary mb-1">
+                  {{ $t('files.noFilterResults') }}
+                </p>
+                <p class="text-sm txt-secondary mb-5">
+                  {{ $t('files.noFilterResultsHint') }}
+                </p>
+                <button
+                  type="button"
+                  class="btn-secondary px-4 py-2.5 text-sm font-medium"
+                  data-testid="btn-filter-empty-reset"
+                  @click="resetFilters"
+                >
+                  {{ $t('files.filterReset') }}
+                </button>
               </div>
             </div>
 
@@ -657,7 +690,7 @@
                   {{ $t('files.empty.browseBody') }}
                 </p>
                 <button
-                  class="btn-primary px-5 py-2.5 rounded-lg inline-flex items-center gap-2"
+                  class="btn-primary px-5 py-2.5 rounded-xl inline-flex items-center gap-2"
                   data-testid="btn-empty-upload"
                   @click="fileInputRef?.click()"
                 >
@@ -670,7 +703,7 @@
             <template v-else>
               <!-- Folder cards (with drag & drop) -->
               <div
-                v-if="displayedFolders.length > 0"
+                v-if="visibleFolders.length > 0"
                 class="mb-6"
                 data-testid="section-folder-grid"
               >
@@ -762,7 +795,7 @@
                     <button
                       v-if="!folder.shared"
                       type="button"
-                      class="absolute top-1 right-1 p-1.5 rounded-lg text-red-500 bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-red-500/15 transition-all"
+                      class="absolute top-1 right-1 p-1.5 rounded-xl text-red-500 bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-red-500/15 transition-all"
                       :title="$t('files.deleteFolder')"
                       :aria-label="$t('files.deleteFolder')"
                       :data-testid="`btn-delete-folder-${folder.name}`"
@@ -770,26 +803,25 @@
                     >
                       <TrashIcon class="w-3.5 h-3.5" />
                     </button>
-                    <!-- Share is the one action people look for on a tile, so it
-                         stays visible in the top-left corner; "use in chat"
-                         sits next to it and appears on hover like delete. -->
+                    <!-- Share, use in chat, and delete share one hover chip:
+                         brand ink on a quiet fill, same size, shown together. -->
                     <button
                       v-if="iamSharingEnabled && !folder.pending && !folder.shared"
                       type="button"
-                      class="absolute top-1 left-1 p-1.5 icon-contrast"
+                      class="absolute top-1 left-1 p-1.5 rounded-xl text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
                       :title="$t('iam.share')"
                       :aria-label="$t('iam.share')"
                       :data-testid="`btn-share-folder-${folder.name}`"
                       @click.stop="openFolderShare(folder.name)"
                     >
-                      <ShareIcon class="w-4 h-4" />
+                      <ShareIcon class="w-3.5 h-3.5" />
                     </button>
                     <!-- §4.8 #2: close the loop with chat — open a chat with
                          this knowledge folder preselected in the picker. -->
                     <button
                       v-if="!folder.pending"
                       type="button"
-                      class="absolute top-1 p-1.5 rounded-lg text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      class="absolute top-1 p-1.5 rounded-xl text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
                       :class="iamSharingEnabled && !folder.shared ? 'left-9' : 'left-1'"
                       :title="$t('files.useInChat')"
                       :aria-label="$t('files.useInChat')"
@@ -826,7 +858,7 @@
                 <button
                   v-if="canCombineSelected"
                   type="button"
-                  class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
+                  class="px-4 py-2 rounded-xl bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
                   data-testid="btn-combine-selected"
                   @click="combineSelected"
                 >
@@ -835,7 +867,7 @@
                 <button
                   v-if="canCombineOfficeSelected"
                   type="button"
-                  class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
+                  class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
                   data-testid="btn-combine-office-selected"
                   @click="combineOfficeSelected"
                 >
@@ -843,7 +875,7 @@
                   ({{ combinableOfficeSelectedIds.length }})
                 </button>
                 <button
-                  class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
+                  class="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
                   data-testid="btn-delete-selected"
                   @click="deleteSelected"
                 >
@@ -854,17 +886,6 @@
 
               <!-- All files table -->
               <div v-if="paginatedFiles.length > 0" data-testid="section-table">
-                <div
-                  v-if="displayedFolders.length > 0"
-                  class="flex items-center gap-2 mb-3 pt-2 border-t border-light-border/10 dark:border-dark-border/5"
-                >
-                  <Icon icon="heroicons:document-text" class="w-4 h-4 txt-secondary" />
-                  <span class="text-xs font-medium txt-secondary uppercase tracking-wider">{{
-                    $t('files.allFiles')
-                  }}</span>
-                  <span class="text-xs txt-secondary">({{ totalCount }})</span>
-                </div>
-
                 <!-- Mobile card list -->
                 <div class="sm:hidden space-y-2">
                   <button
@@ -974,9 +995,15 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="file in paginatedFiles"
+                      v-for="(file, index) in paginatedFiles"
                       :key="file.id"
-                      class="group border-b border-light-border/10 dark:border-dark-border/5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                      class="group hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                      :class="
+                        index === paginatedFiles.length - 1 &&
+                        (visibleFolders.length > 0 || totalPages > 1)
+                          ? ''
+                          : 'border-b border-light-border/10 dark:border-dark-border/5'
+                      "
                       data-testid="item-file"
                     >
                       <td class="py-2.5 px-2">
@@ -1003,7 +1030,7 @@
                               <button
                                 v-if="file.source && file.chat_id"
                                 type="button"
-                                class="inline-flex min-w-0 max-w-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                                class="inline-flex min-w-0 max-w-full px-2 py-0.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--brand)]"
                                 :title="$t('files.openInChat')"
                                 :data-testid="`btn-open-in-chat-${file.id}`"
                                 @click="openInChat(file)"
@@ -1062,29 +1089,45 @@
                   </tbody>
                 </table>
 
-                <!-- Pagination -->
+                <!-- Count sits under the list, on the same row as the pages. -->
                 <div
-                  v-if="totalPages > 1"
-                  class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/5"
+                  v-if="visibleFolders.length > 0 || totalPages > 1"
+                  class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-light-border/10 dark:border-dark-border/5"
+                  data-testid="section-table-footer"
                 >
-                  <span class="text-xs txt-secondary"
-                    >{{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}</span
+                  <span
+                    v-if="visibleFolders.length > 0"
+                    class="inline-flex items-center gap-2 min-w-0 text-xs txt-secondary"
                   >
-                  <div class="flex gap-2">
-                    <button
-                      :disabled="currentPage === 1"
-                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      @click="previousPage"
-                    >
-                      {{ $t('files.previous') }}
-                    </button>
-                    <button
-                      :disabled="currentPage >= totalPages"
-                      class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      @click="nextPage"
-                    >
-                      {{ $t('files.next') }}
-                    </button>
+                    <Icon icon="heroicons:document-text" class="w-4 h-4 shrink-0" />
+                    <span class="font-medium uppercase tracking-wider">{{
+                      $t('files.allFiles')
+                    }}</span>
+                    <span>({{ totalCount }})</span>
+                  </span>
+                  <span v-else-if="totalPages > 1" class="text-xs txt-secondary">
+                    {{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}
+                  </span>
+                  <div v-if="totalPages > 1" class="flex items-center gap-3 ml-auto">
+                    <span v-if="visibleFolders.length > 0" class="text-xs txt-secondary">
+                      {{ $t('files.page') }} {{ currentPage }} / {{ totalPages }}
+                    </span>
+                    <div class="flex gap-2">
+                      <button
+                        :disabled="currentPage === 1"
+                        class="px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        @click="previousPage"
+                      >
+                        {{ $t('files.previous') }}
+                      </button>
+                      <button
+                        :disabled="currentPage >= totalPages"
+                        class="px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        @click="nextPage"
+                      >
+                        {{ $t('files.next') }}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1096,7 +1139,7 @@
             <!-- Breadcrumb navigation -->
             <div class="flex items-center gap-2 mb-4">
               <button
-                class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors shrink-0"
+                class="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors shrink-0"
                 data-testid="btn-back-to-root"
                 @click="exitFolder"
               >
@@ -1131,7 +1174,7 @@
               <button
                 v-if="!openSharedFolder"
                 type="button"
-                class="ml-auto shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+                class="ml-auto shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
                 data-testid="btn-delete-current-folder"
                 @click="requestDeleteCurrentFolder"
               >
@@ -1148,7 +1191,7 @@
               <button
                 v-if="canCombineSelected && !openSharedFolder"
                 type="button"
-                class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
+                class="px-4 py-2 rounded-xl bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
                 data-testid="btn-combine-selected"
                 @click="combineSelected"
               >
@@ -1157,7 +1200,7 @@
               <button
                 v-if="canCombineOfficeSelected && !openSharedFolder"
                 type="button"
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
+                class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
                 data-testid="btn-combine-office-selected"
                 @click="combineOfficeSelected"
               >
@@ -1167,7 +1210,7 @@
               <button
                 v-if="canChangeOpenFolder"
                 type="button"
-                class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
+                class="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
                 data-testid="btn-delete-selected"
                 @click="deleteSelected"
               >
@@ -1324,9 +1367,14 @@
                 </thead>
                 <tbody>
                   <tr
-                    v-for="file in paginatedFiles"
+                    v-for="(file, index) in paginatedFiles"
                     :key="file.id"
-                    class="group border-b border-light-border/10 dark:border-dark-border/5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                    class="group hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+                    :class="
+                      index === paginatedFiles.length - 1 && totalPages > 1
+                        ? ''
+                        : 'border-b border-light-border/10 dark:border-dark-border/5'
+                    "
                     data-testid="item-file"
                   >
                     <td class="py-2.5 px-2">
@@ -1353,7 +1401,7 @@
                             <button
                               v-if="file.source && file.chat_id"
                               type="button"
-                              class="inline-flex min-w-0 max-w-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                              class="inline-flex min-w-0 max-w-full px-2 py-0.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--brand)]"
                               :title="$t('files.openInChat')"
                               :data-testid="`btn-open-in-chat-${file.id}`"
                               @click="openInChat(file)"
@@ -1410,7 +1458,7 @@
               <!-- Pagination -->
               <div
                 v-if="totalPages > 1"
-                class="flex items-center justify-between mt-4 pt-4 border-t border-light-border/10 dark:border-dark-border/5"
+                class="flex items-center justify-between pt-4 border-t border-light-border/10 dark:border-dark-border/5"
                 data-testid="section-pagination"
               >
                 <span class="text-xs txt-secondary">
@@ -1419,14 +1467,14 @@
                 <div class="flex gap-2">
                   <button
                     :disabled="currentPage === 1"
-                    class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     @click="previousPage"
                   >
                     {{ $t('files.previous') }}
                   </button>
                   <button
                     :disabled="currentPage >= totalPages"
-                    class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     @click="nextPage"
                   >
                     {{ $t('files.next') }}
@@ -1531,14 +1579,14 @@
             <!-- Actions -->
             <div class="flex gap-3 justify-end pt-2">
               <button
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+                class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
                 data-testid="btn-delete-selected-cancel"
                 @click="cancelDeleteSelected"
               >
                 {{ $t('common.cancel') }}
               </button>
               <button
-                class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-all"
+                class="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-all"
                 data-testid="btn-delete-selected-confirm"
                 @click="confirmDeleteSelected"
               >
@@ -1679,6 +1727,8 @@ const canChangeOpenFolder = computed(
 const folderMenuOpen = ref<number | null>(null)
 const files = ref<FileItem[]>([])
 const fileGroups = ref<Array<{ name: string; count: number }>>([])
+/** Folder name → matching file count while a search or file filter is active. */
+const matchingGroupCounts = ref<Map<string, number> | null>(null)
 const sharedFolders = ref<
   Array<{
     name: string
@@ -1774,8 +1824,6 @@ const activeFilterCount = computed(() => {
   return count
 })
 
-const hasActiveSearch = computed(() => searchQuery.value !== '' || activeFilterCount.value > 0)
-
 // Drag & Drop state
 const isDragging = ref(false)
 const dragCounter = ref(0)
@@ -1839,11 +1887,23 @@ const displayedFolders = computed<DisplayedFolder[]>(() => {
   return [...real, ...pending, ...shared]
 })
 
-const visibleFolders = computed(() =>
-  filterSharedWithMe.value
+const listingNarrowed = computed(
+  () => searchQuery.value.trim() !== '' || activeFilterCount.value > 0
+)
+
+const visibleFolders = computed(() => {
+  if (listingNarrowed.value) {
+    const counts = matchingGroupCounts.value
+    if (!counts) return []
+    return [...counts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, count]) => ({ name, count, pending: false }))
+  }
+
+  return filterSharedWithMe.value
     ? displayedFolders.value.filter((folder) => folder.shared)
     : displayedFolders.value
-)
+})
 
 watch(
   () => fileGroups.value.map((f) => f.name),
@@ -2353,23 +2413,45 @@ const loadFiles = async (page = currentPage.value) => {
   const seq = ++loadFilesSeq
   isLoading.value = true
 
+  const narrowed = searchQuery.value.trim() !== '' || activeFilterCount.value > 0
+
   try {
-    const response = await filesService.listFiles({
-      groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
-      sharedFolder: openSharedFolder.value?.resourceId,
-      search: searchQuery.value || undefined,
-      fileType: filterFileType.value || undefined,
-      source: filterSource.value || undefined,
-      vectorState: filterVectorized.value || undefined,
-      incoming: filterIncoming.value ? true : undefined,
-      dateFrom: buildDateTimestamp(filterDateFrom.value),
-      dateTo: buildDateTimestamp(filterDateTo.value, true),
-      page,
-      limit: itemsPerPage,
-    })
+    const groupsPromise = narrowed
+      ? filesService
+          .getFileGroups({
+            search: searchQuery.value.trim() || undefined,
+            fileType: filterFileType.value || undefined,
+            source: filterSource.value || undefined,
+            vectorState: filterVectorized.value || undefined,
+            incoming: filterIncoming.value ? true : undefined,
+            dateFrom: buildDateTimestamp(filterDateFrom.value),
+            dateTo: buildDateTimestamp(filterDateTo.value, true),
+          })
+          .catch(() => [])
+      : Promise.resolve(null)
+
+    const [response, groups] = await Promise.all([
+      filesService.listFiles({
+        groupKey: openSharedFolder.value ? undefined : filterGroup.value || undefined,
+        sharedFolder: openSharedFolder.value?.resourceId,
+        search: searchQuery.value || undefined,
+        fileType: filterFileType.value || undefined,
+        source: filterSource.value || undefined,
+        vectorState: filterVectorized.value || undefined,
+        incoming: filterIncoming.value ? true : undefined,
+        dateFrom: buildDateTimestamp(filterDateFrom.value),
+        dateTo: buildDateTimestamp(filterDateTo.value, true),
+        page,
+        limit: itemsPerPage,
+      }),
+      groupsPromise,
+    ])
 
     if (seq !== loadFilesSeq) return
 
+    matchingGroupCounts.value = groups
+      ? new Map(groups.map((group) => [group.name, group.count]))
+      : null
     files.value = response.files
     sharedFolderCanEdit.value = response.shared?.canEdit === true
     totalCount.value = response.pagination.total

@@ -25,7 +25,7 @@
           type="password"
           autocomplete="off"
           spellcheck="false"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
           data-testid="input-agents-api-key"
         />
       </label>
@@ -33,7 +33,7 @@
       <div class="flex flex-wrap gap-3">
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!apiKey.trim() || savingKey"
           data-testid="btn-agents-save-key"
           @click="onSaveKey"
@@ -43,7 +43,7 @@
         <button
           v-if="status.keys.anthropic?.has_user_key"
           type="button"
-          class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="clearingKey"
           data-testid="btn-agents-clear-key"
           @click="onClearKey"

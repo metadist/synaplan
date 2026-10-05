@@ -25,7 +25,7 @@
 
       <button
         type="button"
-        class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+        class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
         data-testid="btn-pick-existing-files"
         @click="showFilePicker = true"
       >
@@ -50,7 +50,7 @@
         <span class="flex-1 text-sm txt-primary truncate">{{ file.name }}</span>
         <button
           type="button"
-          class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+          class="p-1.5 rounded-xl hover:bg-red-500/10 transition-colors"
           :aria-label="$t('common.delete')"
           @click="removeUpload(index)"
         >
@@ -66,7 +66,7 @@
         <span class="flex-1 text-sm txt-primary truncate">{{ file.fileName }}</span>
         <button
           type="button"
-          class="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+          class="p-1.5 rounded-xl hover:bg-red-500/10 transition-colors"
           :aria-label="$t('common.delete')"
           @click="removeLinkedFile(index)"
         >

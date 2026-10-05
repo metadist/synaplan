@@ -4,7 +4,7 @@
       <span class="txt-secondary text-sm">{{ $t('assistants.triggers.mailbox') }}</span>
       <select
         v-model="mailbox"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         data-testid="select-mailbox"
       >
         <option value="">{{ $t('assistants.triggers.chooseMailbox') }}</option>
@@ -32,7 +32,7 @@
           <span class="txt-secondary text-sm">{{ $t('assistants.triggers.from') }}</span>
           <input
             v-model="fromText"
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-mail-from"
             :placeholder="$t('assistants.triggers.fromPlaceholder')"
           />
@@ -41,7 +41,7 @@
           <span class="txt-secondary text-sm">{{ $t('assistants.triggers.containing') }}</span>
           <input
             v-model="containsText"
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-mail-contains"
             :placeholder="$t('assistants.triggers.containsPlaceholder')"
           />
@@ -50,7 +50,7 @@
           <span class="txt-secondary text-sm">{{ $t('assistants.triggers.match') }}</span>
           <select
             v-model="match"
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="select-mail-match"
           >
             <option value="any">{{ $t('assistants.triggers.matchAny') }}</option>
@@ -72,7 +72,7 @@
       <select
         v-if="mode === 'department'"
         v-model="department"
-        class="ml-6 w-[calc(100%-1.5rem)] px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="ml-6 w-[calc(100%-1.5rem)] px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         data-testid="select-mail-department"
       >
         <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
@@ -83,7 +83,7 @@
       <textarea
         v-model="instruction"
         rows="3"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         data-testid="input-mail-instruction"
       />
     </label>
@@ -91,7 +91,7 @@
     <div class="flex flex-wrap gap-2">
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-cancel-mail-event"
         @click="emit('cancel')"
       >
@@ -99,7 +99,7 @@
       </button>
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="!mailbox"
         data-testid="btn-save-mail-event"
         @click="onSave"

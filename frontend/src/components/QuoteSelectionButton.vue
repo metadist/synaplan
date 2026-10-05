@@ -3,7 +3,7 @@
     <button
       v-if="visible"
       type="button"
-      class="fixed z-[9999] flex items-center gap-1.5 px-3 py-1.5 rounded-lg surface-card shadow-lg border border-light-border/30 dark:border-dark-border/20 text-sm font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+      class="fixed z-[9999] flex items-center gap-1.5 px-3 py-1.5 rounded-xl surface-card shadow-lg border border-light-border/30 dark:border-dark-border/20 text-sm font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
       :style="style"
       data-testid="btn-quote-selection"
       @mousedown.prevent

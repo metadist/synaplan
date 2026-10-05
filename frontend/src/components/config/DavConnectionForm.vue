@@ -167,7 +167,7 @@ const submit = async () => {
       <button
         v-if="!open"
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0"
+        class="btn-primary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap shrink-0"
         data-testid="btn-open-dav-form"
         @click="open = true"
       >
@@ -209,7 +209,7 @@ const submit = async () => {
           type="url"
           required
           :placeholder="serverPlaceholder"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="dav-server-url"
         />
         <p v-if="allowInsecureLocal" class="text-xs txt-secondary mt-1">
@@ -223,7 +223,7 @@ const submit = async () => {
           type="url"
           required
           placeholder="https://cloud.example.com/remote.php/dav/files/USERNAME"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="dav-dav-url"
         />
       </label>
@@ -236,7 +236,7 @@ const submit = async () => {
             type="text"
             required
             autocomplete="off"
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="dav-username"
           />
         </label>
@@ -249,7 +249,7 @@ const submit = async () => {
             type="password"
             required
             autocomplete="new-password"
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="dav-app-password"
           />
         </label>
@@ -263,7 +263,7 @@ const submit = async () => {
         <input
           v-model="folder"
           type="text"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="dav-folder"
         />
       </label>
@@ -282,7 +282,7 @@ const submit = async () => {
           v-if="withCalendar"
           v-model="calendar"
           type="text"
-          class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="dav-calendar"
         />
       </div>
@@ -290,7 +290,7 @@ const submit = async () => {
       <div class="flex gap-2">
         <button
           type="submit"
-          class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-primary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium"
           :disabled="!canSubmit || submitting"
           data-testid="btn-dav-submit"
         >
@@ -302,7 +302,7 @@ const submit = async () => {
         </button>
         <button
           type="button"
-          class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-secondary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium"
           @click="reset"
         >
           {{ $t('common.cancel') }}

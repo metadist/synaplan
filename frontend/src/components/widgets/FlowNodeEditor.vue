@@ -16,7 +16,7 @@
           :disabled="rt.requiresPro && !isPro"
           :title="rt.requiresPro && !isPro ? $t('widgets.detail.nodeEditor.upgradeRequired') : ''"
           :class="[
-            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all',
+            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all',
             form.type === rt.key
               ? 'border-[var(--brand)] bg-[var(--brand)]/10 txt-brand'
               : rt.requiresPro && !isPro
@@ -44,7 +44,7 @@
       <input
         ref="nameInputRef"
         v-model="form.label"
-        class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+        class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
       />
     </div>
 
@@ -65,7 +65,7 @@
         v-model="form.content"
         :rows="form.type === 'list' ? 4 : 3"
         :placeholder="contentPlaceholder"
-        class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+        class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
       />
     </div>
 
@@ -81,7 +81,7 @@
             ? 'https://api.example.com/v1/users/{externalUserId}/profile'
             : 'https://...'
         "
-        class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+        class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
       />
       <p v-if="form.type === 'api'" class="text-[10px] txt-secondary mt-1">
         {{
@@ -99,7 +99,7 @@
       </label>
       <select
         v-model="form.method"
-        class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+        class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
       >
         <option value="GET">GET</option>
         <option value="POST">POST</option>
@@ -115,7 +115,7 @@
       </label>
       <select
         v-model="form.crawlInterval"
-        class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+        class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
       >
         <option value="never">{{ $t('widgets.detail.nodeEditor.crawlNever') }}</option>
         <option value="daily">{{ $t('widgets.detail.nodeEditor.crawlDaily') }}</option>
@@ -127,14 +127,14 @@
     <!-- Actions -->
     <div class="flex justify-end gap-2 pt-1">
       <button
-        class="px-3 py-1.5 rounded-lg text-xs font-medium txt-secondary hover:txt-primary transition-colors"
+        class="px-3 py-1.5 rounded-xl text-xs font-medium txt-secondary hover:txt-primary transition-colors"
         @click="emit('cancel')"
       >
         {{ $t('widgets.detail.wizard.cancel') }}
       </button>
       <button
         :disabled="!form.label.trim()"
-        class="px-4 py-1.5 rounded-lg text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
+        class="px-4 py-1.5 rounded-xl text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
         @click="save"
       >
         {{ $t('widgets.detail.nodeEditor.save') }}

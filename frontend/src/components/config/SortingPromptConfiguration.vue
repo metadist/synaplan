@@ -114,7 +114,7 @@
             </div>
           </div>
           <button
-            class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-4 py-2 rounded-xl border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-planner-toggle-mode"
             :disabled="loadingPlanner"
             @click="togglePlannerEditMode"
@@ -134,7 +134,7 @@
             v-for="tab in ['rendered', 'source']"
             :key="tab"
             :class="[
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              'px-4 py-2 rounded-xl text-sm font-medium transition-colors',
               plannerTab === tab
                 ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
                 : 'surface-chip txt-secondary hover:txt-primary',
@@ -164,13 +164,13 @@
           v-else
           v-model="plannerPrompt.prompt"
           rows="22"
-          class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
+          class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
           data-testid="input-planner-prompt"
         />
 
         <div v-if="plannerEditMode" class="flex gap-3">
           <button
-            class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="btn-primary px-6 py-2.5 rounded-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-planner-save"
             :disabled="savingPlanner || loadingPlanner"
             @click="savePlannerPrompt"
@@ -179,7 +179,7 @@
             {{ $t('config.routing.plannerSave') }}
           </button>
           <button
-            class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-6 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-planner-reset"
             :disabled="savingPlanner || loadingPlanner"
             @click="resetPlannerPrompt"
@@ -214,7 +214,7 @@
           id="planner-model-select"
           :value="plannerModelId ?? ''"
           :disabled="loadingPlannerModel || savingPlannerModel"
-          class="w-full max-w-md px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
+          class="w-full max-w-md px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
           data-testid="select-planner-model"
           @change="onPlannerModelChange(($event.target as HTMLSelectElement).value)"
         >
@@ -370,7 +370,7 @@
                       {{ $t('config.sortingPrompt.tabSource') }}
                     </h3>
                     <button
-                      class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-4 py-2 rounded-xl border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="btn-toggle-mode"
                       :disabled="!canEdit || loading"
                       @click="toggleEditMode"
@@ -399,13 +399,13 @@
                     v-else
                     v-model="sortingPrompt.promptContent"
                     rows="25"
-                    class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
+                    class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
                     data-testid="input-prompt"
                   />
 
                   <div v-if="editMode" class="flex gap-3">
                     <button
-                      class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="btn-primary px-6 py-2.5 rounded-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="btn-save"
                       :disabled="saving || loading"
                       @click="savePrompt"
@@ -414,7 +414,7 @@
                       {{ $t('config.sortingPrompt.savePrompt') }}
                     </button>
                     <button
-                      class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-6 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="btn-reset"
                       :disabled="saving || loading"
                       @click="resetPrompt"

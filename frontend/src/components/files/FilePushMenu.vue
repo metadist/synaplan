@@ -20,7 +20,7 @@
       <div
         v-if="open"
         ref="menuRef"
-        class="fixed z-[200] overflow-y-auto scroll-thin surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5"
+        class="fixed z-[200] overflow-y-auto scroll-thin surface-card !rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5"
         :style="menuStyle"
         data-testid="file-push-menu-panel"
         @click.stop

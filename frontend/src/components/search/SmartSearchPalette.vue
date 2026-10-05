@@ -43,7 +43,7 @@
             />
             <button
               type="button"
-              class="sm:hidden p-2 rounded-lg txt-secondary hover:bg-black/5 dark:hover:bg-white/5"
+              class="sm:hidden p-2 rounded-xl txt-secondary hover:bg-black/5 dark:hover:bg-white/5"
               :aria-label="$t('common.close')"
               data-testid="btn-smart-search-close"
               @click="store.close()"

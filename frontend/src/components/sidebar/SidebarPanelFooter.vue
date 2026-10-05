@@ -3,7 +3,7 @@
     <button
       v-if="!isGuestMode"
       type="button"
-      class="w-full flex items-center gap-2 min-h-11 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-secondary text-[15px] text-left focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+      class="w-full flex items-center gap-2 min-h-11 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-secondary text-[15px] text-left focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
       :title="searchHint"
       :aria-label="searchHint"
       aria-keyshortcuts="Control+K Meta+K"
@@ -18,7 +18,7 @@
     <button
       v-if="showUpgrade"
       type="button"
-      class="v2-upgrade-btn w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-[15px] font-medium min-h-11"
+      class="v2-upgrade-btn w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[15px] font-medium min-h-11"
       data-testid="btn-sidebar-v2-upgrade"
       @click="go('/subscription')"
     >
@@ -29,7 +29,7 @@
     <button
       ref="userBtnRef"
       type="button"
-      class="w-full inline-flex items-center gap-2 min-h-11 px-2 py-1.5 rounded-lg text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.04] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+      class="w-full inline-flex items-center gap-2 min-h-11 px-2 py-1.5 rounded-xl text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.04] focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
       :title="authStore.user?.email || $t('nav.accountDescription')"
       :aria-label="authStore.user?.email || $t('nav.account')"
       :aria-expanded="userMenuOpen"

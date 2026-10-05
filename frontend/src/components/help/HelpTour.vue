@@ -42,7 +42,7 @@
               <h3 class="text-lg font-semibold txt-primary">{{ currentStepData.title }}</h3>
             </div>
             <button
-              class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
+              class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
               :aria-label="$t('help.close')"
               data-testid="btn-close"
               @click="$emit('close')"
@@ -58,7 +58,7 @@
             <div class="flex gap-2">
               <button
                 v-if="currentStepIndex > 0"
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
+                class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm"
                 data-testid="btn-prev"
                 @click="prevStep"
               >
@@ -66,7 +66,7 @@
               </button>
               <button
                 v-if="currentStepIndex < steps.length - 1"
-                class="btn-primary px-5 py-2 rounded-lg text-sm font-medium"
+                class="btn-primary px-5 py-2 rounded-xl text-sm font-medium"
                 data-testid="btn-next"
                 @click="nextStep"
               >
@@ -74,7 +74,7 @@
               </button>
               <button
                 v-else
-                class="btn-primary px-5 py-2 rounded-lg text-sm font-medium"
+                class="btn-primary px-5 py-2 rounded-xl text-sm font-medium"
                 data-testid="btn-finish"
                 @click="finish"
               >

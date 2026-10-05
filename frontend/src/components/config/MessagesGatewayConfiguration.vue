@@ -104,7 +104,7 @@
           >{{ setupSnippet }}</pre>
         <button
           type="button"
-          class="btn-primary mt-3 px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-primary mt-3 px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-copy-setup"
           @click="copySetup"
         >

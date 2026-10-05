@@ -1,7 +1,7 @@
 <template>
   <div v-if="feedbacks.length > 0" class="mt-3">
     <button
-      class="flex items-center gap-2 px-3 py-2 rounded-lg surface-chip hover:bg-black/5 dark:hover:bg-white/5 transition-all w-full text-left"
+      class="flex items-center gap-2 px-3 py-2 rounded-xl surface-chip hover:bg-black/5 dark:hover:bg-white/5 transition-all w-full text-left"
       @click="toggleExpand"
     >
       <Icon icon="mdi:alert-circle-check-outline" class="w-4 h-4 flex-shrink-0 txt-brand" />

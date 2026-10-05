@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Entity\File;
 use App\Entity\Message;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -60,70 +61,7 @@ class FileRepository extends ServiceEntityRepository
             }
         }
 
-        $search = $filters['search'] ?? null;
-        if (null !== $search && '' !== $search) {
-            // §4.4: match the original (source) name too, so an Outlook
-            // attachment is findable by the name the user recognises.
-            $qb->andWhere('(mf.fileName LIKE :search OR mf.originalName LIKE :search OR mf.fileText LIKE :search)')
-                ->setParameter('search', '%'.$search.'%');
-        }
-
-        $fileType = $filters['file_type'] ?? null;
-        if (null !== $fileType && '' !== $fileType) {
-            $types = array_filter(array_map('trim', explode(',', $fileType)));
-            if (1 === count($types)) {
-                $qb->andWhere('mf.fileType = :fileType')
-                    ->setParameter('fileType', $types[0]);
-            } elseif (count($types) > 1) {
-                $qb->andWhere('mf.fileType IN (:fileTypes)')
-                    ->setParameter('fileTypes', $types);
-            }
-        }
-
-        $source = $filters['source'] ?? null;
-        if (null !== $source && '' !== $source) {
-            $sources = array_filter(array_map('trim', explode(',', $source)));
-            if (count($sources) >= 1) {
-                $qb->andWhere('mf.source IN (:sources)')
-                    ->setParameter('sources', $sources);
-            }
-        }
-
-        $vectorState = $filters['vector_state'] ?? null;
-        if (null !== $vectorState && '' !== $vectorState) {
-            $states = array_filter(array_map('trim', explode(',', $vectorState)));
-            if (count($states) >= 1) {
-                $qb->andWhere('mf.vectorState IN (:vectorStates)')
-                    ->setParameter('vectorStates', $states);
-            }
-        }
-
-        $incoming = $filters['incoming'] ?? null;
-        if (null !== $incoming) {
-            $qb->andWhere('mf.incoming = :incoming')
-                ->setParameter('incoming', $incoming);
-        }
-
-        $originKind = $filters['origin_kind'] ?? null;
-        if (null !== $originKind && '' !== $originKind) {
-            $kinds = array_filter(array_map('trim', explode(',', $originKind)));
-            if (count($kinds) >= 1) {
-                $qb->andWhere('mf.originKind IN (:originKinds)')
-                    ->setParameter('originKinds', $kinds);
-            }
-        }
-
-        $dateFrom = $filters['date_from'] ?? null;
-        if (null !== $dateFrom) {
-            $qb->andWhere('mf.createdAt >= :dateFrom')
-                ->setParameter('dateFrom', $dateFrom);
-        }
-
-        $dateTo = $filters['date_to'] ?? null;
-        if (null !== $dateTo) {
-            $qb->andWhere('mf.createdAt <= :dateTo')
-                ->setParameter('dateTo', $dateTo);
-        }
+        $this->applyListingFilters($qb, 'mf', $filters);
 
         [$sortField, $sortDir] = $this->resolveSort($filters['sort'] ?? null);
         $qb->orderBy('mf.'.$sortField, $sortDir);
@@ -493,9 +431,11 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
+     *
      * @return array<string, int> group name => file count
      */
-    public function getGroupCountsByUser(int $userId): array
+    public function getGroupCountsByUser(int $userId, array $filters = []): array
     {
         $qb = $this->createQueryBuilder('f')
             ->select('f.groupKey AS name, COUNT(f.id) AS cnt')
@@ -508,12 +448,88 @@ class FileRepository extends ServiceEntityRepository
             ->groupBy('f.groupKey')
             ->orderBy('f.groupKey', 'ASC');
 
+        $this->applyListingFilters($qb, 'f', $filters);
+
         $groups = [];
         foreach ($qb->getQuery()->getResult() as $row) {
             $groups[$row['name']] = (int) $row['cnt'];
         }
 
         return $groups;
+    }
+
+    /**
+     * Same predicates as the file list, so a folder count only includes files
+     * the current search or filters would actually show.
+     *
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
+     */
+    private function applyListingFilters(QueryBuilder $qb, string $alias, array $filters): void
+    {
+        $search = $filters['search'] ?? null;
+        if (null !== $search && '' !== $search) {
+            // Match the original (source) name too, so an Outlook attachment
+            // is findable by the name the user recognises.
+            $qb->andWhere(sprintf('(%1$s.fileName LIKE :search OR %1$s.originalName LIKE :search OR %1$s.fileText LIKE :search)', $alias))
+                ->setParameter('search', '%'.$search.'%');
+        }
+
+        $fileType = $filters['file_type'] ?? null;
+        if (null !== $fileType && '' !== $fileType) {
+            $types = array_filter(array_map('trim', explode(',', $fileType)));
+            if (1 === count($types)) {
+                $qb->andWhere(sprintf('%s.fileType = :fileType', $alias))
+                    ->setParameter('fileType', $types[0]);
+            } elseif (count($types) > 1) {
+                $qb->andWhere(sprintf('%s.fileType IN (:fileTypes)', $alias))
+                    ->setParameter('fileTypes', $types);
+            }
+        }
+
+        $source = $filters['source'] ?? null;
+        if (null !== $source && '' !== $source) {
+            $sources = array_filter(array_map('trim', explode(',', $source)));
+            if (count($sources) >= 1) {
+                $qb->andWhere(sprintf('%s.source IN (:sources)', $alias))
+                    ->setParameter('sources', $sources);
+            }
+        }
+
+        $vectorState = $filters['vector_state'] ?? null;
+        if (null !== $vectorState && '' !== $vectorState) {
+            $states = array_filter(array_map('trim', explode(',', $vectorState)));
+            if (count($states) >= 1) {
+                $qb->andWhere(sprintf('%s.vectorState IN (:vectorStates)', $alias))
+                    ->setParameter('vectorStates', $states);
+            }
+        }
+
+        $incoming = $filters['incoming'] ?? null;
+        if (null !== $incoming) {
+            $qb->andWhere(sprintf('%s.incoming = :incoming', $alias))
+                ->setParameter('incoming', $incoming);
+        }
+
+        $originKind = $filters['origin_kind'] ?? null;
+        if (null !== $originKind && '' !== $originKind) {
+            $kinds = array_filter(array_map('trim', explode(',', $originKind)));
+            if (count($kinds) >= 1) {
+                $qb->andWhere(sprintf('%s.originKind IN (:originKinds)', $alias))
+                    ->setParameter('originKinds', $kinds);
+            }
+        }
+
+        $dateFrom = $filters['date_from'] ?? null;
+        if (null !== $dateFrom) {
+            $qb->andWhere(sprintf('%s.createdAt >= :dateFrom', $alias))
+                ->setParameter('dateFrom', $dateFrom);
+        }
+
+        $dateTo = $filters['date_to'] ?? null;
+        if (null !== $dateTo) {
+            $qb->andWhere(sprintf('%s.createdAt <= :dateTo', $alias))
+                ->setParameter('dateTo', $dateTo);
+        }
     }
 
     /**

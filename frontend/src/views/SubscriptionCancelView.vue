@@ -13,13 +13,13 @@
 
         <div class="flex gap-3 justify-center">
           <button
-            class="btn-primary px-6 py-3 rounded-lg font-semibold"
+            class="btn-primary px-6 py-3 rounded-xl font-semibold"
             @click="router.push('/subscription')"
           >
             View Plans
           </button>
           <button
-            class="btn-secondary px-6 py-3 rounded-lg font-semibold"
+            class="btn-secondary px-6 py-3 rounded-xl font-semibold"
             @click="router.push('/')"
           >
             Back to Home

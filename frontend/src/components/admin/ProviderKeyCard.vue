@@ -80,7 +80,7 @@
               ? $t('adminSetup.replaceKeyPlaceholder')
               : $t('adminSetup.keyPlaceholder')
           "
-          class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :aria-label="$t('adminSetup.keyAriaLabel', { provider: provider.displayName })"
           :data-testid="`provider-key-input-${provider.name}`"
           autocomplete="off"
@@ -91,7 +91,7 @@
           v-model="secretInput"
           type="password"
           :placeholder="$t('adminSetup.secretPlaceholder')"
-          class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :aria-label="$t('adminSetup.secretAriaLabel', { provider: provider.displayName })"
           :data-testid="`provider-secret-input-${provider.name}`"
           autocomplete="off"
@@ -99,7 +99,7 @@
         />
         <button
           type="button"
-          class="btn-primary whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="saving || !canSave"
           :data-testid="`provider-key-save-${provider.name}`"
           @click="save"

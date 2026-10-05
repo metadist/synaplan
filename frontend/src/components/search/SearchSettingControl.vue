@@ -56,7 +56,7 @@
       :value="value"
       :aria-label="$t('search.palette.setting.selectLabel', { name })"
       :disabled="saving"
-      class="max-w-[9rem] px-2 py-1 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+      class="max-w-[9rem] px-2 py-1 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
       data-testid="select-smart-search-setting"
       @change="emit('change', ($event.target as HTMLSelectElement).value)"
     >

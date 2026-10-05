@@ -23,7 +23,7 @@
     >
       <button
         type="button"
-        class="chat-row-btn flex w-full min-w-0 items-center gap-2 text-left rounded-lg cursor-pointer"
+        class="chat-row-btn flex w-full min-w-0 items-center gap-2 text-left rounded-xl cursor-pointer"
         :aria-describedby="previewChatId === chat.id ? PREVIEW_ID : undefined"
         @click="emit('select', chat.id)"
       >

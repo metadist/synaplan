@@ -92,7 +92,7 @@ const copy = async (value: string, which: 'redirect' | 'scopes') => {
               >
               <button
                 type="button"
-                class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium flex-shrink-0"
+                class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0"
                 :disabled="!redirectUri"
                 @click="copy(redirectUri, 'redirect')"
               >
@@ -114,7 +114,7 @@ const copy = async (value: string, which: 'redirect' | 'scopes') => {
               >
               <button
                 type="button"
-                class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium flex-shrink-0"
+                class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0"
                 @click="copy(SCOPES, 'scopes')"
               >
                 <Icon

@@ -21,7 +21,7 @@
     </p>
     <button
       type="button"
-      class="btn-primary mt-2.5 sm:mt-3 px-4 py-2 rounded-lg text-sm font-medium w-full"
+      class="btn-primary mt-2.5 sm:mt-3 px-4 py-2 rounded-xl text-sm font-medium w-full"
       data-testid="btn-demo-login"
       @click="emit('continue')"
     >

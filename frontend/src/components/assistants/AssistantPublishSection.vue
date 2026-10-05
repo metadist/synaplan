@@ -31,7 +31,7 @@
       <textarea
         v-model="changelog"
         rows="3"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.changelogPlaceholder')"
         data-testid="input-publish-changelog"
       />
@@ -40,7 +40,7 @@
     <div class="flex flex-wrap gap-2">
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="publishing || store.current?.status === 'archived'"
         data-testid="btn-publish-assistant"
         @click="onPublish"
@@ -49,7 +49,7 @@
       </button>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="store.current?.status !== 'published'"
         data-testid="btn-share-assistant"
         @click="shareOpen = true"
@@ -59,7 +59,7 @@
       <button
         v-if="store.current?.status === 'published'"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-archive-assistant"
         @click="onArchive"
       >
@@ -68,7 +68,7 @@
       <button
         v-else-if="store.current?.status === 'archived'"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-unarchive-assistant"
         @click="onUnarchive"
       >
@@ -76,7 +76,7 @@
       </button>
       <button
         type="button"
-        class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-delete-assistant"
         @click="onDelete"
       >

@@ -90,7 +90,7 @@ const handleSubmit = () => {
               </div>
             </div>
             <button
-              class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
+              class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
               :aria-label="t('common.cancel')"
               @click="emit('close')"
             >
@@ -142,7 +142,7 @@ const handleSubmit = () => {
                 v-model="details"
                 rows="3"
                 :maxlength="DETAILS_MAX"
-                class="w-full px-3 py-2 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none text-sm"
+                class="w-full px-3 py-2 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none text-sm"
                 :placeholder="t('moderation.report.detailsPlaceholder')"
               />
             </div>

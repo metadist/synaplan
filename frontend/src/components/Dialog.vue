@@ -59,7 +59,7 @@
             v-model="inputValue"
             type="text"
             :placeholder="dialog.placeholder"
-            class="w-full px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+            class="w-full px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
             data-testid="input-dialog-prompt"
             @keydown.enter.prevent="handleConfirm"
             @keydown.esc="handleCancel"
@@ -69,7 +69,7 @@
           <div class="flex gap-3 justify-end pt-2">
             <button
               v-if="dialog.type !== 'alert'"
-              class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+              class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
               data-testid="btn-dialog-cancel"
               @click="handleCancel"
             >
@@ -77,7 +77,7 @@
             </button>
             <button
               v-if="dialog.extraText"
-              class="btn-danger px-4 py-2 rounded-lg text-sm font-medium"
+              class="btn-danger px-4 py-2 rounded-xl text-sm font-medium"
               data-testid="btn-dialog-extra"
               @click="handleExtra"
             >
@@ -85,7 +85,7 @@
             </button>
             <button
               :class="[
-                'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                'px-4 py-2 rounded-xl text-sm font-medium transition-all',
                 dialog.danger ? 'bg-red-500 hover:bg-red-600 text-white' : 'btn-primary',
               ]"
               data-testid="btn-dialog-confirm"

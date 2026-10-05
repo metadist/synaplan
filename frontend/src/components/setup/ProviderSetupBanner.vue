@@ -20,7 +20,7 @@
       <RouterLink
         v-if="isAdmin"
         to="/admin/setup"
-        class="inline-flex items-center justify-center gap-2 btn-primary px-5 py-3 rounded-lg font-medium"
+        class="inline-flex items-center justify-center gap-2 btn-primary px-5 py-3 rounded-xl font-medium"
         data-testid="provider-setup-tombstone-cta"
       >
         <Icon icon="mdi:cog-outline" class="w-5 h-5" aria-hidden="true" />
@@ -31,7 +31,7 @@
         :href="DOCS_URL"
         target="_blank"
         rel="noopener noreferrer"
-        class="inline-flex items-center justify-center gap-2 btn-primary px-5 py-3 rounded-lg font-medium"
+        class="inline-flex items-center justify-center gap-2 btn-primary px-5 py-3 rounded-xl font-medium"
         data-testid="provider-setup-tombstone-docs"
       >
         <Icon icon="mdi:book-open-page-variant-outline" class="w-5 h-5" aria-hidden="true" />

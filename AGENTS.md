@@ -267,19 +267,21 @@ const config = await httpClient('/api/v1/config/runtime', {
 
 ### Buttons (MANDATORY)
 
-`.btn-primary` / `.btn-secondary` / `.btn-danger` only set the **color**. They do
-**not** add padding, radius, or type size. A bare `<button class="btn-primary">`
-renders as a rectangular browser button and is unfinished work.
+`.btn-primary` and `.btn-secondary` set the **color** and the default corner
+(`rounded-xl`, 12px). They do **not** add padding or type size. `.btn-danger`
+sets only the color. A bare `<button class="btn-primary">` still needs padding
+and type size.
 
 Every clickable button must use a house utility **and** the standard shape:
 
 ```html
-<button type="button" class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium">
+<button type="button" class="btn-primary px-4 py-2.5 text-sm font-medium">
 ```
 
-- Primary action: `btn-primary px-4 py-2.5 rounded-lg` (add `inline-flex items-center gap-2` when there is an icon).
-- Secondary / cancel: `btn-secondary` with the same padding and radius.
-- Destructive: `btn-danger` with the same padding and radius.
+- Primary action: `btn-primary px-4 py-2.5` (add `inline-flex items-center gap-2` when there is an icon). The corner comes from the class. Do not add `rounded-lg` — that utility is 8px and overrides the default.
+- Secondary / cancel: `btn-secondary` with the same padding. Same default corner.
+- A pill (`rounded-full`) still wins when that shape is intentional.
+- Destructive: `btn-danger` with the same padding, plus an explicit radius (`rounded-lg` or the nearby radius).
 - **Never** a raw `<button>` or `<input type="submit">` without those classes.
 - Match nearby buttons on the same surface — do not invent a one-off size.
 
@@ -303,7 +305,7 @@ unfinished work — and it already shipped once across the whole assistants buil
 Every text field, textarea and select must carry the full house chain:
 
 ```html
-<input class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" />
+<input class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" />
 ```
 
 - Full-width form field: the chain above (drop `mt-1` when the field is not under a label, use `flex-1 min-w-0` instead of `w-full` inside a row).
@@ -437,8 +439,8 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 - Business logic or EntityManager work in a controller
 - Hardcoded user-facing strings (use `$t()`) or hardcoded AI model names (use `ModelRepository`)
 - Tailwind colors / custom CSS instead of `style.css` tokens
-- A raw or `btn-primary`-only button (missing `px-4 py-2.5 rounded-lg`)
-- An `input` / `textarea` / `select` with layout classes only (missing `px-3 py-2 rounded-lg surface-card border … txt-primary`)
+- A raw or `btn-primary`-only button (missing `px-4 py-2.5`), or `rounded-lg` on `.btn-primary` / `.btn-secondary` (that forces 8px over the 12px default)
+- An `input` / `textarea` / `select` with layout classes only (missing `px-3 py-2 rounded-xl surface-card border … txt-primary`)
 - An interactive utility (`.pill`, `.btn-*`, `.icon-ghost`) used for a static, non-clickable badge
 - `setTimeout()` to "fix" race conditions
 - German (or non-English) code comments

@@ -84,12 +84,12 @@ async function onSaveAliases() {
           id="agents-upstream"
           v-model="upstreamUrl"
           type="url"
-          class="flex-1 min-w-[16rem] px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+          class="flex-1 min-w-[16rem] px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
           data-testid="input-agents-upstream"
         />
         <button
           type="button"
-          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          class="btn-primary px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
           :disabled="savingUpstream"
           data-testid="btn-agents-save-upstream"
           @click="onSaveUpstream"
@@ -108,12 +108,12 @@ async function onSaveAliases() {
         id="agents-aliases"
         v-model="aliasesJson"
         rows="4"
-        class="w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs font-mono"
+        class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs font-mono"
         data-testid="input-agents-aliases"
       />
       <button
         type="button"
-        class="btn-primary mt-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+        class="btn-primary mt-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
         :disabled="savingAliases"
         data-testid="btn-agents-save-aliases"
         @click="onSaveAliases"

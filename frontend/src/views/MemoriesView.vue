@@ -11,7 +11,7 @@
             <button
               v-if="canGoBack"
               type="button"
-              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
               data-testid="btn-memories-back"
               @click="router.back()"
             >
@@ -21,7 +21,7 @@
             <!-- View Toggle -->
             <div class="flex items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto">
               <button
-                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"
                 :class="viewMode === 'list' ? 'nav-item--active' : ''"
                 @click="viewMode = 'list'"
               >
@@ -30,7 +30,7 @@
                 <span class="sm:hidden">{{ $t('memories.listView.shortTitle') }}</span>
               </button>
               <button
-                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"
                 :class="viewMode === 'graph' ? 'nav-item--active' : ''"
                 @click="viewMode = 'graph'"
               >
@@ -40,7 +40,7 @@
               </button>
               <button
                 v-if="is3dSupported"
-                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"
                 :class="viewMode === 'graph3d' ? 'nav-item--active' : ''"
                 @click="viewMode = 'graph3d'"
               >
@@ -93,7 +93,7 @@
               </ul>
             </div>
             <button
-              class="btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg disabled:opacity-60"
+              class="btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl disabled:opacity-60"
               :disabled="retryingConnection"
               data-testid="memories-retry"
               @click="retryConnection"

@@ -64,7 +64,7 @@ const onReject = async () => {
       <button
         v-if="showApprove"
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="approval-approve"
         @click="onApprove"
       >
@@ -72,7 +72,7 @@ const onReject = async () => {
       </button>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="approval-reject"
         @click="onReject"
       >
@@ -81,7 +81,7 @@ const onReject = async () => {
       <button
         v-if="showAlwaysAllow"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="approval-always-allow"
         @click="onAlwaysAllow"
       >
@@ -90,7 +90,7 @@ const onReject = async () => {
       <button
         v-if="showOpenContext"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="approval-open-context"
         @click="emit('openContext', approval.id)"
       >

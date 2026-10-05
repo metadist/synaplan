@@ -13,7 +13,7 @@
       <button
         v-if="expired"
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid="btn-telegram-renew"
         :disabled="busy"
         @click="emit('renew')"
@@ -25,14 +25,14 @@
         :href="link"
         target="_blank"
         rel="noopener noreferrer"
-        class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="link-telegram-open"
       >
         {{ t('channels.telegram.openTelegram') }}
       </a>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid="btn-telegram-cancel"
         :disabled="busy"
         @click="emit('cancel')"

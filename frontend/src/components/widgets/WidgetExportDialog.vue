@@ -12,7 +12,7 @@
               <Icon icon="heroicons:arrow-down-tray" class="w-5 h-5 txt-brand" />
               {{ $t('export.title') }}
             </h2>
-            <button class="p-2 rounded-lg hover-surface transition-colors" @click="$emit('close')">
+            <button class="p-2 rounded-xl hover-surface transition-colors" @click="$emit('close')">
               <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
             </button>
           </div>
@@ -76,7 +76,7 @@
             </label>
             <select
               v-model="dateRange"
-              class="w-full px-3 py-2 rounded-lg surface-chip txt-primary"
+              class="w-full px-3 py-2 rounded-xl surface-chip txt-primary"
             >
               <option value="all">{{ $t('export.allTime') }}</option>
               <option value="today">{{ $t('export.today') }}</option>
@@ -89,13 +89,13 @@
               <input
                 v-model="customFrom"
                 type="date"
-                class="flex-1 px-3 py-2 rounded-lg surface-chip txt-primary"
+                class="flex-1 px-3 py-2 rounded-xl surface-chip txt-primary"
               />
               <span class="self-center txt-secondary">-</span>
               <input
                 v-model="customTo"
                 type="date"
-                class="flex-1 px-3 py-2 rounded-lg surface-chip txt-primary"
+                class="flex-1 px-3 py-2 rounded-xl surface-chip txt-primary"
               />
             </div>
           </div>
@@ -107,7 +107,7 @@
             </label>
             <select
               v-model="modeFilter"
-              class="w-full px-3 py-2 rounded-lg surface-chip txt-primary"
+              class="w-full px-3 py-2 rounded-xl surface-chip txt-primary"
             >
               <option value="">{{ $t('export.allSessions') }}</option>
               <option value="ai">{{ $t('export.aiOnly') }}</option>
@@ -121,14 +121,14 @@
           class="p-4 border-t border-light-border/30 dark:border-dark-border/20 flex justify-end gap-2"
         >
           <button
-            class="px-4 py-2 rounded-lg surface-chip txt-secondary hover-surface transition-colors"
+            class="px-4 py-2 rounded-xl surface-chip txt-secondary hover-surface transition-colors"
             @click="$emit('close')"
           >
             {{ $t('common.cancel') }}
           </button>
           <button
             :disabled="exporting"
-            class="px-4 py-2 rounded-lg btn-primary disabled:opacity-50"
+            class="px-4 py-2 rounded-xl btn-primary disabled:opacity-50"
             @click="startExport"
           >
             <Icon

@@ -207,7 +207,7 @@ const onDelete = async () => {
           (item.type === 'm365' || item.type === 'dropbox') && item.status === 'reauth_required'
         "
         type="button"
-        class="btn-primary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
+        class="btn-primary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium flex-1 sm:flex-none"
         @click="emit('reconnect')"
       >
         <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
@@ -215,7 +215,7 @@ const onDelete = async () => {
       </button>
       <button
         type="button"
-        class="btn-secondary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
+        class="btn-secondary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium flex-1 sm:flex-none"
         :disabled="testing"
         data-testid="btn-test-connection"
         @click="onTest"
@@ -228,7 +228,7 @@ const onDelete = async () => {
       </button>
       <button
         type="button"
-        class="btn-secondary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
+        class="btn-secondary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium flex-1 sm:flex-none"
         data-testid="btn-edit-connection"
         @click="openEdit"
       >
@@ -237,7 +237,7 @@ const onDelete = async () => {
       </button>
       <button
         type="button"
-        class="icon-ghost icon-ghost--danger inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
+        class="icon-ghost icon-ghost--danger inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium flex-1 sm:flex-none"
         data-testid="btn-delete-connection"
         @click="onDelete"
       >
@@ -258,7 +258,7 @@ const onDelete = async () => {
           v-model="name"
           type="text"
           required
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="connection-edit-name"
         />
       </label>
@@ -269,7 +269,7 @@ const onDelete = async () => {
             v-model="serverUrl"
             type="url"
             required
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="connection-edit-server"
           />
         </label>
@@ -281,7 +281,7 @@ const onDelete = async () => {
               type="text"
               required
               autocomplete="off"
-              class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               data-testid="connection-edit-username"
             />
           </label>
@@ -293,7 +293,7 @@ const onDelete = async () => {
               v-model="appPassword"
               type="password"
               autocomplete="new-password"
-              class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               data-testid="connection-edit-password"
             />
           </label>
@@ -304,7 +304,7 @@ const onDelete = async () => {
           <input
             v-model="folder"
             type="text"
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="connection-edit-folder"
           />
         </label>
@@ -315,7 +315,7 @@ const onDelete = async () => {
           <input
             v-model="calendar"
             type="text"
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="connection-edit-calendar"
           />
         </label>
@@ -323,7 +323,7 @@ const onDelete = async () => {
       <div class="flex gap-2">
         <button
           type="submit"
-          class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-primary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium"
           :disabled="saving || !name.trim()"
           data-testid="btn-save-connection"
         >
@@ -331,7 +331,7 @@ const onDelete = async () => {
         </button>
         <button
           type="button"
-          class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-secondary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium"
           @click="editing = false"
         >
           {{ $t('common.cancel') }}

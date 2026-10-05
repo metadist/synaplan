@@ -15,7 +15,7 @@
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold txt-primary">{{ $t('chatShare.title') }}</h2>
             <button
-              class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
+              class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
               data-testid="btn-chat-share-close"
               @click="close"
             >
@@ -129,7 +129,7 @@
               <!-- Make Public Button -->
               <button
                 :disabled="sharing"
-                class="btn-primary w-full py-3 rounded-lg font-medium disabled:opacity-50"
+                class="btn-primary w-full py-3 rounded-xl font-medium disabled:opacity-50"
                 data-testid="btn-chat-share-make-public"
                 @click="makePublic"
               >
@@ -159,7 +159,7 @@
                     $t('chatShare.publicLink')
                   }}</span>
                   <button
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary text-sm"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary text-sm"
                     data-testid="btn-chat-share-copy"
                     @click="copyLink"
                   >
@@ -210,7 +210,7 @@
               <!-- Revoke Button -->
               <button
                 :disabled="revoking"
-                class="w-full py-2 rounded-lg border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                class="w-full py-2 rounded-xl border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                 data-testid="btn-chat-share-revoke"
                 @click="revoke"
               >

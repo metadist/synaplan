@@ -29,7 +29,7 @@
       <p class="flex-1 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-alert-retry"
         @click="loadLinks"
       >
@@ -113,7 +113,7 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <button
                   type="button"
-                  class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+                  class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
                   data-testid="btn-disconnect"
                   @click="disconnect(link)"
                 >

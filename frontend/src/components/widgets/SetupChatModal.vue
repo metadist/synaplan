@@ -28,7 +28,7 @@
             </div>
           </div>
           <button
-            class="w-9 h-9 rounded-lg hover-surface transition-colors flex items-center justify-center"
+            class="w-9 h-9 rounded-xl hover-surface transition-colors flex items-center justify-center"
             :aria-label="$t('common.close')"
             data-testid="btn-close"
             @click="handleClose"
@@ -123,7 +123,7 @@
             <!-- Save Button -->
             <button
               :disabled="isSending"
-              class="btn-primary px-6 py-2.5 rounded-lg font-medium disabled:opacity-50"
+              class="btn-primary px-6 py-2.5 rounded-xl font-medium disabled:opacity-50"
               data-testid="btn-save-prompt"
               @click="saveGeneratedPrompt"
             >

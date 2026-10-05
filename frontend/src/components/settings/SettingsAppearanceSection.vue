@@ -17,7 +17,7 @@
           :key="lang.value"
           type="button"
           :class="[
-            'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
+            'p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2',
             selectedLanguage === lang.value
               ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
               : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
@@ -40,7 +40,7 @@
         <button
           type="button"
           :class="[
-            'p-4 rounded-lg border-2 transition-all',
+            'p-4 rounded-xl border-2 transition-all',
             theme === 'light'
               ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
               : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
@@ -57,7 +57,7 @@
         <button
           type="button"
           :class="[
-            'p-4 rounded-lg border-2 transition-all',
+            'p-4 rounded-xl border-2 transition-all',
             theme === 'dark'
               ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
               : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
@@ -74,7 +74,7 @@
         <button
           type="button"
           :class="[
-            'p-4 rounded-lg border-2 transition-all',
+            'p-4 rounded-xl border-2 transition-all',
             theme === 'system'
               ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
               : 'border-light-border/30 dark:border-dark-border/20 hover-surface',

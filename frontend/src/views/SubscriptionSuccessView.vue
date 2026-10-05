@@ -35,7 +35,7 @@
           >
             {{ $t('subscription.success.newPlan') }}: {{ newLevel }}
           </p>
-          <button class="btn-primary px-8 py-3 rounded-lg font-semibold" @click="goHome">
+          <button class="btn-primary px-8 py-3 rounded-xl font-semibold" @click="goHome">
             {{ $t('subscription.success.startUsing') }}
           </button>
         </template>
@@ -56,13 +56,13 @@
           <div class="flex flex-col gap-3">
             <button
               :disabled="syncing"
-              class="btn-primary px-8 py-3 rounded-lg font-semibold"
+              class="btn-primary px-8 py-3 rounded-xl font-semibold"
               @click="retrySync"
             >
               <Icon v-if="syncing" icon="mdi:loading" class="w-5 h-5 animate-spin inline mr-2" />
               {{ $t('subscription.success.retry') }}
             </button>
-            <button class="btn-secondary px-8 py-3 rounded-lg font-semibold" @click="goHome">
+            <button class="btn-secondary px-8 py-3 rounded-xl font-semibold" @click="goHome">
               {{ $t('subscription.success.continueAnyway') }}
             </button>
           </div>

@@ -7,13 +7,13 @@
             v-model="userSearch"
             type="text"
             :placeholder="$t('admin.users.searchPlaceholder')"
-            class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+            class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
             data-testid="input-user-search"
             @input="debouncedSearchUsers"
           />
         </div>
         <button
-          class="btn-secondary px-6 py-2.5 rounded-lg font-medium"
+          class="btn-secondary px-6 py-2.5 rounded-xl font-medium"
           data-testid="btn-refresh-users"
           @click="loadUsers()"
         >
@@ -92,7 +92,7 @@
                 <td class="py-3 px-4">
                   <select
                     :value="user.level"
-                    class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="px-3 py-1.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                     :disabled="user.id === currentUserId"
                     :data-testid="`select-user-level-${user.id}`"
                     @change="
@@ -137,7 +137,7 @@
                 <td class="py-3 px-4 text-right">
                   <div v-if="user.id !== currentUserId" class="flex items-center justify-end gap-1">
                     <button
-                      class="icon-ghost p-2 rounded-lg text-warning disabled:opacity-50"
+                      class="icon-ghost p-2 rounded-xl text-warning disabled:opacity-50"
                       :title="
                         impersonationDisabled
                           ? $t('admin.impersonate.disabledTitle')
@@ -150,7 +150,7 @@
                       <Icon icon="mdi:incognito" class="w-5 h-5" />
                     </button>
                     <button
-                      class="icon-ghost icon-ghost--danger p-2 rounded-lg"
+                      class="icon-ghost icon-ghost--danger p-2 rounded-xl"
                       :title="$t('admin.users.delete')"
                       :data-testid="`btn-delete-user-${user.id}`"
                       @click="confirmDeleteUser(user)"
@@ -170,7 +170,7 @@
         <div v-if="totalPages > 1" class="flex justify-center gap-2 mt-6">
           <button
             :disabled="currentPage === 1"
-            class="btn-secondary px-4 py-2 rounded-lg disabled:opacity-50"
+            class="btn-secondary px-4 py-2 rounded-xl disabled:opacity-50"
             data-testid="btn-prev-page"
             @click="currentPage = Math.max(1, currentPage - 1)"
           >
@@ -179,7 +179,7 @@
           <span class="px-4 py-2 txt-primary">{{ currentPage }} / {{ totalPages }}</span>
           <button
             :disabled="currentPage === totalPages"
-            class="btn-secondary px-4 py-2 rounded-lg disabled:opacity-50"
+            class="btn-secondary px-4 py-2 rounded-xl disabled:opacity-50"
             data-testid="btn-next-page"
             @click="currentPage = Math.min(totalPages, currentPage + 1)"
           >
@@ -226,7 +226,7 @@
             </label>
             <div class="flex justify-end gap-3">
               <button
-                class="btn-secondary py-2 px-4 rounded-lg"
+                class="btn-secondary py-2 px-4 rounded-xl"
                 data-testid="btn-cancel-delete-user"
                 @click="closeDeleteModal()"
               >
@@ -234,7 +234,7 @@
               </button>
               <button
                 :disabled="!deleteConfirmed"
-                class="btn-danger py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-danger py-2 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-confirm-delete-user"
                 @click="deleteUser()"
               >

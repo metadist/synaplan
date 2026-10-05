@@ -45,7 +45,7 @@
                 </p>
                 <button
                   :disabled="isProcessing || !stripeConfigured"
-                  class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+                  class="btn-primary px-4 py-2 rounded-xl text-sm font-medium"
                   data-testid="btn-fix-payment"
                   @click="openBillingPortal"
                 >
@@ -115,7 +115,7 @@
               <button
                 v-if="subscriptionStatus?.hasSubscription"
                 :disabled="isProcessing || (!isNative && !stripeConfigured)"
-                class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+                class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
                 data-testid="btn-open-portal"
                 @click="openBillingPortal"
               >
@@ -208,7 +208,7 @@
               <button
                 v-if="isCurrentPlan(plan.id)"
                 disabled
-                class="w-full py-3 rounded-lg font-semibold bg-green-500/20 text-green-600 dark:text-green-400 cursor-default"
+                class="w-full py-3 rounded-xl font-semibold bg-green-500/20 text-green-600 dark:text-green-400 cursor-default"
               >
                 <Icon icon="mdi:check" class="w-5 h-5 inline mr-2" />
                 {{ $t('subscription.currentPlan') }}
@@ -216,7 +216,7 @@
               <button
                 v-else-if="isLowerPlan(plan.id)"
                 disabled
-                class="w-full py-3 rounded-lg font-semibold surface-chip txt-secondary cursor-not-allowed"
+                class="w-full py-3 rounded-xl font-semibold surface-chip txt-secondary cursor-not-allowed"
               >
                 {{ $t('subscription.includedInCurrent') }}
               </button>
@@ -224,7 +224,7 @@
                 v-else
                 :disabled="isProcessing"
                 :class="[
-                  'w-full py-3 rounded-lg font-semibold transition-all',
+                  'w-full py-3 rounded-xl font-semibold transition-all',
                   plan.id === 'TEAM'
                     ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg'
                     : 'btn-primary',
@@ -256,7 +256,7 @@
           >
             <button
               :disabled="isProcessing"
-              class="btn-secondary px-5 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary px-5 py-2.5 rounded-xl text-sm font-medium"
               data-testid="btn-restore-purchases"
               @click="restorePurchases"
             >

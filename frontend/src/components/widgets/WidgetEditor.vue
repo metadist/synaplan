@@ -9,14 +9,14 @@
         <button
           v-if="iamSharingEnabled && resourceId"
           type="button"
-          class="btn-secondary px-3 py-2 rounded-lg text-sm"
+          class="btn-secondary px-3 py-2 rounded-xl text-sm"
           data-testid="btn-share-widget"
           @click="iamShareOpen = true"
         >
           {{ $t('iam.share') }}
         </button>
         <button
-          class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
+          class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
           :aria-label="$t('widget.closeEditor')"
           data-testid="btn-close"
           @click="$emit('cancel')"
@@ -64,7 +64,7 @@
           </label>
           <select
             v-model="config.position"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-position"
           >
             <option v-for="pos in positions" :key="pos.value" :value="pos.value">
@@ -80,7 +80,7 @@
           </label>
           <select
             v-model="config.defaultTheme"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-theme"
           >
             <option value="light">{{ $t('widget.options.lightMode') }}</option>
@@ -96,7 +96,7 @@
           <input
             v-model="config.primaryColor"
             type="color"
-            class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+            class="w-full h-12 rounded-xl border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
             data-testid="input-primary-color"
           />
           <p class="text-xs txt-secondary mt-1">{{ $t('widget.hints.primaryColor') }}</p>
@@ -109,7 +109,7 @@
           <input
             v-model="config.iconColor"
             type="color"
-            class="w-full h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+            class="w-full h-12 rounded-xl border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
             data-testid="input-icon-color"
           />
           <p class="text-xs txt-secondary mt-1">{{ $t('widget.hints.iconColor') }}</p>
@@ -131,7 +131,7 @@
           <input
             v-model="config.autoMessage"
             type="text"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('widget.placeholders.autoMessage')"
             data-testid="input-auto-message"
           />
@@ -144,7 +144,7 @@
           </label>
           <select
             v-model="config.aiPrompt"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-ai-prompt"
           >
             <option v-for="prompt in aiPrompts" :key="prompt.value" :value="prompt.value">
@@ -182,7 +182,7 @@
           </label>
           <select
             v-model="config.integrationType"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-integration"
           >
             <option v-for="type in integrationTypes" :key="type.value" :value="type.value">
@@ -199,7 +199,7 @@
           <input
             v-model="config.previewUrl"
             type="url"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             placeholder="https://example.com"
             data-testid="input-preview-url"
           />
@@ -223,7 +223,7 @@
               class="bg-black/5 dark:bg-white/5 p-4 rounded-lg overflow-x-auto text-sm font-mono txt-primary"
               >{{ embedCode }}</pre>
             <button
-              class="absolute top-2 right-2 px-3 py-1 rounded bg-[var(--brand)] text-white text-xs hover:bg-[var(--brand-hover)] transition-colors"
+              class="absolute top-2 right-2 px-3 py-1 rounded-xl bg-[var(--brand)] text-white text-xs hover:bg-[var(--brand-hover)] transition-colors"
               data-testid="btn-copy"
               @click="copyCode"
             >

@@ -46,7 +46,7 @@
       </p>
       <button
         v-if="config.billing.enabled && purchaseAllowed && stats?.user_level === 'NEW'"
-        class="mt-2 w-full btn-primary text-xs py-1.5 px-3 rounded"
+        class="mt-2 w-full btn-primary text-xs py-1.5 px-3 rounded-xl"
         data-testid="btn-storage-upgrade"
         @click="$emit('upgrade')"
       >

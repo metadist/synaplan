@@ -13,7 +13,7 @@
     </div>
 
     <div class="absolute top-6 right-6 flex items-center gap-2" data-testid="section-controls">
-      <button class="h-9 px-3 rounded-lg icon-ghost text-xs font-medium" @click="cycleLanguage">
+      <button class="h-9 px-3 rounded-xl icon-ghost text-xs font-medium" @click="cycleLanguage">
         {{ currentLanguage.toUpperCase() }}
       </button>
     </div>

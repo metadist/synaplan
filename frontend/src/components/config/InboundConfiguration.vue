@@ -81,7 +81,7 @@
             <input
               v-model="emailKeyword"
               type="text"
-              class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] max-w-xs"
+              class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] max-w-xs"
               :placeholder="$t('channels.keywordPlaceholder')"
               data-testid="input-email-keyword"
             />
@@ -127,7 +127,7 @@
         </p>
         <router-link
           to="/channels/api/docs"
-          class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
+          class="btn-primary px-6 py-3 rounded-xl font-medium inline-flex items-center gap-2"
         >
           <CommandLineIcon class="w-4 h-4" />
           {{ $t('channels.viewApiDocumentation') }}

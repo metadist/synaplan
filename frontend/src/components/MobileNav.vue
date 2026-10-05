@@ -494,7 +494,7 @@
 
             <div class="flex-shrink-0" @click.stop>
               <button
-                class="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                class="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 :class="chatMenuOpenId === chat.id && 'bg-black/5 dark:bg-white/5'"
                 :aria-label="$t('nav.more')"
                 data-testid="btn-mobile-history-row-menu"

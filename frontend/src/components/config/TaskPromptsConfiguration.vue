@@ -36,7 +36,7 @@
         </div>
 
         <button
-          class="px-4 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
+          class="px-4 py-2.5 rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
           data-testid="btn-create-prompt"
           @click="showCreateModal = true"
         >
@@ -80,12 +80,12 @@
                 v-model="promptListSearch"
                 type="text"
                 :placeholder="$t('config.taskPrompts.searchPlaceholder')"
-                class="w-full pl-9 pr-9 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full pl-9 pr-9 py-2 rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-prompt-search"
               />
               <button
                 v-if="promptListSearch"
-                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded txt-secondary hover:txt-primary"
+                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-xl txt-secondary hover:txt-primary"
                 :title="$t('config.taskPrompts.clearFilters')"
                 data-testid="btn-clear-search"
                 @click="promptListSearch = ''"
@@ -95,7 +95,7 @@
             </div>
             <button
               type="button"
-              class="p-2 rounded-lg surface-chip txt-secondary hover:txt-primary transition-colors"
+              class="p-2 rounded-xl surface-chip txt-secondary hover:txt-primary transition-colors"
               :title="
                 viewDensity === 'compact'
                   ? $t('config.taskPrompts.densityDetailed')
@@ -170,7 +170,7 @@
             <div v-if="group.prompts.length > 0" class="px-2 mb-1">
               <button
                 type="button"
-                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors text-[11px] uppercase tracking-wide font-semibold"
+                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors text-[11px] uppercase tracking-wide font-semibold"
                 :data-testid="`group-${group.id}`"
                 @click="toggleGroup(group.id)"
               >
@@ -195,7 +195,7 @@
                 <li v-for="prompt in group.prompts" :key="prompt.id">
                   <button
                     type="button"
-                    class="w-full text-left px-2 rounded-md transition-all group flex items-center gap-2"
+                    class="w-full text-left px-2 rounded-xl transition-all group flex items-center gap-2"
                     :class="[
                       viewDensity === 'compact' ? 'py-1.5' : 'py-2.5',
                       selectedPromptId === prompt.id
@@ -307,7 +307,7 @@
             data-testid="section-prompt-header"
           >
             <button
-              class="lg:hidden p-2 rounded-lg hover:bg-light-border/10 dark:hover:bg-dark-border/10"
+              class="lg:hidden p-2 rounded-xl hover:bg-light-border/10 dark:hover:bg-dark-border/10"
               :title="$t('config.taskPrompts.backToList')"
               data-testid="btn-back-to-list"
               @click="backToListMobile"
@@ -350,7 +350,7 @@
             <button
               v-if="canSharePrompt"
               type="button"
-              class="btn-secondary inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+              class="btn-secondary inline-flex items-center px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap"
               data-testid="btn-share-assistant"
               @click="openAssistantShare"
             >
@@ -359,7 +359,7 @@
             <button
               v-if="showSaveAsTask"
               type="button"
-              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap"
               data-testid="btn-save-as-task"
               @click="onSaveAsTask"
             >
@@ -468,7 +468,7 @@
               <textarea
                 v-model="formData.shortDescription"
                 rows="3"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
                 :placeholder="$t('config.taskPrompts.descriptionPlaceholder')"
                 data-testid="input-description"
               />
@@ -487,7 +487,7 @@
               <textarea
                 v-model="formData.selectionRules"
                 rows="3"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
                 :placeholder="$t('config.taskPrompts.rulesPlaceholder')"
                 data-testid="input-rules"
               />
@@ -506,7 +506,7 @@
               <select
                 v-model="formData.language"
                 :disabled="currentPrompt.isDefault && isAdmin"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="input-language"
               >
                 <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
@@ -577,7 +577,7 @@
                   </div>
                   <select
                     v-model="formData.toolInternet"
-                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                     data-testid="select-tool-internet"
                   >
                     <option value="auto">
@@ -629,7 +629,7 @@
                   <button
                     v-for="tool in markdownTools"
                     :key="tool.label"
-                    class="p-2 rounded hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
+                    class="p-2 rounded-xl hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
                     :title="tool.label"
                     data-testid="btn-markdown-tool"
                     @click="insertMarkdown(tool.before, tool.after)"
@@ -643,7 +643,7 @@
                 ref="contentTextarea"
                 v-model="formData.content"
                 rows="18"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono leading-relaxed"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono leading-relaxed"
                 :placeholder="$t('config.taskPrompts.contentPlaceholder')"
                 data-testid="input-content"
               />
@@ -733,7 +733,7 @@
                   </div>
                   <button
                     :disabled="loading"
-                    class="w-7 h-7 rounded-lg hover:bg-rose-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="w-7 h-7 rounded-xl hover:bg-rose-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('config.taskPrompts.unlinkFile')"
                     data-testid="btn-unlink"
                     @click="handleDeleteFile(file.messageId)"
@@ -775,7 +775,7 @@
                   v-model="availableFilesSearch"
                   type="text"
                   :placeholder="$t('config.taskPrompts.searchFilesPlaceholder')"
-                  class="w-full pl-10 pr-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full pl-10 pr-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-file-search"
                   @input="loadAvailableFiles"
                 />
@@ -827,7 +827,7 @@
                   <button
                     :disabled="loading || isFileLinked(file.messageId)"
                     :class="[
-                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5',
+                      'px-3 py-1.5 rounded-xl text-xs font-medium transition-colors flex items-center gap-1.5',
                       isFileLinked(file.messageId)
                         ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-default'
                         : 'bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20',
@@ -903,7 +903,7 @@
               </p>
               <button
                 :disabled="loading"
-                class="px-5 py-2.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/30 font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-5 py-2.5 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/30 font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-delete"
                 @click="handleDelete"
               >
@@ -932,7 +932,7 @@
               {{ $t('config.taskPrompts.selectPromptDescription') }}
             </p>
             <button
-              class="px-5 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm inline-flex items-center gap-2"
+              class="px-5 py-2.5 rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm inline-flex items-center gap-2"
               data-testid="btn-create-prompt-empty"
               @click="showCreateModal = true"
             >
@@ -961,7 +961,7 @@
             {{ $t('config.taskPrompts.createNew') }}
           </h3>
           <button
-            class="p-2 rounded-lg hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors"
+            class="p-2 rounded-xl hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors"
             :title="$t('common.close', 'Close')"
             data-testid="btn-close"
             @click="showCreateModal = false"
@@ -973,7 +973,7 @@
         <div class="space-y-4">
           <div v-if="newPromptContent === '' && newPromptRules === ''" class="flex justify-end">
             <button
-              class="text-xs px-3 py-1.5 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors flex items-center gap-1.5"
+              class="text-xs px-3 py-1.5 rounded-xl bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors flex items-center gap-1.5"
               data-testid="btn-load-template"
               @click="loadTemplates"
             >
@@ -991,7 +991,7 @@
               <input
                 v-model="newPromptTopic"
                 type="text"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="$t('config.taskPrompts.topicPlaceholder')"
                 data-testid="input-new-topic"
               />
@@ -1004,7 +1004,7 @@
               <input
                 v-model="newPromptName"
                 type="text"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="$t('config.taskPrompts.namePlaceholder')"
                 data-testid="input-new-name"
               />
@@ -1016,7 +1016,7 @@
               </label>
               <select
                 v-model="newPromptLanguage"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-new-language"
               >
                 <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
@@ -1034,7 +1034,7 @@
             <textarea
               v-model="newPromptDescription"
               rows="2"
-              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
+              class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
               :placeholder="$t('config.taskPrompts.descriptionPlaceholder')"
               data-testid="input-new-description"
             ></textarea>
@@ -1051,7 +1051,7 @@
             <textarea
               v-model="newPromptRules"
               rows="3"
-              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
+              class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
               :placeholder="SELECTION_RULES_TEMPLATE"
               data-testid="input-new-rules"
             ></textarea>
@@ -1066,7 +1066,7 @@
             <textarea
               v-model="newPromptContent"
               rows="8"
-              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono resize-y"
+              class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono resize-y"
               :placeholder="PROMPT_CONTENT_TEMPLATE"
               data-testid="input-new-content"
             ></textarea>
@@ -1096,7 +1096,7 @@
                 v-model="newPromptFilesSearch"
                 type="text"
                 :placeholder="$t('config.taskPrompts.searchFilesPlaceholderShort')"
-                class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+                class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
                 data-testid="input-new-file-search"
               />
             </div>
@@ -1181,7 +1181,7 @@
             class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
           >
             <button
-              class="w-full sm:flex-1 px-6 py-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors font-medium"
+              class="w-full sm:flex-1 px-6 py-3 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors font-medium"
               data-testid="btn-cancel-create"
               @click="showCreateModal = false"
             >
@@ -1189,7 +1189,7 @@
             </button>
             <button
               :disabled="!canCreatePrompt"
-              class="w-full sm:flex-1 px-6 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              class="w-full sm:flex-1 px-6 py-3 rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               data-testid="btn-confirm-create"
               @click="handleCreateNew"
             >

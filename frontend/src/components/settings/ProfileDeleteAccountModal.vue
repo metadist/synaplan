@@ -52,7 +52,7 @@
           <input
             v-model="deleteConfirmPassword"
             type="password"
-            class="w-full px-4 py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors border-0"
+            class="w-full px-4 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors border-0"
             :placeholder="$t('profile.deleteAccountModal.confirmPasswordPlaceholder')"
             data-testid="input-delete-password"
             @keyup.enter="handleDeleteAccount"
@@ -66,7 +66,7 @@
           <input
             v-model="deleteConfirmText"
             type="text"
-            class="w-full px-4 py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors border-0"
+            class="w-full px-4 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors border-0"
             :placeholder="$t('profile.deleteAccountModal.externalAuthPlaceholder')"
             data-testid="input-delete-confirm"
             @keyup.enter="handleDeleteAccount"
@@ -76,7 +76,7 @@
         <div class="flex gap-3 pt-2">
           <button
             type="button"
-            class="flex-1 btn-secondary py-2.5 rounded-lg font-medium"
+            class="flex-1 btn-secondary py-2.5 rounded-xl font-medium"
             :disabled="deletingAccount"
             data-testid="btn-cancel-delete"
             @click="showDeleteModal = false"
@@ -85,7 +85,7 @@
           </button>
           <button
             type="button"
-            class="flex-1 btn-danger py-2.5 rounded-lg font-medium"
+            class="flex-1 btn-danger py-2.5 rounded-xl font-medium"
             :disabled="deletingAccount || !canConfirmDelete"
             data-testid="btn-confirm-delete"
             @click="handleDeleteAccount"

@@ -12,7 +12,7 @@
         <button
           v-if="preview"
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
           @click="copy"
         >
           {{ $t('partners.copy') }}

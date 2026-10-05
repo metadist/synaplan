@@ -64,7 +64,7 @@
                 <a
                   v-if="purchaseAllowed"
                   href="/settings#billing"
-                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
                   data-testid="btn-upgrade-cta"
                 >
                   {{ $t('config.embeddingSwitch.premium.upgradeCta') }}
@@ -287,7 +287,7 @@
             >
               <button
                 type="button"
-                class="px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 text-sm font-medium transition-colors"
+                class="px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 text-sm font-medium transition-colors"
                 data-testid="btn-cancel"
                 @click="onCancel"
               >
@@ -295,7 +295,7 @@
               </button>
               <button
                 type="button"
-                class="px-5 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 :class="confirmButtonClass"
                 :disabled="!canSubmit"
                 data-testid="btn-confirm-switch"

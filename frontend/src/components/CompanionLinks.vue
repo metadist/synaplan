@@ -40,7 +40,7 @@
             :href="APP_STORE_URL"
             target="_blank"
             rel="noopener noreferrer"
-            class="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+            class="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
             data-testid="link-companion-app-store"
           >
             <Icon icon="mdi:apple" class="w-4 h-4" aria-hidden="true" />
@@ -51,7 +51,7 @@
             :href="PLAY_STORE_URL"
             target="_blank"
             rel="noopener noreferrer"
-            class="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+            class="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
             data-testid="link-companion-play-store"
           >
             <Icon icon="mdi:google-play" class="w-4 h-4" aria-hidden="true" />

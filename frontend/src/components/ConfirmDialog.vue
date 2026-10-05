@@ -80,14 +80,14 @@
             class="flex items-center justify-end gap-3 p-6 border-t border-light-border/10 dark:border-dark-border/10"
           >
             <button
-              class="px-6 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              class="px-6 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="btn-confirm-cancel"
               @click="cancel"
             >
               {{ cancelText }}
             </button>
             <button
-              class="px-6 py-2 rounded-lg transition-colors"
+              class="px-6 py-2 rounded-xl transition-colors"
               :class="{
                 'bg-red-500 hover:bg-red-600 text-white': variant === 'danger',
                 'bg-yellow-500 hover:bg-yellow-600 text-white': variant === 'warning',

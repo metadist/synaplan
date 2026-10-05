@@ -27,7 +27,7 @@ const inputId = computed(() => `prompt-md-${props.testid}`)
 const previewHtml = computed(() => render(model.value, { processFileMarkers: false }))
 
 const fieldClass =
-  'w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
+  'w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
 
 function tabClass(active: boolean): string {
   const tone = active ? 'btn-primary' : 'btn-secondary'
@@ -77,7 +77,7 @@ function tabClass(active: boolean): string {
 
     <div
       v-show="mode === 'preview'"
-      class="rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 px-3 py-2"
+      class="rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 px-3 py-2"
       :data-testid="`preview-${testid}`"
     >
       <p v-if="!model.trim()" class="text-sm txt-secondary">

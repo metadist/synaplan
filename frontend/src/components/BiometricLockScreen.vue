@@ -28,7 +28,7 @@
       </div>
       <button
         type="button"
-        class="btn-primary px-8 py-3 rounded-lg font-medium"
+        class="btn-primary px-8 py-3 rounded-xl font-medium"
         data-testid="btn-biometric-unlock"
         @click="unlock"
       >

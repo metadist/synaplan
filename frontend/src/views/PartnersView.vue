@@ -33,7 +33,7 @@
         <p class="txt-primary text-sm">{{ $t('partners.unreachable') }}</p>
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium opacity-50 cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium opacity-50 cursor-not-allowed"
           disabled
           data-testid="btn-partners-open"
         >
@@ -53,13 +53,13 @@
             v-model="companyName"
             type="text"
             maxlength="80"
-            class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-partners-name"
           />
         </label>
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
           :disabled="busy || companyName.trim() === ''"
           data-testid="btn-partners-open"
           @click="openPartners"
@@ -78,7 +78,7 @@
           </p>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-partners-close"
             @click="closePartners"
           >
@@ -89,7 +89,7 @@
         <section class="surface-card p-6 space-y-3 mb-4">
           <button
             type="button"
-            class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
             :disabled="busy"
             data-testid="btn-partners-invite"
             @click="createInvite"
@@ -101,7 +101,7 @@
             <p class="txt-primary text-sm break-all">{{ pasteUrl }}</p>
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
               @click="copyUrl"
             >
               {{ $t('partners.copy') }}
@@ -115,14 +115,14 @@
             <input
               v-model="inviteUrl"
               type="url"
-              class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               :placeholder="$t('partners.pastePlaceholder')"
               data-testid="input-partners-invite"
             />
           </label>
           <button
             type="button"
-            class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
             :disabled="busy || inviteUrl.trim() === ''"
             data-testid="btn-partners-connect"
             @click="acceptInvite"
@@ -158,14 +158,14 @@
                   partner.pausedBy === 'both'
                 "
                 type="button"
-                class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+                class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
                 @click="partner.status === 'paused' ? resume(partner.id) : pause(partner.id)"
               >
                 {{ partner.status === 'paused' ? $t('partners.resume') : $t('partners.pause') }}
               </button>
               <button
                 type="button"
-                class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+                class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
                 @click="remove(partner)"
               >
                 {{

@@ -12,11 +12,11 @@
       ></div>
     </div>
     <div class="absolute top-6 right-6 flex items-center gap-4" data-testid="section-controls">
-      <button class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium" @click="cycleLanguage">
+      <button class="h-10 px-4 rounded-xl icon-ghost text-sm font-medium" @click="cycleLanguage">
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        class="h-10 w-10 rounded-lg icon-ghost flex items-center justify-center"
+        class="h-10 w-10 rounded-xl icon-ghost flex items-center justify-center"
         :aria-label="
           themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
         "
@@ -48,7 +48,7 @@
 
         <div class="space-y-3">
           <Button
-            class="w-full btn-primary py-3 rounded-lg font-medium"
+            class="w-full btn-primary py-3 rounded-xl font-medium"
             data-testid="btn-continue"
             @click="handleContinue"
           >

@@ -220,7 +220,7 @@ const handleRetry = () => {
       <button
         v-if="canCopy"
         type="button"
-        class="p-1 rounded txt-muted hover:txt-primary transition-colors"
+        class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
         :aria-label="$t('taskPlan.copyText')"
         :title="$t('taskPlan.copyText')"
         data-testid="task-card-copy"
@@ -232,7 +232,7 @@ const handleRetry = () => {
       <button
         v-if="isCollapsible"
         type="button"
-        class="p-1 rounded txt-muted hover:txt-primary transition-colors"
+        class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
         :aria-label="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
         :aria-expanded="!collapsed"
         :title="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"

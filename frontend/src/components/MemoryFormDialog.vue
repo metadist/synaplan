@@ -19,7 +19,7 @@
               {{ memory ? $t('memories.edit.title') : $t('memories.create.title') }}
             </h3>
             <button
-              class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
+              class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
               @click="close"
             >
               <Icon icon="mdi:close" class="w-5 h-5 txt-secondary" />
@@ -31,7 +31,7 @@
             <div class="flex items-center gap-2 p-1.5 surface-chip rounded-xl">
               <button
                 type="button"
-                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
                 :class="
                   mode === 'easy'
                     ? 'mode-toggle-active'
@@ -44,7 +44,7 @@
               </button>
               <button
                 type="button"
-                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
                 :class="
                   mode === 'advanced'
                     ? 'mode-toggle-active'

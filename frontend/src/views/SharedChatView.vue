@@ -40,7 +40,7 @@
               <div class="relative">
                 <select
                   v-model="currentLang"
-                  class="appearance-none px-3 py-2 rounded-lg surface-chip txt-primary text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="appearance-none px-3 py-2 rounded-xl surface-chip txt-primary text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   @change="switchLanguage"
                 >
                   <option v-for="lang in supportedLanguages" :key="lang" :value="lang">
@@ -51,7 +51,7 @@
               <a
                 :href="config.branding.homepageUrl"
                 target="_blank"
-                class="btn-primary px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+                class="btn-primary px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap"
                 data-testid="btn-try-synaplan"
               >
                 {{ $t('shared.tryBrand', { brand: config.branding.name }) }}
@@ -95,7 +95,7 @@
           <p class="txt-secondary mb-6">{{ $t('shared.notFoundDesc') }}</p>
           <a
             :href="config.branding.homepageUrl"
-            class="btn-primary px-6 py-3 rounded-lg inline-block"
+            class="btn-primary px-6 py-3 rounded-xl inline-block"
           >
             {{ $t('shared.visitBrand', { brand: config.branding.name }) }}
           </a>
@@ -319,7 +319,7 @@
             <router-link
               v-if="config.auth.registrationEnabled"
               to="/register"
-              class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
+              class="btn-primary px-6 py-3 rounded-xl font-medium inline-block"
             >
               {{ $t('shared.getStarted') }}
             </router-link>

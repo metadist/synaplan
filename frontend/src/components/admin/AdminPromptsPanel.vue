@@ -41,7 +41,7 @@ const {
 } = useAccordion(sectionIds)
 
 const fieldClass =
-  'mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
+  'mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
 
 onMounted(() => {
   void loadPrompts()
@@ -129,7 +129,7 @@ async function savePrompt(promptId: number): Promise<void> {
     <p class="text-sm txt-primary">{{ t('admin.prompts.loadFailed') }}</p>
     <button
       type="button"
-      class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+      class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
       data-testid="btn-prompts-retry"
       @click="loadPrompts()"
     >
@@ -145,7 +145,7 @@ async function savePrompt(promptId: number): Promise<void> {
     <div class="flex justify-end">
       <button
         type="button"
-        class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
         data-testid="btn-prompts-accordion-toggle-all"
         @click="allPromptsOpen ? collapseAll() : expandAll()"
       >
@@ -179,7 +179,7 @@ async function savePrompt(promptId: number): Promise<void> {
         <template v-if="editingId !== prompt.id" #actions>
           <button
             type="button"
-            class="btn-secondary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            class="btn-secondary inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             :disabled="saving"
             :data-testid="`btn-edit-prompt-${prompt.id}`"
             @click="startEdit(prompt)"
@@ -222,7 +222,7 @@ async function savePrompt(promptId: number): Promise<void> {
           <div class="flex justify-end gap-3">
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
               data-testid="btn-cancel-edit-prompt"
               @click="cancelEdit()"
             >
@@ -230,7 +230,7 @@ async function savePrompt(promptId: number): Promise<void> {
             </button>
             <button
               type="submit"
-              class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="saving"
               data-testid="btn-save-prompt"
             >

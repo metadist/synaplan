@@ -16,7 +16,7 @@
       <template v-if="activeTab === 'choice' && allProvidersAvailable" #actions>
         <button
           type="button"
-          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"
           data-testid="btn-reset-defaults"
           @click="confirmResetDefaults"
@@ -61,7 +61,7 @@
         <p class="text-sm text-red-600 dark:text-red-400">{{ $t('config.aiModels.loadFailed') }}</p>
         <button
           type="button"
-          class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-retry-models"
           @click="retryLoadModels"
         >
@@ -134,7 +134,7 @@
             <button
               type="button"
               :class="[
-                'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
+                'w-full px-4 py-3 pl-10 pr-10 rounded-xl surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
                 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
                 openDropdown === capability && 'ring-2 ring-[var(--brand)]',
                 ((capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
@@ -235,7 +235,7 @@
         <div class="flex flex-wrap gap-2">
           <button
             :class="[
-              'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
+              'px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
               selectedPurpose === null
                 ? 'bg-[var(--brand)] text-white'
                 : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
@@ -249,7 +249,7 @@
             v-for="capability in Object.keys(purposeLabels)"
             :key="capability"
             :class="[
-              'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
+              'px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
               selectedPurpose === capability
                 ? 'bg-[var(--brand)] text-white'
                 : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
@@ -282,7 +282,7 @@
                 type="search"
                 :placeholder="$t('config.aiModels.searchPlaceholder')"
                 :aria-label="$t('config.aiModels.searchPlaceholder')"
-                class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-model-search"
               />
             </div>
@@ -303,7 +303,7 @@
             <div class="relative">
               <select
                 v-model="sortBy"
-                class="px-3 py-2 pr-8 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer appearance-none"
+                class="px-3 py-2 pr-8 rounded-xl border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer appearance-none"
                 @change="
                   sortDirection = sortBy === 'quality' || sortBy === 'rating' ? 'desc' : 'asc'
                 "
@@ -337,7 +337,7 @@
           </p>
           <button
             type="button"
-            class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-retry-models-list"
             @click="retryLoadModels"
           >
@@ -509,7 +509,7 @@
           </span>
           <div class="flex items-center gap-1">
             <button
-              class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              class="p-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               :disabled="modelsPage <= 1"
               @click="modelsPage--"
             >
@@ -519,7 +519,7 @@
               {{ modelsPage }} / {{ modelsTotalPages }}
             </span>
             <button
-              class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              class="p-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               :disabled="modelsPage >= modelsTotalPages"
               @click="modelsPage++"
             >
@@ -543,7 +543,7 @@
         />
         <button
           type="button"
-          class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
           data-testid="btn-ai-models-edit-accordion-toggle-all"
           @click="allEditSectionsOpen ? collapseAllEditSections() : expandAllEditSections()"
         >

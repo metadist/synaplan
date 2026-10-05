@@ -2,7 +2,7 @@
   <div class="flex h-dvh overflow-hidden" data-testid="comp-main-layout">
     <a
       href="#main-content"
-      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[300] focus:px-3 focus:py-2 focus:rounded-lg btn-primary"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[300] focus:px-3 focus:py-2 focus:rounded-xl btn-primary"
       data-testid="link-skip-to-content"
     >
       {{ $t('common.skipToContent') }}

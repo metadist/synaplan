@@ -22,7 +22,7 @@
           </div>
           <div class="flex items-center gap-2">
             <button
-              class="px-3 md:px-4 py-2 rounded-lg txt-secondary hover-surface transition-all text-sm font-medium flex items-center gap-2"
+              class="px-3 md:px-4 py-2 rounded-xl txt-secondary hover-surface transition-all text-sm font-medium flex items-center gap-2"
               data-testid="btn-select-all"
               @click="toggleSelectAll"
             >
@@ -33,7 +33,7 @@
               }}</span>
             </button>
             <button
-              class="px-3 md:px-4 py-2 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium flex items-center gap-2"
+              class="px-3 md:px-4 py-2 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium flex items-center gap-2"
               data-testid="btn-bulk-delete"
               @click="handleBulkDelete"
             >
@@ -41,7 +41,7 @@
               <span class="hidden sm:inline">{{ $t('chat.browser.deleteSelected') }}</span>
             </button>
             <button
-              class="p-2 rounded-lg txt-secondary hover-surface transition-all"
+              class="p-2 rounded-xl txt-secondary hover-surface transition-all"
               :title="$t('common.cancel')"
               data-testid="btn-clear-selection"
               @click="clearSelection"
@@ -134,12 +134,12 @@
           v-model="searchQuery"
           type="text"
           :placeholder="$t('chat.browser.searchPlaceholder')"
-          class="w-full pl-9 md:pl-10 pr-10 py-2.5 md:py-3 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
+          class="w-full pl-9 md:pl-10 pr-10 py-2.5 md:py-3 bg-app border border-light-border dark:border-dark-border rounded-xl txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
           data-testid="input-search-chats"
         />
         <button
           v-if="searchQuery"
-          class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5"
+          class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
           @click="searchQuery = ''"
         >
           <XMarkIcon class="w-4 h-4 txt-secondary" />
@@ -170,7 +170,7 @@
           </label>
           <select
             v-model="selectedDateRange"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
+            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-xl txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
             data-testid="select-date-filter"
           >
             <option value="all">{{ $t('chat.browser.allDates') }}</option>
@@ -190,7 +190,7 @@
           </label>
           <select
             v-model="sortBy"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
+            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-xl txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
             data-testid="select-sort"
           >
             <option value="newest">{{ $t('chat.browser.sortNewest') }}</option>
@@ -370,7 +370,7 @@
             <!-- Delete Button -->
             <button
               v-if="chat.type !== 'shared'"
-              class="p-1.5 md:p-2 rounded-lg txt-secondary hover:text-red-500 hover:bg-red-500/10 transition-all"
+              class="p-1.5 md:p-2 rounded-xl txt-secondary hover:text-red-500 hover:bg-red-500/10 transition-all"
               :title="$t('common.delete')"
               data-testid="btn-chat-delete"
               @click.stop="handleSingleDelete(chat.id)"
@@ -379,7 +379,7 @@
             </button>
             <!-- Open Button -->
             <button
-              class="px-2 md:px-3 py-1.5 md:py-2 rounded-lg bg-brand/10 txt-brand transition-all flex items-center gap-1 text-sm"
+              class="px-2 md:px-3 py-1.5 md:py-2 rounded-xl bg-brand/10 txt-brand transition-all flex items-center gap-1 text-sm"
               data-testid="btn-chat-open"
               @click.stop="openChat(chat.id)"
             >
@@ -400,7 +400,7 @@
       <!-- Previous Button -->
       <button
         :disabled="currentPage === 1"
-        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
+        class="px-2 md:px-3 py-2 rounded-xl txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
         data-testid="btn-prev-page"
         @click="goToPage(currentPage - 1)"
       >
@@ -410,7 +410,7 @@
       <!-- First Page -->
       <button
         v-if="currentPage > 3"
-        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
+        class="px-2 md:px-3 py-2 rounded-xl txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
         @click="goToPage(1)"
       >
         1
@@ -422,7 +422,7 @@
         v-for="page in visiblePages"
         :key="page"
         :class="[
-          'px-2 md:px-3 py-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base',
+          'px-2 md:px-3 py-2 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base',
           page === currentPage
             ? 'bg-primary text-white font-medium'
             : 'txt-secondary hover-surface',
@@ -439,7 +439,7 @@
       >
       <button
         v-if="currentPage < totalPages - 2"
-        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
+        class="px-2 md:px-3 py-2 rounded-xl txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
         @click="goToPage(totalPages)"
       >
         {{ totalPages }}
@@ -448,7 +448,7 @@
       <!-- Next Button -->
       <button
         :disabled="currentPage === totalPages"
-        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
+        class="px-2 md:px-3 py-2 rounded-xl txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
         data-testid="btn-next-page"
         @click="goToPage(currentPage + 1)"
       >
@@ -469,7 +469,7 @@
         <h3 class="text-lg font-medium txt-primary mb-2">{{ $t('chats.empty') }}</h3>
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-chats-empty-new"
           :disabled="creatingChat"
           @click="goToNewChat"

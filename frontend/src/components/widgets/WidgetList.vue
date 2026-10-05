@@ -6,7 +6,7 @@
         {{ $t('widgets.listTitle') }}
       </h2>
       <button
-        class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2"
+        class="btn-primary px-4 py-2 rounded-xl flex items-center gap-2"
         data-testid="btn-create"
         @click="$emit('create')"
       >
@@ -89,7 +89,7 @@
           <!-- Right: Actions -->
           <div class="flex gap-2 min-w-[180px] flex-shrink-0">
             <button
-              class="flex-1 px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium"
+              class="flex-1 px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium"
               data-testid="btn-edit"
               @click.stop="$emit('edit', widget)"
             >
@@ -97,7 +97,7 @@
               Edit
             </button>
             <button
-              class="px-4 py-2 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
+              class="px-4 py-2 rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
               :aria-label="`Delete widget ${widget.id}`"
               data-testid="btn-delete"
               @click.stop="$emit('delete', widget.id)"

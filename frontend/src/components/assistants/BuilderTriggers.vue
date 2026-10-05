@@ -22,7 +22,7 @@
       <div class="flex flex-wrap gap-2">
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-add-event-empty"
           @click="picker = 'event'"
         >
@@ -31,7 +31,7 @@
         <button
           v-if="savedTasksEnabled"
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-add-schedule-empty"
           @click="picker = 'schedule'"
         >
@@ -45,7 +45,7 @@
         <h3 class="txt-primary text-sm font-medium">{{ $t('assistants.triggers.events') }}</h3>
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-add-event"
           @click="picker = 'event'"
         >
@@ -72,7 +72,7 @@
             </label>
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
               @click="removeEvent(event.id)"
             >
               {{ $t('assistants.triggers.remove') }}
@@ -86,7 +86,7 @@
           <h3 class="txt-primary text-sm font-medium">{{ $t('assistants.triggers.schedule') }}</h3>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-add-schedule"
             @click="picker = 'schedule'"
           >
@@ -116,7 +116,7 @@
               </label>
               <button
                 type="button"
-                class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+                class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
                 @click="removeSchedule(item.id)"
               >
                 {{ $t('assistants.triggers.remove') }}
@@ -136,7 +136,7 @@
       <button
         v-if="availableKinds.includes('mail')"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium w-full text-left"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium w-full text-left"
         data-testid="btn-kind-mail"
         @click="eventKind = 'mail'"
       >
@@ -145,7 +145,7 @@
       <button
         v-if="availableKinds.includes('widget')"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium w-full text-left"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium w-full text-left"
         data-testid="btn-kind-widget"
         @click="addWidgetEvent"
       >
@@ -154,7 +154,7 @@
       <button
         v-if="availableKinds.includes('whatsapp')"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium w-full text-left"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium w-full text-left"
         data-testid="btn-kind-whatsapp"
         @click="addWhatsappEvent"
       >
@@ -163,7 +163,7 @@
       <button
         v-if="availableKinds.includes('api')"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium w-full text-left"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium w-full text-left"
         data-testid="btn-kind-api"
         @click="addSimpleEvent('api')"
       >
@@ -172,7 +172,7 @@
       <button
         v-if="availableKinds.includes('mcp')"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium w-full text-left"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium w-full text-left"
         data-testid="btn-kind-mcp"
         @click="addSimpleEvent('mcp')"
       >
@@ -181,7 +181,7 @@
       <button
         v-if="availableKinds.includes('desktop')"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium w-full text-left"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium w-full text-left"
         data-testid="btn-kind-desktop"
         @click="addSimpleEvent('desktop')"
       >
@@ -191,7 +191,7 @@
       <button
         v-if="eventKind !== 'mail'"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         @click="picker = ''"
       >
         {{ $t('common.cancel') }}

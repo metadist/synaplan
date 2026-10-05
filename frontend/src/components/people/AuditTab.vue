@@ -55,7 +55,7 @@
       <div v-if="nextCursor !== null" class="mt-4 text-center">
         <button
           type="button"
-          class="btn-secondary px-4 py-2 rounded-lg"
+          class="btn-secondary px-4 py-2 rounded-xl"
           :disabled="loading"
           data-testid="btn-audit-more"
           @click="loadMore"

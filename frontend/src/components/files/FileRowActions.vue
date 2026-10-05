@@ -50,7 +50,7 @@ const ACTION_ICONS = {
 } as const
 
 const ACTION_BUTTON_CLASS =
-  'p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+  'p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 const DELETE_BUTTON_CLASS =
-  'p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+  'p-1.5 rounded-xl hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
 </script>

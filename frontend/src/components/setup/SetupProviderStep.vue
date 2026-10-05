@@ -56,7 +56,7 @@
     <div class="flex flex-col gap-2 mt-2">
       <button
         type="button"
-        class="btn-primary w-full py-2.5 rounded-lg text-sm font-semibold"
+        class="btn-primary w-full py-2.5 rounded-xl text-sm font-semibold"
         data-testid="setup-provider-continue"
         @click="emit('next')"
       >

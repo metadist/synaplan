@@ -20,7 +20,7 @@
       <button
         v-if="serverSwitchAvailable"
         type="button"
-        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
+        class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
         :aria-label="$t('setup.switchServer')"
         :title="$t('setup.switchServer')"
         data-testid="setup-switch-server"
@@ -35,7 +35,7 @@
       -->
       <button
         type="button"
-        class="h-9 px-3 rounded-lg icon-ghost text-xs font-medium"
+        class="h-9 px-3 rounded-xl icon-ghost text-xs font-medium"
         :aria-label="$t('setup.switchLanguage')"
         :title="$t('setup.switchLanguage')"
         data-testid="setup-switch-language"
@@ -45,7 +45,7 @@
       </button>
       <button
         type="button"
-        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
+        class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
         :aria-label="$t('setup.toggleTheme')"
         :title="$t('setup.toggleTheme')"
         data-testid="setup-toggle-theme"
@@ -98,7 +98,7 @@
           <p class="text-sm txt-secondary">{{ $t('setup.alreadyDone.description') }}</p>
           <router-link
             to="/login"
-            class="btn-primary w-full py-2.5 rounded-lg text-sm font-semibold text-center"
+            class="btn-primary w-full py-2.5 rounded-xl text-sm font-semibold text-center"
             data-testid="setup-goto-login"
           >
             {{ $t('setup.alreadyDone.cta') }}

@@ -2,7 +2,7 @@
   <div ref="root" class="relative" data-testid="iam-permission-select">
     <button
       type="button"
-      class="dropdown-trigger w-full justify-between border border-light-border/30 dark:border-dark-border/8 bg-[var(--bg-card)] txt-primary text-sm rounded-lg px-3 py-2 min-h-[42px] disabled:opacity-50 disabled:cursor-not-allowed"
+      class="dropdown-trigger w-full justify-between border border-light-border/30 dark:border-dark-border/8 bg-[var(--bg-card)] txt-primary text-sm rounded-xl px-3 py-2 min-h-[42px] disabled:opacity-50 disabled:cursor-not-allowed"
       :aria-expanded="open"
       :aria-label="$t('iam.dialog.permission')"
       :disabled="disabled"

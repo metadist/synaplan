@@ -21,7 +21,7 @@
         </p>
         <button
           type="button"
-          class="btn-danger px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-danger px-4 py-2 rounded-xl text-sm font-medium"
           data-testid="btn-delete-account"
           @click="showDeleteModal = true"
         >

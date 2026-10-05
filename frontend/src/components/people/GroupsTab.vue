@@ -2,7 +2,7 @@
   <div data-testid="section-groups">
     <div class="flex justify-end mb-4">
       <button
-        class="btn-primary px-4 py-2.5 rounded-lg"
+        class="btn-primary px-4 py-2.5 rounded-xl"
         data-testid="btn-create-group"
         @click="createGroup"
       >
@@ -66,14 +66,14 @@
               <td class="py-3 px-3 text-right">
                 <div v-if="group.kind === 'manual'" class="flex justify-end gap-1">
                   <button
-                    class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
+                    class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
                     :data-testid="`btn-rename-group-${group.id}`"
                     @click.stop="renameGroup(group)"
                   >
                     {{ $t('people.groups.rename') }}
                   </button>
                   <button
-                    class="icon-ghost icon-ghost--danger p-2 rounded-lg"
+                    class="icon-ghost icon-ghost--danger p-2 rounded-xl"
                     :data-testid="`btn-delete-group-${group.id}`"
                     @click.stop="deleteGroup(group)"
                   >

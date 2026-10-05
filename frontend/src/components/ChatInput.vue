@@ -74,7 +74,7 @@
             v-for="skill in pendingDesktopRun.skills"
             :key="skill"
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             :data-testid="`btn-desktop-skill-${skill}`"
             @click="chooseDesktopSkill(skill)"
           >
@@ -82,7 +82,7 @@
           </button>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-desktop-skill-cancel"
             @click="pendingDesktopRun = null"
           >
@@ -114,7 +114,7 @@
           <select
             id="summarize-length"
             v-model="summarizeLength"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="select-summarize-length"
           >
             <option v-for="length in summarizeLengthOptions" :key="length" :value="length">
@@ -129,7 +129,7 @@
           <select
             id="summarize-language"
             v-model="summarizeLanguage"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="select-summarize-language"
           >
             <option v-for="language in summarizeLanguageOptions" :key="language" :value="language">

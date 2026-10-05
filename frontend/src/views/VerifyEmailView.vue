@@ -13,14 +13,14 @@
     </div>
     <div class="absolute top-6 right-6 flex items-center gap-4">
       <button
-        class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium"
+        class="h-10 px-4 rounded-xl icon-ghost text-sm font-medium"
         data-testid="btn-language-toggle"
         @click="cycleLanguage"
       >
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        class="h-10 w-10 rounded-lg icon-ghost flex items-center justify-center"
+        class="h-10 w-10 rounded-xl icon-ghost flex items-center justify-center"
         :aria-label="
           themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
         "
@@ -112,7 +112,7 @@
 
           <Button
             :disabled="isResending || countdown > 0 || remainingAttempts <= 0"
-            class="w-full btn-secondary py-3 rounded-lg font-medium"
+            class="w-full btn-secondary py-3 rounded-xl font-medium"
             data-testid="btn-resend-email"
             @click="handleResendEmail"
           >

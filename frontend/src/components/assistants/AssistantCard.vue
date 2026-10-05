@@ -26,7 +26,7 @@
     <div class="flex flex-wrap gap-2 mt-auto">
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-assistant-start-chat"
         :disabled="cardId == null || card.canStartChat === false || card.status === 'archived'"
         @click="emitStartChat"
@@ -35,7 +35,7 @@
       </button>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-assistant-clone"
         :disabled="cardId == null"
         @click="emitClone"
@@ -45,7 +45,7 @@
       <button
         v-if="card.origin === 'mine' || card.canEdit === true"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-assistant-edit"
         :disabled="cardId == null"
         @click="emitEdit"
@@ -55,7 +55,7 @@
       <button
         v-if="card.origin === 'mine'"
         type="button"
-        class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-assistant-delete"
         :disabled="cardId == null"
         @click="emitDelete"
