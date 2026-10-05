@@ -186,6 +186,14 @@
       },
       "pagination": {
         "showing": "Affichage de {start}–{end} sur {total}"
+      },
+      "scope": {
+        "label": "S’applique à",
+        "instance": "Tout le monde",
+        "user": "Moi uniquement",
+        "instanceHint": "Les invités et tous les membres sans choix personnel utilisent ces modèles. Les membres peuvent toujours choisir les leurs.",
+        "userHint": "Seules vos conversations utilisent ces modèles. Les invités et les autres membres gardent le choix de « Tout le monde ».",
+        "savedInstance": "Enregistré pour tout le monde. Les invités et les membres sans choix personnel l’utilisent dès leur prochain message."
       }
     },
     "embeddingSwitch": {

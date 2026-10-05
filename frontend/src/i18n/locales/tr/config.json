@@ -402,7 +402,15 @@
       "purpose": "AMAÇ",
       "service": "HİZMET",
       "name": "AD",
-      "descriptionHeader": "AÇIKLAMA"
+      "descriptionHeader": "AÇIKLAMA",
+      "scope": {
+        "label": "Kimin için",
+        "instance": "Herkes",
+        "user": "Yalnızca ben",
+        "instanceHint": "Misafirler ve kendi seçimi olmayan tüm üyeler bu modelleri kullanır. Üyeler yine de kendi modellerini seçebilir.",
+        "userHint": "Bu modelleri yalnızca senin sohbetlerin kullanır. Misafirler ve diğer üyeler “Herkes” altındaki seçimi korur.",
+        "savedInstance": "Herkes için kaydedildi. Misafirler ve kendi seçimi olmayan üyeler bir sonraki mesajlarından itibaren bunu kullanır."
+      }
     },
     "providers": {
       "higgsfield": {

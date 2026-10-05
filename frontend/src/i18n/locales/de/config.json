@@ -173,6 +173,14 @@
       },
       "pagination": {
         "showing": "Zeige {start}–{end} von {total}"
+      },
+      "scope": {
+        "label": "Gilt für",
+        "instance": "Alle",
+        "user": "Nur mich",
+        "instanceHint": "Gäste und alle Mitglieder ohne eigene Auswahl nutzen diese Modelle. Mitglieder können weiterhin selbst wählen.",
+        "userHint": "Nur deine eigenen Chats nutzen diese Modelle. Gäste und andere Mitglieder behalten die Auswahl unter „Alle“.",
+        "savedInstance": "Für alle gespeichert. Gäste und Mitglieder ohne eigene Auswahl nutzen es ab ihrer nächsten Nachricht."
       }
     },
     "embeddingSwitch": {

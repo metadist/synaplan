@@ -188,6 +188,14 @@
       },
       "pagination": {
         "showing": "Showing {start}–{end} of {total}"
+      },
+      "scope": {
+        "label": "Applies to",
+        "instance": "Everyone",
+        "user": "Just me",
+        "instanceHint": "Guests and every member without their own choice use these models. Members can still pick their own.",
+        "userHint": "Only your own chats use these models. Guests and other members keep the choices under Everyone.",
+        "savedInstance": "Saved for everyone. Guests and members without their own choice use it from their next message."
       }
     },
     "embeddingSwitch": {
