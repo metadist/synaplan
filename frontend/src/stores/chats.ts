@@ -329,6 +329,12 @@ export const useChatsStore = defineStore('chats', () => {
         listLoading = null
       }
     }
+    // A newer load superseded this one, so this response was dropped. Callers
+    // decide on the list right after (the chat view picks or creates the open
+    // chat), so they wait for the load whose list is actually applied.
+    while (listLoading) {
+      await listLoading
+    }
   }
 
   /**

@@ -7,7 +7,11 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ref, nextTick } from 'vue'
-import { useAttachmentPersist, useAutoPersist } from '@/composables/useInputPersistence'
+import {
+  useAttachmentPersist,
+  useAutoPersist,
+  usePastedBlocksPersist,
+} from '@/composables/useInputPersistence'
 
 const STORAGE_PREFIX = 'synaplan_input_'
 
@@ -122,5 +126,120 @@ describe('useAutoPersist — chatId watcher', () => {
     expect(stored).not.toBeNull()
     const parsed = JSON.parse(stored!)
     expect(parsed.message).toBe('unsaved text in chat 7')
+  })
+})
+
+interface ComposerFile {
+  file_id: number
+  filename: string
+  file_type: string
+  name?: string
+  processing: boolean
+  staged?: boolean
+}
+
+function attachKey(chatId: number | null): string {
+  return chatId == null ? `${STORAGE_PREFIX}attach_chat` : `${STORAGE_PREFIX}attach_chat_${chatId}`
+}
+
+function writeAttachments(chatId: number | null, files: Array<Omit<ComposerFile, 'processing'>>) {
+  localStorage.setItem(attachKey(chatId), JSON.stringify({ files, timestamp: Date.now() }))
+}
+
+const ready = (id: number, filename: string): ComposerFile => ({
+  file_id: id,
+  filename,
+  file_type: 'txt',
+  processing: false,
+  staged: true,
+})
+
+describe('useAttachmentPersist — chatId watcher', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  it('real chat switch: loads the attachments of the target chat', async () => {
+    const chatId = ref<number | null>(1)
+    const files = ref<ComposerFile[]>([ready(10, 'one.txt')])
+    writeAttachments(2, [{ file_id: 20, filename: 'two.txt', file_type: 'txt' }])
+
+    useAttachmentPersist(files, 'chat', chatId)
+    chatId.value = 2
+    await nextTick()
+
+    expect(files.value.map((f) => f.file_id)).toEqual([20])
+  })
+
+  it('null → realId: attachments added before the chat had an id are kept, uploads included', async () => {
+    const chatId = ref<number | null>(null)
+    const uploading: ComposerFile = {
+      file_id: 0,
+      filename: 'draft.txt',
+      file_type: 'txt',
+      name: 'draft.txt',
+      processing: true,
+      staged: true,
+    }
+    const files = ref<ComposerFile[]>([ready(10, 'one.txt'), uploading])
+
+    useAttachmentPersist(files, 'chat', chatId)
+    chatId.value = 42
+    await nextTick()
+
+    expect(files.value).toEqual([ready(10, 'one.txt'), uploading])
+    expect(localStorage.getItem(attachKey(null))).toBeNull()
+    const stored = JSON.parse(localStorage.getItem(attachKey(42))!)
+    expect(stored.files.map((f: ComposerFile) => f.file_id)).toEqual([10])
+  })
+
+  it('null → realId with saved attachments for that chat: the saved ones win', async () => {
+    const chatId = ref<number | null>(null)
+    const files = ref<ComposerFile[]>([])
+    writeAttachments(42, [{ file_id: 30, filename: 'saved.txt', file_type: 'txt' }])
+
+    useAttachmentPersist(files, 'chat', chatId)
+    chatId.value = 42
+    await nextTick()
+
+    expect(files.value.map((f) => f.file_id)).toEqual([30])
+  })
+})
+
+describe('usePastedBlocksPersist — chatId watcher', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  it('null → realId: pasted blocks are kept and move to the new chat', async () => {
+    const chatId = ref<number | null>(null)
+    const blocks = ref([{ id: 'b1', content: 'pasted log' }])
+
+    usePastedBlocksPersist(blocks, 'chat', chatId)
+    chatId.value = 42
+    await nextTick()
+
+    expect(blocks.value).toEqual([{ id: 'b1', content: 'pasted log' }])
+    expect(localStorage.getItem(`${STORAGE_PREFIX}pasted_chat`)).toBeNull()
+    expect(localStorage.getItem(`${STORAGE_PREFIX}pasted_chat_42`)).not.toBeNull()
+  })
+
+  it('real chat switch: blocks of the left chat do not follow', async () => {
+    const chatId = ref<number | null>(1)
+    const blocks = ref([{ id: 'b1', content: 'chat 1 paste' }])
+
+    usePastedBlocksPersist(blocks, 'chat', chatId)
+    chatId.value = 2
+    await nextTick()
+
+    expect(blocks.value).toEqual([])
   })
 })

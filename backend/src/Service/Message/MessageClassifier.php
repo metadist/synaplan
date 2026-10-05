@@ -1740,7 +1740,7 @@ final readonly class MessageClassifier
         // "single-node, no planning" — so a shortcut here would make the
         // multitask planner (and with it the `mcp_fetch` data node)
         // unreachable no matter what the user configured under
-        // Channels → MCP Servers. Deferring costs one extra sorter call.
+        // Manage → Connections → MCP Servers. Deferring costs one extra sorter call.
         static $dataSourceTriggers = [
             // English
             'knowledge base', 'knowledgebase', ' my documents', ' my files',

@@ -8,7 +8,7 @@ Synaplan exposes an Anthropic Messages API-compatible gateway so Claude Code and
 ## Quick start (Claude Code)
 
 1. Create an API key in Synaplan (**Manage → Developer & devices → API Keys**).
-2. Enable the gateway under **Manage → Developer & devices → Coding clients** (admin: turn on “Enable Messages gateway”).
+2. Enable the gateway under **Manage → Developer & devices → Coding clients** (admin: turn on “Enable the gateway”).
 3. Save your own Anthropic key under **Manage → Your AI accounts** (or ask an admin to allow the server key).
 4. Configure Claude Code:
 

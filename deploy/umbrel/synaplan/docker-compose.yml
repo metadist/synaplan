@@ -19,7 +19,7 @@ x-app-environment: &app-environment
   # (together with the image pin below and umbrel-app.yml) to the version whose
   # image was just published. Do not edit by hand —
   # scripts/set-release-version.mjs owns these three lines.
-  APP_VERSION: "5.1.4"
+  APP_VERSION: "5.2.0"
 
   # umbrelOS serves apps over plain HTTP on the device's .local domain. Synaplan
   # derives the auth cookies' Secure flag from this scheme, so the session
@@ -85,7 +85,7 @@ x-app-environment: &app-environment
 # then hands over to Caddy/FrankenPHP, which binds port 80 inside the container.
 # Tag and digest are maintained by CI together with APP_VERSION above —
 # scripts/set-release-version.mjs owns this line.
-x-app-image: &app-image ghcr.io/metadist/synaplan:5.1.4@sha256:820bc587f2433ae8fdf10a9ee2e120b3aa103cbeeb3aefece3022e9d431f219a
+x-app-image: &app-image ghcr.io/metadist/synaplan:5.2.0@sha256:cfdef74ef8b5158238540f014107036065ceb3d270dc158049e679899daba3dc
 
 # Uploaded and generated files. The web role writes them, the worker reads them
 # back while processing a job, so all three app roles share the directory.

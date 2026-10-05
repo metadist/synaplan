@@ -372,17 +372,16 @@ export function useAttachmentPersist<T extends PersistedChatAttachment>(
           filesRef.value = []
           return
         }
-        save(toPersisted(filesRef.value), oldId)
         const incoming = load(newId)
-
-        // null → real id: a brand-new chat receives its id while a file is
-        // still uploading (file_id 0, so it was not saved). Keep that row
-        // instead of replacing the list with the empty slot.
-        if (incoming.length === 0 && oldId == null && filesRef.value.length > 0) {
+        // null → realId: a new chat got its server id, or the boot opened a
+        // chat, while the composer already held attachments (uploads still
+        // running included). Carry them over, like the text draft.
+        if (oldId == null && incoming.length === 0 && filesRef.value.length > 0) {
+          clear(oldId)
           save(toPersisted(filesRef.value), newId)
           return
         }
-
+        save(toPersisted(filesRef.value), oldId)
         filesRef.value = fromPersisted(incoming)
       },
       { immediate: false }
@@ -507,8 +506,14 @@ export function usePastedBlocksPersist(
           blocksRef.value = []
           return
         }
+        const incoming = load(newId)
+        if (oldId == null && incoming.length === 0 && blocksRef.value.length > 0) {
+          clear(oldId)
+          save(blocksRef.value, newId)
+          return
+        }
         save(blocksRef.value, oldId)
-        blocksRef.value = load(newId)
+        blocksRef.value = incoming
       },
       { immediate: false }
     )
