@@ -774,6 +774,10 @@
       "title": "Meta API key",
       "message": "Create an API key in the Meta Model API dashboard (API keys), then paste it here. This unlocks Muse Spark. Prompts are processed by Meta."
     },
+    "cerebras": {
+      "title": "Cerebras API key",
+      "message": "Create an API key in the Cerebras Cloud dashboard (API Keys), then paste it here. This unlocks GPT OSS 120B and Qwen 3.8 27B with very fast answers. Prompts are processed by Cerebras in the US."
+    },
     "huggingface": {
       "title": "HuggingFace API token",
       "message": "Create an access token in your HuggingFace settings, then paste it here to use HuggingFace Inference models."

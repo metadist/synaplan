@@ -770,6 +770,10 @@
       "title": "Meta API anahtarı",
       "message": "Meta Model API panelinde (API keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, Muse Spark'ı açar. İstemleri Meta işler."
     },
+    "cerebras": {
+      "title": "Cerebras API anahtarı",
+      "message": "Cerebras Cloud panelinde (API Keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, çok hızlı yanıtlarla GPT OSS 120B ve Qwen 3.8 27B'yi açar. İstemleri ABD'de Cerebras işler."
+    },
     "huggingface": {
       "title": "HuggingFace API jetonu",
       "message": "HuggingFace ayarlarında bir erişim jetonu oluşturun ve HuggingFace Inference modellerini kullanmak için buraya yapıştırın."

@@ -978,6 +978,7 @@ const speechLanguage = computed(() => {
     de: 'de-DE',
     fr: 'fr-FR',
     es: 'es-ES',
+    tr: 'tr-TR',
     it: 'it-IT',
     pt: 'pt-BR',
     nl: 'nl-NL',

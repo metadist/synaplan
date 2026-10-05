@@ -308,6 +308,18 @@
   "settings": {
     "title": "Tercihler",
     "subtitle": "Tercihlerinizi ve yapılandırmanızı yönetin",
+    "sections": {
+      "indexLabel": "Bu sayfada",
+      "profile": "Profil",
+      "appearance": "Dil ve görünüm",
+      "chat": "Sohbet ve AI",
+      "data": "Veri ve gizlilik",
+      "billing": "Faturalandırma",
+      "security": "Güvenlik",
+      "app": "Uygulama",
+      "legal": "Yasal",
+      "delete": "Hesabı sil"
+    },
     "tabs": {
       "general": "Genel",
       "features": "Özellikler"

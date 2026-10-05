@@ -15,6 +15,7 @@ use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
+use App\Service\Multitask\Execution\UpstreamHandover;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
@@ -114,9 +115,21 @@ final readonly class ChatRunner implements TaskRunner
         }
         $systemPrompt .= $this->linkedPagesContext($context);
 
+        // Structural handover: whatever the plan wired (or forgot to wire),
+        // the output of every upstream step reaches the answering model.
+        // A correctly spliced `$nX.text` is already in $text → nothing added.
+        $handover = UpstreamHandover::missing($node, $context, $text, $inputs);
+        if ([] !== $handover) {
+            $this->logger->info('ChatRunner: plan did not hand over upstream step output, appending it to the prompt', [
+                'node' => $node->id,
+                'capability' => $node->capability->value,
+                'appended' => UpstreamHandover::labels($handover),
+            ]);
+        }
+
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user', 'content' => $text],
+            ['role' => 'user', 'content' => $text.UpstreamHandover::render($handover)],
         ];
 
         // Stream tokens into the node's card (task_chunk) while accumulating the

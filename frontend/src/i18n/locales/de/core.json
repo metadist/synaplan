@@ -408,7 +408,7 @@
         "admin_people": "benutzer personen gruppen rollen rechte",
         "admin_config": "systemkonfiguration einstellungen feature flags umgebung",
         "profile": "profil konto name e-mail passwort",
-        "settings": "einstellungen sprache design aussehen",
+        "settings": "einstellungen sprache design aussehen profil konto name e-mail passwort",
         "memories": "erinnerungen gedächtnis fakten persönlich",
         "statistics": "statistik nutzung kosten tokens",
         "chats": "alle chats verlauf unterhaltungen",

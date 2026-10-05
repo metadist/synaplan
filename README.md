@@ -325,13 +325,14 @@ Synaplan is provider-neutral: connect the providers you want in **Operate → AI
 
 | Provider | Variable in `backend/.env` | Models |
 |----------|---------------------------|--------|
-| OpenAI | `OPENAI_API_KEY` | GPT-5.6 Sol / Terra / Luna, GPT-5.5 (+ Pro), GPT-5.4 (+ mini / nano), GPT Image, Whisper, text-embedding-3 |
+| OpenAI | `OPENAI_API_KEY` | GPT-5.6 Sol / Terra / Luna, GPT-5.5 (+ Pro), GPT-5.4 (+ mini), GPT Image, Whisper, text-embedding-3 |
 | Anthropic | `ANTHROPIC_API_KEY` | Claude Opus 5, Sonnet 5, Fable 5, Opus 4.8, Haiku 4.5 (chat + vision) |
 | Google Gemini | `GOOGLE_GEMINI_API_KEY` | Gemini 3.x / 2.5 chat + vision, Nano Banana (incl. Pro / Lite), Veo 3.1, Gemini TTS |
 | Groq | `GROQ_API_KEY` | Qwen 3.6 27B (chat + vision), GPT-OSS 20B/120B, Whisper Large v3 |
 | Mistral 🇫🇷 | `MISTRAL_API_KEY` | Mistral Medium 3.5 (+ vision), Mistral Large 3, Voxtral transcription + TTS |
 | xAI | `XAI_API_KEY` | Grok 4.7 / 4.6 / 4.5 (+ vision, 500K context), Grok Imagine image + video (incl. Pro / 1.5 tiers) |
 | [Meta](https://dev.meta.ai/) | `META_API_KEY` | Muse Spark 1.3 (+ vision) — Meta Model API |
+| [Cerebras](https://cloud.cerebras.ai/) | `CEREBRAS_API_KEY` | Qwen 3.8 27B (+ vision), GPT OSS 120B — very fast inference (~2,000–3,000 tokens/s) |
 | [TrustedTokens](https://trustedtokens.eu/) 🇩🇪 | `TRUSTEDTOKENS_API_KEY` | GLM 5.2 / 5.3 (+ Flash vision), Chimera, Qwen3.6 35B (+ vision), GPT OSS 120B — sovereign inference on German GPUs (TNG), zero data retention |
 | [A2Agent](https://a2agent.me/) 🇨🇳 | `A2AGENT_API_KEY` | Qwen3.8 MAX / Flash (+ vision), DeepSeek V4 Pro / Flash, MiniMax M3 — Chinese frontier models via the A2Agent gateway |
 | HuggingFace | `HUGGINGFACE_API_KEY` | Kimi K3 / K2.5 / K2.6 / K2.7 Code (chat + vision) |

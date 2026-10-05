@@ -109,6 +109,50 @@ class MediaJobServiceTest extends TestCase
         self::assertSame('cancelled', $this->service->toStatusArray($job)['state']);
     }
 
+    public function testMarkCompletedKeepsAnAlreadyTerminalOutcome(): void
+    {
+        $job = (new MediaJob('job-terminal'))
+            ->setUserId(1)
+            ->setStatus(MediaJob::STATUS_SUBMITTING);
+        $stored = (new MediaJob('job-terminal'))
+            ->setUserId(1)
+            ->setStatus(MediaJob::STATUS_TIMED_OUT)
+            ->setError('Render worker stopped responding')
+            ->setFinishedAt(1_700_000_000);
+
+        $store = $this->createMock(MediaJobStore::class);
+        $store->method('find')->willReturn($stored);
+        $store->expects(self::never())->method('save');
+        $service = new MediaJobService($store, new NullLogger());
+
+        $service->markCompleted($job, ['file' => ['url' => '/api/v1/files/uploads/late.png']]);
+
+        self::assertSame(MediaJob::STATUS_TIMED_OUT, $job->getStatus());
+        self::assertSame('Render worker stopped responding', $job->getError());
+        self::assertSame(1_700_000_000, $job->getFinishedAt());
+    }
+
+    public function testMarkCompletedAdoptsTheSnapshotThatWonTheSave(): void
+    {
+        $job = (new MediaJob('job-race'))
+            ->setUserId(1)
+            ->setStatus(MediaJob::STATUS_SUBMITTING);
+        $winner = (new MediaJob('job-race'))
+            ->setUserId(1)
+            ->setStatus(MediaJob::STATUS_TIMED_OUT)
+            ->setError('Render worker stopped responding')
+            ->setFinishedAt(1_700_000_100);
+
+        $store = $this->createMock(MediaJobStore::class);
+        $store->method('find')->willReturn(null);
+        $store->expects(self::once())->method('save')->willReturn($winner);
+        $service = new MediaJobService($store, new NullLogger());
+
+        self::assertFalse($service->markCompleted($job, ['file' => ['url' => '/late.png']]));
+        self::assertSame(MediaJob::STATUS_TIMED_OUT, $job->getStatus());
+        self::assertSame('Render worker stopped responding', $job->getError());
+    }
+
     public function testPercentIsClampedToValidRange(): void
     {
         $job = new MediaJob();

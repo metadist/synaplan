@@ -10,7 +10,7 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Install-wide store for cloud AI provider API keys (Groq, OpenAI, Anthropic,
- * Gemini, Mistral, TrustedTokens, A2Agent, HuggingFace, xAI).
+ * Gemini, Mistral, TrustedTokens, A2Agent, Meta, Cerebras, HuggingFace, xAI).
  *
  * Keys live in BCONFIG (ownerId = 0, group {@see self::CONFIG_GROUP}, one row
  * per provider) as an AES-256-CBC encrypted JSON payload
@@ -62,6 +62,7 @@ final class ProviderKeyStore
         'trustedtokens',
         'a2agent',
         'meta',
+        'cerebras',
         'huggingface',
         'xai',
         'perplexity',

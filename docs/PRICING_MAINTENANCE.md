@@ -15,7 +15,8 @@ Living playbook for keeping Synaplan's model prices correct **and** billed the w
 
 | What | File |
 | ---- | ---- |
-| Source of truth (prices, units, `pricing_mode`, `resolution_prices`) | `backend/src/Model/ModelCatalog.php` |
+| Authored baseline (structure, units, `pricing_mode`, `resolution_prices`, and the price a release ships) | `backend/src/Model/ModelCatalog.php` |
+| Live per-token price after `app:sync-model-prices` | `BMODELS`, owned by LiteLLM until the catalog price changes or the row is `pricePinned` — see §"Who owns a per-token price" |
 | Cost calc (per_token / per_character / per_image / per_second, cache discount) | `backend/src/Service/CostCalculationService.php` |
 | Charge = raw × (1+markup) | `backend/src/Service/RateLimitService.php` |
 | Auto price pull from LiteLLM | `backend/src/Command/SyncModelPricesCommand.php` (`app:sync-model-prices`, `--dry-run`) |
@@ -193,6 +194,18 @@ TrustedTokens dropped the remaining DeepSeek V4 ids (`deepseek-ai/DeepSeek-V4-Fl
 
 Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 336 or 337, so nothing is orphaned. Neither BID is a `ProviderDefaultsService` recommendation. The health monitor skips rows that carry `BRETIREDON`, so this also stops the hourly incident mail for these ids.
 
+### OpenAI deprecation notice (2026-10-02, shutdown 2027-04-01)
+
+OpenAI announced by email on 2026-10-02 that `gpt-5.4-nano`, `gpt-5.1` and `gpt-5.3-codex` stop being served on **2027-04-01**. Only `gpt-5.4-nano` was ever in the catalog; `gpt-5.1` and `gpt-5.3-codex` have no `BMODELS` row (the retired BIDs 193/194 are `gpt-5.3`, a different id).
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 234 | GPT-5.4 nano | `gpt-5.4-nano` | `openai:gpt-5.6-luna:chat` (GPT-5.6 Luna, BID 255) |
+
+**Retired ahead of the shutdown, on purpose.** Neither detector sees an announced deprecation: `app:models:check-availability` reports a model only once the provider stops serving it, and OpenAI's `/v1/models` carries no deprecation date. Waiting for the check means users hit the failure first on 2027-04-01. The provider's notice (mail or [deprecations page](https://developers.openai.com/api/docs/deprecations)) is the only early signal, so a notice is retired by hand on the day it arrives.
+
+GPT-5.6 Luna is the suggested successor `app:models:check-availability` would print for BID 234 and the same price tier ($0.20 in both, $1.20 vs $1.25 out) on the same Responses API, with vision on top. Retired via the registry, no migration. No shipped `DEFAULTMODEL` binding or `ProviderDefaultsService` recommendation names BID 234; any binding an operator or user stored (`DEFAULTMODEL`, a widget's `aiModelId`, a prompt's `aiModel`) follows `BSUCCESSORID` to Luna at resolution time.
+
 ## Maintenance links
 
 **Official provider price pages** (use these first — step 2 of the playbook):
@@ -211,6 +224,7 @@ Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalo
 - TrustedTokens (JSON catalog, not the JS marketing page): https://trustedtokens.eu/api/billing/models · docs https://trustedtokens.eu/docs/
 - A2Agent (models page; `GET /v1/models` is key-gated and answers `401`; not in LiteLLM): https://a2agent.me/models · https://a2agent.me/pricing
 - xAI: https://docs.x.ai/developers/pricing · models https://docs.x.ai/developers/models
+- Cerebras: https://inference-docs.cerebras.ai/models/overview · caching https://inference-docs.cerebras.ai/capabilities/prompt-caching
 
 **Tooling / cross-checks:**
 
@@ -234,6 +248,7 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | **TrustedTokens** | ✅ verified 2026-09-17 (V4 Flash, Flash-0731 and V4 Pro retired) | https://trustedtokens.eu/api/billing/models |
 | **A2Agent** | ✅ verified 2026-09-14 (public group rate) | https://a2agent.me/models |
 | **Meta** | ✅ verified 2026-09-23 (Muse Spark 1.3 standard tier) | https://developer.meta.com/ai/models/muse-spark/ |
+| **Cerebras** | ✅ verified 2026-10-03 (pay-as-you-go; matches LiteLLM) | https://inference-docs.cerebras.ai/models/overview |
 | **xAI Grok Imagine + voice** | ✅ verified 2026-09-24 (chat rows are synced; grok-4.7 cache + long-context corrected) | https://docs.x.ai/docs/models · https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
@@ -313,6 +328,15 @@ OpenAI-compatible Chat Completions at `https://api.meta.ai/v1`. Catalog stores t
 | BID | Model | Catalog in/out | Official (cache) | Context |
 | --- | ----- | -------------- | ---------------- | ------- |
 | 369 / 370 | `muse-spark-1.3` (chat + vision) | $1.25 / $4.25 | $1.25 / $4.25 (cache $0.15) | 1M |
+
+### Cerebras (verified 2026-10-03)
+
+OpenAI-compatible Chat Completions at `https://api.cerebras.ai/v1` (Shared Inference). Catalog stores the pay-as-you-go USD per 1M rate from https://inference-docs.cerebras.ai/models/overview. Prompt caching has **no discount** — cached input is billed at the full input rate (https://inference-docs.cerebras.ai/capabilities/prompt-caching), so every row authors `cache_read_price_per_1M` equal to its input price; leaving it out would bill cache hits at the 0.5x default. LiteLLM lists both ids under the `cerebras/` prefix at the same rates, so the daily sync matches them. Context and output limits are the paid-tier values; the free trial allows 65K context and 32K output.
+
+| BID | Model | Catalog in/out | Official (cache) | Context |
+| --- | ----- | -------------- | ---------------- | ------- |
+| 383 / 384 | `qwen-3.8-27b` (chat + vision) | $0.99 / $1.49 | $0.99 / $1.49 (cache $0.99) | 131K |
+| 385 / 386 | `gpt-oss-120b` (chat + memory extraction) | $0.35 / $0.75 | $0.35 / $0.75 (cache $0.35) | 131K |
 
 ### TheHive (verified 2026-07-13)
 
@@ -419,6 +443,17 @@ Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no dri
 | gemini-2.5-flash-preview-tts | per_character | per_token | mode-mismatch (manual) |
 
 **Writes stay conservative:** only per_token rows are auto-written. `--force` overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog). Same-mode media drift is surfaced (and fails `--fail-on-drift`) but left for a human to apply in `ModelCatalog.php`.
+
+### Who owns a per-token price (#2309)
+
+LiteLLM owns the **live** per-token price. The catalog owns every other field, and it owns the price again in two cases:
+
+1. **The catalog price changed** since the last successful sync. The sync stores that price in `BJSON.__catalog_price_at_sync` and refreshes `BJSON.__catalog_fingerprint`, so `ModelSeeder` does not mistake the write for an admin edit. The next `app:seed` applies the new catalog price. Until the catalog price changes, seed leaves the LiteLLM price in place (including when a release only changes the description or features). A later sync that runs before that seed keeps the older snapshot, so the catalog change is not recorded as already applied.
+2. **The catalog entry sets `json.pricePinned: true`.** The sync reports the LiteLLM number and does not write it. Seed applies the catalog price. Use this when the official page and LiteLLM disagree and the catalog number must stick — the same intent as `LITELLM_DEVIATIONS`, which already silences a known-wrong LiteLLM pair. A pin is the override; a deviation entry is the drift-check silence. A row can have either or both.
+
+An admin edit (the stored fingerprint no longer matches the row, and the row is not price-pinned) is still preserved. The sync only refreshes the fingerprint when the non-price fields still match the catalog, so a renamed model is not silently claimed back.
+
+`ModelPriceHistory` is unchanged: a sync write is still `source = litellm`, and an admin price is still skipped unless `--force`.
 
 ### Automated daily drift check (CI)
 

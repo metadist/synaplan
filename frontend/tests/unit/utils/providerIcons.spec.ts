@@ -66,6 +66,11 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('meta')).toBe('logos:meta-icon')
   })
 
+  it('should return the Cerebras icon for Cerebras', () => {
+    expect(getProviderIcon('Cerebras')).toBe('logos:cerebras-icon')
+    expect(getProviderIcon('cerebras')).toBe('logos:cerebras-icon')
+  })
+
   it('should return a gateway icon for A2Agent', () => {
     expect(getProviderIcon('A2Agent')).toBe('mdi:transit-connection-variant')
     expect(getProviderIcon('a2agent')).toBe('mdi:transit-connection-variant')
@@ -108,6 +113,11 @@ describe('Provider Flag Utility', () => {
   it('should return the US flag for Meta', () => {
     expect(getProviderFlag('Meta')).toBe('circle-flags:us')
     expect(getProviderFlag('meta')).toBe('circle-flags:us')
+  })
+
+  it('should return the US flag for Cerebras', () => {
+    expect(getProviderFlag('Cerebras')).toBe('circle-flags:us')
+    expect(getProviderFlag('cerebras')).toBe('circle-flags:us')
   })
 
   it('should return the Chinese flag for A2Agent', () => {

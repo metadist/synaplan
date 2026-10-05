@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\AI\Messages\Translator;
 
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
+use App\AI\Image\PngJpegInlineImages;
+use App\AI\Image\UnsupportedImageInputException;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
@@ -56,6 +58,9 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         'anthropic_version',
     ];
 
+    /** Upstream that accepts images only as inline base64 PNG or JPEG. */
+    private const INLINE_PNG_JPEG_ONLY = 'cerebras';
+
     public function __construct(
         private HttpClientInterface $httpClient,
         #[Autowire('%env(string:default::OLLAMA_BASE_URL)%')]
@@ -77,6 +82,15 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
                 'status' => 502,
                 'headers' => [],
                 'body' => $this->toAnthropicError(null, $this->unresolvedUpstreamMessage($context), 502),
+                'usage' => new MessagesUsage(),
+            ];
+        }
+
+        if (null !== ($route['input_error'] ?? null)) {
+            return [
+                'status' => 400,
+                'headers' => [],
+                'body' => self::invalidRequestError($route['input_error']),
                 'usage' => new MessagesUsage(),
             ];
         }
@@ -127,6 +141,15 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             $emit([
                 'event' => 'error',
                 'data' => $this->toAnthropicError(null, $this->unresolvedUpstreamMessage($context), 502),
+            ]);
+
+            return new MessagesUsage();
+        }
+
+        if (null !== ($route['input_error'] ?? null)) {
+            $emit([
+                'event' => 'error',
+                'data' => self::invalidRequestError($route['input_error']),
             ]);
 
             return new MessagesUsage();
@@ -283,7 +306,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
      * @param array<string, mixed> $requestBody
      * @param array<string, mixed> $context
      *
-     * @return array{url: string, payload: array<string, mixed>, responses: bool}|null
+     * @return array{url: string, payload: array<string, mixed>, responses: bool, input_error?: string|null}|null
      */
     private function resolveUpstream(array $requestBody, array $context, bool $stream): ?array
     {
@@ -301,10 +324,35 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             return null;
         }
 
+        $payload = $this->toOpenAiRequest($requestBody, $stream, $imageDetail);
+        $inputError = null;
+        if (self::INLINE_PNG_JPEG_ONLY === strtolower((string) ($context['provider'] ?? ''))) {
+            try {
+                $payload['messages'] = PngJpegInlineImages::normalizeMessages($payload['messages'], 'Cerebras');
+            } catch (UnsupportedImageInputException $e) {
+                $inputError = $e->getMessage();
+            }
+        }
+
         return [
             'url' => $url,
-            'payload' => $this->toOpenAiRequest($requestBody, $stream, $imageDetail),
+            'payload' => $payload,
             'responses' => false,
+            'input_error' => $inputError,
+        ];
+    }
+
+    /**
+     * @return array{type: string, error: array{type: string, message: string}}
+     */
+    private static function invalidRequestError(string $message): array
+    {
+        return [
+            'type' => 'error',
+            'error' => [
+                'type' => 'invalid_request_error',
+                'message' => $message,
+            ],
         ];
     }
 

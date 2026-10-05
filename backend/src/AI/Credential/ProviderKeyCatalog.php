@@ -154,6 +154,18 @@ final class ProviderKeyCatalog
                 'headers' => ['Authorization' => 'Bearer {key}'],
             ],
         ],
+        'cerebras' => [
+            'displayName' => 'Cerebras',
+            'envVar' => 'CEREBRAS_API_KEY',
+            'consoleUrl' => 'https://cloud.cerebras.ai/',
+            'freeTier' => true,
+            'recommended' => false,
+            'validation' => [
+                'method' => 'GET',
+                'url' => 'https://api.cerebras.ai/v1/models',
+                'headers' => ['Authorization' => 'Bearer {key}'],
+            ],
+        ],
         'xai' => [
             'displayName' => 'xAI',
             'envVar' => 'XAI_API_KEY',

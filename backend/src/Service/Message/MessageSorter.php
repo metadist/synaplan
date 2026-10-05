@@ -140,6 +140,7 @@ final readonly class MessageSorter
         private ?AgentService $agentService = null,
         private ?UserRepository $users = null,
         private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
+        private ?ConnectedSystemsHint $connectedSystems = null,
     ) {
     }
 
@@ -256,6 +257,12 @@ final readonly class MessageSorter
         $promptText = str_replace('[LANGLIST]', $langList, $promptText);
         if (null !== $this->officePdfRouting) {
             $promptText = $this->officePdfRouting->decoratePrompt($promptText);
+        }
+        // Connected systems (MCP servers) the BMULTI vote has to know about —
+        // appended, not templated, so stored prompt rows need no migration.
+        // Empty for users without a connection: their prompt is unchanged.
+        if (null !== $this->connectedSystems) {
+            $promptText .= $this->connectedSystems->renderForSorter($userId);
         }
 
         // Build messages array for AI

@@ -774,6 +774,10 @@
       "title": "Meta-API-Schlüssel",
       "message": "Erstelle einen API-Schlüssel im Meta Model API-Dashboard (API keys) und füge ihn hier ein. Damit steht Muse Spark zur Verfügung. Prompts werden von Meta verarbeitet."
     },
+    "cerebras": {
+      "title": "Cerebras-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel im Cerebras-Cloud-Dashboard (API Keys) und füge ihn hier ein. Damit stehen GPT OSS 120B und Qwen 3.8 27B mit sehr schnellen Antworten zur Verfügung. Prompts werden von Cerebras in den USA verarbeitet."
+    },
     "huggingface": {
       "title": "HuggingFace-API-Token",
       "message": "Erstelle ein Access-Token in den HuggingFace-Einstellungen und füge es hier ein, um HuggingFace-Inference-Modelle zu nutzen."

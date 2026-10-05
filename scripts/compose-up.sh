@@ -71,6 +71,7 @@ case "$env_file" in
     *) env_file="${root}/${env_file}" ;;
 esac
 load_synaplan_ports "$env_file"
+"${root}/scripts/check-project-env.sh" "$env_file" "$@"
 frontend_port="${SYNAPLAN_FRONTEND_PORT:-5173}"
 
 echo "Starting the status page (http://localhost:${frontend_port})…"

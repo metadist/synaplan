@@ -55,6 +55,13 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     public function getStatus(): array
     {
+        if (!$this->isConfigured()) {
+            return [
+                'healthy' => false,
+                'error' => 'Server URL not configured',
+            ];
+        }
+
         try {
             $start = microtime(true);
             $models = $this->client->models()->list();
@@ -77,6 +84,10 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     public function isAvailable(): bool
     {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+
         try {
             $this->client->models()->list();
 
@@ -84,6 +95,15 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * Local AI is opt-in (the `local-ai` compose profile), so an empty
+     * OLLAMA_BASE_URL is the normal state of a stock install, not a failure.
+     */
+    private function isConfigured(): bool
+    {
+        return '' !== trim($this->baseUrl);
     }
 
     public function getRequiredEnvVars(): array

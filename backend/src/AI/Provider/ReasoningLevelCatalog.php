@@ -69,6 +69,7 @@ final class ReasoningLevelCatalog
             'anthropic' => self::anthropicLevels($providerId),
             'meta' => ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
             'huggingface', 'hugging face' => self::huggingFaceLevels($providerId),
+            'cerebras' => self::cerebrasLevels($providerId),
             default => null,
         };
     }
@@ -269,6 +270,25 @@ final class ReasoningLevelCatalog
     {
         if (str_contains($providerId, 'kimi-k3') || str_contains($providerId, 'kimi-k2')) {
             return ['low', 'high', 'max'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Qwen 3.8 can switch reasoning off; GPT OSS cannot (`none` is a 400).
+     * Must stay aligned with CerebrasProvider::REASONING_EFFORTS.
+     *
+     * @return list<string>|null
+     */
+    private static function cerebrasLevels(string $providerId): ?array
+    {
+        if (str_starts_with($providerId, 'qwen-3.8')) {
+            return ['none', 'low', 'medium', 'high'];
+        }
+
+        if (str_starts_with($providerId, 'gpt-oss')) {
+            return ['low', 'medium', 'high'];
         }
 
         return null;

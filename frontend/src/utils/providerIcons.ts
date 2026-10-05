@@ -30,6 +30,8 @@ export const getProviderIcon = (provider: string): string => {
     return 'mdi:runway'
   } else if (providerLower.includes('meta')) {
     return 'logos:meta-icon'
+  } else if (providerLower.includes('cerebras')) {
+    return 'logos:cerebras-icon'
   } else if (providerLower.includes('microsoft')) {
     return 'logos:microsoft-icon'
   } else if (providerLower.includes('cohere')) {
@@ -106,6 +108,7 @@ export const getProviderFlag = (provider: string): string => {
     p.includes('groq') ||
     p.includes('xai') ||
     p.includes('meta') ||
+    p.includes('cerebras') ||
     p.includes('thehive') ||
     p.includes('the hive')
   ) {

@@ -33,6 +33,12 @@ test('classifies compute sidecars as no-app-impact', () => {
   assert.equal(result.classification, 'no-app-impact')
 })
 
+test('classifies a removed local worktree gitlink as no-app-impact', () => {
+  const result = classifyFiles([entry('.worktrees/fix-2282-voice-reply', 'D')], policy)
+
+  assert.equal(result.classification, 'no-app-impact')
+})
+
 test('classifies allow-listed internal backend files as backend-only', () => {
   const result = classifyFiles([
     entry('backend/src/Service/ReportExportService.php', 'M'),
