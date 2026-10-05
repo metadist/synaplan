@@ -47,7 +47,9 @@ the **KEY messages** — documents with their content, results, decisions,
 important facts/amounts/dates — and write one searchable title per message
 ("office rent letter to realtor about the increase of payments"). Requests to
 the assistant ("make a chart of this") and notes that a file was created are
-skipped; only the facts they contain count. The model sees the existing titles
+skipped; only the facts they contain count. Titles are written in the language
+the user writes in, so a German question also finds an English contract. The
+model sees the existing titles
 of the batch's chats and the user's 30 newest titles, so a task repeated in
 another chat is not indexed twice. Each digest row is embedded and indexed in
 Qdrant.

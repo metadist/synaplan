@@ -174,7 +174,7 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('A request to the assistant to do something', $prompt);
         $this->assertStringContainsString('A note that a file was created', $prompt);
         $this->assertStringContainsString('Name the facts, not the action', $prompt);
-        $this->assertStringContainsString('a German message gets a German line', $prompt);
+        $this->assertStringContainsString('a German-speaking user gets German lines for an English contract', $prompt);
     }
 
     private function catalogPrompt(string $topic): string

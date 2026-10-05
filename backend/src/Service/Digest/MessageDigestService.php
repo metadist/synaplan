@@ -542,7 +542,7 @@ PROMPT;
         $this->logger->warning('Message digest prompt not found in DB, using fallback');
 
         return <<<'PROMPT'
-You index a user's message history. Select ONLY the KEY messages of the batch (documents with their content, decisions, important facts/dates/names — never small talk, requests to the assistant or notes that a file was created) and write one searchable title per message, in the language of the source message, max 200 characters.
+You index a user's message history. Select ONLY the KEY messages of the batch (documents with their content, decisions, important facts/dates/names — never small talk, requests to the assistant or notes that a file was created) and write one searchable title per message, in the language the user writes in (keep names and numbers as in the source), max 200 characters.
 
 RESPONSE FORMAT (strict JSON, no markdown):
 {"digests": [
