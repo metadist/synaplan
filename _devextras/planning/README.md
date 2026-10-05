@@ -12,8 +12,8 @@ paths were renamed on 2026-09-17.
 | ---- | ----------------- |
 | [`20260925_roadmap.md`](./20260925_roadmap.md) | Current roadmap (UX close-out, in-app transcription, Telegram, openDesk meeting notes, Wave 6) |
 | [`20260927-early-intake/`](./20260927-early-intake/README.md) | Sprint files for transcription, the easy issues, and Telegram |
-| [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: catalog, Connect UI, editor / office clients. Jitsi meeting notes moved to `20261004_openDesk/` |
-| [`20261004_openDesk/`](./20261004_openDesk/README.md) | Plan of record for openDesk meeting notes (Jitsi plugin). Replaces the September `opendesk_stt` sketch |
+| [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: catalog, Connect UI, editor / office clients. Jitsi meeting notes moved to the synaScriber repository |
+| [metadist/synaScriber](https://github.com/metadist/synaScriber) | Plan of record for openDesk meeting notes (Jitsi plugin). Replaces the September `opendesk_stt` sketch |
 | [`20260927_roadmap.md`](./20260927_roadmap.md) | Stub → folded into the 2026-09-25 plan |
 | [`20260917_roadmap.md`](./20260917_roadmap.md) | Stub → live plan + frozen 2026-09-17 text |
 | [`20260910_roadmap_update.md`](./20260910_roadmap_update.md) | Stub → live plan + frozen 2026-09-10 text |

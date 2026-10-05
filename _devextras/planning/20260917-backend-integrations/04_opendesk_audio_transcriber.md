@@ -1,8 +1,8 @@
 # openDesk audio transcriber — master plan
 
 **Superseded for Jitsi (2026-10-04).** The plan of record is
-[`../20261004_openDesk/README.md`](../20261004_openDesk/README.md)
-(plugin `meeting_notes`, Prosody module, the existing transcriber).
+[metadist/synaScriber](https://github.com/metadist/synaScriber)
+(`docs/`: plugin, Prosody module, the existing transcriber).
 Do not implement the `opendesk_stt` module or the new sidecar repository
 described below. This file stays as the September sketch.
 
