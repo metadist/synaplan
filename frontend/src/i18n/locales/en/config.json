@@ -966,6 +966,7 @@
         "skillMessage": "Which skill should run on \"{name}\"?",
         "pickSkill": "Choose a skill for {name}.",
         "noSkills": "{name} has not reported its skills yet. Type the skill name.",
+        "noRunnableSkills": "{name} has no skill that may run while you are away. In Synaplan Desktop, turn on \"Run when I am away\" for a skill.",
         "skillPlaceholder": "e.g. pptx",
         "invalidSkill": "Use only lowercase letters, numbers and hyphens.",
         "sent": "Sent to \"{name}\".",

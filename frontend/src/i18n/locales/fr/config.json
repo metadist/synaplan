@@ -964,6 +964,7 @@
         "skillMessage": "Quel skill exécuter sur « {name} » ?",
         "pickSkill": "Choisissez un skill pour {name}.",
         "noSkills": "{name} n'a pas encore indiqué ses skills. Saisissez le nom du skill.",
+        "noRunnableSkills": "{name} n'a aucun skill qui peut s'exécuter pendant votre absence. Dans Synaplan Desktop, activez « Exécuter quand je suis absent » pour un skill.",
         "skillPlaceholder": "p. ex. pptx",
         "invalidSkill": "Utilisez uniquement des minuscules, des chiffres et des traits d'union.",
         "sent": "Envoyé à « {name} ».",

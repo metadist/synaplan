@@ -85,6 +85,34 @@ describe('useAutoPersist — chatId watcher', () => {
     expect(input.value).toBe('')
   })
 
+  it('null → realId: an in-progress upload is kept', async () => {
+    const chatId = ref<number | null>(null)
+    const files = ref([
+      {
+        file_id: 0,
+        filename: 'most_important_thing.txt',
+        file_type: 'txt',
+        name: 'most_important_thing.txt',
+        processing: true,
+      },
+    ])
+
+    useAttachmentPersist(files, 'chat', chatId)
+
+    chatId.value = 7
+    await nextTick()
+
+    expect(files.value).toEqual([
+      {
+        file_id: 0,
+        filename: 'most_important_thing.txt',
+        file_type: 'txt',
+        name: 'most_important_thing.txt',
+        processing: true,
+      },
+    ])
+  })
+
   it('text from the left chat is flushed to its own storage slot', async () => {
     const chatId = ref<number | null>(7)
     const input = ref('unsaved text in chat 7')
