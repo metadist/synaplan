@@ -335,7 +335,11 @@
       "enhanceDesc": "Reescribe tu mensaje con IA antes de enviarlo"
     },
     "modelDropdown": {
-      "default": "Estándar"
+      "default": "Estándar",
+      "filterLabel": "Filtrar modelos",
+      "filterPlaceholder": "Filtrar modelos…",
+      "clearFilter": "Borrar filtro",
+      "noMatch": "Ningún modelo coincide con «{query}»."
     },
     "removeTool": "Quitar herramienta",
     "pastedText": {

@@ -1,7 +1,29 @@
 <template>
-  <aside class="v2-sidebar-panel flex h-full min-h-0 flex-col" data-testid="section-sidebar-panel">
-    <header class="flex h-14 flex-shrink-0 items-center px-3">
-      <h2 class="truncate text-[15px] font-semibold txt-primary">{{ activeSection.label }}</h2>
+  <aside
+    id="sidebar-v2-panel"
+    class="v2-sidebar-panel flex h-full min-h-0 flex-col"
+    :class="overlay && 'v2-sidebar-panel--overlay'"
+    :role="overlay ? 'dialog' : undefined"
+    :aria-label="overlay ? activeSection.label : undefined"
+    data-testid="section-sidebar-panel"
+    @click="onPanelClick"
+  >
+    <header class="flex h-14 flex-shrink-0 items-center gap-2 pl-3 pr-2">
+      <h2 class="min-w-0 flex-1 truncate text-[15px] font-semibold txt-primary">
+        {{ activeSection.label }}
+      </h2>
+      <button
+        type="button"
+        class="icon-ghost inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
+        :aria-label="$t('nav.collapseSidebar')"
+        :title="$t('nav.collapseSidebar')"
+        aria-controls="sidebar-v2-panel"
+        aria-expanded="true"
+        data-testid="btn-sidebar-v2-collapse"
+        @click="collapse"
+      >
+        <ChevronDoubleLeftIcon class="h-4 w-4" aria-hidden="true" />
+      </button>
     </header>
 
     <!--
@@ -24,15 +46,37 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { ChevronDoubleLeftIcon } from '@heroicons/vue/24/outline'
 import { useNavSections } from '@/composables/useNavSections'
+import { focusSidebarToggle, useSidebarLayout } from '@/composables/useSidebarLayout'
 import SidebarPanelChats from './SidebarPanelChats.vue'
 import SidebarPanelLibrary from './SidebarPanelLibrary.vue'
 import SidebarPanelLinks from './SidebarPanelLinks.vue'
 import SidebarPanelFooter from './SidebarPanelFooter.vue'
 
+const props = withDefaults(defineProps<{ overlay?: boolean }>(), { overlay: false })
+
+const emit = defineEmits<{ navigate: [] }>()
+
+/** Picking one of these leaves the panel: a chat row, a page link, New Chat, or search. */
+const LEAVES_PANEL =
+  'a[href], .chat-row-btn, [data-testid="btn-sidebar-v2-new-chat"], [data-testid="btn-sidebar-v2-search"]'
+
 const { activeKey, activeSection, activeGroups, activeSectionPath } = useNavSections()
+const { closePanel } = useSidebarLayout()
 
 const chatsPanel = ref<{ showMoreChats: () => void } | null>(null)
+
+const collapse = () => {
+  closePanel()
+  focusSidebarToggle('expand')
+}
+
+const onPanelClick = (event: MouseEvent) => {
+  if (!props.overlay) return
+  const target = event.target
+  if (target instanceof Element && target.closest(LEAVES_PANEL)) emit('navigate')
+}
 
 const onPanelScroll = (event: Event) => {
   if (activeKey.value !== 'chats') return

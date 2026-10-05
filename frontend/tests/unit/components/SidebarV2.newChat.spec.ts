@@ -141,6 +141,59 @@ describe('SidebarV2 New Chat lock', () => {
     wrapper.unmount()
   })
 
+  it('folds the docked panel to the rail and opens it again with one click', async () => {
+    localStorage.removeItem('sidebar-panel-collapsed')
+    const wrapper = await mountSidebar()
+    expect(wrapper.find('[data-testid="section-sidebar-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-sidebar-v2-expand"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="btn-sidebar-v2-collapse"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="section-sidebar-panel"]').exists()).toBe(false)
+    expect(localStorage.getItem('sidebar-panel-collapsed')).toBe('true')
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-testid="btn-sidebar-v2-expand"]').element
+    )
+
+    await wrapper.get('[data-testid="btn-sidebar-v2-expand"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="section-sidebar-panel"]').exists()).toBe(true)
+    expect(localStorage.getItem('sidebar-panel-collapsed')).toBe('false')
+    wrapper.unmount()
+  })
+
+  it('groups the chat history by date under the Chat history heading', async () => {
+    const now = Date.now()
+    const chats = [
+      { id: 1, title: 'Fresh', updatedAt: new Date(now).toISOString() },
+      { id: 2, title: 'Old', updatedAt: new Date(now - 90 * 24 * 3600 * 1000).toISOString() },
+    ].map((chat) => ({ ...chat, createdAt: chat.updatedAt, messageCount: 2, isShared: false }))
+    vi.mocked(httpClient).mockImplementation(async (url: unknown) => {
+      if (typeof url === 'string' && url.startsWith('/api/v1/chats')) {
+        return { success: true, chats, total: 2, offset: 0, limit: 30, hasMore: false }
+      }
+      return { success: true }
+    })
+
+    const wrapper = await mountSidebar()
+    expect(wrapper.get('[data-testid="btn-sidebar-v2-chats-toggle"]').text()).toContain(
+      'Chat history'
+    )
+    expect(wrapper.findAll('[data-testid="text-chat-history-group"]').map((g) => g.text())).toEqual(
+      ['Today', 'Older']
+    )
+
+    vi.mocked(httpClient).mockResolvedValue({
+      success: true,
+      chats: [],
+      total: 0,
+      offset: 0,
+      limit: 30,
+      hasMore: false,
+    })
+    wrapper.unmount()
+  })
+
   it('keeps search and profile fixed and pages the chat list by 30', async () => {
     const chats = Array.from({ length: 45 }, (_, index) => ({
       id: index + 1,

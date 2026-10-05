@@ -9,6 +9,20 @@
       />
     </div>
 
+    <button
+      v-if="!panelVisible"
+      type="button"
+      class="v2-rail-icon mb-1 inline-flex h-9 w-11 flex-shrink-0 items-center justify-center rounded-xl"
+      :aria-label="$t('nav.expandSidebar')"
+      :title="$t('nav.expandSidebar')"
+      aria-controls="sidebar-v2-panel"
+      aria-expanded="false"
+      data-testid="btn-sidebar-v2-expand"
+      @click="expand"
+    >
+      <ChevronDoubleRightIcon class="h-4 w-4" aria-hidden="true" />
+    </button>
+
     <nav
       class="flex-1 flex flex-col items-center gap-1 py-1 w-full overflow-y-auto sidebar-scroll"
       :aria-label="$t('nav.menu')"
@@ -110,8 +124,10 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, computed, watch, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ChevronDoubleRightIcon } from '@heroicons/vue/24/outline'
 import SchedulerStaleHint from '@/components/SchedulerStaleHint.vue'
 import { useConfigStore } from '@/stores/config'
+import { focusSidebarToggle, useSidebarLayout } from '@/composables/useSidebarLayout'
 import { useSchedulerStore } from '@/stores/scheduler'
 import { useUpdatesStore } from '@/stores/updates'
 import { useIncomingStore } from '@/stores/incoming'
@@ -121,6 +137,7 @@ import { useNavSections, type NavSection } from '@/composables/useNavSections'
 import { formatRunningVersion } from '@/utils/formatRunningVersion'
 
 const configStore = useConfigStore()
+const { panelOverlay, panelVisible, openPanel, closePanel } = useSidebarLayout()
 const updatesStore = useUpdatesStore()
 const schedulerStore = useSchedulerStore()
 const incomingStore = useIncomingStore()
@@ -174,8 +191,20 @@ function scheduleTip(section: NavSection, event: Event, immediate = false) {
   tipTimer = window.setTimeout(() => placeTip(section, anchor), TIP_DELAY_MS)
 }
 
+function expand() {
+  openPanel()
+  focusSidebarToggle('collapse')
+}
+
 function openSection(key: NavSection['key']) {
   hideTipNow()
+  // A rail icon names a panel. In the overlay, a second click on the open
+  // section closes it again; otherwise choosing an icon shows its panel.
+  if (panelOverlay.value && activeKey.value === key) {
+    closePanel()
+    return
+  }
+  if (!panelVisible.value) openPanel()
   selectSection(key)
 }
 

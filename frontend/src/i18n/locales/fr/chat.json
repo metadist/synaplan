@@ -344,7 +344,11 @@
       "enhanceDesc": "Réécrire votre message avec l’IA avant l’envoi"
     },
     "modelDropdown": {
-      "default": "Par défaut"
+      "default": "Par défaut",
+      "filterLabel": "Filtrer les modèles",
+      "filterPlaceholder": "Filtrer les modèles…",
+      "clearFilter": "Effacer le filtre",
+      "noMatch": "Aucun modèle ne correspond à « {query} »."
     },
     "removeTool": "Retirer l’outil",
     "pastedText": {

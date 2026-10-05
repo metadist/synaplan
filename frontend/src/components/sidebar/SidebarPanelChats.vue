@@ -51,10 +51,7 @@
             data-testid="text-sidebar-v2-incoming-count"
             >{{ incomingStore.unseenCount }}</span
           >
-          <ChevronDownIcon
-            :class="[sectionChevronClass, { '-rotate-90': !incomingExpanded }]"
-            aria-hidden="true"
-          />
+          <ChevronDownIcon :class="chevronClass(incomingExpanded)" aria-hidden="true" />
         </button>
         <router-link
           v-if="groupsEnabled"
@@ -103,10 +100,7 @@
           @click="pinnedExpanded = !pinnedExpanded"
         >
           {{ $t('nav.pinned') }}
-          <ChevronDownIcon
-            :class="[sectionChevronClass, { '-rotate-90': !pinnedExpanded }]"
-            aria-hidden="true"
-          />
+          <ChevronDownIcon :class="chevronClass(pinnedExpanded)" aria-hidden="true" />
         </button>
       </div>
       <div v-show="pinnedExpanded" id="sidebar-pinned-list" class="px-1">
@@ -136,11 +130,8 @@
           data-testid="btn-sidebar-v2-chats-toggle"
           @click="chatsExpanded = !chatsExpanded"
         >
-          {{ $t('nav.chats') }}
-          <ChevronDownIcon
-            :class="[sectionChevronClass, { '-rotate-90': !chatsExpanded }]"
-            aria-hidden="true"
-          />
+          {{ $t('nav.chatHistory') }}
+          <ChevronDownIcon :class="chevronClass(chatsExpanded)" aria-hidden="true" />
         </button>
         <router-link
           to="/chats"
@@ -160,6 +151,7 @@
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
+          :group-of="dateGroupLabel"
           @select="selectChat"
           @share="shareChat"
           @rename="renameChat"
@@ -191,9 +183,11 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
+import { chatDateGroup } from './chatDateGroups'
 import { listOverflows, scrollerGrewWithContent } from './chatHistoryPaging'
 import { chatsPanelRefresh } from '@/composables/useNavSections'
-import { useChatHistory } from '@/composables/useChatHistory'
+import { useI18n } from 'vue-i18n'
+import { useChatHistory, type HistoryChat } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
@@ -240,8 +234,17 @@ const rememberExpanded = (key: string, open: boolean) => {
 const sectionToggleClass =
   'mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-3 py-1 text-left text-[13px] font-semibold txt-secondary hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'
 
-const sectionChevronClass =
-  'h-3.5 w-3.5 flex-shrink-0 opacity-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none group-hover/section:opacity-100 group-focus-visible/section:opacity-100'
+const sectionChevronBase =
+  'h-3.5 w-3.5 flex-shrink-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none'
+
+/**
+ * An open section shows its chevron on hover only. A folded one always shows
+ * it, pointing right, or the heading would look like an empty list.
+ */
+const chevronClass = (expanded: boolean): string =>
+  expanded
+    ? `${sectionChevronBase} opacity-0 group-hover/section:opacity-100 group-focus-visible/section:opacity-100`
+    : `${sectionChevronBase} -rotate-90 opacity-100`
 
 const sectionSideLinkClass =
   'absolute right-2 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary transition-opacity hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]'
@@ -251,6 +254,20 @@ const sectionHoverLinkClass =
   ' pointer-events-none opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/section:pointer-events-auto group-hover/section:opacity-100'
 
 const groupsEnabled = computed(() => isIamGroupsEnabled())
+
+const { t } = useI18n()
+/** One "now" per list change, so every row is bucketed against the same day. */
+const dateGroupLabels = computed(() => {
+  const now = new Date()
+  return new Map(
+    unpinnedChats.value.map((chat) => [
+      chat.id,
+      t(`chat.browser.${chatDateGroup(chat.updatedAt || chat.createdAt, now)}`),
+    ])
+  )
+})
+const dateGroupLabel = (chat: HistoryChat): string | null =>
+  dateGroupLabels.value.get(chat.id) ?? null
 
 const authStore = useAuthStore()
 const configStore = useConfigStore()

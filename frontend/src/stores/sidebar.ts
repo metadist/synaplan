@@ -1,9 +1,26 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
+const PANEL_COLLAPSED_KEY = 'sidebar-panel-collapsed'
+
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === 'true'
+  } catch {
+    return false
+  }
+}
+
 export const useSidebarStore = defineStore('sidebar', () => {
   const isOpen = ref(false)
-  const isCollapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
+  /**
+   * Desktop context panel folded away, leaving only the icon rail. Own key:
+   * the retired sidebar wrote `sidebar-collapsed`, and a stale value from it
+   * must not fold the panel on someone's first visit.
+   */
+  const isCollapsed = ref(readFlag(PANEL_COLLAPSED_KEY))
+  /** Below the dock width the panel opens above the content. Never remembered. */
+  const panelOverlayOpen = ref(false)
   const showChats = ref(localStorage.getItem('sidebar-show-chats') !== 'false')
 
   /**
@@ -32,7 +49,11 @@ export const useSidebarStore = defineStore('sidebar', () => {
   })
 
   watch(isCollapsed, (value) => {
-    localStorage.setItem('sidebar-collapsed', String(value))
+    try {
+      localStorage.setItem(PANEL_COLLAPSED_KEY, String(value))
+    } catch {
+      // Private mode can block storage. The panel still folds for this visit.
+    }
   })
 
   watch(showChats, (value) => {
@@ -80,6 +101,7 @@ export const useSidebarStore = defineStore('sidebar', () => {
   return {
     isOpen,
     isCollapsed,
+    panelOverlayOpen,
     showChats,
     chatDisclosure,
     mobileDrawerOpen,

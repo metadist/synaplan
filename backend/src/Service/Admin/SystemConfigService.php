@@ -2301,7 +2301,7 @@ final readonly class SystemConfigService
             'BRAND_ICON_URL' => [
                 'tab' => 'branding', 'section' => 'logos', 'type' => 'url',
                 'sensitive' => false,
-                'description' => 'Brand icon/favicon URL. Leave empty to use the bundled asset (app icons are produced by Epic 6).',
+                'description' => 'Brand icon URL (SVG recommended). Used for the sidebar mark, the favicon and the faint background watermark. Empty falls back to the light logo, then to the bundled Synaplan bird.',
                 'default' => '',
                 'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_ICON_URL,
             ],
