@@ -386,7 +386,7 @@ class SubscriptionController extends AbstractController
             $paymentMethods = array_filter(array_map('trim', explode(',', $this->stripePaymentMethods)));
             $session = \Stripe\Checkout\Session::create([
                 'customer' => $customerId,
-                'payment_method_types' => $paymentMethods,
+                'allowed_payment_method_types' => $paymentMethods,
                 'line_items' => [[
                     'price' => $priceId,
                     'quantity' => 1,
@@ -579,7 +579,7 @@ class SubscriptionController extends AbstractController
 
             $session = \Stripe\Checkout\Session::create([
                 'customer' => $customerId,
-                'payment_method_types' => $paymentMethods,
+                'allowed_payment_method_types' => $paymentMethods,
                 'line_items' => [[
                     'price_data' => [
                         'currency' => 'eur',

@@ -101,6 +101,25 @@ class ApprovalRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Compare-and-set: only one of several concurrent sweeps can expire a
+     * given approval, so its linked run is failed (and counted) once.
+     */
+    public function expireIfPending(int $id, int $decidedAt): bool
+    {
+        $affected = $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE BAPPROVALS SET BSTATUS = :expired, BDECIDEDAT = :decidedAt WHERE BID = :id AND BSTATUS = :pending',
+            [
+                'expired' => Approval::STATUS_EXPIRED,
+                'decidedAt' => $decidedAt,
+                'id' => $id,
+                'pending' => Approval::STATUS_PENDING,
+            ]
+        );
+
+        return $affected > 0;
+    }
+
     public function flush(): void
     {
         $this->getEntityManager()->flush();

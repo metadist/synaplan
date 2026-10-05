@@ -108,7 +108,9 @@
   "welcomeUser": "Welcome, {name}",
   "sidebar": {
     "featureStatus": "Feature Status",
-    "upgrade": "Upgrade"
+    "upgrade": "Upgrade",
+    "schedulerStopped": "Background jobs stopped",
+    "schedulerStoppedShort": "Jobs stopped"
   },
   "nav": {
     "chat": "Chat",

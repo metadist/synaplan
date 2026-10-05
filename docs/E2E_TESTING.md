@@ -69,7 +69,7 @@ cause; a cause that can be fixed (a test depending on the local env or on
 fixtures) is fixed instead.
 
 - **Specs that need the test stack** (`docker-compose.test.yml`) fail under `make test-e2e` on the dev stack:
-  - Mail specs (`email`, `registration`, `guest-registration`, `admin-panel`): the runner defaults to MailHog `:8026` (test stack); run with `MAILHOG_URL=http://localhost:8025`.
+  - Mail specs (`email`, `registration`, `guest-registration`, `admin-panel`, `account-language`): the runner defaults to MailHog `:8026` (test stack); run with `MAILHOG_URL=http://localhost:8025`.
   - Guest specs (`guest-chat`, `guest-registration`): the dev stack allows 5 guest sessions per IP (`GUEST_MAX_SESSIONS_PER_IP`, test stack: 100), so after a few runs the API answers `Too many guest sessions` and the guest banner never renders.
   - `@whatsapp` specs: the WhatsApp stub on `:3999` only runs in the test stack.
   - `@telegram` specs: the dev stack keeps the channel off and talks to the real Bot API. Start the stub and recreate backend and worker with `TELEGRAM_ENABLED=true TELEGRAM_API_BASE_URL=http://telegram-stub:3998 TELEGRAM_WEBHOOK_BASE_URL=https://e2e.synaplan.test docker compose --profile telegram-stub up -d telegram-stub backend worker` to run them there.

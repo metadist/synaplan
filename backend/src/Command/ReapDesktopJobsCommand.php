@@ -55,7 +55,9 @@ final class ReapDesktopJobsCommand extends Command
             return Command::SUCCESS;
         }
 
-        $lock = $this->lockFactory->createLock('desktop-job-reaper', 120);
+        // Outlasts the scheduler's 300 s cap plus its 30 s kill grace, so runs on two
+        // nodes never overlap.
+        $lock = $this->lockFactory->createLock('desktop-job-reaper', 600);
         if (!$lock->acquire()) {
             $io->note('Previous desktop reaper run is still active. Skipping.');
 

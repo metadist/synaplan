@@ -192,6 +192,10 @@ export const selectors = {
     /** Wrapper that contains only the generated answer body (no timestamp, no footer). Use this for asserting reply text. */
     assistantAnswerBody: '[data-testid="section-message-text"]',
     messageText: '[data-testid="message-text"]',
+    /** Classes the KaTeX library puts on its own output inside a message */
+    katexFormula: '.katex',
+    katexDisplay: '.katex-display',
+    katexError: '.katex-error',
     /** Audio player section rendered for an `audio` message part (TTS / voice reply / uploads) */
     messageAudio: '[data-testid="section-message-audio"]',
     // The "Again with… ▾" control is a single button that opens the model
@@ -588,6 +592,11 @@ export const selectors = {
     computeStatusPill: '[data-testid="compute-status-pill"]',
     computeRetry: '[data-testid="btn-compute-retry"]',
     computeConfigLink: '[data-testid="link-compute-config"]',
+    schedulerSection: '[data-testid="section-scheduler-status"]',
+    schedulerStateLine: '[data-testid="scheduler-state-line"]',
+    schedulerDocsLink: '[data-testid="link-scheduler-docs"]',
+    /** Admin rail/drawer hint while background jobs are stale */
+    schedulerSidebarHint: '[data-testid="link-sidebar-v2-scheduler"]',
   },
   people: {
     backToOperate: '[data-testid="link-people-back-operate"]',

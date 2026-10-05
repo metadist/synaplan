@@ -84,62 +84,374 @@ echo "Case 1: worker waits for initialization and preserves Messenger defaults"
 assert_contains "doctrine:migrations:up-to-date --no-interaction" "$COMMAND_LOG" "worker waits until migrations are current"
 assert_contains "messenger:consume async_ai_high async_extract async_index --time-limit=3600 --memory-limit=512M -v" "$COMMAND_LOG" "worker consumes all current transports with current limits"
 
-echo "Case 2: scheduler runs every slot's command initially and writes a heartbeat"
+# PATH stubs: `timeout` does not see a shell function named php, and the claim
+# call may be either a direct php or a child of timeout. Both go through PATH.
+cat > "$TMP_DIR/bin/php" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$COMMAND_LOG"
+case "$*" in
+    *app:scheduler:claim*)
+        if [ -n "${CLAIM_SLEEP:-}" ]; then
+            sleep "$CLAIM_SLEEP"
+        fi
+        if [ -n "${CLAIM_OUT:-}" ]; then
+            printf '%s\n' "$CLAIM_OUT"
+        fi
+        exit "${CLAIM_EXIT:-0}"
+        ;;
+    *app:saved-tasks:tick*)
+        if [ -n "${SAVED_TASKS_SLEEP:-}" ]; then
+            sleep "$SAVED_TASKS_SLEEP" &
+            sleep_pid=$!
+            trap 'kill "$sleep_pid" 2>/dev/null || true; exit 143' TERM INT
+            wait "$sleep_pid" || exit $?
+        fi
+        exit 0
+        ;;
+    *app:media:reap-jobs*)
+        if [ -n "${MEDIA_REAP_EXIT:-}" ]; then
+            exit "$MEDIA_REAP_EXIT"
+        fi
+        ;;
+    *app:chat:reap-stuck*)
+        if [ -n "${CHAT_REAP_EXIT:-}" ]; then
+            exit "$CHAT_REAP_EXIT"
+        fi
+        ;;
+    *app:desktop:reap-jobs*)
+        if [ -n "${DESKTOP_REAP_EXIT:-}" ]; then
+            exit "$DESKTOP_REAP_EXIT"
+        fi
+        ;;
+esac
+exit 0
+EOF
+cat > "$TMP_DIR/bin/timeout" <<'EOF'
+#!/bin/sh
+printf 'TIMEOUT %s\n' "$*" >> "$COMMAND_LOG"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --)
+            shift
+            break
+            ;;
+        --*)
+            shift
+            ;;
+        -*)
+            shift
+            ;;
+        *)
+            shift
+            break
+            ;;
+    esac
+done
+if [ $# -eq 0 ]; then
+    exit 127
+fi
+exec "$@"
+EOF
+chmod +x "$TMP_DIR/bin/php" "$TMP_DIR/bin/timeout"
+
+reset_scheduler_env() {
+    unset CLAIM_EXIT CLAIM_OUT CLAIM_SLEEP SAVED_TASKS_SLEEP MEDIA_REAP_EXIT CHAT_REAP_EXIT DESKTOP_REAP_EXIT
+    unset SYNAPLAN_SCHEDULER_SMART_MAILBOX SYNAPLAN_SCHEDULER_PRICE_SYNC
+    unset SYNAPLAN_SCHEDULER_DAILY_AT SYNAPLAN_SCHEDULER_HOURLY_SECONDS
+    unset SYNAPLAN_SCHEDULER_TICK_SECONDS SYNAPLAN_SCHEDULER_MAX_CYCLES
+    unset SYNAPLAN_SCHEDULER_MODEL_HEALTH_SECONDS SYNAPLAN_SCHEDULER_MODEL_HEALTH_JITTER
+    unset SYNAPLAN_SCHEDULER_DAILY_SECONDS
+}
+
+run_scheduler_for_test() {
+    local log_file="$1"
+    local status=0
+
+    (
+        set -euo pipefail
+        cd "$TMP_DIR/app" || exit 1
+        export PATH="$TMP_DIR/bin:$PATH"
+        export COMMAND_LOG APP_ENV=prod
+        export SYNAPLAN_ROLE=scheduler
+        export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
+        # shellcheck disable=SC1090
+        . "$RUNTIME_LIB"
+        prepare_role_cache() { :; }
+        wait_for_web_initialization() { :; }
+        run_scheduler_role
+    ) >"$log_file" 2>&1 || status=$?
+    if [ "$status" -ne 0 ]; then
+        echo "scheduler run failed (exit ${status}); log follows:" >&2
+        cat "$log_file" >&2
+    fi
+    return "$status"
+}
+
+count_in() {
+    local needle="$1"
+    local file="$2"
+    local count=0
+
+    count="$(grep -c -F -- "$needle" "$file" || true)"
+    printf '%s\n' "$count"
+}
+
+# timeout logs the same command text before exec, so a raw count double-counts.
+count_php_invocations() {
+    local needle="$1"
+    local count=0
+
+    count="$(grep -F -- "$needle" "$COMMAND_LOG" | grep -cv '^TIMEOUT ' || true)"
+    printf '%s\n' "$count"
+}
+
+echo "Case 2: every lane runs when claims succeed, and opt-in jobs stay off"
+reset_scheduler_env
 : > "$COMMAND_LOG"
-(
-    cd "$TMP_DIR/app" || exit
-    export PATH="$TMP_DIR/bin:$PATH"
-    export COMMAND_LOG
-    export SYNAPLAN_ROLE=scheduler
-    export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
-    export SYNAPLAN_SCHEDULER_MAX_CYCLES=1
-    # shellcheck disable=SC1090
-    . "$RUNTIME_LIB"
-    prepare_role_cache() { :; }
-    wait_for_web_initialization() { :; }
-    php() {
-        printf '%s\n' "$*" >> "$COMMAND_LOG"
-    }
-    run_scheduler_role
-)
+rm -f "$TMP_DIR/runtime/scheduler.heartbeat"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=1
+# The removed daily-seconds knob must not bring the daily slot back.
+export SYNAPLAN_SCHEDULER_DAILY_SECONDS=10
+CASE2_LOG="$TMP_DIR/scheduler-case2.log"
+CASE2_STATUS=0
+run_scheduler_for_test "$CASE2_LOG" || CASE2_STATUS=$?
+assert_eq 0 "$CASE2_STATUS" "scheduler completes one cycle under set -e"
 assert_contains "app:media:reap-jobs --no-interaction" "$COMMAND_LOG" "scheduler runs media reaper"
 assert_contains "app:chat:reap-stuck --no-interaction" "$COMMAND_LOG" "scheduler runs stuck-chat reaper"
 assert_contains "app:desktop:reap-jobs --no-interaction" "$COMMAND_LOG" "scheduler runs desktop job reaper"
+assert_contains "app:process-mail-handlers --no-interaction" "$COMMAND_LOG" "scheduler runs mail handlers"
+assert_contains "app:saved-tasks:tick --no-interaction" "$COMMAND_LOG" "scheduler runs Saved Tasks tick"
 assert_contains "app:files:reap-ephemeral --no-interaction" "$COMMAND_LOG" "scheduler runs ephemeral-file reaper"
+assert_contains "app:approvals:expire --no-interaction" "$COMMAND_LOG" "scheduler runs approval expiry"
+assert_contains "app:models:discover --notify --no-interaction" "$COMMAND_LOG" "scheduler runs the model discovery check"
 assert_contains "app:updates:check --no-interaction" "$COMMAND_LOG" "scheduler runs the daily update check"
 assert_contains "app:models:check-availability --notify --no-interaction" "$COMMAND_LOG" "scheduler runs the daily model availability check"
-assert_contains "app:models:discover --notify --no-interaction" "$COMMAND_LOG" "scheduler runs the model discovery check"
+assert_contains "app:digest:run --no-interaction" "$COMMAND_LOG" "scheduler runs the message digest"
 assert_contains "app:selfaware:sync-docs --no-interaction" "$COMMAND_LOG" "scheduler runs the daily platform docs sync"
-assert_contains "app:model:health-check --jitter=" "$COMMAND_LOG" "scheduler runs the model health check with request jitter"
+assert_contains "app:approvals:digest --no-interaction" "$COMMAND_LOG" "scheduler runs the approval digest"
+assert_contains "app:model:health-check --jitter=120" "$COMMAND_LOG" "scheduler runs the model health check with request jitter"
+assert_not_contains "app:process-emails" "$COMMAND_LOG" "smart mailbox stays off unless SYNAPLAN_SCHEDULER_SMART_MAILBOX=1"
+assert_not_contains "app:sync-model-prices" "$COMMAND_LOG" "price sync stays off unless SYNAPLAN_SCHEDULER_PRICE_SYNC=1"
+assert_contains "app:scheduler:claim hourly --interval=3600 --no-interaction" "$COMMAND_LOG" "hourly claim uses the interval"
+assert_contains "app:scheduler:claim daily --at=03:30 --no-interaction" "$COMMAND_LOG" "daily claim defaults to 03:30 UTC"
+assert_contains "app:scheduler:claim health --interval=900 --no-interaction" "$COMMAND_LOG" "health claim uses its interval"
+assert_contains "TIMEOUT --signal=TERM --kill-after=5 30 php bin/console --env=prod app:scheduler:claim daily --at=03:30 --no-interaction" "$COMMAND_LOG" "slot claims are capped at 30s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:media:reap-jobs --no-interaction" "$COMMAND_LOG" "tick jobs are capped at 300s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:chat:reap-stuck --no-interaction" "$COMMAND_LOG" "stuck-chat reaper is capped at 300s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:desktop:reap-jobs --no-interaction" "$COMMAND_LOG" "desktop reaper is capped at 300s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:process-mail-handlers --no-interaction" "$COMMAND_LOG" "mail handlers are capped at 300s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 900 php bin/console --env=prod app:files:reap-ephemeral --no-interaction" "$COMMAND_LOG" "hourly jobs are capped at 900s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 10800 php bin/console --env=prod app:digest:run --no-interaction" "$COMMAND_LOG" "message digest is capped at 10800s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 3600 php bin/console --env=prod app:updates:check --no-interaction" "$COMMAND_LOG" "other daily jobs are capped at 3600s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 600 php bin/console --env=prod app:model:health-check --jitter=120 --no-interaction" "$COMMAND_LOG" "model health check is capped at 600s"
+assert_eq 0 "$(grep -c 'TIMEOUT .*app:saved-tasks:tick' "$COMMAND_LOG" || true)" "Saved Tasks tick is not wrapped in timeout"
 if [ -s "$TMP_DIR/runtime/scheduler.heartbeat" ]; then
     assert_eq 1 1 "scheduler writes liveness heartbeat"
 else
     assert_eq 1 0 "scheduler writes liveness heartbeat"
 fi
+unset SYNAPLAN_SCHEDULER_DAILY_SECONDS
 
-echo "Case 2b: model discovery runs on the hourly slot, not the daily one"
+echo "Case 2b: opt-in mail and price-sync jobs run when their flags are 1"
+reset_scheduler_env
 : > "$COMMAND_LOG"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=1
+export SYNAPLAN_SCHEDULER_SMART_MAILBOX=1
+export SYNAPLAN_SCHEDULER_PRICE_SYNC=1
+CASE2B_STATUS=0
+run_scheduler_for_test "$TMP_DIR/scheduler-case2b.log" || CASE2B_STATUS=$?
+assert_eq 0 "$CASE2B_STATUS" "scheduler completes a flagged cycle under set -e"
+assert_contains "app:process-emails --no-interaction" "$COMMAND_LOG" "smart mailbox runs when the flag is 1"
+assert_contains "app:sync-model-prices --no-interaction" "$COMMAND_LOG" "price sync runs when the flag is 1"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 300 php bin/console --env=prod app:process-emails --no-interaction" "$COMMAND_LOG" "smart mailbox is capped at 300s"
+assert_contains "TIMEOUT --signal=TERM --kill-after=30 3600 php bin/console --env=prod app:sync-model-prices --no-interaction" "$COMMAND_LOG" "price sync is capped at 3600s"
+
+echo "Case 2c: a claim that is not due skips that slot and backs off"
+reset_scheduler_env
+: > "$COMMAND_LOG"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=2
+export SYNAPLAN_SCHEDULER_TICK_SECONDS=0
+export CLAIM_EXIT=3
+export CLAIM_OUT=3600
+CASE2C_STATUS=0
+run_scheduler_for_test "$TMP_DIR/scheduler-case2c.log" || CASE2C_STATUS=$?
+assert_eq 0 "$CASE2C_STATUS" "a not-due claim does not abort the scheduler under set -e"
+assert_contains "app:media:reap-jobs" "$COMMAND_LOG" "tick lane still runs when slots are not due"
+assert_contains "app:saved-tasks:tick" "$COMMAND_LOG" "Saved Tasks lane still runs when slots are not due"
+assert_not_contains "app:files:reap-ephemeral" "$COMMAND_LOG" "hourly jobs do not run when the claim is not due"
+assert_not_contains "app:approvals:expire" "$COMMAND_LOG" "approval expiry does not run when the claim is not due"
+assert_not_contains "app:models:discover" "$COMMAND_LOG" "model discovery does not run when the claim is not due"
+assert_not_contains "app:updates:check" "$COMMAND_LOG" "daily jobs do not run when the claim is not due"
+assert_not_contains "app:digest:run" "$COMMAND_LOG" "message digest does not run when the claim is not due"
+assert_not_contains "app:model:health-check" "$COMMAND_LOG" "health check does not run when the claim is not due"
+assert_eq 1 "$(count_php_invocations 'app:scheduler:claim hourly')" "hourly claim waits for the reported delay"
+assert_eq 1 "$(count_php_invocations 'app:scheduler:claim daily')" "daily claim waits for the reported delay"
+assert_eq 1 "$(count_php_invocations 'app:scheduler:claim health')" "health claim waits for the reported delay"
+
+echo "Case 2d: a claim answer that is not a delay is asked again next tick"
+reset_scheduler_env
+: > "$COMMAND_LOG"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=2
+export SYNAPLAN_SCHEDULER_TICK_SECONDS=0
+export CLAIM_EXIT=3
+export CLAIM_OUT=soon
+CASE2D_STATUS=0
+run_scheduler_for_test "$TMP_DIR/scheduler-case2d.log" || CASE2D_STATUS=$?
+assert_eq 0 "$CASE2D_STATUS" "a non-numeric not-due claim does not abort the scheduler"
+assert_eq 2 "$(count_php_invocations 'app:scheduler:claim hourly')" "a non-numeric delay is asked again on the next tick"
+assert_not_contains "app:files:reap-ephemeral" "$COMMAND_LOG" "a non-numeric not-due claim does not run hourly jobs"
+
+echo "Case 2e: a failed claim skips the slot and is asked again next tick"
+reset_scheduler_env
+: > "$COMMAND_LOG"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=2
+export SYNAPLAN_SCHEDULER_TICK_SECONDS=0
+export CLAIM_EXIT=1
+CASE2E_LOG="$TMP_DIR/scheduler-case2e.log"
+CASE2E_STATUS=0
+run_scheduler_for_test "$CASE2E_LOG" || CASE2E_STATUS=$?
+assert_eq 0 "$CASE2E_STATUS" "a failed claim does not abort the scheduler under set -e"
+assert_not_contains "app:files:reap-ephemeral" "$COMMAND_LOG" "hourly jobs do not run when the claim fails"
+assert_not_contains "app:updates:check" "$COMMAND_LOG" "daily jobs do not run when the claim fails"
+assert_not_contains "app:model:health-check" "$COMMAND_LOG" "health check does not run when the claim fails"
+assert_contains "app:media:reap-jobs" "$COMMAND_LOG" "tick lane still runs when a claim fails"
+assert_contains "Could not check whether the hourly jobs are due (exit 1); asking again on the next tick." "$CASE2E_LOG" "a failed hourly claim is logged"
+assert_contains "Could not check whether the daily jobs are due (exit 1); asking again on the next tick." "$CASE2E_LOG" "a failed daily claim is logged"
+assert_contains "Could not check whether the health jobs are due (exit 1); asking again on the next tick." "$CASE2E_LOG" "a failed health claim is logged"
+assert_eq 2 "$(count_in 'Could not check whether the hourly jobs are due (exit 1)' "$CASE2E_LOG")" "a failed claim is asked again on the next tick"
+
+echo "Case 2f: daily and hourly claim arguments follow their env knobs"
+reset_scheduler_env
+: > "$COMMAND_LOG"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=1
+export SYNAPLAN_SCHEDULER_DAILY_AT=04:15
+export SYNAPLAN_SCHEDULER_HOURLY_SECONDS=120
+CASE2F_STATUS=0
+run_scheduler_for_test "$TMP_DIR/scheduler-case2f.log" || CASE2F_STATUS=$?
+assert_eq 0 "$CASE2F_STATUS" "custom slot knobs do not abort the scheduler"
+assert_contains "app:scheduler:claim daily --at=04:15 --no-interaction" "$COMMAND_LOG" "daily claim uses SYNAPLAN_SCHEDULER_DAILY_AT"
+assert_contains "app:scheduler:claim hourly --interval=120 --no-interaction" "$COMMAND_LOG" "hourly claim uses SYNAPLAN_SCHEDULER_HOURLY_SECONDS"
+assert_not_contains "app:scheduler:claim daily --at=03:30" "$COMMAND_LOG" "the default daily time is replaced by the env knob"
+
+echo "Case 2g: a live lane is not started again, and a slow lane does not block the tick"
+reset_scheduler_env
+: > "$COMMAND_LOG"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=3
+export SYNAPLAN_SCHEDULER_TICK_SECONDS=0
+export SAVED_TASKS_SLEEP=2
+# The real claim boots PHP and yields the CPU. The stub returns instantly, so
+# without this pause a tick-0 loop can finish before the first tick lane does.
+export CLAIM_SLEEP=0.2
+export CLAIM_EXIT=0
+CASE2G_STATUS=0
+CASE2G_START=$SECONDS
+run_scheduler_for_test "$TMP_DIR/scheduler-case2g.log" || CASE2G_STATUS=$?
+CASE2G_ELAPSED=$((SECONDS - CASE2G_START))
+assert_eq 0 "$CASE2G_STATUS" "overlapping lanes still finish under set -e"
+assert_eq 1 "$(count_php_invocations 'app:saved-tasks:tick')" "a live Saved Tasks lane is not started again"
+MEDIA_RUNS="$(count_php_invocations 'app:media:reap-jobs')"
+if [ "$MEDIA_RUNS" -ge 2 ]; then
+    assert_eq 1 1 "tick lane runs again while Saved Tasks is still in its first run"
+else
+    assert_eq 2 "$MEDIA_RUNS" "tick lane runs again while Saved Tasks is still in its first run"
+fi
+if [ "$CASE2G_ELAPSED" -lt 8 ]; then
+    assert_eq 1 1 "three cycles do not wait out the Saved Tasks sleep each time"
+else
+    assert_eq 7 "$CASE2G_ELAPSED" "three cycles do not wait out the Saved Tasks sleep each time"
+fi
+
+echo "Case 2h: a job failure names the command and a timeout names the cap"
+reset_scheduler_env
+: > "$COMMAND_LOG"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=1
+export MEDIA_REAP_EXIT=1
+export CHAT_REAP_EXIT=124
+export DESKTOP_REAP_EXIT=137
+CASE2H_LOG="$TMP_DIR/scheduler-case2h.log"
+CASE2H_STATUS=0
+run_scheduler_for_test "$CASE2H_LOG" || CASE2H_STATUS=$?
+assert_eq 0 "$CASE2H_STATUS" "a failing job does not abort the scheduler under set -e"
+assert_contains "app:media:reap-jobs failed (exit 1); it will be retried on the next run." "$CASE2H_LOG" "a failed job is logged with its exit code"
+assert_contains "app:chat:reap-stuck was stopped after 300 seconds." "$CASE2H_LOG" "exit 124 is logged as stopped after the cap"
+assert_contains "app:desktop:reap-jobs was killed (exit 137): it ignored the stop signal after its 300-second limit, or it ran out of memory." "$CASE2H_LOG" "exit 137 is logged as a forced kill, not a plain failure"
+assert_contains "app:process-mail-handlers" "$COMMAND_LOG" "later tick jobs still run after a failure"
+
+echo "Case 2i: TERM stops a running lane"
+reset_scheduler_env
+: > "$COMMAND_LOG"
+export SYNAPLAN_SCHEDULER_MAX_CYCLES=0
+export SYNAPLAN_SCHEDULER_TICK_SECONDS=30
+export SAVED_TASKS_SLEEP=30
+export CLAIM_EXIT=0
+CASE2I_LOG="$TMP_DIR/scheduler-case2i.log"
 (
-    cd "$TMP_DIR/app" || exit
+    set -euo pipefail
+    cd "$TMP_DIR/app" || exit 1
     export PATH="$TMP_DIR/bin:$PATH"
-    export COMMAND_LOG
+    export COMMAND_LOG APP_ENV=prod
     export SYNAPLAN_ROLE=scheduler
     export SYNAPLAN_RUNTIME_DIR="$TMP_DIR/runtime"
-    export SYNAPLAN_SCHEDULER_MAX_CYCLES=2
-    export SYNAPLAN_SCHEDULER_TICK_SECONDS=0
-    export SYNAPLAN_SCHEDULER_HOURLY_SECONDS=0
-    export SYNAPLAN_SCHEDULER_DAILY_SECONDS=86400
     # shellcheck disable=SC1090
     . "$RUNTIME_LIB"
     prepare_role_cache() { :; }
     wait_for_web_initialization() { :; }
-    php() {
-        printf '%s\n' "$*" >> "$COMMAND_LOG"
-    }
     run_scheduler_role
-)
-assert_eq 2 "$(grep -c 'app:models:discover --notify' "$COMMAND_LOG")" "model discovery runs on every hourly slot"
-assert_eq 1 "$(grep -c 'app:updates:check' "$COMMAND_LOG")" "daily update check still runs once per day"
+) >"$CASE2I_LOG" 2>&1 &
+CASE2I_PID=$!
+CASE2I_SEEN=0
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if grep -q 'app:saved-tasks:tick' "$COMMAND_LOG"; then
+        CASE2I_SEEN=1
+        break
+    fi
+    sleep 0.1
+done
+kill -TERM "$CASE2I_PID" 2>/dev/null || true
+CASE2I_EXITED=0
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if ! kill -0 "$CASE2I_PID" 2>/dev/null; then
+        CASE2I_EXITED=1
+        break
+    fi
+    sleep 0.25
+done
+if [ "$CASE2I_EXITED" -eq 0 ]; then
+    case2i_child=''
+    for case2i_child in $(pgrep -P "$CASE2I_PID" 2>/dev/null || true); do
+        kill -KILL -- "-${case2i_child}" 2>/dev/null || kill -KILL "$case2i_child" 2>/dev/null || true
+    done
+    kill -KILL "$CASE2I_PID" 2>/dev/null || true
+fi
+wait "$CASE2I_PID" 2>/dev/null || true
+assert_eq 1 "$CASE2I_SEEN" "TERM is sent while a lane is running"
+assert_eq 1 "$CASE2I_EXITED" "scheduler exits within a few seconds of TERM"
+assert_contains "Scheduler stopped." "$CASE2I_LOG" "scheduler logs that it stopped"
+
+echo "Case 2j: lane commands match ScheduledJobs.php"
+SCHEDULED_JOBS_PHP="${SCRIPT_DIR}/../../../backend/src/Service/Scheduler/ScheduledJobs.php"
+# app:scheduler:claim is the slot gate, not a lane job, so it is outside this range.
+SHELL_JOBS="$(
+    awk '
+        /^run_scheduler_role\(\)/ {p=0}
+        p {print}
+        /^run_scheduler_tick_lane\(\)/ {p=1}
+    ' "$RUNTIME_LIB" | grep -oE 'app:[A-Za-z0-9:-]+' | sort -u
+)"
+if [ ! -f "$SCHEDULED_JOBS_PHP" ]; then
+    assert_eq 1 0 "scheduler commands match ScheduledJobs.php"
+else
+    PHP_JOBS="$(grep -oE "'app:[A-Za-z0-9:-]+'" "$SCHEDULED_JOBS_PHP" | tr -d "'" | sort -u)"
+    if [ "$SHELL_JOBS" = "$PHP_JOBS" ]; then
+        assert_eq 1 1 "scheduler commands match ScheduledJobs.php"
+    else
+        echo "shell jobs:" >&2
+        printf '%s\n' "$SHELL_JOBS" >&2
+        echo "php jobs:" >&2
+        printf '%s\n' "$PHP_JOBS" >&2
+        assert_eq 1 0 "scheduler commands match ScheduledJobs.php"
+    fi
+fi
 
 echo "Case 3: initialization wait retries pending migrations"
 DB_CALLS=0

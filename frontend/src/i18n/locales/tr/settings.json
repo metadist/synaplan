@@ -400,6 +400,48 @@
         "failed24": "{count} başarısız (24 sa)",
         "openConfig": "Dosya çalışması ayarları",
         "stateTierBlocked": "Açık, ancak gerekli yalıtımın altında. Dosya işleri gizli."
+      },
+      "scheduler": {
+        "title": "Arka plan işleri",
+        "loading": "Arka plan işleri kontrol ediliyor…",
+        "error": "Arka plan işlerinin durumu yüklenemedi. Sayfayı yeniden yükleyin.",
+        "never": "Bu sunucuda arka plan işleri hiç çalışmadı.",
+        "running": "Arka plan işleri çalışıyor. Son çalışma: {time}.",
+        "stale": "Arka plan işleri durdu. Son çalışma: {time}. Zamanlanmış görevler, anımsatıcılar ve temizlemeler çalışmıyor. Zamanlayıcı hizmetini yeniden başlatın.",
+        "howToStart": "Zamanlayıcı nasıl başlatılır",
+        "refresh": "Yenile",
+        "notRunYet": "Henüz çalışmadı",
+        "statusRunning": "Çalışıyor",
+        "statusStopped": "Durdu",
+        "statusNever": "Hiç başlamadı",
+        "failures": "{count} iş başarısız: {names}. Ayrıntılar zamanlayıcı günlüğünde.",
+        "unfinished": "Başladı ama henüz bitmedi: {names} (hâlâ çalışıyor veya süre sınırı nedeniyle durdu).",
+        "owner": "Bu işler, bu sunucunun zamanlayıcı hizmetinde, Docker Compose dosyasıyla başlatılarak çalışır. Şu komutla yeniden başlatın: {command}.",
+        "lanes": {
+          "tick": "Her dakika",
+          "tasks": "Kayıtlı görevler",
+          "hourly": "Saatlik",
+          "daily": "Günlük",
+          "health": "Model sağlığı"
+        },
+        "jobs": {
+          "mediaReap": "görüntü ve video işi temizliği",
+          "chatReap": "takılı sohbet temizliği",
+          "desktopReap": "masaüstü işi temizliği",
+          "mailHandlers": "gelen e-posta işleyicileri",
+          "processEmails": "akıllı posta kutusu",
+          "savedTasks": "Kayıtlı görevler",
+          "ephemeralFiles": "geçici dosya temizliği",
+          "approvalsExpire": "süresi dolan onaylar",
+          "modelsDiscover": "yeni model kontrolü",
+          "updatesCheck": "güncelleme kontrolü",
+          "modelsAvailability": "model kullanılabilirlik kontrolü",
+          "digest": "mesaj özeti",
+          "syncDocs": "belge senkronizasyonu",
+          "approvalsDigest": "onay özeti e-postası",
+          "syncPrices": "model fiyat senkronizasyonu",
+          "modelHealth": "model sağlık kontrolü"
+        }
       }
     },
     "notLoggedIn": "Oturum açılmadı"

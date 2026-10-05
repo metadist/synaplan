@@ -1,15 +1,17 @@
 import { loadConfig } from './config.js'
 import { createElementBot } from './elementBot.js'
+import { createPluginClient } from './pluginSession.js'
 import { createApp } from './server.js'
 import { createSynaplanClient } from './synaplan.js'
 
 const config = loadConfig(process.env)
 const synaplan = createSynaplanClient({ baseUrl: config.synaplanUrl, apiKey: config.apiKey })
+const plugin = createPluginClient({ baseUrl: config.synaplanUrl, apiKey: config.apiKey })
 const log = (line) => {
   process.stdout.write(`${new Date().toISOString()} ${line}\n`)
 }
 
-const server = createApp(config, { synaplan, log })
+const server = createApp(config, { synaplan, plugin, log })
 server.listen(config.port, config.host, () => {
   log(`Meeting notes listening on ${config.host}:${config.port} (${config.mode})`)
 })
