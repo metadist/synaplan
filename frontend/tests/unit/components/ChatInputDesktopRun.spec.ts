@@ -280,6 +280,18 @@ describe('ChatInput run on this computer', () => {
     expect(wrapper.find('[data-testid="dropdown-plus-panel"]').exists()).toBe(false)
   })
 
+  it('closes the plus panel on Escape when a child stops the key event', async () => {
+    const wrapper = await mountInput()
+    await wrapper.get('[data-testid="btn-chat-plus"]').trigger('click')
+    const input = wrapper.get('[data-testid="input-chat-message"]').element
+    input.addEventListener('keydown', (event) => event.stopPropagation())
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dropdown-plus-panel"]').exists()).toBe(false)
+  })
+
   it('shows the empty-skill sentence when the computer reported none', async () => {
     harness.devices.value = [device({ enabledSkills: [], skillsReported: true })]
     const wrapper = await mountInput()

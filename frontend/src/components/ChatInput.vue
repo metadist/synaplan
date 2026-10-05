@@ -1742,14 +1742,16 @@ const clearSilenceTimer = () => {
 
 onMounted(() => {
   document.addEventListener('click', handlePlusClickOutside)
-  document.addEventListener('keydown', handlePlusEscape)
+  // Capture so Escape still closes the panel when the composer stops the
+  // event for an open command or mention palette.
+  document.addEventListener('keydown', handlePlusEscape, true)
 })
 
 onUnmounted(() => {
   dictationUnmounted = true
   stopDictation({ keepText: false })
   document.removeEventListener('click', handlePlusClickOutside)
-  document.removeEventListener('keydown', handlePlusEscape)
+  document.removeEventListener('keydown', handlePlusEscape, true)
   if (uploadAbortController.value) {
     uploadAbortController.value.abort()
     uploadAbortController.value = null
