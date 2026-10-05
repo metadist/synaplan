@@ -226,6 +226,59 @@ final class MessageDigestRunnerTest extends TestCase
         $this->runner->runForUser($user, maxBatches: 4, dryRun: true);
     }
 
+    public function testDryRunCollectsProposalsAndShowsEarlierPicksToLaterBatches(): void
+    {
+        $user = $this->makeUser(7);
+        $this->userRepository->method('find')->willReturn($user);
+        $this->messageRepository->method('findDigestCandidates')
+            ->willReturnOnConsecutiveCalls([$this->makeMessage(50)], [$this->makeMessage(60)], []);
+
+        $pendingPerCall = [];
+        $this->digestService->method('digestBatch')->willReturnCallback(
+            function (User $user, array $messages, bool $dryRun, array $pendingTitles) use (&$pendingPerCall): array {
+                $pendingPerCall[] = $pendingTitles;
+                $messageId = $messages[0]->getId();
+
+                return [
+                    'scanned' => 1,
+                    'created' => 0,
+                    'proposals' => [['title' => 'title for '.$messageId, 'message_id' => $messageId]],
+                    'failed' => false,
+                    'failureReason' => null,
+                ];
+            },
+        );
+
+        $summary = $this->runner->backfill(onlyUserId: 7, sinceUnix: 1_000_000, dryRun: true);
+
+        self::assertSame([[], ['title for 50']], $pendingPerCall);
+        self::assertSame([
+            ['user_id' => 7, 'title' => 'title for 50', 'message_id' => 50],
+            ['user_id' => 7, 'title' => 'title for 60', 'message_id' => 60],
+        ], $summary['proposals']);
+    }
+
+    public function testRealRunPassesNoPendingTitlesAndListsNoProposals(): void
+    {
+        $user = $this->makeUser(7);
+        $this->config->method('getCursor')->willReturn(0);
+        $this->messageRepository->method('findDigestCandidates')
+            ->willReturnOnConsecutiveCalls([$this->makeMessage(50)], [$this->makeMessage(60)], []);
+        $this->digestService->expects(self::exactly(2))->method('digestBatch')
+            ->with(self::anything(), self::anything(), false, [])
+            ->willReturn([
+                'scanned' => 1,
+                'created' => 1,
+                'proposals' => [['title' => 'stored title', 'message_id' => 50]],
+                'failed' => false,
+                'failureReason' => null,
+            ]);
+
+        $result = $this->runner->runForUser($user, maxBatches: 4);
+
+        self::assertSame([], $result['proposals']);
+    }
+
     public function testPruneRunsAfterAUserPassThatCreatedDigests(): void
     {
         $user = $this->makeUser(7);

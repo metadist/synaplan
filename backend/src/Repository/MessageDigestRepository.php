@@ -80,6 +80,24 @@ class MessageDigestRepository extends ServiceEntityRepository
     }
 
     /**
+     * Newest active titles of a user across all chats, for dedup context.
+     *
+     * @return list<string>
+     */
+    public function findRecentTitles(int $userId, int $limit): array
+    {
+        return $this->createQueryBuilder('d')
+            ->select('d.title')
+            ->where('d.userId = :userId')
+            ->andWhere('d.active = true')
+            ->setParameter('userId', $userId)
+            ->orderBy('d.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getSingleColumnResult();
+    }
+
+    /**
      * Active digests for a set of message ids, scoped to one user — resolves
      * `[Message:ID]` badge references in the web UI after a page reload.
      *

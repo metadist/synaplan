@@ -43,9 +43,13 @@ condensed hardest). The newest turns are always replayed word for word.
 ## Message digests (deep memory)
 
 A daily job walks each user's new messages and asks the memory model to pick
-the **KEY messages** — documents, decisions, important facts/amounts/dates —
-and write one searchable title per message ("office rent letter to realtor
-about the increase of payments"). Each digest row is embedded and indexed in
+the **KEY messages** — documents with their content, results, decisions,
+important facts/amounts/dates — and write one searchable title per message
+("office rent letter to realtor about the increase of payments"). Requests to
+the assistant ("make a chart of this") and notes that a file was created are
+skipped; only the facts they contain count. The model sees the existing titles
+of the batch's chats and the user's 30 newest titles, so a task repeated in
+another chat is not indexed twice. Each digest row is embedded and indexed in
 Qdrant.
 
 During a chat turn, the user's prompt embedding (already computed for memory
@@ -111,6 +115,10 @@ php bin/console app:digest:backfill --all-users --since-days=365
 # Preview what the model would pick, storing nothing
 php bin/console app:digest:backfill --user=123 --since-days=365 --dry-run
 ```
+
+A dry run (also on `app:digest:run`) still calls the model and is billed; it
+prints a table of the proposed titles with their message ids. Later batches see
+the titles earlier batches proposed, as a real run would.
 
 Backfill never moves the per-user cursor; idempotency comes from the
 one-digest-per-message unique key, so overlapping runs are safe.

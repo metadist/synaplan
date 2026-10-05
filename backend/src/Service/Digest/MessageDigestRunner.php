@@ -46,7 +46,7 @@ final readonly class MessageDigestRunner
     /**
      * Scheduled entry point: digest new messages for every eligible user.
      *
-     * @return array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int}
+     * @return array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int, proposals: list<array{user_id: int, title: string, message_id: int}>}
      */
     public function run(?int $onlyUserId = null, bool $dryRun = false, ?int $maxBatchesPerUser = null): array
     {
@@ -66,7 +66,7 @@ final readonly class MessageDigestRunner
      * Backfill a historical range for one user (or all): starts from message id 0
      * within the `sinceUnix` window and does NOT advance the stored cursor.
      *
-     * @return array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int}
+     * @return array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int, proposals: list<array{user_id: int, title: string, message_id: int}>}
      */
     public function backfill(?int $onlyUserId, int $sinceUnix, bool $dryRun = false, ?int $maxBatchesPerUser = null): array
     {
@@ -85,7 +85,7 @@ final readonly class MessageDigestRunner
      * or chat-less row is a hole: the pass stops below it. An abort-class
      * failure returns with `aborted` set and does not move the cursor.
      *
-     * @return array{batches: int, created: int, scanned: int, cursor: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int}
+     * @return array{batches: int, created: int, scanned: int, cursor: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int, proposals: list<array{title: string, message_id: int}>}
      */
     public function runForOtherChats(User $user, int $liveChatId, int $maxBatches = 2): array
     {
@@ -104,7 +104,7 @@ final readonly class MessageDigestRunner
      * `cursor` in the result is the scan position: the last candidate of the
      * last successful or skipped batch.
      *
-     * @return array{batches: int, created: int, scanned: int, cursor: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int}
+     * @return array{batches: int, created: int, scanned: int, cursor: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int, proposals: list<array{title: string, message_id: int}>}
      */
     public function runForUser(
         User $user,
@@ -155,7 +155,13 @@ final readonly class MessageDigestRunner
                 break;
             }
 
-            $batchResult = $this->digestService->digestBatch($user, $candidates, $dryRun);
+            // A dry run stores nothing, so later batches learn earlier picks here.
+            $batchResult = $this->digestService->digestBatch(
+                $user,
+                $candidates,
+                $dryRun,
+                array_column($result['proposals'], 'title'),
+            );
             if ($batchResult['failed']) {
                 ++$result['failed_batches'];
                 $reason = $batchResult['failureReason'];
@@ -176,6 +182,9 @@ final readonly class MessageDigestRunner
             ++$result['batches'];
             $result['created'] += $batchResult['created'];
             $result['scanned'] += $batchResult['scanned'];
+            if ($dryRun) {
+                array_push($result['proposals'], ...$batchResult['proposals']);
+            }
             $scanCursor = $lastId;
             $result['cursor'] = $scanCursor;
 
@@ -211,7 +220,7 @@ final readonly class MessageDigestRunner
     /**
      * @param list<int> $userIds
      *
-     * @return array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int}
+     * @return array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int, proposals: list<array{user_id: int, title: string, message_id: int}>}
      */
     private function runAcrossUsers(
         array $userIds,
@@ -237,7 +246,7 @@ final readonly class MessageDigestRunner
                 dryRun: $dryRun,
                 advanceCursor: $advanceCursor,
             );
-            $this->absorbUser($summary, $result);
+            $this->absorbUser($summary, $result, $userId);
             if ($result['aborted']) {
                 $this->markAborted($summary, $result, \count($userIds) - $index - 1, $job);
                 break;
@@ -250,13 +259,16 @@ final readonly class MessageDigestRunner
     }
 
     /**
-     * @param array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int} $summary
-     * @param array{batches: int, created: int, scanned: int, failed_batches: int, skipped_budget: int}                                                                       $result
+     * @param array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int, proposals: list<array{user_id: int, title: string, message_id: int}>} $summary
+     * @param array{batches: int, created: int, scanned: int, failed_batches: int, skipped_budget: int, proposals: list<array{title: string, message_id: int}>}                                                                                     $result
      */
-    private function absorbUser(array &$summary, array $result): void
+    private function absorbUser(array &$summary, array $result, int $userId): void
     {
         $summary['failed_batches'] += $result['failed_batches'];
         $summary['skipped_budget'] += $result['skipped_budget'];
+        foreach ($result['proposals'] as $proposal) {
+            $summary['proposals'][] = ['user_id' => $userId] + $proposal;
+        }
         if ($result['batches'] > 0) {
             ++$summary['users'];
             $summary['batches'] += $result['batches'];
@@ -382,7 +394,7 @@ final readonly class MessageDigestRunner
     }
 
     /**
-     * @return array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int}
+     * @return array{users: int, skipped_users: int, batches: int, created: int, scanned: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int, proposals: list<array{user_id: int, title: string, message_id: int}>}
      */
     private function emptyRunSummary(): array
     {
@@ -396,11 +408,12 @@ final readonly class MessageDigestRunner
             'aborted' => false,
             'abort_reason' => null,
             'skipped_budget' => 0,
+            'proposals' => [],
         ];
     }
 
     /**
-     * @return array{batches: int, created: int, scanned: int, cursor: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int}
+     * @return array{batches: int, created: int, scanned: int, cursor: int, failed_batches: int, aborted: bool, abort_reason: ?string, skipped_budget: int, proposals: list<array{title: string, message_id: int}>}
      */
     private function emptyUserResult(int $cursor): array
     {
@@ -413,6 +426,7 @@ final readonly class MessageDigestRunner
             'aborted' => false,
             'abort_reason' => null,
             'skipped_budget' => 0,
+            'proposals' => [],
         ];
     }
 }
