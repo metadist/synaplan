@@ -592,6 +592,31 @@ final class MessageDigestRunnerTest extends TestCase
         self::assertSame(50, $cursor);
     }
 
+    public function testUserWithoutStoredCursorStartsAfterTheGlobalStartPoint(): void
+    {
+        $stored = [
+            '0|'.MessageDigestConfig::KEY_START_AFTER_ID => '9000',
+            '8|'.MessageDigestConfig::KEY_CURSOR => '9500',
+        ];
+        $config = new MessageDigestConfig($this->configRepository($stored));
+
+        self::assertSame(9000, $config->getCursor(7));
+        self::assertSame(9500, $config->getCursor(8));
+
+        $config->advanceCursor(7, 8000);
+        self::assertArrayNotHasKey('7|'.MessageDigestConfig::KEY_CURSOR, $stored);
+        $config->advanceCursor(7, 9010);
+        self::assertSame(9010, $config->getCursor(7));
+    }
+
+    public function testFreshInstallWithoutStartPointStartsAtZero(): void
+    {
+        $stored = [];
+        $config = new MessageDigestConfig($this->configRepository($stored));
+
+        self::assertSame(0, $config->getCursor(7));
+    }
+
     public function testCursorAdvanceNeverDecreases(): void
     {
         $stored = ['7|'.MessageDigestConfig::KEY_CURSOR => '50'];

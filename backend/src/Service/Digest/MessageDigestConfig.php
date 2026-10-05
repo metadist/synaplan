@@ -24,6 +24,7 @@ final class MessageDigestConfig
     public const KEY_QUIET_SECONDS = 'QUIET_SECONDS';
     public const KEY_CURSOR = 'CURSOR';
     public const KEY_CURSOR_FAILURES = 'CURSOR_FAILURES';
+    public const KEY_START_AFTER_ID = 'START_AFTER_ID';
     public const KEY_TOP_K = 'TOP_K';
     public const KEY_MIN_SCORE = 'MIN_SCORE';
     public const KEY_RECENCY_HALF_LIFE_DAYS = 'RECENCY_HALF_LIFE_DAYS';
@@ -94,13 +95,24 @@ final class MessageDigestConfig
      * Per-user digest cursor: the highest message id of the contiguous
      * scanned prefix. A batch with no key message still advances it. A row
      * skipped only for the quiet window bounds it, and a failed batch does
-     * not move it.
+     * not move it. A user without a stored cursor starts at
+     * {@see getStartAfterId()}.
      */
     public function getCursor(int $userId): int
     {
         $raw = $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_CURSOR);
 
-        return null !== $raw ? max(0, (int) $raw) : 0;
+        return null !== $raw ? max(0, (int) $raw) : $this->getStartAfterId();
+    }
+
+    /**
+     * Highest message id that existed when long-term memory was introduced,
+     * written once by a migration. The scheduled and after-turn passes never
+     * digest messages at or below it; only an explicit backfill reaches them.
+     */
+    public function getStartAfterId(): int
+    {
+        return max(0, $this->getInt(self::KEY_START_AFTER_ID, 0));
     }
 
     public function setCursor(int $userId, int $messageId): void
