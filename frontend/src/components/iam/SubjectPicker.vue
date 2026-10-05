@@ -5,7 +5,7 @@
       v-model="query"
       type="search"
       autocomplete="off"
-      class="w-full px-3 py-2 text-sm rounded-lg border border-light-border/30 dark:border-dark-border/8 bg-[var(--bg-card)] txt-primary placeholder:txt-secondary min-h-[42px]"
+      class="w-full px-3 py-2 text-sm rounded-xl border border-light-border/30 dark:border-dark-border/8 bg-[var(--bg-card)] txt-primary placeholder:txt-secondary min-h-[42px]"
       :placeholder="
         personScope === 'everyone'
           ? $t('iam.dialog.searchPlaceholder')
@@ -31,7 +31,7 @@
         {{ $t('iam.dialog.searchFailed') }}
         <button
           type="button"
-          class="btn-secondary ml-2 px-3 py-1.5 rounded-lg text-sm font-medium"
+          class="btn-secondary ml-2 px-3 py-1.5 rounded-xl text-sm font-medium"
           data-testid="btn-iam-search-retry"
           @click="load"
         >

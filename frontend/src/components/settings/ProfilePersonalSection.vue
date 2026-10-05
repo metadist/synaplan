@@ -13,7 +13,7 @@
         <input
           v-model="formData.firstName"
           type="text"
-          class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           :placeholder="$t('profile.personalInfo.firstNamePlaceholder')"
           data-testid="input-first-name"
         />
@@ -26,7 +26,7 @@
         <input
           v-model="formData.lastName"
           type="text"
-          class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           :placeholder="$t('profile.personalInfo.lastNamePlaceholder')"
           data-testid="input-last-name"
         />
@@ -62,7 +62,7 @@
             v-model="emailPassword"
             type="password"
             autocomplete="current-password"
-            class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('profile.personalInfo.emailPasswordPlaceholder')"
             data-testid="input-email-password"
           />
@@ -79,7 +79,7 @@
         <input
           v-model="formData.phone"
           type="tel"
-          class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           :placeholder="$t('profile.personalInfo.phonePlaceholder')"
           data-testid="input-phone"
         />

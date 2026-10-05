@@ -119,6 +119,40 @@ class FileRepositoryTest extends KernelTestCase
         $this->assertSame(1, $found['total']);
     }
 
+    public function testGetGroupCountsByUserDropsFoldersWithoutMatchingFiles(): void
+    {
+        $user = $this->createUser('group-filter');
+        $sheetFolder = 'Sheets_'.bin2hex(random_bytes(3));
+        $docFolder = 'Docs_'.bin2hex(random_bytes(3));
+
+        $sheet = $this->createFile($user, 'budget.xlsx');
+        $sheet->setFileType('xlsx');
+        $sheet->setGroupKey($sheetFolder);
+
+        $csv = $this->createFile($user, 'budget.csv');
+        $csv->setFileType('csv');
+        $csv->setGroupKey($sheetFolder);
+
+        $doc = $this->createFile($user, 'notes.pdf');
+        $doc->setGroupKey($docFolder);
+        $this->em->flush();
+
+        $userId = (int) $user->getId();
+        $all = $this->repository->getGroupCountsByUser($userId);
+        $this->assertSame(2, $all[$sheetFolder]);
+        $this->assertSame(1, $all[$docFolder]);
+
+        $sheets = $this->repository->getGroupCountsByUser($userId, [
+            'file_type' => 'xlsx,csv',
+        ]);
+
+        $this->assertSame(2, $sheets[$sheetFolder]);
+        $this->assertArrayNotHasKey($docFolder, $sheets);
+
+        $leadingComma = $this->repository->getGroupCountsByUser($userId, ['file_type' => ',xlsx']);
+        $this->assertSame(1, $leadingComma[$sheetFolder]);
+    }
+
     public function testFindFilesByChatIdRespectsLimitNewestFirst(): void
     {
         $user = $this->createUser('files-chat-limit');

@@ -17,7 +17,7 @@
         <input
           v-model="formData.street"
           type="text"
-          class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           :placeholder="$t('profile.billingAddress.streetPlaceholder')"
           data-testid="input-street"
         />
@@ -31,7 +31,7 @@
           <input
             v-model="formData.zipCode"
             type="text"
-            class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+            class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
             :placeholder="$t('profile.billingAddress.zipCodePlaceholder')"
             data-testid="input-zip"
           />
@@ -44,7 +44,7 @@
           <input
             v-model="formData.city"
             type="text"
-            class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+            class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
             :placeholder="$t('profile.billingAddress.cityPlaceholder')"
             data-testid="input-city"
           />
@@ -57,7 +57,7 @@
         </label>
         <select
           v-model="formData.country"
-          class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           data-testid="select-country"
         >
           <option v-for="country in countries" :key="country.code" :value="country.code">

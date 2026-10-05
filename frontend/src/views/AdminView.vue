@@ -152,7 +152,7 @@
                 v-for="period in ['day', 'week', 'month', 'all']"
                 :key="period"
                 :class="[
-                  'px-4 py-2 rounded-lg font-medium',
+                  'px-4 py-2 rounded-xl font-medium',
                   usageStatsPeriod === period ? 'btn-primary' : 'btn-secondary',
                 ]"
                 :data-testid="`btn-period-${period}`"
@@ -215,7 +215,7 @@
             <div class="flex justify-end">
               <button
                 type="button"
-                class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+                class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
                 data-testid="btn-usage-accordion-toggle-all"
                 @click="
                   allUsageSectionsOpen ? collapseAllUsageSections() : expandAllUsageSections()

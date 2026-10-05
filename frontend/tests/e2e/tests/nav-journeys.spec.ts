@@ -34,18 +34,20 @@ const summarizeDocumentName = path.basename(summarizeDocument)
 
 async function openOperateLink(page: Page, linkSelector: string) {
   await page.locator(NAV.sidebarV2Admin).click()
-  const flyout = page.locator(NAV.navDropdown)
-  await expect(flyout).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  await flyout.locator(linkSelector).click()
+  const panel = page.locator(NAV.sidebarPanel)
+  await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  await panel.locator(linkSelector).click()
 }
 
 async function openManageGroup(page: Page, groupKey: string) {
-  await page.locator(NAV.sidebarV2Manage).click()
-  await expect(page.locator(NAV.navDropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  await page.locator(NAV.flyoutGroup(groupKey)).click()
-  const sub = page.locator(NAV.navSubDropdown)
-  await expect(sub).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  return sub
+  const rail =
+    groupKey === 'assistants' || groupKey === 'automations'
+      ? NAV.sidebarV2Assistants
+      : NAV.sidebarV2Channels
+  await page.locator(rail).click()
+  const group = page.locator(NAV.panelGroup(groupKey))
+  await expect(group).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  return group
 }
 
 /**
@@ -134,6 +136,7 @@ test.describe('@ci Navigation journeys', () => {
       await expect(modal.locator(NAV.chatV2Row).filter({ hasText: title })).toHaveCount(1, {
         timeout: TIMEOUTS.STANDARD,
       })
+      await page.locator('[data-testid="btn-sidebar-v2-chats-toggle"]').hover()
       await page.locator(NAV.chatV2ShowAll).click()
       await expect(page).toHaveURL(/\/chats$/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(selectors.pages.chats)).toBeVisible()
@@ -151,30 +154,29 @@ test.describe('@ci Navigation journeys', () => {
     })
 
     if (sharing) {
-      await test.step('Incoming is a sibling tab and an Account entry', async () => {
-        await page.goto('/chats')
-        await expect(page.locator('[data-testid="tab-chats-incoming"]')).toBeVisible({
-          timeout: TIMEOUTS.STANDARD,
-        })
-        await page.locator('[data-testid="tab-chats-incoming"]').click()
-        await expect(page).toHaveURL(/\/chats\/incoming/, { timeout: TIMEOUTS.STANDARD })
-        await expect(page.locator('[data-testid="page-chats-incoming"]')).toBeVisible()
-
-        await page.locator(USR.button).click()
-        await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-        await page.locator(USR.incomingBtn).click()
-        await expect(page).toHaveURL(/\/chats\/incoming/, { timeout: TIMEOUTS.STANDARD })
-      })
-    } else {
-      await test.step('IAM sharing off ⇒ no Incoming tab', async () => {
+      await test.step('Incoming is a sidebar category, and the old page opens the filtered list', async () => {
         await page.goto('/chats')
         await expect(page.locator(selectors.pages.chats)).toBeVisible({
           timeout: TIMEOUTS.STANDARD,
         })
         await expect(page.locator('[data-testid="tab-chats-incoming"]')).toHaveCount(0)
-        await page.locator(USR.button).click()
-        await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-        await expect(page.locator(USR.incomingBtn)).toHaveCount(0)
+
+        await page.goto('/chats/incoming')
+        await expect(page).toHaveURL(/\/chats\?type=group$/, { timeout: TIMEOUTS.STANDARD })
+
+        await page.locator(NAV.sidebarV2ChatNav).click()
+        await expect(page.locator('[data-testid="section-sidebar-incoming"]')).toBeVisible({
+          timeout: TIMEOUTS.STANDARD,
+        })
+      })
+    } else {
+      await test.step('IAM sharing off ⇒ no Incoming category', async () => {
+        await page.goto('/chats')
+        await expect(page.locator(selectors.pages.chats)).toBeVisible({
+          timeout: TIMEOUTS.STANDARD,
+        })
+        await expect(page.locator('[data-testid="tab-chats-incoming"]')).toHaveCount(0)
+        await expect(page.locator('[data-testid="section-sidebar-incoming"]')).toHaveCount(0)
       })
     }
 
@@ -274,13 +276,12 @@ test.describe('@ci Navigation journeys', () => {
       await expect(page.locator(CHAT.summarizeOptions)).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
-      const manage = page.locator(NAV.sidebarV2Manage)
-      await expect(manage).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      await manage.click()
-      await page.locator(NAV.flyoutGroup('assistants')).click()
-      const sub = page.locator(NAV.navSubDropdown)
-      await expect(sub).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(sub.locator('[data-testid="link-sidebar-v2-doc-summary"]')).toHaveCount(0)
+      const assistants = page.locator(NAV.sidebarV2Assistants)
+      await expect(assistants).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await assistants.click()
+      const group = page.locator(NAV.panelGroup('assistants'))
+      await expect(group).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(group.locator('[data-testid="link-sidebar-v2-doc-summary"]')).toHaveCount(0)
     })
   })
 

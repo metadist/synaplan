@@ -8,9 +8,9 @@ const FILES = selectors.files
 /**
  * J-CP-2 on the Files side with COMPUTE.WORKSPACES_ENABLED on. The CI stack has
  * no compute sidecar, so the runtime flag and the four workspace endpoints are
- * served by route mocks; everything the user sees — tab, list, preview dialog,
- * delete confirmation, empty and error states — is the real app. The flag-off
- * half (no tab, direct route redirects) runs against the real backend.
+ * served by route mocks; everything the user sees — sidebar link, list, preview
+ * dialog, delete confirmation, empty and error states — is the real app. The
+ * flag-off half (no link, direct route redirects) runs against the real backend.
  */
 
 const REPORT = { path: 'reports/january.csv', size: 12, mime: 'text/csv', modifiedAt: '' }
@@ -48,21 +48,21 @@ async function mockWorkspaceApi(page: Page, state: { exists: boolean; files: (ty
   )
 }
 
-test.describe('@ci Files workspace tab', () => {
+test.describe('@ci Files workspace', () => {
   test('flag on: list, preview, close with Escape, delete to the empty state', async ({ page }) => {
     const state = { exists: true, files: [REPORT] }
     await enableWorkspaceFlag(page)
     await mockWorkspaceApi(page, state)
 
-    await test.step('Arrange: Files shows the Workspace tab', async () => {
+    await test.step('Arrange: Files shows the Workspace link', async () => {
       await openApp(page)
       await page.locator(selectors.nav.sidebarV2Files).click()
-      await expect(page.locator(FILES.tabsBar)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      await expect(page.locator(FILES.tabWorkspace)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(FILES.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(FILES.linkWorkspace)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
 
-    await test.step('The tab lists the nested file with its relative path', async () => {
-      await page.locator(FILES.tabWorkspace).click()
+    await test.step('The page lists the nested file with its relative path', async () => {
+      await page.locator(FILES.linkWorkspace).click()
       await expect(page).toHaveURL(/\/files\/workspace/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(FILES.pageWorkspace)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(FILES.workspaceFiles)).toContainText('reports/january.csv')
@@ -112,11 +112,11 @@ test.describe('@ci Files workspace tab', () => {
     await expect(page.locator(FILES.workspaceError)).toHaveCount(0)
   })
 
-  test('flag off: the direct route redirects to Files and no tab is offered', async ({ page }) => {
+  test('flag off: the direct route redirects to Files and no link is offered', async ({ page }) => {
     await openApp(page)
     await page.goto('/files/workspace')
     await expect(page).toHaveURL(/\/files$/, { timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(FILES.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expect(page.locator(FILES.tabWorkspace)).toHaveCount(0)
+    await expect(page.locator(FILES.linkWorkspace)).toHaveCount(0)
   })
 })

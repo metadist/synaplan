@@ -7,7 +7,7 @@
         :value="name"
         type="text"
         maxlength="128"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.namePlaceholder')"
         :aria-invalid="Boolean(errorFor('name'))"
         :aria-describedby="errorFor('name') ? 'assistant-name-error' : undefined"
@@ -28,7 +28,7 @@
       <textarea
         :value="description"
         rows="3"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.descriptionPlaceholder')"
         data-testid="input-assistant-description"
         @input="patchDescription(($event.target as HTMLTextAreaElement).value)"
@@ -46,7 +46,7 @@
       <input
         :value="greeting"
         type="text"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.greetingPlaceholder')"
         data-testid="input-assistant-greeting"
         @input="patchGreeting(($event.target as HTMLInputElement).value)"
@@ -65,7 +65,7 @@
         <input
           :value="prompt"
           type="text"
-          class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :placeholder="$t('assistants.starterPromptPlaceholder')"
           :data-testid="`input-starter-${index}`"
           @input="patchStarter(index, ($event.target as HTMLInputElement).value)"
@@ -73,7 +73,7 @@
       </div>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-add-starter"
         @click="addStarter"
       >

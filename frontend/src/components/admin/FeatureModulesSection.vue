@@ -90,7 +90,7 @@ const docsHref = (module: FeatureModule): string =>
       <button
         v-if="sorted.length > 1"
         type="button"
-        class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
         data-testid="btn-modules-toggle-all"
         @click="allOpen ? collapseAll() : expandAll()"
       >

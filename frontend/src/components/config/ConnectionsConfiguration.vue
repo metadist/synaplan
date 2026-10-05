@@ -219,7 +219,7 @@ onMounted(async () => {
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
-              class="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
+              class="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium flex-1 sm:flex-none"
               data-testid="btn-test-connection"
               @click="onAdapterOpen(item)"
             >
@@ -257,7 +257,7 @@ onMounted(async () => {
               type="button"
               :class="[
                 m365Connected ? 'btn-secondary' : 'btn-primary',
-                'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0',
+                'inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap shrink-0',
               ]"
               :disabled="m365Connecting"
               data-testid="btn-connect-m365"
@@ -327,7 +327,7 @@ onMounted(async () => {
               type="button"
               :class="[
                 dropboxConnected ? 'btn-secondary' : 'btn-primary',
-                'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0',
+                'inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap shrink-0',
               ]"
               :disabled="dropboxConnecting"
               data-testid="btn-connect-dropbox"
@@ -394,7 +394,7 @@ onMounted(async () => {
             </div>
             <router-link
               to="/channels/email"
-              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap shrink-0"
             >
               {{ $t('config.connections.providers.mailbox.action') }}
             </router-link>
@@ -419,7 +419,7 @@ onMounted(async () => {
             </div>
             <router-link
               to="/channels/mcp"
-              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap shrink-0"
             >
               {{ $t('config.connections.providers.mcp.action') }}
             </router-link>

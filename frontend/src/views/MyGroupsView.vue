@@ -9,7 +9,7 @@
         <router-link
           v-if="authStore.isAdmin"
           to="/admin/people"
-          class="btn-primary px-4 py-2.5 rounded-lg inline-flex items-center gap-2"
+          class="btn-primary px-4 py-2.5 rounded-xl inline-flex items-center gap-2"
           data-testid="link-my-groups-people"
         >
           {{ $t('people.openPeople') }}
@@ -102,7 +102,7 @@
           <button
             v-if="canLeave(group)"
             type="button"
-            class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
             :data-testid="`btn-leave-group-${group.id}`"
             @click="leaveGroup(group)"
           >

@@ -16,7 +16,7 @@
     <template v-if="collapsed">
       <button
         type="button"
-        class="btn-secondary px-2 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-2"
+        class="btn-secondary px-2 py-1 rounded-xl text-xs font-medium inline-flex items-center gap-2"
         :aria-expanded="expanded"
         data-testid="btn-timeline-toggle"
         @click="expanded = !expanded"

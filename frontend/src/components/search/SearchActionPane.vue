@@ -1,6 +1,6 @@
 <template>
   <div
-    class="absolute left-3 right-3 bottom-3 sm:left-auto sm:bottom-12 sm:w-72 z-10 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-2xl overflow-hidden"
+    class="absolute left-3 right-3 bottom-3 sm:left-auto sm:bottom-12 sm:w-72 z-10 surface-card !rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-2xl overflow-hidden"
     data-testid="pane-smart-search-actions"
   >
     <p class="px-3 pt-3 pb-1 text-xs font-semibold txt-secondary truncate">

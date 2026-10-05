@@ -387,7 +387,7 @@
       "promptContentSubtitle": "Message système au format Markdown utilisé pour ce sujet.",
       "knowledgeTitle": "Base de connaissances",
       "knowledgeSubtitle": "Liez des fichiers indexés pour un contexte enrichi par la recherche.",
-      "openFileManager": "Sources",
+      "openFileManager": "Bibliothèque",
       "linkedFiles": "Fichiers liés ({n})",
       "noFilesLinked": "Aucun fichier lié pour le moment",
       "noFilesLinkedHint": "Liez des fichiers ci-dessous pour les ajouter à la base de connaissances de cette instruction.",

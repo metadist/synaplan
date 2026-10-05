@@ -1,7 +1,7 @@
 <template>
   <div class="relative">
     <button
-      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:text-[var(--brand)] transition-colors"
+      class="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:text-[var(--brand)] transition-colors"
       :title="$t('files.moveTo')"
       @click.stop="$emit('toggle')"
     >
@@ -10,7 +10,7 @@
     <Transition name="fade">
       <div
         v-if="open"
-        class="absolute right-0 top-full mt-1 z-30 w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
+        class="absolute right-0 top-full mt-1 z-30 w-52 surface-card !rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
       >
         <div class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary">
           {{ $t('files.moveTo') }}
@@ -48,13 +48,18 @@
           <Icon icon="heroicons:folder-minus" class="w-4 h-4 shrink-0" />
           <span class="truncate">{{ $t('files.removeFromFolder') }}</span>
         </button>
-        <div class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5">
-          <div class="flex items-center gap-1.5 px-3 py-1">
-            <Icon icon="heroicons:folder-plus" class="w-4 h-4 text-[var(--brand)] shrink-0" />
+        <div
+          class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 px-2 pt-2 pb-2"
+        >
+          <div class="relative">
+            <Icon
+              icon="heroicons:folder-plus"
+              class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--brand)] pointer-events-none"
+            />
             <input
               v-model="newTarget"
               type="text"
-              class="flex-1 text-xs bg-transparent txt-primary placeholder:txt-secondary/50 focus:outline-none"
+              class="w-full pl-8 pr-2 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
               :placeholder="$t('files.folderPicker.newPlaceholder')"
               @keyup.enter="$emit('move', newTarget.trim())"
               @click.stop

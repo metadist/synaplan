@@ -5,7 +5,7 @@
       type="button"
       :disabled="disabled"
       :class="[
-        'w-full px-4 py-2.5 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
+        'w-full px-4 py-2.5 pl-10 pr-10 rounded-xl surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
         'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
         isOpen && 'ring-2 ring-[var(--brand)]',
         disabled && 'opacity-50 cursor-not-allowed',

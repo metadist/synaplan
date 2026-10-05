@@ -2,7 +2,7 @@
   <div class="flex h-dvh overflow-hidden" data-testid="comp-main-layout">
     <a
       href="#main-content"
-      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[300] focus:px-3 focus:py-2 focus:rounded-lg btn-primary"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[300] focus:px-3 focus:py-2 focus:rounded-xl btn-primary"
       data-testid="link-skip-to-content"
     >
       {{ $t('common.skipToContent') }}
@@ -77,6 +77,12 @@
     >
       <XMarkIcon v-if="sidebarStore.mobileDrawerOpen" class="w-6 h-6" aria-hidden="true" />
       <Bars3Icon v-else class="w-6 h-6" aria-hidden="true" />
+      <span
+        v-if="incomingStore.hasNew && !sidebarStore.mobileDrawerOpen"
+        class="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-card)]"
+        aria-hidden="true"
+        data-testid="dot-mobile-drawer-incoming-new"
+      />
     </button>
 
     <!-- Guest login shortcut (top-right) — mirrors the drawer toggle on the
@@ -118,6 +124,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { matchesPhoneChrome } from '../composables/usePhoneChrome'
 import { useSidebarStore } from '../stores/sidebar'
+import { useIncomingStore } from '../stores/incoming'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
@@ -131,6 +138,7 @@ import ModelMixControl from './chat/ModelMixControl.vue'
 const route = useRoute()
 const router = useRouter()
 const sidebarStore = useSidebarStore()
+const incomingStore = useIncomingStore()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 

@@ -106,7 +106,7 @@ const onNotifyChange = async () => {
       {{ $t('approvals.notify') }}
       <select
         v-model="notifyMode"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         data-testid="approvals-notify-mode"
         @change="onNotifyChange"
       >
@@ -118,7 +118,7 @@ const onNotifyChange = async () => {
     <div class="flex gap-2">
       <button
         type="button"
-        class="px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="px-4 py-2.5 rounded-xl text-sm font-medium"
         :class="tab === 'pending' ? 'btn-primary' : 'btn-secondary'"
         data-testid="approvals-tab-pending"
         @click="switchTab('pending')"
@@ -127,7 +127,7 @@ const onNotifyChange = async () => {
       </button>
       <button
         type="button"
-        class="px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="px-4 py-2.5 rounded-xl text-sm font-medium"
         :class="tab === 'decided' ? 'btn-primary' : 'btn-secondary'"
         data-testid="approvals-tab-decided"
         @click="switchTab('decided')"
@@ -167,7 +167,7 @@ const onNotifyChange = async () => {
           <p class="text-xs txt-secondary">{{ statusLabel(row.status) }}</p>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="approval-open-context"
             @click="openContext(row)"
           >

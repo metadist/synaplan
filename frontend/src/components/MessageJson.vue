@@ -15,7 +15,7 @@
       </div>
       <button
         type="button"
-        class="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium txt-secondary hover-surface"
+        class="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium txt-secondary hover-surface"
         :aria-label="$t('commands.copy')"
         data-testid="btn-copy-json"
         @click="copyJson"

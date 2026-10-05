@@ -60,17 +60,25 @@
     }
   },
   "chats": {
-    "tabs": {
-      "all": "Alle",
-      "incoming": "Eingehend"
-    },
     "empty": "Du hast noch keine Chats.",
     "emptyAction": "Neuer Chat"
   },
   "chat": {
     "title": "Chat",
     "newChat": "Neuer Chat",
+    "pin": "Chat anheften",
+    "unpin": "Anheften aufheben",
+    "pinSaveFailed": "Das Anheften konnte nicht gespeichert werden. Der Chat bleibt, wo er war.",
     "stillGenerating": "Antwortet noch",
+    "listOrigin": {
+      "web": "Chat",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "email": "E-Mail",
+      "widget": "Chat-Widget",
+      "api": "API",
+      "incoming": "Mit dir geteilt"
+    },
     "quote": {
       "button": "Im Chat erwähnen",
       "remove": "Zitat entfernen"
@@ -218,12 +226,14 @@
     "placeholderShort": "Nachricht...",
     "provider": "Anbieter",
     "model": "Modell",
-    "modelCaption": "Modell: {name}",
+    "modelPicker": {
+      "ariaLabel": "Modell {model}, Denkaufwand {level}",
+      "ariaLabelNoLevel": "Modell {model}"
+    },
     "plusMenu": {
       "label": "Hinzufügen",
       "attach": "Dateien anhängen",
       "photo": "Foto aufnehmen",
-      "model": "Modell",
       "tools": "Tools",
       "knowledge": "Wissensordner"
     },

@@ -9,7 +9,7 @@
         <button
           v-if="!builderMode"
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2"
           data-testid="btn-create-assistant-header"
           @click="createAssistant"
         >
@@ -18,7 +18,7 @@
         <button
           v-else
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-back-gallery"
           @click="router.push('/ai/assistants')"
         >

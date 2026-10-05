@@ -87,7 +87,6 @@ const mountInput = () =>
         FileMentionPalette: true,
         ToolsDropdown: true,
         ToolBadge: true,
-        ModelDropdown: true,
         KnowledgeFolderPicker: true,
         FileSelectionModal: true,
         PastedTextModal: true,
@@ -103,11 +102,7 @@ describe('ChatInput reasoning level', () => {
     setActivePinia(createPinia())
   })
 
-  const openPlusMenu = async (wrapper: ReturnType<typeof mountInput>) => {
-    await wrapper.get('[data-testid="btn-chat-plus"]').trigger('click')
-  }
-
-  it('shows the model default in the plus menu and sends that level', async () => {
+  it('shows the model default on the chip and sends that level', async () => {
     const store = useAiConfigStore()
     store.models.CHAT = [chatModel()]
     store.defaults.CHAT = 55
@@ -115,13 +110,12 @@ describe('ChatInput reasoning level', () => {
     const wrapper = mountInput()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="btn-reasoning-toggle"]').exists()).toBe(false)
-
-    await openPlusMenu(wrapper)
-    expect(wrapper.get('[data-testid="reasoning-level-current"]').text()).toBe(
+    expect(wrapper.find('[data-testid="dropdown-plus-panel"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="reasoning-level-current"]').text()).toContain(
       'chatInput.reasoningLevel.medium'
     )
 
+    await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
     await wrapper.get('[data-testid="btn-reasoning-toggle"]').trigger('click')
     await wrapper.get('[data-testid="btn-reasoning-xhigh"]').trigger('click')
     await wrapper.get('[data-testid="input-chat-message"]').setValue('Explain this')
@@ -141,8 +135,8 @@ describe('ChatInput reasoning level', () => {
 
     const wrapper = mountInput()
     await flushPromises()
-    await openPlusMenu(wrapper)
     await wrapper.get('[data-testid="input-chat-message"]').setValue('Hi')
+    await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
     await wrapper.get('[data-testid="btn-reasoning-toggle"]').trigger('click')
     await wrapper.get('[data-testid="btn-reasoning-none"]').trigger('click')
     await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
@@ -168,8 +162,9 @@ describe('ChatInput reasoning level', () => {
 
     const wrapper = mountInput()
     await flushPromises()
-    await openPlusMenu(wrapper)
+    await wrapper.get('[data-testid="btn-model-toggle"]').trigger('click')
 
-    expect(wrapper.find('[data-testid="btn-reasoning-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="dropdown-reasoning-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="reasoning-level-current"]').exists()).toBe(false)
   })
 })

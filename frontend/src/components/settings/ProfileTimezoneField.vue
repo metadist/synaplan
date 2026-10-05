@@ -10,7 +10,7 @@
           v-model="timezoneQuery"
           type="search"
           autocomplete="off"
-          class="mb-2 w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mb-2 w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :placeholder="$t('profile.accountSettings.timezoneSearch')"
           :aria-label="$t('profile.accountSettings.timezoneSearch')"
           data-testid="input-timezone-search"
@@ -21,7 +21,7 @@
         <select
           id="profile-timezone"
           v-model="formData.timezone"
-          class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="select-timezone"
         >
           <option v-if="formData.timezone === ''" value="">

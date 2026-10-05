@@ -66,7 +66,7 @@
                 {{ selectedSessionIds.size }} {{ $t('widgetSessions.selected') }}
               </span>
               <button
-                class="p-1 rounded-lg hover:bg-[var(--brand)]/20 transition-colors"
+                class="p-1 rounded-xl hover:bg-[var(--brand)]/20 transition-colors"
                 :title="$t('common.clearSelection')"
                 @click="clearSelection"
               >
@@ -150,7 +150,7 @@
               {{ selectedSessionIds.size }}
             </span>
             <button
-              class="p-0.5 rounded hover:bg-[var(--brand)]/20 transition-colors"
+              class="p-0.5 rounded-xl hover:bg-[var(--brand)]/20 transition-colors"
               :title="$t('common.clearSelection')"
               @click="clearSelection"
             >
@@ -335,7 +335,7 @@
                           {{ session.title || getModeLabel(session.mode) }}
                         </span>
                         <button
-                          class="p-0.5 rounded transition-all duration-200 flex-shrink-0"
+                          class="p-0.5 rounded-xl transition-all duration-200 flex-shrink-0"
                           :class="
                             session.isFavorite
                               ? 'text-amber-500'
@@ -377,7 +377,7 @@
               <!-- Load More -->
               <div v-if="pagination.hasMore" class="pt-2 pb-1 text-center">
                 <button
-                  class="text-xs txt-brand hover:underline px-4 py-2 rounded-lg hover:bg-[var(--brand)]/5 transition-colors"
+                  class="text-xs txt-brand hover:underline px-4 py-2 rounded-xl hover:bg-[var(--brand)]/5 transition-colors"
                   @click="loadMore"
                 >
                   {{ $t('common.loadMore') }}
@@ -454,7 +454,7 @@
                         ref="titleInputRef"
                         v-model="editTitleValue"
                         type="text"
-                        class="text-sm font-medium txt-primary bg-white/5 dark:bg-white/5 px-2 py-1 rounded-lg border border-white/10 focus:border-[var(--brand)]/50 focus:ring-1 focus:ring-[var(--brand)]/30 outline-none transition-all w-48"
+                        class="text-sm font-medium txt-primary bg-white/5 dark:bg-white/5 px-2 py-1 rounded-xl border border-white/10 focus:border-[var(--brand)]/50 focus:ring-1 focus:ring-[var(--brand)]/30 outline-none transition-all w-48"
                         :placeholder="$t('chat.namePlaceholder')"
                         maxlength="100"
                         @keydown.enter="saveTitle"
@@ -469,7 +469,7 @@
                         {{ selectedSession.title || getModeLabel(selectedSession.mode) }}
                       </p>
                       <button
-                        class="p-1 rounded-lg hover:bg-white/10 transition-colors txt-secondary hover:text-[var(--brand)] flex-shrink-0"
+                        class="p-1 rounded-xl hover:bg-white/10 transition-colors txt-secondary hover:text-[var(--brand)] flex-shrink-0"
                         :title="$t('chat.rename')"
                         @click="startEditTitle"
                       >
@@ -478,7 +478,7 @@
                     </template>
                     <!-- Favorite star -->
                     <button
-                      class="p-1 rounded-lg transition-all duration-200 flex-shrink-0"
+                      class="p-1 rounded-xl transition-all duration-200 flex-shrink-0"
                       :class="
                         selectedSession.isFavorite
                           ? 'text-amber-500 hover:bg-amber-500/10'
@@ -705,13 +705,13 @@
                     v-if="field.type === 'text'"
                     v-model="internalFieldValues[field.id]"
                     type="text"
-                    class="w-full px-3 py-1.5 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
+                    class="w-full px-3 py-1.5 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
                     maxlength="256"
                   />
                   <select
                     v-else-if="field.type === 'dropdown'"
                     v-model="internalFieldValues[field.id]"
-                    class="w-full px-3 py-1.5 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
+                    class="w-full px-3 py-1.5 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
                   >
                     <option value="">{{ $t('widgets.customFields.dropdownPlaceholder') }}</option>
                     <option v-for="opt in field.options ?? []" :key="opt" :value="opt">
@@ -720,7 +720,7 @@
                   </select>
                   <button
                     v-else
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors w-full"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-colors w-full"
                     :class="
                       internalFieldValues[field.id]
                         ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
@@ -814,7 +814,7 @@
                   ref="messageInputRef"
                   v-model="messageText"
                   type="text"
-                  class="flex-1 px-5 py-3 rounded-2xl bg-white/5 dark:bg-white/5 txt-primary text-sm placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
+                  class="flex-1 px-5 py-3 rounded-xl bg-white/5 dark:bg-white/5 txt-primary text-sm placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
                   :placeholder="$t('widgetSessions.typeMessage')"
                   :disabled="sendingMessage || uploadingFiles"
                 />
@@ -878,7 +878,7 @@
                 {{ $t('widgetSessions.aiSummary') }}
               </h3>
               <button
-                class="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                class="p-1.5 rounded-xl hover:bg-white/5 transition-colors"
                 @click="showSummaryPanel = false"
               >
                 <Icon icon="heroicons:x-mark" class="w-4 h-4 txt-secondary" />
@@ -926,7 +926,7 @@
                   {{ $t('widgetSessions.aiSummary') }}
                 </h3>
                 <button
-                  class="p-2 rounded-lg hover:bg-white/5 transition-colors"
+                  class="p-2 rounded-xl hover:bg-white/5 transition-colors"
                   @click="showSummaryPanel = false"
                 >
                   <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />

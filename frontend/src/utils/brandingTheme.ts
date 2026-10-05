@@ -146,8 +146,8 @@ function applyColors(): void {
       `--brand-hover:color-mix(in srgb, ${primaryColor} 88%, black)`,
       `--brand-light:color-mix(in srgb, ${primaryColor} 55%, white)`,
       `--brand-alpha-light:color-mix(in srgb, ${primaryColor} 10%, transparent)`,
-      // Buttons, checkboxes and icon-contrast read the ink that wins on this
-      // brand — never a fixed white that vanishes on a light custom color.
+      // Buttons and checkboxes read the ink that wins on this brand — never a
+      // fixed white that vanishes on a light custom color.
       `--on-brand:${pickOnBrandColor(primaryColor)}`,
       // User bubbles use the saturated brand, darkened until white passes, so
       // they never turn into a bright wash with unreadable white text.

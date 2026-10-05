@@ -46,7 +46,7 @@
         >
           <div class="txt-secondary mb-4">{{ $t('common.error') }}</div>
           <button
-            class="btn-primary px-6 py-2.5 rounded-lg"
+            class="btn-primary px-6 py-2.5 rounded-xl"
             data-testid="btn-retry-features"
             @click="loadFeatures"
           >
@@ -131,7 +131,7 @@
             />
             <button
               type="button"
-              class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+              class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
               data-testid="btn-features-accordion-toggle-all"
               @click="
                 allFeatureCategoriesOpen

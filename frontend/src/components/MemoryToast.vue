@@ -73,13 +73,13 @@
         <!-- Compact Actions -->
         <div class="flex items-center gap-1.5">
           <button
-            class="flex-1 px-2 py-1.5 rounded text-xs font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+            class="flex-1 px-2 py-1.5 rounded-xl text-xs font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all"
             @click="discard(memory)"
           >
             {{ $t('memories.toast.discardCompact') }}
           </button>
           <button
-            class="flex-1 px-2 py-1.5 rounded text-xs font-medium btn-primary"
+            class="flex-1 px-2 py-1.5 rounded-xl text-xs font-medium btn-primary"
             @click="edit(memory)"
           >
             {{ $t('memories.toast.editCompact') }}

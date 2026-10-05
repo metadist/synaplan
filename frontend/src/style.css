@@ -58,12 +58,27 @@
   }
 }
 
-/* Rail width includes the landscape notch so icons are never clipped when
-   the desktop chrome is showing (iPad landscape, notched desktops). */
+/* Icon rail plus the wider context panel. The rail width includes the
+   landscape notch so icons are never clipped (iPad landscape, notched desktops). */
+.v2-sidebar {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
 .v2-sidebar-rail {
   box-sizing: border-box;
-  width: calc(80px + env(safe-area-inset-left, 0px));
-  min-width: calc(80px + env(safe-area-inset-left, 0px));
+  width: calc(56px + env(safe-area-inset-left, 0px));
+  min-width: calc(56px + env(safe-area-inset-left, 0px));
+  height: 100%;
+}
+.v2-sidebar-panel {
+  box-sizing: border-box;
+  width: 280px;
+  min-width: 280px;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Mobile floating header button clearance — pushes titles below the button.
@@ -266,6 +281,20 @@
     background-repeat: no-repeat !important;
     background-position: right 0.75rem center !important;
     background-size: 1rem 1rem !important;
+  }
+}
+
+/* Default corner for every button (Tailwind rounded-xl, 12px).
+   The components layer sits under utilities, so rounded-full on the element still wins. */
+@layer components {
+  button,
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'],
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    border-radius: var(--radius-xl, 0.75rem);
   }
 }
 
@@ -656,6 +685,7 @@
        white in light mode and near-black in dark mode. */
     color: var(--on-brand);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+    cursor: pointer;
   }
   .btn-primary:hover {
     background: var(--brand-hover);
@@ -694,6 +724,7 @@
     background: rgba(0, 0, 0, 0.05);
     border: 1px solid rgba(0, 0, 0, 0.22);
     color: var(--txt-primary);
+    cursor: pointer;
     transition:
       background-color 0.15s,
       border-color 0.15s;
@@ -739,7 +770,7 @@
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
     min-height: 44px;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     outline: none;
     color: var(--txt-secondary);
     transition: background-color 0.15s;
@@ -764,7 +795,7 @@
     gap: 0.75rem;
     width: 100%;
     padding: 0.625rem 0.75rem;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     font-size: 0.875rem;
     text-align: left;
     outline: none;
@@ -783,6 +814,13 @@
   .dropdown-item:focus-visible {
     outline: 2px solid var(--brand);
     outline-offset: -2px;
+  }
+  /* Typeahead moves focus in script, which does not set :focus-visible. */
+  [data-testid='dropdown-model-panel'] .dropdown-item:focus {
+    background: rgba(0, 63, 199, 0.09);
+  }
+  .dark [data-testid='dropdown-model-panel'] .dropdown-item:focus {
+    background: rgba(107, 143, 214, 0.16);
   }
 
   .dropdown-item--active {
@@ -842,7 +880,7 @@
     align-items: center;
     gap: 0.375rem;
     padding: 0.5rem 0.75rem;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     font-size: 0.75rem;
     line-height: 1rem;
     font-weight: 500;
@@ -1063,7 +1101,7 @@
      #5e5e5e itself is 4.8:1 on that page and ~6.2:1 on a white card. */
   .icon-ghost {
     color: #5e5e5e;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     padding: 0.25rem 0.375rem;
     transition:
       background 0.15s,
@@ -1089,37 +1127,6 @@
     background: rgba(107, 143, 214, 0.15);
     color: var(--brand-light);
     opacity: 1;
-  }
-
-  /* Icon contrast: an always-visible white icon button for actions that must
-     be found on a tile (folder share). White in both themes on purpose — the
-     hairline ring and shadow lift it off a light card, the white face off a
-     dark one. Hover/focus swap to the brand fill, like .btn-primary. */
-  .icon-contrast {
-    color: #1f2937;
-    background: #fff;
-    border-radius: 0.5rem;
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.08),
-      0 1px 3px rgba(0, 0, 0, 0.18);
-    transition:
-      background 0.15s,
-      color 0.15s,
-      box-shadow 0.15s;
-  }
-  .icon-contrast:hover,
-  .icon-contrast:focus-visible {
-    background: var(--brand);
-    /* --on-brand, not white: the dark-mode brand is a light blue and white
-       on it is only ~2.9:1. */
-    color: var(--on-brand);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-    outline: none;
-  }
-  .dark .icon-contrast {
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.12),
-      0 1px 3px rgba(0, 0, 0, 0.45);
   }
 
   /* Icon ghost danger variant */
@@ -1920,4 +1927,75 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Every button is 12px. Unlayered so a leftover rounded-lg utility cannot
+   shrink it. Pills keep rounded-full. */
+button:not(.rounded-full),
+input[type='button']:not(.rounded-full),
+input[type='submit']:not(.rounded-full),
+input[type='reset']:not(.rounded-full),
+a.btn-primary:not(.rounded-full),
+a.btn-secondary:not(.rounded-full),
+a.btn-danger:not(.rounded-full) {
+  border-radius: var(--radius-xl, 0.75rem);
+}
+
+/* Preflight sets cursor: default on every button. Hand-rolled actions such as
+   Combine as PDF never pick up .btn-primary, so the pointer lives here. */
+button:not(:disabled),
+input[type='button']:not(:disabled),
+input[type='submit']:not(:disabled),
+input[type='reset']:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Text fields and native dropdowns are 12px. Unlayered so a leftover
+   rounded-lg utility cannot shrink them. Checkboxes, radios, sliders,
+   and pills keep their own shape. The chat composer and the smart-search
+   field are bare; their shell is the visible surface. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not(
+    [type='button']
+  ):not([type='submit']):not([type='reset']):not([type='image']):not([type='hidden']):not(
+    .rounded-full
+  ):not([data-testid='input-smart-search']),
+textarea:not(.rounded-full):not(.chat-textarea),
+select:not(.rounded-full) {
+  border-radius: var(--radius-xl, 0.75rem);
+}
+
+/* Dropdowns and date fields are controls, like buttons: a pointer, and a
+   brand edge on hover. Text fields stay a text cursor. */
+select:not(:disabled),
+input[type='date']:not(:disabled),
+input[type='datetime-local']:not(:disabled),
+input[type='time']:not(:disabled),
+input[type='month']:not(:disabled),
+input[type='week']:not(:disabled),
+.dropdown-trigger:not(:disabled) {
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+select:not(:disabled):hover,
+input[type='date']:not(:disabled):hover,
+input[type='datetime-local']:not(:disabled):hover,
+input[type='time']:not(:disabled):hover,
+input[type='month']:not(:disabled):hover,
+input[type='week']:not(:disabled):hover,
+.dropdown-trigger:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+
+input[type='date']:not(:disabled)::-webkit-calendar-picker-indicator,
+input[type='datetime-local']:not(:disabled)::-webkit-calendar-picker-indicator,
+input[type='time']:not(:disabled)::-webkit-calendar-picker-indicator,
+input[type='month']:not(:disabled)::-webkit-calendar-picker-indicator,
+input[type='week']:not(:disabled)::-webkit-calendar-picker-indicator {
+  cursor: pointer;
 }

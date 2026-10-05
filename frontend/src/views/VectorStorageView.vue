@@ -5,7 +5,7 @@
       data-testid="page-vector-storage"
     >
       <div class="max-w-7xl mx-auto space-y-6">
-        <FilesTabs active="vectors" />
+        <FilesTabs />
 
         <p class="text-sm txt-secondary">{{ $t('vectorStorage.intro') }}</p>
 

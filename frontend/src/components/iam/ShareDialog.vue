@@ -52,7 +52,7 @@
             />
             <button
               type="button"
-              class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium w-full sm:w-auto shrink-0"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium w-full sm:w-auto shrink-0"
               :disabled="!subject || saving"
               data-testid="btn-iam-share-confirm"
               @click="grant"
@@ -83,7 +83,7 @@
               <p>{{ $t('iam.dialog.loadFailed') }}</p>
               <button
                 type="button"
-                class="btn-secondary mt-2 px-4 py-2.5 rounded-lg text-sm font-medium"
+                class="btn-secondary mt-2 px-4 py-2.5 rounded-xl text-sm font-medium"
                 data-testid="btn-iam-share-retry"
                 @click="load"
               >
@@ -152,7 +152,7 @@
             <p class="text-sm txt-secondary mb-3">{{ $t('iam.dialog.publicLinkHint') }}</p>
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
               data-testid="btn-iam-public-link"
               @click="emit('publicLink')"
             >

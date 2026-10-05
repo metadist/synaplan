@@ -111,7 +111,7 @@
               :file-name="file.display_name || file.filename"
             />
             <button
-              class="flex-1 min-w-0 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
+              class="flex-1 min-w-0 px-2 py-1 rounded-xl bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
               :title="$t('files.generated.download')"
               :data-testid="`btn-generated-download-${file.id}`"
               @click="download(file)"
@@ -121,7 +121,7 @@
             </button>
             <button
               v-if="file.chat_id"
-              class="shrink-0 px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
+              class="shrink-0 px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
               :title="$t('files.generated.openInChat')"
               :data-testid="`btn-generated-open-${file.id}`"
               @click="openInChat(file)"
@@ -130,7 +130,7 @@
             </button>
             <div v-if="vectorStateOf(file) !== 'vectorized'" class="relative shrink-0">
               <button
-                class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:text-[var(--brand)] transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+                class="px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:text-[var(--brand)] transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
                 :title="$t('files.describeSortAction')"
                 :disabled="isIndexing(file.id)"
                 :data-testid="`btn-generated-index-${file.id}`"
@@ -145,7 +145,7 @@
               <Transition name="fade">
                 <div
                   v-if="kbMenuOpen === file.id"
-                  class="absolute right-0 bottom-full mb-1 z-30 w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
+                  class="absolute right-0 bottom-full mb-1 z-30 w-52 surface-card !rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
                   :data-testid="`menu-generated-index-${file.id}`"
                   @click.stop
                 >
@@ -172,17 +172,17 @@
                     <span class="truncate">{{ folder.name }}</span>
                   </button>
                   <div
-                    class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5"
+                    class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 px-2 pt-2 pb-2"
                   >
-                    <div class="flex items-center gap-1.5 px-3 py-1">
+                    <div class="relative">
                       <Icon
                         icon="heroicons:folder-plus"
-                        class="w-4 h-4 text-[var(--brand)] shrink-0"
+                        class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--brand)] pointer-events-none"
                       />
                       <input
                         v-model="newFolderName"
                         type="text"
-                        class="flex-1 text-xs bg-transparent txt-primary placeholder:txt-secondary/50 focus:outline-none"
+                        class="w-full pl-8 pr-2 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
                         :placeholder="$t('files.folderPicker.newPlaceholder')"
                         @keyup.enter="addToKnowledgeBase(file, newFolderName.trim())"
                         @click.stop
@@ -193,7 +193,7 @@
               </Transition>
             </div>
             <button
-              class="shrink-0 px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 text-red-400/70 hover:text-red-500 hover:bg-red-500/10 transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+              class="shrink-0 px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 text-red-400/70 hover:text-red-500 hover:bg-red-500/10 transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
               :title="$t('files.delete')"
               :disabled="isDeleting(file.id)"
               :data-testid="`btn-generated-delete-${file.id}`"
@@ -218,7 +218,7 @@
       <div class="flex gap-2">
         <button
           :disabled="currentPage === 1"
-          class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          class="px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           data-testid="btn-generated-prev"
           @click="previousPage"
         >
@@ -226,7 +226,7 @@
         </button>
         <button
           :disabled="currentPage >= totalPages"
-          class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          class="px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           data-testid="btn-generated-next"
           @click="nextPage"
         >

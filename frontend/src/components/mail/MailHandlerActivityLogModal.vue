@@ -202,7 +202,7 @@ const detailsByEntryId = computed<Record<number, Array<{ key: string; value: str
             <div class="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+                class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
                 :title="t('mail.activity.refresh')"
                 :aria-label="t('mail.activity.refresh')"
                 :disabled="isLoading"
@@ -215,7 +215,7 @@ const detailsByEntryId = computed<Record<number, Array<{ key: string; value: str
               </button>
               <button
                 type="button"
-                class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+                class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
                 :aria-label="t('common.close')"
                 @click="emit('close')"
               >
@@ -313,7 +313,7 @@ const detailsByEntryId = computed<Record<number, Array<{ key: string; value: str
             </p>
             <button
               type="button"
-              class="px-4 py-2 rounded-lg surface-chip txt-secondary hover:txt-primary transition-colors text-sm font-medium"
+              class="px-4 py-2 rounded-xl surface-chip txt-secondary hover:txt-primary transition-colors text-sm font-medium"
               @click="emit('close')"
             >
               {{ t('common.close') }}

@@ -5,7 +5,7 @@
       data-testid="page-files-generated"
     >
       <div class="max-w-7xl mx-auto space-y-6">
-        <FilesTabs active="generated" />
+        <FilesTabs />
         <div class="surface-card p-4 sm:p-6">
           <FilesGrid />
         </div>

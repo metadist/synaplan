@@ -10,7 +10,7 @@ const SET = selectors.settings
 const TITLES = {
   de: {
     login: /Anmelden/,
-    files: /Quellen/,
+    files: /Bibliothek/,
     memories: /Erinnerungen/,
     assistants: /Assistenten/,
     widgets: /Chat-Widgets/,
@@ -19,7 +19,7 @@ const TITLES = {
   },
   fr: {
     login: /Connexion/,
-    files: /Sources/,
+    files: /Bibliothèque/,
     memories: /Mémoires/,
     assistants: /Assistants/,
     widgets: /Widgets de chat/,

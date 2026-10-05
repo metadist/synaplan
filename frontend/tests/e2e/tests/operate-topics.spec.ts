@@ -21,11 +21,11 @@ import { TIMEOUTS } from '../config/config'
 
 const NAV = selectors.nav
 
-async function openOperateFlyout(page: Page) {
+async function openOperatePanel(page: Page) {
   await page.locator(NAV.sidebarV2Admin).click()
-  const flyout = page.locator(NAV.navDropdown)
-  await expect(flyout).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  return flyout
+  const panel = page.locator(NAV.sidebarPanel)
+  await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  return panel
 }
 
 test.describe('@ci Operate topics', () => {
@@ -35,7 +35,7 @@ test.describe('@ci Operate topics', () => {
 
   test('J-OP-1 everything AI in one place, the rest by topic', async ({ page }) => {
     await test.step('Operate lists one entry per topic', async () => {
-      const flyout = await openOperateFlyout(page)
+      const flyout = await openOperatePanel(page)
       const links = flyout.locator('[data-testid^="link-sidebar-v2-admin-"]')
       await expect(links).toHaveCount(6)
       expect(
@@ -91,7 +91,7 @@ test.describe('@ci Operate topics', () => {
     })
 
     await test.step('System configuration groups the platform settings by topic', async () => {
-      const flyout = await openOperateFlyout(page)
+      const flyout = await openOperatePanel(page)
       await flyout.locator(NAV.flyoutLinkAdminConfig).click()
       await expect(page.locator('[data-testid="config-topic-nav"]')).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
@@ -122,7 +122,7 @@ test.describe('@ci Operate topics', () => {
     })
 
     await test.step('Moderation is a tab of People', async () => {
-      const flyout = await openOperateFlyout(page)
+      const flyout = await openOperatePanel(page)
       await flyout.locator(NAV.flyoutLinkAdminPeople).click()
       await page.locator('[data-testid="tab-moderation"]').click()
       await expect(page.locator('[data-testid="admin-moderation-panel"]')).toBeVisible({

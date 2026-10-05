@@ -418,6 +418,178 @@ class ChatControllerTest extends WebTestCase
         $this->assertEquals('Updated Title', $chat->getTitle());
     }
 
+    public function testPinAndUnpinChat(): void
+    {
+        $chat = new Chat();
+        $chat->setUserId($this->user->getId());
+        $chat->setTitle('Pin me');
+        $chat->setCreatedAt(new \DateTime());
+        $chat->setUpdatedAt(new \DateTime());
+
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        $this->client->request(
+            'PATCH',
+            '/api/v1/chats/'.$chat->getId(),
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+            ],
+            json_encode(['pinned' => true])
+        );
+
+        $this->assertResponseIsSuccessful();
+        $pinned = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($pinned['chat']['pinned']);
+        $this->assertNotEmpty($pinned['chat']['pinnedAt']);
+
+        $this->em->refresh($chat);
+        $this->assertTrue($chat->isPinned());
+        $this->assertNotNull($chat->getPinnedAt());
+
+        $this->client->request(
+            'PATCH',
+            '/api/v1/chats/'.$chat->getId(),
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+            ],
+            json_encode(['pinned' => false])
+        );
+
+        $this->assertResponseIsSuccessful();
+        $unpinned = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertFalse($unpinned['chat']['pinned']);
+        $this->assertNull($unpinned['chat']['pinnedAt']);
+
+        $stored = $this->em->find(Chat::class, $chat->getId());
+        $this->assertInstanceOf(Chat::class, $stored);
+        $this->assertFalse($stored->isPinned());
+        $this->assertNull($stored->getPinnedAt());
+    }
+
+    public function testPinKeepsLastActivityAndFirstPinTime(): void
+    {
+        $lastActivity = new \DateTime('-3 days');
+        $chat = new Chat();
+        $chat->setUserId($this->user->getId());
+        $chat->setTitle('Old chat');
+        $chat->setCreatedAt(new \DateTime('-4 days'));
+        $chat->setUpdatedAt($lastActivity);
+        $chat->setPinned(true);
+        $chat->setPinnedAt(new \DateTime('-1 day'));
+
+        $this->em->persist($chat);
+        $this->em->flush();
+        $firstPinnedAt = $chat->getPinnedAt()?->format('c');
+
+        foreach ([true, false] as $pinned) {
+            $this->client->request(
+                'PATCH',
+                '/api/v1/chats/'.$chat->getId(),
+                [],
+                [],
+                [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                ],
+                json_encode(['pinned' => $pinned])
+            );
+            $this->assertResponseIsSuccessful();
+            $body = json_decode($this->client->getResponse()->getContent(), true);
+            $this->assertSame($lastActivity->format('c'), $body['chat']['updatedAt']);
+            if ($pinned) {
+                $this->assertSame($firstPinnedAt, $body['chat']['pinnedAt']);
+            }
+        }
+    }
+
+    public function testUpdateRejectsNonStringTitle(): void
+    {
+        $chat = new Chat();
+        $chat->setUserId($this->user->getId());
+        $chat->setTitle('Keep me');
+        $chat->setCreatedAt(new \DateTime());
+        $chat->setUpdatedAt(new \DateTime());
+
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        $this->client->request(
+            'PATCH',
+            '/api/v1/chats/'.$chat->getId(),
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+            ],
+            json_encode(['title' => ['not', 'a', 'string']])
+        );
+
+        $this->assertResponseStatusCodeSame(400);
+        $this->em->refresh($chat);
+        $this->assertSame('Keep me', $chat->getTitle());
+    }
+
+    public function testListChatsIncludesPinned(): void
+    {
+        $older = new Chat();
+        $older->setUserId($this->user->getId());
+        $older->setTitle('Older pin');
+        $older->setCreatedAt(new \DateTime('-2 hours'));
+        $older->setUpdatedAt(new \DateTime('-2 hours'));
+        $older->setPinned(true);
+        $older->setPinnedAt(new \DateTime('-1 hour'));
+
+        $newer = new Chat();
+        $newer->setUserId($this->user->getId());
+        $newer->setTitle('Newer pin');
+        $newer->setCreatedAt(new \DateTime('-3 hours'));
+        $newer->setUpdatedAt(new \DateTime('-3 hours'));
+        $newer->setPinned(true);
+        $newer->setPinnedAt(new \DateTime('-10 minutes'));
+
+        $plain = new Chat();
+        $plain->setUserId($this->user->getId());
+        $plain->setTitle('Not pinned');
+        $plain->setCreatedAt(new \DateTime());
+        $plain->setUpdatedAt(new \DateTime());
+
+        $this->em->persist($older);
+        $this->em->persist($newer);
+        $this->em->persist($plain);
+        $this->em->flush();
+
+        $this->client->request(
+            'GET',
+            '/api/v1/chats',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
+        );
+
+        $this->assertResponseIsSuccessful();
+        $response = json_decode($this->client->getResponse()->getContent(), true);
+        $byTitle = [];
+        foreach ($response['chats'] as $row) {
+            $this->assertArrayHasKey('pinned', $row);
+            $this->assertArrayHasKey('pinnedAt', $row);
+            $byTitle[$row['title']] = $row;
+        }
+
+        $this->assertTrue($byTitle['Older pin']['pinned']);
+        $this->assertNotEmpty($byTitle['Older pin']['pinnedAt']);
+        $this->assertTrue($byTitle['Newer pin']['pinned']);
+        $this->assertFalse($byTitle['Not pinned']['pinned']);
+        $this->assertNull($byTitle['Not pinned']['pinnedAt']);
+    }
+
     public function testDeleteChatWithoutAuth(): void
     {
         self::ensureKernelShutdown();

@@ -277,7 +277,7 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
         :id="fieldKey"
         :value="localValue"
         :disabled="disabled"
-        class="flex-1 px-3 py-2 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+        class="flex-1 px-3 py-2 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
         @change="handleInput"
       >
         <option v-for="opt in schema.options" :key="opt" :value="opt">
@@ -287,7 +287,7 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
       <button
         v-if="isDirty"
         type="button"
-        class="btn-primary px-4 py-2 rounded-lg"
+        class="btn-primary inline-flex items-center px-4 py-2 min-h-10 rounded-xl"
         @click="saveChanges"
       >
         {{ $t('common.save') }}
@@ -304,7 +304,7 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
           :placeholder="placeholder"
           :disabled="disabled"
           :class="[
-            'w-full px-3 py-2 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none',
+            'w-full px-3 py-2 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none',
             schema.type === 'password' && 'pr-10',
             disabled && 'opacity-50 cursor-not-allowed',
           ]"
@@ -327,18 +327,18 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
       <button
         v-if="canClear"
         type="button"
-        class="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 min-h-10 rounded-xl font-medium"
         :title="$t('admin.config.clearHint')"
         data-testid="config-field-clear"
         @click="clearValue"
       >
-        <TrashIcon class="w-4 h-4" />
+        <TrashIcon class="w-5 h-5" />
         {{ $t('admin.config.clear') }}
       </button>
       <button
         v-if="isDirty"
         type="button"
-        class="btn-secondary px-3 py-2 rounded-lg"
+        class="btn-secondary inline-flex items-center justify-center px-3 py-2 min-h-10 rounded-xl"
         :title="$t('common.reset')"
         @click="resetValue"
       >
@@ -347,7 +347,7 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
       <button
         v-if="isDirty"
         type="button"
-        class="btn-primary px-4 py-2 rounded-lg"
+        class="btn-primary inline-flex items-center px-4 py-2 min-h-10 rounded-xl"
         @click="saveChanges"
       >
         {{ $t('common.save') }}

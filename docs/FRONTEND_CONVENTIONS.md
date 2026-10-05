@@ -190,7 +190,7 @@ function handleOpen() {
     <p class="txt-secondary text-sm">{{ $t('widget.description') }}</p>
     <button
       type="button"
-      class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+      class="btn-primary mt-4 px-4 py-2.5 text-sm font-medium"
       @click="handleOpen"
     >
       {{ $t('actions.open') }}

@@ -1043,4 +1043,51 @@ describe('Chats Store', () => {
       expect([...store.activeRunChatIds]).toEqual([2])
     })
   })
+
+  describe('toggleChatPin', () => {
+    const pinnable = () => ({
+      id: 3,
+      title: 'Chat 3',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      messageCount: 1,
+      source: 'web' as const,
+      pinned: false,
+    })
+
+    it('ignores a second toggle while the first request is in flight', async () => {
+      const store = useChatsStore()
+      store.chats = [pinnable()]
+      let settle: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          settle = resolve
+        })
+      )
+
+      const first = store.toggleChatPin(3)
+      expect(store.pinPendingChatIds.has(3)).toBe(true)
+      await store.toggleChatPin(3)
+
+      expect(httpClientMock).toHaveBeenCalledTimes(1)
+      expect(store.chats[0].pinned).toBe(true)
+
+      settle({ success: true })
+      await first
+
+      expect(store.pinPendingChatIds.has(3)).toBe(false)
+      expect(store.chats[0].pinned).toBe(true)
+    })
+
+    it('restores the previous state and frees the button when the request fails', async () => {
+      const store = useChatsStore()
+      store.chats = [pinnable()]
+      httpClientMock.mockRejectedValueOnce(new Error('offline'))
+
+      await store.toggleChatPin(3)
+
+      expect(store.chats[0].pinned).toBe(false)
+      expect(store.pinPendingChatIds.has(3)).toBe(false)
+    })
+  })
 })

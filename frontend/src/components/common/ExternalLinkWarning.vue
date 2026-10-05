@@ -149,14 +149,14 @@ defineExpose({ shouldShowWarning })
           <div class="flex gap-3 justify-end pt-2">
             <button
               type="button"
-              class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+              class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
               @click="cancel"
             >
               {{ t('externalLink.cancel') }}
             </button>
             <button
               type="button"
-              class="btn-primary px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5"
+              class="btn-primary px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5"
               @click="proceed"
             >
               <Icon icon="mdi:open-in-new" class="w-3.5 h-3.5" />

@@ -54,7 +54,7 @@
             v-model="phoneNumber"
             type="tel"
             :placeholder="$t('config.phoneVerification.phoneNumberPlaceholder')"
-            class="w-full px-4 py-3 rounded-lg surface-chip txt-primary border border-light-border focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors"
+            class="w-full px-4 py-3 rounded-xl surface-chip txt-primary border border-light-border focus:border-brand focus:ring-2 focus:ring-brand/20 transition-colors"
             :disabled="verificationPending"
             data-testid="input-phone"
             @input="formatPhoneNumber"
@@ -95,7 +95,7 @@
         <button
           v-if="!verificationPending"
           :disabled="!phoneNumber.trim() || requesting || cooldownRemaining > 0"
-          class="btn-primary px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          class="btn-primary px-6 py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           data-testid="btn-send"
           @click="requestVerification"
         >
@@ -221,7 +221,7 @@
         <div class="flex gap-3 items-center">
           <button
             :disabled="requesting || cooldownRemaining > 0"
-            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm"
+            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm"
             data-testid="btn-regenerate"
             @click="regenerateCode"
           >
@@ -240,7 +240,7 @@
           </button>
 
           <button
-            class="px-4 py-2 surface-chip rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-sm"
+            class="px-4 py-2 surface-chip rounded-xl font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-sm"
             data-testid="btn-cancel"
             @click="cancelVerification"
           >
@@ -284,7 +284,7 @@
       </div>
 
       <button
-        class="w-full surface-chip px-4 py-3 rounded-lg font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+        class="w-full surface-chip px-4 py-3 rounded-xl font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
         data-testid="btn-remove"
         @click="removePhone"
       >

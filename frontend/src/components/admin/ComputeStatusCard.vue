@@ -91,7 +91,7 @@
     <div class="flex items-center gap-3 flex-wrap pt-1">
       <RouterLink
         :to="{ path: SYSTEM_CONFIG_PATH, query: { tab: 'tools', section: 'compute' } }"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="link-compute-config"
       >
         {{ $t('settings.features.compute.openConfig') }}
@@ -99,7 +99,7 @@
       <button
         v-if="!compute.reachable"
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-compute-retry"
         @click="$emit('retry')"
       >

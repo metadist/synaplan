@@ -33,7 +33,7 @@
               type="password"
               required
               autocomplete="current-password"
-              class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
+              class="w-full px-4 py-3 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
               :placeholder="$t('forcedPasswordChange.currentPasswordPlaceholder')"
               data-testid="input-current-password"
             />
@@ -49,7 +49,7 @@
               type="password"
               required
               autocomplete="new-password"
-              class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
+              class="w-full px-4 py-3 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
               :class="{ 'ring-2 ring-red-500': passwordErrors.length > 0 }"
               :placeholder="$t('forcedPasswordChange.newPasswordPlaceholder')"
               data-testid="input-new-password"
@@ -75,7 +75,7 @@
               type="password"
               required
               autocomplete="new-password"
-              class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
+              class="w-full px-4 py-3 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
               :placeholder="$t('forcedPasswordChange.confirmPasswordPlaceholder')"
               data-testid="input-confirm-password"
             />
@@ -94,7 +94,7 @@
 
           <Button
             type="submit"
-            class="w-full btn-primary py-3 rounded-lg font-medium"
+            class="w-full btn-primary py-3 rounded-xl font-medium"
             :disabled="!canSubmit"
             data-testid="btn-change-password"
           >

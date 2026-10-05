@@ -49,6 +49,12 @@ class Chat
     #[ORM\Column(name: 'BOGIMAGEPATH', type: 'string', length: 255, nullable: true)]
     private ?string $ogImagePath = null;
 
+    #[ORM\Column(name: 'BPINNED', type: 'boolean', options: ['default' => false])]
+    private bool $pinned = false;
+
+    #[ORM\Column(name: 'BPINNEDAT', type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $pinnedAt = null;
+
     #[ORM\OneToMany(mappedBy: 'chat', targetEntity: Message::class)]
     private Collection $messages;
 
@@ -168,6 +174,30 @@ class Chat
     public function setOgImagePath(?string $ogImagePath): self
     {
         $this->ogImagePath = $ogImagePath;
+
+        return $this;
+    }
+
+    public function isPinned(): bool
+    {
+        return $this->pinned;
+    }
+
+    public function setPinned(bool $pinned): self
+    {
+        $this->pinned = $pinned;
+
+        return $this;
+    }
+
+    public function getPinnedAt(): ?\DateTimeInterface
+    {
+        return $this->pinnedAt;
+    }
+
+    public function setPinnedAt(?\DateTimeInterface $pinnedAt): self
+    {
+        $this->pinnedAt = $pinnedAt;
 
         return $this;
     }

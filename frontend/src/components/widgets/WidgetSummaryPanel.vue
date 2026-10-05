@@ -13,7 +13,7 @@
       </p>
       <button
         v-if="purchaseAllowed"
-        class="px-6 py-2.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium hover:from-purple-600 hover:to-pink-600 transition-all flex items-center gap-2 mx-auto"
+        class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium hover:from-purple-600 hover:to-pink-600 transition-all flex items-center gap-2 mx-auto"
         @click="goToUpgrade"
       >
         <Icon icon="heroicons:arrow-up-circle" class="w-5 h-5" />
@@ -36,7 +36,7 @@
           <!-- Saved Summaries Button -->
           <button
             v-if="savedSummaries.length > 0"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+            class="px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors"
             :class="
               showSavedSummaries
                 ? 'bg-[var(--brand)] text-white'
@@ -50,7 +50,7 @@
           <!-- Back to generator button (when viewing a saved summary) -->
           <button
             v-if="selectedSavedSummary"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium surface-chip txt-secondary hover:txt-primary flex items-center gap-1.5 transition-colors"
+            class="px-3 py-1.5 rounded-xl text-xs font-medium surface-chip txt-secondary hover:txt-primary flex items-center gap-1.5 transition-colors"
             @click="clearSummary"
           >
             <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
@@ -80,7 +80,7 @@
           <button
             v-for="s in savedSummaries"
             :key="s.id"
-            class="w-full p-2.5 rounded-lg text-left transition-colors"
+            class="w-full p-2.5 rounded-xl text-left transition-colors"
             :class="
               selectedSavedSummary?.id === s.id
                 ? 'bg-[var(--brand-alpha-light)] border border-[var(--brand)]/30'
@@ -125,7 +125,7 @@
             <input
               v-model="fromDate"
               type="date"
-              class="w-full px-2 py-2 rounded-lg surface-chip text-sm txt-primary"
+              class="w-full px-2 py-2 rounded-xl surface-chip text-sm txt-primary"
             />
           </div>
           <div class="flex-1" style="min-width: 140px">
@@ -133,7 +133,7 @@
             <input
               v-model="toDate"
               type="date"
-              class="w-full px-2 py-2 rounded-lg surface-chip text-sm txt-primary"
+              class="w-full px-2 py-2 rounded-xl surface-chip text-sm txt-primary"
             />
           </div>
         </div>
@@ -143,7 +143,7 @@
       <button
         v-if="!selectedSavedSummary"
         :disabled="generating"
-        class="w-full mb-4 px-4 py-2.5 rounded-lg btn-primary text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+        class="w-full mb-4 px-4 py-2.5 rounded-xl btn-primary text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
         @click="() => generateAnalysis()"
       >
         <Icon
@@ -157,7 +157,7 @@
       <button
         v-else
         :disabled="generating"
-        class="w-full mb-4 px-4 py-2.5 rounded-lg surface-chip text-sm font-medium flex items-center justify-center gap-2 txt-secondary hover:txt-primary disabled:opacity-50 transition-colors"
+        class="w-full mb-4 px-4 py-2.5 rounded-xl surface-chip text-sm font-medium flex items-center justify-center gap-2 txt-secondary hover:txt-primary disabled:opacity-50 transition-colors"
         @click="() => generateAnalysis(true)"
       >
         <Icon
@@ -543,7 +543,7 @@
               <span class="truncate">{{ $t('summary.promptSuggestions') }}</span>
             </h4>
             <button
-              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500 text-white hover:bg-purple-600 transition-colors flex items-center gap-1.5 flex-shrink-0"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium bg-purple-500 text-white hover:bg-purple-600 transition-colors flex items-center gap-1.5 flex-shrink-0"
               @click="openPromptEditor"
             >
               <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />

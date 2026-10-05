@@ -46,7 +46,7 @@
               </div>
               <button
                 ref="closeButton"
-                class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+                class="w-10 h-10 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
                 :aria-label="$t('help.close')"
                 data-testid="btn-close"
                 @click="$emit('close')"
@@ -88,7 +88,7 @@
             <!-- Footer -->
             <div class="p-6 border-t border-light-border/30 dark:border-dark-border/20">
               <button
-                class="btn-primary w-full py-3 rounded-lg font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand)]"
+                class="btn-primary w-full py-3 rounded-xl font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand)]"
                 data-testid="btn-confirm"
                 @click="$emit('close')"
               >

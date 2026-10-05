@@ -6,8 +6,7 @@
     >
       <div class="px-3 py-4 sm:p-4 md:p-8">
         <div class="max-w-7xl mx-auto space-y-6">
-          <!-- §4.8: the knowledge base has two tabs — Files (browse) + Search -->
-          <FilesTabs active="search" />
+          <FilesTabs />
 
           <!-- §4.8 #4: one compact status line instead of 4 jargon stat cards -->
           <p v-if="stats" class="text-sm txt-secondary" data-testid="section-stats">
@@ -40,7 +39,7 @@
                   v-model="query"
                   type="text"
                   :placeholder="$t('rag.searchPlaceholder')"
-                  class="w-full px-4 py-3 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+                  class="w-full px-4 py-3 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
                   :disabled="isSearching"
                   data-testid="input-query"
                   @keydown.enter.prevent="performSearch"
@@ -64,7 +63,7 @@
                   </label>
                   <select
                     v-model.number="limit"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer transition-all"
+                    class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer transition-all"
                     data-testid="input-limit"
                   >
                     <option :value="5">{{ $t('rag.nResults', { n: 5 }) }}</option>
@@ -90,7 +89,7 @@
                   </label>
                   <select
                     v-model.number="minScore"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer transition-all"
+                    class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer transition-all"
                     data-testid="input-min-score"
                   >
                     <option :value="0.3">{{ $t('rag.simMore') }}</option>
@@ -118,7 +117,7 @@
                     v-model="groupKey"
                     type="text"
                     :placeholder="$t('rag.optional')"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+                    class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
                     data-testid="input-group-key"
                   />
                 </div>
@@ -128,7 +127,7 @@
                 <button
                   type="submit"
                   :disabled="isSearching || !query.trim()"
-                  class="btn-primary px-8 py-3 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform"
+                  class="btn-primary px-8 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform"
                   data-testid="btn-search"
                 >
                   <svg
@@ -268,14 +267,14 @@
               <!-- Actions -->
               <div class="flex gap-2">
                 <button
-                  class="text-sm px-3 py-1.5 rounded-lg hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
+                  class="text-sm px-3 py-1.5 rounded-xl hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
                   data-testid="btn-view-file"
                   @click="viewFile(result.message_id)"
                 >
                   {{ $t('rag.viewFile') }}
                 </button>
                 <button
-                  class="text-sm px-3 py-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
+                  class="text-sm px-3 py-1.5 rounded-xl hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
                   data-testid="btn-find-similar"
                   @click="findSimilarDocs(result.chunk_id)"
                 >
@@ -335,7 +334,7 @@
             </p>
             <router-link
               to="/files"
-              class="btn-primary px-6 py-2.5 rounded-lg inline-block"
+              class="btn-primary px-6 py-2.5 rounded-xl inline-block"
               data-testid="btn-go-files"
             >
               {{ $t('rag.goToFiles') }}

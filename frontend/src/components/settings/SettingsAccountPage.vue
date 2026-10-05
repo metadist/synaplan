@@ -28,7 +28,7 @@
             <p class="txt-primary text-sm">{{ $t('profile.loadFailed') }}</p>
             <button
               type="button"
-              class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="btn-profile-retry"
               :disabled="loading"
               @click="loadProfile"

@@ -30,7 +30,7 @@
           <p class="text-sm txt-secondary">{{ $t('adminSetup.settingsLoadFailed') }}</p>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             @click="systemConfig.load"
           >
             {{ $t('common.retry') }}

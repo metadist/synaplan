@@ -18,7 +18,7 @@
         />
         <button
           type="button"
-          class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
           data-testid="btn-ai-accounts-accordion-toggle-all"
           @click="
             allAccountSectionsOpen ? collapseAllAccountSections() : expandAllAccountSections()

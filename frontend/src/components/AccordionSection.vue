@@ -62,7 +62,7 @@ const bodyId = computed(() => `${props.panelId}-body`)
         <slot name="actions" />
         <button
           type="button"
-          class="p-2 rounded-lg hover-surface"
+          class="p-2 rounded-xl hover-surface"
           :aria-expanded="open"
           :aria-controls="bodyId"
           :aria-label="title"

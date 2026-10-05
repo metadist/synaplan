@@ -425,7 +425,7 @@ const onRunCopy = async () => {
       </p>
       <button
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium mt-2"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium mt-2"
         @click="onResume"
       >
         {{ $t('config.savedTasks.resume') }}
@@ -436,7 +436,7 @@ const onRunCopy = async () => {
       <button
         v-if="sharedView"
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="copying"
         data-testid="btn-run-copy"
         @click="onRunCopy"
@@ -446,7 +446,7 @@ const onRunCopy = async () => {
       <button
         v-else
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="running"
         data-testid="btn-run-now"
         @click="onRunNow"
@@ -456,7 +456,7 @@ const onRunCopy = async () => {
       <button
         v-if="iamSharingEnabled && !sharedView"
         type="button"
-        class="btn-secondary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-share-saved-task"
         @click="iamShareOpen = true"
       >
@@ -465,7 +465,7 @@ const onRunCopy = async () => {
       <button
         v-if="!sharedView"
         type="button"
-        class="btn-danger inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-danger inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-delete-saved-task"
         @click="onDelete"
       >
@@ -474,7 +474,7 @@ const onRunCopy = async () => {
       <select
         v-if="!sharedView"
         v-model="scheduleKind"
-        class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid="saved-task-schedule"
         :disabled="!task.enabled"
         @change="onSchedule"
@@ -491,7 +491,7 @@ const onRunCopy = async () => {
         v-if="!sharedView && (scheduleKind === 'daily' || scheduleKind === 'weekly')"
         v-model="scheduleAt"
         type="time"
-        class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         @change="onSchedule"
       />
       <span class="text-xs txt-secondary">{{ scheduleTz }}</span>
@@ -504,7 +504,7 @@ const onRunCopy = async () => {
       <button
         v-if="task.chatId"
         type="button"
-        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium"
         data-testid="btn-show-results"
         @click="openResults"
       >
@@ -512,7 +512,7 @@ const onRunCopy = async () => {
       </button>
       <button
         type="button"
-        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium"
         data-testid="btn-view-runs"
         @click="loadRuns"
       >
@@ -521,7 +521,7 @@ const onRunCopy = async () => {
       <button
         v-if="workflowsEnabled && !sharedView"
         type="button"
-        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium"
         data-testid="btn-saved-task-steps"
         @click="stepsOpen = true"
       >
@@ -558,7 +558,7 @@ const onRunCopy = async () => {
       <p class="text-sm font-medium txt-primary">{{ $t('workflows.webhookCardTitle') }}</p>
       <p class="text-xs txt-secondary">{{ $t('workflows.webhookCardHint') }}</p>
       <input
-        class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :value="webhookUrl"
         :aria-label="$t('workflows.webhookCardTitle')"
         readonly
@@ -567,7 +567,7 @@ const onRunCopy = async () => {
       <div class="flex flex-wrap gap-2">
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-copy-webhook-url"
           @click="copyWebhookUrl"
         >
@@ -575,7 +575,7 @@ const onRunCopy = async () => {
         </button>
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-regenerate-webhook"
           @click="regenerateWebhook"
         >
@@ -606,7 +606,7 @@ const onRunCopy = async () => {
         <p class="alert-warning-text">{{ $t('workflows.secretRevealTitle') }}</p>
         <p class="alert-warning-text font-normal">{{ $t('workflows.secretRevealHint') }}</p>
         <input
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :value="revealedSecret"
           :aria-label="$t('workflows.secretRevealTitle')"
           readonly
@@ -614,7 +614,7 @@ const onRunCopy = async () => {
         />
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-copy-webhook-secret"
           @click="copyWebhookSecret"
         >

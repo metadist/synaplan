@@ -817,11 +817,33 @@ export const deleteFolder = async (groupKey: string): Promise<DeleteFolderRespon
  *
  * @returns Array of group names with file counts
  */
-export const getFileGroups = async (): Promise<Array<{ name: string; count: number }>> => {
+export const getFileGroups = async (
+  options: Pick<
+    FileListOptions,
+    | 'search'
+    | 'fileType'
+    | 'source'
+    | 'vectorState'
+    | 'originKind'
+    | 'incoming'
+    | 'dateFrom'
+    | 'dateTo'
+  > = {}
+): Promise<Array<{ name: string; count: number }>> => {
+  const params: Record<string, string | number> = {}
+  if (options.search) params.search = options.search
+  if (options.fileType) params.file_type = options.fileType
+  if (options.source) params.source = options.source
+  if (options.vectorState) params.vector_state = options.vectorState
+  if (options.originKind) params.origin_kind = options.originKind
+  if (options.incoming !== undefined) params.incoming = options.incoming ? 1 : 0
+  if (options.dateFrom) params.date_from = options.dateFrom
+  if (options.dateTo) params.date_to = options.dateTo
+
   const response = await api.get<{
     success: boolean
     groups: Array<{ name: string; count: number }>
-  }>('/api/v1/files/groups')
+  }>('/api/v1/files/groups', { params })
   return response.data.groups
 }
 

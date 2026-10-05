@@ -98,6 +98,8 @@ class ChatController extends AbstractController
                                     ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, example: 'web'),
                                     new OA\Property(property: 'firstMessagePreview', type: 'string', nullable: true, example: 'How do I reset my password?'),
+                                    new OA\Property(property: 'pinned', type: 'boolean', example: false, description: 'When true, the chat is listed in the Pinned category.'),
+                                    new OA\Property(property: 'pinnedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the chat was last pinned. Null when it is not pinned.'),
                                     new OA\Property(
                                         property: 'widgetSession',
                                         type: 'object',
@@ -199,6 +201,8 @@ class ChatController extends AbstractController
                 'source' => $chat->getSource(),
                 'widgetSession' => $sessionMap[$chat->getId()] ?? null,
                 'firstMessagePreview' => $firstMessagePreview,
+                'pinned' => $chat->isPinned(),
+                'pinnedAt' => $chat->getPinnedAt()?->format('c'),
             ];
         }, $chats);
 
@@ -494,11 +498,12 @@ class ChatController extends AbstractController
     #[Route('/{id}', name: 'update', methods: ['PATCH'])]
     #[OA\Patch(
         path: '/api/v1/chats/{id}',
-        summary: 'Update chat title',
+        summary: 'Update chat title or pin',
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'title', type: 'string', example: 'Updated Title'),
+                    new OA\Property(property: 'pinned', type: 'boolean', example: true, description: 'Pin or unpin this chat. Only the owner may change it.'),
                 ]
             )
         ),
@@ -508,6 +513,7 @@ class ChatController extends AbstractController
         ],
         responses: [
             new OA\Response(response: 200, description: 'Chat updated successfully'),
+            new OA\Response(response: 400, description: 'title is not a string or pinned is not a boolean'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Chat not found'),
         ]
@@ -528,12 +534,30 @@ class ChatController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-
-        if (isset($data['title'])) {
-            $chat->setTitle($data['title']);
+        if (!\is_array($data)) {
+            $data = [];
         }
 
-        $chat->updateTimestamp();
+        if (isset($data['title'])) {
+            if (!\is_string($data['title'])) {
+                return $this->json(['error' => 'title must be a string'], Response::HTTP_BAD_REQUEST);
+            }
+            $chat->setTitle($data['title']);
+            $chat->updateTimestamp();
+        }
+
+        if (\array_key_exists('pinned', $data)) {
+            if (!\is_bool($data['pinned'])) {
+                return $this->json(['error' => 'pinned must be a boolean'], Response::HTTP_BAD_REQUEST);
+            }
+            // Pinning is list placement, not activity: updatedAt stays, so an
+            // unpinned chat returns to where it was in the history.
+            if ($data['pinned'] !== $chat->isPinned()) {
+                $chat->setPinned($data['pinned']);
+                $chat->setPinnedAt($data['pinned'] ? new \DateTime() : null);
+            }
+        }
+
         $this->em->flush();
 
         return $this->json([
@@ -542,6 +566,8 @@ class ChatController extends AbstractController
                 'id' => $chat->getId(),
                 'title' => $chat->getTitle(),
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
+                'pinned' => $chat->isPinned(),
+                'pinnedAt' => $chat->getPinnedAt()?->format('c'),
             ],
         ]);
     }

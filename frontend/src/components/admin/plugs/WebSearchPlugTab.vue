@@ -10,7 +10,7 @@
       <p class="txt-secondary">{{ $t('aiInfra.webSearch.loadFailed') }}</p>
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
         @click="load"
       >
         {{ $t('common.retry') }}
@@ -83,7 +83,7 @@
                 v-model="keyDraft[provider.key]"
                 type="password"
                 autocomplete="off"
-                class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="
                   provider.keyStatus.maskedKey || $t('aiInfra.webSearch.apiKeyPlaceholder')
                 "
@@ -91,7 +91,7 @@
               />
               <button
                 type="button"
-                class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+                class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
                 :disabled="savingKey === provider.key || !keyDraft[provider.key]"
                 :data-testid="`web-search-save-key-${provider.key}`"
                 @click="saveKey(provider.key)"
@@ -110,7 +110,7 @@
         <select
           id="web-search-fallback"
           v-model="fallback"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="web-search-fallback"
         >
           <option value="">{{ $t('aiInfra.webSearch.fallbackNone') }}</option>
@@ -131,7 +131,7 @@
 
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
           :disabled="saving"
           data-testid="web-search-save"
           @click="save"
@@ -147,13 +147,13 @@
           <input
             v-model="testQuery"
             type="text"
-            class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('aiInfra.webSearch.testPlaceholder')"
             data-testid="web-search-test-query"
           />
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             :disabled="testing || !testQuery.trim()"
             data-testid="web-search-test-button"
             @click="runTest"

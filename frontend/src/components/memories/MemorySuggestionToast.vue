@@ -104,14 +104,14 @@ function handleClose() {
           <!-- Actions -->
           <div class="flex items-center gap-2">
             <button
-              class="flex-1 btn-secondary px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+              class="flex-1 btn-secondary px-3 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
               @click="handleEdit"
             >
               <Pencil :size="14" />
               {{ t('memories.toast.actions.edit') }}
             </button>
             <button
-              class="flex-1 btn-danger px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+              class="flex-1 btn-danger px-3 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
               @click="handleDelete"
             >
               <Trash2 :size="14" />

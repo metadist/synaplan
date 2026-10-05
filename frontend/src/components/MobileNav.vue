@@ -52,14 +52,68 @@
         </button>
 
         <button
+          v-if="iamSharingEnabled && !isGuestMode"
+          type="button"
+          class="v2-drawer-item"
+          :class="incomingActive && 'v2-drawer-item--active'"
+          data-testid="btn-mobile-nav-incoming"
+          @click="handleNavigate('/chats/incoming')"
+        >
+          <InboxArrowDownIcon class="w-5 h-5" aria-hidden="true" />
+          <span class="flex-1 text-left">{{
+            incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
+          }}</span>
+          <span
+            v-if="incomingStore.hasNew"
+            class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+            data-testid="text-mobile-nav-incoming-count"
+            >{{ incomingStore.unseenCount }}</span
+          >
+        </button>
+
+        <button
           class="v2-drawer-item"
           :class="[filesActive && 'v2-drawer-item--active', isGuestMode && 'opacity-60']"
+          :aria-expanded="isGuestMode ? undefined : libraryExpanded"
           data-testid="btn-mobile-nav-files"
           @click="handleFilesClick"
         >
           <FolderIcon class="w-5 h-5" aria-hidden="true" />
           <span class="flex-1 text-left">{{ $t('nav.files') }}</span>
+          <Icon
+            v-if="!isGuestMode"
+            icon="mdi:chevron-down"
+            class="w-5 h-5 flex-shrink-0 transition-transform txt-secondary"
+            :class="libraryExpanded && 'rotate-180'"
+            aria-hidden="true"
+          />
         </button>
+
+        <div v-if="!isGuestMode && libraryExpanded" class="pl-4 pb-1">
+          <router-link
+            v-for="link in libraryLinks"
+            :key="link.id"
+            :to="link.to"
+            class="v2-drawer-child"
+            :class="
+              isLibraryLinkActive(link.to, route.path)
+                ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                : 'txt-secondary'
+            "
+            :aria-current="isLibraryLinkActive(link.to, route.path) ? 'page' : undefined"
+            :data-testid="link.mobileTestId"
+            @click="closeDrawer"
+          >
+            <component :is="link.icon" class="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+            <span class="flex-1 truncate">{{ link.label }}</span>
+            <span
+              v-if="link.badge"
+              class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-warning-muted)] text-[var(--status-warning-text)] tabular-nums"
+            >
+              {{ link.badge }}
+            </span>
+          </router-link>
+        </div>
 
         <button
           v-if="!isGuestMode"
@@ -261,33 +315,6 @@
                     {{ authStore.user?.email || '' }}
                   </p>
                   <button
-                    v-if="iamSharingEnabled"
-                    class="v2-drawer-account"
-                    :class="
-                      isPathActive('/chats/incoming') ? 'v2-drawer-account--active' : 'txt-primary'
-                    "
-                    :data-nav-active="isPathActive('/chats/incoming') ? 'true' : undefined"
-                    data-testid="btn-mobile-more-incoming"
-                    @click="handleNavigate('/chats/incoming')"
-                  >
-                    <span class="relative flex-shrink-0">
-                      <InboxArrowDownIcon class="w-5 h-5" />
-                      <span
-                        v-if="incomingStore.hasNew"
-                        class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--status-error)]"
-                        data-testid="dot-mobile-more-incoming-new"
-                      />
-                    </span>
-                    <span class="flex-1 truncate text-left">{{
-                      incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
-                    }}</span>
-                    <span
-                      v-if="incomingStore.hasNew"
-                      class="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
-                      >{{ incomingStore.unseenCount }}</span
-                    >
-                  </button>
-                  <button
                     v-if="iamGroupsEnabled"
                     class="v2-drawer-account"
                     :class="isPathActive('/groups') ? 'v2-drawer-account--active' : 'txt-primary'"
@@ -483,7 +510,7 @@
 
             <div class="flex-shrink-0" @click.stop>
               <button
-                class="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                class="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 :class="chatMenuOpenId === chat.id && 'bg-black/5 dark:bg-white/5'"
                 :aria-label="$t('nav.more')"
                 data-testid="btn-mobile-history-row-menu"
@@ -591,11 +618,11 @@ import {
   Cog6ToothIcon,
   CreditCardIcon,
   FolderIcon,
+  InboxArrowDownIcon,
   PlusIcon,
   RocketLaunchIcon,
   ServerIcon,
   UserGroupIcon,
-  InboxArrowDownIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -609,6 +636,7 @@ import { useAuthStore } from '../stores/auth'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useConfigStore } from '../stores/config'
 import { useSidebarStore } from '../stores/sidebar'
+import { useIncomingStore } from '../stores/incoming'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { useAuth } from '../composables/useAuth'
 import {
@@ -622,8 +650,8 @@ import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { useI18n } from 'vue-i18n'
+import { isLibraryLinkActive, useLibraryLinks } from '@/composables/useLibraryLinks'
 import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
-import { useIncomingStore } from '@/stores/incoming'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 import SchedulerStaleHint from './SchedulerStaleHint.vue'
 import ChatShareModal from './ChatShareModal.vue'
@@ -643,8 +671,10 @@ const sidebarStore = useSidebarStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
 const { navItems, isItemActive, isGuestMode } = useNavItems()
+const { links: libraryLinks } = useLibraryLinks()
 
 const moreExpanded = ref(false)
+const libraryExpanded = ref(false)
 const expandedSection = ref<string | null>(null)
 const expandedGroup = ref<string | null>(null)
 const isCreatingChat = ref(false)
@@ -679,7 +709,20 @@ const moreSections = computed(() =>
 )
 
 const filesActive = computed(() => route.path.startsWith('/files'))
-const historyActive = computed(() => route.path === '/' || route.path.startsWith('/chat'))
+
+watch(
+  filesActive,
+  (active) => {
+    if (active) libraryExpanded.value = true
+  },
+  { immediate: true }
+)
+const incomingActive = computed(
+  () => route.path.startsWith('/chats') && route.query.type === 'group'
+)
+const historyActive = computed(
+  () => !incomingActive.value && (route.path === '/' || route.path.startsWith('/chat'))
+)
 const moreActive = computed(() => moreSections.value.some((item) => isItemActive(item)))
 
 // Account-block entries live inside the "More" panel but outside navItems, so
@@ -743,8 +786,8 @@ const handleFilesClick = () => {
     featureGateOpen.value = true
     return
   }
-  closeDrawer()
-  router.push('/files')
+  triggerHapticImpact('light')
+  libraryExpanded.value = !libraryExpanded.value
 }
 
 const toggleMore = () => {

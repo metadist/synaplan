@@ -57,7 +57,7 @@ async function resetStyle(): Promise<void> {
         </p>
         <button
           type="button"
-          class="btn-secondary mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-secondary mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"
           data-testid="btn-reset-branding-style"
           @click="resetStyle"

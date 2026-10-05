@@ -4,7 +4,7 @@
     to="/admin/features"
     :class="
       compact
-        ? 'flex flex-col items-center gap-0.5 w-[64px] px-1 py-1 rounded-lg text-[10px] font-semibold leading-tight text-center transition-opacity hover:opacity-80 bg-[var(--status-error-muted)] text-[var(--status-error-text)]'
+        ? 'flex flex-col items-center gap-0.5 w-full px-1 py-1 rounded-lg text-[10px] font-semibold leading-tight text-center transition-opacity hover:opacity-80 bg-[var(--status-error-muted)] text-[var(--status-error-text)]'
         : 'flex items-center gap-2 w-full min-h-[44px] px-3 py-2.5 rounded-lg text-sm font-medium bg-[var(--status-error-muted)] text-[var(--status-error-text)]'
     "
     :title="$t('sidebar.schedulerStopped')"

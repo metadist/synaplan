@@ -142,20 +142,20 @@ onUnmounted(() => {
           v-if="field.type === 'text'"
           v-model="values[field.id]"
           type="text"
-          class="w-full px-3 py-2 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
+          class="w-full px-3 py-2 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
           maxlength="256"
         />
         <select
           v-else-if="field.type === 'dropdown'"
           v-model="values[field.id]"
-          class="w-full px-3 py-2 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
+          class="w-full px-3 py-2 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
         >
           <option value="">{{ $t('widgets.customFields.dropdownPlaceholder') }}</option>
           <option v-for="opt in field.options ?? []" :key="opt" :value="opt">{{ opt }}</option>
         </select>
         <button
           v-else
-          class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors w-full"
+          class="flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-colors w-full"
           :class="
             values[field.id]
               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'

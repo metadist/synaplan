@@ -652,12 +652,10 @@ const router = createRouter({
       beforeEnter: groupsRouteGuard,
     },
     {
-      // Conversations other people or groups shared with me ("incoming").
-      // Sibling of /files/incoming, which is the file inbox.
+      // Chats shared with me: the full chat list, filtered to incoming.
+      // The phone drawer links here; old bookmarks keep working.
       path: '/chats/incoming',
-      name: 'chats-incoming',
-      component: () => import('@/views/ChatsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.incoming', i18n: ['chat', 'files'] },
+      redirect: { name: 'chats', query: { type: 'group' } },
     },
     {
       // Dead end for an account that still carries a deployment-generated

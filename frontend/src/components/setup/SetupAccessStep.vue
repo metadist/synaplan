@@ -82,7 +82,7 @@
 
     <button
       type="button"
-      class="btn-primary w-full py-2.5 rounded-lg text-sm font-semibold"
+      class="btn-primary w-full py-2.5 rounded-xl text-sm font-semibold"
       :disabled="busy"
       data-testid="setup-access-submit"
       @click="submit"

@@ -111,7 +111,7 @@ onMounted(refresh)
       <p class="text-sm txt-secondary">{{ $t('aiInfra.searchModels.loadFailed') }}</p>
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
         data-testid="btn-smart-search-models-retry"
         @click="refresh"
       >

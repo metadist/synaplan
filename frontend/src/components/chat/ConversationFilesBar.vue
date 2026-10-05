@@ -55,7 +55,7 @@
           >
             <button
               type="button"
-              class="btn-secondary flex-1 min-w-0 px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-1.5 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+              class="btn-secondary flex-1 min-w-0 px-3 py-1.5 rounded-xl text-xs font-medium inline-flex items-center gap-1.5 text-left disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="!canAttach || file.id === null"
               :title="attachTitle(file)"
               :aria-label="attachTitle(file)"
@@ -71,7 +71,7 @@
             <button
               v-if="canDelete && file.id !== null"
               type="button"
-              class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors shrink-0"
+              class="p-1.5 rounded-xl hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors shrink-0"
               :title="$t('chat.conversationFiles.delete', { name: file.name })"
               :aria-label="$t('chat.conversationFiles.delete', { name: file.name })"
               data-testid="conversation-file-delete"

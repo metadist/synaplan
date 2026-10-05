@@ -9,7 +9,7 @@
         class="flex-shrink-0 w-10 h-10 rounded-lg surface-chip flex items-center justify-center"
         aria-hidden="true"
       >
-        <component :is="result.icon" class="w-5 h-5" />
+        <component :is="result.icon" class="w-5 h-5 txt-primary" />
       </span>
       <div class="min-w-0">
         <p
@@ -64,7 +64,7 @@
         type="button"
         :class="[
           position === 0 ? 'btn-primary' : 'btn-secondary',
-          'inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium',
+          'inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium',
         ]"
         :data-testid="`btn-smart-search-preview-${action.id}`"
         @mousedown.prevent

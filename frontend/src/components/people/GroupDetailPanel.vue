@@ -34,7 +34,7 @@
             type="text"
             autocomplete="off"
             :placeholder="$t('people.groups.addMemberPlaceholder')"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-add-member"
             @focus="memberSearchOpen = true"
           />
@@ -68,7 +68,7 @@
         </div>
         <select
           v-model="memberRole"
-          class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="select-member-role"
         >
           <option value="member">{{ $t('people.groups.roleMember') }}</option>
@@ -76,7 +76,7 @@
         </select>
         <button
           type="submit"
-          class="btn-primary px-4 py-2.5 rounded-lg"
+          class="btn-primary px-4 py-2.5 rounded-xl"
           :disabled="adding || !memberQuery.trim()"
           data-testid="btn-add-member"
         >
@@ -118,7 +118,7 @@
           </div>
           <button
             v-if="member.source !== 'directory'"
-            class="icon-ghost icon-ghost--danger p-2 rounded-lg"
+            class="icon-ghost icon-ghost--danger p-2 rounded-xl"
             :data-testid="`btn-remove-member-${member.userId}`"
             @click="removeMember(member)"
           >

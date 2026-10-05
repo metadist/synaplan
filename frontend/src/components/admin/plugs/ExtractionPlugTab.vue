@@ -10,7 +10,7 @@
       <p class="txt-secondary">{{ $t('aiInfra.extraction.loadFailed') }}</p>
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
         @click="load"
       >
         {{ $t('common.retry') }}
@@ -28,7 +28,7 @@
         />
         <button
           type="button"
-          class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
           data-testid="btn-extraction-accordion-toggle-all"
           @click="
             allExtractionSectionsOpen
@@ -63,7 +63,7 @@
               <span class="flex-1 min-w-0 text-sm txt-primary">{{ labelFor(key) }}</span>
               <button
                 type="button"
-                class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-medium"
+                class="btn-secondary px-3 py-1.5 rounded-xl text-xs font-medium"
                 :disabled="index === 0"
                 :aria-label="$t('aiInfra.extraction.moveUp')"
                 @click="move(family, index, -1)"
@@ -72,7 +72,7 @@
               </button>
               <button
                 type="button"
-                class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-medium"
+                class="btn-secondary px-3 py-1.5 rounded-xl text-xs font-medium"
                 :disabled="index === (chains[family]?.length ?? 0) - 1"
                 :aria-label="$t('aiInfra.extraction.moveDown')"
                 @click="move(family, index, 1)"
@@ -81,7 +81,7 @@
               </button>
               <button
                 type="button"
-                class="btn-danger px-3 py-1.5 rounded-lg text-xs font-medium"
+                class="btn-danger px-3 py-1.5 rounded-xl text-xs font-medium"
                 @click="removeKey(family, index)"
               >
                 {{ $t('aiInfra.extraction.remove') }}
@@ -91,7 +91,7 @@
           <div class="mt-3 flex flex-col sm:flex-row gap-2">
             <select
               v-model="addKey[family]"
-              class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             >
               <option value="">{{ $t('aiInfra.extraction.addPlaceholder') }}</option>
               <option v-for="option in unusedKeys(family)" :key="option" :value="option">
@@ -100,7 +100,7 @@
             </select>
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
               :disabled="!addKey[family]"
               @click="add(family)"
             >
@@ -112,7 +112,7 @@
 
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mb-8"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mb-8"
         :disabled="saving"
         data-testid="extraction-save-chains"
         @click="save"
@@ -131,7 +131,7 @@
         />
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
           :disabled="!testFile || testing"
           data-testid="extraction-test-button"
           @click="runTest"

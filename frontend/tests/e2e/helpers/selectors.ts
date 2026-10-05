@@ -50,10 +50,14 @@ export const selectors = {
   },
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
+    sidebarPanel: '[data-testid="section-sidebar-panel"]',
+    /** Desktop chats column (recent chats, new chat, all chats). */
+    sidebarChats: '[data-testid="section-sidebar-chats"]',
     navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
-    /** Second-level Manage flyout (Assistants / Channels / …) */
+    /** Second-level Manage flyout — retired on desktop; panel groups replaced it. */
     navSubDropdown: '[data-testid="dropdown-sidebar-v2-nav-sub"]',
     flyoutGroup: (key: string) => `[data-testid="btn-sidebar-v2-group-${key}"]`,
+    panelGroup: (key: string) => `[data-testid="section-sidebar-group-${key}"]`,
     mobileMoreGroup: (key: string) => `[data-testid="btn-mobile-more-group-${key}"]`,
     /** Full-screen backdrop behind an open rail flyout; click it to dismiss. */
     navOverlay: '[data-testid="overlay-sidebar-v2-nav"]',
@@ -88,18 +92,20 @@ export const selectors = {
      * `link-sidebar-v2-<key>`) — decoupled from route paths so URL migrations
      * never rename selectors (navigation IA cleanup, phase 0.5).
      */
-    /** V2 sidebar: History nav item opens the chat list modal */
+    /** V2 sidebar: Chats rail icon. The list lives in the context panel. */
     sidebarV2ChatNav: '[data-testid="btn-sidebar-v2-nav-chat"]',
-    /** History sheet footer — opens All chats (`/chats`) */
+    /** Chats panel footer — opens All chats (`/chats`) */
     chatV2ShowAll: '[data-testid="btn-chat-v2-show-all"]',
-    /** V2 sidebar: files nav icon */
+    /** V2 sidebar: Library rail icon */
     sidebarV2Files: '[data-testid="btn-sidebar-v2-nav-files"]',
-    /** V2 sidebar: Manage rail item (Channels + assistants + automations) */
-    sidebarV2Manage: '[data-testid="btn-sidebar-v2-nav-manage"]',
-    /** Alias kept while specs migrate off the old Channels rail item */
-    sidebarV2Channels: '[data-testid="btn-sidebar-v2-nav-manage"]',
+    /** V2 sidebar: Assistants rail icon */
+    sidebarV2Assistants: '[data-testid="btn-sidebar-v2-nav-assistants"]',
+    /** V2 sidebar: Channels rail icon */
+    sidebarV2Channels: '[data-testid="btn-sidebar-v2-nav-channels"]',
+    /** @deprecated The Manage rail item was split into Assistants and Channels. */
+    sidebarV2Manage: '[data-testid="btn-sidebar-v2-nav-assistants"]',
     /** Alias kept while specs migrate off the old AI Setup rail item */
-    sidebarV2AiSetup: '[data-testid="btn-sidebar-v2-nav-manage"]',
+    sidebarV2AiSetup: '[data-testid="btn-sidebar-v2-nav-assistants"]',
     /** V2 sidebar: admin / Operate nav icon (admin only) */
     sidebarV2Admin: '[data-testid="btn-sidebar-v2-nav-admin"]',
     /** V2 rail: always-visible label node inside each nav button (§4.1 #3) */
@@ -120,10 +126,6 @@ export const selectors = {
     flyoutLinkAdminPeople: '[data-testid="link-sidebar-v2-admin-people"]',
     flyoutLinkAdminSetup: '[data-testid="link-sidebar-v2-admin-setup"]',
     flyoutLinkAdminConfig: '[data-testid="link-sidebar-v2-admin-config"]',
-    /** V2 chat list modal */
-    modalChatManager: '[data-testid="modal-chat-manager"]',
-    /** V2 chat list modal: backdrop — click outside the panel to close */
-    modalChatManagerBackdrop: '[data-testid="modal-chat-manager-backdrop"]',
     /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
     chatManagerListRows: '[data-testid="list-chat-manager-rows"]',
     /** V2 chat list: one row per chat; scope menu to this */
@@ -157,7 +159,7 @@ export const selectors = {
     chatBtnToggle: '[data-testid="btn-chat-toggle"]',
     textInput: '[data-testid="input-chat-message"]',
     sendBtn: '[data-testid="btn-chat-send"]',
-    /** "+" menu trigger in the composer (holds attach + Model/Tools/Knowledge) */
+    /** "+" menu trigger in the composer (holds attach, tools and knowledge) */
     plusToggle: '[data-testid="btn-chat-plus"]',
     /** "+" menu panel (opens upward) */
     plusPanel: '[data-testid="dropdown-plus-panel"]',
@@ -206,6 +208,8 @@ export const selectors = {
     againDropdownPanel: '[data-testid="dropdown-again-models"]',
     againDropdownItem: 'button.dropdown-item',
     modelToggle: '[data-testid="btn-model-toggle"]',
+    modelPanel: '[data-testid="dropdown-model-panel"]',
+    modelChipName: '[data-testid="model-chip-name"]',
     toolsToggle: '[data-testid="btn-tools-toggle"]',
     toolsPanel: '[data-testid="dropdown-tools-panel"]',
     toolsActiveBadge: '[data-testid="badge-tools-active"]',
@@ -317,20 +321,19 @@ export const selectors = {
     stateEmptyFolder: '[data-testid="state-empty-folder"]',
     /** File row action: delete this file (opens ConfirmDialog) */
     btnDeleteFile: '[data-testid="btn-delete"]',
-    /** §4.8: knowledge-base tabs shared by /files and its sub-views */
-    tabsBar: '[data-testid="tabs-files"]',
-    tabBrowse: '[data-testid="tab-files-browse"]',
-    tabSearch: '[data-testid="tab-files-search"]',
-    tabIncoming: '[data-testid="tab-files-incoming"]',
-    tabGenerated: '[data-testid="tab-files-generated"]',
-    tabWorkspace: '[data-testid="tab-files-workspace"]',
-    tabVectors: '[data-testid="tab-files-vectors"]',
-    /** Sub-view page roots reached via the Files tabs */
+    /** Library section links in the desktop sidebar */
+    linkBrowse: '[data-testid="link-sidebar-v2-files-browse"]',
+    linkSearch: '[data-testid="link-sidebar-v2-files-search"]',
+    linkIncoming: '[data-testid="link-sidebar-v2-files-incoming"]',
+    linkGenerated: '[data-testid="link-sidebar-v2-files-generated"]',
+    linkWorkspace: '[data-testid="link-sidebar-v2-files-workspace"]',
+    linkVectors: '[data-testid="link-sidebar-v2-files-vectors"]',
+    /** Sub-view page roots reached from the library sidebar */
     pageIncoming: '[data-testid="page-files-incoming"]',
     pageGenerated: '[data-testid="page-files-generated"]',
     pageWorkspace: '[data-testid="page-files-workspace"]',
     pageVectors: '[data-testid="page-vector-storage"]',
-    /** Workspace tab (COMPUTE.WORKSPACES_ENABLED on): list, preview dialog, delete, states */
+    /** Workspace page (COMPUTE.WORKSPACES_ENABLED on): list, preview dialog, delete, states */
     workspaceFiles: '[data-testid="workspace-files"]',
     workspaceEmpty: '[data-testid="workspace-empty"]',
     workspaceError: '[data-testid="workspace-error"]',
@@ -360,7 +363,7 @@ export const selectors = {
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
     memoriesBtn: '[data-testid="btn-sidebar-v2-memories"]',
-    incomingBtn: '[data-testid="btn-sidebar-v2-incoming"]',
+    incomingToggle: '[data-testid="btn-sidebar-v2-incoming-toggle"]',
   },
   oidc: {
     keycloakButton: '[data-testid="btn-social-keycloak"]',

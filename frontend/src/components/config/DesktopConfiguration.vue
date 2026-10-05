@@ -8,7 +8,7 @@
     >
       <template #actions>
         <button
-          class="btn-primary px-5 py-2.5 rounded-lg font-medium text-sm inline-flex items-center gap-2"
+          class="btn-primary px-5 py-2.5 rounded-xl font-medium text-sm inline-flex items-center gap-2"
           data-testid="btn-pair"
           @click="openPairing"
         >
@@ -28,7 +28,7 @@
       <RouterLink
         v-if="chatGateAdmin"
         to="/channels/agents"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center justify-center shrink-0"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center justify-center shrink-0"
         data-testid="link-coding-clients"
       >
         {{ $t('config.desktop.chatGate.openCodingClients') }}
@@ -70,7 +70,7 @@
               :href="DESKTOP_REPO_URL"
               target="_blank"
               rel="noopener noreferrer"
-              class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2"
               data-testid="link-desktop-github"
             >
               <Icon icon="mdi:github" class="w-5 h-5" aria-hidden="true" />
@@ -116,7 +116,7 @@
         :href="DESKTOP_REPO_URL"
         target="_blank"
         rel="noopener noreferrer"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2"
         data-testid="link-desktop-github"
       >
         <Icon icon="mdi:github" class="w-5 h-5" aria-hidden="true" />
@@ -161,7 +161,7 @@
       <p class="txt-secondary text-lg">{{ $t('config.desktop.devices.empty') }}</p>
       <button
         type="button"
-        class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+        class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2"
         data-testid="btn-pair-empty"
         @click="openPairing"
       >
@@ -217,7 +217,7 @@
           <button
             v-if="device.status === 'active'"
             type="button"
-            class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-disconnect"
             @click="disconnect(device)"
           >
@@ -226,7 +226,7 @@
           <button
             v-else
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-remove"
             @click="removeDevice(device)"
           >
@@ -281,7 +281,7 @@
               <div v-else-if="pairingError" class="py-6 text-center">
                 <p class="text-sm text-red-500 mb-4">{{ pairingError }}</p>
                 <button
-                  class="btn-primary px-4 py-2.5 rounded-lg font-medium text-sm"
+                  class="btn-primary px-4 py-2.5 rounded-xl font-medium text-sm"
                   @click="createCode"
                 >
                   {{ $t('common.retry') }}
@@ -304,7 +304,7 @@
                       {{ serverAddress }}
                     </code>
                     <button
-                      class="surface-chip px-3 py-2.5 rounded-lg txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
+                      class="surface-chip px-3 py-2.5 rounded-xl txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
                       :aria-label="$t('config.desktop.pairing.copyAddress')"
                       @click="copy(serverAddress, 'address')"
                     >
@@ -326,7 +326,7 @@
                       {{ pairingCode.code }}
                     </code>
                     <button
-                      class="surface-chip px-3 py-3 rounded-lg txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
+                      class="surface-chip px-3 py-3 rounded-xl txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
                       :aria-label="$t('config.desktop.pairing.copyCode')"
                       @click="copy(pairingCode.code, 'code')"
                     >
@@ -344,7 +344,7 @@
                   <div v-else class="space-y-3" data-testid="section-expired">
                     <p class="text-xs text-amber-500">{{ $t('config.desktop.pairing.expired') }}</p>
                     <button
-                      class="btn-primary px-4 py-2.5 rounded-lg font-medium text-sm"
+                      class="btn-primary px-4 py-2.5 rounded-xl font-medium text-sm"
                       data-testid="btn-new-code"
                       @click="createCode"
                     >
@@ -356,7 +356,7 @@
 
               <div class="mt-6">
                 <button
-                  class="w-full surface-chip px-4 py-3 rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  class="w-full surface-chip px-4 py-3 rounded-xl font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   data-testid="btn-pairing-close"
                   @click="closePairing"
                 >

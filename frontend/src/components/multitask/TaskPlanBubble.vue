@@ -99,7 +99,7 @@ const onSchedule = async () => {
       <button
         v-if="canSchedule"
         type="button"
-        class="icon-ghost inline-flex items-center p-1 rounded-lg"
+        class="icon-ghost inline-flex items-center p-1 rounded-xl"
         :disabled="saving"
         data-testid="btn-schedule-plan"
         :aria-label="$t('taskPlan.scheduleThis')"

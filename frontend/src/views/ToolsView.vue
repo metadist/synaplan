@@ -49,7 +49,7 @@
                     Live Preview
                   </h3>
                   <button
-                    class="lg:hidden w-8 h-8 rounded-lg icon-ghost flex items-center justify-center"
+                    class="lg:hidden w-8 h-8 rounded-xl icon-ghost flex items-center justify-center"
                     @click="togglePreview"
                   >
                     <XMarkIcon class="w-5 h-5" />

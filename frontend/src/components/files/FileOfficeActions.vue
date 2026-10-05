@@ -3,7 +3,7 @@
     <button
       ref="triggerRef"
       type="button"
-      class="shrink-0 px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
+      class="shrink-0 px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
       :aria-expanded="open"
       :aria-label="$t('files.download')"
       data-testid="file-office-actions-trigger"
@@ -21,7 +21,7 @@
       <div
         v-if="open"
         ref="menuRef"
-        class="fixed z-[200] w-52 overflow-y-auto scroll-thin surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5"
+        class="fixed z-[200] w-52 overflow-y-auto scroll-thin surface-card !rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5"
         :style="menuStyle"
         data-testid="file-office-actions-menu"
         @click.stop

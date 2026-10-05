@@ -5,7 +5,7 @@
       data-testid="page-files-workspace"
     >
       <div class="max-w-7xl mx-auto space-y-6">
-        <FilesTabs active="workspace" />
+        <FilesTabs />
 
         <div class="surface-card p-4 sm:p-6 space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -19,7 +19,7 @@
             <button
               v-if="info?.exists"
               type="button"
-              class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium self-start disabled:opacity-50 disabled:cursor-not-allowed"
+              class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium self-start disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="btn-workspace-delete"
               :disabled="busy"
               @click="onDelete"
@@ -40,7 +40,7 @@
             <p class="text-sm text-red-600 dark:text-red-400 max-w-sm">{{ error }}</p>
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
               data-testid="btn-workspace-retry"
               @click="reload"
             >
@@ -56,7 +56,7 @@
             <p class="text-sm txt-secondary max-w-sm">{{ $t('files.workspace.empty') }}</p>
             <router-link
               to="/"
-              class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4 inline-flex items-center"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4 inline-flex items-center"
               data-testid="btn-workspace-empty-chat"
             >
               {{ $t('files.workspace.emptyAction') }}
@@ -109,7 +109,7 @@
           <button
             ref="previewCloseButton"
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-workspace-preview-close"
             @click="closePreview"
           >

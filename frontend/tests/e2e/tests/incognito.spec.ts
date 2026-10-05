@@ -51,15 +51,13 @@ test.describe('@ci Incognito Chat', () => {
       expect(answer.length).toBeGreaterThan(0)
     })
 
-    await test.step('Assert: the chat manager lists no chat for the incognito turn', async () => {
+    await test.step('Assert: the chat list has no row for the incognito turn', async () => {
       await page.locator(selectors.nav.sidebarV2ChatNav).click()
-      const modal = page.locator(selectors.nav.modalChatManager)
-      await modal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      const list = page.locator(selectors.nav.sidebarChats)
+      await list.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await expect(
-        modal.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })
+        list.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })
       ).toHaveCount(0)
-      await page.locator(selectors.nav.modalChatManagerBackdrop).click({ position: { x: 8, y: 8 } })
-      await modal.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
     })
 
     await test.step('Act: end the session via toggle and confirm the discard warning', async () => {
@@ -83,10 +81,10 @@ test.describe('@ci Incognito Chat', () => {
       await openApp(page)
       await expect(page.getByText(uniqueMessage)).toHaveCount(0)
       await page.locator(selectors.nav.sidebarV2ChatNav).click()
-      const modal = page.locator(selectors.nav.modalChatManager)
-      await modal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      const list = page.locator(selectors.nav.sidebarChats)
+      await list.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await expect(
-        modal.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })
+        list.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })
       ).toHaveCount(0)
     })
   })

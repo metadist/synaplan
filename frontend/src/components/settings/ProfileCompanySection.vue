@@ -14,7 +14,7 @@
         <input
           v-model="formData.companyName"
           type="text"
-          class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           :placeholder="$t('profile.companyInfo.companyNamePlaceholder')"
           data-testid="input-company-name"
         />
@@ -27,7 +27,7 @@
         <input
           v-model="formData.vatId"
           type="text"
-          class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           :placeholder="$t('profile.companyInfo.vatIdPlaceholder')"
           data-testid="input-vat-id"
         />
@@ -40,7 +40,7 @@
         <input
           v-model="formData.invoiceEmail"
           type="email"
-          class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+          class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
           :placeholder="$t('profile.accountSettings.invoiceEmailPlaceholder')"
           data-testid="input-invoice-email"
         />

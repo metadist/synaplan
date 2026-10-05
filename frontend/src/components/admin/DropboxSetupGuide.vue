@@ -114,7 +114,7 @@ const resetConnections = async () => {
               >
               <button
                 type="button"
-                class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium flex-shrink-0"
+                class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0"
                 @click="copy(SCOPES, 'scopes')"
               >
                 <Icon
@@ -136,7 +136,7 @@ const resetConnections = async () => {
               >
               <button
                 type="button"
-                class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium flex-shrink-0"
+                class="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0"
                 :disabled="!redirectUri"
                 @click="copy(redirectUri, 'redirect')"
               >
@@ -174,7 +174,7 @@ const resetConnections = async () => {
           </p>
           <button
             type="button"
-            class="btn-danger inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            class="btn-danger inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
             :disabled="resetting"
             data-testid="btn-reset-dropbox-connections"
             @click="resetConnections"

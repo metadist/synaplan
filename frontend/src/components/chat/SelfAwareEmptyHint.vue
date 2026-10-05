@@ -2,7 +2,7 @@
   <div v-if="visible" class="flex justify-center" data-testid="self-aware-empty-hint">
     <button
       type="button"
-      class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+      class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
       data-testid="btn-self-aware-empty-hint"
       @click="emit('ask', question)"
     >

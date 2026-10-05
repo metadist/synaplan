@@ -10,7 +10,7 @@ export const INCOMING_KIND = 'conversation'
 /**
  * "Incoming": conversations other people or groups shared with the signed-in
  * user, plus the "how many arrived since I last looked" counter behind the red
- * dot on the account button.
+ * dot on the chats rail icon and the phone drawer's incoming entry.
  *
  * Everything is gated on the IAM sharing flag and fails closed — with the
  * feature off (or a failing request) both lists are empty and no dot shows.

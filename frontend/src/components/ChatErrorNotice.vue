@@ -137,7 +137,7 @@ const retry = () => {
       <select
         v-if="showModelPicker"
         v-model="pickedModelId"
-        class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm max-w-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm max-w-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :aria-label="t('chatError.chooseModel')"
         data-testid="chat-error-model-select"
       >
@@ -147,7 +147,7 @@ const retry = () => {
       </select>
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2"
         data-testid="btn-chat-error-retry"
         @click="retry"
       >

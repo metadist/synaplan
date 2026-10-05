@@ -11,7 +11,7 @@
       <div class="txt-secondary mb-4">{{ $t('adminModelStatus.loadFailed') }}</div>
       <button
         type="button"
-        class="btn-primary px-6 py-2.5 rounded-lg"
+        class="btn-primary px-6 py-2.5 rounded-xl"
         data-testid="btn-retry"
         @click="load"
       >
@@ -51,7 +51,7 @@
 
           <button
             type="button"
-            class="btn-primary px-5 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-60"
+            class="btn-primary px-5 py-2.5 rounded-xl flex items-center gap-2 disabled:opacity-60"
             :disabled="isRefreshing"
             data-testid="btn-refresh"
             @click="refresh()"
@@ -89,7 +89,7 @@
           <span>{{ $t('adminModelStatus.filters.capability') }}</span>
           <select
             v-model="capabilityFilter"
-            class="px-3 py-1.5 rounded-lg surface-chip txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="px-3 py-1.5 rounded-xl surface-chip txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="filter-capability"
           >
             <option value="">{{ $t('adminModelStatus.filters.allCapabilities') }}</option>
@@ -107,7 +107,7 @@
           />
           <button
             type="button"
-            class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
             data-testid="btn-model-status-toggle-all"
             @click="allProvidersOpen ? collapseAllProviders() : expandAllProviders()"
           >
@@ -150,7 +150,7 @@
           <template #actions>
             <button
               type="button"
-              class="btn-secondary px-3 py-1.5 rounded-lg text-xs disabled:opacity-60"
+              class="btn-secondary px-3 py-1.5 rounded-xl text-xs disabled:opacity-60"
               :disabled="isRefreshing"
               :aria-label="
                 $t('adminModelStatus.actions.refreshProviderAria', {
@@ -231,7 +231,7 @@
                 <div class="flex gap-2 flex-shrink-0">
                   <button
                     type="button"
-                    class="btn-secondary px-3 py-1.5 rounded-lg text-xs"
+                    class="btn-secondary px-3 py-1.5 rounded-xl text-xs"
                     data-testid="btn-reset-counters"
                     :disabled="busyModelId === model.id"
                     @click="resetCounters(model)"
@@ -240,7 +240,7 @@
                   </button>
                   <button
                     type="button"
-                    class="btn-secondary px-3 py-1.5 rounded-lg text-xs"
+                    class="btn-secondary px-3 py-1.5 rounded-xl text-xs"
                     data-testid="btn-toggle-exempt"
                     :disabled="busyModelId === model.id"
                     @click="toggleExempt(model)"

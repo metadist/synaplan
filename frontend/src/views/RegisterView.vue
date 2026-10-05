@@ -19,7 +19,7 @@
 
     <button
       v-if="isNativeApp()"
-      class="absolute left-6 h-9 w-9 rounded-lg icon-ghost flex items-center justify-center z-20"
+      class="absolute left-6 h-9 w-9 rounded-xl icon-ghost flex items-center justify-center z-20"
       style="top: calc(env(safe-area-inset-top, 0px) + 1.5rem)"
       :aria-label="$t('common.back')"
       data-testid="btn-back"
@@ -34,7 +34,7 @@
     >
       <button
         v-if="isNativeServerControlAvailable()"
-        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
+        class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
         :aria-label="$t('nativeServer.changeServer')"
         :title="$t('nativeServer.changeServer')"
         data-testid="btn-change-server"
@@ -43,14 +43,14 @@
         <ServerIcon class="w-4 h-4" />
       </button>
       <button
-        class="h-9 px-3 rounded-lg icon-ghost text-xs font-medium"
+        class="h-9 px-3 rounded-xl icon-ghost text-xs font-medium"
         data-testid="btn-language-toggle"
         @click="cycleLanguage"
       >
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
+        class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
         :aria-label="
           themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
         "
@@ -263,7 +263,7 @@
                 />
                 <button
                   type="button"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-xl txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
                   :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
                   data-testid="btn-toggle-password"
                   @click="showPassword = !showPassword"
@@ -303,7 +303,7 @@
                 />
                 <button
                   type="button"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-xl txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
                   :aria-label="
                     showConfirmPassword ? $t('auth.hidePassword') : $t('auth.showPassword')
                   "

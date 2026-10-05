@@ -60,10 +60,6 @@
     }
   },
   "chats": {
-    "tabs": {
-      "all": "Tous",
-      "incoming": "Entrants"
-    },
     "empty": "Vous n'avez pas encore de conversation.",
     "emptyAction": "Nouveau chat"
   },
@@ -75,7 +71,19 @@
     "config": "Config IA",
     "statistics": "Statistiques",
     "newChat": "Nouveau chat",
+    "pin": "Épingler le chat",
+    "unpin": "Retirer l'épingle",
+    "pinSaveFailed": "L'épingle n'a pas pu être enregistrée. Le chat reste où il était.",
     "stillGenerating": "Réponse en cours",
+    "listOrigin": {
+      "web": "Chat",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "email": "E-mail",
+      "widget": "Widget de chat",
+      "api": "API",
+      "incoming": "Partagé avec vous"
+    },
     "quote": {
       "button": "Mentionner dans le chat",
       "remove": "Retirer la citation"
@@ -222,12 +230,14 @@
     "placeholderShort": "Message…",
     "provider": "Fournisseur",
     "model": "Modèle",
-    "modelCaption": "Modèle : {name}",
+    "modelPicker": {
+      "ariaLabel": "Modèle {model}, raisonnement {level}",
+      "ariaLabelNoLevel": "Modèle {model}"
+    },
     "plusMenu": {
       "label": "Ajouter",
       "attach": "Joindre des fichiers",
       "photo": "Prendre une photo",
-      "model": "Modèle",
       "tools": "Outils",
       "knowledge": "Dossier de connaissances"
     },

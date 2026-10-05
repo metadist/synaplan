@@ -15,7 +15,7 @@
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-xl font-bold txt-primary">{{ $t('widgets.filePicker.title') }}</h2>
             <button
-              class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
+              class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
               data-testid="btn-file-picker-close"
               @click="close"
             >
@@ -34,7 +34,7 @@
                 v-model="searchQuery"
                 type="text"
                 :placeholder="$t('widgets.filePicker.searchPlaceholder')"
-                class="w-full pl-10 pr-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full pl-10 pr-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-file-search"
               />
             </div>
@@ -89,14 +89,14 @@
             </span>
             <div class="flex gap-3">
               <button
-                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 @click="close"
               >
                 {{ $t('common.cancel') }}
               </button>
               <button
                 :disabled="selectedFiles.size === 0"
-                class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-4 py-2 rounded-xl bg-[var(--brand)] text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 @click="confirmSelection"
               >
                 {{ $t('widgets.filePicker.addFiles') }}

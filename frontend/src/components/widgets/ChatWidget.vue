@@ -130,7 +130,7 @@
             <button
               v-if="humanHandoffEnabled && chatMode === 'ai' && !handoffRequested"
               :disabled="handoffSubmitting"
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               :aria-label="$t('widget.humanHandoff.button')"
               :title="$t('widget.humanHandoff.tooltip')"
               data-testid="btn-human-handoff"
@@ -141,7 +141,7 @@
             <!-- Export button disabled - functionality preserved for future use -->
             <button
               v-if="false"
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="$t('widget.exportChat')"
               :title="$t('widget.exportChat')"
               data-testid="btn-export"
@@ -150,7 +150,7 @@
               <ArrowDownTrayIcon class="w-5 h-5 text-white" />
             </button>
             <button
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="
                 widgetTheme === 'dark' ? $t('widget.switchToLight') : $t('widget.switchToDark')
               "
@@ -162,7 +162,7 @@
             </button>
             <button
               v-if="allowFullscreen && !isMobile"
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="isFullscreen ? $t('widget.minimize') : $t('widget.maximize')"
               data-testid="btn-fullscreen"
               @click="toggleFullscreen"
@@ -171,7 +171,7 @@
               <ArrowsPointingOutIcon v-else class="w-5 h-5 text-white" />
             </button>
             <button
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="$t('widget.closeChat')"
               data-testid="btn-close"
               @click="toggleChat"
@@ -316,7 +316,7 @@
                       { id: message.fileId, filename: message.fileName },
                     ]"
                     :key="file.id"
-                    class="flex items-center gap-2 px-2 py-1 rounded-md bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                    class="flex items-center gap-2 px-2 py-1 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
                     :title="$t('widget.downloadFile')"
                     @click="downloadFileById(file.id, file.filename)"
                   >
@@ -497,7 +497,7 @@
               <button
                 :disabled="isSending || uploadingFile"
                 :class="[
-                  'w-6 h-6 rounded flex items-center justify-center flex-shrink-0',
+                  'w-6 h-6 rounded-xl flex items-center justify-center flex-shrink-0',
                   isSending || uploadingFile
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:bg-black/10 dark:hover:bg-white/10',
@@ -536,7 +536,7 @@
               />
               <button
                 :disabled="inputDisabled || !canAddMoreFiles"
-                class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-10 h-10 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 :aria-label="$t('widget.attachFile')"
                 data-testid="btn-attach"
                 @click="fileInput?.click()"
@@ -559,7 +559,7 @@
                     : $t('widget.placeholder')
               "
               rows="1"
-              class="flex-1 px-4 py-2 rounded-lg resize-none focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="flex-1 px-4 py-2 rounded-xl resize-none focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               :style="{
                 backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6',
                 color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937',
@@ -576,7 +576,7 @@
                 canSend && !isSending && !uploadingFile ? { backgroundColor: primaryColor } : {}
               "
               :class="[
-                'w-10 h-10 rounded-lg transition-all flex items-center justify-center',
+                'w-10 h-10 rounded-xl transition-all flex items-center justify-center',
                 canSend && !isSending && !uploadingFile
                   ? 'hover:scale-110 shadow-lg'
                   : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed',

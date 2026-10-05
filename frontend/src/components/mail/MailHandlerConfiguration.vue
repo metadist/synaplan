@@ -7,7 +7,7 @@
     >
       <template #actions>
         <button
-          class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
+          class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
           :aria-label="$t('common.close')"
           data-testid="btn-close"
           @click="$emit('cancel')"
@@ -27,7 +27,7 @@
           <input
             v-model="handlerName"
             type="text"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.handlerNamePlaceholder')"
             data-testid="input-handler-name"
           />
@@ -110,7 +110,7 @@
           <input
             v-model="config.mailServer"
             type="text"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.mailServerPlaceholder')"
             data-testid="input-mail-server"
           />
@@ -126,7 +126,7 @@
           <input
             v-model.number="config.port"
             type="number"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.portPlaceholder')"
             data-testid="input-port"
           />
@@ -141,7 +141,7 @@
           </label>
           <select
             v-model="config.protocol"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-protocol"
           >
             <option v-for="option in protocolOptions" :key="option.value" :value="option.value">
@@ -159,7 +159,7 @@
           </label>
           <select
             v-model="config.security"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-security"
           >
             <option v-for="option in securityOptions" :key="option.value" :value="option.value">
@@ -178,7 +178,7 @@
           <input
             v-model="config.username"
             type="text"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             placeholder="user@example.com or account123"
             data-testid="input-username"
           />
@@ -194,7 +194,7 @@
           <input
             v-model="config.password"
             type="password"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.passwordPlaceholder')"
             data-testid="input-password"
           />
@@ -225,7 +225,7 @@
       <div class="flex gap-3 mt-6">
         <button
           :disabled="isTestingConnection"
-          class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="px-4 py-2 rounded-xl border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-test"
           @click="testConnection"
         >
@@ -254,7 +254,7 @@
           {{ isTestingConnection ? $t('mail.testing') : $t('mail.testConnection') }}
         </button>
         <button
-          class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+          class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
           data-testid="btn-help"
           @click="showHelp"
         >
@@ -318,7 +318,7 @@
           <input
             v-model="smtpConfig.smtpServer"
             type="text"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.smtpServerPlaceholder')"
             data-testid="input-smtp-server"
           />
@@ -334,7 +334,7 @@
           <input
             v-model.number="smtpConfig.smtpPort"
             type="number"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.smtpPortPlaceholder')"
             data-testid="input-smtp-port"
           />
@@ -349,7 +349,7 @@
           </label>
           <select
             v-model="smtpConfig.smtpSecurity"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-smtp-security"
           >
             <option value="STARTTLS">STARTTLS (Port 587)</option>
@@ -370,7 +370,7 @@
           <input
             v-model="smtpConfig.smtpUsername"
             type="text"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             placeholder="user@example.com"
             data-testid="input-smtp-username"
           />
@@ -386,7 +386,7 @@
           <input
             v-model="smtpConfig.smtpPassword"
             type="password"
-            class="w-full px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             :placeholder="$t('mail.smtpPasswordPlaceholder')"
             data-testid="input-smtp-password"
           />
@@ -471,7 +471,7 @@
               <input
                 v-model="emailFilter.fromDate"
                 type="datetime-local"
-                class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-3 py-2 text-sm rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-from-date"
               />
               <p class="text-xs txt-secondary mt-1">
@@ -543,7 +543,7 @@
               <input
                 v-model="dept.email"
                 type="email"
-                class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+                class="w-full px-4 py-2.5 rounded-xl bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
                 :placeholder="$t('mail.emailAddressPlaceholder')"
                 data-testid="input-dept-email"
               />
@@ -556,7 +556,7 @@
               <input
                 v-model="dept.rules"
                 type="text"
-                class="w-full px-4 py-2.5 rounded-lg bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+                class="w-full px-4 py-2.5 rounded-xl bg-transparent border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
                 :placeholder="$t('mail.rulesPlaceholder')"
                 data-testid="input-dept-rules"
               />
@@ -594,7 +594,7 @@
       <div class="flex gap-3 mt-6">
         <button
           :disabled="departments.length >= 10"
-          class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="px-4 py-2 rounded-xl border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-add"
           @click="addDepartment"
         >
@@ -602,7 +602,7 @@
           {{ $t('mail.addDepartment') }}
         </button>
         <button
-          class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           data-testid="btn-reset"
           @click="resetToDefault"
         >
@@ -640,7 +640,7 @@
 
         <button
           :disabled="isTestingConnection"
-          class="w-full px-6 py-3 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full px-6 py-3 rounded-xl bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-run-test"
           @click="testConnection"
         >
@@ -712,7 +712,7 @@
     <div class="flex gap-3 justify-between" data-testid="section-navigation">
       <button
         v-if="currentStep > 0"
-        class="px-6 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        class="px-6 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         data-testid="btn-prev"
         @click="prevStep"
       >
@@ -724,7 +724,7 @@
         <button
           v-if="currentStep < steps.length - 1"
           :disabled="(currentStep === 0 && !isStep1Valid) || (currentStep === 1 && !isStep2Valid)"
-          class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-6 py-2 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-next"
           @click="nextStep"
         >
@@ -732,7 +732,7 @@
         </button>
         <button
           v-else
-          class="btn-primary px-6 py-2 rounded-lg flex items-center gap-2"
+          class="btn-primary px-6 py-2 rounded-xl flex items-center gap-2"
           data-testid="btn-save"
           @click="saveConfiguration"
         >

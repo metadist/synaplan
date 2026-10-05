@@ -49,7 +49,7 @@ function commit() {
     :min="min"
     :max="max"
     :disabled="disabled"
-    class="w-24 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:cursor-not-allowed"
+    class="w-24 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:cursor-not-allowed"
     @change="commit"
   />
 </template>
