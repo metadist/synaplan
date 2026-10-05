@@ -1251,7 +1251,7 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
     }
   }
 
-  await saveConfiguration()
+  await saveConfiguration(capability)
 }
 
 const onEmbeddingSwitchCancel = () => {
@@ -1481,25 +1481,25 @@ function warnReplacedChoice(
   warning(t('config.aiModels.saveReplaced', { model, fallback: nameOf(effectiveId) }))
 }
 
-const saveConfiguration = async () => {
+const saveConfiguration = async (capability: Capability) => {
+  const value = defaultConfig.value[capability]
+  if (value === null) {
+    return
+  }
+
   saving.value = true
   try {
-    // Filter out null values
-    const defaults: Record<string, number> = {}
-    for (const [key, value] of Object.entries(defaultConfig.value)) {
-      if (value !== null) {
-        defaults[key] = value
-      }
-    }
-
-    const response = await saveDefaultModels({ defaults })
+    // Only the capability the person just changed. The dropdown may show a
+    // fallback while the saved row stays the choice that cannot be used yet;
+    // posting every visible id would overwrite that row with the fallback.
+    const response = await saveDefaultModels({ defaults: { [capability]: value } })
 
     if (response.success) {
       savedChoiceEpoch += 1
       const replaced = Object.entries(response.replaced ?? {}) as [Capability, number | null][]
-      for (const [capability, effectiveId] of replaced) {
-        warnReplacedChoice(capability, defaultConfig.value[capability], effectiveId)
-        defaultConfig.value[capability] = effectiveId
+      for (const [replacedCapability, effectiveId] of replaced) {
+        warnReplacedChoice(replacedCapability, defaultConfig.value[replacedCapability], effectiveId)
+        defaultConfig.value[replacedCapability] = effectiveId
       }
       originalConfig.value = { ...defaultConfig.value }
       if (replaced.length === 0) {
