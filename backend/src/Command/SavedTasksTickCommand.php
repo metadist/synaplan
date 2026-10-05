@@ -45,10 +45,11 @@ final class SavedTasksTickCommand extends Command
 
             $result = $this->tick->tick(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
             $io->writeln(sprintf(
-                'Claimed %d, completed %d, failed %d.',
+                'Claimed %d, completed %d, failed %d, skipped %d (previous run still going).',
                 $result['claimed'],
                 $result['ran'],
                 $result['failed'],
+                $result['skipped'],
             ));
         } finally {
             $lock->release();
