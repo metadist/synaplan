@@ -617,6 +617,51 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
+     * Issue #2287: a voice note whose transcript is the message text is
+     * classified like the same words typed, not as a file task.
+     */
+    public function testSpokenVoiceNoteIsClassifiedLikeTypedText(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $sorterResult = ['topic' => 'general', 'language' => 'de', 'web_search' => true];
+        $this->messageSorter->method('classify')->willReturn($sorterResult);
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $typed = $this->createMock(Message::class);
+        $typed->method('getId')->willReturn(21);
+        $typed->method('getUserId')->willReturn(10);
+        $typed->method('getText')->willReturn($text);
+        $typed->method('getLanguage')->willReturn('de');
+        $typed->method('getFiles')->willReturn(new ArrayCollection());
+        $typed->method('getFile')->willReturn(0);
+
+        $file = $this->createMock(File::class);
+        $file->method('getFileType')->willReturn('ogg');
+        $file->method('getFileName')->willReturn('voice.ogg');
+        $file->method('getFileText')->willReturn($text);
+
+        $voice = $this->createMock(Message::class);
+        $voice->method('getId')->willReturn(22);
+        $voice->method('getUserId')->willReturn(10);
+        $voice->method('getText')->willReturn($text);
+        $voice->method('getLanguage')->willReturn('de');
+        $voice->method('getFile')->willReturn(0);
+        $voice->method('getFiles')->willReturn(new ArrayCollection([$file]));
+        $voice->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        $typedResult = $this->service->classify($typed);
+        $voiceResult = $this->service->classify($voice);
+
+        $this->assertSame($typedResult['topic'], $voiceResult['topic']);
+        $this->assertSame($typedResult['intent'], $voiceResult['intent']);
+        $this->assertSame('general', $voiceResult['topic']);
+        $this->assertNotSame('file_analysis', $voiceResult['intent']);
+        $this->assertNotSame('analyzefile', $voiceResult['topic']);
+    }
+
+    /**
      * Issue #983: a video attachment must take the same analyzefile route
      * as documents and audio (skip the AI sorter, use the ANALYZE model)
      * so the FileAnalysisHandler actually receives the clip.

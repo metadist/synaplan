@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Seed;
 
+use App\Model\CatalogPriceOwnership;
 use App\Model\ModelCatalog;
 use Doctrine\DBAL\Connection;
 
@@ -20,7 +21,14 @@ use Doctrine\DBAL\Connection;
  *        - if catalog values are identical → SKIP (already in sync, no write).
  *   3. **DB row exists but values differ from the stored fingerprint** → PRESERVE.
  *      An admin edited the row via /config/ai-models after we last seeded it; we
- *      MUST NOT overwrite their changes on container restart.
+ *      MUST NOT overwrite their changes on container restart. A price-only
+ *      mismatch on a `pricePinned` catalog row is the exception: the pin says
+ *      the catalog price wins, and the non-price fields still match, so the
+ *      catalog price is applied.
+ *   3b. **DB row is stamped `__price_owner = litellm`** and the fingerprint
+ *      matches the row (the sync refreshed it). LiteLLM keeps the price until
+ *      the catalog price changes or the row is `pricePinned`. A non-price
+ *      catalog change is still applied, with the LiteLLM price left in place.
  *   4. **DB row exists with no fingerprint at all** (legacy row predating the
  *      fingerprint mechanism):
  *        - if the row already matches the catalog exactly → silently adopt by
@@ -58,6 +66,7 @@ final readonly class ModelSeeder
 
     private const ACTION_INSERT = 'insert';
     private const ACTION_UPDATE = 'update';
+    private const ACTION_UPDATE_KEEP_PRICE = 'update_keep_price';
     private const ACTION_PRESERVE = 'preserve';
     private const ACTION_SKIP = 'skip';
 
@@ -131,6 +140,15 @@ final readonly class ModelSeeder
     {
         $action = $this->decideAction($catalog, $existing);
 
+        if (self::ACTION_UPDATE_KEEP_PRICE === $action && null !== $existing) {
+            ModelCatalog::upsert(
+                $this->connection,
+                CatalogPriceOwnership::mergeKeepingLiteLlmPrice($existing, $catalog),
+            );
+
+            return self::ACTION_UPDATE;
+        }
+
         if (self::ACTION_INSERT === $action || self::ACTION_UPDATE === $action) {
             ModelCatalog::upsert($this->connection, $catalog);
         }
@@ -166,8 +184,23 @@ final readonly class ModelSeeder
         }
 
         if ($stored !== $current) {
-            // Row was edited via the admin UI after we last seeded it. Preserve.
+            // Row was edited via the admin UI after we last seeded it. Preserve,
+            // unless the catalog pins the price and nothing but the price moved:
+            // that pin is the explicit "catalog wins" override.
+            if (CatalogPriceOwnership::isPricePinned($catalog)
+                && CatalogPriceOwnership::nonPriceCatalogMatches($existing, $catalog)) {
+                return self::ACTION_UPDATE;
+            }
+
             return self::ACTION_PRESERVE;
+        }
+
+        if (CatalogPriceOwnership::shouldKeepLiteLlmPrice($existing, $catalog)) {
+            if (CatalogPriceOwnership::nonPriceCatalogMatches($existing, $catalog)) {
+                return self::ACTION_SKIP;
+            }
+
+            return self::ACTION_UPDATE_KEEP_PRICE;
         }
 
         if ($desired === $stored) {

@@ -323,6 +323,21 @@ same secret as `META_API_KEY`. Create a key at [dev.meta.ai](https://dev.meta.ai
 under **API keys → Create API key** (the key is shown only once).
 Docs: [dev.meta.ai/docs/authentication](https://dev.meta.ai/docs/authentication).
 
+### Cerebras
+
+```bash
+CEREBRAS_API_KEY=your_key_here
+```
+
+Qwen 3.8 27B (chat with tools, image understanding) and GPT OSS 120B (text only) on
+Cerebras Inference at `https://api.cerebras.ai/v1`, at roughly 2,000–3,000 tokens per
+second. The Thinking toggle maps to `reasoning_effort`: off sends `none` on Qwen and
+`low` on GPT OSS, which cannot switch reasoning off. Image requests to Qwen always run
+without reasoning, and images must be PNG or JPEG. Prompts are processed by Cerebras in
+the US. Create a key at [cloud.cerebras.ai](https://cloud.cerebras.ai/) under
+**API Keys**; a free trial is available with a smaller context (65K) and rate limits.
+Docs: [inference-docs.cerebras.ai](https://inference-docs.cerebras.ai/).
+
 ### HuggingFace
 
 ```bash

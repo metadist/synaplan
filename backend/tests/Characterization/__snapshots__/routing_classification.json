@@ -743,5 +743,22 @@
         "source": "ai_sorting",
         "topic": "officemaker",
         "web_search": false
+    },
+    "voice_note_weather": {
+        "intent": "chat",
+        "language": "de",
+        "model_id": null,
+        "model_name": null,
+        "multi_step": null,
+        "provider": null,
+        "read_pages": null,
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": false,
+        "sorting_usage": null,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": true
     }
 }

@@ -14,6 +14,8 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class OpenAiMessagesTranslatorTest extends TestCase
 {
+    private const ONE_PIXEL_GIF = 'R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+
     public function testStripsThinkingAndMapsTools(): void
     {
         $t = new OpenAiMessagesTranslator(new MockHttpClient());
@@ -397,6 +399,104 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame('PONG', $result['body']['content'][0]['text']);
     }
 
+    public function testCerebrasRejectsUrlImagesBeforeCallingUpstream(): void
+    {
+        $called = false;
+        $client = new MockHttpClient(static function () use (&$called): MockResponse {
+            $called = true;
+
+            return new MockResponse('{}');
+        });
+        $t = new OpenAiMessagesTranslator($client);
+
+        $result = $t->complete(
+            $this->cerebrasImageRequest(['type' => 'url', 'url' => 'https://example.test/cat.png']),
+            ['api_key' => 'csk_test', 'upstream_url' => 'https://api.anthropic.com', 'provider' => 'cerebras'],
+        );
+
+        $this->assertFalse($called, 'A link Cerebras cannot load must not reach the upstream');
+        $this->assertSame(400, $result['status']);
+        $this->assertIsArray($result['body']);
+        $this->assertSame('invalid_request_error', $result['body']['error']['type']);
+        $this->assertStringContainsString('not as links', $result['body']['error']['message']);
+    }
+
+    public function testCerebrasStreamRejectsUrlImagesWithAnErrorEvent(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient(static fn (): MockResponse => throw new \LogicException('upstream must not be called')));
+        $events = [];
+
+        $t->stream(
+            $this->cerebrasImageRequest(['type' => 'url', 'url' => 'https://example.test/cat.png']),
+            ['api_key' => 'csk_test', 'upstream_url' => 'https://api.anthropic.com', 'provider' => 'cerebras'],
+            static function (string|array $event) use (&$events): void {
+                $events[] = $event;
+            },
+        );
+
+        $this->assertCount(1, $events);
+        $this->assertIsArray($events[0]);
+        $this->assertSame('error', $events[0]['event']);
+        $this->assertSame('invalid_request_error', $events[0]['data']['error']['type']);
+    }
+
+    public function testCerebrasReceivesGifAsPngWithoutDetail(): void
+    {
+        if (!extension_loaded('imagick')) {
+            $this->markTestSkipped('imagick is required to transcode GIF to PNG');
+        }
+
+        $seenBody = null;
+        $client = new MockHttpClient(static function (string $method, string $url, array $options) use (&$seenBody): MockResponse {
+            $seenBody = json_decode((string) ($options['body'] ?? ''), true);
+
+            return new MockResponse((string) json_encode([
+                'choices' => [['message' => ['role' => 'assistant', 'content' => 'a dot'], 'finish_reason' => 'stop']],
+                'usage' => ['prompt_tokens' => 5, 'completion_tokens' => 2],
+            ]));
+        });
+        $t = new OpenAiMessagesTranslator($client);
+
+        $result = $t->complete(
+            $this->cerebrasImageRequest(['type' => 'base64', 'media_type' => 'image/gif', 'data' => self::ONE_PIXEL_GIF]),
+            ['api_key' => 'csk_test', 'upstream_url' => 'https://api.anthropic.com', 'provider' => 'cerebras', 'image_detail' => 'high'],
+        );
+
+        $this->assertSame(200, $result['status']);
+        $this->assertIsArray($seenBody);
+        $image = $seenBody['messages'][0]['content'][1]['image_url'];
+        $this->assertStringStartsWith('data:image/png;base64,', $image['url']);
+        $this->assertArrayNotHasKey('detail', $image);
+    }
+
+    public function testOtherProvidersKeepUrlImagesAndDetail(): void
+    {
+        $request = $this->cerebrasImageRequest(['type' => 'url', 'url' => 'https://example.test/cat.png']);
+        $payload = (new OpenAiMessagesTranslator(new MockHttpClient()))->toOpenAiRequest($request, false, 'high');
+
+        $this->assertSame(['url' => 'https://example.test/cat.png', 'detail' => 'high'], $payload['messages'][0]['content'][1]['image_url']);
+    }
+
+    /**
+     * @param array<string, string> $source
+     *
+     * @return array<string, mixed>
+     */
+    private function cerebrasImageRequest(array $source): array
+    {
+        return [
+            'model' => 'qwen-3.8-27b',
+            'max_tokens' => 64,
+            'messages' => [[
+                'role' => 'user',
+                'content' => [
+                    ['type' => 'text', 'text' => 'What is this?'],
+                    ['type' => 'image', 'source' => $source],
+                ],
+            ]],
+        ];
+    }
+
     public function testStreamMapsResponsesTextDelta(): void
     {
         $sse = "event: response.output_text.delta\n"
@@ -483,6 +583,7 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertTrue($t->supports('trustedtokens'));
         $this->assertTrue($t->supports('a2agent'));
         $this->assertTrue($t->supports('meta'));
+        $this->assertTrue($t->supports('cerebras'));
         $this->assertTrue($t->supports('perplexity'));
         $this->assertTrue($t->supports('ollama'));
         $this->assertTrue($t->supports(OpenAiCompatibleEndpointRegistry::PROVIDER_NAME));
@@ -515,6 +616,10 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame(
             'https://api.meta.ai/v1/chat/completions',
             $t->resolveCompletionsUrl(['provider' => 'meta']),
+        );
+        $this->assertSame(
+            'https://api.cerebras.ai/v1/chat/completions',
+            $t->resolveCompletionsUrl(['provider' => 'cerebras']),
         );
         $this->assertSame(
             'https://api.openai.com/v1/chat/completions',

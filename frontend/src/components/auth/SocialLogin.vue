@@ -61,7 +61,7 @@ import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiOidcDiscoveryResponseSchema } from '@/generated/api-schemas'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const oidcAvailable = ref(false)
@@ -91,7 +91,7 @@ const loginWithGoogle = () => {
     error.value = null
 
     // Redirect to Google OAuth
-    window.location.href = `${API_BASE_URL}/api/v1/auth/google/login`
+    window.location.href = `${API_BASE_URL}/api/v1/auth/google/login?language=${encodeURIComponent(locale.value)}`
   } catch (e: unknown) {
     error.value = getErrorMessage(e) || t('auth.socialLoginError')
     loading.value = false
@@ -104,7 +104,7 @@ const loginWithGitHub = () => {
     error.value = null
 
     // Redirect to GitHub OAuth
-    window.location.href = `${API_BASE_URL}/api/v1/auth/github/login`
+    window.location.href = `${API_BASE_URL}/api/v1/auth/github/login?language=${encodeURIComponent(locale.value)}`
   } catch (e: unknown) {
     error.value = getErrorMessage(e) || t('auth.socialLoginError')
     loading.value = false
@@ -117,7 +117,7 @@ const loginWithKeycloak = () => {
     error.value = null
 
     // Redirect to Keycloak OIDC login (with PKCE)
-    window.location.href = `${API_BASE_URL}/api/v1/auth/keycloak/login`
+    window.location.href = `${API_BASE_URL}/api/v1/auth/keycloak/login?language=${encodeURIComponent(locale.value)}`
   } catch (e: unknown) {
     error.value = getErrorMessage(e) || t('auth.socialLoginError')
     loading.value = false

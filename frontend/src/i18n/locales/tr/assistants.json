@@ -111,7 +111,7 @@
     "toolsSkills": "Araçlar ve beceriler",
     "toolsSkillsHint": "Birisi konuştuğunda bu asistanın yapabilecekleri.",
     "toolInternet": "İnternette ara",
-    "toolInternetHint": "Yapay zeka bu asistan için webde arama yapabilir.",
+    "toolInternetHint": "Yapay zeka yalnızca bir soru hava durumu, fiyatlar veya haberler gibi güncel bilgi gerektirdiğinde webde arama yapar.",
     "toolFiles": "Dosyaları kullan",
     "toolFilesHint": "Yapay zeka yukarıda seçtiğiniz klasörleri arayabilir.",
     "mcpServers": "Bağlı uygulamalar",

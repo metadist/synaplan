@@ -14,11 +14,7 @@
       <div
         class="absolute -bottom-24 right-1/4 w-[28rem] h-[28rem] bg-brand/4 dark:bg-brand/8 rounded-full blur-3xl animate-float-delayed"
       ></div>
-      <img
-        :src="iconSrc"
-        alt=""
-        class="absolute top-[8%] right-[5%] w-[280px] opacity-[0.035] dark:opacity-[0.06] rotate-12 pointer-events-none select-none"
-      />
+      <!-- The bird watermark moved to the global AmbientBackground in App.vue. -->
     </div>
 
     <button
@@ -462,7 +458,7 @@ const isDark = computed(() => {
   return matchMedia('(prefers-color-scheme: dark)').matches
 })
 
-const { logoSrc, iconSrc } = useBrandLogo(isDark)
+const { logoSrc } = useBrandLogo(isDark)
 
 const email = ref('')
 const password = ref('')
@@ -668,7 +664,8 @@ const handleSocialLogin = async (provider: string) => {
     return
   }
 
-  window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
+  const params = new URLSearchParams({ language: String(locale.value) })
+  window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
 }
 </script>
 

@@ -338,6 +338,18 @@
   "settings": {
     "title": "Einstellungen",
     "subtitle": "Verwalten Sie Ihre Präferenzen und Konfiguration",
+    "sections": {
+      "indexLabel": "Auf dieser Seite",
+      "profile": "Profil",
+      "appearance": "Sprache & Darstellung",
+      "chat": "Chat & KI",
+      "data": "Daten & Datenschutz",
+      "billing": "Abrechnung",
+      "security": "Sicherheit",
+      "app": "App",
+      "legal": "Rechtliches",
+      "delete": "Konto löschen"
+    },
     "tabs": {
       "general": "Allgemein",
       "features": "Features"
@@ -362,7 +374,7 @@
     },
     "language": {
       "title": "Sprache",
-      "description": "Wählen Sie die Sprache der Benutzeroberfläche"
+      "description": "Diese Sprache gilt in der App, in E-Mails und in Kanalnachrichten wie Telegram."
     },
     "webSearch": {
       "title": "Websuche",

@@ -359,6 +359,18 @@
         "light": "You are editing the LIGHT mode settings — colors saved here apply when the app is in light mode. Switch the app to dark mode to edit the dark mode colors.",
         "dark": "You are editing the DARK mode settings — colors saved here apply when the app is in dark mode. Switch the app to light mode to edit the light mode colors."
       },
+      "brandingReset": {
+        "title": "Reset to the default style",
+        "description": "Restores the default Synaplan colors and fonts for light and dark mode. The name, logos, legal links, landing pages and attribution stay as they are.",
+        "button": "Reset style",
+        "resetting": "Resetting…",
+        "confirmTitle": "Reset the style to the defaults?",
+        "confirmMessage": "Your custom colors and fonts (light and dark mode) will be replaced with the Synaplan defaults. The name, logos, links and attribution stay untouched. This cannot be undone.",
+        "success": "Style reset — the defaults are in use again.",
+        "partial": "{reset} setting(s) reset, {failed} failed — the failed ones kept your values.",
+        "failed": "The style could not be reset. Your values are unchanged.",
+        "unconfirmed": "We could not confirm whether the style was reset. Reload the page to see the current style."
+      },
       "restartBanner": {
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
@@ -485,7 +497,8 @@
         "COMPUTE_POLICY_INTERACTIVE": "When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An assistant cannot loosen this.",
         "COMPUTE_POLICY_UNATTENDED": "When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An assistant cannot loosen this.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "How many days a file-work folder may sit unused before cleanup can remove it. Default 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Manage → Channels. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository."
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Manage → Channels. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.",
+        "FEATURE_SEARCH_AI_ENABLED": "AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why in one sentence. It never changes anything by itself. Each use is one short AI call. Off keeps keyword and meaning search."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -665,6 +678,64 @@
         "title": "Last measurement",
         "line": "On {date}: found the right snippet {recallOff} of the time without reranking, {recallOn} with it. Slowest answers took {p95Off} ms without and {p95On} ms with."
       }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "The models behind the search palette (Ctrl/Cmd+K). Search questions use each person's chat model until you pick one model for everyone. The search index follows the document embedding model until you pick another.",
+      "loading": "Loading the search models…",
+      "loadFailed": "The search models could not be loaded.",
+      "noModel": "no model",
+      "undo": "Undo",
+      "ai": {
+        "label": "AI model for search questions",
+        "hint": "The first choice uses the chat model each person already uses. Any model under “Same model for everyone” is used for the whole server. It only points at a result and never changes anything by itself.",
+        "inherit": "Each person's chat model",
+        "globalGroup": "Same model for everyone",
+        "userChat": "Search questions use each person's chat model. Yours is {model}.",
+        "userChatUnavailable": "Search questions use each person's chat model. Yours cannot answer right now, so your search shows no AI help.",
+        "ready": "Everyone's search questions are answered by {model}.",
+        "off": "AI help in search is switched off, so the palette shows no AI row.",
+        "openFlag": "Turn it on in Features",
+        "unavailable": "The chosen model cannot answer right now, so the palette shows no AI row. Pick another model or set up its provider.",
+        "saved": "Everyone's search questions now use {model}.",
+        "savedUserChat": "Search questions use each person's chat model again.",
+        "restored": "Everyone's search questions use {model} again.",
+        "restoredUserChat": "Search questions use each person's chat model again."
+      },
+      "embed": {
+        "label": "Embedding model for the search index",
+        "hint": "Finds pages, settings, chats and files by meaning. Changing it re-reads the whole index in the background.",
+        "inherit": "Same as the document embedding model: {model}",
+        "separate": "Search and documents use different embedding models, so each search makes two short embedding calls.",
+        "otherRun": "Another embedding change is running. You can change this model when it has finished.",
+        "confirmTitle": "Change the search embedding model?",
+        "confirmMessage": "Search re-reads {count} entries with {model} in the background, one short embedding call each. Until an entry is done it is found by keywords only. If the change fails, search stays on {current}.",
+        "confirm": "Change and re-read",
+        "started": "Search is moving to {model}. You can follow the progress here.",
+        "savedNoRun": "Search uses {model}. The index already fits it, so nothing had to be re-read."
+      },
+      "reason": {
+        "notPulled": "not downloaded in Ollama",
+        "providerUnavailable": "no API key for {service}"
+      },
+      "index": {
+        "empty": "The search index is still empty. It fills as people use Synaplan.",
+        "keywordOnly": "Search finds by keywords only until the index has been read with the embedding model.",
+        "coverage": "{embedded} of {rows} index entries can be found by meaning."
+      },
+      "run": {
+        "running": "Re-reading the index with {model}: {done} of {total}. Search keeps working meanwhile.",
+        "completed": "The search index uses {model}.",
+        "partial": "The search index uses {model}. {count} entries could not be read and are found by keywords only until they change.",
+        "failed": "Moving the index to {model} failed, so search is back on {previous}. Entries that were already moved are found by keywords only until they are read again. Pick a model above to try again.",
+        "cancelled": "Moving the index to {model} was stopped. Search stays on {previous}."
+      },
+      "refused": {
+        "invalid_model": "{model} cannot be used for search right now. The previous model stays.",
+        "probe_failed": "{model} did not answer a test call, so nothing was changed.",
+        "run_in_progress": "Another embedding change is running. Nothing was changed; try again when it has finished.",
+        "unknown": "The model could not be changed. The previous one stays."
+      }
     }
   },
   "providerHelp": {
@@ -702,6 +773,10 @@
     "meta": {
       "title": "Meta API key",
       "message": "Create an API key in the Meta Model API dashboard (API keys), then paste it here. This unlocks Muse Spark. Prompts are processed by Meta."
+    },
+    "cerebras": {
+      "title": "Cerebras API key",
+      "message": "Create an API key in the Cerebras Cloud dashboard (API Keys), then paste it here. This unlocks GPT OSS 120B and Qwen 3.8 27B with very fast answers. Prompts are processed by Cerebras in the US."
     },
     "huggingface": {
       "title": "HuggingFace API token",
@@ -949,6 +1024,7 @@
         "SAVEDTASKS_ENABLED": "Saved tasks",
         "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Document tools",
+        "SEARCH_AI_ENABLED": "AI help in search",
         "MULTITASK_ROUTING_ENABLED": "Multi-step routing",
         "MULTITASK_PARALLEL_ENABLED": "Parallel steps",
         "MULTITASK_URL_FETCH_ENABLED": "Fetch web pages",

@@ -452,10 +452,9 @@
       "availableToolsHelp": "Habilita herramientas que estarán disponibles al usar este prompt",
       "internetSearch": {
         "label": "Búsqueda en Internet",
-        "help": "Elige cuándo este prompt busca en la web. «Automático» deja que el clasificador decida por mensaje; «Siempre activado» fuerza la búsqueda; «Siempre desactivado» la desactiva.",
-        "auto": "Automático (decide el clasificador)",
-        "on": "Siempre activado",
-        "off": "Siempre desactivado"
+        "help": "La IA solo busca en la web cuando un mensaje necesita información actual, como el tiempo, precios o noticias. Para buscar en un solo mensaje, usa Herramientas → Búsqueda Web en el chat. «Desactivado» desactiva la búsqueda web para este prompt.",
+        "auto": "Automático (decide la IA)",
+        "off": "Desactivado"
       },
       "promptContent": "Contenido del Prompt",
       "contentPlaceholder": "Ingresa tu prompt del sistema aquí...",
@@ -863,6 +862,11 @@
       }
     },
     "setByAdmin": "Definido por su administrador",
-    "fromGroup": "Valor predeterminado de su grupo"
+    "fromGroup": "Valor predeterminado de su grupo",
+    "embeddingSwitch": {
+      "scopes": {
+        "search": "Índice de Smart Search"
+      }
+    }
   }
 }

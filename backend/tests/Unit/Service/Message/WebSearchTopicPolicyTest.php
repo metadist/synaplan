@@ -12,9 +12,10 @@ use PHPUnit\Framework\TestCase;
  * Locks down the contract of the hybrid web-search routing policy.
  *
  * The decision rules are exhaustive — every relevant combination of explicit
- * user request × topic (non-search vs. search-friendly) × prompt flag
- * (true / false / null) × classifier BWEBSEARCH vote (true / false / null) ×
- * message triviality is covered so any drift in the policy is caught by CI.
+ * user request (toggle or text) × topic (non-search vs. search-friendly) ×
+ * prompt flag (true / false / null) × classifier BWEBSEARCH vote (true /
+ * false / null) × message triviality is covered so any drift in the policy
+ * is caught by CI.
  */
 final class WebSearchTopicPolicyTest extends TestCase
 {
@@ -40,30 +41,34 @@ final class WebSearchTopicPolicyTest extends TestCase
         yield 'user_request_beats_no_vote' => ['general', true, null, false, 'hey', true, 'rule 2: explicit request beats no-vote and triviality'];
         yield 'user_request_on_media_topic' => ['mediamaker', true, null, null, 'a cat', true, 'rule 2: explicit request beats NON_WEB_SEARCH gate'];
 
-        // Rule 3: explicit opt-in is absolute, beats the NON_WEB_SEARCH gate
-        // and overrides a "no" vote from the model.
-        yield 'opt_in_on_chat_topic_searches' => ['general', false, true, false, self::NON_TRIVIAL, true, 'rule 3: explicit opt-in beats no-vote'];
-        yield 'opt_in_on_media_topic_searches' => ['mediamaker', false, true, null, self::NON_TRIVIAL, true, 'rule 3: opt-in overrides NON_WEB_SEARCH gate'];
+        // Explicit request written in the message itself — same as the toggle.
+        yield 'text_request_de' => ['general', false, null, false, 'Such im Internet nach den Öffnungszeiten vom Städel', true, 'rule 2: "such im Internet" is an explicit request'];
+        yield 'text_request_en' => ['general', false, null, null, 'search the web for cheap flights to Rome', true, 'rule 2: "search the web" is an explicit request'];
+        yield 'text_request_beaten_by_opt_out' => ['general', false, false, null, 'google mal das Wetter', false, 'rule 1: hard disable beats a text request'];
 
-        // Rule 4: NON_WEB_SEARCH topics suppress search when no opt-in is set,
-        // even if the model voted to search.
-        yield 'mediamaker_no_opinion' => ['mediamaker', false, null, true, self::NON_TRIVIAL, false, 'rule 4: media topic without opt-in'];
-        yield 'officemaker_no_opinion' => ['officemaker', false, null, true, self::NON_TRIVIAL, false, 'rule 4: document topic'];
+        // `tool_internet=true` only ALLOWS search: it never forces one.
+        yield 'allow_flag_greeting' => ['general', false, true, null, 'Hi, wie gehts?', false, 'allow flag does not search a greeting'];
+        yield 'allow_flag_vote_no' => ['general', false, true, false, 'Wie lang ist die Chinesische Mauer?', false, 'allow flag follows a no-vote'];
+        yield 'allow_flag_vote_yes' => ['general', false, true, true, 'Wie steht der Dollar zum Euro?', true, 'allow flag follows a yes-vote'];
+        yield 'allow_flag_media_topic' => ['mediamaker', false, true, true, self::NON_TRIVIAL, false, 'allow flag does not lift the media gate'];
 
-        // Rule 5: no explicit flag → trust the classifier's BWEBSEARCH vote
-        // for non-trivial messages.
-        yield 'general_vote_yes' => ['general', false, null, true, self::NON_TRIVIAL, true, 'rule 5: model voted to search'];
-        yield 'general_vote_no' => ['general', false, null, false, self::NON_TRIVIAL, false, 'rule 5: model voted no search'];
-        yield 'general_no_vote' => ['general', false, null, null, self::NON_TRIVIAL, false, 'rule 5: no vote (fast-path) → no search'];
-        yield 'custom_topic_vote_yes' => ['my-custom-topic', false, null, true, self::NON_TRIVIAL, true, 'rule 5: custom prompt, model voted yes'];
-        yield 'custom_topic_vote_no' => ['my-custom-topic', false, null, false, self::NON_TRIVIAL, false, 'rule 5: custom prompt, model voted no'];
+        // Rule 3: NON_WEB_SEARCH topics suppress a vote-triggered search.
+        yield 'mediamaker_no_opinion' => ['mediamaker', false, null, true, self::NON_TRIVIAL, false, 'rule 3: media topic'];
+        yield 'officemaker_no_opinion' => ['officemaker', false, null, true, self::NON_TRIVIAL, false, 'rule 3: document topic'];
 
-        // Rule 5 veto: an over-eager yes-vote on a trivial chat is suppressed.
-        yield 'trivial_greeting_vote_yes' => ['general', false, null, true, 'Hey, wie gehts?', false, 'rule 5 veto: greeting suppresses yes-vote'];
-        yield 'trivial_thanks_vote_yes' => ['general', false, null, true, 'thanks a lot!', false, 'rule 5 veto: thanks suppresses yes-vote'];
-        yield 'trivial_short_noise_vote_yes' => ['general', false, null, true, 'lol ok', false, 'rule 5 veto: short noise suppresses yes-vote'];
-        // …but a trivial message never blocks an explicit opt-in/request.
-        yield 'trivial_but_opt_in_searches' => ['general', false, true, true, 'hello', true, 'opt-in beats triviality veto'];
+        // Rule 4: trust the classifier's BWEBSEARCH vote for non-trivial messages.
+        yield 'general_vote_yes' => ['general', false, null, true, self::NON_TRIVIAL, true, 'rule 4: model voted to search'];
+        yield 'general_vote_no' => ['general', false, null, false, self::NON_TRIVIAL, false, 'rule 4: model voted no search'];
+        yield 'general_no_vote' => ['general', false, null, null, self::NON_TRIVIAL, false, 'rule 4: no vote → no search'];
+        yield 'custom_topic_vote_yes' => ['my-custom-topic', false, null, true, self::NON_TRIVIAL, true, 'rule 4: custom prompt, model voted yes'];
+        yield 'custom_topic_vote_no' => ['my-custom-topic', false, null, false, self::NON_TRIVIAL, false, 'rule 4: custom prompt, model voted no'];
+        yield 'greeting_plus_question_vote_yes' => ['general', false, null, true, 'Hi, wie steht der Dollar zum Euro?', true, 'rule 4: a greeting before a real question is not smalltalk'];
+
+        // Rule 4 veto: an over-eager yes-vote on a trivial chat is suppressed.
+        yield 'trivial_greeting_vote_yes' => ['general', false, null, true, 'Hey, wie gehts?', false, 'rule 4 veto: greeting suppresses yes-vote'];
+        yield 'trivial_thanks_vote_yes' => ['general', false, null, true, 'thanks a lot!', false, 'rule 4 veto: thanks suppresses yes-vote'];
+        yield 'trivial_short_noise_vote_yes' => ['general', false, null, true, 'lol ok', false, 'rule 4 veto: short noise suppresses yes-vote'];
+        // …but a trivial message never blocks an explicit request.
         yield 'trivial_but_user_request_searches' => ['general', true, null, true, 'hello', true, 'user request beats triviality veto'];
 
         // Edge cases.
@@ -206,6 +211,16 @@ final class WebSearchTopicPolicyTest extends TestCase
         // Trivial: ultra-short, question-less noise.
         yield 'short_noise' => ['lol ok', true];
         yield 'single_word' => ['danke', true];
+        yield 'greeting_with_time_of_day' => ['Guten Morgen!', true];
+
+        // Not trivial: a greeting followed by a real question.
+        yield 'greeting_then_fx_question' => ['Hi, wie steht der Dollar zum Euro?', false];
+        yield 'thanks_then_question' => ['Danke! Und was ist die Hauptstadt von Kanada?', false];
+        yield 'greeting_then_short_question' => ['Hi, Öffnungszeiten Städel?', false];
+        yield 'greeting_then_short_remark' => ['Hallo, alles super', true];
+        // Whole-word matching: "know" is not "now", "actually" is not "actual".
+        yield 'know_is_not_now' => ['ok i know', true];
+        yield 'actually_is_not_actual' => ['thanks actually', true];
 
         // Not trivial: actuality signals make a short message search-worthy.
         yield 'weather_query' => ['weather tomorrow', false];
@@ -224,6 +239,55 @@ final class WebSearchTopicPolicyTest extends TestCase
         // Edge cases.
         yield 'empty' => ['', false];
         yield 'null' => [null, false];
+    }
+
+    /**
+     * @return iterable<string, array{0: ?string, 1: bool}>
+     */
+    public static function explicitSearchRequestProvider(): iterable
+    {
+        yield 'de_such_im_internet' => ['Such im Internet nach dem Wetter', true];
+        yield 'de_im_internet_nachschauen' => ['Kannst du im Internet nachschauen, wann Ikea öffnet?', true];
+        yield 'de_google_mal' => ['google mal den Bitcoin-Kurs', true];
+        yield 'de_recherchiere_online' => ['Recherchiere online, was das kostet', true];
+        yield 'de_websuche' => ['Mach eine Websuche zu Tesla', true];
+        yield 'en_search_the_web' => ['Search the web for the latest iPhone', true];
+        yield 'en_look_it_up_online' => ['can you look it up online?', true];
+        yield 'en_google_it' => ['just google it', true];
+        yield 'es_busca_en_internet' => ['Busca en internet el horario del museo', true];
+        yield 'fr_cherche_sur_internet' => ['Cherche sur internet les horaires', true];
+        yield 'tr_internette_ara' => ['internette ara: hava durumu', true];
+        yield 'en_greeting_then_request' => ['Hi, can you please search the web for train strikes?', true];
+        yield 'en_do_a_web_search' => ['Do a web search on solar panel prices', true];
+        yield 'de_bitte_suche_online' => ['Bitte suche online nach einem Rezept', true];
+        yield 'de_kannst_du_googeln' => ['Kannst du das mal googeln?', true];
+        yield 'de_websuche_colon' => ['Websuche: Öffnungszeiten Zoo Frankfurt', true];
+        yield 'es_puedes_buscar' => ['¿Puedes buscar en internet el precio?', true];
+        yield 'es_por_favor_busca' => ['Por favor, busca en internet el precio', true];
+        yield 'fr_peux_tu_chercher' => ['Peux-tu chercher sur internet la météo ?', true];
+
+        // Mentioning the web or Google is not a request to search.
+        yield 'how_does_google_work' => ['How does Google search work?', false];
+        yield 'en_why_people_search_the_web' => ['Why do people search the web for medical advice?', false];
+        yield 'en_i_searched_the_web' => ['I tried to search the web but found nothing', false];
+        yield 'de_wie_funktioniert_websuche' => ['Wie funktioniert eine Websuche?', false];
+        yield 'de_ich_habe_im_internet_gesucht' => ['Ich habe im Internet gesucht, aber nichts gefunden', false];
+        yield 'fr_pourquoi_chercher' => ['Pourquoi les gens cherchent sur internet ?', false];
+        yield 'what_is_the_internet' => ['Was ist das Internet?', false];
+        yield 'great_wall' => ['Wie lang ist die Chinesische Mauer?', false];
+        yield 'greeting' => ['Hi, wie gehts?', false];
+        yield 'empty' => ['', false];
+        yield 'null' => [null, false];
+    }
+
+    #[DataProvider('explicitSearchRequestProvider')]
+    public function testIsExplicitSearchRequest(?string $text, bool $expected): void
+    {
+        self::assertSame(
+            $expected,
+            WebSearchTopicPolicy::isExplicitSearchRequest($text),
+            sprintf('text=%s', var_export($text, true)),
+        );
     }
 
     #[DataProvider('trivialConversationProvider')]

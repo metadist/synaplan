@@ -50,6 +50,7 @@ use App\Service\SavedTask\WorkflowsConfig;
 use App\Service\SelfAware\CapabilityInventory;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\Setup\SetupStateService;
+use App\Service\SmartSearch\Interpret\SearchInterpreter;
 use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
@@ -117,6 +118,7 @@ class ConfigController extends AbstractController
         private readonly ?DocumentToolsConfig $documentToolsConfig = null,
         private readonly ?ComputeConfig $computeConfig = null,
         private readonly ?GroupRepository $groupRepository = null,
+        private readonly ?SearchInterpreter $searchInterpreter = null,
     ) {
     }
 
@@ -218,6 +220,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'toolsApprovalsEnabled', type: 'boolean', example: false, description: 'When true, write-class tools ask for approval and Manage → Automations → Approvals is shown. On by default; pin with FEATURE_TOOLS_APPROVALS_ENABLED.'),
                         new OA\Property(property: 'toolsCustomHttpEnabled', type: 'boolean', example: false, description: 'When true, Connections shows Custom tools for HTTP/OpenAPI tools. On by default; pin with FEATURE_TOOLS_CUSTOM_HTTP_ENABLED.'),
                         new OA\Property(property: 'workflowsBuilderEnabled', type: 'boolean', example: false, description: 'When true, Saved Tasks show a Steps editor and can start from another system. On by default; pin with FEATURE_WORKFLOWS_BUILDER_ENABLED.'),
+                        new OA\Property(property: 'smartSearchAi', type: 'boolean', example: true, description: 'When true, the search palette offers AI help (POST /api/v1/search/interpret): FEATURE_SEARCH_AI_ENABLED is on and the search model (the chat model of the person unless an admin pins one) can answer. False for anonymous clients.'),
                     ]
                 ),
                 new OA\Property(
@@ -558,6 +561,7 @@ class ConfigController extends AbstractController
             'toolsApprovalsEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($user?->getId()),
             'toolsCustomHttpEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isCustomHttpEnabled($user?->getId()),
             'workflowsBuilderEnabled' => null !== $this->workflowsConfig && $this->workflowsConfig->isBuilderEnabled($user?->getId()),
+            'smartSearchAi' => null !== $user && null !== $this->searchInterpreter && $this->searchInterpreter->isAvailable($user),
         ];
 
         // Speech-to-text configuration

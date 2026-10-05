@@ -1,5 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+
+const { mockRoute } = vi.hoisted(() => ({
+  mockRoute: { query: {} as Record<string, string> },
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => mockRoute,
+}))
 import ConfigField from '@/components/admin/ConfigField.vue'
 import { i18n, type SupportedLanguage } from '@/i18n'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
@@ -215,5 +223,23 @@ describe('ConfigField — locale overlay for backend schema copy', () => {
       'Strong isolation (gVisor)',
       'Virtual machine (microVM)',
     ])
+  })
+})
+
+describe('ConfigField — search deep link', () => {
+  afterEach(() => {
+    mockRoute.query = {}
+  })
+
+  it('rings the field a search result points at', () => {
+    mockRoute.query = { highlight: 'REGISTRATION_ENABLED' }
+
+    expect(mountField().find('[data-testid="config-field-highlighted"]').exists()).toBe(true)
+  })
+
+  it('leaves every other field unmarked', () => {
+    mockRoute.query = { highlight: 'MAILER_DSN' }
+
+    expect(mountField().find('[data-testid="config-field-highlighted"]').exists()).toBe(false)
   })
 })

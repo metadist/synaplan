@@ -359,6 +359,18 @@
         "light": "Sie bearbeiten die Einstellungen für den HELLEN Modus — hier gespeicherte Farben gelten im hellen Modus. Wechseln Sie in den dunklen Modus, um die Farben für den dunklen Modus zu bearbeiten.",
         "dark": "Sie bearbeiten die Einstellungen für den DUNKLEN Modus — hier gespeicherte Farben gelten im dunklen Modus. Wechseln Sie in den hellen Modus, um die Farben für den hellen Modus zu bearbeiten."
       },
+      "brandingReset": {
+        "title": "Auf den Standardstil zurücksetzen",
+        "description": "Stellt die Standardfarben und -schriften von Synaplan für den hellen und dunklen Modus wieder her. Name, Logos, rechtliche Links, Landingpages und die Attribution bleiben unverändert.",
+        "button": "Stil zurücksetzen",
+        "resetting": "Wird zurückgesetzt…",
+        "confirmTitle": "Stil auf die Standards zurücksetzen?",
+        "confirmMessage": "Ihre benutzerdefinierten Farben und Schriften (heller und dunkler Modus) werden durch die Synaplan-Standards ersetzt. Name, Logos, Links und Attribution bleiben unberührt. Dies kann nicht rückgängig gemacht werden.",
+        "success": "Stil zurückgesetzt — die Standards werden wieder verwendet.",
+        "partial": "{reset} Einstellung(en) zurückgesetzt, {failed} fehlgeschlagen — die fehlgeschlagenen haben Ihre Werte behalten.",
+        "failed": "Der Stil konnte nicht zurückgesetzt werden. Ihre Werte sind unverändert.",
+        "unconfirmed": "Es ließ sich nicht feststellen, ob der Stil zurückgesetzt wurde. Laden Sie die Seite neu, um den aktuellen Stil zu sehen."
+      },
       "restartBanner": {
         "title": "Konfiguration aktualisiert — Neustart erforderlich",
         "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",
@@ -485,7 +497,8 @@
         "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Verwalten → Kanäle. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut."
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Verwalten → Kanäle. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut.",
+        "FEATURE_SEARCH_AI_ENABLED": "KI-Hilfe in der Suchpalette (Strg/Cmd+K): Bei einer Frage in normalen Worten wählt das Tools-Modell den passendsten Treffer und begründet ihn in einem Satz. Es ändert selbst nichts. Jede Nutzung ist ein kurzer KI-Aufruf. Aus: Stichwort- und Bedeutungssuche bleiben."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -665,6 +678,64 @@
         "title": "Letzte Messung",
         "line": "Am {date}: richtige Stelle ohne Neuordnung {recallOff} der Fälle, mit {recallOn}. Langsamste Antworten {p95Off} ms ohne und {p95On} ms mit."
       }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "Die Modelle hinter der Suchpalette (Strg/Cmd+K). Suchfragen nutzen das Chat-Modell der jeweiligen Person, bis du ein Modell für alle festlegst. Der Suchindex folgt dem Embedding-Modell der Dokumente, bis du ein anderes wählst.",
+      "loading": "Suchmodelle werden geladen …",
+      "loadFailed": "Die Suchmodelle konnten nicht geladen werden.",
+      "noModel": "kein Modell",
+      "undo": "Rückgängig",
+      "ai": {
+        "label": "KI-Modell für Suchfragen",
+        "hint": "Die erste Auswahl nutzt das Chat-Modell, das jede Person schon verwendet. Jedes Modell unter „Dasselbe Modell für alle“ gilt für den ganzen Server. Es zeigt nur auf einen Treffer und ändert selbst nichts.",
+        "inherit": "Chat-Modell der jeweiligen Person",
+        "globalGroup": "Dasselbe Modell für alle",
+        "userChat": "Suchfragen nutzen das Chat-Modell der jeweiligen Person. Deins ist {model}.",
+        "userChatUnavailable": "Suchfragen nutzen das Chat-Modell der jeweiligen Person. Deins kann gerade nicht antworten, deshalb zeigt deine Suche keine KI-Hilfe.",
+        "ready": "Suchfragen aller Personen beantwortet {model}.",
+        "off": "Die KI-Hilfe in der Suche ist ausgeschaltet, deshalb zeigt die Palette keine KI-Zeile.",
+        "openFlag": "In den Funktionen einschalten",
+        "unavailable": "Das gewählte Modell kann gerade nicht antworten, deshalb zeigt die Palette keine KI-Zeile. Wähle ein anderes Modell oder richte seinen Anbieter ein.",
+        "saved": "Suchfragen aller Personen nutzen jetzt {model}.",
+        "savedUserChat": "Suchfragen nutzen wieder das Chat-Modell der jeweiligen Person.",
+        "restored": "Suchfragen aller Personen nutzen wieder {model}.",
+        "restoredUserChat": "Suchfragen nutzen wieder das Chat-Modell der jeweiligen Person."
+      },
+      "embed": {
+        "label": "Embedding-Modell für den Suchindex",
+        "hint": "Findet Seiten, Einstellungen, Chats und Dateien nach Bedeutung. Ein Wechsel liest den ganzen Index im Hintergrund neu ein.",
+        "inherit": "Wie das Embedding-Modell der Dokumente: {model}",
+        "separate": "Suche und Dokumente nutzen verschiedene Embedding-Modelle, deshalb macht jede Suche zwei kurze Embedding-Aufrufe.",
+        "otherRun": "Gerade läuft ein anderer Embedding-Wechsel. Du kannst dieses Modell ändern, sobald er fertig ist.",
+        "confirmTitle": "Embedding-Modell der Suche wechseln?",
+        "confirmMessage": "Die Suche liest {count} Einträge im Hintergrund mit {model} neu ein, je ein kurzer Embedding-Aufruf. Bis ein Eintrag fertig ist, wird er nur über Stichwörter gefunden. Scheitert der Wechsel, bleibt die Suche bei {current}.",
+        "confirm": "Wechseln und neu einlesen",
+        "started": "Die Suche wechselt zu {model}. Den Fortschritt siehst du hier.",
+        "savedNoRun": "Die Suche nutzt {model}. Der Index passt schon, nichts musste neu eingelesen werden."
+      },
+      "reason": {
+        "notPulled": "in Ollama nicht heruntergeladen",
+        "providerUnavailable": "kein API-Schlüssel für {service}"
+      },
+      "index": {
+        "empty": "Der Suchindex ist noch leer. Er füllt sich, während Synaplan genutzt wird.",
+        "keywordOnly": "Die Suche findet nur über Stichwörter, bis der Index mit dem Embedding-Modell eingelesen ist.",
+        "coverage": "{embedded} von {rows} Indexeinträgen sind nach Bedeutung auffindbar."
+      },
+      "run": {
+        "running": "Der Index wird mit {model} neu eingelesen: {done} von {total}. Die Suche funktioniert währenddessen weiter.",
+        "completed": "Der Suchindex nutzt {model}.",
+        "partial": "Der Suchindex nutzt {model}. {count} Einträge konnten nicht eingelesen werden und werden nur über Stichwörter gefunden, bis sie sich ändern.",
+        "failed": "Der Wechsel des Index zu {model} ist gescheitert, die Suche nutzt wieder {previous}. Schon umgestellte Einträge werden nur über Stichwörter gefunden, bis sie neu eingelesen sind. Wähle oben ein Modell, um es erneut zu versuchen.",
+        "cancelled": "Der Wechsel des Index zu {model} wurde abgebrochen. Die Suche bleibt bei {previous}."
+      },
+      "refused": {
+        "invalid_model": "{model} kann gerade nicht für die Suche genutzt werden. Das bisherige Modell bleibt.",
+        "probe_failed": "{model} hat auf einen Testaufruf nicht geantwortet, deshalb wurde nichts geändert.",
+        "run_in_progress": "Gerade läuft ein anderer Embedding-Wechsel. Nichts wurde geändert; versuch es erneut, wenn er fertig ist.",
+        "unknown": "Das Modell konnte nicht geändert werden. Das bisherige bleibt."
+      }
     }
   },
   "providerHelp": {
@@ -702,6 +773,10 @@
     "meta": {
       "title": "Meta-API-Schlüssel",
       "message": "Erstelle einen API-Schlüssel im Meta Model API-Dashboard (API keys) und füge ihn hier ein. Damit steht Muse Spark zur Verfügung. Prompts werden von Meta verarbeitet."
+    },
+    "cerebras": {
+      "title": "Cerebras-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel im Cerebras-Cloud-Dashboard (API Keys) und füge ihn hier ein. Damit stehen GPT OSS 120B und Qwen 3.8 27B mit sehr schnellen Antworten zur Verfügung. Prompts werden von Cerebras in den USA verarbeitet."
     },
     "huggingface": {
       "title": "HuggingFace-API-Token",
@@ -949,6 +1024,7 @@
         "SAVEDTASKS_ENABLED": "Gespeicherte Aufgaben",
         "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Dokumentwerkzeuge",
+        "SEARCH_AI_ENABLED": "KI-Hilfe in der Suche",
         "MULTITASK_ROUTING_ENABLED": "Mehrschritt-Routing",
         "MULTITASK_PARALLEL_ENABLED": "Parallele Schritte",
         "MULTITASK_URL_FETCH_ENABLED": "Webseiten abrufen",

@@ -355,6 +355,18 @@
         "light": "AÇIK mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler açık modda geçerlidir. Koyu mod renklerini düzenlemek için uygulamayı koyu moda geçirin.",
         "dark": "KOYU mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler koyu modda geçerlidir. Açık mod renklerini düzenlemek için uygulamayı açık moda geçirin."
       },
+      "brandingReset": {
+        "title": "Varsayılan stile sıfırla",
+        "description": "Açık ve koyu mod için varsayılan Synaplan renklerini ve yazı tiplerini geri yükler. Ad, logolar, yasal bağlantılar, açılış sayfaları ve atıf değişmeden kalır.",
+        "button": "Stili sıfırla",
+        "resetting": "Sıfırlanıyor…",
+        "confirmTitle": "Stil varsayılanlara sıfırlansın mı?",
+        "confirmMessage": "Özel renkleriniz ve yazı tipleriniz (açık ve koyu mod) Synaplan varsayılanlarıyla değiştirilecek. Ad, logolar, bağlantılar ve atıf değişmeyecek. Bu işlem geri alınamaz.",
+        "success": "Stil sıfırlandı — varsayılanlar yeniden kullanılıyor.",
+        "partial": "{reset} ayar sıfırlandı, {failed} başarısız oldu — başarısız olanlar değerlerinizi korudu.",
+        "failed": "Stil sıfırlanamadı. Değerleriniz değişmedi.",
+        "unconfirmed": "Stilin sıfırlanıp sıfırlanmadığı doğrulanamadı. Geçerli stili görmek için sayfayı yenileyin."
+      },
       "restartBanner": {
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
@@ -481,7 +493,8 @@
         "COMPUTE_POLICY_INTERACTIVE": "Sahip oradayken (sohbet veya canlı bir API çağrısı): dosya çalışmasını otomatik çalıştır, önce sor veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
         "COMPUTE_POLICY_UNATTENDED": "Kayıtlı bir görev dosya çalışmasını kendi başına çalıştırdığında: önce sor (varsayılan), otomatik çalıştır veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Bir dosya çalışması klasörünün temizlik onu kaldırmadan önce kaç gün kullanılmadan durabileceği. Varsayılan 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Yönet → Kanallar altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir."
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Yönet → Kanallar altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
+        "FEATURE_SEARCH_AI_ENABLED": "Arama paletinde AI yardımı (Ctrl/Cmd+K): Günlük dilde sorulan bir soruda araç modeli en uygun sonucu seçer ve nedenini tek cümleyle söyler. Kendi başına hiçbir şeyi değiştirmez. Her kullanım kısa bir AI çağrısıdır. Kapalıyken anahtar kelime ve anlam araması çalışmaya devam eder."
       },
       "fieldOptions": {
         "COMPUTE_REQUIRE_TIER": {
@@ -661,6 +674,64 @@
         "title": "Son ölçüm",
         "line": "{date} tarihinde: doğru parça yeniden sıralama olmadan {recallOff}, onunla {recallOn}. En yavaş yanıtlar {p95Off} ms olmadan, {p95On} ms onunla."
       }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "Arama paletinin (Ctrl/Cmd+K) arkasındaki modeller. Herkes için bir model seçene kadar arama soruları her kişinin kendi sohbet modelini kullanır. Arama dizini, başka bir model seçene kadar belgelerin embedding modelini izler.",
+      "loading": "Arama modelleri yükleniyor…",
+      "loadFailed": "Arama modelleri yüklenemedi.",
+      "noModel": "model yok",
+      "undo": "Geri al",
+      "ai": {
+        "label": "Arama soruları için AI modeli",
+        "hint": "İlk seçenek, her kişinin zaten kullandığı sohbet modelini kullanır. «Herkes için aynı model» altındaki her model tüm sunucu için geçerlidir. Yalnızca bir sonucu gösterir ve kendi başına hiçbir şeyi değiştirmez.",
+        "inherit": "Her kişinin sohbet modeli",
+        "globalGroup": "Herkes için aynı model",
+        "userChat": "Arama soruları her kişinin sohbet modelini kullanır. Seninki {model}.",
+        "userChatUnavailable": "Arama soruları her kişinin sohbet modelini kullanır. Seninki şu anda yanıt veremiyor, bu yüzden araman AI yardımı göstermiyor.",
+        "ready": "Herkesin arama sorularını {model} yanıtlıyor.",
+        "off": "Aramada AI yardımı kapalı, bu yüzden palet AI satırı göstermiyor.",
+        "openFlag": "Özellikler bölümünden aç",
+        "unavailable": "Seçilen model şu anda yanıt veremiyor, bu yüzden palet AI satırı göstermiyor. Başka bir model seç veya sağlayıcısını kur.",
+        "saved": "Herkesin arama soruları artık {model} kullanıyor.",
+        "savedUserChat": "Arama soruları yeniden her kişinin sohbet modelini kullanıyor.",
+        "restored": "Herkesin arama soruları yeniden {model} kullanıyor.",
+        "restoredUserChat": "Arama soruları yeniden her kişinin sohbet modelini kullanıyor."
+      },
+      "embed": {
+        "label": "Arama dizini için embedding modeli",
+        "hint": "Sayfaları, ayarları, sohbetleri ve dosyaları anlamlarına göre bulur. Değiştirmek tüm dizini arka planda yeniden okur.",
+        "inherit": "Belgelerin embedding modeliyle aynı: {model}",
+        "separate": "Arama ve belgeler farklı embedding modelleri kullanıyor, bu yüzden her arama iki kısa embedding çağrısı yapar.",
+        "otherRun": "Başka bir embedding değişikliği sürüyor. Bitince bu modeli değiştirebilirsin.",
+        "confirmTitle": "Aramanın embedding modeli değiştirilsin mi?",
+        "confirmMessage": "Arama {count} girdiyi arka planda {model} ile yeniden okur, her biri için kısa bir embedding çağrısı. Bir girdi bitene kadar yalnızca anahtar kelimelerle bulunur. Değişiklik başarısız olursa arama {current} ile devam eder.",
+        "confirm": "Değiştir ve yeniden oku",
+        "started": "Arama {model} modeline geçiyor. İlerlemeyi burada izleyebilirsin.",
+        "savedNoRun": "Arama {model} kullanıyor. Dizin zaten uygun, hiçbir şeyin yeniden okunması gerekmedi."
+      },
+      "reason": {
+        "notPulled": "Ollama'da indirilmedi",
+        "providerUnavailable": "{service} için API anahtarı yok"
+      },
+      "index": {
+        "empty": "Arama dizini henüz boş. Synaplan kullanıldıkça dolar.",
+        "keywordOnly": "Dizin embedding modeliyle okunana kadar arama yalnızca anahtar kelimelerle bulur.",
+        "coverage": "{rows} dizin girdisinden {embedded} tanesi anlamına göre bulunabilir."
+      },
+      "run": {
+        "running": "Dizin {model} ile yeniden okunuyor: {total} girdiden {done} tanesi. Arama bu sırada çalışmaya devam eder.",
+        "completed": "Arama dizini {model} kullanıyor.",
+        "partial": "Arama dizini {model} kullanıyor. {count} girdi okunamadı ve değişene kadar yalnızca anahtar kelimelerle bulunur.",
+        "failed": "Dizinin {model} modeline geçişi başarısız oldu, bu yüzden arama yeniden {previous} kullanıyor. Zaten geçirilmiş girdiler yeniden okunana kadar yalnızca anahtar kelimelerle bulunur. Yeniden denemek için yukarıdan bir model seç.",
+        "cancelled": "Dizinin {model} modeline geçişi durduruldu. Arama {previous} ile devam ediyor."
+      },
+      "refused": {
+        "invalid_model": "{model} şu anda arama için kullanılamıyor. Önceki model kalıyor.",
+        "probe_failed": "{model} bir test çağrısına yanıt vermedi, bu yüzden hiçbir şey değiştirilmedi.",
+        "run_in_progress": "Başka bir embedding değişikliği sürüyor. Hiçbir şey değiştirilmedi; bitince yeniden dene.",
+        "unknown": "Model değiştirilemedi. Önceki model kalıyor."
+      }
     }
   },
   "providerHelp": {
@@ -698,6 +769,10 @@
     "meta": {
       "title": "Meta API anahtarı",
       "message": "Meta Model API panelinde (API keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, Muse Spark'ı açar. İstemleri Meta işler."
+    },
+    "cerebras": {
+      "title": "Cerebras API anahtarı",
+      "message": "Cerebras Cloud panelinde (API Keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, çok hızlı yanıtlarla GPT OSS 120B ve Qwen 3.8 27B'yi açar. İstemleri ABD'de Cerebras işler."
     },
     "huggingface": {
       "title": "HuggingFace API jetonu",
@@ -945,6 +1020,7 @@
         "SAVEDTASKS_ENABLED": "Kayıtlı görevler",
         "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
         "DOCUMENT_TOOLS_ENABLED": "Belge araçları",
+        "SEARCH_AI_ENABLED": "Aramada AI yardımı",
         "MULTITASK_ROUTING_ENABLED": "Çok adımlı yönlendirme",
         "MULTITASK_PARALLEL_ENABLED": "Paralel adımlar",
         "MULTITASK_URL_FETCH_ENABLED": "Web sayfalarını getir",

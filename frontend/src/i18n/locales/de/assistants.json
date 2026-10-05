@@ -111,7 +111,7 @@
     "toolsSkills": "Werkzeuge und Fähigkeiten",
     "toolsSkillsHint": "Was dieser Assistent tun darf, wenn jemand mit ihm spricht.",
     "toolInternet": "Im Internet nachschlagen",
-    "toolInternetHint": "Die KI darf für diesen Assistenten das Web durchsuchen.",
+    "toolInternetHint": "Die KI sucht nur im Web, wenn eine Frage aktuelle Informationen braucht, etwa Wetter, Preise oder Nachrichten.",
     "toolFiles": "Dateien nutzen",
     "toolFilesHint": "Die KI darf die oben gewählten Ordner durchsuchen.",
     "mcpServers": "Verbundene Apps",

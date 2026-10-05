@@ -291,7 +291,7 @@ final readonly class MessagesGateway
                 400,
                 'invalid_request_error',
                 sprintf(
-                    'Provider `%s` cannot be used through the Messages gateway. Use a catalog chat model on Anthropic, Gemini, or an OpenAI-compatible API (OpenAI, Groq, Mistral, xAI, HuggingFace, TrustedTokens, A2Agent, Perplexity, Ollama, or an admin-registered endpoint), or add a MODEL_ALIASES entry.',
+                    'Provider `%s` cannot be used through the Messages gateway. Use a catalog chat model on Anthropic, Gemini, or an OpenAI-compatible API (OpenAI, Groq, Mistral, xAI, HuggingFace, TrustedTokens, A2Agent, Meta, Cerebras, Perplexity, Ollama, or an admin-registered endpoint), or add a MODEL_ALIASES entry.',
                     $resolved['provider'],
                 ),
             );

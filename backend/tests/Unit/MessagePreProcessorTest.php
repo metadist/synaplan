@@ -3,12 +3,14 @@
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\TikaClient;
 use App\Service\Message\MessagePreProcessor;
+use App\Service\Message\SpokenInput;
 use App\Service\RateLimitService;
 use App\Service\WhisperService;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -235,7 +237,7 @@ class MessagePreProcessorTest extends TestCase
                 ->willReturn(true);
 
             $this->whisperService
-                ->expects($this->once())
+                ->expects($this->exactly(2))
                 ->method('transcribe')
                 ->willThrowException(new \Exception('Transcription failed'));
 
@@ -282,7 +284,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(42);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn('docx');
@@ -340,7 +342,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(88);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn('png');
@@ -400,7 +402,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(55);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn('pdf');
@@ -454,7 +456,7 @@ class MessagePreProcessorTest extends TestCase
      */
     public function testProcessFileEntityKeepsStatusWhenBinaryMissingButTextPresent(): void
     {
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getId')->willReturn(60);
         $file->method('getFilePath')->willReturn('does/not/exist.docx');
         $file->method('getFileType')->willReturn('docx');
@@ -483,7 +485,7 @@ class MessagePreProcessorTest extends TestCase
      */
     public function testProcessFileEntityMarksErrorWhenBinaryMissingAndNoText(): void
     {
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getId')->willReturn(61);
         $file->method('getFilePath')->willReturn('does/not/exist.docx');
         $file->method('getFileType')->willReturn('docx');
@@ -537,7 +539,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(99);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn($extension);
@@ -600,7 +602,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(43);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn('docx');
@@ -674,7 +676,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(77);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn($extension);
@@ -737,7 +739,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(77);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn('webm');
@@ -811,7 +813,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(78);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn('webm');
@@ -881,7 +883,7 @@ class MessagePreProcessorTest extends TestCase
         touch($tempFile);
 
         try {
-            $file = $this->createMock(\App\Entity\File::class);
+            $file = $this->createMock(File::class);
             $file->method('getId')->willReturn(79);
             $file->method('getFilePath')->willReturn(basename($tempFile));
             $file->method('getFileType')->willReturn('webm');
@@ -945,5 +947,79 @@ class MessagePreProcessorTest extends TestCase
                 unlink($tempFile);
             }
         }
+    }
+
+    /**
+     * Issue #2287: empty or placeholder text plus audio becomes the transcript
+     * and is marked as spoken input. A caption is never marked.
+     */
+    #[DataProvider('spokenInputTextProvider')]
+    public function testAudioTranscriptReplacesOnlyPlaceholderText(string $original, bool $marked): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_audio_'.uniqid().'.ogg';
+        touch($tempFile);
+
+        try {
+            $transcript = 'Wie wird das Wetter heute in Münster?';
+            $file = new File();
+            $file->setUserId(7);
+            $file->setFilePath(basename($tempFile));
+            $file->setFileType('ogg');
+            $file->setFileName('voice.ogg');
+            $file->setFileSize(800);
+
+            $message = new Message();
+            $message->setUserId(7);
+            $message->setTrackingId(1);
+            $message->setText($original);
+            $message->addFile($file);
+
+            $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
+            $this->whisperService->method('isAvailable')->willReturn(true);
+            $this->whisperService->method('transcribe')->willReturn([
+                'text' => $transcript,
+                'language' => 'de',
+            ]);
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $service->process($message);
+
+            $this->assertSame($transcript, $file->getFileText());
+            $this->assertSame('processed', $file->getStatus());
+            if ($marked) {
+                $this->assertSame($transcript, $message->getText());
+                $this->assertSame(SpokenInput::META_TRANSCRIPT, $message->getMeta(SpokenInput::META_KEY));
+            } else {
+                $this->assertSame($original, $message->getText());
+                $this->assertNull($message->getMeta(SpokenInput::META_KEY));
+            }
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function spokenInputTextProvider(): iterable
+    {
+        yield 'empty' => ['', true];
+        yield 'audio placeholder' => ['[Audio message]', true];
+        yield 'short audio placeholder' => ['[Audio]', true];
+        yield 'caption' => ['Please summarize this recording', false];
     }
 }

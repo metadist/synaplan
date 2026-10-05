@@ -563,43 +563,31 @@ class MessageProcessorTest extends TestCase
     }
 
     /**
-     * Regression test for the silent "Internet Search" toggle bug.
-     *
-     * Setup: a German message that would otherwise NOT trigger the
-     * classifier's web_search hint (no keyword from WEB_SEARCH_KEYWORDS).
-     * The task prompt has `tool_internet=true` set in the user's UI.
-     *
-     * Before the fix `processStream()` had no positive trigger for the
-     * prompt flag — only a negative gate that read the wrong key
-     * (`tool_internet_search`). The user toggle was therefore ignored.
-     *
-     * After the fix the streaming pipeline must mirror the non-streaming
-     * `process()` path and call `BraveSearchService::search()` exactly
-     * once when the prompt opts in via `tool_internet`.
+     * A prompt with `tool_internet=true` only ALLOWS web search: when the
+     * classifier says the message needs no fresh information, nothing is
+     * searched. Older installs stored `true` from a pre-selected checkbox,
+     * which turned every "Hi" into a web search.
      */
-    public function testProcessStreamTriggersWebSearchFromPromptToolInternetFlag(): void
+    public function testProcessStreamDoesNotForceWebSearchFromPromptToolInternetFlag(): void
     {
         $message = $this->createMock(Message::class);
         $message->method('getUserId')->willReturn(1);
         $message->method('getTrackingId')->willReturn(123);
         $message->method('getFile')->willReturn(0);
         $message->method('getId')->willReturn(99);
-        $message->method('getText')->willReturn('Erzähl mir etwas über Eigentumswohnungen in München');
+        $message->method('getText')->willReturn('Hi, wie gehts?');
 
         $this->preProcessor->method('process')->willReturn($message);
         $this->messageRepository->method('findConversationHistory')->willReturn([]);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
-        // Classifier picks a non-search-worthy topic and does NOT set
-        // web_search — so the only way search can fire is the prompt flag.
         $this->classifier->method('classify')->willReturn([
-            'topic' => 'company',
+            'topic' => 'general',
             'language' => 'de',
             'source' => 'ai_sorting',
             'web_search' => false,
         ]);
 
-        // Prompt metadata has internet search opted-in by the user's UI.
         $this->promptService
             ->method('getPromptWithMetadata')
             ->willReturn([
@@ -607,28 +595,53 @@ class MessageProcessorTest extends TestCase
             ]);
 
         $this->braveSearchService->method('isEnabled')->willReturn(true);
-        $this->searchQueryGenerator->method('generate')->willReturn('Eigentumswohnungen München Preise');
-
-        $braveSearchCalled = false;
-        $this->braveSearchService
-            ->expects($this->once())
-            ->method('search')
-            ->willReturnCallback(function (string $query) use (&$braveSearchCalled): array {
-                $braveSearchCalled = true;
-
-                return ['results' => [], 'query' => $query];
-            });
+        $this->braveSearchService->expects($this->never())->method('search');
 
         $this->router
             ->method('routeStream')
             ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
 
         $this->processor->processStream($message, function (): void {});
+    }
 
-        $this->assertTrue(
-            $braveSearchCalled,
-            'BraveSearchService::search() must be called when the resolved task prompt has tool_internet=true',
-        );
+    /**
+     * A plain-language request in the message ("Such im Internet …") forces
+     * a search like the chat toggle, even when the classifier voted no.
+     */
+    public function testProcessStreamSearchesOnExplicitRequestInMessageText(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(99);
+        $message->method('getText')->willReturn('Such im Internet nach Eigentumswohnungen in München');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('Eigentumswohnungen München');
+        $this->braveSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->willReturnCallback(static fn (string $query): array => ['results' => [], 'query' => $query]);
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream($message, function (): void {});
     }
 
     /**

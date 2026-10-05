@@ -14,6 +14,7 @@ use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
+use App\Service\Message\ConnectedSystemsHint;
 use App\Service\Message\MessageSorter;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -562,6 +563,35 @@ class MessageSorterTest extends TestCase
         $this->assertSame(0, $result['read_pages']);
     }
 
+    /**
+     * @return iterable<string, array{0: string, 1: bool}>
+     */
+    public static function webSearchVoteProvider(): iterable
+    {
+        yield 'int_one' => ['1', true];
+        yield 'int_zero' => ['0', false];
+        yield 'bool_true' => ['true', true];
+        yield 'bool_false' => ['false', false];
+        yield 'string_true' => ['"true"', true];
+        yield 'string_false' => ['"false"', false];
+        yield 'string_one' => ['"1"', true];
+        yield 'string_zero' => ['"0"', false];
+        yield 'garbage' => ['"maybe"', false];
+        yield 'string_yes' => ['"yes"', false];
+        yield 'string_on' => ['"on"', false];
+        yield 'int_two' => ['2', false];
+        yield 'null' => ['null', false];
+    }
+
+    #[DataProvider('webSearchVoteProvider')]
+    public function testParseResponseReadsTheWebSearchVoteStrictly(string $rawVote, bool $expected): void
+    {
+        $response = '{"BTOPIC":"general","BLANG":"en","BWEBSEARCH":'.$rawVote.'}';
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, ['BTOPIC' => 'general', 'BLANG' => 'en']);
+
+        $this->assertSame($expected, $result['web_search']);
+    }
+
     public function testParseResponseLeavesReadPagesNullWhenTheFieldIsOmitted(): void
     {
         $response = '{"BTOPIC":"general","BLANG":"en","BWEBSEARCH":1}';
@@ -1054,6 +1084,60 @@ class MessageSorterTest extends TestCase
         $this->assertStringContainsString(OfficePdfRoutingDecorator::officeMakerDescription(), $system);
         $this->assertStringContainsString('OFFICE_PDF_ROUTING', $system);
         $this->assertStringNotContainsString('Not for any other format.', $system);
+    }
+
+    /**
+     * The BMULTI vote decides whether the planner — and with it any
+     * `mcp_fetch` step — runs at all. The sorter therefore has to be told
+     * which systems the user connected; without one the prompt is unchanged.
+     */
+    public function testClassifyAppendsTheConnectedSystemsHintToTheSystemPrompt(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'catch-all'],
+        ]);
+
+        $sent = [];
+        $aiFacade->method('chat')->willReturnCallback(
+            function (array $messages) use (&$sent): array {
+                $sent = $messages;
+
+                return ['content' => '{"BTOPIC":"general","BLANG":"en","BMULTI":true}', 'provider' => 'groq'];
+            }
+        );
+
+        $hint = $this->createMock(ConnectedSystemsHint::class);
+        $hint->method('renderForSorter')->willReturnCallback(
+            static fn (?int $userId): string => null === $userId ? '' : "\n\n## Connected systems of this user\n- \"Backblaze B2\" (connected data source)",
+        );
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            connectedSystems: $hint,
+        );
+
+        // A signed-in user with a connection: the hint closes the system prompt.
+        $sorter->classify(['BTEXT' => 'is my bucket reachable?', 'BLANG' => 'en', 'BTOPIC' => ''], [], 2);
+        $this->assertStringEndsWith("## Connected systems of this user\n- \"Backblaze B2\" (connected data source)", (string) $sent[0]['content']);
+        $this->assertStringStartsWith('SORT - "general": catch-all', (string) $sent[0]['content']);
+
+        // Anonymous turn: nothing connected, the templated prompt is untouched.
+        $sorter->classify(['BTEXT' => 'is my bucket reachable?', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
+        $this->assertStringNotContainsString('Connected systems', (string) $sent[0]['content']);
     }
 
     public function testClassifyFallsBackToGeneralWhenProviderFails(): void

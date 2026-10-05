@@ -37,8 +37,9 @@ test.describe('@ci Chat empty landing', () => {
     await ask.click()
 
     await expect(page.locator(CHAT.stateEmpty)).toBeHidden({ timeout: TIMEOUTS.STANDARD })
-    await expect(page.locator(CHAT.userMessageBubble)).toContainText('What can you do?', {
-      timeout: TIMEOUTS.STANDARD,
-    })
+    await expect(page.locator(CHAT.userMessageBubble)).toContainText(
+      'Give me a rough overview of the features',
+      { timeout: TIMEOUTS.STANDARD }
+    )
   })
 })

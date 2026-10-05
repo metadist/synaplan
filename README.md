@@ -1,13 +1,15 @@
 <div align="center">
 
-<a href="https://www.synaplan.com"><img src="docs/images/hero.svg" alt="Synaplan — We open-source artificial intelligence" width="100%"></a>
+<a href="https://www.synaplan.com"><img src="docs/images/hero.svg" alt="Synaplan — We produce AI freedom" width="100%"></a>
 
-**The open-source AI platform — chat, knowledge, media and agents on infrastructure you control.**
+**We produce AI freedom.**
+
+Chat, knowledge, media and agents — on infrastructure you control. Apache-2.0. The cloud install and the one you run yourself are the same software.
 
 [Website](https://www.synaplan.com) &nbsp;·&nbsp; [Docs](https://docs.synaplan.com/) &nbsp;·&nbsp; [Live instance](https://web.synaplan.com/) &nbsp;·&nbsp; [iOS](https://apps.apple.com/app/id6784278288?ct=github-readme) &nbsp;·&nbsp; [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) &nbsp;·&nbsp; [Desktop](https://github.com/metadist/synaplan-desktop) &nbsp;·&nbsp; [Outlook Add-in](https://github.com/metadist/Synamail) &nbsp;·&nbsp; [Discord](https://discord.com/invite/kQB3eDjWfF)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-one%20command-2496ED?logo=docker&logoColor=white)](#your-first-answer-in-three-steps)
+[![Docker](https://img.shields.io/badge/Docker-one%20command-2496ED?logo=docker&logoColor=white)](#quickstart)
 [![Download on the App Store](https://img.shields.io/badge/App%20Store-Download-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/id6784278288?ct=github-readme)
 [![Get it on Google Play](https://img.shields.io/badge/Google%20Play-Download-414141?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme)
 [![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/kQB3eDjWfF)
@@ -17,56 +19,9 @@
 
 ---
 
-## Why Synaplan?
+## Quickstart
 
-- **We open-source artificial intelligence.** The complete platform — backend, frontend, widgets, plugins — is Apache-2.0, Dockerized, and starts with one command. No core/enterprise split, no functional downgrade: self-hosted is the same software as our cloud.
-- **Hundreds of models, one platform.** OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, HuggingFace, sovereign EU providers, and any local model via Ollama — swap providers per task in the UI, without touching a config file. No vendor lock-in, ever.
-- **DAG task routing that saves tokens.** An AI planner decomposes complex requests into a directed task graph (extract → summarize → generate → reply) and routes every step to the model that fits it — a cheap fast model for extraction, a strong one only where reasoning is needed. Live task cards stream while the graph executes, and every answer shows what it cost.
-- **Sovereign by design.** Run on-prem, in the EU cloud, or fully air-gapped: chat, RAG knowledge search, document processing, transcription and speech run with zero internet connection. No training on your data, no forced telemetry — proven in production up to 5,000-workplace offline deployments.
-- **Everywhere you work.** Web app, [iPhone](https://apps.apple.com/app/id6784278288?ct=github-readme) and [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) apps, [Desktop](https://github.com/metadist/synaplan-desktop), [Outlook add-in](https://github.com/metadist/Synamail), embeddable chat widget, WhatsApp, email — plus the tools you already run: Microsoft 365, Dropbox, Nextcloud / ownCloud, calendars, Jira and Confluence, and [OpenCloud](https://github.com/metadist/synaplan-opencloud).
-- **Extensible without forking.** A non-invasive plugin system, an OpenAPI-documented REST API, an MCP server *and* client, and an Anthropic-compatible endpoint for Claude Code and friends. Optional sidecars stay optional: file work, office conversion and local search never leak a half-working control when they are off.
-
----
-
-## Your first answer in three steps
-
-Start the published image without a git checkout and without `make`. Two files: `compose.yaml` and `.env`.
-
-1. **Save the files.**
-
-```bash
-mkdir synaplan && cd synaplan
-curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/compose.yaml
-curl -fsSL -o .env https://raw.githubusercontent.com/metadist/synaplan/main/deploy/selfhost.env.example
-```
-
-A Docker GUI uses the same two files: paste `compose.yaml` and select `.env`.
-
-2. **Configure.** In `.env`, `SYNAPLAN_VERSION` is already a release tag (today `5.0.5`). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` are `http://127.0.0.1:8000`. If you change the bind, the port, or the public address, set all three to the same address you open in the browser. Live chat stays disconnected when they do not match. Leave both admin lines empty to create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
-
-Leave the eight secret lines commented out. The first start generates them into `data/secrets.env`. Back that file up with the database: a restored database cannot be opened without it. To choose the values yourself, set each line to the output of `openssl rand -hex 32` before the first start. Do not use a `replace-with-*` example value — the start is refused and nothing is created.
-
-3. **Start, then open the app.**
-
-```bash
-docker compose up -d
-```
-
-Open **<http://127.0.0.1:8000>**. That address is `SYNAPLAN_HTTP_BIND` plus `SYNAPLAN_HTTP_PORT`. People on a closed network use the opt-in [local network](#local-network) certificate and open `https://<address>/`.
-
-To move to another release later, back up `./data` first, change `SYNAPLAN_VERSION`, and run `docker compose up -d` again. If the newer version already migrated the database, switching the tag back is not enough — restore the backup as described in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#roll-back).
-
-Then connect one AI provider. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting.
-
-### Develop from this repository
-
-The steps above run the published image. To work on the source, the installer checks Docker, fetches Synaplan, and starts the development stack:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | bash
-```
-
-Or do the same by hand (`make up` starts the status page on `:5173` first, then pulls and starts the rest — a plain `docker compose up -d` also works but `:5173` stays silent until every image is pulled):
+### On this machine
 
 ```bash
 git clone https://github.com/metadist/synaplan.git
@@ -74,67 +29,42 @@ cd synaplan
 make up
 ```
 
-1. **Open <http://localhost:5173> immediately.** A live status screen appears within seconds and shows every boot step — database, backend, AI model download, interface — then switches to the app automatically the moment it is ready (first start: 5–15 minutes; every later start: seconds). It also lists which [optional building blocks](#lean-by-design-core-vs-optional-building-blocks) (Qdrant, Centrifugo, Collabora, …) this install is running and how to switch each on or off. The same notes print in `docker compose logs -f startup-notes`.
-2. **Log in** as `admin@synaplan.com` / `admin123` — the status screen shows these too.
-3. **Connect an AI provider — the app takes you there.** Until a key is in place, chat answers in demo mode and points you to the setup. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting. **You never touch a config file.**
+Open **<http://localhost:5173>**. A status screen is up within seconds and lists every boot step, then switches to the app when it is ready. First start: 5–15 minutes. Later starts: seconds.
 
-That is the source-checkout onboarding. After chat works, open **Manage → Connections** to hook up Outlook, Nextcloud, Dropbox, a calendar, or Jira / Confluence — then you can say *"summarize the latest mail from X"* or *"create a picture and put it in nextcloud"*.
+`make up` answers on `:5173` before the rest of the images finish pulling. `docker compose up -d` starts the same stack; `:5173` stays quiet until those pulls finish.
 
-### Key management, the short version
+1. Log in as `admin@synaplan.com` / `admin123`. The status screen shows this too.
+2. Paste one provider key. Free: [Groq](https://console.groq.com). The app opens **AI provider setup** until a key is in place. You do not edit a config file for that.
+3. Same notes in the terminal: `docker compose logs -f startup-notes`.
 
-- **The first-run screen is the setup.** You do not have to hunt through Admin: an empty install blocks chat with a single **Go to AI provider setup** button. The same wizard lives at **Operate → AI infrastructure → Providers & keys** (`/admin/setup`) later.
-- **Tested before it's saved.** The key is validated against the live provider API, so a typo fails immediately instead of at your first chat.
-- **Encrypted at rest.** It lives encrypted in your own database, not in a plaintext file on disk.
-- **Active instantly.** No restart and no rebuild — the next message already uses it.
-- **Defaults repair themselves.** If the default chat model points at a provider you have no key for, Synaplan repoints it to one that works, so chat is never dead on a fresh install.
-- **Local-model progress is visible.** A download card in the setup wizard (and in `docker compose logs -f backend`) shows how far the optional Ollama pull has got; cloud chat works while it runs.
-- **`.env` still works.** Keys already in `backend/.env` are imported into the encrypted store on first use, and a key you later save in the UI wins permanently.
+No cloud key? `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up` pulls a local chat model (`gpt-oss:20b`, ~14 GB). Chat starts when the download finishes.
 
-**No cloud key at all?** Start with `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up` to run Ollama and pull a local chat model (`gpt-oss:20b`, ~14 GB, GPU or a strong CPU recommended). Chat begins working when the download finishes.
+### Published image, no git checkout
 
-### Host it on your own server
-
-The commands above start the **development** stack (source build, Vite, MailHog, phpMyAdmin). For a production install on a Linux box, the same installer drives the published image and the `deploy/` contract — it writes `deploy/.env` for you (the step most installs stumble over), pins the latest release, creates the first administrator, and runs the full lifecycle (prepare → pull → validate → start → smoke-test). Secrets are generated on first start and recorded in `deploy/data/secrets.env`:
+Two files, then start. A Docker GUI uses the same pair: paste `compose.yaml` and select `.env`.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | \
-  bash -s -- --mode server --domain https://ai.example.com
+mkdir synaplan && cd synaplan
+curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/compose.yaml
+curl -fsSL -o .env https://raw.githubusercontent.com/metadist/synaplan/main/deploy/selfhost.env.example
+docker compose up -d
 ```
 
-Prefer manual control? The identical steps by hand:
+Open **<http://127.0.0.1:8000>** (`SYNAPLAN_HTTP_BIND` plus `SYNAPLAN_HTTP_PORT`).
 
-```bash
-cp deploy/selfhost.env.example deploy/.env
-# Set SYNAPLAN_VERSION (immutable SemVer, never latest), public URL, and BOOTSTRAP_ADMIN_*
-# (or leave both admin vars empty and claim the instance through the /setup wizard)
-deploy/scripts/prepare.sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml pull
-deploy/scripts/validate-release.sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
-deploy/scripts/smoke-test.sh
-```
+`SYNAPLAN_VERSION` in that `.env` is a release tag (`5.1.1` in the example). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. Leave the eight secret lines commented out — the first start writes them to `data/secrets.env`. Back that file up with the database. Leave both admin lines empty and create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
 
-The installer also accepts `--admin-email`, `--admin-password` (auto-generated when omitted), `--version` (defaults to the latest release), `--dir`, `--branch` and `--yes` — see `bash install.sh --help`.
+If you change the bind, the port, or the public address, set `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` to that same address. Live chat stays disconnected when they do not match.
 
-After login, the **same first-run provider screen** applies. Full walkthrough: [Installation](docs/INSTALLATION.md) · [deploy/README.md](deploy/README.md).
+To move to another release, back up `./data` first, change `SYNAPLAN_VERSION`, and run `docker compose up -d` again. Rolling the tag back after a migration needs the backup: [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#roll-back).
 
-## Local network
+### Closed network
 
-Opt-in. The default install stays on this machine at `http://127.0.0.1:8000`.
+Opt-in. The default stays `http://127.0.0.1:8000` on this machine.
 
-Turn it on when the network has **no route to the public internet** and people open Synaplan by the machine's address. Chat needs `https://<address>/`. The machine creates the certificate. The browser warns once; continue past that warning.
+Turn it on when the network has **no route to the public internet** and people open Synaplan by the machine's address. Chat needs `https://<address>/`. The machine creates the certificate. The browser warns once.
 
-Any IPv4 address on that network works. That includes every unrouted block:
-
-| Address | Block |
-| --- | --- |
-| `10.0.0.15` | `10.0.0.0/8` |
-| `172.16.5.4` | `172.16.0.0/12` |
-| `192.168.1.20` | `192.168.0.0/16` |
-| `100.64.0.8` | `100.64.0.0/10` (shared) |
-| `169.254.1.20` | `169.254.0.0/16` (link-local) |
-
-Another block you assigned and do not announce is accepted the same way. Pass the address people will type:
+Any IPv4 address on that network works, including `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10` and `169.254.0.0/16`, plus a block you assigned and do not announce.
 
 ```bash
 cp deploy/selfhost.env.example deploy/.env
@@ -146,11 +76,37 @@ deploy/scripts/validate-release.sh
 docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
 ```
 
-Colleagues open **https://10.0.0.15/**. Ports 80 and 443 must be free. The command adds the `local-tls` profile and sets `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` to that URL. The app itself stays on `127.0.0.1:8000`.
-
-A second interface is another argument: `deploy/scripts/local-tls.sh 10.0.0.15 192.168.1.20`. Back up `deploy/data/tls` with the rest of `deploy/data`. A public name keeps your own HTTPS proxy and leaves `local-tls` off.
+Colleagues open **https://10.0.0.15/**. Ports 80 and 443 must be free. The app itself stays on `127.0.0.1:8000`. A second interface is another argument: `deploy/scripts/local-tls.sh 10.0.0.15 192.168.1.20`. A public name keeps your own HTTPS proxy and leaves this off.
 
 Details: [docs.synaplan.com/local-network](https://docs.synaplan.com/local-network) · [deploy/README.md](deploy/README.md#local-network).
+
+### On a server
+
+The commands above are the development stack (source build, Vite, MailHog, phpMyAdmin) or the published image. For a Linux server, the installer writes `deploy/.env`, pins the latest release, and runs prepare → pull → validate → start → smoke-test. Secrets land in `deploy/data/secrets.env`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | \
+  bash -s -- --mode server --domain https://ai.example.com
+```
+
+The same steps by hand are in [Installation](docs/INSTALLATION.md) and [deploy/README.md](deploy/README.md). Flags: `bash install.sh --help`.
+
+One-liner for the development stack, if you would rather not clone by hand:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | bash
+```
+
+---
+
+## Why Synaplan
+
+- **Freedom, not a plan tier.** The whole platform — backend, frontend, widgets, plugins — is Apache-2.0 and starts with one command. Self-hosted is the same software as the cloud.
+- **Hundreds of models, one place.** OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, HuggingFace, sovereign EU providers, and any local model via Ollama. Swap a provider per task in the UI.
+- **The planner spends the expensive model only where it matters.** A request becomes a small task graph (extract → summarize → generate → reply). Live cards show the steps. Every answer shows what it cost.
+- **Yours, including offline.** On-prem, EU cloud, or fully air-gapped. No training on your data. No forced telemetry.
+- **Where you already work.** Web, [iPhone](https://apps.apple.com/app/id6784278288?ct=github-readme), [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme), [Desktop](https://github.com/metadist/synaplan-desktop), [Outlook](https://github.com/metadist/Synamail), a chat widget, WhatsApp, email — plus Microsoft 365, Dropbox, Nextcloud / ownCloud, calendars, Jira, Confluence and [OpenCloud](https://github.com/metadist/synaplan-opencloud).
+- **Extend it without a fork.** Plugins, an OpenAPI REST API, an MCP server and client, and an Anthropic-compatible endpoint for Claude Code and friends. Optional sidecars stay off until you turn them on.
 
 ---
 
@@ -369,13 +325,14 @@ Synaplan is provider-neutral: connect the providers you want in **Operate → AI
 
 | Provider | Variable in `backend/.env` | Models |
 |----------|---------------------------|--------|
-| OpenAI | `OPENAI_API_KEY` | GPT-5.6 Sol / Terra / Luna, GPT-5.5 (+ Pro), GPT-5.4 (+ mini / nano), GPT Image, Whisper, text-embedding-3 |
+| OpenAI | `OPENAI_API_KEY` | GPT-5.6 Sol / Terra / Luna, GPT-5.5 (+ Pro), GPT-5.4 (+ mini), GPT Image, Whisper, text-embedding-3 |
 | Anthropic | `ANTHROPIC_API_KEY` | Claude Opus 5, Sonnet 5, Fable 5, Opus 4.8, Haiku 4.5 (chat + vision) |
 | Google Gemini | `GOOGLE_GEMINI_API_KEY` | Gemini 3.x / 2.5 chat + vision, Nano Banana (incl. Pro / Lite), Veo 3.1, Gemini TTS |
 | Groq | `GROQ_API_KEY` | Qwen 3.6 27B (chat + vision), GPT-OSS 20B/120B, Whisper Large v3 |
 | Mistral 🇫🇷 | `MISTRAL_API_KEY` | Mistral Medium 3.5 (+ vision), Mistral Large 3, Voxtral transcription + TTS |
 | xAI | `XAI_API_KEY` | Grok 4.7 / 4.6 / 4.5 (+ vision, 500K context), Grok Imagine image + video (incl. Pro / 1.5 tiers) |
 | [Meta](https://dev.meta.ai/) | `META_API_KEY` | Muse Spark 1.3 (+ vision) — Meta Model API |
+| [Cerebras](https://cloud.cerebras.ai/) | `CEREBRAS_API_KEY` | Qwen 3.8 27B (+ vision), GPT OSS 120B — very fast inference (~2,000–3,000 tokens/s) |
 | [TrustedTokens](https://trustedtokens.eu/) 🇩🇪 | `TRUSTEDTOKENS_API_KEY` | GLM 5.2 / 5.3 (+ Flash vision), Chimera, Qwen3.6 35B (+ vision), GPT OSS 120B — sovereign inference on German GPUs (TNG), zero data retention |
 | [A2Agent](https://a2agent.me/) 🇨🇳 | `A2AGENT_API_KEY` | Qwen3.8 MAX / Flash (+ vision), DeepSeek V4 Pro / Flash, MiniMax M3 — Chinese frontier models via the A2Agent gateway |
 | HuggingFace | `HUGGINGFACE_API_KEY` | Kimi K3 / K2.5 / K2.6 / K2.7 Code (chat + vision) |

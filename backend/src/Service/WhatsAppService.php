@@ -19,6 +19,7 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
+use App\Service\Message\SpokenInput;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
 use App\Service\WhatsApp\WhatsAppAgentBinding;
@@ -1690,6 +1691,12 @@ final class WhatsAppService
                         $placeholders = ['[Audio message]', '[Audio]', '[Video]', '[Video message]'];
 
                         if (empty($currentText) || in_array($currentText, $placeholders, true)) {
+                            // Only a caption-less voice note is spoken input.
+                            // A video, or audio that already has a caption, keeps
+                            // today's attachment handling.
+                            if ('audio' === $dto->type && SpokenInput::isReplaceablePlaceholder((string) $currentText)) {
+                                SpokenInput::mark($message);
+                            }
                             $message->setText($extractedText);
                             $this->logger->info('WhatsApp: Replaced media placeholder with transcription', [
                                 'type' => $dto->type,

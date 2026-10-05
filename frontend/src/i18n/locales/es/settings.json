@@ -307,6 +307,18 @@
   "settings": {
     "title": "Preferencias",
     "subtitle": "Administra tus preferencias y configuración",
+    "sections": {
+      "indexLabel": "En esta página",
+      "profile": "Perfil",
+      "appearance": "Idioma y apariencia",
+      "chat": "Chat e IA",
+      "data": "Datos y privacidad",
+      "billing": "Facturación",
+      "security": "Seguridad",
+      "app": "App",
+      "legal": "Legal",
+      "delete": "Eliminar cuenta"
+    },
     "tabs": {
       "general": "General",
       "features": "Funciones"
@@ -331,7 +343,7 @@
     },
     "language": {
       "title": "Idioma",
-      "description": "Elige el idioma de la interfaz"
+      "description": "Este idioma se usa en la aplicación, en los correos y en los mensajes de canales como Telegram."
     },
     "webSearch": {
       "title": "Búsqueda web",

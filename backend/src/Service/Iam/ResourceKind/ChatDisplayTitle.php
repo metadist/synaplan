@@ -32,7 +32,7 @@ final class ChatDisplayTitle
         return 'New Chat';
     }
 
-    private static function isPlaceholder(string $title): bool
+    public static function isPlaceholder(string $title): bool
     {
         return \in_array($title, [
             'New Chat',
@@ -49,10 +49,7 @@ final class ChatDisplayTitle
             if (!$message instanceof Message || 'IN' !== $message->getDirection()) {
                 continue;
             }
-            $content = AnthropicContentText::humanText(PastedContentText::strip(
-                (string) preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search|help)\s*/i', '', $message->getText()),
-            ));
-            $content = trim($content);
+            $content = self::humanText($message->getText());
             if ('' === $content) {
                 continue;
             }
@@ -61,5 +58,13 @@ final class ChatDisplayTitle
         }
 
         return null;
+    }
+
+    /** What the person typed, without a slash command, pasted blocks or content markup. */
+    public static function humanText(string $text): string
+    {
+        return trim(AnthropicContentText::humanText(PastedContentText::strip(
+            (string) preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search|help)\s*/i', '', $text),
+        )));
     }
 }

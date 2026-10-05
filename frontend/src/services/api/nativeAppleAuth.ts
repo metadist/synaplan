@@ -81,7 +81,13 @@ export async function startNativeAppleSignIn(): Promise<NativeOAuthResult> {
       method: 'POST',
       credentials: 'omit',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identityToken, firstName: givenName, lastName: familyName, email }),
+      body: JSON.stringify({
+        identityToken,
+        firstName: givenName,
+        lastName: familyName,
+        email,
+        language: String((await import('@/i18n')).i18n.global.locale.value),
+      }),
     })
     if (!res.ok) {
       return { success: false, error: 'Apple sign-in verification failed' }

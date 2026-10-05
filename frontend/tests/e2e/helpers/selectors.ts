@@ -192,6 +192,10 @@ export const selectors = {
     /** Wrapper that contains only the generated answer body (no timestamp, no footer). Use this for asserting reply text. */
     assistantAnswerBody: '[data-testid="section-message-text"]',
     messageText: '[data-testid="message-text"]',
+    /** Classes the KaTeX library puts on its own output inside a message */
+    katexFormula: '.katex',
+    katexDisplay: '.katex-display',
+    katexError: '.katex-error',
     /** Audio player section rendered for an `audio` message part (TTS / voice reply / uploads) */
     messageAudio: '[data-testid="section-message-audio"]',
     // The "Again with… ▾" control is a single button that opens the model
@@ -347,9 +351,10 @@ export const selectors = {
     dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
     /** Full-screen catcher behind the account menu. Clicking it closes the menu. */
     overlay: '[data-testid="overlay-sidebar-v2-user"]',
-    profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
-    /** Avatar menu entry for the /settings page — labeled "Preferences" since phase 2 */
+    /** Avatar menu entry for the /settings page — labeled "Preferences" */
     preferencesBtn: '[data-testid="btn-sidebar-v2-preferences"]',
+    /** Removed with the profile/preferences split. The menu must not grow this row back. */
+    profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
@@ -711,5 +716,22 @@ export const selectors = {
     serverRowAny: '[data-testid^="mcp-server-"]',
     deleteServer: (id: number) => `[data-testid="btn-mcp-delete-${id}"]`,
   },
-  toast: {},
+  smartSearch: {
+    openSidebar: '[data-testid="btn-sidebar-v2-search"]',
+    openMobile: '[data-testid="btn-mobile-nav-search"]',
+    modal: '[data-testid="modal-smart-search"]',
+    panel: '[data-testid="panel-smart-search"]',
+    input: '[data-testid="input-smart-search"]',
+    group: (kind: string) => `[data-testid="group-smart-search-${kind}"]`,
+    row: (kind: string) => `[data-testid="row-smart-search-${kind}"]`,
+    result: (id: string) => `[data-result-id="${id}"]`,
+    settingToggle: '[data-testid="btn-smart-search-setting-toggle"]',
+    actionPane: '[data-testid="pane-smart-search-actions"]',
+    action: (id: string) => `[data-testid="action-smart-search-${id}"]`,
+    preview: '[data-testid="preview-smart-search"]',
+  },
+  toast: {
+    item: '[data-testid="comp-notification-item"]',
+    action: '[data-testid="btn-notification-action"]',
+  },
 } as const

@@ -452,10 +452,9 @@
       "availableToolsHelp": "Bu promptu kullanırken mevcut olacak araçları etkinleştirin",
       "internetSearch": {
         "label": "İnternet Araması",
-        "help": "Bu promptun web'de ne zaman arama yapacağını seçin. \"Otomatik\" kararı her mesaj için sınıflandırıcıya bırakır; \"Her zaman açık\" aramayı zorunlu kılar; \"Her zaman kapalı\" devre dışı bırakır.",
-        "auto": "Otomatik (sınıflandırıcı karar verir)",
-        "on": "Her zaman açık",
-        "off": "Her zaman kapalı"
+        "help": "Yapay zeka yalnızca bir mesaj hava durumu, fiyatlar veya haberler gibi güncel bilgi gerektirdiğinde web'de arama yapar. Tek bir mesaj için sohbette Araçlar → Web Araması'nı kullanın. \"Kapalı\" bu prompt için web aramasını devre dışı bırakır.",
+        "auto": "Otomatik (yapay zeka karar verir)",
+        "off": "Kapalı"
       },
       "promptContent": "Prompt İçeriği",
       "contentPlaceholder": "Sistem promptunuzu buraya girin...",
@@ -863,6 +862,11 @@
       }
     },
     "setByAdmin": "Yöneticiniz tarafından ayarlandı",
-    "fromGroup": "Grubunuzun varsayılanı"
+    "fromGroup": "Grubunuzun varsayılanı",
+    "embeddingSwitch": {
+      "scopes": {
+        "search": "Smart Search dizini"
+      }
+    }
   }
 }

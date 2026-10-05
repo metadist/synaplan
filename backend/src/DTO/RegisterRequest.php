@@ -2,6 +2,7 @@
 
 namespace App\DTO;
 
+use App\Service\AccountLanguage;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class RegisterRequest
@@ -23,4 +24,10 @@ class RegisterRequest
         message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
     )]
     public string $password;
+
+    /**
+     * UI language used on the signup screen. Stored before the verification email.
+     */
+    #[Assert\Choice(choices: AccountLanguage::SUPPORTED)]
+    public ?string $language = null;
 }

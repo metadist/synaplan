@@ -3,10 +3,16 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import type { SavedTask } from '@/services/api/savedTasksApi'
 
-const { mockList, mockAgentsEnabled, savedTasksOn } = vi.hoisted(() => ({
+const { mockList, mockAgentsEnabled, savedTasksOn, mockRoute } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockAgentsEnabled: vi.fn(() => false),
   savedTasksOn: { value: true },
+  mockRoute: { query: {} as Record<string, string> },
+}))
+
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
+  useRoute: () => mockRoute,
 }))
 
 vi.mock('@/services/api/savedTasksApi', () => ({
@@ -98,6 +104,16 @@ describe('SavedTasksOverview', () => {
     vi.clearAllMocks()
     savedTasksOn.value = true
     mockAgentsEnabled.mockReturnValue(false)
+    mockRoute.query = {}
+  })
+
+  it('rings the task a search result points at', async () => {
+    mockRoute.query = { task: '7' }
+    mockList.mockResolvedValue([task, { ...task, id: 8, name: 'Other' }])
+    const wrapper = await mountPage()
+    const highlighted = wrapper.findAll('[data-testid="saved-task-highlighted"]')
+    expect(highlighted).toHaveLength(1)
+    expect(highlighted[0]!.attributes('data-task-id')).toBe('7')
   })
 
   it('is absent and does not load when saved tasks are off', async () => {

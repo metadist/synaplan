@@ -86,6 +86,8 @@ parameters:
     env(XAI_API_KEY): ''
     # Meta Model API (Muse Spark). Meta's SDK calls this MODEL_API_KEY.
     env(META_API_KEY): ''
+    # Cerebras Inference (GPT OSS 120B, Qwen 3.8 27B).
+    env(CEREBRAS_API_KEY): ''
     env(PERPLEXITY_API_KEY): ''
     env(TAVILY_API_KEY): ''
     env(EXA_API_KEY): ''
@@ -362,6 +364,7 @@ services:
                 huggingface: '%env(HUGGINGFACE_API_KEY)%'
                 xai: '%env(XAI_API_KEY)%'
                 meta: '%env(META_API_KEY)%'
+                cerebras: '%env(CEREBRAS_API_KEY)%'
                 perplexity: '%env(PERPLEXITY_API_KEY)%'
                 # Media and speech providers share the store so Models & keys
                 # is the one editor for every instance key.
@@ -466,6 +469,14 @@ services:
         tags:
             - { name: 'app.ai.chat', key: 'meta' }
             - { name: 'app.ai.vision', key: 'meta' }
+
+    App\AI\Provider\CerebrasProvider:
+        arguments:
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat', key: 'cerebras' }
+            - { name: 'app.ai.vision', key: 'cerebras' }
 
     App\AI\Provider\XaiProvider:
         arguments:

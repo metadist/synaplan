@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import BrandingStyleResetCard from '@/components/admin/BrandingStyleResetCard.vue'
 import ConfigSectionStack from '@/components/admin/ConfigSectionStack.vue'
 import RestartRequiredBanner from '@/components/admin/RestartRequiredBanner.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
@@ -386,6 +387,8 @@ onBeforeUnmount(() => {
             </p>
 
             <WebSearchPlugTab v-if="currentTab.panel === 'web-search'" />
+
+            <BrandingStyleResetCard v-if="currentTab.id === 'branding'" :config="systemConfig" />
 
             <section
               v-if="currentTab.sections.length > 0"

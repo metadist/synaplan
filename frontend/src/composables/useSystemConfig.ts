@@ -5,6 +5,7 @@ import { useConfigStore } from '@/stores/config'
 import {
   getConfigSchema,
   getConfigValues,
+  resetBrandingStyle as resetBrandingStyleApi,
   testConnection,
   updateConfigValue,
   type ConfigFieldSchema,
@@ -45,6 +46,32 @@ export interface ResolveOptions {
 }
 
 const EMPTY_VALUE: ConfigValue = { value: '', isSet: false, isMasked: false }
+
+/**
+ * Must match BrandingService::STYLE_RESET_KEYS. Used only to re-read the
+ * outcome when the reset response itself is lost.
+ */
+const STYLE_RESET_KEYS = [
+  'BRAND_PRIMARY_COLOR',
+  'BRAND_SECONDARY_COLOR',
+  'BRAND_ACCENT_COLOR',
+  'BRAND_PRIMARY_COLOR_DARK',
+  'BRAND_SECONDARY_COLOR_DARK',
+  'BRAND_ACCENT_COLOR_DARK',
+  'BRAND_FONT_FAMILY',
+  'BRAND_HEADING_FONT_FAMILY',
+  'BRAND_FONT_URL',
+] as const
+
+function styleValueChanged(
+  before: ConfigValue | undefined,
+  after: ConfigValue | undefined
+): boolean {
+  return (
+    (before?.isSet ?? false) !== (after?.isSet ?? false) ||
+    (before?.value ?? '') !== (after?.value ?? '')
+  )
+}
 
 /**
  * Loads the admin config schema and values once per page and owns saving,
@@ -178,6 +205,102 @@ export function useSystemConfig() {
     }
   }
 
+  /**
+   * Restore the default style (brand colors + fonts, both modes). One request,
+   * one outcome sentence: the backend reports per key what did and did not
+   * reset, and the runtime config + live theme follow in the same step so the
+   * new defaults are visible at once.
+   */
+  async function resetBrandingStyle(): Promise<boolean> {
+    try {
+      const result = await resetBrandingStyleApi()
+      const next = { ...values.value }
+      for (const key of result.reset) {
+        const field = schema.value?.fields[key]
+        next[key] = {
+          value: field?.default ?? '',
+          isSet: false,
+          isMasked: false,
+        }
+      }
+      values.value = next
+      try {
+        await configStore.reload()
+        applyBrandingTheme()
+      } catch (err) {
+        console.error('Style reset, but the runtime config could not be reloaded:', err)
+        showError(t('admin.config.savedButNotRefreshed'))
+        return result.success
+      }
+      if (result.success) {
+        success(t('admin.config.brandingReset.success'))
+      } else {
+        showError(
+          t('admin.config.brandingReset.partial', {
+            reset: result.reset.length,
+            failed: result.failed.length,
+          })
+        )
+      }
+      return result.success
+    } catch (err) {
+      // A dropped response or a schema mismatch can land here after the
+      // server already cleared the style keys. Re-read them before saying
+      // anything about what changed.
+      console.error('Failed to reset branding style:', err)
+      return reconcileBrandingReset(values.value)
+    }
+  }
+
+  /**
+   * The reset call failed in the client. The stored values say what actually
+   * happened: nothing, a full reset, or a partial one. If they cannot be
+   * read, say so — do not claim the previous values are still in place.
+   */
+  async function reconcileBrandingReset(before: Record<string, ConfigValue>): Promise<boolean> {
+    let fresh: Record<string, ConfigValue>
+    try {
+      fresh = await getConfigValues()
+    } catch (err) {
+      console.error('Could not re-read branding after a reset error:', err)
+      showError(t('admin.config.brandingReset.unconfirmed'))
+      return false
+    }
+
+    values.value = fresh
+    const cleared = STYLE_RESET_KEYS.filter(
+      (key) => styleValueChanged(before[key], fresh[key]) && !fresh[key]?.isSet
+    )
+    const stillCustom = STYLE_RESET_KEYS.filter((key) => fresh[key]?.isSet)
+
+    try {
+      await configStore.reload()
+      applyBrandingTheme()
+    } catch (err) {
+      if (cleared.length > 0) {
+        console.error('Style reset, but the runtime config could not be reloaded:', err)
+        showError(t('admin.config.savedButNotRefreshed'))
+        return stillCustom.length === 0
+      }
+    }
+
+    if (cleared.length === 0) {
+      showError(t('admin.config.brandingReset.failed'))
+      return false
+    }
+    if (stillCustom.length === 0) {
+      success(t('admin.config.brandingReset.success'))
+      return true
+    }
+    showError(
+      t('admin.config.brandingReset.partial', {
+        reset: cleared.length,
+        failed: stillCustom.length,
+      })
+    )
+    return false
+  }
+
   async function testService(service: string): Promise<void> {
     testingService.value = service
     try {
@@ -211,6 +334,7 @@ export function useSystemConfig() {
     ensureLoaded,
     resolveSection,
     update,
+    resetBrandingStyle,
     testService,
     dismissRestart,
   }

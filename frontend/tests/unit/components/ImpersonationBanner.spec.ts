@@ -83,6 +83,9 @@ vi.mock('@/stores/userMemories', () => ({
 vi.mock('@/stores/userFeedback', () => ({
   useFeedbackStore: () => ({ $reset: vi.fn() }),
 }))
+vi.mock('@/stores/chatModelPick', () => ({
+  useChatModelPickStore: () => ({ clear: vi.fn() }),
+}))
 // #1381: auth.ts tears the realtime client down and resubscribes mediaJobs on
 // every principal swap. Stub both so the banner spec stays hermetic and fast.
 vi.mock('@/stores/realtime', () => ({
@@ -179,7 +182,7 @@ describe('ImpersonationBanner', () => {
     const wrapper = await mountBanner()
     await wrapper.find('[data-testid="btn-impersonation-exit"]').trigger('click')
     // Allow the awaited stop + resetUserScopedClientState (dynamic imports of
-    // chats/history) + refreshUser() chain to flush before asserting.
+    // chats/history/model pick) + refreshUser() chain to flush before asserting.
     await flushPromises()
 
     expect(stopImpersonationMock).toHaveBeenCalledTimes(1)

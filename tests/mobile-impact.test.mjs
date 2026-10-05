@@ -33,6 +33,12 @@ test('classifies compute sidecars as no-app-impact', () => {
   assert.equal(result.classification, 'no-app-impact')
 })
 
+test('classifies a removed local worktree gitlink as no-app-impact', () => {
+  const result = classifyFiles([entry('.worktrees/fix-2282-voice-reply', 'D')], policy)
+
+  assert.equal(result.classification, 'no-app-impact')
+})
+
 test('classifies allow-listed internal backend files as backend-only', () => {
   const result = classifyFiles([
     entry('backend/src/Service/ReportExportService.php', 'M'),
@@ -387,6 +393,48 @@ test('classifies the first-run setup wizard as backend-only plus ota-candidate',
     classifyFiles([entry('_docker/backend/docker-entrypoint.sh', 'M')], policy).classification,
     'no-app-impact'
   )
+})
+
+test('classifies the branding-style reset as backend-only plus ota-candidate', () => {
+  const backendPaths = [
+    'backend/src/Controller/AdminSystemConfigController.php',
+    'backend/src/Service/Admin/SystemConfigService.php',
+    'backend/src/Service/Branding/BrandingService.php',
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'backend-only', path)
+  }
+
+  // The reset card, theme tokens and translations are ordinary web-layer code.
+  const webPaths = [
+    'frontend/src/components/admin/BrandingStyleResetCard.vue',
+    'frontend/src/composables/useSystemConfig.ts',
+    'frontend/src/services/api/adminConfigApi.ts',
+    'frontend/src/style.css',
+    'frontend/src/style-v2.css',
+    'frontend/src/utils/brandingTheme.ts',
+    'frontend/src/views/AdminConfigView.vue',
+    'frontend/src/i18n/locales/en/admin.json',
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'ota-candidate', path)
+  }
+})
+
+test('classifies the global ambient background as ota-candidate', () => {
+  const webPaths = [
+    'frontend/src/components/AmbientBackground.vue',
+    'frontend/src/utils/ambientPlacement.ts',
+    'frontend/src/App.vue',
+    'frontend/src/views/LoginView.vue',
+    'frontend/src/views/RegisterView.vue',
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'ota-candidate', path)
+  }
 })
 
 test('uses the highest classification for mixed changes', () => {

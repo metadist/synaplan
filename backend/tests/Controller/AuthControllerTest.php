@@ -8,6 +8,7 @@ use App\Entity\Token;
 use App\Entity\User;
 use App\Entity\VerificationToken;
 use App\Service\GuestSessionService;
+use App\Service\InternalEmailService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +30,7 @@ class AuthControllerTest extends WebTestCase
     protected function tearDown(): void
     {
         // Cleanup test users
-        $testEmails = ['newuser@test.com', 'logintest@test.com', 'logintest2@test.com', 'logintest3@test.com', 'unverified@test.com', 'existing@test.com'];
+        $testEmails = ['newuser@test.com', 'logintest@test.com', 'logintest2@test.com', 'logintest3@test.com', 'unverified@test.com', 'existing@test.com', 'languser@test.com', 'meuser@test.com'];
         foreach ($testEmails as $email) {
             $user = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
             if ($user) {
@@ -86,6 +87,77 @@ class AuthControllerTest extends WebTestCase
         $this->assertNotNull($user);
         $this->assertFalse($user->isEmailVerified());
         $this->assertEquals('WEB', $user->getType());
+    }
+
+    public function testRegisterStoresLanguageBeforeTheVerificationEmail(): void
+    {
+        $email = $this->createMock(InternalEmailService::class);
+        $email->expects($this->once())
+            ->method('sendVerificationEmail')
+            ->with(
+                'languser@test.com',
+                $this->callback(static fn (mixed $token): bool => is_string($token) && '' !== $token),
+                'de',
+            );
+        static::getContainer()->set(InternalEmailService::class, $email);
+
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/register',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'languser@test.com',
+                'password' => 'SecurePass123!',
+                'language' => 'de',
+            ])
+        );
+
+        $this->assertResponseIsSuccessful();
+
+        $user = $this->em->getRepository(User::class)->findOneBy(['mail' => 'languser@test.com']);
+        $this->assertNotNull($user);
+        $this->assertSame('de', $user->getUserDetails()['language'] ?? null);
+        $this->assertSame('de', $user->getPreferredLanguage());
+    }
+
+    public function testAuthMeReturnsNullLanguageWhenUnset(): void
+    {
+        $user = new User();
+        $user->setMail('meuser@test.com');
+        $user->setPw(password_hash('TestPass123!', PASSWORD_BCRYPT));
+        $user->setUserLevel('PRO');
+        $user->setProviderId('local');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(true);
+        $user->setUserDetails([]);
+
+        $this->em->persist($user);
+        $this->em->flush();
+
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'meuser@test.com',
+                'password' => 'TestPass123!',
+            ])
+        );
+
+        $this->assertResponseIsSuccessful();
+        $login = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('language', $login['user']);
+        $this->assertNull($login['user']['language']);
+
+        $this->client->request('GET', '/api/v1/auth/me');
+        $this->assertResponseIsSuccessful();
+        $me = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertArrayHasKey('language', $me['user']);
+        $this->assertNull($me['user']['language']);
     }
 
     public function testRegisterWithExistingEmail(): void

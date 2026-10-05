@@ -241,6 +241,47 @@ final class AdminSystemConfigController extends AbstractController
     }
 
     /**
+     * Reset the branding style (colors + fonts) to the defaults.
+     */
+    #[Route('/branding/reset', name: 'admin_config_branding_reset', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/admin/config/branding/reset',
+        summary: 'Reset branding style to defaults',
+        description: 'Clears every brand color and font override (light + dark) so the defaults apply again. Name, logos, legal links, navigation and attribution are kept. Takes effect immediately, no restart required (admin only).',
+        security: [['Bearer' => []]],
+        tags: ['Admin System Config']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Reset result; partial when some keys failed',
+        content: new OA\JsonContent(
+            required: ['success', 'reset', 'failed', 'requiresRestart'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'reset',
+                    type: 'array',
+                    items: new OA\Items(type: 'string'),
+                    example: ['BRAND_PRIMARY_COLOR', 'BRAND_FONT_FAMILY']
+                ),
+                new OA\Property(
+                    property: 'failed',
+                    type: 'array',
+                    items: new OA\Items(type: 'string'),
+                    example: []
+                ),
+                new OA\Property(property: 'requiresRestart', type: 'boolean', example: false),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Authentication required')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    public function resetBrandingStyle(#[CurrentUser] ?User $user): JsonResponse
+    {
+        return $this->json($this->configService->resetBrandingStyle($user?->getId()));
+    }
+
+    /**
      * Test service connection.
      */
     #[Route('/test/{service}', name: 'admin_config_test', methods: ['POST'])]

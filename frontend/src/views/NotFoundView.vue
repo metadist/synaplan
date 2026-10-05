@@ -103,11 +103,14 @@
             />
             <span class="text-sm txt-primary">{{ $t('nav.files') }}</span>
           </router-link>
-          <router-link to="/profile" class="p-4 rounded-lg hover-surface transition-colors group">
-            <UserCircleIcon
+          <router-link
+            to="/settings#profile"
+            class="p-4 rounded-lg hover-surface transition-colors group"
+          >
+            <Cog6ToothIcon
               class="w-6 h-6 mx-auto mb-2 txt-secondary group-hover:text-[var(--brand)] transition-colors"
             />
-            <span class="text-sm txt-primary">{{ $t('nav.profile') }}</span>
+            <span class="text-sm txt-primary">{{ $t('nav.preferences') }}</span>
           </router-link>
         </div>
       </div>
@@ -131,7 +134,6 @@ import {
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   FolderIcon,
-  UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()

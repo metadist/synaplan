@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import MessageText from '@/components/MessageText.vue'
@@ -125,6 +125,37 @@ describe('MessageText streaming (anti-flash)', () => {
     expect(el.querySelector('strong')?.textContent).toBe('Fett')
     expect(el.textContent).not.toContain('**Fett**')
     expect(el.textContent).toContain('mehr Text')
+  })
+})
+
+describe('MessageText math formulas', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('renders a formula in a finished message with KaTeX', async () => {
+    const wrapper = mount(MessageText, {
+      props: { content: 'Sei $E = mc^2$ und $$\\int_0^1 x^2\\,dx$$', readonly: true },
+    })
+
+    const el = messageTextEl(wrapper)
+    await vi.waitFor(() => expect(el.querySelectorAll('.katex')).toHaveLength(2))
+    expect(el.querySelector('.katex-display')).not.toBeNull()
+    expect(el.querySelector('.katex-error')).toBeNull()
+    expect(el.textContent).not.toContain('$')
+  })
+
+  it('upgrades a streamed formula to KaTeX once the stream ends', async () => {
+    const wrapper = mount(MessageText, {
+      props: { content: 'Die Formel lautet $E = m', isStreaming: true, readonly: true },
+    })
+
+    await wrapper.setProps({ content: 'Die Formel lautet $E = mc^2$.', isStreaming: false })
+
+    const el = messageTextEl(wrapper)
+    await vi.waitFor(() => expect(el.querySelector('.katex')).not.toBeNull())
+    expect(el.querySelector('.katex-error')).toBeNull()
+    expect(el.textContent).not.toContain('$E')
   })
 })
 

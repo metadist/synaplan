@@ -33,6 +33,7 @@ use App\Seed\RateLimitConfigSeeder;
 use App\Seed\SavedTaskConfigSeeder;
 use App\Seed\SeedResult;
 use App\Seed\SelfAwareConfigSeeder;
+use App\Seed\SmartSearchConfigSeeder;
 use App\Seed\StructuredOutputConfigSeeder;
 use App\Seed\SubscriptionPlanSeeder;
 use App\Seed\ToolsConfigSeeder;
@@ -131,6 +132,7 @@ final class SeedAllCommand extends Command
         private readonly EmbeddingRouterConfigSeeder $embeddingRouterConfigSeeder,
         private readonly NativeToolRoutingConfigSeeder $nativeToolRoutingConfigSeeder,
         private readonly DocumentToolsConfigSeeder $documentToolsConfigSeeder,
+        private readonly SmartSearchConfigSeeder $smartSearchConfigSeeder,
         private readonly PlugsConfigSeeder $plugsConfigSeeder,
         private readonly ToolsConfigSeeder $toolsConfigSeeder,
         private readonly WorkflowsConfigSeeder $workflowsConfigSeeder,
@@ -216,6 +218,7 @@ final class SeedAllCommand extends Command
             ['embedding-router', fn (): SeedResult => $this->embeddingRouterConfigSeeder->seed()],
             ['native-tool-routing', fn (): SeedResult => $this->nativeToolRoutingConfigSeeder->seed()],
             ['document-tools', fn (): SeedResult => $this->documentToolsConfigSeeder->seed()],
+            ['smart-search', fn (): SeedResult => $this->smartSearchConfigSeeder->seed()],
             ['plugs', fn (): SeedResult => $this->plugsConfigSeeder->seed()],
             ['tools', fn (): SeedResult => $this->toolsConfigSeeder->seed()],
             ['workflows', fn (): SeedResult => $this->workflowsConfigSeeder->seed()],

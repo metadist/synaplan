@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use App\Service\AccountLanguage;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -568,15 +569,39 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Get user's preferred language/locale
-     * Returns 'de', 'en', etc. for email translations.
+     * Stored account language, or null when the account has none yet.
+     * Callers that must always have a locale use {@see getLocale()}.
+     */
+    public function getPreferredLanguage(): ?string
+    {
+        return AccountLanguage::normalize($this->getUserDetails()['language'] ?? null);
+    }
+
+    /**
+     * Store a signup language only when the account does not have one yet.
+     */
+    public function applySignupLanguage(?string $language): void
+    {
+        if (null !== $this->getPreferredLanguage()) {
+            return;
+        }
+
+        $normalized = AccountLanguage::normalize($language);
+        if (null === $normalized) {
+            return;
+        }
+
+        $details = $this->getUserDetails();
+        $details['language'] = $normalized;
+        $this->setUserDetails($details);
+    }
+
+    /**
+     * Get user's preferred language/locale.
+     * Returns 'de', 'en', etc. for email translations. Falls back to English.
      */
     public function getLocale(): string
     {
-        $details = $this->getUserDetails();
-        $language = $details['language'] ?? 'en';
-
-        // Ensure we return a valid locale code (matches SPA supportedLanguages)
-        return in_array($language, ['de', 'en', 'es', 'tr', 'fr'], true) ? $language : 'en';
+        return $this->getPreferredLanguage() ?? 'en';
     }
 }

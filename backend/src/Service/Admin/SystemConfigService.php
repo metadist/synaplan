@@ -38,6 +38,7 @@ use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\WorkflowsConfig;
+use App\Service\SmartSearch\SmartSearchConfig;
 use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
@@ -139,6 +140,9 @@ final readonly class SystemConfigService
                 'FEATURE_DESKTOP_AGENT_ENABLED',
                 'FEATURE_PLATFORM_LINKS_ENABLED',
             ]],
+            'search' => ['label' => 'Search', 'fields' => [
+                'FEATURE_SEARCH_AI_ENABLED',
+            ]],
         ];
 
         $gateKeys = array_keys($this->moduleGateFields());
@@ -199,7 +203,7 @@ final readonly class SystemConfigService
                 'label' => 'AI Services',
                 'sections' => [
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
-                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'META_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
+                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'META_API_KEY', 'CEREBRAS_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
                     'media' => ['label' => 'Image & Video Generation', 'fields' => ['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET']],
                     'embeddings' => ['label' => 'Embeddings (Cloudflare Workers AI)', 'fields' => ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'EMBEDDING_FALLBACK_PROVIDER']],
@@ -375,13 +379,19 @@ final readonly class SystemConfigService
     /**
      * Get current configuration values with sensitive fields masked.
      *
+     * @param list<string>|null $onlyKeys limit the lookup to these keys (null = every field)
+     *
      * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool, envOverride?: bool, effectiveValue?: string, locked?: bool, keySource?: string}>
      */
-    public function getValues(?int $actingUserId = null): array
+    public function getValues(?int $actingUserId = null, ?array $onlyKeys = null): array
     {
         $values = [];
+        $wanted = null === $onlyKeys ? null : array_flip($onlyKeys);
 
         foreach ($this->schema as $key => $field) {
+            if (null !== $wanted && !isset($wanted[$key])) {
+                continue;
+            }
             $source = $field['source'] ?? 'env';
 
             // Instance provider keys live in the encrypted ProviderKeyStore
@@ -621,6 +631,42 @@ final readonly class SystemConfigService
         $this->logChange($key, $value);
 
         return ['success' => true, 'requiresRestart' => true];
+    }
+
+    /**
+     * Restore the default style: clears every brand color and font override so
+     * readers fall back to the field defaults. Name, logos, legal links,
+     * navigation and attribution are brand identity, not style, and are kept.
+     *
+     * Each key clears independently through setValue(), so one failing write
+     * cannot block the rest; callers report what did and did not reset.
+     *
+     * @return array{success: bool, reset: list<string>, failed: list<string>, requiresRestart: bool}
+     */
+    public function resetBrandingStyle(?int $actingUserId = null): array
+    {
+        $reset = [];
+        $failed = [];
+
+        foreach (BrandingService::STYLE_RESET_KEYS as $key) {
+            $result = $this->setValue($key, '', $actingUserId);
+            if ($result['success']) {
+                $reset[] = $key;
+            } else {
+                $failed[] = $key;
+                $this->logger->error('Failed to reset branding style key', [
+                    'key' => $key,
+                    'error' => $result['message'],
+                ]);
+            }
+        }
+
+        return [
+            'success' => [] === $failed,
+            'reset' => $reset,
+            'failed' => $failed,
+            'requiresRestart' => false,
+        ];
     }
 
     /**
@@ -1529,6 +1575,15 @@ final readonly class SystemConfigService
                 'dbGroup' => PlatformLinksConfig::CONFIG_GROUP,
                 'dbKey' => PlatformLinksConfig::KEY_ENABLED,
             ],
+            'FEATURE_SEARCH_AI_ENABLED' => [
+                'tab' => 'features', 'section' => 'search', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the search model (the chat model of each person unless an admin pins one) picks the best matching result and says why. Each use is one short AI call and counts as one message. Off keeps keyword and meaning search.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => SmartSearchConfig::CONFIG_GROUP,
+                'dbKey' => SmartSearchConfig::KEY_AI_ENABLED,
+            ],
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
                 'sensitive' => false,
@@ -2397,6 +2452,12 @@ final readonly class SystemConfigService
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true,
                 'description' => 'Meta Model API key — Muse Spark. Create it at https://dev.meta.ai/ (API keys)',
+                'default' => '', 'source' => 'database',
+            ],
+            'CEREBRAS_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'Cerebras Inference API key — GPT OSS 120B and Qwen 3.8 27B. Create it at https://cloud.cerebras.ai/ (API Keys)',
                 'default' => '', 'source' => 'database',
             ],
             'TRUSTEDTOKENS_API_KEY' => [

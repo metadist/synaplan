@@ -208,7 +208,8 @@
       "scopes": {
         "documents": "Documents (RAG)",
         "memories": "Mémoires utilisateur",
-        "all": "Tous les embeddings"
+        "all": "Tous les embeddings",
+        "search": "Index Smart Search"
       },
       "breakdown": {
         "title": "Détail par périmètre"
@@ -331,10 +332,9 @@
       "availableToolsHelp": "Activez les agents qui seront disponibles avec cette instruction",
       "internetSearch": {
         "label": "Recherche Internet",
-        "help": "Choisissez quand cette instruction recherche sur le Web. « Auto » laisse le classifieur décider pour chaque message ; « Toujours activé » force une recherche ; « Toujours désactivé » la désactive.",
-        "auto": "Auto (le classifieur décide)",
-        "on": "Toujours activé",
-        "off": "Toujours désactivé"
+        "help": "L’IA ne cherche sur le Web que lorsqu’un message a besoin d’informations actuelles, comme la météo, les prix ou l’actualité. Pour un seul message, utilisez Outils → Recherche Web dans le chat. « Désactivé » désactive la recherche Web pour cette instruction.",
+        "auto": "Auto (l’IA décide)",
+        "off": "Désactivé"
       },
       "promptContent": "Contenu de l’instruction",
       "contentPlaceholder": "Saisissez votre message système ici…",

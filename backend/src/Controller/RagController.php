@@ -54,11 +54,14 @@ class RagController extends AbstractController
                     type: 'array',
                     items: new OA\Items(
                         properties: [
-                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'chunk_id', type: 'string', example: '1842'),
+                            new OA\Property(property: 'message_id', type: 'integer', description: 'Legacy alias of file_id', example: 42),
                             new OA\Property(property: 'text', type: 'string'),
                             new OA\Property(property: 'score', type: 'number', format: 'float'),
-                            new OA\Property(property: 'file_id', type: 'integer'),
-                            new OA\Property(property: 'file_name', type: 'string'),
+                            new OA\Property(property: 'start_line', type: 'integer', nullable: true),
+                            new OA\Property(property: 'end_line', type: 'integer', nullable: true),
+                            new OA\Property(property: 'file_id', type: 'integer', example: 42),
+                            new OA\Property(property: 'file_name', type: 'string', nullable: true, example: 'Invoice March.pdf'),
                             new OA\Property(property: 'group_key', type: 'string', nullable: true),
                         ]
                     )
@@ -120,6 +123,9 @@ class RagController extends AbstractController
                     'score' => $r['distance'], // Note: VectorSearchService maps score to distance key for compatibility
                     'start_line' => $r['start_line'] ?? null,
                     'end_line' => $r['end_line'] ?? null,
+                    'file_id' => $r['file_id'] ?? $r['message_id'],
+                    'file_name' => $r['file_name'] ?? null,
+                    'group_key' => $r['group_key'] ?? null,
                 ], $results),
                 'total_results' => count($results),
                 'search_time_ms' => $searchTime,

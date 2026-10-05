@@ -1,5 +1,11 @@
 # openDesk audio transcriber — master plan
 
+**Superseded for Jitsi (2026-10-04).** The plan of record is
+[`../20261004_openDesk/README.md`](../20261004_openDesk/README.md)
+(plugin `meeting_notes`, Prosody module, the existing transcriber).
+Do not implement the `opendesk_stt` module or the new sidecar repository
+described below. This file stays as the September sketch.
+
 **Status:** Draft 2026-09-17. Flagship of Wave 6. No media-path code
 until §0 here is ticked **and** in-app transcription
 ([`../20260927-early-intake/01_sprint_e1_transcription_and_easy.md`](../20260927-early-intake/01_sprint_e1_transcription_and_easy.md),

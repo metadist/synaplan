@@ -135,6 +135,21 @@
       </span>
     </div>
 
+    <!-- Search hint: the keys that open the palette, not a second nav item. -->
+    <div v-if="!isGuestMode" class="flex items-center justify-center pt-1 flex-shrink-0">
+      <button
+        type="button"
+        class="txt-secondary hover:txt-primary px-2 py-1.5 rounded-lg text-[11px] font-medium tracking-wide transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        :title="searchHint"
+        :aria-label="searchHint"
+        aria-keyshortcuts="Control+K Meta+K"
+        data-testid="btn-sidebar-v2-search"
+        @click="smartSearchStore.open()"
+      >
+        <kbd class="font-sans">{{ searchShortcut }}</kbd>
+      </button>
+    </div>
+
     <!-- User Avatar -->
     <div class="flex items-center justify-center py-4 flex-shrink-0">
       <button
@@ -223,15 +238,6 @@
                 {{ authStore.user?.email || '' }}
               </p>
             </div>
-            <button
-              role="menuitem"
-              class="dropdown-item"
-              data-testid="btn-sidebar-v2-profile"
-              @click="handleProfileSettings"
-            >
-              <UserCircleIcon class="w-4 h-4" />
-              <span>{{ $t('nav.profile') }}</span>
-            </button>
             <button
               v-if="iamSharingEnabled"
               role="menuitem"
@@ -322,9 +328,8 @@
           </template>
 
           <!--
-            Preferences holds the language and the theme, both stored on the
-            device rather than on the account, so it stays outside the
-            guest/authenticated split and is offered to everyone.
+            Preferences is the single settings page. Theme stays on the device,
+            so the entry is offered to guests as well as signed-in users.
           -->
           <div class="border-t border-light-border/10 dark:border-dark-border/10">
             <button
@@ -707,13 +712,14 @@ import {
   RocketLaunchIcon,
   Cog6ToothIcon,
   ChartBarIcon,
-  UserCircleIcon,
   UserGroupIcon,
   InboxArrowDownIcon,
   ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
+import { useSmartSearchStore } from '../stores/smartSearch'
+import { paletteShortcutLabel } from '@/composables/search/shortcut'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
@@ -753,6 +759,9 @@ import GuestHintPopover from './guest/GuestHintPopover.vue'
 const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const sidebarStore = useSidebarStore()
+const smartSearchStore = useSmartSearchStore()
+const searchShortcut = computed(() => paletteShortcutLabel(t('search.palette.modifier')))
+const searchHint = computed(() => t('search.palette.openHint', { shortcut: searchShortcut.value }))
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 
@@ -970,13 +979,9 @@ const handleNavigate = (path: string) => {
   router.push(path)
 }
 
-const handleProfileSettings = () => {
-  handleNavigate('/profile')
-}
-
 const handleOpenMemories = () => {
   if (!memoriesEnabledForUser.value) {
-    handleNavigate('/profile?highlight=memories')
+    handleNavigate('/settings#memories')
     return
   }
   handleNavigate('/memories')

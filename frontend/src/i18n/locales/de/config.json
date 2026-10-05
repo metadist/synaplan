@@ -195,7 +195,8 @@
       "scopes": {
         "documents": "Dokumente (RAG)",
         "memories": "Nutzer-Erinnerungen",
-        "all": "Alle Embeddings"
+        "all": "Alle Embeddings",
+        "search": "Smart-Search-Index"
       },
       "breakdown": {
         "title": "Aufschlüsselung pro Bereich"
@@ -318,10 +319,9 @@
       "availableToolsHelp": "Aktivieren Sie Agents, die für diesen Prompt verfügbar sein sollen.",
       "internetSearch": {
         "label": "Internetsuche",
-        "help": "Legt fest, wann dieser Prompt im Web sucht. „Automatisch“ überlässt die Entscheidung pro Nachricht dem Klassifizierer; „Immer an“ erzwingt eine Suche; „Immer aus“ deaktiviert sie.",
-        "auto": "Automatisch (Klassifizierer entscheidet)",
-        "on": "Immer an",
-        "off": "Immer aus"
+        "help": "Die KI sucht nur im Web, wenn eine Nachricht aktuelle Informationen braucht, etwa Wetter, Preise oder Nachrichten. Für eine einzelne Nachricht wählst du im Chat Tools → Web-Suche. „Aus“ schaltet die Websuche für diesen Prompt ab.",
+        "auto": "Automatisch (KI entscheidet)",
+        "off": "Aus"
       },
       "promptContent": "Prompt-Inhalt",
       "contentPlaceholder": "Geben Sie Ihren System-Prompt hier ein...",

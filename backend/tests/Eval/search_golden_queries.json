@@ -1,0 +1,32 @@
+{
+  "description": "Golden queries for app:search:eval. Targets are system settings, which exist on every install; expect lists every id that counts as a correct answer. Non-English wording is found by meaning, so those rows need a real multilingual embedding model (bge-m3).",
+  "queries": [
+    { "lang": "en", "q": "FEATURE_IAM_GROUPS_ENABLED", "expect": ["setting:FEATURE_IAM_GROUPS_ENABLED"] },
+    { "lang": "en", "q": "enable groups", "expect": ["setting:FEATURE_IAM_GROUPS_ENABLED"] },
+    { "lang": "en", "q": "let people share chats with each other", "expect": ["setting:FEATURE_IAM_SHARING_ENABLED"] },
+    { "lang": "en", "q": "allow sign up", "expect": ["setting:REGISTRATION_ENABLED"] },
+    { "lang": "en", "q": "openai key", "expect": ["setting:OPENAI_API_KEY"] },
+    { "lang": "en", "q": "whatsapp", "expect": ["setting:WHATSAPP_ENABLED"] },
+    { "lang": "en", "q": "brand color", "expect": ["setting:BRAND_PRIMARY_COLOR", "setting:BRAND_SECONDARY_COLOR", "setting:BRAND_ACCENT_COLOR", "setting:BRAND_PRIMARY_COLOR_DARK", "setting:BRAND_SECONDARY_COLOR_DARK", "setting:BRAND_ACCENT_COLOR_DARK"] },
+    { "lang": "en", "q": "speech to text", "expect": ["setting:WHISPER_ENABLED"] },
+    { "lang": "en", "q": "web search api", "expect": ["setting:BRAVE_SEARCH_ENABLED", "setting:BRAVE_SEARCH_API_KEY"] },
+    { "lang": "en", "q": "smtp mail server", "expect": ["setting:MAILER_DSN"] },
+    { "lang": "en", "q": "how long does an approval wait", "expect": ["setting:TOOLS_APPROVAL_EXPIRY_HOURS"] },
+    { "lang": "en", "q": "chat without an account", "expect": ["setting:GUEST_CHAT_ENABLED"] },
+    { "lang": "de", "q": "gruppen einschalten", "expect": ["setting:FEATURE_IAM_GROUPS_ENABLED"] },
+    { "lang": "de", "q": "registrierung erlauben", "expect": ["setting:REGISTRATION_ENABLED"] },
+    { "lang": "de", "q": "spracherkennung", "expect": ["setting:WHISPER_ENABLED"] },
+    { "lang": "de", "q": "logo ändern", "expect": ["setting:BRAND_LOGO_URL", "setting:BRAND_LOGO_DARK_URL"] },
+    { "lang": "de", "q": "chats mit kollegen teilen", "expect": ["setting:FEATURE_IAM_SHARING_ENABLED"] },
+    { "lang": "de", "q": "websuche", "expect": ["setting:BRAVE_SEARCH_ENABLED", "setting:BRAVE_SEARCH_API_KEY"] },
+    { "lang": "es", "q": "activar grupos", "expect": ["setting:FEATURE_IAM_GROUPS_ENABLED"] },
+    { "lang": "es", "q": "clave de api de anthropic", "expect": ["setting:ANTHROPIC_API_KEY"] },
+    { "lang": "es", "q": "permitir el registro de usuarios", "expect": ["setting:REGISTRATION_ENABLED"] },
+    { "lang": "fr", "q": "activer les groupes", "expect": ["setting:FEATURE_IAM_GROUPS_ENABLED"] },
+    { "lang": "fr", "q": "clé api openai", "expect": ["setting:OPENAI_API_KEY"] },
+    { "lang": "fr", "q": "couleur de la marque", "expect": ["setting:BRAND_PRIMARY_COLOR", "setting:BRAND_SECONDARY_COLOR", "setting:BRAND_ACCENT_COLOR", "setting:BRAND_PRIMARY_COLOR_DARK", "setting:BRAND_SECONDARY_COLOR_DARK", "setting:BRAND_ACCENT_COLOR_DARK"] },
+    { "lang": "tr", "q": "grupları etkinleştir", "expect": ["setting:FEATURE_IAM_GROUPS_ENABLED"] },
+    { "lang": "tr", "q": "kullanıcı kaydına izin ver", "expect": ["setting:REGISTRATION_ENABLED"] },
+    { "lang": "tr", "q": "telegram botu", "expect": ["setting:TELEGRAM_ENABLED"] }
+  ]
+}

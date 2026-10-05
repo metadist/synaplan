@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useModelMixStore } from '@/stores/modelMix'
+import { useChatModelPickStore } from '@/stores/chatModelPick'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { configApi } from '@/services/api/configApi'
@@ -130,5 +131,40 @@ describe('modelMix store', () => {
     await store.ensureLoaded()
 
     expect(configApi.getModels).toHaveBeenCalled()
+  })
+
+  it('clears an explicit model pick when a mix is applied, including the active mix', async () => {
+    signIn(7)
+    const store = useModelMixStore()
+    const pick = useChatModelPickStore()
+    pick.selectedModelId = 99
+
+    expect(await store.applyMix('default')).toBe(true)
+    expect(pick.selectedModelId).toBeNull()
+
+    pick.selectedModelId = 99
+    expect(await store.applyMix('default')).toBe(true)
+    expect(pick.selectedModelId).toBeNull()
+  })
+
+  it('leaves the explicit model pick when a mix is unavailable', async () => {
+    signIn(7)
+    const store = useModelMixStore()
+    const pick = useChatModelPickStore()
+    pick.selectedModelId = 99
+
+    expect(await store.applyMix('xai')).toBe(false)
+    expect(pick.selectedModelId).toBe(99)
+  })
+
+  it('leaves the explicit model pick when applying a mix fails', async () => {
+    signIn(7)
+    vi.mocked(configApi.resetDefaultModels).mockRejectedValueOnce(new Error('save failed'))
+    const store = useModelMixStore()
+    const pick = useChatModelPickStore()
+    pick.selectedModelId = 99
+
+    await expect(store.applyMix('default')).rejects.toThrow('save failed')
+    expect(pick.selectedModelId).toBe(99)
   })
 })

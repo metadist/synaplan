@@ -590,6 +590,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
+import { useSmartSearchStore } from '@/stores/smartSearch'
 import { isAgentsEnabled } from '@/composables/useAgentsFeature'
 import {
   capturePinnedAgentForSend,
@@ -701,7 +702,12 @@ const route = useRoute()
 const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
 const { isPaywallOpen, paywallReason, shouldRemind, openPaywall, closePaywall } = usePaywallPrompt()
-const { error: showErrorToast, success: showSuccessToast } = useNotification()
+const {
+  error: showErrorToast,
+  success: showSuccessToast,
+  warning: notifyWarning,
+} = useNotification()
+const smartSearchStore = useSmartSearchStore()
 const { goToProviderSetup } = useFirstRunSetup()
 
 const chatContainer = ref<HTMLElement | null>(null)
@@ -1241,6 +1247,94 @@ watch(
     const nextQuery = { ...route.query }
     delete nextQuery.tool
     void router.replace({ path: route.path, query: nextQuery })
+  },
+  { flush: 'post' }
+)
+
+// Smart Search fills the composer via `?prefill=` (slash commands). A URL
+// can only ever produce a draft. Sending ("Ask in chat") comes solely from
+// the in-memory store intent, so a crafted link cannot send on someone's
+// behalf.
+let deliveringSearchPrefill = false
+let deliveringSearchAsk = false
+
+watch(
+  [chatInputRef, () => route.query.prefill],
+  async ([input, prefill]) => {
+    if (deliveringSearchPrefill || !input || typeof prefill !== 'string' || prefill === '') {
+      return
+    }
+    deliveringSearchPrefill = true
+    try {
+      const nextQuery = { ...route.query }
+      delete nextQuery.prefill
+      delete nextQuery.send
+      await router.replace({ path: route.path, query: nextQuery })
+      chatInputRef.value?.setInputText(prefill)
+    } finally {
+      deliveringSearchPrefill = false
+    }
+  },
+  { flush: 'post' }
+)
+
+/** Opens the thread the question goes to. Returns false when there is none. */
+async function openThreadForSearchAsk(): Promise<boolean> {
+  // An incognito session stays incognito: the question joins the current
+  // in-memory conversation instead of a new, stored chat.
+  if (incognitoStore.active) {
+    return true
+  }
+
+  const previousChatId = chatsStore.activeChatId
+  // The chat-id watcher reloads history and would replace an optimistic
+  // user message. Skip that reload, load the empty thread ourselves, then send.
+  suppressNextChatHistoryLoad = true
+  const chat = await chatsStore.findOrCreateEmptyChat()
+  await nextTick()
+  if (!chat || chat.id === previousChatId) {
+    suppressNextChatHistoryLoad = false
+  }
+  if (!chat) {
+    return false
+  }
+  await historyStore.loadMessages(chat.id)
+  return true
+}
+
+async function deliverSearchAsk(text: string): Promise<void> {
+  if (text.startsWith('/')) {
+    chatInputRef.value?.setInputText(text)
+    notifyWarning(t('search.palette.ask.commandDraft'))
+    return
+  }
+  if (!(await openThreadForSearchAsk())) {
+    chatInputRef.value?.setInputText(text)
+    notifyWarning(t('search.palette.ask.notSent'))
+    return
+  }
+  const sent = (await chatInputRef.value?.submitText(text)) ?? false
+  if (!sent) {
+    notifyWarning(t('search.palette.ask.notSent'))
+  }
+}
+
+watch(
+  [chatInputRef, () => smartSearchStore.pendingAsk],
+  async ([input, pending]) => {
+    if (deliveringSearchAsk || !input || !pending) {
+      return
+    }
+    const text = smartSearchStore.takePendingAsk()
+    if (!text) {
+      return
+    }
+    deliveringSearchAsk = true
+    try {
+      await deliverSearchAsk(text)
+    } finally {
+      deliveringSearchAsk = false
+    }
   },
   { flush: 'post' }
 )

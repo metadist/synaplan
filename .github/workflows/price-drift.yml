@@ -36,7 +36,7 @@ jobs:
 
     services:
       mysql:
-        image: mariadb:13.0@sha256:d4fdec0510ad498e4f3127da30a99df3745bd6d5e611ae6ac5f76403d9284a8d
+        image: mariadb:13.0@sha256:f1bba652ba57bea3099ca2fe1af692af537c27d96e0bcde39dce29e2ba1ec4f3
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: synaplan_test
@@ -127,7 +127,7 @@ jobs:
           # signature below. Section titles come from SyncModelPricesCommand.
           awk '
             /^Non-per-token price drift|^Cache \/ long-context price drift|^Obsolete LiteLLM deviations/ { section = 1; next }
-            /^Pricing-mode mismatch|^Unmatched|^Null-price protected|^Known LiteLLM deviations/ { section = 0 }
+            /^Pricing-mode mismatch|^Unmatched|^Null-price protected|^Known LiteLLM deviations|^Catalog price pinned/ { section = 0 }
             section && /^ \* / { print }
             /\[DRY-RUN\]/ { print }
           ' drift-report.txt > drift-flagged.txt
@@ -215,7 +215,7 @@ jobs:
             echo ""
             echo "**What to do:** for every model in the \`[DRY-RUN]\` lines, the \`Non-per-token price drift\` section, and the \`Cache / long-context price drift\` section, open the official provider price page (the \`source:\` URL on the line is LiteLLM's own reference) and decide which side is right. Provider changed the price → correct \`backend/src/Model/ModelCatalog.php\` and ship a fingerprint-preserving data migration. LiteLLM is wrong → record it in \`ModelCatalog::LITELLM_DEVIATIONS\` (in/out and/or per-dimension cache/tier pins) and file the fix upstream. The step-by-step procedure, including the STOP conditions, is \`docs/PRICE_DRIFT_PROCEDURE.md\` (background: \`docs/PRICING_MAINTENANCE.md\`)."
             echo ""
-            echo "_Nothing is auto-written: the catalog is the source of truth. \`Known LiteLLM deviations\`, \`Pricing-mode mismatch\` and \`Unmatched\` are steady-state sections that never fail the check; an \`Obsolete LiteLLM deviations\` section means LiteLLM fixed a value and the registry entry can be deleted._"
+            echo "_The drift check itself writes nothing. Production \`app:sync-model-prices\` may update the live per-token price; the catalog stays the authored baseline and wins again when its price changes or the row is \`pricePinned\` (see \`docs/PRICING_MAINTENANCE.md\`, \"Who owns a per-token price\"). \`Known LiteLLM deviations\`, \`Catalog price pinned\`, \`Pricing-mode mismatch\` and \`Unmatched\` are steady-state sections that never fail the check; an \`Obsolete LiteLLM deviations\` section means LiteLLM fixed a value and the registry entry can be deleted._"
             echo ""
             echo "<details><summary>Dry-run report ($(date -u +%Y-%m-%dT%H:%MZ))</summary>"
             echo ""
