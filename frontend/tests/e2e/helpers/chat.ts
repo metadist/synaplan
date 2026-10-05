@@ -169,14 +169,22 @@ export class ChatHelper {
    */
   async startNewChat(): Promise<void> {
     const v2NewChatBtn = this.page.locator(selectors.nav.sidebarV2NewChat)
+    let usedSidebarButton = false
     try {
       await v2NewChatBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
       await v2NewChatBtn.click()
+      usedSidebarButton = true
     } catch {
       await this.page.locator(selectors.chat.chatBtnToggle).waitFor({ state: 'visible' })
       await this.page.locator(selectors.chat.chatBtnToggle).click()
       await this.page.locator(selectors.chat.newChatButton).waitFor({ state: 'visible' })
       await this.page.locator(selectors.chat.newChatButton).click()
+    }
+
+    if (usedSidebarButton) {
+      // The button stays disabled until the new chat is the active one. Until
+      // then a late boot list can still point the composer at the previous chat.
+      await expect(v2NewChatBtn).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
     }
 
     const textInput = this.page.locator(selectors.chat.textInput)

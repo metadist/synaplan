@@ -262,8 +262,7 @@ test.describe('@ci @telegram Telegram channel', () => {
     )
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'History' }).click()
-    await page.getByText('Telegram: @synaplan_test_bot').first().click()
+    await telegramThreadRow(page).click()
     await expect(page.getByText('What is the total?').first()).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
@@ -386,11 +385,15 @@ function update(updateId: number, message: Record<string, unknown>, userId = 555
 
 async function expectTelegramThread(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/')
-  await page.getByRole('button', { name: 'History' }).click()
-  await expect(page.getByText('Telegram: @synaplan_test_bot').first()).toBeVisible({
-    timeout: TIMEOUTS.STANDARD,
-  })
-  await page.keyboard.press('Escape')
+  await expect(telegramThreadRow(page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+}
+
+function telegramThreadRow(page: import('@playwright/test').Page) {
+  return page
+    .locator(selectors.nav.sidebarChats)
+    .locator(selectors.nav.chatV2Row)
+    .filter({ hasText: 'Telegram: @synaplan_test_bot' })
+    .first()
 }
 
 async function openChannels(page: import('@playwright/test').Page): Promise<void> {

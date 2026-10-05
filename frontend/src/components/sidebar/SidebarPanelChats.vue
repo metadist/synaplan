@@ -1,5 +1,19 @@
 <template>
-  <div data-testid="section-sidebar-chats" :data-chats-loading="chatsLoading">
+  <div
+    v-if="isGuest"
+    class="flex flex-col gap-3 px-3 pt-2"
+    data-testid="section-sidebar-chats-guest"
+  >
+    <p class="text-sm txt-secondary">{{ $t('guest.banner.subtitle') }}</p>
+    <router-link
+      :to="configStore.auth.registrationEnabled ? '/register' : '/login'"
+      class="btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium min-h-11"
+      data-testid="btn-sidebar-v2-guest-signup"
+    >
+      {{ configStore.auth.registrationEnabled ? $t('guest.banner.signUp') : $t('auth.signIn') }}
+    </router-link>
+  </div>
+  <div v-else data-testid="section-sidebar-chats" :data-chats-loading="chatsLoading">
     <div class="sticky top-0 z-10 bg-[var(--bg-sidebar)] px-3 pt-2 pb-2">
       <button
         type="button"
@@ -180,6 +194,8 @@ import ChatHistoryList from './ChatHistoryList.vue'
 import { chatsPanelRefresh } from '@/composables/useNavSections'
 import { useChatHistory } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
+import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 
 const UNPINNED_PAGE = 30
 
@@ -237,6 +253,10 @@ const sectionHoverLinkClass =
 
 const groupsEnabled = computed(() => isIamGroupsEnabled())
 
+const authStore = useAuthStore()
+const configStore = useConfigStore()
+const isGuest = computed(() => !authStore.isAuthenticated)
+
 const chatsExpanded = ref(readExpanded(CHATS_EXPANDED_KEY))
 const pinnedExpanded = ref(readExpanded(PINNED_EXPANDED_KEY))
 const incomingExpanded = ref(readExpanded(INCOMING_EXPANDED_KEY))
@@ -286,6 +306,8 @@ watch(
 defineExpose({ showMoreChats })
 
 const refreshChats = async () => {
+  // The chats store sends signed-out callers to the login page.
+  if (isGuest.value) return
   chatsReady.value = false
   try {
     await Promise.all([chatsStore.loadChats(), incomingStore.load()])
@@ -297,6 +319,10 @@ const refreshChats = async () => {
 
 watch(chatsPanelRefresh, () => {
   void refreshChats()
+})
+
+watch(isGuest, (guest) => {
+  if (!guest) void refreshChats()
 })
 
 onMounted(() => {

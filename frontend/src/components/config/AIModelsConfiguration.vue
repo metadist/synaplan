@@ -92,7 +92,7 @@
             <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
             <span
               v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--status-warning-muted)] text-[var(--status-warning-text)] border border-amber-500/30"
               :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
               data-testid="badge-embedding-admin-only"
             >

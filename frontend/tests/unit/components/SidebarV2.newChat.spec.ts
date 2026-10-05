@@ -4,6 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import SidebarV2 from '@/components/SidebarV2.vue'
+import { httpClient } from '@/services/api/httpClient'
+import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
 import { useSidebarStore } from '@/stores/sidebar'
 
@@ -49,9 +51,14 @@ vi.mock('@/services/authService', () => ({
   },
 }))
 
-const mountSidebar = async () => {
+const mountSidebar = async ({ guest = false } = {}) => {
   const pinia = createPinia()
   setActivePinia(pinia)
+  if (!guest) {
+    useAuthStore().user = { id: 1, email: 'user@example.com', level: 'NEW' } as NonNullable<
+      ReturnType<typeof useAuthStore>['user']
+    >
+  }
 
   const router = createRouter({
     history: createMemoryHistory(),
@@ -97,6 +104,16 @@ describe('SidebarV2 New Chat lock', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     document.body.innerHTML = '<div id="app"></div>'
+    vi.mocked(httpClient).mockClear()
+  })
+
+  it('shows guests a sign-up action instead of loading a chat list', async () => {
+    const wrapper = await mountSidebar({ guest: true })
+
+    expect(wrapper.find('[data-testid="section-sidebar-chats-guest"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-sidebar-v2-new-chat"]').exists()).toBe(false)
+    expect(vi.mocked(httpClient).mock.calls.some(([url]) => url === '/api/v1/chats')).toBe(false)
+    wrapper.unmount()
   })
 
   it('releases the rail button when create settles and ignores a second click', async () => {

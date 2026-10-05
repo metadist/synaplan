@@ -81,6 +81,7 @@ export function useChatHistory() {
     return chatsStore.chats
       .filter((chat) => {
         if (chat.widgetSession) return false
+        if (chat.id === chatsStore.activeChatId) return true
         const isEmpty =
           (!chat.messageCount || chat.messageCount === 0) &&
           !chat.firstMessagePreview &&
