@@ -2,7 +2,7 @@ import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { ELEMENT_CALL_LATER } from './matrix.js'
 import { createMeetingSession } from './jitsiSession.js'
-import { createPluginSession } from './pluginSession.js'
+import { createPluginSession, isSessionRef } from './pluginSession.js'
 import { publishMeeting } from './publish.js'
 
 function json(response, status, body) {
@@ -27,33 +27,14 @@ function refuse(socket, status, reason) {
   socket.destroy()
 }
 
-function wire(ws, session, onClose, log, label) {
-  const send = (message) => {
-    if (ws.readyState === ws.OPEN) {
-      ws.send(JSON.stringify(message))
-    }
-  }
-  ws.on('message', (data) => {
-    let message
-    try {
-      message = JSON.parse(data.toString())
-    } catch {
-      return
-    }
-    session.handle(message, send).catch((error) => {
-      log(`${label}: ${error.message}`)
-    })
-  })
-  ws.on('close', () => onClose(send))
-}
-
 /**
  * synaScriber plugin mode: the room's metadata put `notes=<ref>` on the
- * bridge URL. The plugin must confirm a live session before any audio is
- * accepted; afterwards every window goes to the plugin.
+ * bridge URL. The plugin must confirm a live session for this meeting
+ * before any audio is accepted; afterwards every window goes to the plugin.
+ * `connected` is what moves the plugin session from starting to running.
  */
-function upgradePlugin({ sockets, request, socket, head, ref, plugin, config, log }) {
-  plugin.bind(ref).then((binding) => {
+function upgradePlugin({ sockets, request, socket, head, ref, meetingId, plugin, config, log }) {
+  plugin.bind(ref, meetingId).then((binding) => {
     if (!binding) {
       log(`Notes ${ref}: no active session, connection refused.`)
       refuse(socket, 410, 'Gone')
@@ -62,19 +43,61 @@ function upgradePlugin({ sockets, request, socket, head, ref, plugin, config, lo
     sockets.handleUpgrade(request, socket, head, (ws) => {
       const session = createPluginSession({
         ref,
+        meetingId,
         language: binding.language || config.language,
+        sessionId: binding.sessionId || '',
+        captions: binding.captions !== false,
+        speakers: binding.speakers || {},
+        glossary: Array.isArray(binding.glossary) ? binding.glossary : [],
         client: plugin,
         commitAfterMs: config.commitAfterMs,
       })
-      log(`Notes ${ref}: bridge connected (${binding.language}).`)
-      wire(ws, session, (send) => {
+      const send = (message) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(JSON.stringify(message))
+        }
+      }
+      const pending = []
+      let ready = false
+      const dispatch = (data) => {
+        let message
+        try {
+          message = JSON.parse(data.toString())
+        } catch {
+          return
+        }
+        session.handle(message, send).catch((error) => {
+          log(`Notes ${ref}: ${error.message}`)
+        })
+      }
+      ws.on('message', (data) => {
+        if (!ready) {
+          pending.push(data)
+          return
+        }
+        dispatch(data)
+      })
+      ws.on('close', () => {
+        if (!ready) {
+          return
+        }
         session.finish(send).then((result) => {
           const stats = session.stats()
-          log(`Notes ${ref}: ${result.state} after ${stats.windows} windows from ${stats.speakers} speakers (${stats.failures} failed).`)
+          log(`Notes ${ref}: ${result.state} after ${stats.windows} windows from ${stats.speakers} speakers (${stats.failures} failed, ${stats.gaps} gaps).`)
         }).catch((error) => {
           log(`Notes ${ref} were not finished: ${error.message}`)
         })
-      }, log, `Notes ${ref}`)
+      })
+      session.connect().then(() => {
+        ready = true
+        log(`Notes ${ref}: bridge connected (${binding.language}).`)
+        for (const data of pending) {
+          dispatch(data)
+        }
+      }).catch((error) => {
+        log(`Notes ${ref}: connected event failed (${error.message}), connection closed.`)
+        ws.close()
+      })
     })
   }).catch((error) => {
     log(`Notes ${ref}: Synaplan not reachable (${error.message}), connection refused.`)
@@ -137,11 +160,12 @@ export function createApp(config, { synaplan, plugin = null, log = () => {} } = 
     }
     const notesRef = url.searchParams.get('notes')
     if (notesRef) {
-      if (!plugin || !/^[a-f0-9]{16}$/.test(notesRef)) {
+      if (!plugin || !isSessionRef(notesRef)) {
         refuse(socket, 400, 'Bad Request')
         return
       }
-      upgradePlugin({ sockets, request, socket, head, ref: notesRef, plugin, config, log })
+      const meetingId = url.searchParams.get('sessionId') || url.searchParams.get('meetingId') || ''
+      upgradePlugin({ sockets, request, socket, head, ref: notesRef, meetingId, plugin, config, log })
       return
     }
     const meetingId = url.searchParams.get('sessionId') || url.searchParams.get('meetingId') || 'meeting'
