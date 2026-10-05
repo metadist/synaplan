@@ -107,7 +107,9 @@
   "welcomeUser": "Bienvenido, {name}",
   "sidebar": {
     "featureStatus": "Estado de Funciones",
-    "upgrade": "Mejorar"
+    "upgrade": "Mejorar",
+    "schedulerStopped": "Trabajos en segundo plano detenidos",
+    "schedulerStoppedShort": "Trabajos detenidos"
   },
   "nav": {
     "desktop": "Synaplan Desktop",

@@ -16,6 +16,12 @@
       class="flex-1 min-h-0 overflow-y-auto scroll-thin px-3 v2-drawer-scroll"
       data-testid="nav-mobile-drawer-scroll"
     >
+      <!--
+        Reachable while the desktop rail is hidden (phone chrome). The rail
+        copy is an icon plus a truncated label; here the full sentence shows.
+      -->
+      <SchedulerStaleHint class="mb-3" />
+
       <!-- Primary actions -->
       <nav class="flex flex-col gap-1" :aria-label="$t('nav.menu')">
         <button
@@ -636,6 +642,7 @@ import { useI18n } from 'vue-i18n'
 import { isLibraryLinkActive, useLibraryLinks } from '@/composables/useLibraryLinks'
 import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
+import SchedulerStaleHint from './SchedulerStaleHint.vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
 

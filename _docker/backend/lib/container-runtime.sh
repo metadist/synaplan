@@ -315,145 +315,491 @@ run_worker_role() {
 _scheduler_stopping=0
 _scheduler_sleep_pid=''
 _scheduler_child_pid=''
+_scheduler_tick_pid=''
+_scheduler_tasks_pid=''
+_scheduler_hourly_pid=''
+_scheduler_daily_pid=''
+_scheduler_health_pid=''
+_scheduler_next_hourly=0
+_scheduler_next_daily=0
+_scheduler_next_health=0
 
 stop_scheduler() {
     _scheduler_stopping=1
-    if [ -n "$_scheduler_child_pid" ]; then
-        kill -TERM "$_scheduler_child_pid" 2>/dev/null || true
-    fi
     if [ -n "$_scheduler_sleep_pid" ]; then
         kill "$_scheduler_sleep_pid" 2>/dev/null || true
     fi
+    scheduler_signal_lanes TERM
+    return 0
 }
 
-run_scheduler_command() {
-    php "$@" &
+# The lane shell forwards TERM to the job it is waiting on, then leaves.
+# $_scheduler_child_pid is the timeout (or php) process of that lane only.
+scheduler_lane_on_term() {
+    if [ -n "${_scheduler_child_pid}" ]; then
+        kill -TERM "$_scheduler_child_pid" 2>/dev/null || true
+    fi
+    exit 143
+}
+
+# kill -0 is true for a zombie. A finished lane stays in the process table
+# until it is reaped, and must not count as still running.
+scheduler_pid_alive() {
+    local pid="$1"
+    local stat_line state
+
+    if [ -z "$pid" ]; then
+        return 1
+    fi
+    if [ ! -r "/proc/${pid}/stat" ]; then
+        return 1
+    fi
+    stat_line="$(cat "/proc/${pid}/stat" 2>/dev/null)" || return 1
+    state="${stat_line##*) }"
+    state="${state%% *}"
+    if [ -z "$state" ] || [ "$state" = "Z" ]; then
+        return 1
+    fi
+    return 0
+}
+
+scheduler_reap_lane() {
+    local slot="$1"
+    local pid=''
+
+    case "$slot" in
+        tick) pid="$_scheduler_tick_pid" ;;
+        tasks) pid="$_scheduler_tasks_pid" ;;
+        hourly) pid="$_scheduler_hourly_pid" ;;
+        daily) pid="$_scheduler_daily_pid" ;;
+        health) pid="$_scheduler_health_pid" ;;
+        *) return 0 ;;
+    esac
+    if [ -z "$pid" ]; then
+        return 0
+    fi
+    if scheduler_pid_alive "$pid"; then
+        return 0
+    fi
+    wait "$pid" 2>/dev/null || true
+    case "$slot" in
+        tick) _scheduler_tick_pid='' ;;
+        tasks) _scheduler_tasks_pid='' ;;
+        hourly) _scheduler_hourly_pid='' ;;
+        daily) _scheduler_daily_pid='' ;;
+        health) _scheduler_health_pid='' ;;
+    esac
+    return 0
+}
+
+scheduler_lane_alive() {
+    local pid=''
+
+    case "$1" in
+        tick) pid="$_scheduler_tick_pid" ;;
+        tasks) pid="$_scheduler_tasks_pid" ;;
+        hourly) pid="$_scheduler_hourly_pid" ;;
+        daily) pid="$_scheduler_daily_pid" ;;
+        health) pid="$_scheduler_health_pid" ;;
+        *) return 1 ;;
+    esac
+    scheduler_pid_alive "$pid"
+}
+
+scheduler_any_lane_alive() {
+    local slot
+
+    for slot in tick tasks hourly daily health; do
+        if scheduler_lane_alive "$slot"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+scheduler_signal_lanes() {
+    local signal="$1"
+    local slot pid=''
+
+    for slot in tick tasks hourly daily health; do
+        pid=''
+        case "$slot" in
+            tick) pid="$_scheduler_tick_pid" ;;
+            tasks) pid="$_scheduler_tasks_pid" ;;
+            hourly) pid="$_scheduler_hourly_pid" ;;
+            daily) pid="$_scheduler_daily_pid" ;;
+            health) pid="$_scheduler_health_pid" ;;
+        esac
+        if scheduler_pid_alive "$pid"; then
+            # The lane is a session leader, so the group includes timeout's child.
+            kill "-${signal}" -- "-${pid}" 2>/dev/null || kill "-${signal}" "$pid" 2>/dev/null || true
+        fi
+    done
+    return 0
+}
+
+scheduler_wait_lanes() {
+    local slot pid=''
+
+    for slot in tick tasks hourly daily health; do
+        pid=''
+        case "$slot" in
+            tick) pid="$_scheduler_tick_pid" ;;
+            tasks) pid="$_scheduler_tasks_pid" ;;
+            hourly) pid="$_scheduler_hourly_pid" ;;
+            daily) pid="$_scheduler_daily_pid" ;;
+            health) pid="$_scheduler_health_pid" ;;
+        esac
+        if [ -n "$pid" ]; then
+            wait "$pid" 2>/dev/null || true
+        fi
+    done
+    _scheduler_tick_pid=''
+    _scheduler_tasks_pid=''
+    _scheduler_hourly_pid=''
+    _scheduler_daily_pid=''
+    _scheduler_health_pid=''
+    return 0
+}
+
+scheduler_wait_lanes_bounded() {
+    local seconds="$1"
+    local deadline
+
+    deadline="$(( $(date +%s) + seconds ))"
+    while scheduler_any_lane_alive; do
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+            return 1
+        fi
+        sleep 0.2
+    done
+    scheduler_wait_lanes
+    return 0
+}
+
+scheduler_spawn_lane() {
+    local slot="$1"
+    local fn="$2"
+    shift 2
+    local runtime_lib pid
+
+    runtime_lib="${BASH_SOURCE[0]}"
+    # setsid makes the lane its own process group, so the stop path's KILL
+    # reaches the command `timeout` is waiting on and not only this shell.
+    # shellcheck disable=SC2016
+    setsid -- "$BASH" -c '
+        set -euo pipefail
+        # exec starts a new shell, which does not inherit the entrypoint options.
+        # shellcheck disable=SC1090
+        . "$1"
+        shift
+        lane_fn="$1"
+        shift
+        "$lane_fn" "$@"
+    ' _ "$runtime_lib" "$fn" "$@" &
+    pid=$!
+    case "$slot" in
+        tick) _scheduler_tick_pid=$pid ;;
+        tasks) _scheduler_tasks_pid=$pid ;;
+        hourly) _scheduler_hourly_pid=$pid ;;
+        daily) _scheduler_daily_pid=$pid ;;
+        health) _scheduler_health_pid=$pid ;;
+    esac
+    return 0
+}
+
+scheduler_ensure_lane() {
+    local slot="$1"
+    shift
+
+    scheduler_reap_lane "$slot"
+    if scheduler_lane_alive "$slot"; then
+        return 0
+    fi
+    scheduler_spawn_lane "$slot" "$@"
+}
+
+# $1 is the cap in seconds. 0 runs php directly: a timeout would kill the process.
+run_scheduler_job() {
+    local cap="$1"
+    shift
+    local status=0
+    local command_name=''
+    local arg
+
+    for arg in "$@"; do
+        case "$arg" in
+            app:*)
+                command_name="$arg"
+                ;;
+        esac
+    done
+
+    if [ "$cap" -gt 0 ]; then
+        timeout --signal=TERM --kill-after=30 "$cap" php "$@" &
+    else
+        php "$@" &
+    fi
     _scheduler_child_pid=$!
-    wait "$_scheduler_child_pid"
-    local status=$?
+    wait "$_scheduler_child_pid" 2>/dev/null || status=$?
     _scheduler_child_pid=''
-    return "$status"
+
+    if [ "$status" -eq 0 ]; then
+        return 0
+    fi
+    # wait returns 128+signal when this lane is stopped. That is not a job failure.
+    if [ "$status" -eq 143 ] || [ "$status" -eq 130 ]; then
+        exit "$status"
+    fi
+    if [ "$status" -eq 124 ]; then
+        runtime_log "${command_name} was stopped after ${cap} seconds." >&2
+        return 0
+    fi
+    if [ "$status" -eq 137 ] && [ "$cap" -gt 0 ]; then
+        runtime_log "${command_name} was killed (exit 137): it ignored the stop signal after its ${cap}-second limit, or it ran out of memory." >&2
+        return 0
+    fi
+    runtime_log "${command_name} failed (exit ${status}); it will be retried on the next run." >&2
+    return 0
+}
+
+scheduler_trim() {
+    local value="$1"
+
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s\n' "$value"
+}
+
+scheduler_is_positive_integer() {
+    case "$1" in
+        ''|*[!0-9]*|0) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+scheduler_slot_next() {
+    case "$1" in
+        hourly) printf '%s\n' "$_scheduler_next_hourly" ;;
+        daily) printf '%s\n' "$_scheduler_next_daily" ;;
+        health) printf '%s\n' "$_scheduler_next_health" ;;
+        *) printf '%s\n' 0 ;;
+    esac
+}
+
+scheduler_set_slot_next() {
+    case "$1" in
+        hourly) _scheduler_next_hourly="$2" ;;
+        daily) _scheduler_next_daily="$2" ;;
+        health) _scheduler_next_health="$2" ;;
+    esac
+}
+
+# Ask the shared slot store. Exit 0 starts the lane, exit 3 defers it, and any
+# other status skips the slot: several nodes run this loop, so falling back to
+# "run it anyway" would double-run the jobs.
+scheduler_claim_slot() {
+    local slot="$1"
+    local mode="$2"
+    local value="$3"
+    local now="$4"
+    local env="$5"
+    local extra="$6"
+    local next
+    local claim_output=''
+    local claim_status=0
+    local until_due
+
+    next="$(scheduler_slot_next "$slot")"
+    scheduler_reap_lane "$slot"
+    if [ "$now" -lt "$next" ]; then
+        return 0
+    fi
+    if scheduler_lane_alive "$slot"; then
+        return 0
+    fi
+
+    # Bounded so a hung database cannot hold the loop (and a pending TERM) forever.
+    claim_output="$(timeout --signal=TERM --kill-after=5 30 php bin/console --env="$env" app:scheduler:claim "$slot" "--${mode}=${value}" --no-interaction)" || claim_status=$?
+
+    if [ "$claim_status" -eq 0 ]; then
+        case "$slot" in
+            hourly) scheduler_ensure_lane hourly run_scheduler_hourly_lane "$env" ;;
+            daily) scheduler_ensure_lane daily run_scheduler_daily_lane "$env" "$extra" ;;
+            health) scheduler_ensure_lane health run_scheduler_health_lane "$env" "$extra" ;;
+        esac
+        if [ "$slot" = "daily" ]; then
+            scheduler_set_slot_next daily "$((now + 3600))"
+        else
+            scheduler_set_slot_next "$slot" "$((now + value))"
+        fi
+        return 0
+    fi
+
+    if [ "$claim_status" -eq 3 ]; then
+        until_due="$(scheduler_trim "$claim_output")"
+        if scheduler_is_positive_integer "$until_due"; then
+            if [ "$until_due" -gt 3600 ]; then
+                until_due=3600
+            fi
+            scheduler_set_slot_next "$slot" "$((now + until_due))"
+        fi
+        return 0
+    fi
+
+    runtime_log "Could not check whether the ${slot} jobs are due (exit ${claim_status}); asking again on the next tick." >&2
+    return 0
+}
+
+# Invoked by name in the lane shell (scheduler_spawn_lane); shellcheck cannot see that call.
+# shellcheck disable=SC2317
+run_scheduler_tick_lane() {
+    local env="$1"
+    local smart_mailbox="$2"
+
+    trap scheduler_lane_on_term TERM
+
+    run_scheduler_job 300 bin/console --env="$env" app:media:reap-jobs --no-interaction
+    run_scheduler_job 300 bin/console --env="$env" app:chat:reap-stuck --no-interaction
+    run_scheduler_job 300 bin/console --env="$env" app:desktop:reap-jobs --no-interaction
+    run_scheduler_job 300 bin/console --env="$env" app:process-mail-handlers --no-interaction
+    if [ "$smart_mailbox" = "1" ]; then
+        run_scheduler_job 300 bin/console --env="$env" app:process-emails --no-interaction
+    fi
+}
+
+# shellcheck disable=SC2317
+run_scheduler_tasks_lane() {
+    local env="$1"
+
+    trap scheduler_lane_on_term TERM
+
+    # No cap: the command runs due AI tasks inline, and killing it would strand a run.
+    run_scheduler_job 0 bin/console --env="$env" app:saved-tasks:tick --no-interaction
+}
+
+# shellcheck disable=SC2317
+run_scheduler_hourly_lane() {
+    local env="$1"
+
+    trap scheduler_lane_on_term TERM
+
+    run_scheduler_job 900 bin/console --env="$env" app:files:reap-ephemeral --no-interaction
+
+    # Tool approvals nobody decided within their deadline (default 72 h)
+    # flip to `expired` and fail the paused Saved Task run. Cheap: one
+    # indexed query, a no-op while approvals are disabled.
+    run_scheduler_job 900 bin/console --env="$env" app:approvals:expire --no-interaction
+
+    # New-model detection. Opt-in via MODEL_DISCOVERY_ENABLED (command
+    # is a no-op when false). Read-only: reports pending upstream ids
+    # to Discord, never writes BMODELS. Hourly so a release is posted
+    # within the hour; BCONFIG state keeps each id to one post.
+    run_scheduler_job 900 bin/console --env="$env" app:models:discover --notify --no-interaction
+}
+
+# shellcheck disable=SC2317
+run_scheduler_daily_lane() {
+    local env="$1"
+    local price_sync="$2"
+
+    trap scheduler_lane_on_term TERM
+
+    # Release-notice detection. Detection only: it stores the published
+    # version in BCONFIG and never touches the installation, so a failure
+    # (offline instance, unreachable manifest) is expected and is simply
+    # retried on the next interval.
+    run_scheduler_job 3600 bin/console --env="$env" app:updates:check --no-interaction
+
+    # Discontinued-model detection. Read-only and reports only: it asks
+    # the providers the operator already configured a key for which
+    # models they still serve, and never changes a row. Installs without
+    # cloud keys make no outbound request at all.
+    run_scheduler_job 3600 bin/console --env="$env" app:models:check-availability --notify --no-interaction
+
+    # Message digest: out-of-band deep-memory indexing of new user
+    # messages (self-locking, per-user cost caps). A failure is
+    # harmless — the per-user cursor means the next run resumes
+    # exactly where this one stopped.
+    run_scheduler_job 10800 bin/console --env="$env" app:digest:run --no-interaction
+
+    # Official documentation corpus for the self-aware chat (owner 0 /
+    # SYSTEM:synaplan). Failure is expected on air-gapped installs and
+    # is retried on the next interval; the previous corpus stays.
+    run_scheduler_job 3600 bin/console --env="$env" app:selfaware:sync-docs --no-interaction
+
+    # One mail per user who chose "daily digest" for pending tool
+    # approvals. Users on "instant" were mailed when the row was created.
+    run_scheduler_job 3600 bin/console --env="$env" app:approvals:digest --no-interaction
+
+    if [ "$price_sync" = "1" ]; then
+        run_scheduler_job 3600 bin/console --env="$env" app:sync-model-prices --no-interaction
+    fi
+}
+
+# shellcheck disable=SC2317
+run_scheduler_health_lane() {
+    local env="$1"
+    local health_jitter="$2"
+
+    trap scheduler_lane_on_term TERM
+
+    # Runtime health of the models this install actually uses. Distinct from
+    # the daily availability check above: that one reports catalog drift for
+    # a human to act on, this one reacts within minutes to a provider that
+    # started failing, which is why it runs on a much shorter interval.
+    # Every provider is asked once through its free "list your models"
+    # endpoint — no inference, so this costs nothing to run on a schedule.
+    # The jitter keeps a fleet of installs from hitting the same provider
+    # APIs on the same minute. A failure just means one provider was
+    # unreachable and is retried on the next interval.
+    run_scheduler_job 600 bin/console --env="$env" app:model:health-check --jitter="$health_jitter" --no-interaction
 }
 
 run_scheduler_role() {
     local env="${APP_ENV:-prod}"
     local tick_seconds="${SYNAPLAN_SCHEDULER_TICK_SECONDS:-60}"
     local hourly_seconds="${SYNAPLAN_SCHEDULER_HOURLY_SECONDS:-3600}"
-    local daily_seconds="${SYNAPLAN_SCHEDULER_DAILY_SECONDS:-86400}"
+    local daily_at="${SYNAPLAN_SCHEDULER_DAILY_AT:-03:30}"
     local health_seconds="${SYNAPLAN_SCHEDULER_MODEL_HEALTH_SECONDS:-900}"
     local health_jitter="${SYNAPLAN_SCHEDULER_MODEL_HEALTH_JITTER:-120}"
-    local now
-    local next_hourly=0
-    local next_daily=0
-    local next_health=0
-    local cycles=0
+    local smart_mailbox="${SYNAPLAN_SCHEDULER_SMART_MAILBOX:-0}"
+    local price_sync="${SYNAPLAN_SCHEDULER_PRICE_SYNC:-0}"
     local max_cycles="${SYNAPLAN_SCHEDULER_MAX_CYCLES:-0}"
+    local now
+    local cycles=0
+
+    _scheduler_stopping=0
+    _scheduler_sleep_pid=''
+    _scheduler_child_pid=''
+    _scheduler_tick_pid=''
+    _scheduler_tasks_pid=''
+    _scheduler_hourly_pid=''
+    _scheduler_daily_pid=''
+    _scheduler_health_pid=''
+    _scheduler_next_hourly=0
+    _scheduler_next_daily=0
+    _scheduler_next_health=0
 
     require_console || return
     prepare_role_cache || return
     wait_for_web_initialization || return
     mkdir -p "$SYNAPLAN_RUNTIME_DIR"
+    if [ -n "${SYNAPLAN_ROLE:-}" ]; then
+        export SYNAPLAN_ROLE
+    fi
     trap stop_scheduler TERM INT
 
-    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper + new-model check every ${hourly_seconds}s, model health check every ${health_seconds}s, update + model-availability check every ${daily_seconds}s)."
+    runtime_log "Starting scheduler (tick lane every ${tick_seconds}s, Saved Tasks lane every ${tick_seconds}s, hourly lane every ${hourly_seconds}s, daily lane at ${daily_at} UTC, model health lane every ${health_seconds}s)."
     while [ "$_scheduler_stopping" -eq 0 ]; do
         now="$(date +%s)"
         printf '%s\n' "$now" > "${SYNAPLAN_RUNTIME_DIR}/scheduler.heartbeat"
 
-        if ! run_scheduler_command bin/console --env="$env" app:media:reap-jobs --no-interaction; then
-            runtime_log "Media reaper failed; it will be retried on the next tick." >&2
-        fi
-
-        if ! run_scheduler_command bin/console --env="$env" app:chat:reap-stuck --no-interaction; then
-            runtime_log "Stuck-chat reaper failed; it will be retried on the next tick." >&2
-        fi
-
-        if ! run_scheduler_command bin/console --env="$env" app:saved-tasks:tick --no-interaction; then
-            runtime_log "Saved Tasks tick failed; it will be retried on the next tick." >&2
-        fi
-
-        if ! run_scheduler_command bin/console --env="$env" app:desktop:reap-jobs --no-interaction; then
-            runtime_log "Desktop job reaper failed; it will be retried on the next tick." >&2
-        fi
-
-        if [ "$now" -ge "$next_hourly" ]; then
-            if ! run_scheduler_command bin/console --env="$env" app:files:reap-ephemeral --no-interaction; then
-                runtime_log "Ephemeral-file reaper failed; it will be retried next hour." >&2
-            fi
-
-            # Tool approvals nobody decided within their deadline (default 72 h)
-            # flip to `expired` and fail the paused Saved Task run. Cheap: one
-            # indexed query, a no-op while approvals are disabled.
-            if ! run_scheduler_command bin/console --env="$env" app:approvals:expire --no-interaction; then
-                runtime_log "Approval expiry sweep failed; it will be retried next hour." >&2
-            fi
-
-            # New-model detection. Opt-in via MODEL_DISCOVERY_ENABLED (command
-            # is a no-op when false). Read-only: reports pending upstream ids
-            # to Discord, never writes BMODELS. Hourly so a release is posted
-            # within the hour; BCONFIG state keeps each id to one post.
-            if ! run_scheduler_command bin/console --env="$env" app:models:discover --notify --no-interaction; then
-                runtime_log "Model discovery check failed; it will be retried next hour." >&2
-            fi
-            next_hourly=$((now + hourly_seconds))
-        fi
-
-        # Release-notice detection. Detection only: it stores the published
-        # version in BCONFIG and never touches the installation, so a failure
-        # (offline instance, unreachable manifest) is expected and is simply
-        # retried on the next interval.
-        if [ "$now" -ge "$next_daily" ]; then
-            if ! run_scheduler_command bin/console --env="$env" app:updates:check --no-interaction; then
-                runtime_log "Update check failed; it will be retried on the next daily interval." >&2
-            fi
-
-            # Discontinued-model detection. Read-only and reports only: it asks
-            # the providers the operator already configured a key for which
-            # models they still serve, and never changes a row. Installs without
-            # cloud keys make no outbound request at all.
-            if ! run_scheduler_command bin/console --env="$env" app:models:check-availability --notify --no-interaction; then
-                runtime_log "Model availability check failed; it will be retried on the next daily interval." >&2
-            fi
-
-            # Message digest: out-of-band deep-memory indexing of new user
-            # messages (self-locking, per-user cost caps). A failure is
-            # harmless — the per-user cursor means the next run resumes
-            # exactly where this one stopped.
-            if ! run_scheduler_command bin/console --env="$env" app:digest:run --no-interaction; then
-                runtime_log "Message digest run failed; it will be retried on the next daily interval." >&2
-            fi
-
-            # Official documentation corpus for the self-aware chat (owner 0 /
-            # SYSTEM:synaplan). Failure is expected on air-gapped installs and
-            # is retried on the next interval; the previous corpus stays.
-            if ! run_scheduler_command bin/console --env="$env" app:selfaware:sync-docs --no-interaction; then
-                runtime_log "Platform docs sync failed; it will be retried on the next daily interval." >&2
-            fi
-
-            # One mail per user who chose "daily digest" for pending tool
-            # approvals. Users on "instant" were mailed when the row was created.
-            if ! run_scheduler_command bin/console --env="$env" app:approvals:digest --no-interaction; then
-                runtime_log "Approval digest failed; it will be retried on the next daily interval." >&2
-            fi
-
-            next_daily=$((now + daily_seconds))
-        fi
-
-        # Runtime health of the models this install actually uses. Distinct from
-        # the daily availability check above: that one reports catalog drift for
-        # a human to act on, this one reacts within minutes to a provider that
-        # started failing, which is why it runs on a much shorter interval.
-        # Every provider is asked once through its free "list your models"
-        # endpoint — no inference, so this costs nothing to run on a schedule.
-        # The jitter keeps a fleet of installs from hitting the same provider
-        # APIs on the same minute. A failure just means one provider was
-        # unreachable and is retried on the next interval.
-        if [ "$now" -ge "$next_health" ]; then
-            if ! run_scheduler_command bin/console --env="$env" app:model:health-check --jitter="$health_jitter" --no-interaction; then
-                runtime_log "Model health check failed; it will be retried on the next interval." >&2
-            fi
-            next_health=$((now + health_seconds))
-        fi
+        scheduler_ensure_lane tick run_scheduler_tick_lane "$env" "$smart_mailbox"
+        scheduler_ensure_lane tasks run_scheduler_tasks_lane "$env"
+        scheduler_claim_slot hourly interval "$hourly_seconds" "$now" "$env" ""
+        scheduler_claim_slot daily at "$daily_at" "$now" "$env" "$price_sync"
+        scheduler_claim_slot health interval "$health_seconds" "$now" "$env" "$health_jitter"
 
         cycles=$((cycles + 1))
         if [ "$max_cycles" -gt 0 ] && [ "$cycles" -ge "$max_cycles" ]; then
@@ -468,6 +814,16 @@ run_scheduler_role() {
         wait "$_scheduler_sleep_pid" 2>/dev/null || true
         _scheduler_sleep_pid=''
     done
+
+    if [ "$_scheduler_stopping" -ne 0 ]; then
+        scheduler_signal_lanes TERM
+        if ! scheduler_wait_lanes_bounded 60; then
+            scheduler_signal_lanes KILL
+            scheduler_wait_lanes_bounded 5 || true
+        fi
+    else
+        scheduler_wait_lanes
+    fi
 
     runtime_log "Scheduler stopped."
 }

@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { login } from '../helpers/auth'
@@ -95,4 +96,63 @@ test.describe('@ci System status', () => {
       /\/admin\/config\?tab=tools&section=compute/
     )
   })
+
+  test('shows stopped jobs on the card and a sidebar hint that opens system status', async ({
+    page,
+  }) => {
+    await mockSchedulerStatus(page, 'stale')
+    await page.goto('/')
+
+    const hint = page
+      .locator(selectors.featureStatus.schedulerSidebarHint)
+      .filter({ visible: true })
+    await expect(hint).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
+    await hint.click()
+
+    await expect(page).toHaveURL(/\/admin\/features/)
+    await expect(page.locator(selectors.featureStatus.schedulerStateLine)).toContainText(
+      'Background jobs have stopped',
+      { timeout: TIMEOUTS.STANDARD }
+    )
+    await expect(page.locator(selectors.featureStatus.schedulerStateLine)).toContainText(
+      'are not running'
+    )
+  })
+
+  test('shows a running sentence and no sidebar hint', async ({ page }) => {
+    await mockSchedulerStatus(page, 'running')
+    await page.goto('/admin/features')
+
+    await expect(page.locator(selectors.featureStatus.schedulerStateLine)).toContainText(
+      'Background jobs are running',
+      { timeout: TIMEOUTS.STANDARD }
+    )
+    await expect(
+      page.locator(selectors.featureStatus.schedulerSidebarHint).filter({ visible: true })
+    ).toHaveCount(0)
+  })
 })
+
+async function mockSchedulerStatus(page: Page, state: 'stale' | 'running'): Promise<void> {
+  const now = Math.floor(Date.now() / 1000)
+  const finished = state === 'running' ? now - 300 : now - 7_200
+  await page.route('**/api/v1/admin/scheduler/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        state,
+        maxAgeSeconds: 180,
+        checkedAt: now,
+        lastRunAt: finished,
+        lanes: (['tick', 'tasks', 'hourly', 'daily', 'health'] as const).map((lane) => ({
+          lane,
+          lastStartedAt: finished - 5,
+          lastFinishedAt: finished,
+          failedJobs: [],
+          unfinishedJobs: [],
+        })),
+      }),
+    })
+  })
+}

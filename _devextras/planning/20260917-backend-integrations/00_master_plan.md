@@ -12,7 +12,7 @@ repos (`backend-only` from this repo’s point of view).
 §1 (in-app transcription is row 1b and is not this page); catalog [`01_catalog.md`](./01_catalog.md);
 editors [`02_developer_clients.md`](./02_developer_clients.md); office
 [`03_office_and_mail.md`](./03_office_and_mail.md). Jitsi meeting notes are
-not this folder: [`../20261004_openDesk/README.md`](../20261004_openDesk/README.md).
+not this folder: [metadist/synaScriber](https://github.com/metadist/synaScriber).
 
 ---
 

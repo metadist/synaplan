@@ -464,6 +464,72 @@ services:
     networks:
       - synaplan-network
 
+  # Scheduler - Saved Tasks, reminders, approval expiry, media / stuck-chat
+  # reapers and the other periodic jobs (see docs/ADMIN.md "Background jobs").
+  # APP_ENV matches the backend: RedisService namespaces keys per env, so a
+  # different env would reap a different key space.
+  scheduler:
+    image: ghcr.io/metadist/synaplan:latest
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: _docker/backend/Dockerfile
+      target: dev
+    container_name: synaplan-scheduler
+    env_file:
+      - path: backend/.env
+        required: false
+    volumes:
+      - ./backend:/var/www/backend
+      - /var/www/backend/var/cache
+      - ./plugins:/plugins:ro
+      - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_docker/backend/lib:/usr/local/bin/lib:ro
+      - ./_docker/backend/container-healthcheck.sh:/usr/local/bin/container-healthcheck:ro
+    environment:
+      APP_ENV: dev
+      SYNAPLAN_ROLE: scheduler
+      SYNAPLAN_WEB_HEALTH_URL: http://backend/api/health
+      APP_URL: http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}
+      FRONTEND_URL: http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
+      PLUGINS_DIR: /plugins
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      OLLAMA_BASE_URL: ""
+      TIKA_BASE_URL: http://tika:9998
+      AI_DEFAULT_PROVIDER: groq
+      TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
+      LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
+      REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      REALTIME_ENABLED: ${REALTIME_ENABLED:-true}
+      REALTIME_API_URL: ${REALTIME_API_URL:-http://centrifugo:8000/api}
+      REALTIME_API_KEY: ${REALTIME_API_KEY:-changeme_centrifugo_api_key}
+      REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-changeme_centrifugo_token_secret}
+      MAILER_DSN: smtp://mailhog:1025
+      AUTO_DOWNLOAD_MODELS: "false"
+      ENABLE_LOCAL_GPT_OSS: "false"
+      WHISPER_ENABLED: "false"
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        # vendor/ is bind-mounted and installed by the backend on first start.
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - synaplan-network
+
   # MariaDB 11.8 Database
   db:
     image: mariadb:13.0.2@sha256:f1bba652ba57bea3099ca2fe1af692af537c27d96e0bcde39dce29e2ba1ec4f3

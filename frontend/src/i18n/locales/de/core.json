@@ -108,7 +108,9 @@
   "welcomeUser": "Willkommen, {name}",
   "sidebar": {
     "featureStatus": "Feature-Status",
-    "upgrade": "Upgrade"
+    "upgrade": "Upgrade",
+    "schedulerStopped": "Hintergrundjobs gestoppt",
+    "schedulerStoppedShort": "Jobs gestoppt"
   },
   "nav": {
     "desktop": "Synaplan Desktop",

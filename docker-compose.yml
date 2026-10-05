@@ -731,6 +731,7 @@ services:
       - ./_docker/backend/container-healthcheck.sh:/usr/local/bin/container-healthcheck:ro
     environment:
       APP_ENV: dev
+      SYNAPLAN_ROLE: scheduler
       SYNAPLAN_WEB_HEALTH_URL: http://backend/api/health
       DAV_ALLOW_INSECURE_LOCAL: "1"
       # Public URLs, same as the backend: approval digest/instant mail

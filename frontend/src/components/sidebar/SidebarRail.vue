@@ -63,8 +63,8 @@
     </Teleport>
 
     <div
-      v-if="versionLabel"
-      class="mb-3 flex h-11 w-full flex-shrink-0 items-center justify-center px-1"
+      v-if="versionLabel || schedulerStore.isStale"
+      class="mb-3 flex w-full flex-shrink-0 flex-col items-center justify-center gap-1 px-1"
       data-testid="section-sidebar-v2-version"
     >
       <a
@@ -83,13 +83,14 @@
         {{ versionLabel }}
       </a>
       <span
-        v-else
+        v-else-if="versionLabel"
         class="max-w-full text-center text-[10px] leading-tight txt-secondary break-all"
         :title="$t('updates.runningVersion', { version: versionLabel })"
         data-testid="text-sidebar-v2-version"
       >
         {{ versionLabel }}
       </span>
+      <SchedulerStaleHint compact />
     </div>
   </aside>
 </template>
@@ -97,7 +98,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, computed, watch, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import SchedulerStaleHint from '@/components/SchedulerStaleHint.vue'
 import { useConfigStore } from '@/stores/config'
+import { useSchedulerStore } from '@/stores/scheduler'
 import { useUpdatesStore } from '@/stores/updates'
 import { useTheme } from '@/composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
@@ -106,6 +109,7 @@ import { formatRunningVersion } from '@/utils/formatRunningVersion'
 
 const configStore = useConfigStore()
 const updatesStore = useUpdatesStore()
+const schedulerStore = useSchedulerStore()
 const { t } = useI18n()
 const { isDark } = useTheme()
 const { iconSrc } = useBrandLogo(isDark)
@@ -164,7 +168,20 @@ function hideTipSoon() {
   }, 80)
 }
 
-onUnmounted(hideTipNow)
+/** Five minutes. Polling while the admin is signed in, not a race workaround. */
+const SCHEDULER_POLL_MS = 5 * 60 * 1000
+let schedulerPoll: ReturnType<typeof setInterval> | null = null
+
+function stopSchedulerPoll(): void {
+  if (schedulerPoll === null) return
+  clearInterval(schedulerPoll)
+  schedulerPoll = null
+}
+
+onUnmounted(() => {
+  hideTipNow()
+  stopSchedulerPoll()
+})
 
 const versionLabel = computed(() => formatRunningVersion(configStore.build.version))
 const showUpdateLink = computed(() => updatesStore.showBadge && !!updatesStore.guideUrl)
@@ -179,6 +196,19 @@ watch(
   () => updatesStore.canRead,
   (canRead) => {
     if (canRead) updatesStore.ensureLoaded()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => schedulerStore.canRead,
+  (canRead) => {
+    stopSchedulerPoll()
+    if (!canRead) return
+    void schedulerStore.ensureLoaded()
+    schedulerPoll = setInterval(() => {
+      void schedulerStore.load()
+    }, SCHEDULER_POLL_MS)
   },
   { immediate: true }
 )
