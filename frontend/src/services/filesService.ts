@@ -820,7 +820,14 @@ export const deleteFolder = async (groupKey: string): Promise<DeleteFolderRespon
 export const getFileGroups = async (
   options: Pick<
     FileListOptions,
-    'search' | 'fileType' | 'source' | 'vectorState' | 'originKind' | 'incoming' | 'dateFrom' | 'dateTo'
+    | 'search'
+    | 'fileType'
+    | 'source'
+    | 'vectorState'
+    | 'originKind'
+    | 'incoming'
+    | 'dateFrom'
+    | 'dateTo'
   > = {}
 ): Promise<Array<{ name: string; count: number }>> => {
   const params: Record<string, string | number> = {}

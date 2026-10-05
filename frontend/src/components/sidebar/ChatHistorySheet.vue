@@ -75,7 +75,9 @@
 
           <div class="flex-1 overflow-y-auto scroll-thin px-3 pb-4 sm:px-4">
             <div v-if="filteredPinned.length > 0" data-testid="section-chat-sheet-pinned">
-              <h3 class="mb-0.5 flex items-center min-h-9 px-2 py-1.5 text-xs font-semibold txt-secondary">
+              <h3
+                class="mb-0.5 flex items-center min-h-9 px-2 py-1.5 text-xs font-semibold txt-secondary"
+              >
                 {{ $t('nav.pinned') }}
               </h3>
               <ChatHistoryList
@@ -107,13 +109,19 @@
             >
               <template #empty>
                 <p class="text-sm txt-secondary text-center py-10">
-                  {{ searchQuery || kindFilter !== 'all' ? $t('common.noResults') : $t('chat.noChats') }}
+                  {{
+                    searchQuery || kindFilter !== 'all'
+                      ? $t('common.noResults')
+                      : $t('chat.noChats')
+                  }}
                 </p>
               </template>
             </ChatHistoryList>
           </div>
 
-          <div class="flex-shrink-0 px-4 py-3 sm:px-5 border-t border-black/[0.04] dark:border-white/[0.04]">
+          <div
+            class="flex-shrink-0 px-4 py-3 sm:px-5 border-t border-black/[0.04] dark:border-white/[0.04]"
+          >
             <button
               type="button"
               class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-[var(--brand)] bg-[var(--brand)]/[0.06] hover:bg-[var(--brand)]/[0.12] min-h-11"

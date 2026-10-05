@@ -1947,7 +1947,11 @@ input[type='reset']:not(:disabled) {
    rounded-lg utility cannot shrink them. Checkboxes, radios, sliders,
    and pills keep their own shape. The chat composer and the smart-search
    field are bare; their shell is the visible surface. */
-input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not([type='hidden']):not(.rounded-full):not([data-testid='input-smart-search']),
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not(
+    [type='button']
+  ):not([type='submit']):not([type='reset']):not([type='image']):not([type='hidden']):not(
+    .rounded-full
+  ):not([data-testid='input-smart-search']),
 textarea:not(.rounded-full):not(.chat-textarea),
 select:not(.rounded-full) {
   border-radius: var(--radius-xl, 0.75rem);

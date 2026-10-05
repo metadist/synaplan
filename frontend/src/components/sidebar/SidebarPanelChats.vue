@@ -8,7 +8,12 @@
         data-testid="btn-sidebar-v2-new-chat"
         @click="createChat(false)"
       >
-        <Icon v-if="isCreatingChat" icon="mdi:loading" class="w-5 h-5 animate-spin" aria-hidden="true" />
+        <Icon
+          v-if="isCreatingChat"
+          icon="mdi:loading"
+          class="w-5 h-5 animate-spin"
+          aria-hidden="true"
+        />
         <PlusIcon v-else class="w-5 h-5" aria-hidden="true" />
         {{ $t('chat.newChat') }}
       </button>
@@ -16,37 +21,37 @@
 
     <div v-if="iamSharingEnabled" class="mt-4" data-testid="section-sidebar-incoming">
       <div class="group/section relative">
-      <button
-        type="button"
-        :class="sectionToggleClass"
-        :aria-expanded="incomingExpanded"
-        aria-controls="sidebar-incoming-list"
-        data-testid="btn-sidebar-v2-incoming-toggle"
-        :title="$t('iam.incoming.purpose')"
-        @click="incomingExpanded = !incomingExpanded"
-      >
-        <span class="truncate">{{ $t('iam.incoming.menu') }}</span>
-        <span
-          v-if="incomingStore.hasNew"
-          class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
-          data-testid="text-sidebar-v2-incoming-count"
-          >{{ incomingStore.unseenCount }}</span
+        <button
+          type="button"
+          :class="sectionToggleClass"
+          :aria-expanded="incomingExpanded"
+          aria-controls="sidebar-incoming-list"
+          data-testid="btn-sidebar-v2-incoming-toggle"
+          :title="$t('iam.incoming.purpose')"
+          @click="incomingExpanded = !incomingExpanded"
         >
-        <ChevronDownIcon
-          :class="[sectionChevronClass, { '-rotate-90': !incomingExpanded }]"
-          aria-hidden="true"
-        />
-      </button>
-      <router-link
-        v-if="groupsEnabled"
-        to="/groups"
-        :class="sectionHoverLinkClass"
-        data-testid="btn-sidebar-v2-incoming-groups"
-        :title="$t('nav.myGroups')"
-        :aria-label="$t('nav.myGroups')"
-      >
-        <UserGroupIcon class="w-4 h-4" aria-hidden="true" />
-      </router-link>
+          <span class="truncate">{{ $t('iam.incoming.menu') }}</span>
+          <span
+            v-if="incomingStore.hasNew"
+            class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+            data-testid="text-sidebar-v2-incoming-count"
+            >{{ incomingStore.unseenCount }}</span
+          >
+          <ChevronDownIcon
+            :class="[sectionChevronClass, { '-rotate-90': !incomingExpanded }]"
+            aria-hidden="true"
+          />
+        </button>
+        <router-link
+          v-if="groupsEnabled"
+          to="/groups"
+          :class="sectionHoverLinkClass"
+          data-testid="btn-sidebar-v2-incoming-groups"
+          :title="$t('nav.myGroups')"
+          :aria-label="$t('nav.myGroups')"
+        >
+          <UserGroupIcon class="w-4 h-4" aria-hidden="true" />
+        </router-link>
       </div>
       <div v-show="incomingExpanded" id="sidebar-incoming-list" class="px-1">
         <p
@@ -75,20 +80,20 @@
 
     <div v-if="pinnedChats.length > 0" class="mt-5" data-testid="section-sidebar-pinned">
       <div class="group/section relative">
-      <button
-        type="button"
-        :class="sectionToggleClass"
-        :aria-expanded="pinnedExpanded"
-        aria-controls="sidebar-pinned-list"
-        data-testid="btn-sidebar-v2-pinned-toggle"
-        @click="pinnedExpanded = !pinnedExpanded"
-      >
-        {{ $t('nav.pinned') }}
-        <ChevronDownIcon
-          :class="[sectionChevronClass, { '-rotate-90': !pinnedExpanded }]"
-          aria-hidden="true"
-        />
-      </button>
+        <button
+          type="button"
+          :class="sectionToggleClass"
+          :aria-expanded="pinnedExpanded"
+          aria-controls="sidebar-pinned-list"
+          data-testid="btn-sidebar-v2-pinned-toggle"
+          @click="pinnedExpanded = !pinnedExpanded"
+        >
+          {{ $t('nav.pinned') }}
+          <ChevronDownIcon
+            :class="[sectionChevronClass, { '-rotate-90': !pinnedExpanded }]"
+            aria-hidden="true"
+          />
+        </button>
       </div>
       <div v-show="pinnedExpanded" id="sidebar-pinned-list" class="px-1">
         <ChatHistoryList
@@ -109,29 +114,29 @@
 
     <div class="mt-5">
       <div class="group/section relative">
-      <button
-        type="button"
-        :class="sectionToggleClass"
-        :aria-expanded="chatsExpanded"
-        aria-controls="sidebar-chat-list"
-        data-testid="btn-sidebar-v2-chats-toggle"
-        @click="chatsExpanded = !chatsExpanded"
-      >
-        {{ $t('nav.chats') }}
-        <ChevronDownIcon
-          :class="[sectionChevronClass, { '-rotate-90': !chatsExpanded }]"
-          aria-hidden="true"
-        />
-      </button>
-      <router-link
-        to="/chats"
-        :class="sectionHoverLinkClass"
-        data-testid="btn-chat-v2-show-all"
-        :title="$t('chat.showAll')"
-        :aria-label="$t('chat.showAll')"
-      >
-        <ArrowUpRightIcon class="w-4 h-4" aria-hidden="true" />
-      </router-link>
+        <button
+          type="button"
+          :class="sectionToggleClass"
+          :aria-expanded="chatsExpanded"
+          aria-controls="sidebar-chat-list"
+          data-testid="btn-sidebar-v2-chats-toggle"
+          @click="chatsExpanded = !chatsExpanded"
+        >
+          {{ $t('nav.chats') }}
+          <ChevronDownIcon
+            :class="[sectionChevronClass, { '-rotate-90': !chatsExpanded }]"
+            aria-hidden="true"
+          />
+        </button>
+        <router-link
+          to="/chats"
+          :class="sectionHoverLinkClass"
+          data-testid="btn-chat-v2-show-all"
+          :title="$t('chat.showAll')"
+          :aria-label="$t('chat.showAll')"
+        >
+          <ArrowUpRightIcon class="w-4 h-4" aria-hidden="true" />
+        </router-link>
       </div>
 
       <div v-show="chatsExpanded" id="sidebar-chat-list" class="px-1">
@@ -164,7 +169,12 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { ArrowUpRightIcon, ChevronDownIcon, PlusIcon, UserGroupIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowUpRightIcon,
+  ChevronDownIcon,
+  PlusIcon,
+  UserGroupIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
 import { useChatHistory } from '@/composables/useChatHistory'

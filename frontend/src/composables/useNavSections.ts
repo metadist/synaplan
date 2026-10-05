@@ -50,7 +50,11 @@ function readLastSection(): NavSectionKey {
 /** Shared across rail and panel so a personal page keeps one section. */
 const lastSection = ref<NavSectionKey>(readLastSection())
 
-function longestMatch(children: NavChild[], sectionPath: string, routePath: string): NavChild | null {
+function longestMatch(
+  children: NavChild[],
+  sectionPath: string,
+  routePath: string
+): NavChild | null {
   const matches = children.filter((child) => isNavChildActive(child, sectionPath, routePath))
   matches.sort((a, b) => b.path.length - a.path.length)
   return matches[0] ?? null
@@ -154,7 +158,12 @@ export function useNavSections() {
   })
 
   function sectionKeyForPath(path: string): NavSectionKey | null {
-    if (path === '/' || path === '/chats' || path.startsWith('/chats/') || path.startsWith('/chat/')) {
+    if (
+      path === '/' ||
+      path === '/chats' ||
+      path.startsWith('/chats/') ||
+      path.startsWith('/chat/')
+    ) {
       return 'chats'
     }
     if (path.startsWith('/files')) return 'library'

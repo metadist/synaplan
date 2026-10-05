@@ -34,11 +34,6 @@ import ShareDialog from './iam/ShareDialog.vue'
 import { useChatHistory, useChatShareDialog } from '@/composables/useChatHistory'
 
 const { shareOwnerName, openPublicLinkFromIam, chatsStore } = useChatHistory()
-const {
-  shareModalOpen,
-  shareModalChatId,
-  shareModalChatTitle,
-  iamShareOpen,
-  iamShareResourceId,
-} = useChatShareDialog()
+const { shareModalOpen, shareModalChatId, shareModalChatTitle, iamShareOpen, iamShareResourceId } =
+  useChatShareDialog()
 </script>

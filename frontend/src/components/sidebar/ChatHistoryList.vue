@@ -1,10 +1,5 @@
 <template>
-  <div
-    v-if="chats.length > 0"
-    class="space-y-0.5"
-    role="list"
-    :data-testid="rowsTestId"
-  >
+  <div v-if="chats.length > 0" class="space-y-0.5" role="list" :data-testid="rowsTestId">
     <div
       v-for="chat in chats"
       :key="chat.id"
@@ -43,7 +38,9 @@
             :ref="bindTitle(chat.id)"
             class="block h-5 max-w-full truncate text-[15px] leading-5"
             :class="[
-              chat.id === activeChatId ? 'font-semibold text-[var(--brand)]' : 'chat-row-title font-medium',
+              chat.id === activeChatId
+                ? 'font-semibold text-[var(--brand)]'
+                : 'chat-row-title font-medium',
               marqueeChatId === chat.id && 'chat-title-marquee',
             ]"
           >
@@ -51,7 +48,10 @@
           </span>
         </span>
       </button>
-      <div v-if="!chat.incoming" class="chat-row-menu absolute inset-y-0 right-0 flex items-stretch">
+      <div
+        v-if="!chat.incoming"
+        class="chat-row-menu absolute inset-y-0 right-0 flex items-stretch"
+      >
         <button
           type="button"
           class="chat-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5 cursor-pointer"
@@ -197,8 +197,7 @@ const previewChat = computed(
   () => props.chats.find((chat) => chat.id === previewChatId.value) ?? null
 )
 
-const finePointer = (): boolean =>
-  window.matchMedia('(hover: hover) and (pointer: fine)').matches
+const finePointer = (): boolean => window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
 const bindTitle = (id: number) => (el: Element | null) => {
   if (el instanceof HTMLElement) titleEls.set(id, el)
@@ -275,9 +274,7 @@ const startMarquee = (id: number) => {
       if (!el || !clip) return
       const clipStyle = getComputedStyle(clip)
       const contentWidth =
-        clip.clientWidth -
-        parseFloat(clipStyle.paddingLeft) -
-        parseFloat(clipStyle.paddingRight)
+        clip.clientWidth - parseFloat(clipStyle.paddingLeft) - parseFloat(clipStyle.paddingRight)
       const visible = widthUntilDots(clip, contentWidth)
       const previous = el.style.maxWidth
       el.style.maxWidth = 'none'
@@ -309,7 +306,7 @@ const startMarquee = (id: number) => {
             iterations: Infinity,
             direction: 'alternate',
             easing: 'linear',
-          },
+          }
         )
       })
     })
@@ -501,5 +498,4 @@ onUnmounted(() => {
   overflow: visible;
   text-overflow: clip;
 }
-
 </style>

@@ -55,9 +55,9 @@ test.describe('@ci Incognito Chat', () => {
       await page.locator(selectors.nav.sidebarV2ChatNav).click()
       const list = page.locator(selectors.nav.sidebarChats)
       await list.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-      await expect(list.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })).toHaveCount(
-        0
-      )
+      await expect(
+        list.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })
+      ).toHaveCount(0)
     })
 
     await test.step('Act: end the session via toggle and confirm the discard warning', async () => {
@@ -83,9 +83,9 @@ test.describe('@ci Incognito Chat', () => {
       await page.locator(selectors.nav.sidebarV2ChatNav).click()
       const list = page.locator(selectors.nav.sidebarChats)
       await list.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-      await expect(list.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })).toHaveCount(
-        0
-      )
+      await expect(
+        list.locator(selectors.nav.chatV2Row).filter({ hasText: uniqueMessage })
+      ).toHaveCount(0)
     })
   })
 

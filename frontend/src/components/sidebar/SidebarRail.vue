@@ -74,9 +74,7 @@
         rel="noopener noreferrer"
         class="max-w-full text-center text-[10px] font-semibold leading-tight break-all"
         :class="
-          isSecurityUpdate
-            ? 'text-[var(--status-error-text)]'
-            : 'text-[var(--status-warning-text)]'
+          isSecurityUpdate ? 'text-[var(--status-error-text)]' : 'text-[var(--status-warning-text)]'
         "
         :title="updateHint"
         :aria-label="updateHint"

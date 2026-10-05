@@ -48,5 +48,4 @@ describe('Sidebar Store', () => {
     store.toggleChatSheet()
     expect(store.chatSheetOpen).toBe(false)
   })
-
 })

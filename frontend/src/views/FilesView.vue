@@ -644,7 +644,9 @@
 
             <!-- Filters with nothing behind them. No quoted search term. -->
             <div
-              v-else-if="activeFilterCount > 0 && paginatedFiles.length === 0 && visibleFolders.length === 0"
+              v-else-if="
+                activeFilterCount > 0 && paginatedFiles.length === 0 && visibleFolders.length === 0
+              "
               class="flex flex-col items-center justify-center py-20 gap-4"
               data-testid="state-no-filter-results"
             >
@@ -702,11 +704,7 @@
 
             <template v-else>
               <!-- Folder cards (with drag & drop) -->
-              <div
-                v-if="visibleFolders.length > 0"
-                class="mb-6"
-                data-testid="section-folder-grid"
-              >
+              <div v-if="visibleFolders.length > 0" class="mb-6" data-testid="section-folder-grid">
                 <div
                   class="grid gap-2 sm:gap-3"
                   :class="

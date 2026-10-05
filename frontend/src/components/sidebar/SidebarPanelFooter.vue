@@ -1,5 +1,7 @@
 <template>
-  <div class="flex-shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] px-3 pt-3 pb-3 flex flex-col gap-2">
+  <div
+    class="flex-shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] px-3 pt-3 pb-3 flex flex-col gap-2"
+  >
     <button
       v-if="!isGuestMode"
       type="button"
@@ -260,8 +262,7 @@ const showUpgrade = computed(
     !authStore.isPro
 )
 const showSubscription = computed(
-  () =>
-    !authStore.isAdmin && configStore.billing.enabled && purchaseAllowed && authStore.isPro
+  () => !authStore.isAdmin && configStore.billing.enabled && purchaseAllowed && authStore.isPro
 )
 
 const initials = computed(() => (authStore.user?.email || 'G').charAt(0).toUpperCase())

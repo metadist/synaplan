@@ -5,10 +5,7 @@
       :key="group.key ?? 'flat'"
       :data-testid="group.key ? `section-sidebar-group-${group.key}` : undefined"
     >
-      <h3
-        v-if="group.group"
-        class="px-2 pt-1 pb-1 text-[13px] font-semibold txt-secondary"
-      >
+      <h3 v-if="group.group" class="px-2 pt-1 pb-1 text-[13px] font-semibold txt-secondary">
         {{ group.group }}
       </h3>
       <div class="flex flex-col gap-0.5">

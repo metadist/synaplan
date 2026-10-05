@@ -1310,7 +1310,12 @@
 
 /* Same 12px on fields. Beats .design-v2 .surface-card (16px) when a field
    also wears that class. Excludes the bare composer and search inputs. */
-.design-v2 input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not([type='hidden']):not(.rounded-full):not([data-testid='input-smart-search']),
+.design-v2
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not(
+    [type='button']
+  ):not([type='submit']):not([type='reset']):not([type='image']):not([type='hidden']):not(
+    .rounded-full
+  ):not([data-testid='input-smart-search']),
 .design-v2 textarea:not(.rounded-full):not(.chat-textarea),
 .design-v2 select:not(.rounded-full) {
   border-radius: var(--radius-xl, 0.75rem);

@@ -48,7 +48,9 @@
           <Icon icon="heroicons:folder-minus" class="w-4 h-4 shrink-0" />
           <span class="truncate">{{ $t('files.removeFromFolder') }}</span>
         </button>
-        <div class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 px-2 pt-2 pb-2">
+        <div
+          class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 px-2 pt-2 pb-2"
+        >
           <div class="relative">
             <Icon
               icon="heroicons:folder-plus"
