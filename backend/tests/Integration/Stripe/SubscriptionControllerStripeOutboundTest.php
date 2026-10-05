@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Stripe;
 
+use App\Controller\SubscriptionController;
 use App\Entity\User;
 use App\Tests\Integration\Stripe\Mock\StripeMockHttpClient;
 use App\Tests\Trait\AuthenticatedTestTrait;
@@ -166,11 +167,11 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
         }
         $this->assertNotNull($checkoutCall, 'Checkout session POST must be captured');
 
-        // Stripe's SDK passes payment_method_types as an array under one
+        // Stripe's SDK passes allowed_payment_method_types as an array under one
         // request path and as a form-encoded string under another — accept
         // either so the test isn't coupled to SDK serialisation internals.
-        $paymentMethods = $checkoutCall['params']['payment_method_types'] ?? null;
-        $this->assertNotNull($paymentMethods, 'Checkout session must include payment_method_types');
+        $paymentMethods = $checkoutCall['params']['allowed_payment_method_types'] ?? null;
+        $this->assertNotNull($paymentMethods, 'Checkout session must include allowed_payment_method_types');
 
         $needles = ['card', 'link', 'sepa_debit', 'klarna'];
         if (is_array($paymentMethods)) {
@@ -184,6 +185,45 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
                     sprintf('STRIPE_PAYMENT_METHODS must forward %s to Stripe Checkout', $method));
             }
         }
+    }
+
+    public function testTopupCreatesOneTimeCheckoutWithConfiguredPaymentMethods(): void
+    {
+        $customerId = 'cus_'.bin2hex(random_bytes(8));
+        $this->seedStripeCustomerId($customerId);
+        $sessionId = 'cs_test_'.bin2hex(random_bytes(8));
+
+        $this->stripeMock->expect('GET', 'customers/'.$customerId, [
+            'id' => $customerId,
+            'object' => 'customer',
+            'email' => $this->user->getMail(),
+        ]);
+
+        $this->stripeMock->expect('POST', 'checkout/sessions', [
+            'id' => $sessionId,
+            'object' => 'checkout.session',
+            'url' => 'https://checkout.stripe.com/c/pay/'.$sessionId,
+            'customer' => $customerId,
+        ]);
+
+        $this->postJson('/api/v1/subscription/topup', ['steps' => 2]);
+
+        $this->assertResponseIsSuccessful();
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertSame($sessionId, $body['sessionId']);
+        $this->assertSame(2, $body['steps']);
+        $this->assertSame(2 * SubscriptionController::TOPUP_STEP_EUR, $body['total_eur']);
+
+        $checkoutCall = null;
+        foreach ($this->stripeMock->captured() as $call) {
+            if ('post' === $call['method'] && str_contains($call['url'], 'checkout/sessions')) {
+                $checkoutCall = $call;
+                break;
+            }
+        }
+        $this->assertNotNull($checkoutCall, 'Top-up checkout session POST must be captured');
+        $this->assertSame('payment', $checkoutCall['params']['mode']);
+        $this->assertContains('sepa_debit', (array) ($checkoutCall['params']['allowed_payment_method_types'] ?? []));
     }
 
     public function testCheckoutReusesExistingStripeCustomer(): void
