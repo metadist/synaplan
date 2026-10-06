@@ -70,6 +70,7 @@
     "unpin": "Anheften aufheben",
     "pinSaveFailed": "Das Anheften konnte nicht gespeichert werden. Der Chat bleibt, wo er war.",
     "stillGenerating": "Antwortet noch",
+    "answerReady": "Antwort fertig",
     "listOrigin": {
       "web": "Chat",
       "whatsapp": "WhatsApp",

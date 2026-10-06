@@ -1,5 +1,5 @@
 <template>
-  <nav class="flex flex-col gap-0.5 px-2 py-2" :aria-label="$t('nav.files')">
+  <nav class="flex flex-col gap-0.5 px-3 py-2" :aria-label="$t('nav.files')">
     <router-link
       v-for="item in links"
       :key="item.id"

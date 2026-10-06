@@ -1059,7 +1059,7 @@
       "sourceGroup": "Cette discussion appartient à {owner}. Elle vous est parvenue via le groupe \"{name}\".",
       "sourceEveryone": "Cette discussion appartient à {owner}. Elle a été partagée avec toutes les personnes qui ont un compte.",
       "sourceDirect": "Cette discussion appartient à {owner}. Elle a été partagée avec vous personnellement.",
-      "emptyText": "Quand quelqu'un partage une discussion avec vous ou l'un de vos groupes, elle apparaît ici.",
+      "emptyText": "Aucun chat reçu",
       "filter": {
         "label": "Filtrer les discussions",
         "all": "Toutes",

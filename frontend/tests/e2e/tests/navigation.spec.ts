@@ -13,12 +13,14 @@ async function ensureNavReady(page: Page) {
   await expect(page.locator(NAV.sidebarV2Assistants)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
-/** Avatar menu → Preferences → /settings page. */
+/** Avatar menu → Profile, then the language page in the profile sidebar. */
 async function openPreferences(page: Page) {
   await page.locator(USR.button).click()
   await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  await page.locator(USR.dropdown).locator(USR.preferencesBtn).click()
+  await page.locator(USR.dropdown).locator(USR.profileBtn).click()
   await expect(page.locator(SET.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await page.locator('[data-testid="link-sidebar-v2-settings-appearance"]').click()
+  await expect(page.locator(SET.btnLanguage('en'))).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
 /** Open a rail section and wait for its context panel. */
@@ -317,7 +319,7 @@ test.describe('Navigation: Admin sidebar', () => {
 })
 
 test.describe('Navigation: User menu', () => {
-  test('@ci User menu shows Statistics, Preferences and Logout', async ({ page }) => {
+  test('@ci User menu shows Profile and Logout', async ({ page }) => {
     await test.step('Arrange: login', async () => {
       await openApp(page)
     })
@@ -326,52 +328,40 @@ test.describe('Navigation: User menu', () => {
       await page.locator(USR.button).click()
     })
 
-    await test.step('Assert: dropdown visible with menu items', async () => {
+    await test.step('Assert: dropdown has Profile and Logout only', async () => {
       const dropdown = page.locator(USR.dropdown)
       await expect(dropdown).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(dropdown.locator(USR.statisticsBtn)).toBeVisible()
-      await expect(dropdown.locator(USR.preferencesBtn)).toBeVisible()
-      await expect(dropdown.locator(USR.profileBtn)).toHaveCount(0)
+      await expect(dropdown.locator(USR.profileBtn)).toBeVisible()
       await expect(dropdown.locator(USR.logoutBtn)).toBeVisible()
+      await expect(dropdown.locator(USR.statisticsBtn)).toHaveCount(0)
+      await expect(dropdown.locator('[role="menuitem"]')).toHaveCount(2)
     })
   })
 
-  test('@ci User menu navigates to Preferences', async ({ page }) => {
+  test('@ci User menu navigates to Profile', async ({ page }) => {
     await test.step('Arrange: login and open user menu', async () => {
       await openApp(page)
       await page.locator(USR.button).click()
       await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
 
-    await test.step('Act: click Preferences', async () => {
-      await page.locator(USR.dropdown).locator(USR.preferencesBtn).click()
+    await test.step('Act: click Profile', async () => {
+      await page.locator(USR.dropdown).locator(USR.profileBtn).click()
     })
 
-    await test.step('Assert: Preferences page shows the profile section', async () => {
+    await test.step('Assert: settings page lists its sections in the sidebar', async () => {
       await expect(page.locator(selectors.settings.page)).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
       await expect(page.locator(selectors.pages.profile)).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
-    })
-  })
-
-  test('@ci User menu navigates to Statistics page', async ({ page }) => {
-    await test.step('Arrange: login and open user menu', async () => {
-      await openApp(page)
-      await page.locator(USR.button).click()
-      await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    })
-
-    await test.step('Act: click Statistics', async () => {
-      await page.locator(USR.dropdown).locator(USR.statisticsBtn).click()
-    })
-
-    await test.step('Assert: Statistics page visible', async () => {
-      await expect(page.locator(selectors.pages.statistics)).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
+      await expect(page.locator('[data-testid="link-sidebar-v2-settings-profile"]')).toBeVisible()
+      await expect(
+        page.locator('[data-testid="link-sidebar-v2-settings-appearance"]')
+      ).toBeVisible()
+      await expect(page.locator('[data-testid="link-sidebar-v2-statistics"]')).toBeVisible()
+      await expect(page.locator('[data-testid="nav-settings-sections"]')).toHaveCount(0)
     })
   })
 })
@@ -399,7 +389,7 @@ test.describe('Navigation: Preferences page controls', () => {
           timeout: TIMEOUTS.SHORT,
         })
         .toBe(targetLang)
-      const expectedTitle = targetLang === 'de' ? 'Einstellungen' : 'Preferences'
+      const expectedTitle = targetLang === 'de' ? 'Sprache & Darstellung' : 'Language & appearance'
       await expect(page.locator(SET.page)).toContainText(expectedTitle)
     })
   })

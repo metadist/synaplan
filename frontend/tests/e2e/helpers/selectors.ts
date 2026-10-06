@@ -355,12 +355,12 @@ export const selectors = {
     dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
     /** Full-screen catcher behind the account menu. Clicking it closes the menu. */
     overlay: '[data-testid="overlay-sidebar-v2-user"]',
-    /** Avatar menu entry for the /settings page — labeled "Preferences" */
-    preferencesBtn: '[data-testid="btn-sidebar-v2-preferences"]',
-    /** Removed with the profile/preferences split. The menu must not grow this row back. */
+    /** Avatar menu entry for the /settings page — labeled "Profile" */
+    preferencesBtn: '[data-testid="btn-sidebar-v2-profile"]',
     profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
-    subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
+    /** PRO accounts: Subscription lives in the profile sidebar, not the account menu. */
+    subscriptionLink: '[data-testid="link-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
     memoriesBtn: '[data-testid="btn-sidebar-v2-memories"]',

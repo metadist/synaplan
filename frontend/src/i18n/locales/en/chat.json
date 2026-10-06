@@ -75,6 +75,7 @@
     "unpin": "Unpin chat",
     "pinSaveFailed": "The pin could not be saved. The chat stays where it was.",
     "stillGenerating": "Still answering",
+    "answerReady": "Answer ready",
     "listOrigin": {
       "web": "Chat",
       "whatsapp": "WhatsApp",

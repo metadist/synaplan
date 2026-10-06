@@ -69,4 +69,25 @@ describe('useNavSections', () => {
     expect(wrapper.vm.sectionKeyForPath('/admin/people')).toBe('operate')
     expect(wrapper.vm.sectionKeyForPath('/profile')).toBeNull()
   })
+
+  it('selects no rail section on profile pages and remembers the previous one', async () => {
+    const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
+    const router = wrapper.vm.$router
+
+    await router.push('/files')
+    await router.isReady()
+    expect(wrapper.vm.activeKey).toBe('library')
+
+    await router.push('/settings/profile')
+    await router.isReady()
+    expect(wrapper.vm.activeKey).toBeNull()
+
+    await router.push('/memories')
+    await router.isReady()
+    expect(wrapper.vm.activeKey).toBeNull()
+
+    await router.push('/not-a-section')
+    await router.isReady()
+    expect(wrapper.vm.activeKey).toBe('library')
+  })
 })

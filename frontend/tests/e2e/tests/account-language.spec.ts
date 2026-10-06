@@ -67,7 +67,7 @@ test.describe('@ci @auth Account language', () => {
       await expect(page.locator('[data-testid="field-language"]')).toHaveCount(0)
       await expect(page.locator('[data-testid="select-language"]')).toHaveCount(0)
 
-      await page.goto('/settings')
+      await page.goto('/settings/appearance')
       // The document language flips before the account PUT returns. A reload
       // in that window aborts the save, so a fresh login still sees German.
       const languageSaved = page.waitForResponse((response) => {

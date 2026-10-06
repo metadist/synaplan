@@ -3,6 +3,8 @@ import { useNotification } from '@/composables/useNotification'
 import { i18n } from '@/i18n/instance'
 import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
+import { chatApi } from '@/services/api/chatApi'
+import { isRecoverableStreamError } from '@/utils/streamError'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
@@ -17,6 +19,19 @@ import { buildChatShareUrl } from '@/utils/urlHelper'
 import { CHAT_HISTORY_PAGE } from '@/components/sidebar/chatHistoryPaging'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
+/** Finished-but-unopened chats, per user. A reload must keep the dot until that chat is opened. */
+const READY_CHAT_STORAGE_PREFIX = 'synaplan_ready_chat_ids_'
+/**
+ * Chats this browser left while the answer was still running. If the tab
+ * closes before the answer lands, the next list load turns them into the
+ * finished dot once the server no longer reports the run.
+ */
+const DEPARTED_RUN_STORAGE_PREFIX = 'synaplan_departed_run_chat_ids_'
+const UNACKNOWLEDGED_CHAT_LIMIT = 40
+/** First half-minute of a dropped background stream, then a slower follow-up. */
+const DETACHED_POLL_FAST_ATTEMPTS = 15
+const DETACHED_POLL_FAST_MS = 2000
+const DETACHED_POLL_SLOW_MS = 8000
 
 /** Page size for the mobile history drawer's infinite scroll. */
 const HISTORY_PAGE_SIZE = 20
@@ -174,8 +189,30 @@ export const useChatsStore = defineStore('chats', () => {
    * can return to and keep watching.
    */
   const activeRunChatIds = ref<Set<number>>(new Set())
+  /**
+   * Chats whose background answer has finished and the user has not opened
+   * them yet. The sidebar keeps a dot, in a different color, until that click.
+   * Stored per user so a reload keeps it.
+   */
+  const readyChatIds = ref<Set<number>>(new Set())
+  /**
+   * Chats the user left while the answer was still running. Not shown on its
+   * own: a still-running one stays on the blue dot, a finished one moves into
+   * `readyChatIds` on the next list load.
+   */
+  const departedChatIds = new Set<number>()
   /** Chats with a pin PATCH in flight. A second toggle waits until the first settles. */
   const pinPendingChatIds = ref<Set<number>>(new Set())
+  /** Quiet re-attach of a turn the user walked away from. Keyed by chat id. */
+  const detachedRunStops = new Map<number, () => void>()
+  /** Bumped to cancel an in-flight poll for that chat. */
+  const detachedPollGeneration = new Map<number, number>()
+  const detachedPollsInFlight = new Set<number>()
+  /**
+   * User whose stored marks are already in memory. `$reset` clears memory
+   * without writing, so a logout cannot wipe the previous account's dots.
+   */
+  let hydratedForUserId: number | null = null
 
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
@@ -331,6 +368,7 @@ export const useChatsStore = defineStore('chats', () => {
         )
         chatsListLoaded = true
         ensureValidActiveChat()
+        reconcileUnacknowledgedChats(true)
       } catch (err: unknown) {
         if (seq !== chatsLoadSeq) {
           return
@@ -370,6 +408,82 @@ export const useChatsStore = defineStore('chats', () => {
    * turn finishes. The chat view drives it live from the stream's own
    * `run_started` and terminal events instead.
    */
+  function storageUserId(): number | null {
+    const getUser = authService.getUser
+    if (typeof getUser !== 'function') return null
+    const id = getUser().value?.id
+    return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null
+  }
+
+  function readStoredChatIds(key: string): Set<number> {
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) return new Set()
+      const parsed: unknown = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return new Set()
+      return new Set(
+        parsed.filter(
+          (id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0
+        )
+      )
+    } catch (error) {
+      console.warn('Unable to read chat marks from storage', error)
+      return new Set()
+    }
+  }
+
+  function writeStoredChatIds(key: string, ids: Set<number>) {
+    try {
+      if (ids.size === 0) {
+        localStorage.removeItem(key)
+        return
+      }
+      localStorage.setItem(key, JSON.stringify([...ids]))
+    } catch (error) {
+      console.warn('Unable to persist chat marks', error)
+    }
+  }
+
+  function trimChatIds(ids: Set<number>) {
+    while (ids.size > UNACKNOWLEDGED_CHAT_LIMIT) {
+      const oldest = ids.values().next().value
+      if (oldest === undefined) return
+      ids.delete(oldest)
+    }
+  }
+
+  function hydrateUnacknowledgedChats() {
+    const userId = storageUserId()
+    if (userId === null || userId === hydratedForUserId) return
+    hydratedForUserId = userId
+    readyChatIds.value = readStoredChatIds(`${READY_CHAT_STORAGE_PREFIX}${userId}`)
+    departedChatIds.clear()
+    for (const id of readStoredChatIds(`${DEPARTED_RUN_STORAGE_PREFIX}${userId}`)) {
+      departedChatIds.add(id)
+    }
+  }
+
+  function persistUnacknowledgedChats() {
+    const userId = storageUserId()
+    if (userId === null || userId !== hydratedForUserId) return
+    writeStoredChatIds(`${READY_CHAT_STORAGE_PREFIX}${userId}`, readyChatIds.value)
+    writeStoredChatIds(`${DEPARTED_RUN_STORAGE_PREFIX}${userId}`, departedChatIds)
+  }
+
+  function rememberDepartedChat(chatId: number) {
+    hydrateUnacknowledgedChats()
+    if (departedChatIds.has(chatId)) return
+    departedChatIds.add(chatId)
+    trimChatIds(departedChatIds)
+    persistUnacknowledgedChats()
+  }
+
+  function forgetDepartedChat(chatId: number) {
+    hydrateUnacknowledgedChats()
+    if (!departedChatIds.delete(chatId)) return
+    persistUnacknowledgedChats()
+  }
+
   function markChatGenerating(chatId: number, generating: boolean) {
     // Replaced rather than mutated: a Set is not deeply reactive, so template
     // reads of activeRunChatIds would not re-render on add/delete alone.
@@ -378,12 +492,200 @@ export const useChatsStore = defineStore('chats', () => {
       liveGeneratingEpoch.set(chatId, chatsLoadSeq)
       liveClearedEpoch.delete(chatId)
       next.add(chatId)
+      dismissReadyChat(chatId)
+      if (activeChatId.value === chatId) forgetDepartedChat(chatId)
     } else {
       liveClearedEpoch.set(chatId, chatsLoadSeq)
       liveGeneratingEpoch.delete(chatId)
       next.delete(chatId)
     }
     activeRunChatIds.value = next
+  }
+
+  function dismissReadyChat(chatId: number) {
+    hydrateUnacknowledgedChats()
+    if (!readyChatIds.value.has(chatId)) return
+    const next = new Set(readyChatIds.value)
+    next.delete(chatId)
+    readyChatIds.value = next
+    persistUnacknowledgedChats()
+  }
+
+  /**
+   * The background turn finished. Drop the "still answering" mark and keep a
+   * quieter dot until the user opens the chat. Opening the chat itself clears
+   * the dot: the person is already looking at the answer.
+   */
+  function markChatAnswerReady(chatId: number) {
+    hydrateUnacknowledgedChats()
+    departedChatIds.delete(chatId)
+    if (activeChatId.value === chatId) {
+      dismissReadyChat(chatId)
+      persistUnacknowledgedChats()
+      markChatGenerating(chatId, false)
+      return
+    }
+    markChatGenerating(chatId, false)
+    const next = new Set(readyChatIds.value)
+    next.add(chatId)
+    trimChatIds(next)
+    readyChatIds.value = next
+    persistUnacknowledgedChats()
+  }
+
+  /**
+   * Apply stored marks to the list the server just returned.
+   *
+   * A chat the user is looking at is acknowledged. A chat they left, whose
+   * run is no longer active, becomes the finished dot. A chat that is running
+   * again loses the finished dot so the blue one wins.
+   *
+   * @param fullList True when `chats` is the complete list. A single menu page
+   *   must not drop a mark for a chat that simply was not on that page.
+   */
+  function reconcileUnacknowledgedChats(fullList: boolean) {
+    hydrateUnacknowledgedChats()
+    const runs = activeRunChatIds.value
+    const openId = activeChatId.value
+    const known = new Set(chats.value.map((chat) => chat.id))
+    const readyNext = new Set(readyChatIds.value)
+    let changed = false
+
+    const acknowledge = (id: number) => {
+      if (departedChatIds.delete(id)) changed = true
+      if (readyNext.delete(id)) changed = true
+    }
+
+    if (openId !== null) acknowledge(openId)
+
+    for (const id of [...departedChatIds]) {
+      if (fullList && !known.has(id)) {
+        departedChatIds.delete(id)
+        changed = true
+        continue
+      }
+      if (runs.has(id)) continue
+      departedChatIds.delete(id)
+      readyNext.add(id)
+      changed = true
+    }
+
+    for (const id of [...readyNext]) {
+      if (runs.has(id) || id === openId || (fullList && !known.has(id))) {
+        if (readyNext.delete(id)) changed = true
+      }
+    }
+    trimChatIds(readyNext)
+    const readyChanged =
+      readyNext.size !== readyChatIds.value.size ||
+      [...readyNext].some((id) => !readyChatIds.value.has(id))
+    if (readyChanged) {
+      readyChatIds.value = readyNext
+      changed = true
+    }
+
+    if (changed) persistUnacknowledgedChats()
+    ensureDepartedPolls()
+  }
+
+  function ensureDepartedPolls() {
+    for (const chatId of departedChatIds) {
+      if (!activeRunChatIds.value.has(chatId)) continue
+      if (chatId === activeChatId.value) continue
+      if (detachedRunStops.has(chatId)) continue
+      if (detachedPollsInFlight.has(chatId)) continue
+      if (!detachedPollGeneration.has(chatId)) detachedPollGeneration.set(chatId, 0)
+      const generation = detachedPollGeneration.get(chatId) ?? 0
+      detachedPollsInFlight.add(chatId)
+      void pollDetachedRun(chatId, generation).finally(() => {
+        detachedPollsInFlight.delete(chatId)
+      })
+    }
+  }
+
+  function stopDetachedRunWatch(chatId?: number) {
+    const ids =
+      chatId === undefined
+        ? new Set<number>([...detachedRunStops.keys(), ...detachedPollGeneration.keys()])
+        : [chatId]
+    for (const id of ids) {
+      detachedRunStops.get(id)?.()
+      detachedRunStops.delete(id)
+      detachedPollGeneration.set(id, (detachedPollGeneration.get(id) ?? 0) + 1)
+    }
+  }
+
+  async function pollDetachedRun(chatId: number, generation: number) {
+    let attempt = 0
+    while (detachedPollGeneration.get(chatId) === generation) {
+      const waitMs =
+        attempt < DETACHED_POLL_FAST_ATTEMPTS ? DETACHED_POLL_FAST_MS : DETACHED_POLL_SLOW_MS
+      attempt += 1
+      await new Promise((resolve) => {
+        setTimeout(resolve, waitMs)
+      })
+      if (detachedPollGeneration.get(chatId) !== generation) return
+      if (activeChatId.value === chatId) return
+      await loadChats()
+      if (detachedPollGeneration.get(chatId) !== generation) return
+      // The list load moves a finished run onto the ready dot. Keep going
+      // only while the server still says this chat is answering.
+      if (!departedChatIds.has(chatId) || !activeRunChatIds.value.has(chatId)) return
+    }
+  }
+
+  /**
+   * Follow a turn after the user left its chat. The visible stream is already
+   * closed; this one only updates the sidebar when the answer lands.
+   */
+  function watchDetachedRun(chatId: number, runId: string) {
+    stopDetachedRunWatch(chatId)
+    rememberDepartedChat(chatId)
+    markLocalTurnFinished(chatId)
+    let stopped = false
+    const stop = chatApi.attachStream({
+      runId,
+      onUpdate: (data) => {
+        if (stopped) return
+        if (typeof data.chatTitle === 'string' && data.chatTitle !== '') {
+          applyChatTitle(chatId, data.chatTitle)
+        }
+        if (data.status !== 'complete' && data.status !== 'error') return
+        stopped = true
+        detachedRunStops.delete(chatId)
+        // The user came back. The open chat owns the dot: a finished turn
+        // clears it, a dropped connection leaves the blue mark for the
+        // visible stream. Neither case paints the "answer ready" dot.
+        if (activeChatId.value === chatId) {
+          if (isRecoverableStreamError(data)) {
+            forgetDepartedChat(chatId)
+            return
+          }
+          if (data.status === 'complete') {
+            markChatAnswerReady(chatId)
+            return
+          }
+          forgetDepartedChat(chatId)
+          markChatGenerating(chatId, false)
+          return
+        }
+        if (isRecoverableStreamError(data)) {
+          ensureDepartedPolls()
+          return
+        }
+        if (data.status === 'complete') {
+          markChatAnswerReady(chatId)
+          bumpChatActivity(chatId)
+          return
+        }
+        forgetDepartedChat(chatId)
+        markChatGenerating(chatId, false)
+      },
+    })
+    detachedRunStops.set(chatId, () => {
+      stopped = true
+      stop()
+    })
   }
 
   /**
@@ -497,6 +799,7 @@ export const useChatsStore = defineStore('chats', () => {
       railHasMore.value = data.hasMore === true
       if (Array.isArray(data.activeRunChatIds)) {
         activeRunChatIds.value = applyLiveRunOverlay(data.activeRunChatIds, chatsLoadSeq)
+        reconcileUnacknowledgedChats(false)
       }
     } catch (err: unknown) {
       if (seq !== railLoadSeq) return
@@ -717,6 +1020,10 @@ export const useChatsStore = defineStore('chats', () => {
     if (chat) {
       chat.title = title
     }
+    const rail = railChats.value.find((c) => c.id === chatId)
+    if (rail && rail !== chat) {
+      rail.title = title
+    }
   }
 
   async function deleteChat(chatId: number, silent: boolean = false) {
@@ -731,6 +1038,9 @@ export const useChatsStore = defineStore('chats', () => {
 
       const wasActiveChat = activeChatId.value === chatId
       locallyCreatedIds.delete(chatId)
+      stopDetachedRunWatch(chatId)
+      dismissReadyChat(chatId)
+      forgetDepartedChat(chatId)
       chats.value = chats.value.filter((c) => c.id !== chatId)
       removedChatIds.add(chatId)
       forgetRailChat(chatId)
@@ -886,6 +1196,8 @@ export const useChatsStore = defineStore('chats', () => {
 
   function setActiveChat(chatId: number) {
     updateActiveChatSelection(chatId)
+    dismissReadyChat(chatId)
+    forgetDepartedChat(chatId)
   }
 
   /**
@@ -1025,6 +1337,7 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   function $reset() {
+    stopDetachedRunWatch()
     localTurnCompletions.clear()
     chats.value = []
     conversationAccess.value = null
@@ -1036,6 +1349,10 @@ export const useChatsStore = defineStore('chats', () => {
     liveGeneratingEpoch.clear()
     liveClearedEpoch.clear()
     activeRunChatIds.value = new Set()
+    readyChatIds.value = new Set()
+    departedChatIds.clear()
+    detachedPollsInFlight.clear()
+    hydratedForUserId = null
     pinPendingChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
@@ -1072,8 +1389,11 @@ export const useChatsStore = defineStore('chats', () => {
     loadRailChats,
     isLocallyCreated,
     activeRunChatIds,
+    readyChatIds,
     pinPendingChatIds,
     markChatGenerating,
+    watchDetachedRun,
+    stopDetachedRunWatch,
     loadChats,
     loadChatHistory,
     createChat,

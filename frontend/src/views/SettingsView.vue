@@ -1,19 +1,13 @@
 <template>
   <MainLayout>
     <div class="min-h-full bg-chat px-4 py-6 md:px-8 md:py-8" data-testid="page-settings">
-      <!--
-        Centered in the pane beside the desktop sidebar at every width.
-        A viewport `md` row starts at the same 768px that reveals the sidebar,
-        so the form used to sit in a right-hand column a fixed distance from
-        the menu. Container queries below follow this column, not the window.
-      -->
       <div
         class="@container mx-auto w-full max-w-3xl space-y-6"
         data-testid="section-settings-column"
       >
         <PageHeader
-          :title="$t('settings.title')"
-          :subtitle="$t('settings.subtitle')"
+          :title="pageTitle"
+          :subtitle="pageSubtitle"
           icon="heroicons:cog-6-tooth"
           data-testid="section-header"
         />
@@ -28,11 +22,29 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsSections } from '@/composables/useSettingsSections'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SettingsAppearanceSection from '@/components/settings/SettingsAppearanceSection.vue'
 import SettingsAccountPage from '@/components/settings/SettingsAccountPage.vue'
 
+const { t } = useI18n()
+const route = useRoute()
 const authStore = useAuthStore()
+const { sections } = useSettingsSections()
+
+const pageTitle = computed(() => {
+  if (!authStore.isAuthenticated) return t('settings.title')
+  const slug = typeof route.params.section === 'string' ? route.params.section : 'profile'
+  const match = sections.value.find((item) => item.slug === slug)
+  return match ? t(match.labelKey) : t('settings.sections.profile')
+})
+
+const pageSubtitle = computed(() =>
+  authStore.isAuthenticated ? undefined : t('settings.subtitle')
+)
 </script>

@@ -33,6 +33,7 @@ import {
 } from '@/i18n'
 import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
+import { normalizeSettingsRoute, settingsLocationFor } from '@/composables/useSettingsSections'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
 import { desktopRouteGuard, savedTasksRouteGuard } from '@/router/featureSurfaceGuards'
 import { aiAccountsRouteGuard } from '@/composables/useAiAccounts'
@@ -93,14 +94,7 @@ export function brandName(): string {
  * A `redirect` record would skip the auth guard, so this runs from beforeEnter.
  */
 function profileToSettings(to: RouteLocationNormalized): RouteLocationRaw {
-  if (to.query.highlight === 'memories' || to.hash === '#memories') {
-    return { path: '/settings', hash: '#memories' }
-  }
-  if (to.query.tab === 'subscription') {
-    return { path: '/settings', hash: '#billing' }
-  }
-  const hash = to.hash && to.hash !== '#' ? to.hash : '#profile'
-  return { path: '/settings', hash }
+  return settingsLocationFor(to)
 }
 
 const router = createRouter({
@@ -615,12 +609,19 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.allChats', i18n: ['chat', 'files'] },
     },
     {
-      // Theme stays on the device. Language is also saved on the account from
-      // this page. Guests see language and theme only; signed-in sections
-      // mount with the profile form.
+      // Bare /settings and old hashes (#profile, #memories, #app) pick a section.
       path: '/settings',
       name: 'settings',
+      redirect: (to) => settingsLocationFor(to),
+    },
+    {
+      // Theme stays on the device. Language is also saved on the account from
+      // this page. Guests only reach appearance; each signed-in section is its
+      // own page, listed in the profile sidebar.
+      path: '/settings/:section',
+      name: 'settings-section',
       component: () => import('@/views/SettingsView.vue'),
+      beforeEnter: (to) => normalizeSettingsRoute(to),
       meta: {
         requiresAuth: false,
         titleKey: 'pageTitles.settings',

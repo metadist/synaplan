@@ -826,7 +826,7 @@ const handleNavigate = async (path: string) => {
 const handleOpenMemories = () => {
   closeDrawer()
   if (!memoriesEnabledForUser.value) {
-    router.push('/settings#memories')
+    router.push('/settings/chat?highlight=memories')
     return
   }
   // Navigate to the dedicated memories page instead of opening a modal — the

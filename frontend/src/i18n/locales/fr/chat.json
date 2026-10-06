@@ -75,6 +75,7 @@
     "unpin": "Retirer l'épingle",
     "pinSaveFailed": "L'épingle n'a pas pu être enregistrée. Le chat reste où il était.",
     "stillGenerating": "Réponse en cours",
+    "answerReady": "Réponse prête",
     "listOrigin": {
       "web": "Chat",
       "whatsapp": "WhatsApp",

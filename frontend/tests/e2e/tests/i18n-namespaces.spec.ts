@@ -48,10 +48,9 @@ test.describe('i18n namespace split', () => {
   })
 
   test('@ci Language switch replaces visible Preferences copy', async ({ page }) => {
-    await page.goto('/settings')
+    await page.goto('/settings/appearance')
     await expect(page.locator(SET.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expect(page.locator(SET.page)).toContainText('Preferences')
-    await expect(page.locator(SET.page)).toContainText('Export & import')
+    await expect(page.locator(SET.page)).toContainText('Language')
     await expect(page.locator(SET.page)).not.toContainText('bundle.title')
 
     await page.locator(SET.btnLanguage('de')).click()
@@ -60,8 +59,7 @@ test.describe('i18n namespace split', () => {
         timeout: TIMEOUTS.SHORT,
       })
       .toBe('de')
-    await expect(page.locator(SET.page)).toContainText('Einstellungen')
-    await expect(page.locator(SET.page)).toContainText('Exportieren & importieren')
+    await expect(page.locator(SET.page)).toContainText('Sprache & Darstellung')
     await expect(page.locator(SET.page)).not.toContainText('settings.title')
     await expect(page.locator(SET.page)).not.toContainText('bundle.title')
 

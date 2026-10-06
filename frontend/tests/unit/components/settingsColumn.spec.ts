@@ -4,7 +4,6 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import SettingsAccountPage from '@/components/settings/SettingsAccountPage.vue'
-import SettingsSectionIndex from '@/components/settings/SettingsSectionIndex.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -29,14 +28,20 @@ vi.mock('@/services/api/nativeServer', () => ({
 }))
 
 describe('settings column', () => {
-  it('centers one column instead of a side-by-side row', () => {
+  it('centers one column instead of a side-by-side row', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     useAuthStore().user = null
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/settings/:section', component: { template: '<div />' } }],
+    })
+    await router.push('/settings/appearance')
+    await router.isReady()
 
     const wrapper = mount(SettingsView, {
       global: {
-        plugins: [pinia],
+        plugins: [pinia, router],
         stubs: {
           MainLayout: { template: '<div><slot /></div>' },
           PageHeader: true,
@@ -47,21 +52,28 @@ describe('settings column', () => {
     })
 
     const column = wrapper.get('[data-testid="section-settings-column"]')
-    expect(column.classes()).toEqual(expect.arrayContaining(['mx-auto', 'w-full', 'max-w-3xl']))
-    expect(column.classes().join(' ')).toContain('@container')
+    expect(column.classes()).toEqual(
+      expect.arrayContaining(['mx-auto', 'w-full', 'max-w-3xl', '@container'])
+    )
     expect(wrapper.html()).not.toContain('md:flex-row')
+    expect(wrapper.html()).not.toContain('nav-settings-sections')
     wrapper.unmount()
   })
 
-  it('stacks the section index above the form', () => {
+  it('shows one settings section and no in-page index', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/settings/:section', component: { template: '<div />' } }],
+    })
+    await router.push('/settings/profile')
+    await router.isReady()
 
     const wrapper = mount(SettingsAccountPage, {
       global: {
-        plugins: [pinia],
+        plugins: [pinia, router],
         stubs: {
-          SettingsSectionIndex: { template: '<nav data-testid="nav-settings-sections" />' },
           UnsavedChangesBar: true,
           NativeServerControl: true,
           ProfilePersonalSection: true,
@@ -79,29 +91,9 @@ describe('settings column', () => {
 
     const root = wrapper.get('div')
     expect(root.classes()).not.toContain('md:flex-row')
-    expect(root.classes()).toContain('space-y-6')
-    const index = wrapper.get('[data-testid="nav-settings-sections"]')
-    expect(root.element.firstElementChild).toBe(index.element)
-    wrapper.unmount()
-  })
-
-  it('does not stick the section index under the phone menu button', async () => {
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [{ path: '/', component: { template: '<div />' } }],
-    })
-    await router.push('/')
-    await router.isReady()
-
-    const wrapper = mount(SettingsSectionIndex, {
-      props: { items: [{ id: 'profile', labelKey: 'settings.sections.profile' }] },
-      global: { plugins: [router] },
-    })
-
-    const nav = wrapper.get('[data-testid="nav-settings-sections"]')
-    expect(nav.classes()).toContain('settings-section-index')
-    expect(nav.classes()).not.toContain('sticky')
-    expect(nav.classes()).not.toContain('top-0')
+    expect(wrapper.find('[data-testid="nav-settings-sections"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="page-profile"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-language-settings"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })

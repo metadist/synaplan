@@ -36,9 +36,13 @@ vi.mock('@/stores/auth', () => ({
   }),
 }))
 
-vi.mock('@/services/api/userMemoriesApi', () => ({
-  getCategories: vi.fn().mockResolvedValue([{ category: 'preferences', count: 1 }]),
-}))
+vi.mock('@/services/api/userMemoriesApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api/userMemoriesApi')>()
+  return {
+    ...actual,
+    getCategories: vi.fn().mockResolvedValue([{ category: 'preferences', count: 1 }]),
+  }
+})
 
 vi.mock('@/services/api', () => ({
   profileApi: { updateProfile: vi.fn() },

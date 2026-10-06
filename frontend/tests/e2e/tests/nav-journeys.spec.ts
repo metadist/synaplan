@@ -17,7 +17,6 @@ import { FIXTURE_PATHS } from '../config/test-data'
 import { TIMEOUTS, getApiUrl } from '../config/config'
 
 const NAV = selectors.nav
-const USR = selectors.userMenu
 const CHAT = selectors.chat
 const MEM = selectors.memories
 const ADMIN = selectors.admin
@@ -289,11 +288,9 @@ test.describe('@ci Navigation journeys', () => {
     const key = `nv09_mem_${Date.now()}`
     const chat = new ChatHelper(page)
 
-    await test.step('Account › Memories opens the page, not a dialog', async () => {
+    await test.step('Memories opens the page, not a dialog', async () => {
       await openApp(page)
-      await page.locator(USR.button).click()
-      await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await page.locator(USR.memoriesBtn).click({ timeout: TIMEOUTS.STANDARD })
+      await page.goto('/memories')
       await expect(page).toHaveURL(/\/memories/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(MEM.page)).toBeVisible()
       await expect(page.locator('[data-testid="modal-memories-dialog"]')).toHaveCount(0)
@@ -314,6 +311,7 @@ test.describe('@ci Navigation journeys', () => {
       const memoryId = await row.first().getAttribute('data-memory-id')
       expect(memoryId).toBeTruthy()
 
+      await page.goto('/')
       await chat.startNewChat()
       await expect(page.locator(CHAT.textInput)).toBeVisible()
       await page.goto(`/memories?highlight=${memoryId}`)
