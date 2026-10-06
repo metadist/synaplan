@@ -68,7 +68,7 @@ ENV BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
 # The base image enables opcache.huge_code_pages. On arm64 CPUs with Branch
 # Target Identification (seen on Apple Silicon under Colima) a few percent of
 # all PHP starts then die with SIGILL in php_module_startup, so off on arm64.
-# TODO: switch it off in synaplan-base-php and drop this layer.
+# TODO: drop this layer once metadist/synaplan-base-php#17 ships.
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
         printf 'opcache.huge_code_pages = 0\n' > /usr/local/etc/php/conf.d/21-synaplan-arm64.ini; \
     fi
