@@ -351,23 +351,24 @@ if [ "${SEED_DEMO_DATA:-true}" != "true" ]; then
     echo "⏭️  SEED_DEMO_DATA=${SEED_DEMO_DATA} → skipping demo user fixtures."
     echo "   🧭 An empty database starts in first-run setup: open http://localhost:5173/setup"
 elif [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
-    # If marker exists but DB is empty (e.g. tmpfs wipe, or marker on host volume after down/up), remove stale marker so we load fixtures
-    if [ -f "$FIXTURES_MARKER" ]; then
-        _uc=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
-        if [ "${_uc:-0}" -eq 0 ]; then
-            rm -f "$FIXTURES_MARKER" 2>/dev/null || true
-        fi
+    # A marker on an empty DB (tmpfs wipe, marker on a host volume after
+    # down/up) is stale, so fixtures load again. doctrine:fixtures:load purges
+    # every entity table: only a count that actually answered 0 may trigger it,
+    # and a failed count query skips the step.
+    USER_COUNT=$(_count_sql "SELECT COUNT(*) as count FROM BUSER") || USER_COUNT=""
+
+    if [ -f "$FIXTURES_MARKER" ] && [ "$USER_COUNT" = "0" ]; then
+        rm -f "$FIXTURES_MARKER" 2>/dev/null || true
     fi
 
-    if [ -f "$FIXTURES_MARKER" ]; then
+    if [ -z "$USER_COUNT" ]; then
+        echo "⚠️  Could not count users — skipping demo user fixtures so no data is purged."
+        echo "   💡 Retry with: docker compose restart backend"
+    elif [ -f "$FIXTURES_MARKER" ]; then
         echo "✅ Demo user fixtures already loaded (marker present)"
         echo "   👤 Login: admin@synaplan.com / admin123"
         echo "   💡 To reload: rm backend/var/.fixtures_loaded && docker compose restart backend"
     else
-        # Check if users actually exist in database (not just marker file)
-        USER_COUNT=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
-        USER_COUNT=${USER_COUNT:-0}
-
         if [ "$USER_COUNT" -eq 0 ]; then
             echo "🌱 Loading demo user fixtures (current users: $USER_COUNT)..."
             # Note: Not using --purge-with-truncate because TRUNCATE fails with foreign key constraints
