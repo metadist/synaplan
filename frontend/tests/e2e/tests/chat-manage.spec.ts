@@ -17,9 +17,11 @@ test.describe('@ci Chat Management', () => {
 
     await test.step('Arrange: open app and start a fresh chat', async () => {
       await openApp(page)
-      // The fresh chat is the newest entry → guaranteed first row in the
-      // manager (sorted by activity, newest first).
+      // An untouched New Chat stays out of the sidebar until the user has
+      // written. One sent message puts this chat in the list as the newest
+      // row (sorted by activity), without waiting for the answer.
       await chat.startNewChat()
+      await chat.sendMessage('Rename this chat')
     })
 
     await test.step('Act: rename the newest chat via the row menu', async () => {
