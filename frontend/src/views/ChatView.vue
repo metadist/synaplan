@@ -1945,7 +1945,14 @@ watch(
 // finishes in the background and is restored by loadMessages() on return.
 // Explicit cancellation stays in handleUserStop() (the Stop button).
 function handleNavigateAway() {
+  const runId = attachedRunId
+  const chatId = generatingChatId
   finishStreamingTurnLocally()
+  // The visible stream is gone, but the turn keeps running. Follow it quietly
+  // so the sidebar dot and the generated title update when it finishes.
+  if (!isGuestMode.value && !incognitoStore.active && runId && chatId) {
+    chatsStore.watchDetachedRun(chatId, runId)
+  }
 }
 
 /**
@@ -2007,6 +2014,11 @@ function clearGeneratingMark() {
  * itself instead of leaving the user on a bare prompt until it is persisted.
  */
 async function resumeActiveRunIfAny() {
+  // This view is about to render the turn itself. Drop the quiet watcher
+  // first so the same run is not attached twice.
+  if (chatsStore.activeChatId) {
+    chatsStore.stopDetachedRunWatch(chatsStore.activeChatId)
+  }
   const run = isGuestMode.value ? guestStore.activeRun : historyStore.activeRun
   if (!run) return
 

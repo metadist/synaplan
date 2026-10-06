@@ -1,82 +1,70 @@
 <template>
   <div class="space-y-6">
-    <SettingsSectionIndex :items="sections" />
-
-    <div class="min-w-0 space-y-6">
-      <form
-        class="space-y-6"
-        autocomplete="off"
-        data-testid="comp-profile-form"
-        :aria-busy="loading"
-        @submit.prevent="handleSave"
+    <div
+      v-if="sectionNeedsProfile && profileLoadFailed"
+      class="surface-card rounded-lg p-6"
+      role="alert"
+      data-testid="state-profile-load-failed"
+    >
+      <p class="txt-primary text-sm">{{ $t('profile.loadFailed') }}</p>
+      <button
+        type="button"
+        class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        data-testid="btn-profile-retry"
+        :disabled="loading"
+        @click="loadProfile"
       >
-        <div id="profile" class="scroll-mt-24 space-y-6" data-testid="page-profile">
-          <p
-            v-if="loading && !profileLoaded"
-            class="txt-secondary text-sm"
-            data-testid="state-profile-loading"
-          >
-            {{ $t('profile.loading') }}
-          </p>
-
-          <div
-            v-else-if="profileLoadFailed"
-            class="surface-card rounded-lg p-6"
-            role="alert"
-            data-testid="state-profile-load-failed"
-          >
-            <p class="txt-primary text-sm">{{ $t('profile.loadFailed') }}</p>
-            <button
-              type="button"
-              class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="btn-profile-retry"
-              :disabled="loading"
-              @click="loadProfile"
-            >
-              {{ $t('common.retry') }}
-            </button>
-          </div>
-
-          <fieldset
-            v-show="!profileLoadFailed"
-            :disabled="!profileLoaded"
-            class="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-60"
-          >
-            <ProfilePersonalSection />
-            <ProfileCompanySection />
-          </fieldset>
-        </div>
-
-        <SettingsAppearanceSection />
-        <SettingsChatSection />
-        <SettingsDataSection />
-
-        <fieldset
-          v-show="!profileLoadFailed"
-          :disabled="!profileLoaded"
-          class="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-60"
-        >
-          <ProfileBillingSection v-if="showBilling" />
-          <ProfileSecuritySection />
-        </fieldset>
-
-        <!-- Outside the disabled fieldset. Enter saves the server, not the profile. -->
-        <section v-if="showApp" id="app-server" class="scroll-mt-24" @keydown.enter.prevent>
-          <NativeServerControl />
-        </section>
-
-        <fieldset
-          v-show="!profileLoadFailed"
-          :disabled="!profileLoaded"
-          class="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-60"
-        >
-          <ProfileLegalSection />
-          <ProfileDeleteSection />
-        </fieldset>
-
-        <div class="h-20"></div>
-      </form>
+        {{ $t('common.retry') }}
+      </button>
     </div>
+
+    <form
+      v-else
+      class="@container space-y-6"
+      autocomplete="off"
+      data-testid="comp-profile-form"
+      :aria-busy="loading"
+      @submit.prevent="handleSave"
+    >
+      <div v-if="section === 'profile'" id="profile" class="space-y-6" data-testid="page-profile">
+        <p
+          v-if="loading && !profileLoaded"
+          class="txt-secondary text-sm"
+          data-testid="state-profile-loading"
+        >
+          {{ $t('profile.loading') }}
+        </p>
+
+        <fieldset
+          v-else
+          :disabled="!profileLoaded"
+          class="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-60"
+        >
+          <ProfilePersonalSection />
+          <ProfileCompanySection />
+        </fieldset>
+      </div>
+
+      <SettingsAppearanceSection v-else-if="section === 'appearance'" />
+      <SettingsChatSection v-else-if="section === 'chat'" />
+      <SettingsDataSection v-else-if="section === 'data'" />
+      <ProfileBillingSection v-else-if="section === 'billing'" />
+      <fieldset
+        v-else-if="section === 'security'"
+        :disabled="!profileLoaded"
+        class="space-y-6 border-0 p-0 m-0 min-w-0 disabled:opacity-60"
+      >
+        <ProfileSecuritySection />
+      </fieldset>
+
+      <!-- Outside a disabled fieldset. Enter saves the server, not the profile. -->
+      <section v-else-if="section === 'app'" id="app-server" @keydown.enter.prevent>
+        <NativeServerControl />
+      </section>
+
+      <ProfileLegalSection v-else-if="section === 'legal'" />
+      <ProfileDeleteSection v-else-if="section === 'delete'" />
+    </form>
   </div>
 
   <UnsavedChangesBar
@@ -88,14 +76,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useConfigStore } from '@/stores/config'
-import { isNativeServerControlAvailable, isPurchaseAllowed } from '@/services/api/nativeServer'
+import { useRoute } from 'vue-router'
 import { provideProfileSettings } from '@/composables/useProfileSettings'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import NativeServerControl from '@/components/NativeServerControl.vue'
-import SettingsSectionIndex, {
-  type SettingsSectionLink,
-} from '@/components/settings/SettingsSectionIndex.vue'
 import SettingsAppearanceSection from '@/components/settings/SettingsAppearanceSection.vue'
 import SettingsChatSection from '@/components/settings/SettingsChatSection.vue'
 import SettingsDataSection from '@/components/settings/SettingsDataSection.vue'
@@ -106,10 +90,7 @@ import ProfileSecuritySection from '@/components/settings/ProfileSecuritySection
 import ProfileLegalSection from '@/components/settings/ProfileLegalSection.vue'
 import ProfileDeleteSection from '@/components/settings/ProfileDeleteSection.vue'
 
-const config = useConfigStore()
-const purchaseAllowed = isPurchaseAllowed()
-const showApp = isNativeServerControlAvailable()
-const showBilling = computed(() => config.billing.enabled && purchaseAllowed)
+const route = useRoute()
 
 const {
   loading,
@@ -121,29 +102,12 @@ const {
   handleDiscard,
 } = provideProfileSettings()
 
-const sections = computed<SettingsSectionLink[]>(() => {
-  const failed = profileLoadFailed.value
-  const items: SettingsSectionLink[] = [
-    { id: 'profile', labelKey: 'settings.sections.profile' },
-    { id: 'appearance', labelKey: 'settings.sections.appearance' },
-    { id: 'chat', labelKey: 'settings.sections.chat' },
-    { id: 'data', labelKey: 'settings.sections.data' },
-  ]
-  if (!failed && showBilling.value) {
-    items.push({ id: 'billing', labelKey: 'settings.sections.billing' })
-  }
-  if (!failed) {
-    items.push({ id: 'security', labelKey: 'settings.sections.security' })
-  }
-  if (showApp) {
-    items.push({ id: 'app-server', labelKey: 'settings.sections.app' })
-  }
-  if (!failed) {
-    items.push(
-      { id: 'legal', labelKey: 'settings.sections.legal' },
-      { id: 'delete', labelKey: 'settings.sections.delete' }
-    )
-  }
-  return items
+const section = computed(() => {
+  const param = route.params.section
+  return typeof param === 'string' ? param : 'profile'
 })
+
+const sectionNeedsProfile = computed(() =>
+  ['profile', 'billing', 'security', 'legal', 'delete'].includes(section.value)
+)
 </script>

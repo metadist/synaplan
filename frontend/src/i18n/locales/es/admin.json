@@ -1055,7 +1055,7 @@
       "sourceGroup": "Este chat pertenece a {owner}. Le llegó a través del grupo \"{name}\".",
       "sourceEveryone": "Este chat pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
       "sourceDirect": "Este chat pertenece a {owner}. Se compartió con usted personalmente.",
-      "emptyText": "Cuando alguien comparta un chat contigo o con uno de tus grupos, aparecerá aquí.",
+      "emptyText": "No hay chats entrantes",
       "filter": {
         "label": "Filtrar chats",
         "all": "Todos",

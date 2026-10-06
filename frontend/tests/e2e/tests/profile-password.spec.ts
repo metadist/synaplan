@@ -23,7 +23,7 @@ test.describe('@ci Profile Password Change', () => {
     })
 
     try {
-      await test.step('Act: change the password on the profile page', async () => {
+      await test.step('Act: change the password on the security page', async () => {
         let releaseProfile: () => void = () => {}
         const profileArrived = new Promise<void>((resolve) => {
           releaseProfile = resolve
@@ -36,16 +36,13 @@ test.describe('@ci Profile Password Change', () => {
           await route.continue()
         })
 
-        await page.goto('/profile')
+        await page.goto('/settings/security')
         const currentPassword = page.locator(selectors.profile.inputCurrentPassword)
         await currentPassword.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
         await expect(currentPassword).toBeDisabled()
         await expect(page.locator(selectors.unsavedBar.save)).toHaveCount(0)
         releaseProfile()
 
-        await expect(page.locator(selectors.profile.inputEmail)).toHaveValue(email, {
-          timeout: TIMEOUTS.STANDARD,
-        })
         await expect(currentPassword).toBeEnabled()
         await page.locator(selectors.profile.inputCurrentPassword).fill(oldPassword)
         await page.locator(selectors.profile.inputNewPassword).fill(newPassword)

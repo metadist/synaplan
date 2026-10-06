@@ -189,7 +189,9 @@ export function useProfileSettings() {
         shouldHighlight.value = false
       }, 3000)
       if (route.query.highlight) {
-        await router.replace({ path: route.path, hash: '#memories', query: {} })
+        const nextQuery = { ...route.query }
+        delete nextQuery.highlight
+        await router.replace({ path: route.path, query: nextQuery })
       }
       return
     }

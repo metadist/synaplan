@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="isGuest"
-    class="flex flex-col gap-3 px-3 pt-2"
+    class="flex flex-col gap-3 px-4 pt-2"
     data-testid="section-sidebar-chats-guest"
   >
     <p class="text-sm txt-secondary">{{ $t('guest.banner.subtitle') }}</p>
@@ -14,7 +14,7 @@
     </router-link>
   </div>
   <div v-else data-testid="section-sidebar-chats" :data-chats-loading="chatsLoading">
-    <div class="sticky top-0 z-10 bg-[var(--bg-sidebar)] px-3 pt-2 pb-2">
+    <div class="sticky top-0 z-10 bg-[var(--bg-sidebar)] px-4 pt-2 pb-2">
       <button
         type="button"
         class="btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium min-h-11"
@@ -64,10 +64,10 @@
           <UserGroupIcon class="w-4 h-4" aria-hidden="true" />
         </router-link>
       </div>
-      <div v-show="incomingExpanded" id="sidebar-incoming-list" class="px-1">
+      <div v-show="incomingExpanded" id="sidebar-incoming-list" class="px-2">
         <p
           v-if="incomingChatList.length === 0"
-          class="px-3 py-2 text-sm txt-secondary"
+          class="sidebar-empty-hint px-3 py-2 text-sm"
           data-testid="text-sidebar-v2-incoming-empty"
         >
           {{ $t('iam.incoming.emptyText') }}
@@ -80,6 +80,7 @@
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
+          :answer-ready="isAnswerReady"
           @select="selectChat"
           @share="shareChat"
           @rename="renameChat"
@@ -103,7 +104,7 @@
           <ChevronDownIcon :class="chevronClass(pinnedExpanded)" aria-hidden="true" />
         </button>
       </div>
-      <div v-show="pinnedExpanded" id="sidebar-pinned-list" class="px-1">
+      <div v-show="pinnedExpanded" id="sidebar-pinned-list" class="px-2">
         <ChatHistoryList
           :chats="pinnedChats"
           list-test-id="list-chat-v2-pinned"
@@ -111,6 +112,7 @@
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
+          :answer-ready="isAnswerReady"
           @select="selectChat"
           @share="shareChat"
           @rename="renameChat"
@@ -144,13 +146,14 @@
         </router-link>
       </div>
 
-      <div v-show="chatsExpanded" id="sidebar-chat-list" class="px-1">
+      <div v-show="chatsExpanded" id="sidebar-chat-list" class="px-2">
         <ChatHistoryList
           :chats="unpinnedChats"
           :active-chat-id="chatsStore.activeChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
+          :answer-ready="isAnswerReady"
           :group-of="dateGroupLabel"
           @select="selectChat"
           @share="shareChat"
@@ -160,8 +163,8 @@
         >
           <template #empty>
             <p
-              v-if="chatsReady"
-              class="px-3 py-2 text-sm txt-secondary"
+              v-if="chatsReady && pinnedChats.length === 0"
+              class="sidebar-empty-hint px-3 py-2 text-sm"
               data-testid="text-sidebar-v2-chats-empty"
             >
               {{ $t('nav.chatsEmpty') }}
@@ -202,6 +205,7 @@ const {
   displayTitle,
   formatTimestamp,
   isGenerating,
+  isAnswerReady,
   createChat,
   selectChat,
   renameChat,
@@ -233,7 +237,7 @@ const rememberExpanded = (key: string, open: boolean) => {
 }
 
 const sectionToggleClass =
-  'mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-3 py-1 text-left text-[13px] font-semibold txt-secondary hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'
+  'sidebar-section-label mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-4 py-1 text-left text-[15px] font-semibold hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'
 
 const sectionChevronBase =
   'h-3.5 w-3.5 flex-shrink-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none'
@@ -248,7 +252,7 @@ const chevronClass = (expanded: boolean): string =>
     : `${sectionChevronBase} -rotate-90 opacity-100`
 
 const sectionSideLinkClass =
-  'absolute right-2 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary transition-opacity hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]'
+  'absolute right-3 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary transition-opacity hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]'
 
 const sectionHoverLinkClass =
   sectionSideLinkClass +
@@ -367,3 +371,24 @@ onMounted(() => {
   void refreshChats()
 })
 </script>
+
+<style scoped>
+/* Empty hint is the darkest ink. Section labels sit between it and the
+   lighter chat titles (#3b4353 / #cdd1da). Both stay above WCAG AA on the
+   list column. */
+.sidebar-empty-hint {
+  color: #293141;
+}
+
+.sidebar-section-label {
+  color: #2d3545;
+}
+
+.dark .sidebar-empty-hint {
+  color: #a7afbe;
+}
+
+.dark .sidebar-section-label {
+  color: #b0b7c4;
+}
+</style>

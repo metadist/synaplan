@@ -101,7 +101,8 @@ export function useChatHistory() {
     return sidebarChats.value
       .filter((chat) => {
         if (chat.widgetSession) return false
-        if (chat.id === chatsStore.activeChatId) return true
+        // New Chat stays out of the list until the user has written something,
+        // including while that empty chat is the one open now.
         const isEmpty =
           (!chat.messageCount || chat.messageCount === 0) &&
           !chat.firstMessagePreview &&
@@ -163,6 +164,7 @@ export function useChatHistory() {
   const formatTimestamp = (dateStr: string): string => formatRelativeTime(new Date(dateStr))
 
   const isGenerating = (chat: StoreChat): boolean => chatsStore.activeRunChatIds.has(chat.id)
+  const isAnswerReady = (chat: StoreChat): boolean => chatsStore.readyChatIds.has(chat.id)
 
   const channelIcon = (chat: StoreChat): string | null => {
     switch (chat.source) {
@@ -276,6 +278,7 @@ export function useChatHistory() {
     displayTitle,
     formatTimestamp,
     isGenerating,
+    isAnswerReady,
     channelIcon,
     channelIconClass,
     createChat,

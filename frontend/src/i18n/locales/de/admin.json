@@ -1059,7 +1059,7 @@
       "sourceGroup": "Dieser Chat gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
       "sourceEveryone": "Dieser Chat gehört {owner}. Er wurde mit allen geteilt, die ein Konto haben.",
       "sourceDirect": "Dieser Chat gehört {owner}. Er wurde persönlich mit Ihnen geteilt.",
-      "emptyText": "Wenn jemand einen Chat mit dir oder einer deiner Gruppen teilt, erscheint er hier.",
+      "emptyText": "Keine eingehenden Chats",
       "filter": {
         "label": "Chats filtern",
         "all": "Alle",

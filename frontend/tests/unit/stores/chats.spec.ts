@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick, ref } from 'vue'
 import { useChatsStore } from '@/stores/chats'
+import { chatApi } from '@/services/api/chatApi'
+import type { StreamUpdatePayload } from '@/types/chatStream'
 
 vi.mock('@/services/authService', () => ({
   authService: {
@@ -1101,6 +1103,37 @@ describe('Chats Store', () => {
 
       expect(store.activeRunChatIds.has(7)).toBe(false)
       expect(store.activeRunChatIds).not.toBe(marked)
+    })
+
+    it('updates the sidebar when a detached run finishes', () => {
+      const store = useChatsStore()
+      store.chats = [
+        {
+          id: 4,
+          title: 'New Chat',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          messageCount: 1,
+          source: 'web',
+        },
+      ]
+      store.markChatGenerating(4, true)
+      const updates: Array<(data: StreamUpdatePayload) => void> = []
+      vi.spyOn(chatApi, 'attachStream').mockImplementation((opts) => {
+        updates.push(opts.onUpdate)
+        return () => {}
+      })
+
+      store.watchDetachedRun(4, 'run-4')
+      updates[0]?.({ status: 'complete', chatTitle: 'Weather in Düsseldorf' })
+
+      expect(store.activeRunChatIds.has(4)).toBe(false)
+      expect(store.readyChatIds.has(4)).toBe(true)
+      expect(store.chats[0]?.title).toBe('Weather in Düsseldorf')
+      expect(store.chats[0]?.messageCount).toBe(2)
+
+      store.setActiveChat(4)
+      expect(store.readyChatIds.has(4)).toBe(false)
     })
 
     it('keeps the other chats when one turn ends', async () => {

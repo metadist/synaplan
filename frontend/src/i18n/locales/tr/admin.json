@@ -1055,7 +1055,7 @@
       "sourceGroup": "Bu sohbet {owner} adlı kişiye ait. Size \"{name}\" grubu üzerinden ulaştı.",
       "sourceEveryone": "Bu sohbet {owner} adlı kişiye ait. Hesabı olan herkesle paylaşıldı.",
       "sourceDirect": "Bu sohbet {owner} adlı kişiye ait. Sizinle kişisel olarak paylaşıldı.",
-      "emptyText": "Biri sizinle veya gruplarınızdan biriyle bir sohbet paylaştığında burada görünür.",
+      "emptyText": "Gelen sohbet yok",
       "filter": {
         "label": "Sohbetleri filtrele",
         "all": "Tümü",

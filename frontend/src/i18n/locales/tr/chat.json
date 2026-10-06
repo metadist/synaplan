@@ -75,6 +75,7 @@
     "unpin": "Sabitlemeyi kaldır",
     "pinSaveFailed": "Sabitleme kaydedilemedi. Sohbet olduğu yerde kalır.",
     "stillGenerating": "Hâlâ yanıtlıyor",
+    "answerReady": "Yanıt hazır",
     "listOrigin": {
       "web": "Chat",
       "whatsapp": "WhatsApp",

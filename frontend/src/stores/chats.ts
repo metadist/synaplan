@@ -3,6 +3,8 @@ import { useNotification } from '@/composables/useNotification'
 import { i18n } from '@/i18n/instance'
 import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
+import { chatApi } from '@/services/api/chatApi'
+import { isRecoverableStreamError } from '@/utils/streamError'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
@@ -174,8 +176,17 @@ export const useChatsStore = defineStore('chats', () => {
    * can return to and keep watching.
    */
   const activeRunChatIds = ref<Set<number>>(new Set())
+  /**
+   * Chats whose background answer has finished and the user has not opened
+   * them yet. The sidebar keeps a dot, in a different color, until that click.
+   */
+  const readyChatIds = ref<Set<number>>(new Set())
   /** Chats with a pin PATCH in flight. A second toggle waits until the first settles. */
   const pinPendingChatIds = ref<Set<number>>(new Set())
+  /** Quiet re-attach of a turn the user walked away from. Keyed by chat id. */
+  const detachedRunStops = new Map<number, () => void>()
+  /** Bumped to cancel an in-flight poll for that chat. */
+  const detachedPollGeneration = new Map<number, number>()
 
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
@@ -378,12 +389,95 @@ export const useChatsStore = defineStore('chats', () => {
       liveGeneratingEpoch.set(chatId, chatsLoadSeq)
       liveClearedEpoch.delete(chatId)
       next.add(chatId)
+      dismissReadyChat(chatId)
     } else {
       liveClearedEpoch.set(chatId, chatsLoadSeq)
       liveGeneratingEpoch.delete(chatId)
       next.delete(chatId)
     }
     activeRunChatIds.value = next
+  }
+
+  function dismissReadyChat(chatId: number) {
+    if (!readyChatIds.value.has(chatId)) return
+    const next = new Set(readyChatIds.value)
+    next.delete(chatId)
+    readyChatIds.value = next
+  }
+
+  /**
+   * The background turn finished. Drop the "still answering" mark and keep a
+   * quieter dot until the user opens the chat.
+   */
+  function markChatAnswerReady(chatId: number) {
+    markChatGenerating(chatId, false)
+    const next = new Set(readyChatIds.value)
+    next.add(chatId)
+    readyChatIds.value = next
+  }
+
+  function stopDetachedRunWatch(chatId?: number) {
+    const ids =
+      chatId === undefined
+        ? new Set<number>([...detachedRunStops.keys(), ...detachedPollGeneration.keys()])
+        : [chatId]
+    for (const id of ids) {
+      detachedRunStops.get(id)?.()
+      detachedRunStops.delete(id)
+      detachedPollGeneration.set(id, (detachedPollGeneration.get(id) ?? 0) + 1)
+    }
+  }
+
+  async function pollDetachedRun(chatId: number, generation: number) {
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 2000)
+      })
+      if (detachedPollGeneration.get(chatId) !== generation) return
+      await loadChats()
+      if (detachedPollGeneration.get(chatId) !== generation) return
+      if (!activeRunChatIds.value.has(chatId)) {
+        markChatAnswerReady(chatId)
+        return
+      }
+    }
+  }
+
+  /**
+   * Follow a turn after the user left its chat. The visible stream is already
+   * closed; this one only updates the sidebar when the answer lands.
+   */
+  function watchDetachedRun(chatId: number, runId: string) {
+    stopDetachedRunWatch(chatId)
+    const generation = detachedPollGeneration.get(chatId) ?? 0
+    markLocalTurnFinished(chatId)
+    let stopped = false
+    const stop = chatApi.attachStream({
+      runId,
+      onUpdate: (data) => {
+        if (stopped) return
+        if (typeof data.chatTitle === 'string' && data.chatTitle !== '') {
+          applyChatTitle(chatId, data.chatTitle)
+        }
+        if (data.status !== 'complete' && data.status !== 'error') return
+        stopped = true
+        detachedRunStops.delete(chatId)
+        if (isRecoverableStreamError(data)) {
+          void pollDetachedRun(chatId, generation)
+          return
+        }
+        if (data.status === 'complete') {
+          markChatAnswerReady(chatId)
+          bumpChatActivity(chatId)
+          return
+        }
+        markChatGenerating(chatId, false)
+      },
+    })
+    detachedRunStops.set(chatId, () => {
+      stopped = true
+      stop()
+    })
   }
 
   /**
@@ -717,6 +811,10 @@ export const useChatsStore = defineStore('chats', () => {
     if (chat) {
       chat.title = title
     }
+    const rail = railChats.value.find((c) => c.id === chatId)
+    if (rail && rail !== chat) {
+      rail.title = title
+    }
   }
 
   async function deleteChat(chatId: number, silent: boolean = false) {
@@ -731,6 +829,8 @@ export const useChatsStore = defineStore('chats', () => {
 
       const wasActiveChat = activeChatId.value === chatId
       locallyCreatedIds.delete(chatId)
+      stopDetachedRunWatch(chatId)
+      dismissReadyChat(chatId)
       chats.value = chats.value.filter((c) => c.id !== chatId)
       removedChatIds.add(chatId)
       forgetRailChat(chatId)
@@ -886,6 +986,7 @@ export const useChatsStore = defineStore('chats', () => {
 
   function setActiveChat(chatId: number) {
     updateActiveChatSelection(chatId)
+    dismissReadyChat(chatId)
   }
 
   /**
@@ -1025,6 +1126,7 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   function $reset() {
+    stopDetachedRunWatch()
     localTurnCompletions.clear()
     chats.value = []
     conversationAccess.value = null
@@ -1036,6 +1138,7 @@ export const useChatsStore = defineStore('chats', () => {
     liveGeneratingEpoch.clear()
     liveClearedEpoch.clear()
     activeRunChatIds.value = new Set()
+    readyChatIds.value = new Set()
     pinPendingChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
@@ -1072,8 +1175,11 @@ export const useChatsStore = defineStore('chats', () => {
     loadRailChats,
     isLocallyCreated,
     activeRunChatIds,
+    readyChatIds,
     pinPendingChatIds,
     markChatGenerating,
+    watchDetachedRun,
+    stopDetachedRunWatch,
     loadChats,
     loadChatHistory,
     createChat,

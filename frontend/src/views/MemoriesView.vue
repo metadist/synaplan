@@ -183,7 +183,7 @@
         <div
           v-if="!memoriesEnabledForUser && viewMode !== 'longterm'"
           class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
-          @click.self="router.push('/settings#profile')"
+          @click.self="router.push('/settings/profile')"
         >
           <div
             class="surface-elevated max-w-md w-full p-8 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300"

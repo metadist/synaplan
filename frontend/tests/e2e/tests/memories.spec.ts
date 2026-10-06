@@ -113,13 +113,9 @@ test.describe('@ci Memories', () => {
     })
   })
 
-  test('account Memories opens the page, not a dialog', async ({ page }) => {
+  test('Memories opens the page, not a dialog', async ({ page }) => {
     await openApp(page)
-    await page.locator(selectors.userMenu.button).click()
-    await expect(page.locator(selectors.userMenu.dropdown)).toBeVisible({
-      timeout: TIMEOUTS.SHORT,
-    })
-    await page.locator(selectors.userMenu.memoriesBtn).click({ timeout: TIMEOUTS.STANDARD })
+    await page.goto('/memories')
     await expect(page).toHaveURL(/\/memories/, { timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(MEM.page)).toBeVisible()
     await expect(page.locator('[data-testid="modal-memories-dialog"]')).toHaveCount(0)
@@ -145,6 +141,7 @@ test.describe('@ci Memories', () => {
     const memoryId = await row.first().getAttribute('data-memory-id')
     expect(memoryId).toBeTruthy()
 
+    await page.goto('/')
     await chat.startNewChat()
     await expect(page.locator(selectors.chat.textInput)).toBeVisible()
 

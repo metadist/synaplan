@@ -252,7 +252,7 @@ const routes = parseRoutes()
 describe('i18n route coverage', () => {
   it('parses every routed view (guard against router-format drift)', () => {
     const paths = routes.map((route) => route.path)
-    for (const expected of ['/', '/login', '/settings', '/shared/:token']) {
+    for (const expected of ['/', '/login', '/settings/:section', '/shared/:token']) {
       expect(paths, 'route parser missed known routes').toContain(expected)
     }
     expect(paths.length, 'route parser returned suspiciously few routes').toBeGreaterThan(40)

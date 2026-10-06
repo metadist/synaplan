@@ -50,6 +50,16 @@
               <span class="sr-only">{{ $t('chat.stillGenerating') }}</span>
             </span>
             <span
+              v-else-if="answerReady?.(chat)"
+              class="inline-flex flex-shrink-0"
+              data-testid="indicator-chat-answer-ready"
+            >
+              <span
+                class="w-1.5 h-1.5 rounded-full bg-[var(--status-success-text)] dark:bg-[var(--status-success)]"
+              />
+              <span class="sr-only">{{ $t('chat.answerReady') }}</span>
+            </span>
+            <span
               v-else-if="chat.isNew"
               class="inline-flex flex-shrink-0"
               data-testid="indicator-chat-incoming-new"
@@ -63,7 +73,7 @@
             >
               <span
                 :ref="bindTitle(chat.id)"
-                class="block h-5 max-w-full truncate text-[13px] leading-5"
+                class="block h-5 max-w-full truncate text-[15px] leading-5"
                 :class="[
                   chat.id === activeChatId
                     ? 'font-medium text-[var(--brand)]'
@@ -205,6 +215,8 @@ const props = defineProps<{
   titleOf: (chat: HistoryChat) => string
   timeOf: (chat: HistoryChat) => string
   generating: (chat: HistoryChat) => boolean
+  /** Background answer finished; the dot stays until the row is opened. */
+  answerReady?: (chat: HistoryChat) => boolean
   listTestId?: string
   /** Label of the date group a row belongs to. Rows must arrive sorted, so groups stay contiguous. */
   groupOf?: (chat: HistoryChat) => string | null
@@ -491,7 +503,7 @@ onUnmounted(() => {
 
 /* History sits one step below the menu: smaller, regular weight, and a
    softer ink than the menu's primary text. Both stay above WCAG AA on the
-   sidebar (light #d0daea ≈ 7:1, dark #070b15 ≈ 13:1). */
+   list column (light #d0daea ≈ 7:1, dark #070b15 ≈ 13:1). */
 .chat-row-title {
   color: #3b4353;
 }
@@ -511,9 +523,9 @@ onUnmounted(() => {
 }
 
 .chat-row-menu {
-  /* Short fade, then a plate between the sidebar and the row hover tint.
-     Light: sidebar #d0daea, hover is that color with 4% black (#c8d1e1).
-     Dark: sidebar #070b15, hover is that color with 4% white (#11151e). */
+  /* Short fade, then a plate between the list column and the row hover tint.
+     Light: column #d0daea, hover is that color with 4% black (#c8d1e1).
+     Dark: column #070b15, hover is that color with 4% white (#11151e). */
   --chat-row-plate: #ccd6e5;
   padding-left: 0.5rem;
   background: linear-gradient(to right, transparent, var(--chat-row-plate) 0.5rem);

@@ -36,6 +36,20 @@ const ASSISTANT_GROUPS = new Set(['assistants', 'automations'])
 const CHANNEL_GROUPS = new Set(['channels', 'connections', 'developer'])
 const LAST_SECTION_KEY = 'synaplan.nav.lastSection'
 
+/** Routes whose second sidebar is the profile list, not a rail section. */
+const ACCOUNT_PANEL_ROOTS = [
+  '/settings',
+  '/profile',
+  '/memories',
+  '/statistics',
+  '/feedbacks',
+  '/subscription',
+]
+
+export function isAccountPanelPath(path: string): boolean {
+  return ACCOUNT_PANEL_ROOTS.some((root) => path === root || path.startsWith(`${root}/`))
+}
+
 const SECTION_KEYS: NavSectionKey[] = ['chats', 'library', 'assistants', 'channels', 'operate']
 
 function readLastSection(): NavSectionKey {
@@ -65,8 +79,8 @@ function longestMatch(
 
 /**
  * Desktop shell sections. Mobile keeps `useNavItems` unchanged.
- * The active section follows the route; personal pages keep the last one
- * so search and the profile stay in the panel.
+ * The active section follows the route. Profile pages select nothing in the
+ * rail. Other personal pages keep the last section so search stays in the panel.
  */
 export function useNavSections() {
   const { t } = useI18n()
@@ -193,9 +207,12 @@ export function useNavSections() {
 
   const allowedKeys = computed(() => new Set(sections.value.map((section) => section.key)))
 
-  const activeKey = computed<NavSectionKey>(() => {
+  const activeKey = computed<NavSectionKey | null>(() => {
     const fromRoute = sectionKeyForPath(route.path)
     if (fromRoute && allowedKeys.value.has(fromRoute)) return fromRoute
+    // Profile has its own panel. Leaving a rail icon lit would say that
+    // section is still the current page.
+    if (!isGuestMode.value && isAccountPanelPath(route.path)) return null
     if (allowedKeys.value.has(lastSection.value)) return lastSection.value
     return 'chats'
   })
@@ -203,6 +220,7 @@ export function useNavSections() {
   watch(
     activeKey,
     (key) => {
+      if (key === null) return
       lastSection.value = key
       try {
         localStorage.setItem(LAST_SECTION_KEY, key)

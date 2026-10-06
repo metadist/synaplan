@@ -4,13 +4,13 @@
     class="v2-sidebar-panel flex h-full min-h-0 flex-col"
     :class="overlay && 'v2-sidebar-panel--overlay'"
     :role="overlay ? 'dialog' : undefined"
-    :aria-label="overlay ? activeSection.label : undefined"
+    :aria-label="overlay ? (onSettings ? $t('nav.profile') : activeSection.label) : undefined"
     data-testid="section-sidebar-panel"
     @click="onPanelClick"
   >
-    <header class="flex h-14 flex-shrink-0 items-center gap-2 pl-3 pr-2">
+    <header class="flex h-14 flex-shrink-0 items-center gap-2 pl-4 pr-3">
       <h2 class="min-w-0 flex-1 truncate text-[15px] font-semibold txt-primary">
-        {{ activeSection.label }}
+        {{ onSettings ? $t('nav.profile') : activeSection.label }}
       </h2>
       <button
         type="button"
@@ -35,7 +35,8 @@
       data-testid="section-sidebar-scroll"
       @scroll="onPanelScroll"
     >
-      <SidebarPanelChats v-if="activeKey === 'chats'" ref="chatsPanel" />
+      <SidebarPanelSettings v-if="onSettings" />
+      <SidebarPanelChats v-else-if="activeKey === 'chats'" ref="chatsPanel" />
       <SidebarPanelLibrary v-else-if="activeKey === 'library'" />
       <SidebarPanelLinks v-else :groups="activeGroups" :section-path="activeSectionPath" />
     </div>
@@ -45,11 +46,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ChevronDoubleLeftIcon } from '@heroicons/vue/24/outline'
-import { useNavSections } from '@/composables/useNavSections'
+import { isAccountPanelPath, useNavSections } from '@/composables/useNavSections'
 import { focusSidebarToggle, useSidebarLayout } from '@/composables/useSidebarLayout'
+import { useAuthStore } from '@/stores/auth'
 import SidebarPanelChats from './SidebarPanelChats.vue'
+import SidebarPanelSettings from './SidebarPanelSettings.vue'
 import SidebarPanelLibrary from './SidebarPanelLibrary.vue'
 import SidebarPanelLinks from './SidebarPanelLinks.vue'
 import SidebarPanelFooter from './SidebarPanelFooter.vue'
@@ -61,6 +65,10 @@ const emit = defineEmits<{ navigate: [] }>()
 /** Picking one of these leaves the panel: a chat row, a page link, New Chat, or search. */
 const LEAVES_PANEL =
   'a[href], .chat-row-btn, [data-testid="btn-sidebar-v2-new-chat"], [data-testid="btn-sidebar-v2-search"]'
+
+const route = useRoute()
+const authStore = useAuthStore()
+const onSettings = computed(() => authStore.isAuthenticated && isAccountPanelPath(route.path))
 
 const { activeKey, activeSection, activeGroups, activeSectionPath } = useNavSections()
 const { closePanel } = useSidebarLayout()
