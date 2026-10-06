@@ -68,7 +68,22 @@ test.describe('@ci @auth Account language', () => {
       await expect(page.locator('[data-testid="select-language"]')).toHaveCount(0)
 
       await page.goto('/settings')
+      // The document language flips before the account PUT returns. A reload
+      // in that window aborts the save, so a fresh login still sees German.
+      const languageSaved = page.waitForResponse((response) => {
+        if (response.request().method() !== 'PUT') return false
+        if (new URL(response.url()).pathname !== '/api/v1/profile') return false
+        const raw = response.request().postData()
+        if (raw === null) return false
+        try {
+          return (JSON.parse(raw) as { language?: string }).language === 'fr'
+        } catch {
+          return false
+        }
+      })
       await page.locator('[data-testid="btn-language-fr"]').click()
+      const saved = await languageSaved
+      expect(saved.ok()).toBeTruthy()
       await expect(page.locator('html')).toHaveAttribute('lang', 'fr')
 
       await page.reload()
