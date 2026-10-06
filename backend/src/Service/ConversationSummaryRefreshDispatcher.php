@@ -45,6 +45,9 @@ final readonly class ConversationSummaryRefreshDispatcher
             ]);
         }
 
+        // Widget visitor turns also land here, for the widget owner. The pass
+        // only sends owner messages that no earlier pass scanned, so visitor
+        // traffic does not bill the owner for the same messages again.
         try {
             $this->messageBus->dispatch(new DigestOtherChatsCommand($userId, $chatId));
 

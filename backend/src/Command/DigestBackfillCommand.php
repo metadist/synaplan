@@ -83,15 +83,25 @@ final class DigestBackfillCommand extends Command
             $lock->release();
         }
 
-        $io->success(sprintf(
-            'Digest backfill (%dd window): %d users processed, %d skipped, %d batches, %d messages scanned, %d digests created.',
+        $line = sprintf(
+            'Digest backfill (%dd window): %d users processed, %d skipped, %d batches, %d messages scanned, %d digests created, %d failed batches, %d skipped for budget.',
             $sinceDays,
             $summary['users'],
             $summary['skipped_users'],
             $summary['batches'],
             $summary['scanned'],
             $summary['created'],
-        ));
+            $summary['failed_batches'],
+            $summary['skipped_budget'],
+        );
+
+        if ($summary['aborted']) {
+            $io->warning($line.' Aborted: '.($summary['abort_reason'] ?? 'unknown').'.');
+
+            return Command::SUCCESS;
+        }
+
+        $io->success($line);
 
         return Command::SUCCESS;
     }

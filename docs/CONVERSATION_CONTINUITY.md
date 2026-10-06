@@ -59,11 +59,18 @@ quoted digest title instead.
 - **Job:** `app:digest:run` — self-locking, scheduler-driven (daily, wired in
   `container-runtime.sh`). Per-user cost caps (`BATCH_SIZE` ×
   `MAX_BATCHES_PER_USER` model calls max per run) and a per-user cursor, so
-  every message is billed exactly once. Messages in the *live* chat younger
-  than `QUIET_SECONDS` are left to the rolling summary. After each completed
+  every message is billed once. A failed model call keeps the cursor; a
+  provider outage stops the whole run, and a batch that fails three times is
+  skipped. Every batch checks the user's cost budget first. Messages in the
+  *live* chat younger than `QUIET_SECONDS` are left to the rolling summary,
+  and a pass stops below them until they leave that window. After each completed
   turn, `DigestOtherChatsCommand` indexes the user's other chats without
   that quiet window. A short verbatim tail of the most recently updated
   other chat is also injected on the hot path (SQL only, no digest wait).
+- **Start point:** a migration stores the newest message id at upgrade time
+  as `DIGEST.START_AFTER_ID`. A user without a stored cursor starts after it,
+  so existing history is not indexed (or billed) automatically; use the
+  backfill below for that. A fresh install stores 0.
 - **Exclusions:** widget/guest chats are never digested; users with memories
   disabled are skipped; the whole feature honours the user's memory opt-out at
   retrieval time too.
@@ -82,7 +89,8 @@ All commands run inside the backend container
 
 ### Backfill history for existing users
 
-New installs index forward from day one. To index pre-existing history:
+Indexing runs forward from `DIGEST.START_AFTER_ID`. To index older history
+(billed to each user's budget):
 
 ```bash
 # One user, last 12 months, capped at 20 model calls

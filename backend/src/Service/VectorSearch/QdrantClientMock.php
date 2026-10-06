@@ -106,6 +106,13 @@ final class QdrantClientMock implements QdrantClientInterface
         return 0;
     }
 
+    public function scrollDigests(int $userId): array
+    {
+        $this->logger->info('QdrantClientMock: scrollDigests', ['user_id' => $userId]);
+
+        return [];
+    }
+
     // --- Routing Anchor Operations (Phase 8 embedding-router cascade layer) ---
 
     public function upsertRoutingAnchor(string $pointId, array $vector, array $payload): void

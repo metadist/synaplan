@@ -301,6 +301,7 @@
             <option value="SEARCH_QUERY">{{ $t('config.usage.actions.search_query') }}</option>
             <option value="EMBEDDINGS">{{ $t('config.usage.actions.embeddings') }}</option>
             <option value="RERANK">{{ $t('config.usage.actions.rerank') }}</option>
+            <option value="MESSAGE_DIGEST">{{ $t('config.usage.actions.message_digest') }}</option>
           </select>
 
           <input

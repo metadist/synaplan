@@ -1125,7 +1125,8 @@
         "search_query": "Requête de recherche",
         "embeddings": "Embeddings",
         "api_chat": "Chat API",
-        "rerank": "Rerank"
+        "rerank": "Rerank",
+        "message_digest": "Mémoire à long terme"
       },
       "sources": {
         "whatsapp": "WhatsApp",

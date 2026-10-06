@@ -703,4 +703,78 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertSame('custom_anchors', $client->getRoutingAnchorsCollection());
         $this->assertSame('http://x', $client->getQdrantUrl());
     }
+
+    public function testScrollDigestsPagesWithAUserFilter(): void
+    {
+        $calls = [];
+        $page = 0;
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/scroll' => function () use (&$page): MockResponse {
+                ++$page;
+                if (1 === $page) {
+                    return new MockResponse(
+                        (string) json_encode([
+                            'result' => [
+                                'points' => [[
+                                    'id' => 'uuid-1',
+                                    'payload' => [
+                                        '_point_id' => 'dig_7_11',
+                                        'user_id' => 7,
+                                        'message_id' => 100,
+                                    ],
+                                ]],
+                                'next_page_offset' => 'offset-2',
+                            ],
+                        ]),
+                        ['http_code' => 200],
+                    );
+                }
+
+                return new MockResponse(
+                    (string) json_encode([
+                        'result' => [
+                            'points' => [[
+                                'id' => 'uuid-2',
+                                'payload' => [
+                                    '_point_id' => 'dig_7_22',
+                                    'user_id' => 7,
+                                    'message_id' => 200,
+                                ],
+                            ]],
+                            'next_page_offset' => null,
+                        ],
+                    ]),
+                    ['http_code' => 200],
+                );
+            },
+        ], $calls);
+
+        $points = $client->scrollDigests(7);
+
+        $this->assertSame(['dig_7_11', 'dig_7_22'], array_column($points, 'id'));
+        $this->assertCount(2, $calls);
+
+        $first = json_decode((string) $calls[0]['body'], true);
+        $this->assertIsArray($first);
+        $this->assertSame('user_id', $first['filter']['must'][0]['key']);
+        $this->assertSame(7, $first['filter']['must'][0]['match']['value']);
+        $this->assertArrayNotHasKey('offset', $first);
+        $this->assertFalse($first['with_vector']);
+
+        $second = json_decode((string) $calls[1]['body'], true);
+        $this->assertIsArray($second);
+        $this->assertSame('offset-2', $second['offset']);
+    }
+
+    public function testScrollDigestsReturnsEmptyWhenTheCollectionIsMissing(): void
+    {
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/scroll' => fn () => new MockResponse(
+                (string) json_encode(['status' => ['error' => "Collection `user_message_digests` doesn't exist"]]),
+                ['http_code' => 404],
+            ),
+        ]);
+
+        $this->assertSame([], $client->scrollDigests(7));
+    }
 }
