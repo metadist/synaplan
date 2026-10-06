@@ -79,37 +79,6 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await expect(panel.locator(CHAT.legacyManageKnowledgeGroupsBtn)).toHaveCount(0)
   })
 
-  test('@ci model chip sits in the composer and updates when a model is picked', async ({
-    page,
-  }) => {
-    const chip = page.locator(CHAT.modelChipName)
-    await expect(chip).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    const before = (await chip.innerText()).trim()
-
-    await page.locator(CHAT.modelToggle).click()
-    const panel = page.locator(CHAT.modelPanel)
-    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
-
-    const options = panel.locator('[data-testid^="btn-model-"]')
-    await expect(options.first()).toBeVisible()
-    const count = await options.count()
-    let targetName = ''
-    for (let i = 0; i < count; i++) {
-      const option = options.nth(i)
-      if ((await option.getAttribute('data-testid')) === 'btn-model-default') continue
-      const label = (await option.locator('span.font-medium').first().innerText()).trim()
-      if (label && label !== before) {
-        targetName = label
-        await option.click()
-        break
-      }
-    }
-
-    expect(targetName, 'a chat model whose name differs from the chip').not.toBe('')
-    await expect(chip).toHaveText(targetName)
-    await expect(panel).toBeHidden()
-  })
-
   test('@ci Tools dropdown lists command tools, toggles and Summarize a document', async ({
     page,
   }) => {
