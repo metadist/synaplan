@@ -41,6 +41,8 @@ final class QdrantClientDirect implements QdrantClientInterface
     private const DEFAULT_DIGESTS_COLLECTION = 'user_message_digests';
     private const DEFAULT_ROUTING_ANCHORS_COLLECTION = 'routing_anchors';
     private const BATCH_LIMIT = 100;
+    private const DIGEST_SCROLL_PAGE_SIZE = 256;
+    private const DIGEST_SCROLL_MAX_PAGES = 200;
 
     /** @var array<string, bool> tracks which collections have been verified/created */
     private array $ensuredCollections = [];
@@ -549,6 +551,42 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    public function deleteDigests(array $pointIds): void
+    {
+        $pointIds = array_values(array_unique(array_filter(
+            $pointIds,
+            static fn (string $pointId): bool => '' !== $pointId,
+        )));
+        if ([] === $pointIds) {
+            return;
+        }
+
+        foreach (array_chunk($pointIds, self::BATCH_LIMIT) as $chunk) {
+            try {
+                // Payload filter, not primary ids: legacy points are integer-keyed
+                // and only share `_point_id` with the current UUID-keyed point.
+                $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/delete?wait=true", [
+                    'filter' => [
+                        'must' => [
+                            ['key' => '_point_id', 'match' => ['any' => $chunk]],
+                        ],
+                    ],
+                ]);
+            } catch (\Throwable $e) {
+                if ($this->isMissingCollectionError($e)) {
+                    return;
+                }
+
+                $this->logger->error('Failed to delete digest points from Qdrant', [
+                    'count' => count($chunk),
+                    'error' => $e->getMessage(),
+                ]);
+
+                throw new \RuntimeException('Failed to delete digest points: '.$e->getMessage(), 0, $e);
+            }
+        }
+    }
+
     public function deleteAllDigestsForUser(int $userId): int
     {
         try {
@@ -584,6 +622,80 @@ final class QdrantClientDirect implements QdrantClientInterface
             ]);
 
             return 0;
+        }
+    }
+
+    public function scrollDigests(int $userId): array
+    {
+        try {
+            $pointsByLogical = [];
+            $offset = null;
+            $seenOffsets = [];
+            $page = 0;
+
+            while (true) {
+                ++$page;
+                if ($page > self::DIGEST_SCROLL_MAX_PAGES) {
+                    throw new \RuntimeException(sprintf('Digest scroll exceeded %d pages for user %d', self::DIGEST_SCROLL_MAX_PAGES, $userId));
+                }
+
+                $request = [
+                    'filter' => [
+                        'must' => [
+                            ['key' => 'user_id', 'match' => ['value' => $userId]],
+                        ],
+                    ],
+                    'limit' => self::DIGEST_SCROLL_PAGE_SIZE,
+                    'with_payload' => true,
+                    'with_vector' => false,
+                ];
+                if (null !== $offset) {
+                    $request['offset'] = $offset;
+                }
+
+                $response = $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/scroll", $request);
+                foreach ($response['result']['points'] ?? [] as $point) {
+                    $payloadPointId = $point['payload']['_point_id'] ?? null;
+                    if (is_string($payloadPointId) && '' !== $payloadPointId) {
+                        $logical = $payloadPointId;
+                    } elseif (is_string($point['id'] ?? null) || is_int($point['id'] ?? null)) {
+                        $logical = (string) $point['id'];
+                    } else {
+                        continue;
+                    }
+                    if ('' === $logical || isset($pointsByLogical[$logical])) {
+                        continue;
+                    }
+                    $pointsByLogical[$logical] = [
+                        'id' => $logical,
+                        'payload' => is_array($point['payload'] ?? null) ? $point['payload'] : [],
+                    ];
+                }
+
+                $next = $response['result']['next_page_offset'] ?? null;
+                if (null === $next) {
+                    break;
+                }
+                $offsetKey = is_scalar($next) ? (string) $next : json_encode($next);
+                if (isset($seenOffsets[$offsetKey])) {
+                    break;
+                }
+                $seenOffsets[$offsetKey] = true;
+                $offset = $next;
+            }
+
+            return array_values($pointsByLogical);
+        } catch (\Throwable $e) {
+            if ($this->isMissingCollectionError($e)) {
+                return [];
+            }
+
+            $this->logger->error('Failed to scroll digests in Qdrant', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('Failed to scroll digests: '.$e->getMessage(), 0, $e);
         }
     }
 

@@ -1212,7 +1212,7 @@ class ChatHandlerTest extends TestCase
         $this->digestSearchService
             ->expects($this->once())
             ->method('search')
-            ->with(7, [0.1, 0.2, 0.3], excludeChatId: 55)
+            ->with(7, [0.1, 0.2, 0.3], excludeMessageIds: [9000])
             ->willReturn([$digest]);
 
         $this->promptRepository->method('findOneBy')->willReturn(null);

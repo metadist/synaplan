@@ -159,6 +159,24 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('WRITE it in the user\'s language', $mediamaker);
     }
 
+    /**
+     * The digest schema is `{"digests": [...]}`; a prompt that asks for a bare
+     * array makes strict providers reject the answer and retry the call.
+     * Requests and "file created" notes are what the index filled up with.
+     */
+    public function testMessageDigestPromptAsksForTheSchemaShapeAndFactsOnly(): void
+    {
+        $prompt = $this->catalogPrompt('tools:message_digest');
+
+        $this->assertStringContainsString('{"digests": [', $prompt);
+        $this->assertStringContainsString('Return {"digests": []}', $prompt);
+        $this->assertStringNotContainsString('Return [] or null', $prompt);
+        $this->assertStringContainsString('A request to the assistant to do something', $prompt);
+        $this->assertStringContainsString('A note that a file was created', $prompt);
+        $this->assertStringContainsString('Name the facts, not the action', $prompt);
+        $this->assertStringContainsString('a German-speaking user gets German lines for an English contract', $prompt);
+    }
+
     private function catalogPrompt(string $topic): string
     {
         foreach (PromptCatalog::all() as $entry) {

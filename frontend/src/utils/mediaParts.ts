@@ -1,4 +1,5 @@
 import type { Message, Part, PartType } from '@/stores/history'
+import { createUuid } from '@/utils/uuid'
 
 /**
  * Issue #625: Generated media (image / video / audio) from MEDIAMAKER
@@ -38,10 +39,7 @@ import type { Message, Part, PartType } from '@/stores/history'
  * pending playback or autoplay state).
  */
 export function generatePartId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  return createUuid()
 }
 
 const MEDIA_PART_TYPES: ReadonlySet<PartType> = new Set(['image', 'video', 'audio'])

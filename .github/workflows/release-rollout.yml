@@ -213,7 +213,8 @@ jobs:
                   test("^elestio\\.yml$") == false and
                   test("^deploy/selfhost\\.env\\.example$") == false and
                   test("^deploy/umbrel/synaplan/") == false and
-                  test("^deploy/aws/packer/synaplan\\.pkr\\.hcl$") == false
+                  test("^deploy/aws/packer/synaplan\\.pkr\\.hcl$") == false and
+                  test("^deploy/quickstart/compose\\.yaml$") == false
                 ))
               | join(", ")
             '
@@ -313,6 +314,7 @@ jobs:
             echo "- \`deploy/selfhost.env.example\` for self-hosting"
             echo "- \`deploy/umbrel/synaplan/\` for the Umbrel App Store package"
             echo "- \`deploy/aws/packer/synaplan.pkr.hcl\` for the AWS Marketplace AMI"
+            echo "- \`deploy/quickstart/compose.yaml\` for the one-file quickstart"
             echo ""
             echo "Elestio instances that track the default branch are redeploying now."
             echo "Running installations keep the version their operator pinned."

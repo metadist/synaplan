@@ -819,7 +819,9 @@
   },
   "messageRefs": {
     "olderConversation": "Ältere Unterhaltung",
-    "clickToOpen": "Klicken, um die ursprüngliche Unterhaltung zu öffnen",
+    "clickToOpen": "Öffnet die ursprüngliche Nachricht",
+    "openSource": "Ursprüngliche Nachricht öffnen: {title}",
+    "notFound": "Diese Nachricht gibt es nicht mehr.",
     "missing": {
       "badge": "Ältere Nachricht",
       "tooltip": "Dieser Nachrichtenverweis konnte nicht aufgelöst werden. Die Nachricht wurde möglicherweise gelöscht."

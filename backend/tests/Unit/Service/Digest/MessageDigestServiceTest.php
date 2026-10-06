@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Digest;
 
+use App\AI\Exception\ModelNotConfiguredException;
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
@@ -98,8 +100,10 @@ final class MessageDigestServiceTest extends TestCase
         $storedDigest = null;
         $this->digestRepository->expects(self::once())
             ->method('upsert')
-            ->willReturnCallback(static function (MessageDigest $digest) use (&$storedDigest): void {
+            ->willReturnCallback(static function (MessageDigest $digest) use (&$storedDigest): int {
                 $storedDigest = $digest;
+
+                return 88001;
             });
 
         $qdrantPointId = null;
@@ -175,6 +179,40 @@ final class MessageDigestServiceTest extends TestCase
         $result = $this->service->digestBatch($this->user, $messages);
 
         self::assertSame(0, $result['created']);
+        self::assertTrue($result['failed']);
+        self::assertSame(MessageDigestService::FAILURE_UNPARSABLE, $result['failureReason']);
+        self::assertSame(0, $result['scanned']);
+    }
+
+    public function testLoneDigestObjectCountsAsAListOfOne(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '{"title": "office rent letter to realtor", "message_id": 567}',
+            'usage' => [],
+        ]);
+
+        $result = $this->service->digestBatch($this->user, [$this->makeMessage(567, 'Rent letter.')], dryRun: true);
+
+        self::assertFalse($result['failed']);
+        self::assertSame([['title' => 'office rent letter to realtor', 'message_id' => 567]], $result['proposals']);
+    }
+
+    public function testJsonObjectThatIsNotADigestListIsUnparsable(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '{"answer": "office rent letter", "id": 567}',
+            'usage' => [],
+        ]);
+
+        $result = $this->service->digestBatch($this->user, [$this->makeMessage(567, 'Rent letter.')]);
+
+        self::assertTrue($result['failed']);
+        self::assertSame(MessageDigestService::FAILURE_UNPARSABLE, $result['failureReason']);
+        self::assertSame(0, $result['scanned']);
     }
 
     public function testNullAndEmptyArrayResponsesAreValidEmptyResults(): void
@@ -187,6 +225,9 @@ final class MessageDigestServiceTest extends TestCase
 
         self::assertSame(0, $result['created']);
         self::assertSame([], $result['proposals']);
+        self::assertFalse($result['failed']);
+        self::assertNull($result['failureReason']);
+        self::assertSame(1, $result['scanned']);
     }
 
     public function testDryRunReturnsProposalsButStoresNothing(): void
@@ -328,6 +369,59 @@ final class MessageDigestServiceTest extends TestCase
         self::assertSame([['title' => 'office rent letter to realtor', 'message_id' => 102]], $result['proposals']);
     }
 
+    public function testDedupContextListsChatRecentAndPendingTitlesOnce(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn(['rent letter to realtor']);
+        $this->digestRepository->expects(self::once())
+            ->method('findRecentTitles')
+            ->with(7, self::greaterThan(0))
+            ->willReturn(['invoice INV-2044 from another chat', 'rent letter to realtor']);
+
+        $userPrompt = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages) use (&$userPrompt): array {
+                $userPrompt = end($messages)['content'];
+
+                return ['content' => '{"digests": []}', 'usage' => []];
+            }
+        );
+
+        $this->service->digestBatch(
+            $this->user,
+            [$this->makeMessage(101, 'hi')],
+            dryRun: true,
+            pendingTitles: ['contract value EUR 42,000 picked in an earlier batch'],
+        );
+
+        self::assertIsString($userPrompt);
+        self::assertSame(1, substr_count($userPrompt, '- rent letter to realtor'));
+        self::assertStringContainsString('- invoice INV-2044 from another chat', $userPrompt);
+        self::assertStringContainsString('- contract value EUR 42,000 picked in an earlier batch', $userPrompt);
+    }
+
+    public function testUserPromptAsksForTheShapeTheSchemaEnforces(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+
+        $userPrompt = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages) use (&$userPrompt): array {
+                $userPrompt = end($messages)['content'];
+
+                return ['content' => '{"digests": []}', 'usage' => []];
+            }
+        );
+
+        $this->service->digestBatch($this->user, [$this->makeMessage(101, 'hi')]);
+
+        self::assertIsString($userPrompt);
+        self::assertStringContainsString('{"digests": [', $userPrompt);
+        self::assertStringContainsString('Return {"digests": []}', $userPrompt);
+        self::assertStringNotContainsString('Return []', $userPrompt);
+    }
+
     public function testUsageIsRecordedWithDigestSource(): void
     {
         $messages = [$this->makeMessage(101, 'hello')];
@@ -345,6 +439,93 @@ final class MessageDigestServiceTest extends TestCase
             );
 
         $this->service->digestBatch($this->user, $messages);
+    }
+
+    public function testQdrantPointIdUsesTheBidReturnedByUpsert(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '[{"title": "office rent letter to realtor", "message_id": 102}]',
+            'usage' => [],
+        ]);
+        $this->aiFacade->method('embed')->willReturn(['embedding' => [0.1, 0.2, 0.3, 0.4], 'usage' => []]);
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->digestRepository->method('upsert')->willReturn(515151);
+
+        $pointId = null;
+        $this->qdrantClient->expects(self::once())
+            ->method('upsertDigest')
+            ->willReturnCallback(static function (string $id) use (&$pointId): void {
+                $pointId = $id;
+            });
+
+        $this->service->digestBatch($this->user, [$this->makeMessage(102, 'Letter to the realtor about the office rent increase.')]);
+
+        self::assertSame(MessageDigestService::qdrantPointId(7, 515151), $pointId);
+    }
+
+    public function testThrownProviderErrorEmptyAnswerAndUnparsableAnswerAreDistinct(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+        $this->digestRepository->expects(self::never())->method('upsert');
+
+        $step = 0;
+        $this->aiFacade->method('chat')->willReturnCallback(function () use (&$step): array {
+            ++$step;
+            if (1 === $step) {
+                throw new \RuntimeException('limited', 429);
+            }
+            if (2 === $step) {
+                return ['content' => '[]', 'usage' => []];
+            }
+
+            return ['content' => 'Sure! Here is my analysis without JSON.', 'usage' => []];
+        });
+
+        $thrown = $this->service->digestBatch($this->user, [$this->makeMessage(101, 'rent letter')]);
+        $empty = $this->service->digestBatch($this->user, [$this->makeMessage(102, 'rent letter')]);
+        $unparsable = $this->service->digestBatch($this->user, [$this->makeMessage(103, 'rent letter')]);
+
+        self::assertTrue($thrown['failed']);
+        self::assertSame('rate_limited', $thrown['failureReason']);
+        self::assertSame(0, $thrown['scanned']);
+        self::assertSame([], $thrown['proposals']);
+
+        self::assertFalse($empty['failed']);
+        self::assertNull($empty['failureReason']);
+        self::assertSame(1, $empty['scanned']);
+        self::assertSame([], $empty['proposals']);
+
+        self::assertTrue($unparsable['failed']);
+        self::assertSame(MessageDigestService::FAILURE_UNPARSABLE, $unparsable['failureReason']);
+        self::assertSame(0, $unparsable['scanned']);
+        self::assertNotSame($thrown['failureReason'], $unparsable['failureReason']);
+    }
+
+    public function testOpenCircuitAndMissingModelAreNotClassifiedAsUnknown(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+
+        $step = 0;
+        $this->aiFacade->method('chat')->willReturnCallback(function () use (&$step): array {
+            ++$step;
+            if (1 === $step) {
+                throw new ProviderException('Service temporarily unavailable (circuit breaker is OPEN). Please try again in 60 seconds.', 'openai');
+            }
+
+            throw new ModelNotConfiguredException();
+        });
+
+        $circuit = $this->service->digestBatch($this->user, [$this->makeMessage(101, 'rent letter')]);
+        $missing = $this->service->digestBatch($this->user, [$this->makeMessage(102, 'rent letter')]);
+
+        self::assertSame(MessageDigestService::FAILURE_CIRCUIT_OPEN, $circuit['failureReason']);
+        self::assertTrue($circuit['failed']);
+        self::assertSame(MessageDigestService::FAILURE_MODEL_NOT_CONFIGURED, $missing['failureReason']);
+        self::assertTrue($missing['failed']);
     }
 
     private function makeUser(int $id): User

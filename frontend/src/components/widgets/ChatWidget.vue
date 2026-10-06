@@ -672,6 +672,7 @@ import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { parseAIResponse } from '@/utils/responseParser'
 import { createSmoothStream, type SmoothStream } from '@/utils/smoothStream'
+import { createUuid } from '@/utils/uuid'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
 import {
   subscribeToWidgetSessionRealtime,
@@ -1983,7 +1984,7 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
         : 'ai'
 
   return {
-    id: String(raw.id ?? crypto.randomUUID()),
+    id: String(raw.id ?? createUuid()),
     role,
     type: isFileMessage ? 'file' : 'text',
     content,

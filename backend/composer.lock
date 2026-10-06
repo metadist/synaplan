@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b76db6a9117dd7206c03e948d6ab3996",
+    "content-hash": "3a5a5be9fd4620f3f51f66028225ad80",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -98,16 +98,16 @@
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v5.0.1",
+            "version": "v5.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
-                "reference": "9baefcd0beb13ce630b39d85b8a0593839b713b0"
+                "reference": "dde36a3e2918c1538021aa6471c72d990158303f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/9baefcd0beb13ce630b39d85b8a0593839b713b0",
-                "reference": "9baefcd0beb13ce630b39d85b8a0593839b713b0",
+                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/dde36a3e2918c1538021aa6471c72d990158303f",
+                "reference": "dde36a3e2918c1538021aa6471c72d990158303f",
                 "shasum": ""
             },
             "require": {
@@ -181,9 +181,9 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v5.0.1"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v5.0.2"
             },
-            "time": "2026-09-22T14:19:04+00:00"
+            "time": "2026-10-01T14:00:43+00:00"
         },
         {
             "name": "api-platform/documentation",
@@ -960,16 +960,16 @@
         },
         {
             "name": "api-platform/symfony",
-            "version": "v5.0.1",
+            "version": "v5.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/symfony.git",
-                "reference": "7b25b4e1fd301cd58d98751fef82f691a91d5167"
+                "reference": "580de5ee414656e05b48026574c99c29be2876ad"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/symfony/zipball/7b25b4e1fd301cd58d98751fef82f691a91d5167",
-                "reference": "7b25b4e1fd301cd58d98751fef82f691a91d5167",
+                "url": "https://api.github.com/repos/api-platform/symfony/zipball/580de5ee414656e05b48026574c99c29be2876ad",
+                "reference": "580de5ee414656e05b48026574c99c29be2876ad",
                 "shasum": ""
             },
             "require": {
@@ -1087,9 +1087,9 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/api-platform/symfony/tree/v5.0.1"
+                "source": "https://github.com/api-platform/symfony/tree/v5.0.2"
             },
-            "time": "2026-09-25T18:01:39+00:00"
+            "time": "2026-10-01T08:25:48+00:00"
         },
         {
             "name": "api-platform/validator",
@@ -2770,16 +2770,16 @@
         },
         {
             "name": "doctrine/orm",
-            "version": "3.7.2",
+            "version": "3.7.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/orm.git",
-                "reference": "6b47a02cd1d7119ef4d8f90ca6d49651accef1a3"
+                "reference": "2637802f3bb695a88f54af1a6f0c2e76a4b523fb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/orm/zipball/6b47a02cd1d7119ef4d8f90ca6d49651accef1a3",
-                "reference": "6b47a02cd1d7119ef4d8f90ca6d49651accef1a3",
+                "url": "https://api.github.com/repos/doctrine/orm/zipball/2637802f3bb695a88f54af1a6f0c2e76a4b523fb",
+                "reference": "2637802f3bb695a88f54af1a6f0c2e76a4b523fb",
                 "shasum": ""
             },
             "require": {
@@ -2854,9 +2854,9 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/orm/issues",
-                "source": "https://github.com/doctrine/orm/tree/3.7.2"
+                "source": "https://github.com/doctrine/orm/tree/3.7.3"
             },
-            "time": "2026-09-23T05:28:00+00:00"
+            "time": "2026-09-26T21:45:25+00:00"
         },
         {
             "name": "doctrine/persistence",
@@ -13968,7 +13968,7 @@
     "packages-dev": [
         {
             "name": "api-platform/test",
-            "version": "v5.0.1",
+            "version": "v5.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/test.git",
@@ -14039,7 +14039,7 @@
             ],
             "support": {
                 "issues": "https://github.com/api-platform/test/issues",
-                "source": "https://github.com/api-platform/test/tree/v5.0.1"
+                "source": "https://github.com/api-platform/test/tree/v5.0.2"
             },
             "time": "2026-09-22T14:19:04+00:00"
         },

@@ -47,6 +47,21 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
         '/api/v1/auth/token',
     ];
 
+    /**
+     * Public routes the SPA needs before anyone can sign in. A cookie that no
+     * longer validates (user deleted, `APP_SECRET` rotated by a reinstall) is
+     * treated as "not signed in" here instead of a 401, otherwise the browser
+     * never learns that the setup wizard is open and ends on a login that
+     * answers 503 SETUP_REQUIRED.
+     *
+     * @var list<string>
+     */
+    private const ANONYMOUS_ON_FAILURE_PATHS = [
+        '/api/v1/config/runtime',
+        '/api/v1/setup/state',
+        '/api/v1/setup/admin',
+    ];
+
     public function __construct(
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
@@ -164,6 +179,10 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
+        if (\in_array($request->getPathInfo(), self::ANONYMOUS_ON_FAILURE_PATHS, true)) {
+            return null;
+        }
+
         // Return 401 with info about the error
         return new JsonResponse([
             'error' => 'Authentication failed',

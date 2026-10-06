@@ -169,6 +169,12 @@ jobs:
       - name: Run deploy-lifecycle bash tests
         run: bash deploy/scripts/tests/test-lifecycle.sh
 
+      # The one-shot that creates and publishes the deployment secrets for
+      # deploy/compose.yaml and deploy/quickstart/compose.yaml. A gap here can
+      # start MariaDB with an empty password or lock out an existing database.
+      - name: Run secrets-init bash tests
+        run: bash deploy/scripts/tests/test-secrets-init.sh
+
       # firstboot.sh executed for real, with the metadata service, the AWS CLI
       # and the data volume stubbed. It is the one script no customer can
       # recover from by hand, and the only place it otherwise runs is a
@@ -2170,6 +2176,7 @@ jobs:
             (version, \`APP_VERSION\`, and the published image digest
             \`${DIGEST}\`)
           - \`deploy/aws/packer/synaplan.pkr.hcl\` for the AWS Marketplace AMI
+          - \`deploy/quickstart/compose.yaml\` for the one-file quickstart
 
           Existing deployments are unaffected. They keep the version their operator
           pinned and change it only by following the update guide, so a redeploy never

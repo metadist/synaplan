@@ -848,7 +848,8 @@
         "sorting": "Clasificación",
         "search_query": "Consulta de búsqueda",
         "api_chat": "Chat de API",
-        "rerank": "Rerank"
+        "rerank": "Rerank",
+        "message_digest": "Memoria a largo plazo"
       },
       "sources": {
         "whatsapp": "WhatsApp",

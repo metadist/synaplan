@@ -52,7 +52,9 @@ final readonly class DigestProvider implements SearchProviderInterface
         // cutoff when digests share the index space.
         $minScore = $request->vectors->memoriesMinScore(0.0);
         $best = [];
-        foreach ($this->digests->search($userId, $vector) as $digest) {
+        // Smart search is not a chat turn, so there is no verbatim history
+        // window: digests of every chat, including the one on screen, stay findable.
+        foreach ($this->digests->search($userId, $vector, excludeMessageIds: []) as $digest) {
             $chatId = (string) $digest['chat_id'];
             if ('0' !== $chatId && !isset($best[$chatId]) && $digest['score'] >= $minScore) {
                 $best[$chatId] = $digest;

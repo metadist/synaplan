@@ -20,16 +20,26 @@ database and vector snapshots are consistent.
 
 ## First installation
 
-The shortest start needs no git checkout: copy `compose.yaml` and
-`selfhost.env.example` (as `.env`) into an empty directory, keep
-`SYNAPLAN_VERSION` on a release tag, and run `docker compose up -d`. Leave the
-eight secrets commented out. The first start generates them into
-`data/secrets.env` and refuses a `replace-with-*` example value without
-creating anything. Back `data/secrets.env` up with the database. Open
-`http://127.0.0.1:8000` unless `SYNAPLAN_HTTP_BIND` or `SYNAPLAN_HTTP_PORT`
-changed. Exact commands: root README "Your first answer in three steps". The
-steps below are the same contract from a clone of this repository, plus
-prepare, validate, and smoke-test. `prepare.sh` writes `data/secrets.env`
+The shortest start is [`quickstart/compose.yaml`](quickstart/compose.yaml): one
+file, no git checkout, no `.env` required, and it pastes as-is into a Docker GUI
+such as Portainer or Dockge. Everything has a default, the secrets are generated
+on the first start, and all data lives in named volumes. Exact commands: root
+README "Published image, no git checkout"; backup and rollback:
+[Quickstart volumes](../docs/UPDATE_SELFHOST.md#quickstart-volumes).
+
+This directory's `compose.yaml` is the full contract: optional profiles
+(office, local AI, file work), the closed-network TLS proxy, `./data` bind
+mounts, and the lifecycle scripts. Copied with `selfhost.env.example` (as
+`.env`) into an empty directory, it starts with `docker compose up -d` as well;
+keep `SYNAPLAN_VERSION` on a release tag and leave the eight secrets commented
+out. The first start generates them into `data/secrets.env` and refuses a
+`replace-with-*` example value without creating anything. Back
+`data/secrets.env` up with the database. Open `http://127.0.0.1:8000` unless
+`SYNAPLAN_HTTP_BIND` or `SYNAPLAN_HTTP_PORT` changed. On macOS and Windows,
+keep that directory on a Linux filesystem or use the quickstart: MariaDB
+cannot run its migrations on a case-insensitive bind mount. The steps below are
+the same contract from a clone of this repository, plus prepare, validate, and
+smoke-test. `prepare.sh` writes `data/secrets.env`
 first; the one-shot in `compose.yaml` then only copies that file.
 
 ```bash

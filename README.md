@@ -41,22 +41,29 @@ No cloud key? `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up` pull
 
 ### Published image, no git checkout
 
-Two files, then start. A Docker GUI uses the same pair: paste `compose.yaml` and select `.env`.
+One file is enough. A `.env` beside it is optional.
 
 ```bash
 mkdir synaplan && cd synaplan
-curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/compose.yaml
-curl -fsSL -o .env https://raw.githubusercontent.com/metadist/synaplan/main/deploy/selfhost.env.example
+curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/quickstart/compose.yaml
 docker compose up -d
 ```
 
-Open **<http://127.0.0.1:8000>** (`SYNAPLAN_HTTP_BIND` plus `SYNAPLAN_HTTP_PORT`).
+Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the administrator, paste one provider key (free: [Groq](https://console.groq.com)), done. The first start pulls the images and takes a few minutes.
 
-`SYNAPLAN_VERSION` in that `.env` is a release tag (`5.1.1` in the example). Newer tags are on the [releases page](https://github.com/metadist/synaplan/releases). Never set `latest`. Leave the eight secret lines commented out — the first start writes them to `data/secrets.env`. Back that file up with the database. Leave both admin lines empty and create the first administrator in the browser, or set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` together.
+**Docker GUI** (Portainer, Dockge, Synology Container Manager, …): create a stack, paste [`deploy/quickstart/compose.yaml`](deploy/quickstart/compose.yaml) as its compose file, deploy. Any setting from [`deploy/quickstart/.env.example`](deploy/quickstart/.env.example) goes into the stack's environment variables — nothing is required. When the GUI runs on another machine (a NAS or a server), add `SYNAPLAN_HTTP_BIND=0.0.0.0` and `SYNAPLAN_URL=http://<that machine's IP>:8000`; without them Synaplan only opens on that machine itself. Dockge marks the stack "exited" once the one-time `secrets-init` step has finished; that is expected, and Synaplan keeps running.
 
-If you change the bind, the port, or the public address, set `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` to that same address. Live chat stays disconnected when they do not match.
+**Settings** go into `.env`, then `docker compose up -d` again (in a GUI: the stack's variables, then redeploy):
 
-To move to another release, back up `./data` first, change `SYNAPLAN_VERSION`, and run `docker compose up -d` again. Rolling the tag back after a migration needs the backup: [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#roll-back).
+- `SYNAPLAN_VERSION` picks a release tag from the [releases page](https://github.com/metadist/synaplan/releases). Empty means the release this file was published with. Never `latest`.
+- `SYNAPLAN_HTTP_BIND=0.0.0.0` plus `SYNAPLAN_URL=http://<this machine's IP>:8000` opens it to your network. `SYNAPLAN_URL` must be the address people type, or live chat stays disconnected. Over plain `http://` on a network address, browsers block the microphone and copying to the clipboard; chat and files work. For those two, use [Closed network](#closed-network) HTTPS.
+- Provider keys, a bootstrap administrator and mail are listed in the example with one line each.
+
+**Data** lives in named Docker volumes — the database, uploads, vectors and the generated secrets. Keep them together: a database without its `secrets` volume does not start. `docker compose down` keeps everything; `docker compose down -v` deletes it all.
+
+**Change the release:** back up the volumes, set `SYNAPLAN_VERSION`, run `docker compose up -d` (or redeploy the stack in the GUI). Going back to an older tag after a newer one migrated the database means restoring that backup. The steps are in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#quickstart-volumes).
+
+Office documents, local AI, file work, closed-network TLS and scripted backups use the full [`deploy/compose.yaml`](deploy/compose.yaml) with [`deploy/selfhost.env.example`](deploy/selfhost.env.example) instead.
 
 ### Closed network
 

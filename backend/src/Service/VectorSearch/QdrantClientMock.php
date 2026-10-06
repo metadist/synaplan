@@ -99,11 +99,23 @@ final class QdrantClientMock implements QdrantClientInterface
         $this->logger->info('QdrantClientMock: deleteDigest', ['point_id' => $pointId]);
     }
 
+    public function deleteDigests(array $pointIds): void
+    {
+        $this->logger->info('QdrantClientMock: deleteDigests', ['count' => count($pointIds)]);
+    }
+
     public function deleteAllDigestsForUser(int $userId): int
     {
         $this->logger->info('QdrantClientMock: deleteAllDigestsForUser', ['user_id' => $userId]);
 
         return 0;
+    }
+
+    public function scrollDigests(int $userId): array
+    {
+        $this->logger->info('QdrantClientMock: scrollDigests', ['user_id' => $userId]);
+
+        return [];
     }
 
     // --- Routing Anchor Operations (Phase 8 embedding-router cascade layer) ---

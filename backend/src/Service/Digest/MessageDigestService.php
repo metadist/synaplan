@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Digest;
 
+use App\AI\Exception\ChatFailureClassifier;
+use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\MessageDigestSchema;
@@ -36,6 +38,22 @@ final readonly class MessageDigestService
     private const MAX_TITLE_CHARS = 200;
     private const MESSAGE_CLIP_CHARS = 1500;
     private const FILE_TEXT_CLIP_CHARS = 1000;
+    /** Titles from the user's other chats, so a task repeated elsewhere is not indexed twice. */
+    private const RECENT_TITLES_FOR_DEDUP = 30;
+
+    /** The model answered, but the body was not a JSON list or null. */
+    public const FAILURE_UNPARSABLE = 'unparsable';
+
+    /**
+     * CircuitBreaker fail-fast. The exception has no status or context, so
+     * {@see ChatFailureClassifier} would report Unknown.
+     */
+    public const FAILURE_CIRCUIT_OPEN = 'circuit_open';
+
+    /**
+     * {@see ModelNotConfiguredException}. The classifier would report Unknown.
+     */
+    public const FAILURE_MODEL_NOT_CONFIGURED = 'model_not_configured';
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -48,6 +66,7 @@ final readonly class MessageDigestService
         private LoggerInterface $logger,
         private StructuredOutputConfig $structuredOutputConfig,
         private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
+        private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
     ) {
     }
 
@@ -58,11 +77,19 @@ final readonly class MessageDigestService
      * existing digest titles from the same chats are provided as dedup
      * context, so re-running over the same range is idempotent and cheap.
      *
-     * @param list<Message> $messages
+     * A parsed answer — `[]`, `null`, or a list that validates to nothing —
+     * is a successful scan. A thrown provider error or an unparsable answer
+     * sets `failed` and `failureReason` and leaves `scanned` at 0.
      *
-     * @return array{scanned: int, created: int, proposals: list<array{title: string, message_id: int}>}
+     * `$pendingTitles` are titles a dry run has proposed in earlier batches;
+     * they count as existing because a real run would have stored them.
+     *
+     * @param list<Message> $messages
+     * @param list<string>  $pendingTitles
+     *
+     * @return array{scanned: int, created: int, proposals: list<array{title: string, message_id: int}>, failed: bool, failureReason: ?string}
      */
-    public function digestBatch(User $user, array $messages, bool $dryRun = false): array
+    public function digestBatch(User $user, array $messages, bool $dryRun = false, array $pendingTitles = []): array
     {
         $messages = array_values(array_filter(
             $messages,
@@ -70,7 +97,7 @@ final readonly class MessageDigestService
         ));
 
         if ([] === $messages) {
-            return ['scanned' => 0, 'created' => 0, 'proposals' => []];
+            return $this->outcome(0, 0, []);
         }
 
         $messageIds = array_map(static fn (Message $m): int => (int) $m->getId(), $messages);
@@ -81,17 +108,25 @@ final readonly class MessageDigestService
         ));
 
         if ([] === $pending) {
-            return ['scanned' => count($messages), 'created' => 0, 'proposals' => []];
+            return $this->outcome(count($messages), 0, []);
         }
 
         $chatIds = array_values(array_unique(array_filter(array_map(
             static fn (Message $m): int => (int) $m->getChatId(),
             $pending
         ))));
-        $existingTitles = $this->digestRepository->findTitlesForChats($user->getId(), $chatIds);
+        $existingTitles = array_values(array_unique([
+            ...$this->digestRepository->findTitlesForChats($user->getId(), $chatIds),
+            ...$this->digestRepository->findRecentTitles($user->getId(), self::RECENT_TITLES_FOR_DEDUP),
+            ...$pendingTitles,
+        ]));
 
-        $proposals = $this->extractDigestsViaAi($user, $pending, $existingTitles);
+        $extraction = $this->extractDigestsViaAi($user, $pending, $existingTitles);
+        if ($extraction['failed']) {
+            return $this->outcome(0, 0, [], true, $extraction['failureReason']);
+        }
 
+        $proposals = $extraction['proposals'];
         $created = 0;
         if (!$dryRun) {
             $byId = [];
@@ -105,18 +140,14 @@ final readonly class MessageDigestService
             }
         }
 
-        return [
-            'scanned' => count($messages),
-            'created' => $created,
-            'proposals' => $proposals,
-        ];
+        return $this->outcome(count($messages), $created, $proposals);
     }
 
     /**
      * @param list<Message> $messages
      * @param list<string>  $existingTitles
      *
-     * @return list<array{title: string, message_id: int}>
+     * @return array{proposals: list<array{title: string, message_id: int}>, failed: bool, failureReason: ?string}
      */
     private function extractDigestsViaAi(User $user, array $messages, array $existingTitles): array
     {
@@ -127,7 +158,7 @@ final readonly class MessageDigestService
 
         $existingBlock = '';
         if ([] !== $existingTitles) {
-            $existingBlock = "\nExisting digest titles from these conversations (do NOT duplicate):\n";
+            $existingBlock = "\nExisting digest titles from these and the user's recent conversations (do NOT duplicate):\n";
             foreach ($existingTitles as $title) {
                 $existingBlock .= '- '.$title."\n";
             }
@@ -137,10 +168,10 @@ final readonly class MessageDigestService
 Message batch (each line starts with [#id direction channel date]):
 {$batchText}{$existingBlock}
 RESPONSE FORMAT (strict JSON, no markdown):
-[
+{"digests": [
   {"title": "office rent letter to realtor about the increase of payments", "message_id": 1234}
-]
-Return [] or null if no message in this batch is worth indexing.
+]}
+Return {"digests": []} if no message in this batch is worth indexing.
 PROMPT;
 
         try {
@@ -178,8 +209,20 @@ PROMPT;
             ]);
 
             $validIds = array_map(static fn (Message $m): int => (int) $m->getId(), $messages);
+            $parsed = $this->parseDigestsFromResponse($content, $validIds);
+            if (null === $parsed) {
+                return [
+                    'proposals' => [],
+                    'failed' => true,
+                    'failureReason' => self::FAILURE_UNPARSABLE,
+                ];
+            }
 
-            return $this->parseDigestsFromResponse($content, $validIds);
+            return [
+                'proposals' => $parsed,
+                'failed' => false,
+                'failureReason' => null,
+            ];
         } catch (\Throwable $e) {
             $this->logger->error('Message digest extraction failed', [
                 'user_id' => $user->getId(),
@@ -187,7 +230,11 @@ PROMPT;
                 'error' => $e->getMessage(),
             ]);
 
-            return [];
+            return [
+                'proposals' => [],
+                'failed' => true,
+                'failureReason' => $this->failureReasonFor($e),
+            ];
         }
     }
 
@@ -197,9 +244,9 @@ PROMPT;
      *
      * @param list<int> $validMessageIds
      *
-     * @return list<array{title: string, message_id: int}>
+     * @return list<array{title: string, message_id: int}>|null null when the answer is not JSON
      */
-    private function parseDigestsFromResponse(string $content, array $validMessageIds): array
+    private function parseDigestsFromResponse(string $content, array $validMessageIds): ?array
     {
         $content = trim($content);
 
@@ -209,25 +256,34 @@ PROMPT;
 
         $result = $this->jsonDecoder->decode($content);
 
-        if (!$result->success) {
-            if (false !== stripos($content, 'null')) {
-                return [];
-            }
-
+        if (!$result->success || !is_array($result->data)) {
             $this->logger->warning('Failed to parse message digest JSON', [
                 'content_preview' => substr($content, 0, 300),
                 'error' => $result->errorReason,
             ]);
 
-            return [];
+            return null;
         }
 
         // The schema path wraps the proposals under `digests` (a bare array
         // root is not expressible in structured output); the prose-instruction
-        // fallback still returns them bare.
-        $decoded = $result->data['digests'] ?? $result->data;
-        if (!is_array($decoded)) {
+        // fallback still returns them bare. A JSON null payload is an empty
+        // scan, a lone digest object counts as a list of one, and anything
+        // else that is not a list was not a digest answer.
+        $decoded = array_key_exists('digests', $result->data) ? $result->data['digests'] : $result->data;
+        if (null === $decoded) {
             return [];
+        }
+        if (is_array($decoded) && array_key_exists('message_id', $decoded)) {
+            $decoded = [$decoded];
+        }
+        if (!is_array($decoded) || !array_is_list($decoded)) {
+            $this->logger->warning('Failed to parse message digest JSON', [
+                'content_preview' => substr($content, 0, 300),
+                'error' => 'digest payload was not a list',
+            ]);
+
+            return null;
         }
 
         $validated = [];
@@ -272,14 +328,51 @@ PROMPT;
         return $validated;
     }
 
+    /**
+     * @param list<array{title: string, message_id: int}> $proposals
+     *
+     * @return array{scanned: int, created: int, proposals: list<array{title: string, message_id: int}>, failed: bool, failureReason: ?string}
+     */
+    private function outcome(int $scanned, int $created, array $proposals, bool $failed = false, ?string $failureReason = null): array
+    {
+        return [
+            'scanned' => $scanned,
+            'created' => $created,
+            'proposals' => $proposals,
+            'failed' => $failed,
+            'failureReason' => $failureReason,
+        ];
+    }
+
+    private function failureReasonFor(\Throwable $error): string
+    {
+        for ($current = $error; null !== $current; $current = $current->getPrevious()) {
+            if ($current instanceof ModelNotConfiguredException) {
+                return self::FAILURE_MODEL_NOT_CONFIGURED;
+            }
+            if ($this->isOpenCircuitBreakerMessage($current->getMessage())) {
+                return self::FAILURE_CIRCUIT_OPEN;
+            }
+        }
+
+        return $this->failureClassifier->classify($error)->value;
+    }
+
+    /**
+     * CircuitBreaker fail-fast throws ProviderException with no HTTP status
+     * and no context. Both strings are that class's own messages: the open
+     * state, and the half-open overflow which sets the breaker open first.
+     */
+    private function isOpenCircuitBreakerMessage(string $message): bool
+    {
+        return str_contains($message, 'circuit breaker is OPEN')
+            || str_contains($message, 'Service temporarily unavailable (too many test attempts)');
+    }
+
     private function storeDigest(User $user, Message $message, string $title): void
     {
-        $timestampMs = (int) floor(microtime(true) * 1000);
-        $digestId = ($timestampMs * 1000) + random_int(0, 999);
-
         $digest = new MessageDigest();
-        $digest->setId($digestId)
-            ->setUserId($user->getId())
+        $digest->setUserId($user->getId())
             ->setChatId((int) $message->getChatId())
             ->setMessageId((int) $message->getId())
             ->setTitle($title)
@@ -288,9 +381,22 @@ PROMPT;
             ->setActive(true)
             ->setCreated(time());
 
-        $this->digestRepository->upsert($digest);
+        $storedId = $this->digestRepository->upsert($digest, self::nextDigestId(...));
+        $digest->setId($storedId);
 
         $this->mirrorToQdrant($user, $digest);
+    }
+
+    /**
+     * Millisecond timestamp plus a 0–999 suffix. Two calls in the same
+     * millisecond can still collide; {@see MessageDigestRepository::upsert()}
+     * retries with a new value instead of rewriting the other row.
+     */
+    private static function nextDigestId(): int
+    {
+        $timestampMs = (int) floor(microtime(true) * 1000);
+
+        return ($timestampMs * 1000) + random_int(0, 999);
     }
 
     /**
@@ -301,6 +407,25 @@ PROMPT;
     public static function qdrantPointId(int $userId, int $digestId): string
     {
         return sprintf('dig_%d_%d', $userId, $digestId);
+    }
+
+    /**
+     * Inverse of {@see qdrantPointId()}. Null when the string is not a digest
+     * point for this user.
+     */
+    public static function digestIdFromPointId(int $userId, string $pointId): ?int
+    {
+        $prefix = sprintf('dig_%d_', $userId);
+        if (!str_starts_with($pointId, $prefix)) {
+            return null;
+        }
+
+        $suffix = substr($pointId, strlen($prefix));
+        if ('' === $suffix || !ctype_digit($suffix)) {
+            return null;
+        }
+
+        return (int) $suffix;
     }
 
     /**
@@ -348,6 +473,7 @@ PROMPT;
                 'user_id' => $digest->getUserId(),
                 'chat_id' => $digest->getChatId(),
                 'message_id' => $digest->getMessageId(),
+                'digest_id' => $digest->getId(),
                 'title' => $digest->getTitle(),
                 'channel' => $digest->getChannel(),
                 'source_date' => $digest->getSourceDate(),
@@ -416,13 +542,13 @@ PROMPT;
         $this->logger->warning('Message digest prompt not found in DB, using fallback');
 
         return <<<'PROMPT'
-You index a user's message history. Select ONLY the KEY messages of the batch (documents, decisions, important facts/dates/names — never small talk) and write one searchable title per message, in the language of the source message, max 200 characters.
+You index a user's message history. Select ONLY the KEY messages of the batch (documents with their content, decisions, important facts/dates/names — never small talk, requests to the assistant or notes that a file was created) and write one searchable title per message, in the language the user writes in (keep names and numbers as in the source), max 200 characters.
 
 RESPONSE FORMAT (strict JSON, no markdown):
-[
+{"digests": [
   {"title": "office rent letter to realtor about the increase of payments", "message_id": 1234}
-]
-message_id MUST be an id from the batch. Return [] or null if nothing is worth indexing.
+]}
+message_id MUST be an id from the batch. Return {"digests": []} if nothing is worth indexing.
 PROMPT;
     }
 }

@@ -185,6 +185,16 @@ describe('UsageStatistics', () => {
     expect(secondRow.text()).toContain('~')
   })
 
+  it('offers deep memory indexing in the activity action filter', async () => {
+    const wrapper = mount(UsageStatistics, mountOptions)
+    await flushPromises()
+
+    const option = wrapper.get(
+      '[data-testid="select-activity-action"] option[value="MESSAGE_DIGEST"]'
+    )
+    expect(option.text()).toBe('Long-term memory')
+  })
+
   it('should show dash for zero cached tokens', async () => {
     const wrapper = mount(UsageStatistics, mountOptions)
     await flushPromises()
