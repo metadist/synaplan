@@ -52,6 +52,8 @@ export const selectors = {
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
     sidebarPanel: '[data-testid="section-sidebar-panel"]',
+    /** Rail hover tooltip. Clicking the icon hides it after a short leave fade. */
+    sidebarRailTooltip: '[data-testid="tooltip-sidebar-rail"]',
     /** Desktop chats column (recent chats, new chat, all chats). */
     sidebarChats: '[data-testid="section-sidebar-chats"]',
     navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
