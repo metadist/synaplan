@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import * as widgetsApi from '@/services/api/widgetsApi'
+import {
+  getSetupPrompt,
+  getSummaryPrompt,
+  resetSetupPrompt,
+  resetSummaryPrompt,
+  updateSetupPrompt,
+  updateSummaryPrompt,
+} from '@/services/api/widgetsApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 import WidgetAiPromptSection from './WidgetAiPromptSection.vue'
 
@@ -45,9 +52,9 @@ defineExpose({ save })
       :models="models"
       :loading-models="loadingModels"
       :placeholders="summaryPlaceholders"
-      :load-fn="() => widgetsApi.getSummaryPrompt(widgetId)"
-      :save-fn="(prompt, modelId) => widgetsApi.updateSummaryPrompt(widgetId, prompt, modelId)"
-      :reset-fn="() => widgetsApi.resetSummaryPrompt(widgetId)"
+      :load-fn="() => getSummaryPrompt(widgetId)"
+      :save-fn="(prompt, modelId) => updateSummaryPrompt(widgetId, prompt, modelId)"
+      :reset-fn="() => resetSummaryPrompt(widgetId)"
     />
 
     <!-- Setup Interview Prompt — folded by default so it doesn't distract
@@ -61,9 +68,9 @@ defineExpose({ save })
       :models="models"
       :loading-models="loadingModels"
       :initial-collapsed="true"
-      :load-fn="() => widgetsApi.getSetupPrompt(widgetId)"
-      :save-fn="(prompt, modelId) => widgetsApi.updateSetupPrompt(widgetId, prompt, modelId)"
-      :reset-fn="() => widgetsApi.resetSetupPrompt(widgetId)"
+      :load-fn="() => getSetupPrompt(widgetId)"
+      :save-fn="(prompt, modelId) => updateSetupPrompt(widgetId, prompt, modelId)"
+      :reset-fn="() => resetSetupPrompt(widgetId)"
     />
   </div>
 </template>
