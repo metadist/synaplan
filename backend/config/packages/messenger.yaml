@@ -159,6 +159,11 @@ when@test:
                 # Only this key is overridden — the rest of the routing map
                 # from the base config is merged in unchanged.
                 'App\Message\ExtractMemoriesCommand': sync
+                # The test stack has no messenger worker. A turn in one chat
+                # digests the user's other chats before that response finishes.
+                # TestProvider only creates an entry when a batch line contains
+                # `remember:`, so other specs do not gain long-term memory entries.
+                'App\Message\DigestOtherChatsCommand': sync
                 # The test stack has no messenger worker. Run the turn in the
                 # webhook request so Playwright can see the reply.
                 'App\Message\ProcessTelegramUpdateCommand': sync

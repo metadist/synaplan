@@ -261,6 +261,17 @@ interface QdrantClientInterface
     public function deleteDigest(string $pointId): void;
 
     /**
+     * Delete digest points by logical id (`dig_{userId}_{digestId}`).
+     *
+     * Matched on the `_point_id` payload so a legacy integer-keyed point is
+     * deleted with the current UUID-keyed one. Implementations send the ids
+     * in batches rather than one request per point.
+     *
+     * @param list<string> $pointIds
+     */
+    public function deleteDigests(array $pointIds): void;
+
+    /**
      * Delete all digest points for a user.
      *
      * @return int Number of deleted points

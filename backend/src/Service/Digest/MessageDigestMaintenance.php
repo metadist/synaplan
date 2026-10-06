@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Digest;
 
+use App\Entity\MessageDigest;
 use App\Repository\MessageDigestRepository;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Psr\Log\LoggerInterface;
@@ -14,8 +15,9 @@ use Psr\Log\LoggerInterface;
  * Two invariants are enforced here:
  *  - a user never holds more than `DIGEST.MAX_PER_USER` ACTIVE digests
  *    (oldest-by-source-date entries are deactivated first), and
- *  - deleting a chat deactivates its digests so `[Message:ID]` references
- *    into it stop resolving and its vectors leave the search index.
+ *  - deleting a chat, or a long-term memory entry, deactivates its digests
+ *    so `[Message:ID]` references into it stop resolving and its vectors
+ *    leave the search index.
  *
  * MariaDB is authoritative: the DB soft-delete always happens; the Qdrant
  * point deletes are best-effort. Search drops a hit unless BMESSAGEDIGESTS
@@ -100,20 +102,84 @@ final readonly class MessageDigestMaintenance
     }
 
     /**
+     * Deactivate one active digest owned by this user and drop its point.
+     * Unknown, foreign and already inactive ids are a miss.
+     */
+    public function deactivateOwned(int $userId, int $digestId): bool
+    {
+        $ownedId = $this->digestRepository->findActiveOwnedId($userId, $digestId);
+        if (null === $ownedId) {
+            return false;
+        }
+
+        $this->digestRepository->deactivateByIds([$ownedId]);
+        $this->deletePoints($userId, [$ownedId]);
+
+        return true;
+    }
+
+    /**
+     * Deactivate every active digest of this user and drop the points.
+     *
+     * Walks the table in {@see self::PRUNE_SLICE} pages so a user with
+     * thousands of entries does not issue one Qdrant call per row.
+     *
+     * @return int number of digests deactivated
+     */
+    public function deactivateAllActive(int $userId): int
+    {
+        $deleted = 0;
+        $afterId = 0;
+
+        while (true) {
+            $slice = $this->digestRepository->findActiveForUserAfterId($userId, $afterId, self::PRUNE_SLICE);
+            if ([] === $slice) {
+                break;
+            }
+
+            $ids = array_map(static fn (MessageDigest $digest): int => $digest->getId(), $slice);
+            $nextAfterId = max($ids);
+            if ($nextAfterId <= $afterId) {
+                break;
+            }
+            $afterId = $nextAfterId;
+
+            $deleted += $this->digestRepository->deactivateByIds($ids);
+            $this->deletePoints($userId, $ids);
+        }
+
+        if ($deleted > 0) {
+            $this->logger->info('Message digests deactivated for user', [
+                'user_id' => $userId,
+                'count' => $deleted,
+            ]);
+        }
+
+        return $deleted;
+    }
+
+    /**
      * @param list<int> $digestIds
      */
     private function deletePoints(int $userId, array $digestIds): void
     {
+        if ([] === $digestIds) {
+            return;
+        }
+
+        $pointIds = [];
         foreach ($digestIds as $digestId) {
-            try {
-                $this->qdrantClient->deleteDigest(MessageDigestService::qdrantPointId($userId, $digestId));
-            } catch (\Throwable $e) {
-                $this->logger->warning('Failed to delete digest point from Qdrant (row already deactivated)', [
-                    'user_id' => $userId,
-                    'digest_id' => $digestId,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            $pointIds[] = MessageDigestService::qdrantPointId($userId, $digestId);
+        }
+
+        try {
+            $this->qdrantClient->deleteDigests($pointIds);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to delete digest points from Qdrant (rows already deactivated)', [
+                'user_id' => $userId,
+                'count' => count($digestIds),
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

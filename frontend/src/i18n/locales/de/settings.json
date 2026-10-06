@@ -94,10 +94,10 @@
     },
     "memories": {
       "title": "Erinnerungen",
-      "subtitle": "Steuere, ob Synaplan deine Erinnerungen zur Personalisierung nutzen und automatisch aktualisieren darf.",
-      "toggleLabel": "Erinnerungen für mein Konto aktivieren",
-      "enabledHint": "Aktiv: Die KI kann Erinnerungen nutzen und anhand von Gesprächen aktualisieren.",
-      "disabledHint": "Deaktiviert: Die KI nutzt keine Erinnerungen und aktualisiert sie nicht automatisch. Du kannst es jederzeit wieder aktivieren."
+      "subtitle": "Schalte Erinnerungen und das Langzeitgedächtnis ein oder aus. Die KI nutzt sie, um sich an deine Chats zu erinnern.",
+      "toggleLabel": "Erinnerungen und Langzeitgedächtnis für mein Konto aktivieren",
+      "enabledHint": "An. Die KI kann deine Erinnerungen und dein Langzeitgedächtnis nutzen und aus deinen Chats neue speichern.",
+      "disabledHint": "Aus. Die KI nutzt deine Erinnerungen und dein Langzeitgedächtnis nicht mehr und speichert keine neuen. Vorhandene Einträge im Langzeitgedächtnis bleiben. Du kannst sie unter Erinnerungen im Tab „Langzeitgedächtnis“ löschen."
     },
     "changePassword": {
       "title": "Passwort ändern",

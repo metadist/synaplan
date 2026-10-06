@@ -777,4 +777,71 @@ final class QdrantClientDirectTest extends TestCase
 
         $this->assertSame([], $client->scrollDigests(7));
     }
+
+    public function testDeleteDigestsMatchesLogicalIdsInBatches(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/delete' => fn () => $this->okEmpty(),
+        ], $calls);
+
+        $pointIds = [];
+        for ($i = 1; $i <= 101; ++$i) {
+            $pointIds[] = 'dig_7_'.$i;
+        }
+        $client->deleteDigests($pointIds);
+
+        $deleteCalls = array_values(array_filter(
+            $calls,
+            static fn (array $call): bool => str_ends_with($call['path'], '/points/delete'),
+        ));
+        $this->assertCount(2, $deleteCalls, '101 ids must be two batches of the client limit, not one call per point');
+        $this->assertStringContainsString('wait=true', $deleteCalls[0]['query']);
+
+        $first = json_decode((string) $deleteCalls[0]['body'], true);
+        $second = json_decode((string) $deleteCalls[1]['body'], true);
+        $this->assertIsArray($first);
+        $this->assertIsArray($second);
+        $this->assertArrayNotHasKey('points', $first);
+        $this->assertSame('_point_id', $first['filter']['must'][0]['key']);
+        $this->assertCount(100, $first['filter']['must'][0]['match']['any']);
+        $this->assertSame('dig_7_1', $first['filter']['must'][0]['match']['any'][0]);
+        $this->assertSame('dig_7_100', $first['filter']['must'][0]['match']['any'][99]);
+        $this->assertSame(['dig_7_101'], $second['filter']['must'][0]['match']['any']);
+    }
+
+    public function testDeleteDigestsSkipsEmptyInput(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([], $calls);
+
+        $client->deleteDigests([]);
+        $client->deleteDigests(['']);
+
+        $this->assertSame([], $calls);
+    }
+
+    public function testDeleteDigestsTreatsAMissingCollectionAsSuccess(): void
+    {
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/delete' => fn () => new MockResponse(
+                (string) json_encode(['status' => ['error' => "Collection `user_message_digests` doesn't exist"]]),
+                ['http_code' => 404],
+            ),
+        ]);
+
+        $client->deleteDigests(['dig_7_1', 'dig_7_2']);
+        $this->addToAssertionCount(1);
+    }
+
+    public function testDeleteDigestsThrowsWhenQdrantRejectsTheBatch(): void
+    {
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/delete' => fn () => new MockResponse('nope', ['http_code' => 500]),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Failed to delete digest points');
+        $client->deleteDigests(['dig_7_1']);
+    }
 }

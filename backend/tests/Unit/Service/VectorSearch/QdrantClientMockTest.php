@@ -168,4 +168,10 @@ final class QdrantClientMockTest extends TestCase
     {
         $this->assertSame([], $this->client->scrollDigests(7));
     }
+
+    public function testDeleteDigestsDoesNotThrow(): void
+    {
+        $this->expectNotToPerformAssertions();
+        $this->client->deleteDigests(['dig_7_1', 'dig_7_2']);
+    }
 }

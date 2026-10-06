@@ -269,10 +269,10 @@
     },
     "memories": {
       "title": "Mémoires",
-      "subtitle": "Contrôlez si Synaplan doit utiliser et mettre à jour automatiquement vos mémoires pour la personnalisation.",
-      "toggleLabel": "Activer les mémoires pour mon compte",
-      "enabledHint": "Activé : l’IA peut utiliser et mettre à jour vos mémoires à partir des conversations.",
-      "disabledHint": "Désactivé : l’IA n’utilisera ni ne mettra à jour automatiquement les mémoires. Vous pouvez réactiver à tout moment."
+      "subtitle": "Activez ou désactivez les mémoires et la mémoire à long terme. L’IA s’en sert pour se souvenir de vos conversations.",
+      "toggleLabel": "Activer les mémoires et la mémoire à long terme pour mon compte",
+      "enabledHint": "Activé. L’IA peut utiliser vos mémoires et votre mémoire à long terme, et en enregistrer de nouvelles à partir de vos conversations.",
+      "disabledHint": "Désactivé. L’IA n’utilise plus vos mémoires ni votre mémoire à long terme, et n’en enregistre plus de nouvelles. Les entrées de mémoire à long terme déjà présentes sont conservées. Vous pouvez les supprimer dans Mémoires, onglet Mémoire à long terme."
     },
     "changePassword": {
       "title": "Changer le mot de passe",

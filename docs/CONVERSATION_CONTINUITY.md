@@ -78,6 +78,15 @@ quoted digest title instead.
   5000); on overflow the oldest are deactivated first.
 - **Cleanup:** deleting a chat deactivates its digests and drops their
   vectors; account deletion purges rows and vectors.
+- **User view:** Memories → *Long-term memory* lists the active entries
+  (title, date, channel, source chat) with *Open in chat*, a single delete
+  and *Delete all* (`GET /api/v1/user/message-digests/entries`,
+  `DELETE /api/v1/user/message-digests/{id}`,
+  `DELETE /api/v1/user/message-digests`). A delete deactivates the row and
+  drops its vector; the same message is never digested again. Entries are
+  part of the memory export (`longTermMemory`). The tab stays while the server
+  kill switch is off and entries remain, and disappears once it is off and
+  empty.
 - **Admin knobs:** Admin → System Configuration → Routing → *Deep memory
   (message digests)* (`DIGEST.*` BCONFIG rows, ownerId 0). Kill switch:
   `DIGEST_ENABLED` (stops both indexing and retrieval).
@@ -124,7 +133,7 @@ re-run after an interruption.
 | ------ | ------ |
 | `CONVERSATION_SUMMARY_ENABLED` (admin UI) | no summary injection or refreshes |
 | `DIGEST_ENABLED` (admin UI) | no daily indexing, no retrieval in chat |
-| user's own memories toggle | that user is skipped by indexing AND retrieval |
+| user's own memories toggle | that user is skipped by indexing AND retrieval; existing entries stay until the user deletes them |
 
 ### Quality evaluation (live model calls, not part of CI)
 

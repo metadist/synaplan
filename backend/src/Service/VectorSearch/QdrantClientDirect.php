@@ -551,6 +551,42 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    public function deleteDigests(array $pointIds): void
+    {
+        $pointIds = array_values(array_unique(array_filter(
+            $pointIds,
+            static fn (string $pointId): bool => '' !== $pointId,
+        )));
+        if ([] === $pointIds) {
+            return;
+        }
+
+        foreach (array_chunk($pointIds, self::BATCH_LIMIT) as $chunk) {
+            try {
+                // Payload filter, not primary ids: legacy points are integer-keyed
+                // and only share `_point_id` with the current UUID-keyed point.
+                $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/delete?wait=true", [
+                    'filter' => [
+                        'must' => [
+                            ['key' => '_point_id', 'match' => ['any' => $chunk]],
+                        ],
+                    ],
+                ]);
+            } catch (\Throwable $e) {
+                if ($this->isMissingCollectionError($e)) {
+                    return;
+                }
+
+                $this->logger->error('Failed to delete digest points from Qdrant', [
+                    'count' => count($chunk),
+                    'error' => $e->getMessage(),
+                ]);
+
+                throw new \RuntimeException('Failed to delete digest points: '.$e->getMessage(), 0, $e);
+            }
+        }
+    }
+
     public function deleteAllDigestsForUser(int $userId): int
     {
         try {

@@ -74,7 +74,6 @@ fixtures) is fixed instead.
   - `@whatsapp` specs: the WhatsApp stub on `:3999` only runs in the test stack.
   - `@telegram` specs: the dev stack keeps the channel off and talks to the real Bot API. Start the stub and recreate backend and worker with `TELEGRAM_ENABLED=true TELEGRAM_API_BASE_URL=http://telegram-stub:3998 TELEGRAM_WEBHOOK_BASE_URL=https://e2e.synaplan.test docker compose --profile telegram-stub up -d telegram-stub backend worker` to run them there.
   - `subscription*.spec.ts`: need the fake Stripe secret and price IDs from `backend/.env.test`; real Stripe values in `backend/.env` fail the webhook signature or the level mapping.
-  - `memories.spec.ts` "memorizable fact": the dev stack uses the real extraction model, which stores a paraphrase.
   - `workspace-tab.spec.ts` "flag off": compute is on in the dev stack.
   - `admin-panel.spec.ts` "users: server-side search": once the dev database holds more than 50 users (guest sessions and E2E workers pile up), the admin row is no longer on the first page of the unfiltered list.
 - **Tests that reset mid-test after a file under `frontend/` was saved** during the run: Vite HMR reloaded the page (the trace shows module requests with `?t=<timestamp>`). Never save frontend files while Playwright runs against `:5173`; rerun the affected specs.

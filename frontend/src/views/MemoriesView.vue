@@ -19,7 +19,9 @@
               {{ $t('memories.backToChat') }}
             </button>
             <!-- View Toggle -->
-            <div class="flex items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto">
+            <div
+              class="flex flex-wrap items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto"
+            >
               <button
                 class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"
                 :class="viewMode === 'list' ? 'nav-item--active' : ''"
@@ -28,6 +30,16 @@
                 <Icon icon="mdi:format-list-bulleted" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
                 <span class="hidden sm:inline">{{ $t('memories.listView.title') }}</span>
                 <span class="sm:hidden">{{ $t('memories.listView.shortTitle') }}</span>
+              </button>
+              <button
+                v-if="longTermAvailable"
+                type="button"
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item whitespace-normal leading-tight"
+                :class="viewMode === 'longterm' ? 'nav-item--active' : ''"
+                data-testid="btn-memories-view-long-term"
+                @click="viewMode = 'longterm'"
+              >
+                {{ $t('memories.longTerm.tab') }}
               </button>
               <button
                 class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"
@@ -55,15 +67,23 @@
         <!-- Views -->
         <div
           class="flex-1 surface-card rounded-xl p-3 md:p-6"
-          :class="viewMode === 'list' ? 'overflow-visible' : 'overflow-hidden'"
+          :class="
+            viewMode === 'list' || viewMode === 'longterm' ? 'overflow-visible' : 'overflow-hidden'
+          "
           :style="{
             minHeight: '500px',
-            maxHeight: viewMode === 'list' ? 'none' : 'calc(100vh - 200px)',
+            maxHeight:
+              viewMode === 'list' || viewMode === 'longterm' ? 'none' : 'calc(100vh - 200px)',
           }"
         >
+          <LongTermMemoryTab
+            v-show="viewMode === 'longterm'"
+            @availability="onLongTermAvailability"
+          />
+
           <!-- Loading State -->
           <div
-            v-if="memoriesStore.loading"
+            v-if="viewMode !== 'longterm' && memoriesStore.loading"
             class="flex flex-col items-center justify-center h-full"
           >
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mb-4"></div>
@@ -72,7 +92,7 @@
 
           <!-- Error State -->
           <div
-            v-else-if="memoriesStore.error || isServiceUnavailable"
+            v-else-if="viewMode !== 'longterm' && (memoriesStore.error || isServiceUnavailable)"
             class="flex flex-col items-center justify-center h-full max-w-lg mx-auto text-center"
           >
             <Icon icon="mdi:database-alert" class="w-20 h-20 text-orange-500 mb-4" />
@@ -108,7 +128,7 @@
           </div>
 
           <!-- Content Views -->
-          <template v-else>
+          <template v-else-if="viewMode !== 'longterm'">
             <MemoryListView
               v-if="viewMode === 'list'"
               :memories="memoriesStore.memories"
@@ -161,7 +181,7 @@
       <!-- Fullscreen Overlay wenn Memories für User deaktiviert sind -->
       <Teleport to="#app">
         <div
-          v-if="!memoriesEnabledForUser"
+          v-if="!memoriesEnabledForUser && viewMode !== 'longterm'"
           class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
           @click.self="router.push('/settings#profile')"
         >
@@ -196,6 +216,15 @@
               >
                 <Icon icon="mdi:check-circle" class="w-6 h-6" />
                 {{ $t('memories.userDisabled.enable') }}
+              </button>
+              <button
+                v-if="longTermAvailable"
+                type="button"
+                class="w-full btn-secondary px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-long-term-from-overlay"
+                @click="viewMode = 'longterm'"
+              >
+                {{ $t('memories.longTerm.tab') }}
               </button>
               <button
                 class="w-full surface-chip py-3 rounded-xl font-medium txt-secondary hover:txt-primary transition-colors flex items-center justify-center gap-2"
@@ -235,6 +264,7 @@ import MemoryGraphView from '@/components/MemoryGraphView.vue'
 import MemoryGraph3DView from '@/components/MemoryGraph3DView.vue'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemorySelectionCard from '@/components/memories/MemorySelectionCard.vue'
+import LongTermMemoryTab from '@/components/memories/LongTermMemoryTab.vue'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
@@ -255,7 +285,15 @@ const memoriesStore = useMemoriesStore()
 const { success, error, warning } = useNotification()
 const { confirm } = useDialog()
 
-const viewMode = ref<'list' | 'graph' | 'graph3d'>('list')
+const viewMode = ref<'list' | 'graph' | 'graph3d' | 'longterm'>('list')
+const longTermAvailable = ref(true)
+
+function onLongTermAvailability(available: boolean) {
+  longTermAvailable.value = available
+  if (!available && viewMode.value === 'longterm') {
+    viewMode.value = 'list'
+  }
+}
 const is3dSupported = ref(true)
 let viewportMql: MediaQueryList | null = null
 const handleViewportChange = () => {

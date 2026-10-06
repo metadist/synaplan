@@ -10,6 +10,7 @@ use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\UserMemoryActionSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
+use App\Service\Digest\LongTermMemoryService;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -52,6 +53,7 @@ class UserMemoryController extends AbstractController
         private readonly ModelConfigService $modelConfigService,
         private readonly RateLimitService $rateLimitService,
         private readonly StructuredOutputConfig $structuredOutputConfig,
+        private readonly LongTermMemoryService $longTermMemory,
         private readonly JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
@@ -536,12 +538,14 @@ class UserMemoryController extends AbstractController
     #[OA\Get(
         path: '/api/v1/user/memories/export',
         summary: 'Export all user memories',
-        description: 'Downloads every memory stored for the current user as JSON for data portability',
+        description: 'Downloads every memory and every active long-term memory entry stored for the current user as JSON for data portability',
+        tags: ['User Memories'],
         responses: [
             new OA\Response(
                 response: 200,
                 description: 'Memory export',
                 content: new OA\JsonContent(
+                    required: ['exportedAt', 'memories', 'longTermMemory'],
                     properties: [
                         new OA\Property(property: 'exportedAt', type: 'string', format: 'date-time'),
                         new OA\Property(
@@ -564,6 +568,22 @@ class UserMemoryController extends AbstractController
                                 type: 'object'
                             )
                         ),
+                        new OA\Property(
+                            property: 'longTermMemory',
+                            type: 'array',
+                            description: 'Active long-term memory entries, newest source message first',
+                            items: new OA\Items(
+                                required: ['title', 'messageId', 'chatId', 'channel', 'sourceDate'],
+                                properties: [
+                                    new OA\Property(property: 'title', type: 'string', example: 'office rent letter to realtor about the increase of payments'),
+                                    new OA\Property(property: 'messageId', type: 'integer', example: 5678),
+                                    new OA\Property(property: 'chatId', type: 'integer', nullable: true, example: 42),
+                                    new OA\Property(property: 'channel', type: 'string', example: 'web'),
+                                    new OA\Property(property: 'sourceDate', type: 'integer', example: 1747216800, description: 'Unix timestamp of the source message, in seconds'),
+                                ],
+                                type: 'object'
+                            )
+                        ),
                     ]
                 )
             ),
@@ -571,9 +591,15 @@ class UserMemoryController extends AbstractController
     )]
     public function exportMemories(#[CurrentUser] User $user): JsonResponse
     {
+        $userId = $user->getId();
+        if (!is_int($userId)) {
+            throw new \LogicException('Authenticated user has no id.');
+        }
+
         $response = $this->json([
             'exportedAt' => date(\DATE_ATOM),
-            'memories' => $this->memoryService->exportUserMemories($user->getId()),
+            'memories' => $this->memoryService->exportUserMemories($userId),
+            'longTermMemory' => $this->longTermMemory->exportEntries($userId),
         ]);
         $response->headers->set(
             'Content-Disposition',
