@@ -209,8 +209,6 @@ export const selectors = {
     againDropdownPanel: '[data-testid="dropdown-again-models"]',
     againDropdownItem: 'button.dropdown-item',
     modelToggle: '[data-testid="btn-model-toggle"]',
-    modelPanel: '[data-testid="dropdown-model-panel"]',
-    modelChipName: '[data-testid="model-chip-name"]',
     toolsToggle: '[data-testid="btn-tools-toggle"]',
     toolsPanel: '[data-testid="dropdown-tools-panel"]',
     toolsActiveBadge: '[data-testid="badge-tools-active"]',
