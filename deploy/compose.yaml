@@ -396,7 +396,7 @@ services:
             if [ "$$file_existed" = true ]; then
                 refuse "$$(list_keys "$$unresolved") has no value in $$SECRETS_NAME. That file was not changed. Add the original value there, or restore the file from a backup. A value that exists only in .env is not used once this file exists."
             fi
-            refuse "$$(list_keys "$$unresolved") has no value, and this install already has a database. Put the original value back. A new password would not open the existing database."
+            refuse "$$(list_keys "$$unresolved") has no value, and this install already has a database. Restore $$SECRETS_NAME from the backup of this install, or put the original values back. A new password would not open the existing database."
         fi
 
         if [ "$$file_existed" = false ]; then

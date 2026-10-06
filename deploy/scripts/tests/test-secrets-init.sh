@@ -91,6 +91,7 @@ grep -Fq 'export DB_PASSWORD="$$MARIADB_PASSWORD"' "$compose" ||
 # an existing database.
 quickstart_init="$(awk '/^  secrets-init:/,/^  backend:/' "$quickstart")"
 for line in '- secrets:/data' '- db:/db:ro' 'SECRETS_INIT_DB_DIR: /db' \
+    'SECRETS_INIT_FILE_LABEL: the secrets volume (secrets.env)' \
     '- secrets-app:/out/app' '- secrets-db:/out/db' '- secrets-realtime:/out/realtime'; do
     grep -Fq -- "$line" <<<"$quickstart_init" || fail "quickstart secrets-init lacks '$line'"
 done
@@ -272,7 +273,7 @@ run_init "$restore/data" "$restore/out" >/dev/null
 
 # Quickstart layout: the database lives in its own volume (SECRETS_INIT_DB_DIR)
 # and errors name the volume instead of data/secrets.env.
-qs_label='secrets.env in the secrets volume'
+qs_label='the secrets volume (secrets.env)'
 
 qs_new="$work/quickstart-new"
 mkdir -p "$qs_new/db"
@@ -287,7 +288,8 @@ qs_db="$work/quickstart-existing-db"
 mkdir -p "$qs_db/db"
 printf 'x' > "$qs_db/db/ibdata1"
 set +e
-run_init "$qs_db/secrets" "$qs_db/out" SECRETS_INIT_DB_DIR="$qs_db/db" >"$qs_db/stdout" 2>"$qs_db/stderr"
+run_init "$qs_db/secrets" "$qs_db/out" SECRETS_INIT_DB_DIR="$qs_db/db" \
+    SECRETS_INIT_FILE_LABEL="$qs_label" >"$qs_db/stdout" 2>"$qs_db/stderr"
 code=$?
 set -e
 [[ "$code" -ne 0 ]] || fail "quickstart: a database volume without secrets was accepted"
@@ -295,6 +297,8 @@ set -e
 assert_not_published "$qs_db/out"
 grep -Fq 'already has a database' "$qs_db/stderr" ||
     fail "quickstart: the refusal does not say the database already exists"
+grep -Fq "Restore $qs_label from the backup" "$qs_db/stderr" ||
+    fail "quickstart: the refusal does not say what to restore"
 
 qs_missing="$work/quickstart-missing"
 mkdir -p "$qs_missing/secrets" "$qs_missing/db"

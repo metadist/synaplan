@@ -51,12 +51,12 @@ docker compose up -d
 
 Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the administrator, paste one provider key (free: [Groq](https://console.groq.com)), done. The first start pulls the images and takes a few minutes.
 
-**Docker GUI** (Portainer, Dockge, Synology Container Manager, …): create a stack, paste [`deploy/quickstart/compose.yaml`](deploy/quickstart/compose.yaml) as its compose file, deploy. Any setting from [`deploy/quickstart/.env.example`](deploy/quickstart/.env.example) goes into the stack's environment variables — nothing is required. Dockge marks the stack "exited" once the one-time `secrets-init` step has finished; that is expected, and Synaplan keeps running.
+**Docker GUI** (Portainer, Dockge, Synology Container Manager, …): create a stack, paste [`deploy/quickstart/compose.yaml`](deploy/quickstart/compose.yaml) as its compose file, deploy. Any setting from [`deploy/quickstart/.env.example`](deploy/quickstart/.env.example) goes into the stack's environment variables — nothing is required. When the GUI runs on another machine (a NAS or a server), add `SYNAPLAN_HTTP_BIND=0.0.0.0` and `SYNAPLAN_URL=http://<that machine's IP>:8000`; without them Synaplan only opens on that machine itself. Dockge marks the stack "exited" once the one-time `secrets-init` step has finished; that is expected, and Synaplan keeps running.
 
 **Settings** go into `.env`, then `docker compose up -d` again (in a GUI: the stack's variables, then redeploy):
 
 - `SYNAPLAN_VERSION` picks a release tag from the [releases page](https://github.com/metadist/synaplan/releases). Empty means the release this file was published with. Never `latest`.
-- `SYNAPLAN_HTTP_BIND=0.0.0.0` plus `SYNAPLAN_URL=http://<this machine's IP>:8000` opens it to your network. `SYNAPLAN_URL` must be the address people type, or live chat stays disconnected.
+- `SYNAPLAN_HTTP_BIND=0.0.0.0` plus `SYNAPLAN_URL=http://<this machine's IP>:8000` opens it to your network. `SYNAPLAN_URL` must be the address people type, or live chat stays disconnected. Over plain `http://` on a network address, browsers block the microphone and copying to the clipboard; chat and files work. For those two, use [Closed network](#closed-network) HTTPS.
 - Provider keys, a bootstrap administrator and mail are listed in the example with one line each.
 
 **Data** lives in named Docker volumes — the database, uploads, vectors and the generated secrets. Keep them together: a database without its `secrets` volume does not start. `docker compose down` keeps everything; `docker compose down -v` deletes it all.
