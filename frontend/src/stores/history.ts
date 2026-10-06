@@ -13,6 +13,7 @@ import { finalizeSettledInProgressTurn } from '@/utils/chatErrorDisplay'
 import { authService } from '@/services/authService'
 import { useChatsStore } from '@/stores/chats'
 import { chatGoneStatus } from '@/utils/chatAccessError'
+import { createUuid } from '@/utils/uuid'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import type { MessageUsage } from '@/stores/usageTaximeter'
@@ -545,7 +546,7 @@ export const useHistoryStore = defineStore('history', () => {
     agentId?: number | null
   ) => {
     messages.value.push({
-      id: crypto.randomUUID(),
+      id: createUuid(),
       role,
       parts,
       timestamp: new Date(),
@@ -571,7 +572,7 @@ export const useHistoryStore = defineStore('history', () => {
     backendMessageId?: number,
     originalMessageId?: number
   ): string => {
-    const id = crypto.randomUUID()
+    const id = createUuid()
     if ('assistant' === role) {
       const chatId = useChatsStore().activeChatId
       if (null !== chatId) {

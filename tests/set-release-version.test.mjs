@@ -8,6 +8,7 @@ import {
   applyElestioVersion,
   applyEnvExampleVersion,
   applyPackerVersion,
+  applyQuickstartComposeVersion,
   applyUmbrelAppVersion,
   applyUmbrelComposeVersion,
   parseImageDigest,
@@ -15,6 +16,7 @@ import {
   readElestioVersion,
   readEnvExampleVersion,
   readPackerVersion,
+  readQuickstartComposeVersion,
   readUmbrelAppVersion,
   readUmbrelComposePin,
 } from '../scripts/set-release-version.mjs'
@@ -60,6 +62,18 @@ const PACKER_SAMPLE = [
   '  default     = "us-east-1"',
   '  description = "Build region."',
   '}',
+].join('\n')
+
+const QUICKSTART_SAMPLE = [
+  'x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-4.0.12}',
+  '',
+  'x-app-env: &app-env',
+  '  APP_VERSION: ${SYNAPLAN_VERSION:-4.0.12}',
+  '  APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}',
+  '',
+  'services:',
+  '  redis:',
+  '    image: redis:8.6.4-alpine',
 ].join('\n')
 
 const DIGEST_A = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
@@ -269,6 +283,43 @@ test('the Packer anchors ignore a default that belongs to another variable', () 
   assert.equal(readPackerVersion('variable "region" {\n  default = "us-east-1"\n}'), null)
 })
 
+test('rewrites the quickstart image default and APP_VERSION default together', () => {
+  const result = applyQuickstartComposeVersion(QUICKSTART_SAMPLE, '4.0.14')
+
+  assert.ok(
+    result.includes('x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-4.0.14}')
+  )
+  assert.ok(result.includes('  APP_VERSION: ${SYNAPLAN_VERSION:-4.0.14}'))
+  assert.ok(result.includes('${SYNAPLAN_HTTP_PORT:-8000}'))
+  assert.ok(!result.includes('4.0.12'))
+  assert.deepEqual(readQuickstartComposeVersion(result), { image: '4.0.14', appVersion: '4.0.14' })
+})
+
+test('fails when either quickstart default is missing or duplicated', () => {
+  assert.throws(
+    () => applyQuickstartComposeVersion('  APP_VERSION: ${SYNAPLAN_VERSION:-4.0.12}', '4.0.14'),
+    /x-app-image default, found 0/
+  )
+
+  assert.throws(
+    () =>
+      applyQuickstartComposeVersion(
+        'x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-4.0.12}',
+        '4.0.14'
+      ),
+    /APP_VERSION default, found 0/
+  )
+
+  assert.throws(
+    () =>
+      applyQuickstartComposeVersion(
+        `${QUICKSTART_SAMPLE}\n  APP_VERSION: \${SYNAPLAN_VERSION:-4.0.11}`,
+        '4.0.14'
+      ),
+    /APP_VERSION default, found 2/
+  )
+})
+
 // readUmbrelComposePin builds a regex from the repository name. A partial
 // escape (dots only) would still work for `ghcr.io/metadist/synaplan` today,
 // but would misparse — or throw on — a line whose image differs by even one
@@ -301,6 +352,9 @@ test('the shipped files name one and the same released version', () => {
   )
   const packer = readPackerVersion(
     readFileSync(join(ROOT, 'deploy', 'aws', 'packer', 'synaplan.pkr.hcl'), 'utf8')
+  )
+  const quickstart = readQuickstartComposeVersion(
+    readFileSync(join(ROOT, 'deploy', 'quickstart', 'compose.yaml'), 'utf8')
   )
 
   assert.equal(
@@ -345,6 +399,8 @@ test('the shipped files name one and the same released version', () => {
   assert.equal(elestio, umbrelCompose.appVersion, 'Umbrel APP_VERSION must match Elestio')
   assert.equal(elestio, umbrelCompose.version, 'Umbrel image tag must match Elestio')
   assert.equal(elestio, packer, 'The AWS AMI must bake the same version as Elestio')
+  assert.equal(elestio, quickstart.image, 'The quickstart image default must match Elestio')
+  assert.equal(elestio, quickstart.appVersion, 'The quickstart APP_VERSION must match Elestio')
 })
 
 test('a comment mentioning the variable is not treated as an assignment', () => {

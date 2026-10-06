@@ -2,7 +2,8 @@
 
 // Writes a published release version into the files that decide which version a
 // NEW deployment installs: the Elestio manifest, the self-hosting example
-// configuration, the Umbrel App Store package, and the AWS Packer build.
+// configuration, the Umbrel App Store package, the AWS Packer build, and the
+// one-file quickstart compose.
 //
 // Existing deployments are untouched by design. They keep the version their
 // operator pinned, and change it only by following docs/UPDATE_ELESTIO.md,
@@ -261,6 +262,65 @@ export const applyPackerVersion = (text, version) => {
   return result.join('\n')
 }
 
+// The quickstart compose is the one-file path: it runs without any .env, so
+// the release lives in the `${SYNAPLAN_VERSION:-…}` default of the image line
+// and of APP_VERSION. Both must move together, or the About page would report a
+// different release than the image that runs.
+const QUICKSTART_IMAGE_LINE =
+  /^(x-app-image:\s*&app-image\s+ghcr\.io\/metadist\/synaplan:\$\{SYNAPLAN_VERSION:-)([^}]*)(\}\s*)$/
+const QUICKSTART_APP_VERSION_LINE = /^(\s*APP_VERSION:\s*\$\{SYNAPLAN_VERSION:-)([^}]*)(\}\s*)$/
+
+export const applyQuickstartComposeVersion = (text, version) => {
+  let imageReplaced = 0
+  let appVersionReplaced = 0
+
+  const result = text
+    .split('\n')
+    .map((line) => {
+      const image = QUICKSTART_IMAGE_LINE.exec(line)
+      if (image) {
+        imageReplaced += 1
+        return `${image[1]}${version}${image[3]}`
+      }
+
+      const appVersion = QUICKSTART_APP_VERSION_LINE.exec(line)
+      if (appVersion) {
+        appVersionReplaced += 1
+        return `${appVersion[1]}${version}${appVersion[3]}`
+      }
+
+      return line
+    })
+    .join('\n')
+
+  if (imageReplaced !== 1) {
+    throw new Error(
+      `deploy/quickstart/compose.yaml: expected exactly one x-app-image default, found ${imageReplaced}`
+    )
+  }
+
+  if (appVersionReplaced !== 1) {
+    throw new Error(
+      `deploy/quickstart/compose.yaml: expected exactly one APP_VERSION default, found ${appVersionReplaced}`
+    )
+  }
+
+  return result
+}
+
+export const readQuickstartComposeVersion = (text) => {
+  const lines = text.split('\n')
+  const find = (pattern) => {
+    for (const line of lines) {
+      const match = pattern.exec(line)
+      if (match) return match[2].trim()
+    }
+    return null
+  }
+
+  return { image: find(QUICKSTART_IMAGE_LINE), appVersion: find(QUICKSTART_APP_VERSION_LINE) }
+}
+
 export const readPackerVersion = (text) => {
   const block = /^variable\s+"synaplan_version"\s*\{$([\s\S]*?)^\}$/m.exec(text)
   if (!block) return null
@@ -286,6 +346,10 @@ const TARGETS = [
   {
     path: join('deploy', 'aws', 'packer', 'synaplan.pkr.hcl'),
     apply: (text, version) => applyPackerVersion(text, version),
+  },
+  {
+    path: join('deploy', 'quickstart', 'compose.yaml'),
+    apply: (text, version) => applyQuickstartComposeVersion(text, version),
   },
 ]
 

@@ -9,12 +9,16 @@
 # written as a single-quoted shell literal. The backup file stays raw
 # KEY=value lines, which is what a restore reads back.
 #
-# The same script is inlined in deploy/compose.yaml (every "$" doubled) so a
-# two-file install does not need this path. deploy/scripts/tests/test-secrets-init.sh
-# fails when the two copies differ.
+# The same script is inlined in deploy/compose.yaml and
+# deploy/quickstart/compose.yaml (every "$" doubled) so neither install needs
+# this path. deploy/scripts/tests/test-secrets-init.sh fails when a copy differs.
 set -eu
 DATA="${SECRETS_INIT_DATA:-/data}"
 SECRETS="$DATA/secrets.env"
+# The quickstart keeps the database in its own volume, not under $DATA.
+DB_DIR="${SECRETS_INIT_DB_DIR:-$DATA/mariadb}"
+# Where the person reading an error finds the backup copy.
+SECRETS_NAME="${SECRETS_INIT_FILE_LABEL:-data/secrets.env}"
 # Each consumer mounts only its own directory. The web container never sees
 # the database root password or the realtime admin credentials.
 APP_OUT="${SECRETS_INIT_APP_OUT:-/out/app/secrets.env}"
@@ -60,8 +64,8 @@ shell_quote() {
 }
 
 stack_initialised() {
-    [ -d "$DATA/mariadb" ] || return 1
-    find "$DATA/mariadb" -mindepth 1 -print -quit 2>/dev/null | grep -q .
+    [ -d "$DB_DIR" ] || return 1
+    find "$DB_DIR" -mindepth 1 -print -quit 2>/dev/null | grep -q .
 }
 
 is_placeholder() {
@@ -176,7 +180,7 @@ if [ -n "$placeholders" ]; then
 fi
 
 if [ -n "$file_placeholders" ]; then
-    refuse "$(list_keys "$file_placeholders") in data/secrets.env still has the example value. Replace it with the output of \"openssl rand -hex 32\". The file was not rewritten."
+    refuse "$(list_keys "$file_placeholders") in $SECRETS_NAME still has the example value. Replace it with the output of \"openssl rand -hex 32\". The file was not rewritten."
 fi
 
 if [ -n "$unadoptable" ]; then
@@ -185,9 +189,9 @@ fi
 
 if [ -n "$unresolved" ]; then
     if [ "$file_existed" = true ]; then
-        refuse "$(list_keys "$unresolved") has no value in data/secrets.env. That file was not changed. Add the original value there, or restore the file from a backup. A value that exists only in .env is not used once this file exists."
+        refuse "$(list_keys "$unresolved") has no value in $SECRETS_NAME. That file was not changed. Add the original value there, or restore the file from a backup. A value that exists only in .env is not used once this file exists."
     fi
-    refuse "$(list_keys "$unresolved") has no value, and this install already has a database. Put the original value back. A new password would not open the existing database."
+    refuse "$(list_keys "$unresolved") has no value, and this install already has a database. Restore $SECRETS_NAME from the backup of this install, or put the original values back. A new password would not open the existing database."
 fi
 
 if [ "$file_existed" = false ]; then

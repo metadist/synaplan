@@ -64,3 +64,51 @@ example value." The published `5.0.5` PHP process hit an illegal
 instruction during migrations on this Colima VM, so `/setup`, the first
 chat, and the realtime badge in the browser were not completed here.
 `http://127.0.0.1:18000/setup` did return the app HTML before that.
+
+**2026-10-06 — J-EASY-3b ([#2206](https://github.com/metadist/synaplan/issues/2206)).**
+Reproduced the reporter's "only YAML and .env" path on the m4 host with the
+published `5.2.1`. Four blockers, none of them visible in CI:
+
+- YAML alone: `deploy/compose.yaml` aborts on `:?` for `SYNAPLAN_VERSION`.
+- A folder on the macOS filesystem: MariaDB's `./data` bind mount is
+  case-insensitive, so it runs with `lower_case_table_names=2` and the
+  migrations fail. The same files on a Linux filesystem start fine.
+- Portainer resolves `./data` inside its own `/data/compose/<id>`, so the
+  database and the generated secrets end up hidden in the Portainer volume.
+- The illegal instruction from J-EASY-3: `opcache.huge_code_pages=1` on arm64
+  with Branch Target Identification. A few percent of all PHP starts die with
+  SIGILL (5/150 on, 0/150 with `-d opcache.huge_code_pages=0`). When the
+  crash hit the bootstrap's table count, the count read as 0 and the
+  bootstrap dropped every table: the administrator vanished on a restart.
+
+Fix: `deploy/quickstart/compose.yaml` (defaults for every variable, named
+volumes only, no repo files, no profiles), the bootstrap now stops on an
+unreadable count instead of treating it as an empty database, the dev
+fixtures skip on an unreadable user count, the image switches huge code pages
+off on arm64, and public pre-login routes ignore a cookie that no longer
+validates. 12 restarts with forced SIGILLs: 0 drops, the administrator
+survived each one. With the ini: 0/200 SIGILLs and 10 clean restarts.
+
+Walks, all from the one file with the published `5.2.1`, each to a first
+Groq answer in the browser:
+
+- CLI: empty folder, `docker compose up -d` without `.env` (only the port as
+  a shell variable because 8000 was taken; `config` resolves
+  `127.0.0.1:8000` with nothing set). `/setup` → administrator → chat
+  answer → realtime 1 client. `down` + `up`: secrets hash unchanged, login
+  200. Compose 2.9.0 and 2.20.3 resolve the nested defaults.
+- Rollback: `5.2.0` → volume backup (the commands in
+  `docs/UPDATE_SELFHOST.md`) → `5.2.1` → restore → `5.2.0` again, 109
+  migrations, 1 user, login 200. These two releases share a schema, so this
+  proves the restore, not a schema rollback.
+- Portainer: stack from pasted text plus two environment variables, eight
+  named volumes, wizard showed "Groq Connected", answer in 1.8 s.
+- Dockge: `compose.yaml` and `.env` in its stacks folder, answer in 2.0 s.
+  Dockge lists the stack as "exited" because `secrets-init` finished; that is
+  Dockge's rule for any exited container and now documented.
+
+Found on the way: with the published image, opening a fresh install in a
+browser that still holds a cookie from another Synaplan on the same host
+(cookies ignore the port) lands on `/login`, which answers 503
+SETUP_REQUIRED, until a reload. With the authenticator change the first
+visit opens `/setup` directly, verified with that same cookie.
