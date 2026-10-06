@@ -5,9 +5,11 @@ import { useChatsStore } from '@/stores/chats'
 import { chatApi } from '@/services/api/chatApi'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
+const authUser = ref<{ id: number } | null>(null)
 vi.mock('@/services/authService', () => ({
   authService: {
     isAuthenticated: () => true,
+    getUser: () => authUser,
   },
 }))
 
@@ -34,6 +36,17 @@ vi.mock('@/stores/incoming', () => ({
   }),
 }))
 
+function listedChat(id: number, title: string) {
+  return {
+    id,
+    title,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    messageCount: 1,
+    source: 'web' as const,
+  }
+}
+
 function chatPayload(id: number) {
   return {
     success: true,
@@ -51,6 +64,7 @@ describe('Chats Store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
+    authUser.value = null
     vi.clearAllMocks()
     incomingOpenableMock.mockReturnValue(false)
     incomingLoaded.value = false
@@ -1134,6 +1148,120 @@ describe('Chats Store', () => {
 
       store.setActiveChat(4)
       expect(store.readyChatIds.has(4)).toBe(false)
+    })
+
+    it('keeps the finished dot across a reload until that chat is opened', async () => {
+      authUser.value = { id: 9 }
+      const store = useChatsStore()
+      store.setActiveChat(1)
+      store.markChatGenerating(4, true)
+      const updates: Array<(data: StreamUpdatePayload) => void> = []
+      vi.spyOn(chatApi, 'attachStream').mockImplementation((opts) => {
+        updates.push(opts.onUpdate)
+        return () => {}
+      })
+      store.watchDetachedRun(4, 'run-4')
+      updates[0]?.({ status: 'complete', chatTitle: 'Weather in Düsseldorf' })
+
+      expect(JSON.parse(localStorage.getItem('synaplan_ready_chat_ids_9') ?? '[]')).toEqual([4])
+
+      setActivePinia(createPinia())
+      const reloaded = useChatsStore()
+      httpClientMock.mockResolvedValue({
+        chats: [listedChat(1, 'Open'), listedChat(4, 'Weather in Düsseldorf')],
+        activeRunChatIds: [],
+      })
+      await reloaded.loadChats()
+
+      expect(reloaded.activeChatId).toBe(1)
+      expect(reloaded.readyChatIds.has(4)).toBe(true)
+
+      reloaded.setActiveChat(4)
+      expect(reloaded.readyChatIds.has(4)).toBe(false)
+      expect(localStorage.getItem('synaplan_ready_chat_ids_9')).toBeNull()
+    })
+
+    it('marks a chat the user left when the answer finished while the app was closed', async () => {
+      authUser.value = { id: 9 }
+      const store = useChatsStore()
+      store.setActiveChat(1)
+      store.markChatGenerating(4, true)
+      vi.spyOn(chatApi, 'attachStream').mockImplementation(() => () => {})
+      store.watchDetachedRun(4, 'run-4')
+
+      expect(JSON.parse(localStorage.getItem('synaplan_departed_run_chat_ids_9') ?? '[]')).toEqual([
+        4,
+      ])
+
+      setActivePinia(createPinia())
+      const reloaded = useChatsStore()
+      httpClientMock.mockResolvedValue({
+        chats: [listedChat(1, 'Open'), listedChat(4, 'Weather in Düsseldorf')],
+        activeRunChatIds: [],
+      })
+      await reloaded.loadChats()
+
+      expect(reloaded.readyChatIds.has(4)).toBe(true)
+      expect(reloaded.activeRunChatIds.has(4)).toBe(false)
+      expect(localStorage.getItem('synaplan_departed_run_chat_ids_9')).toBeNull()
+    })
+
+    it('does not paint the finished dot on the chat the user is already reading', () => {
+      const store = useChatsStore()
+      store.setActiveChat(4)
+      store.markChatGenerating(4, true)
+      const updates: Array<(data: StreamUpdatePayload) => void> = []
+      vi.spyOn(chatApi, 'attachStream').mockImplementation((opts) => {
+        updates.push(opts.onUpdate)
+        return () => {}
+      })
+
+      store.watchDetachedRun(4, 'run-4')
+      updates[0]?.({ status: 'complete', chatTitle: 'Weather in Düsseldorf' })
+
+      expect(store.readyChatIds.has(4)).toBe(false)
+      expect(store.activeRunChatIds.has(4)).toBe(false)
+    })
+
+    it('keeps following a dropped background run until the server says it finished', async () => {
+      vi.useFakeTimers()
+      const store = useChatsStore()
+      try {
+        store.setActiveChat(1)
+        store.markChatGenerating(4, true)
+        httpClientMock.mockResolvedValue({
+          chats: [listedChat(1, 'Open'), listedChat(4, 'New Chat')],
+          activeRunChatIds: [4],
+        })
+        vi.spyOn(chatApi, 'attachStream').mockImplementation((opts) => {
+          opts.onUpdate({ status: 'error', error: 'Connection interrupted' })
+          return () => {}
+        })
+
+        store.watchDetachedRun(4, 'run-4')
+        for (let i = 0; i < 15; i++) {
+          await vi.advanceTimersByTimeAsync(2000)
+        }
+
+        expect(store.readyChatIds.has(4)).toBe(false)
+        expect(store.activeRunChatIds.has(4)).toBe(true)
+        expect(httpClientMock).toHaveBeenCalled()
+        const callsWhileRunning = httpClientMock.mock.calls.length
+        expect(callsWhileRunning).toBeGreaterThanOrEqual(15)
+
+        httpClientMock.mockResolvedValue({
+          chats: [listedChat(1, 'Open'), listedChat(4, 'Weather in Düsseldorf')],
+          activeRunChatIds: [],
+        })
+        await vi.advanceTimersByTimeAsync(8000)
+
+        expect(store.readyChatIds.has(4)).toBe(true)
+        expect(store.activeRunChatIds.has(4)).toBe(false)
+      } finally {
+        store.$reset()
+        vi.clearAllTimers()
+        vi.useRealTimers()
+      }
     })
 
     it('keeps the other chats when one turn ends', async () => {
