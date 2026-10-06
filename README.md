@@ -53,7 +53,7 @@ Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the ad
 
 **Docker GUI** (Portainer, Dockge, Synology Container Manager, …): create a stack, paste [`deploy/quickstart/compose.yaml`](deploy/quickstart/compose.yaml) as its compose file, deploy. Any setting from [`deploy/quickstart/.env.example`](deploy/quickstart/.env.example) goes into the stack's environment variables — nothing is required. Dockge marks the stack "exited" once the one-time `secrets-init` step has finished; that is expected, and Synaplan keeps running.
 
-**Settings** go into `.env` (or the GUI's variables), then `docker compose up -d` again:
+**Settings** go into `.env`, then `docker compose up -d` again (in a GUI: the stack's variables, then redeploy):
 
 - `SYNAPLAN_VERSION` picks a release tag from the [releases page](https://github.com/metadist/synaplan/releases). Empty means the release this file was published with. Never `latest`.
 - `SYNAPLAN_HTTP_BIND=0.0.0.0` plus `SYNAPLAN_URL=http://<this machine's IP>:8000` opens it to your network. `SYNAPLAN_URL` must be the address people type, or live chat stays disconnected.
@@ -61,7 +61,7 @@ Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the ad
 
 **Data** lives in named Docker volumes — the database, uploads, vectors and the generated secrets. Keep them together: a database without its `secrets` volume does not start. `docker compose down` keeps everything; `docker compose down -v` deletes it all.
 
-**Change the release:** back up the volumes, set `SYNAPLAN_VERSION`, run `docker compose up -d`. Going back to an older tag after a newer one migrated the database means restoring that backup. The steps are in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#quickstart-volumes).
+**Change the release:** back up the volumes, set `SYNAPLAN_VERSION`, run `docker compose up -d` (or redeploy the stack in the GUI). Going back to an older tag after a newer one migrated the database means restoring that backup. The steps are in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#quickstart-volumes).
 
 Office documents, local AI, file work, closed-network TLS and scripted backups use the full [`deploy/compose.yaml`](deploy/compose.yaml) with [`deploy/selfhost.env.example`](deploy/selfhost.env.example) instead.
 
