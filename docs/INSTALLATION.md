@@ -9,6 +9,12 @@ Synaplan has separate development and production deployment contracts:
 - **Local development:** use the root `docker-compose.yml` or
   `docker-compose-minimal.yml`. These files build from source and include
   development tooling. They are not the supported production contract.
+- **Quickstart from the published image:** download
+  `deploy/quickstart/compose.yaml` into an empty folder and run
+  `docker compose up -d`, or paste it into a Docker GUI (Portainer, Dockge,
+  Synology). No git checkout and no `.env` are required; the optional settings
+  are in `deploy/quickstart/.env.example`. See the root README section
+  "Published image, no git checkout".
 - **Production self-hosting:** use `deploy/compose.yaml` with a pinned Synaplan
   image version and secrets supplied through `deploy/.env`.
 - **Elestio evaluation:** import the repository as a custom Docker Compose

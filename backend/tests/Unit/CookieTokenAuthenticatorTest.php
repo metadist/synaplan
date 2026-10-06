@@ -400,4 +400,35 @@ class CookieTokenAuthenticatorTest extends TestCase
         $this->assertSame('Test error', $content['message']);
         $this->assertSame('AUTH_FAILED', $content['code']);
     }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function anonymousOnFailurePathProvider(): iterable
+    {
+        yield 'runtime config' => ['/api/v1/config/runtime', 'GET'];
+        yield 'setup state' => ['/api/v1/setup/state', 'GET'];
+        yield 'setup admin' => ['/api/v1/setup/admin', 'POST'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('anonymousOnFailurePathProvider')]
+    public function testOnAuthenticationFailureContinuesAnonymouslyOnPreLoginRoutes(string $path, string $method): void
+    {
+        $request = Request::create($path, $method);
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'signed-for-a-deleted-user');
+
+        $result = $this->authenticator->onAuthenticationFailure($request, new AuthenticationException('User not found'));
+
+        $this->assertNull($result);
+    }
+
+    public function testOnAuthenticationFailureStillRejectsOtherRoutes(): void
+    {
+        $request = Request::create('/api/v1/config/runtime/extra', 'GET');
+
+        $response = $this->authenticator->onAuthenticationFailure($request, new AuthenticationException('User not found'));
+
+        $this->assertInstanceOf(\Symfony\Component\HttpFoundation\JsonResponse::class, $response);
+        $this->assertSame(401, $response->getStatusCode());
+    }
 }

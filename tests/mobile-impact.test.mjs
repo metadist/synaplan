@@ -33,6 +33,19 @@ test('classifies compute sidecars as no-app-impact', () => {
   assert.equal(result.classification, 'no-app-impact')
 })
 
+test('classifies the quickstart deployment as no-app-impact', () => {
+  const result = classifyFiles(
+    [
+      entry('deploy/quickstart/compose.yaml', 'A'),
+      entry('deploy/quickstart/.env.example', 'A'),
+      entry('tests/quickstart-compose.test.mjs', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'no-app-impact')
+})
+
 test('classifies a removed local worktree gitlink as no-app-impact', () => {
   const result = classifyFiles([entry('.worktrees/fix-2282-voice-reply', 'D')], policy)
 

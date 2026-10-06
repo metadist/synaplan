@@ -19,12 +19,37 @@
 # runs through the normal migrate path.
 BASELINE_MIGRATION="${BASELINE_MIGRATION:-DoctrineMigrations\\Version20260417000000}"
 
+# Exit status of bootstrap_migrations_metadata when the schema state could not
+# be read. Retryable: nothing was changed.
+BOOTSTRAP_STATE_UNKNOWN=2
+
 # Helper: count rows from a SELECT COUNT(*) statement (handles dbal:run-sql output noise).
+#
+# Fails (non-zero, no output) when the console call fails or prints no number.
+# A failed query must never read as 0: "no BUSER" is what allows the
+# half-applied-baseline recovery below to drop every table.
+#
 # Overridable in tests by redefining after sourcing this file.
 _count_sql() {
     local _sql="$1"
     local _env_flag="${2:-}"
-    php bin/console dbal:run-sql ${_env_flag} "$_sql" 2>/dev/null | grep -oE '[0-9]+' | tail -1
+    local _out
+    local _count
+    _out=$(php bin/console dbal:run-sql ${_env_flag} "$_sql" 2>/dev/null) || return 1
+    _count=$(printf '%s' "$_out" | grep -oE '[0-9]+' | tail -1)
+    [ -n "$_count" ] || return 1
+    printf '%s\n' "$_count"
+}
+
+# Prints the count, or reports why the bootstrap stops and returns non-zero.
+_count_or_stop() {
+    local _label="$1"
+    local _sql="$2"
+    local _env_flag="${3:-}"
+    if ! _count_sql "$_sql" "$_env_flag"; then
+        echo "⚠️  [$_label] Could not read the database schema state — changing nothing" >&2
+        return 1
+    fi
 }
 
 # Pre-create doctrine_migration_versions. We bypass doctrine:migrations:sync-metadata-storage
@@ -138,9 +163,9 @@ bootstrap_migrations_metadata() {
     local _has_buser
     local _has_baseline=0
 
-    _has_buser=$(_count_sql \
+    _has_buser=$(_count_or_stop "$_label" \
         "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'BUSER'" \
-        "$_env_flag")
+        "$_env_flag") || return "$BOOTSTRAP_STATE_UNKNOWN"
 
     if [ "${_has_buser:-0}" -eq 0 ]; then
         # Before treating a BUSER-less database as fresh, guard against a
@@ -159,9 +184,9 @@ bootstrap_migrations_metadata() {
         # data to lose, so we recover by dropping every orphan table and letting
         # the migrate below rebuild the schema from scratch.
         local _has_partial_baseline
-        _has_partial_baseline=$(_count_sql \
+        _has_partial_baseline=$(_count_or_stop "$_label" \
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'BAPIKEYS'" \
-            "$_env_flag")
+            "$_env_flag") || return "$BOOTSTRAP_STATE_UNKNOWN"
         if [ "${_has_partial_baseline:-0}" -gt 0 ]; then
             echo "⚠️  [$_label] Half-applied baseline detected (BAPIKEYS exists but BUSER does not) — dropping orphan tables so migrations can re-run cleanly"
             if ! _drop_all_tables "$_env_flag"; then
@@ -179,9 +204,9 @@ bootstrap_migrations_metadata() {
         return 0
     fi
 
-    _has_versions=$(_count_sql \
+    _has_versions=$(_count_or_stop "$_label" \
         "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'doctrine_migration_versions'" \
-        "$_env_flag")
+        "$_env_flag") || return "$BOOTSTRAP_STATE_UNKNOWN"
 
     # Legacy schema present. Ensure the metadata table exists before checking its contents.
     if [ "${_has_versions:-0}" -eq 0 ]; then
@@ -198,17 +223,17 @@ bootstrap_migrations_metadata() {
         local _legacy_baseline
         _escaped_baseline=$(_mysql_escape_baseline)
         _legacy_baseline=$(_mysql_legacy_stripped_baseline)
-        _has_baseline=$(_count_sql \
+        _has_baseline=$(_count_or_stop "$_label" \
             "SELECT COUNT(*) FROM doctrine_migration_versions WHERE version = '${_escaped_baseline}'" \
-            "$_env_flag")
+            "$_env_flag") || return "$BOOTSTRAP_STATE_UNKNOWN"
         # Detect the legacy buggy row (no backslash). If only that form is
         # present, force a re-register so the self-healing DELETE+INSERT path
         # runs and replaces it with the correctly-escaped version.
         if [ "${_has_baseline:-0}" -eq 0 ] && [ "$_escaped_baseline" != "$_legacy_baseline" ]; then
             local _has_legacy
-            _has_legacy=$(_count_sql \
+            _has_legacy=$(_count_or_stop "$_label" \
                 "SELECT COUNT(*) FROM doctrine_migration_versions WHERE version = '${_legacy_baseline}'" \
-                "$_env_flag")
+                "$_env_flag") || return "$BOOTSTRAP_STATE_UNKNOWN"
             if [ "${_has_legacy:-0}" -gt 0 ]; then
                 echo "📌 [$_label] Detected legacy baseline row with stripped namespace separator — will rewrite"
             fi
@@ -277,17 +302,22 @@ run_migrations_with_retry() {
     local _delay="${MIGRATION_RETRY_DELAY_SECONDS:-5}"
     local _attempt=1
 
+    local _bootstrap_rc
     while :; do
-        # A non-zero bootstrap means an unrecoverable setup failure (e.g. the
-        # half-applied-baseline orphan-table drop failed). Retrying would only
-        # crash-loop on the same error, so abort immediately and let the failure
-        # be visible rather than swallowed.
-        if ! bootstrap_migrations_metadata "$_env_flag" "$_label"; then
+        # BOOTSTRAP_STATE_UNKNOWN (a crashed or failed count query) changed
+        # nothing and is retried like a failed migrate. Any other non-zero
+        # bootstrap is an unrecoverable setup failure (e.g. the
+        # half-applied-baseline orphan-table drop failed). Retrying that would
+        # only crash-loop on the same error, so abort immediately and let the
+        # failure be visible rather than swallowed.
+        _bootstrap_rc=0
+        bootstrap_migrations_metadata "$_env_flag" "$_label" || _bootstrap_rc=$?
+        if [ "$_bootstrap_rc" -ne 0 ] && [ "$_bootstrap_rc" -ne "$BOOTSTRAP_STATE_UNKNOWN" ]; then
             echo "❌ [$_label] Migration metadata bootstrap failed — aborting" >&2
             return 1
         fi
 
-        if _run_doctrine_migrate "$_env_flag"; then
+        if [ "$_bootstrap_rc" -eq 0 ] && _run_doctrine_migrate "$_env_flag"; then
             return 0
         fi
 
