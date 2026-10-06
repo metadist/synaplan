@@ -359,7 +359,8 @@ export const selectors = {
     preferencesBtn: '[data-testid="btn-sidebar-v2-profile"]',
     profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
-    subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
+    /** PRO accounts: Subscription lives in the profile sidebar, not the account menu. */
+    subscriptionLink: '[data-testid="link-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
     memoriesBtn: '[data-testid="btn-sidebar-v2-memories"]',
