@@ -1,3 +1,5 @@
+import { createUuid } from '@/utils/uuid'
+
 export const PASTE_BLOCK_MIN_CHARS = 1200
 export const PASTE_BLOCK_MIN_LINES = 10
 /** A short multi-line address block should stay in the textarea. */
@@ -72,8 +74,5 @@ export function stripPastedBlocks(raw: string): string {
 }
 
 export function createPastedBlockId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `paste-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  return createUuid()
 }
