@@ -47,6 +47,44 @@ Put the previous version back in `deploy/.env` and repeat steps 3 and 4. If the
 new version already changed the database, also restore the backup from step 1 as
 described in [Backup and restore](../deploy/README.md#backup-and-restore).
 
+## Quickstart volumes
+
+The two-file quickstart (`deploy/quickstart/compose.yaml`) keeps its data in
+named Docker volumes instead of `deploy/data`. Run these commands in the folder
+that holds its `compose.yaml`. For a stack created in a Docker GUI, run them on
+the Docker host; the project name is the stack name.
+
+1. **Back up** every volume of the project, the generated secrets included:
+
+```bash
+project=$(docker compose ps -a --format '{{.Project}}' | head -n1)
+docker compose stop
+mkdir -p backup
+for v in $(docker volume ls -q --filter "label=com.docker.compose.project=$project"); do
+  docker run --rm -v "$v:/v:ro" -v "$PWD/backup:/b" alpine tar czf "/b/$v.tgz" -C /v .
+done
+docker compose start
+```
+
+2. **Change the release** with `SYNAPLAN_VERSION=1.4.0` in the `.env` beside
+   `compose.yaml` (or in the stack's environment variables), then run
+   `docker compose up -d`.
+
+3. **Roll back** by setting the previous version and restoring the backup into
+   fresh volumes:
+
+```bash
+docker compose down -v
+docker compose create
+for f in backup/*.tgz; do
+  docker run --rm -v "$(basename "$f" .tgz):/v" -v "$PWD/backup:/b:ro" alpine tar xzf "/b/$(basename "$f")" -C /v
+done
+docker compose up -d
+```
+
+`docker compose down -v` deletes the data of this project. Only run step 3 with
+the backup from step 1 next to you.
+
 ## Good to know
 
 A redeploy on its own never installs a newer version — the version only changes

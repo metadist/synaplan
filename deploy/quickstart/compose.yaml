@@ -1,0 +1,312 @@
+# Synaplan quickstart: the published image from this one file.
+#
+#   docker compose up -d      then open http://127.0.0.1:8000
+#
+# The first visit opens /setup, which creates the first administrator and asks
+# for an AI provider key. A .env next to this file is optional (see
+# .env.example beside it); a Docker GUI can take this file alone. All data and
+# the generated secrets live in named volumes: back up the whole project.
+# Local AI, office documents, file work, local-network TLS and scripted backups
+# use deploy/compose.yaml instead.
+
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.2.1}
+
+x-app-command: &app-command
+  - |
+    set -a
+    . /run/synaplan-secrets/secrets.env
+    set +a
+    export DB_PASSWORD="$$MARIADB_PASSWORD"
+    exec /usr/local/bin/docker-entrypoint.sh
+
+x-app-environment: &app-environment
+  APP_ENV: prod
+  APP_DEBUG: "0"
+  SYNAPLAN_PLATFORM: selfhost
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.2.1}
+  APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
+  FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
+  REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
+  BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+  BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+  REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-}
+  GUEST_CHAT_ENABLED: ${GUEST_CHAT_ENABLED:-}
+  AI_DEFAULT_PROVIDER: ${AI_DEFAULT_PROVIDER:-groq}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
+  MAILER_DSN: ${MAILER_DSN:-null://null}
+  APP_SENDER_EMAIL: ${APP_SENDER_EMAIL:-}
+  APP_SENDER_NAME: Synaplan
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: synaplan
+  DB_USER: synaplan
+  DB_SERVER_VERSION: mariadb-12.3.2
+  REDIS_DSN: redis://redis:6379
+  LOCK_DSN: redis://redis:6379
+  REALTIME_ENABLED: "true"
+  REALTIME_API_URL: http://centrifugo:8000/api
+  REALTIME_PUBLIC_WS_URL: ""
+  QDRANT_URL: http://qdrant:6333
+  TIKA_BASE_URL: http://tika:9998
+  SYNAPLAN_TTS_URL: http://tts:10200
+  OLLAMA_BASE_URL: ""
+  AUTO_DOWNLOAD_MODELS: "false"
+  WHISPER_ENABLED: "false"
+  FFMPEG_BINARY: /usr/bin/ffmpeg
+  LOG_FORMAT: json
+
+services:
+  # Generates the eight deployment secrets once. Each service then gets only
+  # the ones it uses. An existing set is never rewritten. It exits when done,
+  # so Dockge lists the stack as "exited" while everything else runs.
+  secrets-init:
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    restart: "no"
+    environment:
+      APP_SECRET: ${APP_SECRET:-}
+      TOKEN_SECRET: ${TOKEN_SECRET:-}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-}
+      REALTIME_API_KEY: ${REALTIME_API_KEY:-}
+      REALTIME_TOKEN_SECRET: ${REALTIME_TOKEN_SECRET:-}
+      REALTIME_ADMIN_PASSWORD: ${REALTIME_ADMIN_PASSWORD:-}
+      REALTIME_ADMIN_SECRET: ${REALTIME_ADMIN_SECRET:-}
+    volumes:
+      - secrets:/secrets
+      - secrets-app:/out/app
+      - secrets-db:/out/db
+      - secrets-realtime:/out/realtime
+      - db:/db:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        all=/secrets/secrets.env
+        umask 077
+        if [ ! -s "$$all" ]; then
+          if [ -n "$$(ls -A /db)" ]; then
+            echo "Synaplan did not start and changed nothing: the database exists but its secrets volume is empty. Restore that volume from your backup." >&2
+            exit 1
+          fi
+          for key in APP_SECRET TOKEN_SECRET MARIADB_PASSWORD MARIADB_ROOT_PASSWORD REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET; do
+            value=$$(printenv "$$key" || true)
+            case "$$value" in
+              *[!A-Za-z0-9_-]*)
+                echo "Synaplan did not start and created nothing: $$key may contain only letters, digits, '-' and '_'. Delete the line so Synaplan generates one." >&2
+                exit 1
+                ;;
+            esac
+            [ -n "$$value" ] || value=$$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')
+            echo "$$key=$$value"
+          done > "$$all.tmp"
+          mv "$$all.tmp" "$$all"
+        fi
+        publish() {
+          dest=$$1
+          shift
+          for key in "$$@"; do grep "^$$key=" "$$all"; done > "$$dest.tmp"
+          chmod 644 "$$dest.tmp"
+          mv "$$dest.tmp" "$$dest"
+        }
+        publish /out/app/secrets.env APP_SECRET TOKEN_SECRET MARIADB_PASSWORD REALTIME_API_KEY REALTIME_TOKEN_SECRET
+        publish /out/db/secrets.env MARIADB_PASSWORD MARIADB_ROOT_PASSWORD
+        publish /out/realtime/secrets.env REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET
+
+  backend:
+    image: *app-image
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: web
+    volumes:
+      - uploads:/var/www/backend/var/uploads
+      - secrets-app:/run/synaplan-secrets:ro
+    ports:
+      - ${SYNAPLAN_HTTP_BIND:-127.0.0.1}:${SYNAPLAN_HTTP_PORT:-8000}:80
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      centrifugo:
+        condition: service_healthy
+      tika:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    restart: unless-stopped
+
+  worker:
+    image: *app-image
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: worker
+    volumes:
+      - uploads:/var/www/backend/var/uploads
+      - secrets-app:/run/synaplan-secrets:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+  scheduler:
+    image: *app-image
+    entrypoint: ["/bin/bash", "-ec"]
+    command: *app-command
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: scheduler
+    volumes:
+      - uploads:/var/www/backend/var/uploads
+      - secrets-app:/run/synaplan-secrets:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+
+  db:
+    image: mariadb:13.0.2@sha256:f1bba652ba57bea3099ca2fe1af692af537c27d96e0bcde39dce29e2ba1ec4f3
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        set -a
+        . /run/synaplan-secrets/secrets.env
+        set +a
+        exec docker-entrypoint.sh --max-allowed-packet=256M --innodb-buffer-pool-size=512M
+    environment:
+      MARIADB_DATABASE: synaplan
+      MARIADB_USER: synaplan
+    volumes:
+      - db:/var/lib/mysql
+      - secrets-db:/run/synaplan-secrets:ro
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "set -a; . /run/synaplan-secrets/secrets.env; set +a; mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MARIADB_ROOT_PASSWORD\" --silent"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  centrifugo:
+    image: centrifugo/centrifugo:v6.9.6@sha256:3cfded0eb9216882dcb2a77256a89d185654b4e32294934f8de2935fff3c70ec
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        set -a
+        . /run/synaplan-secrets/secrets.env
+        set +a
+        export CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY="$$REALTIME_TOKEN_SECRET"
+        export CENTRIFUGO_HTTP_API_KEY="$$REALTIME_API_KEY"
+        export CENTRIFUGO_ADMIN_PASSWORD="$$REALTIME_ADMIN_PASSWORD"
+        export CENTRIFUGO_ADMIN_SECRET="$$REALTIME_ADMIN_SECRET"
+        exec centrifugo
+    environment:
+      CENTRIFUGO_HTTP_SERVER_ADDRESS: "0.0.0.0"
+      CENTRIFUGO_HTTP_SERVER_PORT: "8000"
+      CENTRIFUGO_LOG_LEVEL: info
+      CENTRIFUGO_ENGINE_TYPE: redis
+      CENTRIFUGO_ENGINE_REDIS_ADDRESS: redis://redis:6379/3
+      CENTRIFUGO_CLIENT_USER_CONNECTION_LIMIT: "16"
+      CENTRIFUGO_CLIENT_PING_INTERVAL: 25s
+      CENTRIFUGO_CLIENT_STALE_CLOSE_DELAY: 60s
+      CENTRIFUGO_ADMIN_ENABLED: "true"
+      CENTRIFUGO_PROMETHEUS_ENABLED: "true"
+      CENTRIFUGO_HEALTH_ENABLED: "true"
+      CENTRIFUGO_CHANNEL_NAMESPACES: '[{"name":"widget","presence":false,"history_size":100,"history_ttl":"10m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"widgettyping","presence":false,"history_size":0,"history_ttl":"0s","force_recovery":false,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":true,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"user","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"admin","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"system","presence":false,"history_size":10,"history_ttl":"1m","force_recovery":false,"allow_subscribe_for_anonymous":true,"allow_subscribe_for_client":true,"allow_publish_for_subscriber":false}]'
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
+    volumes:
+      - secrets-realtime:/run/synaplan-secrets:ro
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  tika:
+    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
+    command: -h 0.0.0.0 -p 9998
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9998 && printf 'GET /version HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
+    volumes:
+      - qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333 && printf 'GET /readyz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:efa9f2188abca5603aa9c15dec59963cdf7070eb5a9e2564793a7ceba6c3642a
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium
+    restart: unless-stopped
+
+volumes:
+  db:
+  redis:
+  qdrant:
+  uploads:
+  secrets:
+  secrets-app:
+  secrets-db:
+  secrets-realtime:

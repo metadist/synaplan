@@ -5,6 +5,8 @@
 # SYNAPLAN_HTTP_PORT. This file does not build from source and does not need
 # the git checkout. Leave the eight secrets unset to generate them into
 # ./data/secrets.env on the first start. Back that file up with the database.
+# Just want it running, or deploying from a Docker GUI? quickstart/compose.yaml
+# starts from that one file alone, with no .env and no host directories.
 name: "${COMPOSE_PROJECT_NAME:-synaplan}"
 
 x-app-image: &app-image "${SYNAPLAN_IMAGE:-ghcr.io/metadist/synaplan}:${SYNAPLAN_VERSION:?Set SYNAPLAN_VERSION to a published compatible immutable SemVer release}"
