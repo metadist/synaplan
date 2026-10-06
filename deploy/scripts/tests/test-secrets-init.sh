@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Lifecycle of the one-shot that a plain `docker compose up` runs before MariaDB.
 # The script under test is deploy/scripts/secrets-init.sh. deploy/compose.yaml
-# inlines the same bytes (every "$" written as "$$") so the two-file install
-# does not need this path.
+# and deploy/quickstart/compose.yaml inline the same bytes (every "$" written
+# as "$$") so neither install needs this path.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
 script="$root/deploy/scripts/secrets-init.sh"
 compose="$root/deploy/compose.yaml"
+quickstart="$root/deploy/quickstart/compose.yaml"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
@@ -28,16 +29,17 @@ fail() {
 }
 
 assert_same_script() {
+    local file="$1"
     extracted="$work/extracted.sh"
     awk '
         /SECRETS_INIT_SCRIPT_START/ { capture = 1; next }
         /SECRETS_INIT_SCRIPT_END/ { capture = 0 }
         capture { print }
-    ' "$compose" | sed 's/^        //; s/\$\$/$/g' > "$extracted"
+    ' "$file" | sed 's/^        //; s/\$\$/$/g' > "$extracted"
     # The standalone file starts with a shebang the container entrypoint does not need.
     tail -n +2 "$script" > "$work/standalone.sh"
     diff -u "$work/standalone.sh" "$extracted" >/dev/null ||
-        fail "deploy/compose.yaml no longer inlines deploy/scripts/secrets-init.sh"
+        fail "${file#"$root"/} no longer inlines deploy/scripts/secrets-init.sh"
 }
 
 run_init() {
@@ -78,10 +80,29 @@ value_of() {
     printf '%s' "${line#"${key}"=}"
 }
 
-assert_same_script
+assert_same_script "$compose"
+assert_same_script "$quickstart"
 
 grep -Fq 'export DB_PASSWORD="$$MARIADB_PASSWORD"' "$compose" ||
     fail "the application command does not map MARIADB_PASSWORD onto DB_PASSWORD"
+
+# The quickstart keeps the backup copy and the database in named volumes. The
+# script must see the database volume, or it would generate new secrets beside
+# an existing database.
+quickstart_init="$(awk '/^  secrets-init:/,/^  backend:/' "$quickstart")"
+for line in '- secrets:/data' '- db:/db:ro' 'SECRETS_INIT_DB_DIR: /db' \
+    '- secrets-app:/out/app' '- secrets-db:/out/db' '- secrets-realtime:/out/realtime'; do
+    grep -Fq -- "$line" <<<"$quickstart_init" || fail "quickstart secrets-init lacks '$line'"
+done
+grep -Fq 'export DB_PASSWORD="$$MARIADB_PASSWORD"' "$quickstart" ||
+    fail "the quickstart application command does not map MARIADB_PASSWORD onto DB_PASSWORD"
+quickstart_backend="$(awk '/^  backend:/,/^  worker:/' "$quickstart")"
+grep -Fq -- '- secrets-app:/run/synaplan-secrets:ro' <<<"$quickstart_backend" ||
+    fail "the quickstart application does not mount its own secrets volume"
+grep -Eq -- '- secrets(-db|-realtime)?:' <<<"$quickstart_backend" &&
+    fail "the quickstart application mounts secrets that are not its own"
+grep -Fq -- '- secrets-db:/run/synaplan-secrets:ro' <<<"$(awk '/^  db:/,/^  redis:/' "$quickstart")" ||
+    fail "the quickstart database does not mount its own secrets volume"
 
 awk '/^x-app-volumes:/,/^services:/' "$compose" | grep -Fq 'synaplan-secrets-db:' &&
     fail "the application mounts the database secrets"
@@ -248,5 +269,46 @@ run_init "$restore/data" "$restore/out" >/dev/null
     fail "a quote in a secret was not kept"
 [[ "$(cksum "$restore/data/secrets.env")" == "$restore_before" ]] ||
     fail "restoring an existing file rewrote it"
+
+# Quickstart layout: the database lives in its own volume (SECRETS_INIT_DB_DIR)
+# and errors name the volume instead of data/secrets.env.
+qs_label='secrets.env in the secrets volume'
+
+qs_new="$work/quickstart-new"
+mkdir -p "$qs_new/db"
+run_init "$qs_new/secrets" "$qs_new/out" SECRETS_INIT_DB_DIR="$qs_new/db" >/dev/null
+[[ -f "$qs_new/secrets/secrets.env" ]] || fail "an empty quickstart database volume blocked generation"
+for key in "${keys[@]}"; do
+    [[ "$(value_of "$qs_new/secrets/secrets.env" "$key")" =~ ^[0-9a-f]{64}$ ]] ||
+        fail "quickstart: $key was not generated"
+done
+
+qs_db="$work/quickstart-existing-db"
+mkdir -p "$qs_db/db"
+printf 'x' > "$qs_db/db/ibdata1"
+set +e
+run_init "$qs_db/secrets" "$qs_db/out" SECRETS_INIT_DB_DIR="$qs_db/db" >"$qs_db/stdout" 2>"$qs_db/stderr"
+code=$?
+set -e
+[[ "$code" -ne 0 ]] || fail "quickstart: a database volume without secrets was accepted"
+[[ ! -f "$qs_db/secrets/secrets.env" ]] || fail "quickstart: the refusal created secrets.env beside an existing database"
+assert_not_published "$qs_db/out"
+grep -Fq 'already has a database' "$qs_db/stderr" ||
+    fail "quickstart: the refusal does not say the database already exists"
+
+qs_missing="$work/quickstart-missing"
+mkdir -p "$qs_missing/secrets" "$qs_missing/db"
+grep -v '^MARIADB_PASSWORD=' "$qs_new/secrets/secrets.env" > "$qs_missing/secrets/secrets.env"
+set +e
+run_init "$qs_missing/secrets" "$qs_missing/out" SECRETS_INIT_DB_DIR="$qs_missing/db" \
+    SECRETS_INIT_FILE_LABEL="$qs_label" >"$qs_missing/stdout" 2>"$qs_missing/stderr"
+code=$?
+set -e
+[[ "$code" -ne 0 ]] || fail "quickstart: a secrets file missing one key was accepted"
+assert_not_published "$qs_missing/out"
+grep -Fq "has no value in $qs_label" "$qs_missing/stderr" ||
+    fail "quickstart: the refusal does not name where the secrets live"
+grep -Fq 'data/secrets.env' "$qs_missing/stderr" &&
+    fail "quickstart: the refusal points to data/secrets.env, which does not exist there"
 
 printf 'secrets-init: ok\n'

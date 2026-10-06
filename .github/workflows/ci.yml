@@ -169,6 +169,12 @@ jobs:
       - name: Run deploy-lifecycle bash tests
         run: bash deploy/scripts/tests/test-lifecycle.sh
 
+      # The one-shot that creates and publishes the deployment secrets for
+      # deploy/compose.yaml and deploy/quickstart/compose.yaml. A gap here can
+      # start MariaDB with an empty password or lock out an existing database.
+      - name: Run secrets-init bash tests
+        run: bash deploy/scripts/tests/test-secrets-init.sh
+
       # firstboot.sh executed for real, with the metadata service, the AWS CLI
       # and the data volume stubbed. It is the one script no customer can
       # recover from by hand, and the only place it otherwise runs is a
